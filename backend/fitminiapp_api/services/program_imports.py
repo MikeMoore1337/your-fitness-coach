@@ -40,6 +40,7 @@ from fitminiapp_api.services.exercise_catalog import (
     _effective_exercise_id,
     _load_visible_exercise_rows,
     _source_exercise_slug,
+    get_visible_exercise_display_map,
 )
 from fitminiapp_api.services.exercise_catalog_metadata import (
     CANONICAL_EXERCISE_REDIRECTS,
@@ -2934,10 +2935,12 @@ def _create_weekly_prescriptions(
     db: Session,
     template: ProgramTemplate,
     draft: _Draft,
+    owner: User,
 ) -> None:
     duration_weeks = draft.get("duration_weeks", 1)
     if duration_weeks <= 1:
         return
+    visible_by_effective_id = get_visible_exercise_display_map(db, owner)
     rows_by_day_week: dict[tuple[int, int], list[_RowDraft]] = defaultdict(list)
     for row in draft["rows"]:
         day_number = row.get("day_number")
@@ -2967,7 +2970,7 @@ def _create_weekly_prescriptions(
                 resolved_id = source_row.get("resolved_exercise_id")
                 if not isinstance(resolved_id, int):
                     raise ProgramError("Упражнение недельного назначения не сопоставлено")
-                exercise = db.get(Exercise, resolved_id)
+                exercise = visible_by_effective_id.get(resolved_id)
                 if exercise is None:
                     raise ProgramError("Exercise is not available for imported program")
                 rest_seconds = source_row.get("rest_seconds")
@@ -3052,7 +3055,7 @@ def confirm_program_import(
             current_user,
             force_private=True,
         )
-        _create_weekly_prescriptions(db, template, rebuilt)
+        _create_weekly_prescriptions(db, template, rebuilt, current_user)
         import_row.status = "confirmed"
         import_row.confirmed_template_id = template.id
         import_row.draft_json = {}
