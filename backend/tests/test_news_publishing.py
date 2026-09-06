@@ -1406,6 +1406,151 @@ def test_legacy_source_fetch_flag_preserves_downstream_pipeline(monkeypatch) -> 
     assert calls == ["publish", "images", "enqueue", "deliver"]
 
 
+def test_hermes_fallback_draft_is_not_delivered_or_requeued(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-fallback-delivery")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = [
+            "deterministic_fallback_requires_editor",
+            "provider_response_too_large",
+        ]
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=601, message_date=utcnow())
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 602
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    delivered = asyncio.run(deliver())
+    assert delivered == 0
+    assert preview_calls == []
+    assert control_calls == []
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.status == "failed"
+        assert delivery.last_error_code == "preview_delivery_blocked"
+        event = db.query(AuditEvent).filter_by(action="news.preview_delivery_blocked").one()
+        assert (
+            "unresolved_warning:deterministic_fallback_requires_editor" in event.details["blockers"]
+        )
+        assert "unresolved_warning:provider_response_too_large" in event.details["blockers"]
+        assert enqueue_review_deliveries(db, {7001}) == 0
+
+
+def test_overlong_preview_never_sends_control_card_without_artifact(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="overlong-delivery-guard")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+            "editorial_fields": {
+                "headline": "Тест",
+                "summary": "Я" * 1009,
+                "why_it_matters": "",
+            },
+        }
+        draft.warnings = []
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=603, message_date=utcnow())
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 604
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    delivered = asyncio.run(deliver())
+    assert delivered == 0
+    assert preview_calls == []
+    assert control_calls == []
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.last_error_code == "preview_delivery_blocked"
+
+
+def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-image-required")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    async def unexpected_send(*_args, **_kwargs):
+        raise AssertionError("Hermes delivery requires an image preview")
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                unexpected_send,
+                unexpected_send,
+                channel_ready=True,
+            )
+
+    assert asyncio.run(deliver()) == 0
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.last_error_code == "preview_delivery_blocked"
+
+
 def test_over_limit_photo_control_card_shows_measurement_and_recovery_actions(
     monkeypatch,
 ) -> None:

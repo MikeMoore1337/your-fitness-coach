@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Literal
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.config import settings
@@ -90,6 +91,34 @@ class ReviewArtifact:
     transport: Literal["message", "photo"] | None
     visible_length: int | None
     limit: int | None
+
+
+HERMES_SUBMISSION_MARKER = "hermes_narrow_intake"
+PREVIEW_OPERATIONAL_BLOCKERS = frozenset({"publishing_disabled", "channel_rights_missing"})
+
+
+def review_delivery_blockers(
+    draft: NewsDraftRevision,
+    review: ReviewArtifact,
+) -> tuple[str, ...]:
+    """Return blockers that make an owner Telegram delivery unsafe or misleading."""
+
+    is_hermes_draft = draft.evidence_metadata.get("submitted_by") == HERMES_SUBMISSION_MARKER
+    blockers: list[str] = []
+    if is_hermes_draft:
+        blockers.extend(
+            blocker for blocker in review.blockers if blocker not in PREVIEW_OPERATIONAL_BLOCKERS
+        )
+        blockers.extend(
+            f"unresolved_warning:{warning}"
+            for warning in draft.warnings
+            if isinstance(warning, str) and warning
+        )
+    if review.artifact is None:
+        blockers.append("preview_artifact_unavailable")
+    if is_hermes_draft and (review.image is None or not review.image.image_data):
+        blockers.append("preview_image_missing")
+    return tuple(dict.fromkeys(blockers))
 
 
 def editorial_actor_ref(telegram_user_id: int) -> str:
@@ -532,7 +561,13 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
                 .filter(
                     NewsReviewDelivery.draft_id == draft.id,
                     NewsReviewDelivery.delivery_round == cluster.delivery_round,
-                    NewsReviewDelivery.status.in_({"queued", "processing"}),
+                    or_(
+                        NewsReviewDelivery.status.in_({"queued", "processing"}),
+                        and_(
+                            NewsReviewDelivery.status == "failed",
+                            NewsReviewDelivery.last_error_code == "preview_delivery_blocked",
+                        ),
+                    ),
                 )
                 .first()
                 is not None
