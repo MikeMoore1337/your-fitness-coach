@@ -1,0 +1,8 @@
+{
+  "name": "yfc-allure-report-origin",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/index.test.js"
+  }
+}

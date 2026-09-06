@@ -1,5 +1,18 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import type { UserConfig } from 'vite';
+
+type TestReporters = NonNullable<NonNullable<UserConfig['test']>['reporters']>;
+
+const testReporters: TestReporters | undefined = process.env.ALLURE_RESULTS_DIR
+  ? [
+      'default',
+      [
+        process.env.ALLURE_VITEST_REPORTER_PATH ?? 'allure-vitest/reporter',
+        { resultsDir: process.env.ALLURE_RESULTS_DIR },
+      ],
+    ]
+  : undefined;
 
 export default defineConfig({
   plugins: [react()],
@@ -25,5 +38,6 @@ export default defineConfig({
     setupFiles: './tests/setup.ts',
     include: ['tests/unit/**/*.test.{ts,tsx}'],
     css: true,
+    ...(testReporters ? { reporters: testReporters } : {}),
   },
 });

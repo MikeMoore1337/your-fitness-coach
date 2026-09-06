@@ -142,6 +142,7 @@ def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> Non
         "frontend-e2e",
         "frontend-mobile-regression",
         "frontend-mobile-regression-extended",
+        "frontend-cross-browser",
         "python-tests",
         "migrated-stack",
         "dependency-audit",
@@ -169,9 +170,41 @@ def test_workflow_uses_lockfile_download_cache_without_audit_installation() -> N
     assert "NPM_CONFIG_CACHE" not in workflow
     assert "cache: npm" in workflow
     assert "cache-dependency-path: frontend/package-lock.json" in workflow
-    assert "node_modules" not in workflow
+    assert "node_modules" not in audit_job
     assert "npm ci" not in audit_job
     assert "run-group frontend-dependency-audit" in audit_job
+
+
+def test_allure_dependencies_are_scheduled_only() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    package = (root / "frontend" / "package.json").read_text(encoding="utf-8")
+    scheduled_package = (root / "frontend" / "scheduled-report" / "package.json").read_text(
+        encoding="utf-8"
+    )
+    development_requirements = (root / "backend" / "requirements-dev.in").read_text(
+        encoding="utf-8"
+    )
+    scheduled_requirements = (root / "backend" / "requirements-scheduled-report.in").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"allure-vitest"' not in package
+    assert '"allure-playwright"' not in package
+    assert '"allure-commandline"' not in package
+    assert "allure-pytest" not in development_requirements
+    assert '"allure-vitest": "3.12.0"' in scheduled_package
+    assert '"allure-playwright": "3.12.0"' in scheduled_package
+    assert '"allure-commandline": "2.43.0"' in scheduled_package
+    assert "allure-pytest==2.16.0" in scheduled_requirements
+    assert workflow.count("npm ci --prefix scheduled-report") == 7
+    assert workflow.count("--omit=peer") == 7
+    assert workflow.count("requirements-scheduled-report.txt") == 4
+    assert "./scheduled-report/node_modules/.bin/allure generate" in workflow
+    assert "npm --prefix deploy/allure-report-worker test" in workflow
+    python_job_start = workflow.index("  python-tests:")
+    python_steps_start = workflow.index("    steps:", python_job_start)
+    assert "ALLURE_RESULTS_DIR:" in workflow[python_job_start:python_steps_start]
 
 
 def test_workflow_keeps_four_way_smoke_and_python_shards_independent() -> None:
@@ -183,7 +216,7 @@ def test_workflow_keeps_four_way_smoke_and_python_shards_independent() -> None:
     assert workflow.count("        shard: [1, 2, 3, 4]") == 2
     assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/4"' in workflow
     assert 'run-group python-tests --shard "${{ matrix.shard }}/4"' in workflow
-    assert workflow.count("          path: ~/.cache/ms-playwright") == 4
+    assert workflow.count("          path: ~/.cache/ms-playwright") == 5
     assert (
         workflow.count(
             "          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
@@ -200,7 +233,10 @@ def test_workflow_keeps_four_way_smoke_and_python_shards_independent() -> None:
     )
     assert "run-group frontend-mobile-regression" in workflow
     assert "run-group frontend-mobile-regression-extended" in workflow
-    assert "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'" in workflow
+    assert "run-group frontend-cross-browser" in workflow
+    assert 'cron: "17 2 * * *"' in workflow
+    assert 'cron: "43 3 * * 0"' in workflow
+    assert "run_kind:" in workflow
     assert (
         "playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
         in workflow
@@ -221,11 +257,13 @@ def test_policy_group_executes_ci_timing_regressions() -> None:
     assert "tests/test_ci_timing.py" in policy_argv
 
 
-def test_scheduled_profile_adds_extended_mobile_coverage() -> None:
-    assert set(ci_contract.PROFILE_GROUPS["cross-stack"]) < set(
-        ci_contract.PROFILE_GROUPS["scheduled"]
-    )
-    assert "frontend-mobile-regression-extended" in ci_contract.PROFILE_GROUPS["scheduled"]
+def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
+    daily = set(ci_contract.PROFILE_GROUPS["daily-regression"])
+    weekly = set(ci_contract.PROFILE_GROUPS["weekly-exhaustive"])
+
+    assert set(ci_contract.PROFILE_GROUPS["cross-stack"]) - daily
+    assert daily < weekly
+    assert {"frontend-mobile-regression-extended", "frontend-cross-browser"} <= weekly
 
 
 @pytest.mark.parametrize(
@@ -399,14 +437,19 @@ def test_repository_router_uses_exact_pull_request_diff(monkeypatch, tmp_path: P
     assert decision["head_sha"] == "head"
 
 
-def test_scheduled_and_manual_routes_use_full_regression_profile() -> None:
-    for event in ("schedule", "workflow_dispatch"):
-        decision = ci_contract.route_repository(Path.cwd(), event=event)
-        assert decision["profile"] == "scheduled"
-        assert set(decision["required_groups"]) == set(ci_contract.PROFILE_GROUPS["scheduled"])
-        assert decision["outputs"]["run_full_dependency_audit"] is True
-        assert decision["outputs"]["run_frontend_mobile_regression"] is True
-        assert decision["outputs"]["run_frontend_mobile_regression_extended"] is True
+def test_scheduled_and_manual_routes_resolve_distinct_regression_profiles() -> None:
+    daily = ci_contract.route_repository(Path.cwd(), event="schedule", schedule_cron="17 2 * * *")
+    weekly = ci_contract.route_repository(Path.cwd(), event="schedule", schedule_cron="43 3 * * 0")
+    manual = ci_contract.route_repository(Path.cwd(), event="workflow_dispatch", run_kind="weekly")
+
+    assert daily["profile"] == "daily-regression"
+    assert weekly["profile"] == "weekly-exhaustive"
+    assert manual["profile"] == weekly["profile"]
+    assert daily["outputs"]["run_full_dependency_audit"] is False
+    assert weekly["outputs"]["run_full_dependency_audit"] is True
+    assert daily["outputs"]["run_frontend_mobile_regression_extended"] is False
+    assert weekly["outputs"]["run_frontend_mobile_regression_extended"] is True
+    assert daily["outputs"]["run_scheduled_report"] is True
 
 
 def test_push_route_keeps_merge_provenance_and_container_delivery() -> None:

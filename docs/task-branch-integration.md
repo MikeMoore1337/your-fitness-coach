@@ -68,9 +68,11 @@ expected result set в `scripts/ci_contract.py verify-results`; required job с�
 
 Обычные PR runs используют `cancel-in-progress` только для одного PR: новый SHA отменяет устаревший
 незавершённый run того же PR. Production/release workflow сохраняет `group: production` и
-`cancel-in-progress: false`. `schedule` и `workflow_dispatch` запускают полный cross-stack profile
-на текущем `master`, но не вызывают production deployment. Push в `master` остаётся минимальным
-post-merge набором exact provenance и immutable container delivery.
+`cancel-in-progress: false`. `schedule` и `workflow_dispatch` на текущем `master` запускают
+bounded `daily-regression` или `weekly-exhaustive` profile и единый `scheduled-report` job; они не
+вызывают production deployment. Push в `master` остаётся минимальным post-merge набором exact
+provenance и immutable container delivery. Подробный scope и private Allure contract описаны в
+[`docs/scheduled-regression-allure.md`](scheduled-regression-allure.md).
 
 Frontend jobs используют стандартный download cache `actions/setup-node` с ключом от
 `frontend/package-lock.json`; `node_modules` не является artifact или cache. Dependency audit не
