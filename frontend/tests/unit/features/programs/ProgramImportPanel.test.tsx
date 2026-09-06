@@ -164,6 +164,7 @@ describe('ProgramImportPanel', () => {
     const exerciseSelect = await screen.findByRole('combobox', {
       name: 'Упражнение для строки 3',
     });
+    await screen.findByRole('option', { name: 'Приседания без веса' });
     fireEvent.change(exerciseSelect, { target: { value: '11' } });
     fireEvent.change(screen.getByLabelText('Название программы'), {
       target: { value: 'Моя программа' },
