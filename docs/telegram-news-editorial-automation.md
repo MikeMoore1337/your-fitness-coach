@@ -101,6 +101,15 @@ draft и transient retry; paid/cloud fallback, новые credentials и provide
 публикацию. YFC по-прежнему применяет `manual_required`, Gate B/C и остаётся единственным
 publisher.
 
+YFC имеет дополнительный final delivery gate: Hermes draft не отправляется владельцу в Telegram,
+пока не собраны exact image и rendered caption и не сняты content/publication blockers. Fallback-
+заглушки, unresolved provider warnings, переполненный caption и отсутствие artifact не создают
+ни preview, ни управляющую карточку. Заблокированная попытка фиксируется как bounded failure и
+не повторяется для той же text/image revision; новая попытка появляется только после новой
+ревизии текста или изображения. Операционные состояния `publishing_disabled` и
+`channel_rights_missing` не меняют требование наличия image+text preview и не считаются
+содержательным fallback.
+
 ## Taxonomy and policy
 
 `NewsCluster` stores versioned independent fields:

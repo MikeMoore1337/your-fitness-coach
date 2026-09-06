@@ -28,6 +28,7 @@ from fitminiapp_api.services.news_editorial import (
     editorial_actor_ref,
     enqueue_review_deliveries,
     prune_news_editorial,
+    review_delivery_blockers,
     review_message,
 )
 from fitminiapp_api.services.news_freshness import is_current_month_publication
@@ -394,6 +395,45 @@ def _claim_deliveries() -> list[int]:
         return result
 
 
+def _mark_review_delivery_blocked(
+    delivery_id: int,
+    *,
+    draft_id: str,
+    text_revision: int,
+    image_revision: int,
+    attempt_count: int,
+    blockers: tuple[str, ...],
+) -> None:
+    with get_session_context() as db:
+        delivery = db.get(NewsReviewDelivery, delivery_id)
+        if delivery is None or delivery.status != "processing":
+            return
+        delivery.status = "failed"
+        delivery.processing_started_at = None
+        delivery.last_error_code = "preview_delivery_blocked"
+        record_audit_event(
+            db,
+            action="news.preview_delivery_blocked",
+            resource_type="news_draft_revision",
+            resource_id=draft_id,
+            details={
+                "blockers": list(blockers),
+                "delivery_id": delivery_id,
+                "text_revision": text_revision,
+                "image_revision": image_revision,
+            },
+        )
+    logger.warning(
+        "news_review_delivery_blocked",
+        extra={
+            "pipeline_stage": "owner_delivery",
+            "reason": "preview_not_deliverable",
+            "blockers": ",".join(blockers),
+            "attempt_count": attempt_count,
+        },
+    )
+
+
 async def deliver_review_queue(
     client: httpx.AsyncClient,
     send_message: Callable[..., Awaitable[int | None]],
@@ -426,7 +466,9 @@ async def deliver_review_queue(
                 delivery.processing_started_at = None
                 continue
             review = compose_review_artifact(db, draft, channel_ready=channel_ready)
-            message, _, markup = review_message(db, draft, channel_ready=channel_ready)
+            delivery_blockers = review_delivery_blockers(draft, review)
+            if not delivery_blockers:
+                message, _, markup = review_message(db, draft, channel_ready=channel_ready)
             image_data = review.image.image_data if review.image is not None else None
             preview_message_id = delivery.telegram_message_id
             artifact = review.artifact
@@ -436,6 +478,16 @@ async def deliver_review_queue(
             image_revision = cluster.current_image_revision
             attempt_count = delivery.attempt_count
             queue_age = max(0, round((utcnow() - delivery.created_at).total_seconds()))
+        if delivery_blockers:
+            _mark_review_delivery_blocked(
+                delivery_id,
+                draft_id=draft_resource_id,
+                text_revision=text_revision,
+                image_revision=image_revision,
+                attempt_count=attempt_count,
+                blockers=delivery_blockers,
+            )
+            continue
         try:
             if artifact is not None and preview_message_id is None:
                 preview_result = await send_preview(
