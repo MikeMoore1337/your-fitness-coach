@@ -39,6 +39,8 @@ jobs:
       run_policy: ${{ steps.route.outputs.run_policy }}
       run_frontend: ${{ steps.route.outputs.run_frontend }}
       run_frontend_smoke: ${{ steps.route.outputs.run_frontend_smoke }}
+      run_frontend_mobile_regression: ${{ steps.route.outputs.run_frontend_mobile_regression }}
+      run_frontend_mobile_regression_extended: ${{ steps.route.outputs.run_frontend_mobile_regression_extended }}
       run_python: ${{ steps.route.outputs.run_python }}
       run_migrated_stack: ${{ steps.route.outputs.run_migrated_stack }}
       run_dependency_audit: ${{ steps.route.outputs.run_dependency_audit }}
@@ -239,6 +241,114 @@ jobs:
         with:
           name: playwright-failure-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: .artifacts/runtime/tests/playwright
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 7
+
+  frontend-mobile-regression:
+    name: Mobile regression (Chromium + WebKit)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_mobile_regression == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI_TIMING_FILE: ${{ github.workspace }}/.artifacts/runtime/ci/mobile-regression-timing.jsonl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command npm-ci -- npm ci
+      - name: Build frontend preview
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command vite-build -- npx vite build
+      - name: Cache mobile Playwright browsers
+        id: mobile-playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Report mobile Playwright cache
+        run: echo "CI_CACHE package=playwright-mobile hit=${{ steps.mobile-playwright-cache.outputs.cache-hit }}"
+      - name: Install mobile Chromium and WebKit
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install --with-deps chromium webkit
+      - name: Run shared mobile regression group
+        run: python scripts/ci_contract.py run-group frontend-mobile-regression
+      - name: Upload mobile regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-mobile-regression-${{ github.run_id }}
+          path: |
+            .artifacts/runtime/ci/mobile-regression-timing.jsonl
+            .artifacts/runtime/tests/playwright-mobile-regression
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 7
+
+  frontend-mobile-regression-extended:
+    name: Extended mobile regression (Firefox + WebKit)
+    needs: scope-router
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_mobile_regression_extended == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI_TIMING_FILE: ${{ github.workspace }}/.artifacts/runtime/ci/mobile-regression-extended-timing.jsonl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression-extended --command npm-ci -- npm ci
+      - name: Build frontend preview
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression-extended --command vite-build -- npx vite build
+      - name: Cache extended mobile Playwright browsers
+        id: extended-playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-mobile-extended-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Report extended Playwright cache
+        run: echo "CI_CACHE package=playwright-mobile-extended hit=${{ steps.extended-playwright-cache.outputs.cache-hit }}"
+      - name: Install extended mobile Firefox and WebKit
+        working-directory: frontend
+        run: python ../scripts/ci_timing.py --group frontend-mobile-regression-extended --command playwright-install -- npx playwright install --with-deps firefox webkit
+      - name: Run shared extended mobile regression group
+        run: python scripts/ci_contract.py run-group frontend-mobile-regression-extended
+      - name: Upload extended mobile regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-mobile-regression-extended-${{ github.run_id }}
+          path: |
+            .artifacts/runtime/ci/mobile-regression-extended-timing.jsonl
+            .artifacts/runtime/tests/playwright-mobile-regression-extended
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 7
@@ -537,7 +647,7 @@ jobs:
     name: ${{ github.event_name == 'pull_request' && 'checks' || 'branch-checks' }}
     if: always()
     needs:
-      [scope-router, task-provenance, merge-provenance, quality, policy, frontend, frontend-smoke, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts]
+      [scope-router, task-provenance, merge-provenance, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -559,6 +669,8 @@ jobs:
           POLICY_RESULT: ${{ needs.policy.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
           FRONTEND_SMOKE_RESULT: ${{ needs.frontend-smoke.result }}
+          FRONTEND_MOBILE_REGRESSION_RESULT: ${{ needs.frontend-mobile-regression.result }}
+          FRONTEND_MOBILE_REGRESSION_EXTENDED_RESULT: ${{ needs.frontend-mobile-regression-extended.result }}
           PYTHON_TESTS_RESULT: ${{ needs.python-tests.result }}
           MIGRATED_STACK_RESULT: ${{ needs.migrated-stack.result }}
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
@@ -584,6 +696,8 @@ jobs:
               "policy",
               "frontend",
               "frontend-smoke",
+              "frontend-mobile-regression",
+              "frontend-mobile-regression-extended",
               "python-tests",
               "migrated-stack",
               "dependency-audit",

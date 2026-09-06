@@ -164,12 +164,14 @@ describe('ProgramImportPanel', () => {
     const exerciseSelect = await screen.findByRole('combobox', {
       name: 'Упражнение для строки 3',
     });
+    await screen.findByRole('option', { name: 'Приседания без веса' });
     fireEvent.change(exerciseSelect, { target: { value: '11' } });
     fireEvent.change(screen.getByLabelText('Название программы'), {
       target: { value: 'Моя программа' },
     });
     fireEvent.change(screen.getByLabelText('Цель'), { target: { value: 'maintenance' } });
     fireEvent.change(screen.getByLabelText('Уровень'), { target: { value: 'beginner' } });
+    await waitFor(() => expect(exerciseSelect).toHaveValue('11'));
     fireEvent.click(screen.getByRole('button', { name: 'Применить исправления' }));
 
     await waitFor(() =>

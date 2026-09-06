@@ -16,6 +16,8 @@
     "e2e": "npm run build && playwright test",
     "e2e:ci": "playwright test",
     "e2e:migrated-stack": "playwright test --config=playwright.migrated-stack.config.ts",
+    "e2e:mobile-regression": "playwright test --config=playwright.mobile-regression.config.ts",
+    "e2e:mobile-regression:extended": "playwright test --config=playwright.mobile-regression.extended.config.ts",
     "e2e:cross-browser": "playwright test --config=playwright.cross-browser.config.ts",
     "e2e:tma-smoke": "npm run build && playwright test tma-smoke.spec.ts demo-mode.spec.ts",
     "perf:check": "node ../scripts/check_frontend_performance.mjs",
