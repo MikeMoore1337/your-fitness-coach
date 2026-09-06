@@ -1395,6 +1395,50 @@ class TaskController:
                         delivery_task_id=expected_delivery_task,
                     )
                 try:
+                    final_canonical_branch = self.repository.git(
+                        "branch", "--show-current", cwd=root
+                    )
+                    final_symbolic_head = self.repository.git(
+                        "symbolic-ref", "--quiet", "--short", "HEAD", cwd=root, check=False
+                    )
+                    final_canonical_head = self.repository.head(cwd=root)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_before_merge,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason="canonical HEAD could not be verified immediately before mutation",
+                        recovery_hint="Restore the canonical master checkout and retry; no mutation was attempted.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if (
+                    final_canonical_branch != TARGET_BASE_BRANCH
+                    or final_symbolic_head != TARGET_BASE_BRANCH
+                    or final_canonical_head != old_sha
+                ):
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=final_canonical_head,
+                        origin_sha=origin_sha,
+                        live_sha=live_before_merge,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason=(
+                            "canonical checkout changed during final refresh validation: "
+                            f"branch={final_canonical_branch or '<detached>'}; "
+                            f"symbolic_head={final_symbolic_head or '<detached>'}; "
+                            f"HEAD={final_canonical_head}; expected_branch={TARGET_BASE_BRANCH}; "
+                            f"expected_HEAD={old_sha}"
+                        ),
+                        recovery_hint="Restore the canonical master checkout and retry; no mutation was attempted.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                try:
                     self.repository.git("merge", "--ff-only", origin_sha, cwd=root)
                 except TaskSessionError:
                     new_sha = self._safe_ref("master")

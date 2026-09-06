@@ -1012,6 +1012,36 @@ def test_canonical_refresh_reports_post_update_worktree_change(
     assert git_repository.ref("master") == remote_sha
 
 
+def test_canonical_refresh_blocks_checkout_change_before_mutation(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository = repository
+    before_sha, remote_sha = _advance_remote_master(root, 1)
+    github = FakeGitHub(remote_sha)
+    controller = task_session.TaskController(git_repository, github=github)
+    original_branch_head = github.branch_head
+    calls = 0
+
+    def checkout_other_branch(branch: str) -> str:
+        nonlocal calls
+        calls += 1
+        result = original_branch_head(branch)
+        if calls == 2:
+            _git(root, "switch", "-c", "synthetic-checkout-race")
+        return result
+
+    monkeypatch.setattr(github, "branch_head", checkout_other_branch)
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == "BLOCKED"
+    assert "checkout changed" in result["reason"]
+    assert "expected_HEAD" in result["reason"]
+    assert git_repository.ref("master") == before_sha
+    assert git_repository.head(cwd=root) == before_sha
+    assert git_repository.git("branch", "--show-current", cwd=root) == "synthetic-checkout-race"
+
+
 def test_canonical_refresh_blocks_ambiguous_lease_worktree(
     repository: tuple[Path, Any],
 ) -> None:
