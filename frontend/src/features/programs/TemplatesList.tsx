@@ -67,7 +67,9 @@ function programMeta(item: ProgramTemplate) {
           (item.days.length % 100 < 10 || item.days.length % 100 >= 20)
         ? 'тренировки'
         : 'тренировок';
-  return `${goalLabels[item.goal] ?? 'Цель не указана'} · ${levelLabels[item.level] ?? 'Уровень не указан'} · ${item.days.length} ${suffix} в цикле`;
+  const duration =
+    item.default_duration_weeks > 1 ? ` · ${item.default_duration_weeks} недель` : '';
+  return `${goalLabels[item.goal] ?? 'Цель не указана'} · ${levelLabels[item.level] ?? 'Уровень не указан'} · ${item.days.length} ${suffix} в цикле${duration}`;
 }
 
 function programKind(item: ProgramTemplate, currentUserId?: number): string {
@@ -195,7 +197,9 @@ export function TemplatesList({
 
   const openAssignment = (template: ProgramTemplate) => {
     setAssignmentStartDate(defaultStartDate);
-    setAssignmentDuration(4);
+    setAssignmentDuration(
+      template.default_duration_weeks > 1 ? template.default_duration_weeks : 4,
+    );
     setAssignmentWeekdays(defaultWeekdays(template, defaultStartDate));
     setAssignmentTemplate(template);
   };
@@ -634,13 +638,24 @@ export function TemplatesList({
                   <input
                     type="number"
                     min="1"
-                    max="24"
+                    max={
+                      assignmentTemplate.default_duration_weeks > 1
+                        ? assignmentTemplate.default_duration_weeks
+                        : 24
+                    }
                     value={assignmentDuration}
                     onChange={(event) => setAssignmentDuration(Number(event.target.value))}
                     required
                   />
                 </label>
               </div>
+              {assignmentTemplate.default_duration_weeks > 1 && (
+                <p className="auth-notice">
+                  Для этого шаблона доступны назначения на{' '}
+                  {assignmentTemplate.default_duration_weeks} недель с сохранённой схемой
+                  повторений.
+                </p>
+              )}
               {assignmentTemplate.days.length > 7 ? (
                 <p className="auth-notice">
                   Восьмидневный цикл планируется последовательно: одна тренировка за другой, начиная

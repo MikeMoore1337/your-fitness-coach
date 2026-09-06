@@ -6920,6 +6920,10 @@ export interface components {
             schema_version: number;
             /** Parser Version */
             parser_version: string;
+            /** Layout Version */
+            layout_version?: string | null;
+            /** Duration Weeks */
+            duration_weeks?: number | null;
             /**
              * Expires At
              * Format: date-time
@@ -6949,6 +6953,8 @@ export interface components {
             source_cells?: {
                 [key: string]: string;
             };
+            /** Week Number */
+            week_number?: number | null;
             /** Day Number */
             day_number?: number | null;
             /** Day Title */
@@ -6971,6 +6977,8 @@ export interface components {
             rest_seconds?: number | null;
             /** Notes */
             notes?: string | null;
+            /** Source Auxiliary */
+            source_auxiliary?: string | null;
             /** Superset Group */
             superset_group?: number | null;
             /** Superset Order */
@@ -7247,6 +7255,23 @@ export interface components {
              * @default false
              */
             has_guide: boolean;
+            /** Weekly Prescriptions */
+            weekly_prescriptions?: components["schemas"]["ProgramTemplateExerciseWeekResponse"][];
+        };
+        /** ProgramTemplateExerciseWeekResponse */
+        ProgramTemplateExerciseWeekResponse: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Week Number */
+            week_number: number;
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds: number;
         };
         /** ProgramTemplateResponse */
         ProgramTemplateResponse: {
@@ -7309,6 +7334,11 @@ export interface components {
             assigned_program_duration_weeks?: number | null;
             /** Current Revision Number */
             current_revision_number?: number | null;
+            /**
+             * Default Duration Weeks
+             * @default 1
+             */
+            default_duration_weeks: number;
             /** Days */
             days: components["schemas"]["ProgramTemplateDayResponse"][];
         };

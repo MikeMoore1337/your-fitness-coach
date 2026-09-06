@@ -44,6 +44,7 @@ class ProgramImportRow(BaseModel):
     source_sheet: str | None = Field(default=None, max_length=31)
     source_range: str | None = Field(default=None, max_length=64)
     source_cells: dict[str, str] = Field(default_factory=dict, max_length=18)
+    week_number: int | None = Field(default=None, ge=1, le=24)
     day_number: int | None = Field(default=None, ge=1, le=8)
     day_title: str | None = Field(default=None, max_length=128)
     exercise_name: str | None = Field(default=None, max_length=512)
@@ -54,7 +55,8 @@ class ProgramImportRow(BaseModel):
     prescribed_reps: str | None = Field(default=None, max_length=32)
     prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
     rest_seconds: int | None = Field(default=None, ge=0, le=600)
-    notes: str | None = Field(default=None, max_length=512)
+    notes: str | None = Field(default=None, max_length=2_000)
+    source_auxiliary: str | None = Field(default=None, max_length=512)
     superset_group: int | None = Field(default=None, ge=1)
     superset_order: int | None = Field(default=None, ge=1, le=2)
     resolved_exercise_id: int | None = Field(default=None, ge=1)
@@ -80,6 +82,8 @@ class ProgramImportResponse(BaseModel):
     source_format: ImportFormat
     schema_version: int
     parser_version: str
+    layout_version: str | None = None
+    duration_weeks: int | None = Field(default=None, ge=1, le=24)
     expires_at: datetime
     program_title: str | None = None
     goal: ImportGoal | None = None

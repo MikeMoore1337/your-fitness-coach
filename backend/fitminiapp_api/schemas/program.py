@@ -125,6 +125,15 @@ class ProgramTemplateCreate(BaseModel):
         return self
 
 
+class ProgramTemplateExerciseWeekResponse(BaseModel):
+    exercise_id: int = Field(ge=1)
+    week_number: int = Field(ge=1, le=24)
+    prescribed_sets: int = Field(ge=1, le=10)
+    prescribed_reps: str = Field(max_length=32)
+    prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
+    rest_seconds: int = Field(ge=0, le=600)
+
+
 class ProgramTemplateExerciseResponse(BaseModel):
     id: int
     exercise_id: int
@@ -138,6 +147,7 @@ class ProgramTemplateExerciseResponse(BaseModel):
     superset_group: int | None = None
     superset_order: int | None = None
     has_guide: bool = False
+    weekly_prescriptions: list[ProgramTemplateExerciseWeekResponse] = Field(default_factory=list)
 
 
 class ProgramTemplateDayResponse(BaseModel):
@@ -170,6 +180,7 @@ class ProgramTemplateResponse(BaseModel):
     assigned_program_start_date: date | None = None
     assigned_program_duration_weeks: int | None = None
     current_revision_number: int | None = None
+    default_duration_weeks: int = Field(default=1, ge=1, le=24)
     days: list[ProgramTemplateDayResponse]
 
 

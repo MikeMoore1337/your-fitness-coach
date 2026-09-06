@@ -121,10 +121,12 @@ class Settings(BaseSettings):
     program_import_max_file_bytes: int = Field(default=2_000_000, ge=256_000, le=8_000_000)
     program_import_max_request_bytes: int = Field(default=2_400_000, ge=300_000, le=10_000_000)
     program_import_max_rows: int = Field(default=500, ge=20, le=2_000)
-    program_import_max_columns: int = Field(default=18, ge=8, le=32)
-    program_import_max_cells: int = Field(default=8_000, ge=100, le=50_000)
+    program_import_max_columns: int = Field(default=64, ge=8, le=128)
+    program_import_max_cells: int = Field(default=8_000, ge=100, le=100_000)
     program_import_max_cell_chars: int = Field(default=512, ge=64, le=4_096)
     program_import_max_xlsx_entries: int = Field(default=32, ge=8, le=128)
+    program_import_max_xlsx_physical_rows: int = Field(default=2_000, ge=100, le=10_000)
+    program_import_max_xlsx_physical_cells: int = Field(default=20_000, ge=1_000, le=200_000)
     program_import_max_xlsx_expanded_bytes: int = Field(
         default=4_000_000, ge=512_000, le=20_000_000
     )
