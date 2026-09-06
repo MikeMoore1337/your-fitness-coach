@@ -170,6 +170,7 @@ describe('ProgramImportPanel', () => {
     });
     fireEvent.change(screen.getByLabelText('Цель'), { target: { value: 'maintenance' } });
     fireEvent.change(screen.getByLabelText('Уровень'), { target: { value: 'beginner' } });
+    await waitFor(() => expect(exerciseSelect).toHaveValue('11'));
     fireEvent.click(screen.getByRole('button', { name: 'Применить исправления' }));
 
     await waitFor(() =>
