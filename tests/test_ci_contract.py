@@ -214,6 +214,13 @@ def test_cross_stack_profile_includes_delivery_policy_gates() -> None:
     assert "frontend-mobile-regression-extended" not in groups
 
 
+def test_policy_group_executes_ci_timing_regressions() -> None:
+    policy_commands = ci_contract.COMMAND_GROUPS["policy"].commands
+    policy_argv = {argument for command in policy_commands for argument in command.argv}
+
+    assert "tests/test_ci_timing.py" in policy_argv
+
+
 def test_scheduled_profile_adds_extended_mobile_coverage() -> None:
     assert set(ci_contract.PROFILE_GROUPS["cross-stack"]) < set(
         ci_contract.PROFILE_GROUPS["scheduled"]
