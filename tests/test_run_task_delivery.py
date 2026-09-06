@@ -63,6 +63,8 @@ def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
     assert "Не запрашивай generic approval" in prompt
     assert "READY_FOR_DELIVERY" in prompt
     assert "WAITING_FOR_DELIVERY" in prompt
+    assert "refresh-canonical-master" in prompt
+    assert "canonical checkpoint не заменяет refresh task branch" in prompt
     assert "refresh-delivery" in prompt
     assert "final applicable gate" in prompt
     assert "reopen-for-review" in prompt

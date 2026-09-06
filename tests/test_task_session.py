@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import sys
+import threading
 import uuid
 from pathlib import Path
 from typing import Any
@@ -238,6 +239,25 @@ def _commit_task(worktree: Path, task_id: str, filename: str = "change.txt") -> 
     return _git(worktree, "rev-parse", "HEAD")
 
 
+def _advance_remote_master(root: Path, count: int, *, fetch: bool = True) -> tuple[str, str]:
+    old_sha = _git(root, "rev-parse", "master")
+    remote_worktree = root.parent / f"remote-master-{uuid.uuid4().hex[:8]}"
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), old_sha)
+    try:
+        for index in range(count):
+            filename = f"remote-change-{index}.txt"
+            (remote_worktree / filename).write_text(f"remote {index}\n", encoding="utf-8")
+            _git(remote_worktree, "add", filename)
+            _git(remote_worktree, "commit", "-m", f"chore: advance remote master {index + 1}")
+        new_sha = _git(remote_worktree, "rev-parse", "HEAD")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    if fetch:
+        _git(root, "fetch", "origin", "master")
+    return old_sha, new_sha
+
+
 def _prepare_delivery(controller: Any, task_id: str, *, branch: str) -> dict[str, Any]:
     acquired = controller.acquire_delivery(task_id)
     assert acquired["acquired"] is True
@@ -452,6 +472,7 @@ def test_start_uses_exact_origin_master_and_records_no_dev_lane(
     assert lease["integration_policy"] == "task-pr-to-master"
     assert "base_origin_dev_sha" not in lease
     assert "PR master" in started["prompt"]
+    assert "refresh-delivery task branch" in started["prompt"]
 
 
 def test_two_independent_write_tasks_get_distinct_leases_and_worktrees(
@@ -547,7 +568,9 @@ def test_adopt_current_uses_same_compatible_lease_contract(
     _git(root, "worktree", "add", "-b", "task/228-adopted", str(adopted_path), "origin/master")
 
     adopted_controller = task_session.TaskController(task_session.GitRepository(adopted_path))
-    lease = adopted_controller.adopt_current("228", owner_launch=True, session_label="adopted")
+    lease = adopted_controller.adopt_current(
+        "228", owner_launch=True, session_label="adopted", offline=True
+    )
 
     assert lease["task_id"] == "228"
     assert lease["concurrency_class"] == "independent-write"
@@ -758,6 +781,31 @@ def test_refresh_updates_stale_task_base_and_invalidates_old_exact_head_evidence
     assert validated["delivery_gate_pass"]["head_sha"] == new_head
 
 
+def test_refresh_delivery_waits_for_active_production_before_touching_task_branch(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "244", concurrency="independent-write"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    _write_gate_evidence(controller, "244", branch=branch, head_sha=head_sha, base_sha=base_sha)
+    controller.mark_ready("244", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.acquire_delivery("244", offline=True)
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.active_runs = [{"name": "Deploy production", "status": "in_progress"}]
+    before_head = git_repository.head(cwd=worktree)
+
+    with pytest.raises(task_session.TaskSessionError, match="canonical master refresh is waiting"):
+        controller.refresh_for_delivery("244")
+
+    lease = controller.store.read_json(controller.store.task_lease_path("244"))
+    assert isinstance(lease, dict)
+    assert lease["lifecycle_state"] == "delivering"
+    assert controller.store.delivery_state()["owner"]["task_id"] == "244"
+    assert git_repository.head(cwd=worktree) == before_head
+
+
 def test_refresh_requires_new_evidence_when_head_and_base_are_unchanged(
     repository: tuple[Path, Any],
 ) -> None:
@@ -811,7 +859,7 @@ def test_refresh_refuses_post_ready_commit_until_review_and_qa_repeat(
     assert base_sha == lease["base_origin_master_sha"]
 
 
-def test_local_master_behind_remote_is_informational_and_start_uses_remote_base(
+def test_local_master_behind_remote_is_refreshed_before_start(
     repository: tuple[Path, Any],
 ) -> None:
     root, git_repository = repository
@@ -826,15 +874,411 @@ def test_local_master_behind_remote_is_informational_and_start_uses_remote_base(
         _git(root, "worktree", "remove", "--force", str(remote_worktree))
     _git(root, "fetch", "origin", "master")
     _write_task(root, "235", "behind-remote", concurrency="independent-write")
-    controller = task_session.TaskController(git_repository)
+    remote_sha = git_repository.ref("origin/master")
+    controller = task_session.TaskController(git_repository, github=FakeGitHub(remote_sha))
 
     report = controller.doctor(offline=True)
-    started = controller.start("235", owner_launch=True, session_label="behind", offline=True)
+    started = controller.start("235", owner_launch=True, session_label="behind")
+    refreshed_report = controller.doctor(offline=True)
 
-    assert git_repository.ahead_behind("master", "origin/master") == (0, 1)
+    assert git_repository.ahead_behind("master", "origin/master") == (0, 0)
     assert any("behind" in item for item in report["informational_findings"])
+    assert not any("behind" in item for item in refreshed_report["informational_findings"])
     assert report["implementation_blockers"] == []
     assert started["lease"]["base_origin_master_sha"] == git_repository.ref("origin/master")
+    assert started["canonical_master_refresh"]["result"] == "REFRESHED"
+
+
+def test_compatible_start_keeps_current_base_fetch_when_production_is_active(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _, remote_sha = _advance_remote_master(root, 1, fetch=False)
+    _write_task(root, "235A", "production-active", concurrency="independent-write")
+    github = FakeGitHub(remote_sha)
+    github.active_runs = [{"name": "Deploy production", "status": "in_progress"}]
+    controller = task_session.TaskController(git_repository, github=github)
+
+    started = controller.start("235A", owner_launch=True, session_label="production-active")
+
+    assert started["canonical_master_refresh"]["result"] == "WAITING"
+    assert started["lease"]["base_origin_master_sha"] == remote_sha
+    assert git_repository.ref("origin/master") == remote_sha
+
+
+@pytest.mark.parametrize(
+    ("count", "expected_result"), [(0, "ALIGNED"), (1, "REFRESHED"), (3, "REFRESHED")]
+)
+def test_canonical_refresh_reports_exact_fast_forward_and_is_idempotent(
+    repository: tuple[Path, Any], count: int, expected_result: str
+) -> None:
+    _, git_repository = repository
+    old_sha, remote_sha = _advance_remote_master(repository[0], count)
+    controller = task_session.TaskController(git_repository, github=FakeGitHub(remote_sha))
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == expected_result
+    assert result["old_sha"] == old_sha
+    assert result["new_sha"] == remote_sha
+    assert result["origin_master_sha"] == remote_sha
+    assert result["live_master_sha"] == remote_sha
+    assert result["ahead_before"] == 0
+    assert result["behind_before"] == count
+    assert result["updated_commits"] == count
+    assert result["mutation_performed"] is (count > 0)
+    assert git_repository.ref("master") == remote_sha
+
+    repeated = controller.refresh_canonical_master()
+
+    assert repeated["result"] == "ALIGNED"
+    assert repeated["old_sha"] == remote_sha
+    assert repeated["new_sha"] == remote_sha
+    assert repeated["behind_before"] == 0
+    assert repeated["updated_commits"] == 0
+    assert repeated["mutation_performed"] is False
+
+
+def test_canonical_refresh_offline_waits_without_claiming_freshness(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    before_master = git_repository.ref("master")
+    controller = task_session.TaskController(git_repository, github=FakeGitHub(before_master))
+
+    result = controller.refresh_canonical_master(offline=True)
+
+    assert result["result"] == "WAITING"
+    assert "offline" in result["reason"]
+    assert result["mutation_performed"] is False
+    assert git_repository.ref("master") == before_master
+    assert git_repository.status(root) == []
+
+
+def test_first_controller_state_initialization_is_safe_under_concurrency(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, git_repository = repository
+    store = task_session.StateStore(git_repository.common_dir)
+    original_create_json = task_session.StateStore.create_json
+    barrier = threading.Barrier(2)
+    errors: list[BaseException] = []
+
+    def concurrent_create_json(current: Any, path: Path, payload: dict[str, Any]) -> None:
+        barrier.wait(timeout=5)
+        original_create_json(current, path, payload)
+
+    monkeypatch.setattr(task_session.StateStore, "create_json", concurrent_create_json)
+
+    def initialize() -> None:
+        try:
+            store.initialize()
+        except BaseException as error:  # pragma: no cover - assertion context below reports it
+            errors.append(error)
+
+    workers = [threading.Thread(target=initialize) for _ in range(2)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join(timeout=5)
+
+    assert not any(worker.is_alive() for worker in workers)
+    assert not errors
+    assert (store.root / "contract.json").is_file()
+
+
+def test_canonical_refresh_reports_post_update_worktree_change(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository = repository
+    _, remote_sha = _advance_remote_master(root, 1)
+    controller = task_session.TaskController(git_repository, github=FakeGitHub(remote_sha))
+    original_git = git_repository.git
+
+    def mutate_after_merge(*args: str, **kwargs: Any) -> str:
+        result = original_git(*args, **kwargs)
+        if args[:2] == ("merge", "--ff-only"):
+            (root / "external-change-after-merge.txt").write_text("keep\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(git_repository, "git", mutate_after_merge)
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == "BLOCKED"
+    assert result["mutation_performed"] is True
+    assert result["new_sha"] == remote_sha
+    assert "worktree changed" in result["reason"]
+    assert git_repository.ref("master") == remote_sha
+
+
+def test_canonical_refresh_blocks_ambiguous_lease_worktree(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "246A", "first", concurrency="independent-write")
+    _write_task(root, "246B", "second", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    first = controller.start("246A", owner_launch=True, session_label="first", offline=True)
+    controller.start("246B", owner_launch=True, session_label="second", offline=True)
+    second_path = controller.store.task_lease_path("246B")
+    second = controller.store.read_json(second_path)
+    assert isinstance(second, dict)
+    second["worktree"] = first["lease"]["worktree"]
+    task_session.StateStore.replace_json(second_path, second)
+
+    result = controller.refresh_canonical_master(offline=True)
+
+    assert result["result"] == "BLOCKED"
+    assert "share worktree" in result["reason"]
+
+
+def test_start_exposes_coordination_waiting_to_launcher_retry(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "247", "start-lock", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    waiting = {
+        "result": "WAITING",
+        "reason": "another controller operation owns the coordination lock",
+        "recovery_hint": "Wait and retry.",
+    }
+    monkeypatch.setattr(controller, "refresh_canonical_master", lambda **_: waiting)
+
+    with pytest.raises(task_session.TaskSessionError, match="Coordination state is locked"):
+        controller.start("247", owner_launch=True, session_label="start-lock", offline=True)
+
+    assert not controller.store.task_lease_path("247").exists()
+
+
+def test_offline_canonical_refresh_cli_does_not_require_github_origin(
+    repository: tuple[Path, Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _ = repository
+
+    exit_code = task_session.main(["--repo", str(root), "refresh-canonical-master", "--offline"])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["result"] == "WAITING"
+    assert "offline" in payload["reason"]
+
+
+def test_canonical_refresh_allows_managed_ignored_state_but_blocks_unexpected_ignored_state(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    managed = root / ".artifacts" / "controller-cache.bin"
+    managed.parent.mkdir(parents=True, exist_ok=True)
+    managed.write_text("managed\n", encoding="utf-8")
+    controller = task_session.TaskController(
+        git_repository, github=FakeGitHub(git_repository.ref("master"))
+    )
+
+    aligned = controller.refresh_canonical_master()
+
+    assert aligned["result"] == "ALIGNED"
+
+    (root / ".git" / "info" / "exclude").write_text("ignored-unexpected.txt\n", encoding="utf-8")
+    unexpected = root / "ignored-unexpected.txt"
+    unexpected.write_text("unexpected\n", encoding="utf-8")
+    before_master = git_repository.ref("master")
+
+    blocked = controller.refresh_canonical_master()
+
+    assert blocked["result"] == "BLOCKED"
+    assert "ignored" in blocked["reason"]
+    assert blocked["mutation_performed"] is False
+    assert git_repository.ref("master") == before_master
+
+
+@pytest.mark.parametrize("blocker", ["untracked", "operation"])
+def test_canonical_refresh_blocks_dirty_or_interrupted_controller_without_mutation(
+    repository: tuple[Path, Any], blocker: str
+) -> None:
+    root, git_repository = repository
+    controller = task_session.TaskController(
+        git_repository, github=FakeGitHub(git_repository.ref("master"))
+    )
+    operation_lock = root / ".git" / "index.lock"
+    if blocker == "untracked":
+        (root / "untracked-controller-file.txt").write_text("keep\n", encoding="utf-8")
+    else:
+        operation_lock.write_text("synthetic lock\n", encoding="utf-8")
+
+    try:
+        result = controller.refresh_canonical_master()
+    finally:
+        operation_lock.unlink(missing_ok=True)
+
+    assert result["result"] == "BLOCKED"
+    assert result["mutation_performed"] is False
+    assert git_repository.ref("master") == git_repository.ref("origin/master")
+
+
+def test_canonical_refresh_blocks_local_ahead_without_reset_or_merge(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    remote_sha = git_repository.ref("origin/master")
+    (root / "local-master.txt").write_text("local\n", encoding="utf-8")
+    _git(root, "add", "local-master.txt")
+    _git(root, "commit", "-m", "chore: synthetic unpublished master commit")
+    before_master = git_repository.ref("master")
+    controller = task_session.TaskController(git_repository, github=FakeGitHub(remote_sha))
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == "BLOCKED"
+    assert "ahead=1" in result["reason"]
+    assert result["mutation_performed"] is False
+    assert git_repository.ref("master") == before_master
+    assert git_repository.ref("origin/master") == remote_sha
+
+
+def test_canonical_refresh_blocks_diverged_refs_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _, remote_sha = _advance_remote_master(root, 1)
+    (root / "local-master.txt").write_text("local\n", encoding="utf-8")
+    _git(root, "add", "local-master.txt")
+    _git(root, "commit", "-m", "chore: synthetic divergent master commit")
+    before_master = git_repository.ref("master")
+    controller = task_session.TaskController(git_repository, github=FakeGitHub(remote_sha))
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == "BLOCKED"
+    assert "ahead=1 behind=1" in result["reason"]
+    assert result["mutation_performed"] is False
+    assert git_repository.ref("master") == before_master
+    assert git_repository.ref("origin/master") == remote_sha
+
+
+def test_canonical_refresh_blocks_stale_tracking_ref_against_live_master(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository = repository
+    old_sha, live_sha = _advance_remote_master(root, 1, fetch=False)
+    _git(root, "update-ref", "refs/remotes/origin/master", old_sha)
+    assert git_repository.ref("origin/master") == old_sha
+    monkeypatch.setattr(git_repository, "fetch_origin_master", lambda **_: None)
+    controller = task_session.TaskController(git_repository, github=FakeGitHub(live_sha))
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == "BLOCKED"
+    assert "does not match live" in result["reason"]
+    assert result["mutation_performed"] is False
+    assert git_repository.ref("master") == old_sha
+    assert git_repository.ref("origin/master") == old_sha
+
+
+def test_canonical_refresh_fetch_failure_preserves_refs(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, git_repository = repository
+    before_master = git_repository.ref("master")
+    before_origin = git_repository.ref("origin/master")
+
+    def fail_fetch(**_: Any) -> None:
+        raise task_session.TaskSessionError("synthetic fetch failure")
+
+    monkeypatch.setattr(git_repository, "fetch_origin_master", fail_fetch)
+    controller = task_session.TaskController(git_repository, github=FakeGitHub(before_origin))
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == "BLOCKED"
+    assert "fetch" in result["reason"]
+    assert result["mutation_performed"] is False
+    assert git_repository.ref("master") == before_master
+    assert git_repository.ref("origin/master") == before_origin
+
+
+def test_canonical_refresh_waits_for_active_production_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository = repository
+    before_master = git_repository.ref("master")
+    github = FakeGitHub(before_master)
+    github.active_runs = [{"name": "Deploy production", "status": "in_progress"}]
+    controller = task_session.TaskController(git_repository, github=github)
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == "WAITING"
+    assert "production" in result["reason"]
+    assert result["mutation_performed"] is False
+    assert git_repository.ref("master") == before_master
+
+
+def test_canonical_refresh_waits_for_delivery_owner_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "245", concurrency="independent-write"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    _write_gate_evidence(controller, "245", branch=branch, head_sha=head_sha, base_sha=base_sha)
+    controller.mark_ready("245", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    assert controller.acquire_delivery("245", offline=True)["acquired"] is True
+    before_master = git_repository.ref("master")
+
+    result = controller.refresh_canonical_master()
+
+    assert result["result"] == "WAITING"
+    assert "occupied" in result["reason"]
+    assert result["mutation_performed"] is False
+    assert git_repository.ref("master") == before_master
+    assert worktree.exists()
+
+
+def test_canonical_refresh_serializes_concurrent_invocations(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository = repository
+    _, remote_sha = _advance_remote_master(root, 1)
+    github = FakeGitHub(remote_sha)
+    controller = task_session.TaskController(git_repository, github=github)
+    entered_fetch = threading.Event()
+    release_fetch = threading.Event()
+    original_fetch = git_repository.fetch_origin_master
+    first_result: list[dict[str, Any]] = []
+    first_errors: list[BaseException] = []
+
+    def blocking_fetch(**kwargs: Any) -> None:
+        entered_fetch.set()
+        if not release_fetch.wait(timeout=5):
+            raise AssertionError("timed out waiting to release synthetic fetch")
+        original_fetch(**kwargs)
+
+    monkeypatch.setattr(git_repository, "fetch_origin_master", blocking_fetch)
+
+    def run_first() -> None:
+        try:
+            first_result.append(controller.refresh_canonical_master())
+        except BaseException as error:  # pragma: no cover - assertion context below reports it
+            first_errors.append(error)
+
+    worker = threading.Thread(target=run_first)
+    worker.start()
+    assert entered_fetch.wait(timeout=5)
+
+    second = controller.refresh_canonical_master()
+
+    assert second["result"] == "WAITING"
+    assert second["reread_after_contention"] is True
+    assert second["mutation_performed"] is False
+    release_fetch.set()
+    worker.join(timeout=5)
+
+    assert not worker.is_alive()
+    assert not first_errors
+    assert first_result[0]["result"] == "REFRESHED"
+    assert git_repository.ref("master") == remote_sha
 
 
 def test_local_master_unique_commit_is_a_fail_closed_start_blocker(
