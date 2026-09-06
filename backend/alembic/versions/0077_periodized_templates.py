@@ -17,20 +17,17 @@ depends_on: str | Sequence[str] | None = None
 
 online_rollout_phase = "expand"
 online_rollout_notes = (
-    "Adds a bounded default duration to program templates and normalized week-specific "
-    "prescriptions used by deterministic XLSX/CSV imports. Existing templates keep one week."
+    "Adds a nullable duration column and the new week-prescription table without rewriting "
+    "the existing program_templates table; legacy NULL durations are handled as one week "
+    "by the application until an explicit contract migration is approved."
 )
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("program_templates") as batch_op:
-        batch_op.add_column(
-            sa.Column("default_duration_weeks", sa.Integer(), nullable=False, server_default="1")
-        )
-        batch_op.create_check_constraint(
-            "ck_program_templates_default_duration_weeks",
-            "default_duration_weeks >= 1 AND default_duration_weeks <= 24",
-        )
+    op.add_column(
+        "program_templates",
+        sa.Column("default_duration_weeks", sa.Integer(), nullable=True),
+    )
     op.create_table(
         "program_template_exercise_weeks",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -95,9 +92,4 @@ def downgrade() -> None:
         table_name="program_template_exercise_weeks",
     )
     op.drop_table("program_template_exercise_weeks")
-    with op.batch_alter_table("program_templates") as batch_op:
-        batch_op.drop_constraint(
-            "ck_program_templates_default_duration_weeks",
-            type_="check",
-        )
-        batch_op.drop_column("default_duration_weeks")
+    op.drop_column("program_templates", "default_duration_weeks")

@@ -82,7 +82,7 @@ def _serialize_template_with_context(
         "slug": item.slug,
         "goal": item.goal,
         "level": item.level,
-        "default_duration_weeks": item.default_duration_weeks,
+        "default_duration_weeks": item.effective_duration_weeks,
         "split_type": item.split_type,
         "owner_user_id": item.owner_user_id,
         "owner_telegram_user_id": owner.telegram_user_id if owner else None,
@@ -423,14 +423,15 @@ def assign_template_to_user(
     assignment_week_exercises: dict[tuple[int, int], Exercise] = {}
     assignment_week_exercise_ids: dict[tuple[int, int], int] = {}
     assignment_week_prescriptions: dict[tuple[int, int], ExercisePrescription] = {}
-    has_weekly_prescriptions = template.default_duration_weeks > 1 or any(
+    effective_duration_weeks = template.effective_duration_weeks
+    has_weekly_prescriptions = effective_duration_weeks > 1 or any(
         exercise_item.weekly_prescriptions
         for day in ordered_days
         for exercise_item in day.exercises
     )
-    if has_weekly_prescriptions and duration_weeks > template.default_duration_weeks:
+    if has_weekly_prescriptions and duration_weeks > effective_duration_weeks:
         raise ProgramError(
-            f"This periodized template is available for at most {template.default_duration_weeks} weeks"
+            f"This periodized template is available for at most {effective_duration_weeks} weeks"
         )
     for day in ordered_days:
         for exercise_item in day.exercises:
@@ -865,7 +866,7 @@ def _update_periodized_template_preserving_structure(
             weekly_by_number = {
                 item.week_number: item for item in existing_exercise.weekly_prescriptions
             }
-            if set(weekly_by_number) != set(range(1, template.default_duration_weeks + 1)):
+            if set(weekly_by_number) != set(range(1, template.effective_duration_weeks + 1)):
                 raise ProgramError(
                     "Периодизированный шаблон содержит неполную недельную схему; измените его повторным импортом"
                 )
@@ -944,7 +945,7 @@ def update_template_for_user(
         _effective_exercise_id(ex): ex for ex in _load_visible_exercise_rows(db, target_user)
     }
 
-    is_periodized = template.default_duration_weeks > 1 or any(
+    is_periodized = template.effective_duration_weeks > 1 or any(
         exercise.weekly_prescriptions for day in template.days for exercise in day.exercises
     )
     if is_periodized:
