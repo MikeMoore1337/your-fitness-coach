@@ -114,7 +114,7 @@ def review_delivery_blockers(
             for warning in draft.warnings
             if isinstance(warning, str) and warning
         )
-    if review.artifact is None:
+    if is_hermes_draft and review.artifact is None:
         blockers.append("preview_artifact_unavailable")
     if is_hermes_draft and (review.image is None or not review.image.image_data):
         blockers.append("preview_image_missing")

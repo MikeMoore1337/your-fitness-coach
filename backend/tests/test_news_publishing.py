@@ -1551,6 +1551,58 @@ def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None
         assert delivery.last_error_code == "preview_delivery_blocked"
 
 
+def test_legacy_overlong_preview_keeps_recovery_control_card(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="legacy-overlong-delivery")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        metadata = dict(draft.evidence_metadata)
+        metadata["editorial_fields"] = {
+            "headline": "Тест",
+            "summary": "Я" * 1009,
+            "why_it_matters": "",
+        }
+        draft.evidence_metadata = metadata
+        draft.warnings = []
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    preview_calls: list[int] = []
+    control_calls: list[dict[str, object]] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        raise AssertionError("legacy overlong delivery must keep the control-card path")
+
+    async def send_control(_client, chat_id, text, *, reply_markup):
+        control_calls.append({"chat_id": chat_id, "text": text, "reply_markup": reply_markup})
+        return 605
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    assert asyncio.run(deliver()) == 1
+    assert preview_calls == []
+    assert len(control_calls) == 1
+    assert "Точный preview: недоступен" in control_calls[0]["text"]
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.status == "sent"
+
+
 def test_over_limit_photo_control_card_shows_measurement_and_recovery_actions(
     monkeypatch,
 ) -> None:
