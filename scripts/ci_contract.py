@@ -120,6 +120,40 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
         commands=(_cmd("frontend-e2e", "npm", "run", "e2e:ci", cwd="frontend"),),
         prerequisites=("npm", "frontend/node_modules", "frontend/playwright.config.ts"),
     ),
+    "frontend-mobile-regression": GroupSpec(
+        name="frontend-mobile-regression",
+        commands=(
+            _cmd(
+                "frontend-mobile-regression",
+                "npm",
+                "run",
+                "e2e:mobile-regression",
+                cwd="frontend",
+            ),
+        ),
+        prerequisites=(
+            "npm",
+            "frontend/node_modules",
+            "frontend/playwright.mobile-regression.config.ts",
+        ),
+    ),
+    "frontend-mobile-regression-extended": GroupSpec(
+        name="frontend-mobile-regression-extended",
+        commands=(
+            _cmd(
+                "frontend-mobile-regression-extended",
+                "npm",
+                "run",
+                "e2e:mobile-regression:extended",
+                cwd="frontend",
+            ),
+        ),
+        prerequisites=(
+            "npm",
+            "frontend/node_modules",
+            "frontend/playwright.mobile-regression.extended.config.ts",
+        ),
+    ),
     "python-tests": GroupSpec(
         name="python-tests",
         commands=(
@@ -341,7 +375,13 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
 
 
 PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
-    "frontend": ("quality", "frontend-checks", "frontend-e2e", "critical-smoke"),
+    "frontend": (
+        "quality",
+        "frontend-checks",
+        "frontend-e2e",
+        "frontend-mobile-regression",
+        "critical-smoke",
+    ),
     "backend": ("quality", "python-tests", "critical-smoke"),
     "migration": (
         "quality",
@@ -356,6 +396,7 @@ PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
         "quality",
         "frontend-checks",
         "frontend-e2e",
+        "frontend-mobile-regression",
         "python-tests",
         "migrated-stack",
         "dependency-audit",
@@ -376,12 +417,19 @@ PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
     "documentation": ("quality", "workflow-config"),
 }
 
+PROFILE_GROUPS["scheduled"] = (
+    *PROFILE_GROUPS["cross-stack"],
+    "frontend-mobile-regression-extended",
+)
+
 
 GROUP_TO_JOB: dict[str, str] = {
     "quality": "quality",
     "policy": "policy",
     "frontend-checks": "frontend",
     "frontend-e2e": "frontend-smoke",
+    "frontend-mobile-regression": "frontend-mobile-regression",
+    "frontend-mobile-regression-extended": "frontend-mobile-regression-extended",
     "python-tests": "python-tests",
     "migrated-stack": "migrated-stack",
     "dependency-audit": "dependency-audit",
@@ -401,6 +449,8 @@ ROUTER_JOB_NAMES: tuple[str, ...] = (
     "policy",
     "frontend",
     "frontend-smoke",
+    "frontend-mobile-regression",
+    "frontend-mobile-regression-extended",
     "python-tests",
     "migrated-stack",
     "dependency-audit",
@@ -415,6 +465,8 @@ ROUTER_OUTPUTS: dict[str, str] = {
     "policy": "run_policy",
     "frontend": "run_frontend",
     "frontend-smoke": "run_frontend_smoke",
+    "frontend-mobile-regression": "run_frontend_mobile_regression",
+    "frontend-mobile-regression-extended": "run_frontend_mobile_regression_extended",
     "python-tests": "run_python",
     "migrated-stack": "run_migrated_stack",
     "dependency-audit": "run_dependency_audit",
@@ -778,11 +830,11 @@ def route_repository(
         )
     if event in {"schedule", "workflow_dispatch"}:
         return _decision_for_groups(
-            profile="cross-stack",
+            profile="scheduled",
             paths=[],
             signals={"scheduled_full_regression": True},
-            reasons=["scheduled/manual regression always uses the full authoritative profile"],
-            groups=PROFILE_GROUPS["cross-stack"],
+            reasons=["scheduled/manual regression uses the full authoritative scheduled profile"],
+            groups=PROFILE_GROUPS["scheduled"],
             event=event,
         )
     raise CIContractError(f"Unsupported CI event: {event}")
@@ -844,6 +896,28 @@ def verify_results(expected_jobs: Sequence[str], results: Mapping[str, str]) -> 
     }
     if unexpected:
         raise CIContractError(f"Unexpected CI jobs ran outside the router result set: {unexpected}")
+
+
+def _record_timing(
+    *, group: str, command: str, duration: float, status: str, attempts: int
+) -> None:
+    destination = os.environ.get("CI_TIMING_FILE")
+    if not destination:
+        return
+    record = {
+        "group": group,
+        "command": command,
+        "duration_seconds": round(duration, 3),
+        "status": status,
+        "attempts": attempts,
+    }
+    try:
+        path = Path(destination)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8", newline="\n") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+    except OSError as error:
+        print(f"CI_TIMING_ARTIFACT_ERROR path={destination} error={error}", file=sys.stderr)
 
 
 def _run_command(
@@ -909,6 +983,13 @@ def _run_command(
             f"CI_TIMING group={group} command={command.name} duration_seconds={duration:.3f} "
             f"status={status} attempts={attempts}",
             flush=True,
+        )
+        _record_timing(
+            group=group,
+            command=command.name,
+            duration=duration,
+            status=status,
+            attempts=attempts,
         )
 
 
@@ -1248,6 +1329,8 @@ def validate_contract() -> None:
         "policy",
         "frontend",
         "frontend-smoke",
+        "frontend-mobile-regression",
+        "frontend-mobile-regression-extended",
         "python-tests",
         "migrated-stack",
         "dependency-audit",

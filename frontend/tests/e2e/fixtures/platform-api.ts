@@ -7,6 +7,7 @@ type ProgressionOutcome = 'consider_progressing' | 'hold' | 'review' | 'consider
 
 export interface PlatformApiOptions {
   browserSession?: boolean;
+  fixedDate?: string;
   workoutStatus?: WorkoutStatus;
   activeProgram?: boolean;
   weeklyReviewAvailable?: boolean;
@@ -185,7 +186,8 @@ export async function installPlatformApi(
   page: Page,
   options: PlatformApiOptions = {},
 ): Promise<PlatformApiController> {
-  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
+  const today =
+    options.fixedDate ?? new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   const todayDate = new Date(`${today}T12:00:00Z`);
   const contextDate = new Date(todayDate);
   const nextWorkoutDate = new Date(todayDate);

@@ -140,6 +140,8 @@ def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> Non
         "policy",
         "frontend-checks",
         "frontend-e2e",
+        "frontend-mobile-regression",
+        "frontend-mobile-regression-extended",
         "python-tests",
         "migrated-stack",
         "dependency-audit",
@@ -181,7 +183,7 @@ def test_workflow_keeps_four_way_smoke_and_python_shards_independent() -> None:
     assert workflow.count("        shard: [1, 2, 3, 4]") == 2
     assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/4"' in workflow
     assert 'run-group python-tests --shard "${{ matrix.shard }}/4"' in workflow
-    assert workflow.count("          path: ~/.cache/ms-playwright") == 2
+    assert workflow.count("          path: ~/.cache/ms-playwright") == 4
     assert (
         workflow.count(
             "          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
@@ -196,11 +198,27 @@ def test_workflow_keeps_four_way_smoke_and_python_shards_independent() -> None:
         "  migrated-stack:\n    name: Migrated PostgreSQL stack\n    needs: scope-router\n    if:"
         in workflow
     )
+    assert "run-group frontend-mobile-regression" in workflow
+    assert "run-group frontend-mobile-regression-extended" in workflow
+    assert "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'" in workflow
+    assert (
+        "playwright-mobile-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}"
+        in workflow
+    )
 
 
 def test_cross_stack_profile_includes_delivery_policy_gates() -> None:
     groups = set(ci_contract.PROFILE_GROUPS["cross-stack"])
     assert {"policy", "workflow-config", "deployment-contract"} <= groups
+    assert "frontend-mobile-regression" in groups
+    assert "frontend-mobile-regression-extended" not in groups
+
+
+def test_scheduled_profile_adds_extended_mobile_coverage() -> None:
+    assert set(ci_contract.PROFILE_GROUPS["cross-stack"]) < set(
+        ci_contract.PROFILE_GROUPS["scheduled"]
+    )
+    assert "frontend-mobile-regression-extended" in ci_contract.PROFILE_GROUPS["scheduled"]
 
 
 @pytest.mark.parametrize(
@@ -377,9 +395,11 @@ def test_repository_router_uses_exact_pull_request_diff(monkeypatch, tmp_path: P
 def test_scheduled_and_manual_routes_use_full_regression_profile() -> None:
     for event in ("schedule", "workflow_dispatch"):
         decision = ci_contract.route_repository(Path.cwd(), event=event)
-        assert decision["profile"] == "cross-stack"
-        assert set(decision["required_groups"]) == set(ci_contract.PROFILE_GROUPS["cross-stack"])
+        assert decision["profile"] == "scheduled"
+        assert set(decision["required_groups"]) == set(ci_contract.PROFILE_GROUPS["scheduled"])
         assert decision["outputs"]["run_full_dependency_audit"] is True
+        assert decision["outputs"]["run_frontend_mobile_regression"] is True
+        assert decision["outputs"]["run_frontend_mobile_regression_extended"] is True
 
 
 def test_push_route_keeps_merge_provenance_and_container_delivery() -> None:

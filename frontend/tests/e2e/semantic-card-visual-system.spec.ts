@@ -1,7 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import { nutritionDaySummary } from './fixtures/locators';
 import { installPlatformApi } from './fixtures/platform-api';
-import { installTelegramHarness } from './fixtures/mobile-tma';
+import {
+  expectDockWithinViewport,
+  expectElementsWithinHorizontalViewport,
+  expectNoHorizontalOverflow,
+  expectTouchTargets,
+  installTelegramHarness,
+} from './fixtures/mobile-tma';
 
 const captureTask123Proofs =
   (
@@ -23,13 +29,6 @@ async function openSurface(page: Page, route: string, theme: 'light' | 'dark', t
   await page.goto(route);
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
   await expect(page.locator('.app-shell')).toBeVisible();
-}
-
-async function expectNoHorizontalOverflow(page: Page) {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(1);
 }
 
 async function waitForSemanticSurface(page: Page, route: string) {
@@ -67,6 +66,9 @@ test('semantic families, compact actions and disclosure states share one accessi
     const box = await action.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
   }
+  await expectDockWithinViewport(page);
+  await expectElementsWithinHorizontalViewport(page, '[data-semantic-family]');
+  await expectTouchTargets(page.locator('.semantic-card__action > :is(a, button)'));
   await expectNoHorizontalOverflow(page);
 
   const progressCard = page.locator('[data-semantic-family="progress"]').first();

@@ -87,6 +87,36 @@ production hooks только ради удобства теста.
 и physical-device evidence перечисляются раздельно. Browser/mock результат никогда не выдаётся за
 доказательство реального Telegram client или физического устройства.
 
+### Task 146: mobile visual/layout lanes
+
+`mobile-ui-regression.spec.ts` содержит узкий risk-based набор для Today, Active Workout, Nutrition,
+Progress, Profile и mocked TMA. Критический lane запускается командами:
+
+```bash
+cd frontend
+npm run e2e:mobile-regression
+```
+
+Он выполняет Chromium и mobile WebKit на `390x844`; тесты дополнительно проверяют `360x800`,
+`430x932`, TMA safe-area/viewport/lifecycle, keyboard/fixed navigation, touch targets,
+horizontal overflow и long-content geometry. `320x800` и landscape остаются stress-проверками
+scheduled/extended lane:
+
+```bash
+cd frontend
+npm run e2e:mobile-regression:extended
+```
+
+PR profile включает critical Chromium + WebKit lane. Extended Firefox + WebKit lane выполняется
+только schedule/manual и не запускает production deployment. Baselines разделены по browser project
+и runner platform, чтобы Windows и Linux не смешивали renderer/font raster; их принимают только
+после review diff и явного `MANUAL_VISUAL_APPROVAL`. Визуальные snapshots не заменяют geometry,
+accessibility, mocked TMA или migrated real-backend checks.
+
+Для setup/install/build и command-group timing новые jobs используют `CI_TIMING` в логах и
+`.artifacts/runtime/ci/*-timing.jsonl` в job artifact. Кешируются только npm download cache,
+uv cache и Playwright browser cache; `node_modules`, credentials и dynamic test state не кешируются.
+
 ## Что фиксирует continuous smoke
 
 `tma-smoke.spec.ts` проверяет без дублирования больших feature suites:
@@ -117,7 +147,9 @@ npm run e2e:tma-smoke
 ```
 
 Обычный `npm run e2e:ci` также включает `tma-smoke.spec.ts` и `demo-mode.spec.ts`, поэтому smoke является частью
-репозиторного CI, а не отдельной ручной проверкой.
+репозиторного CI, а не отдельной ручной проверкой. Dedicated `mobile-ui-regression.spec.ts` намеренно не дублируется
+в этом suite: его critical-проверки являются обязательным отдельным `frontend-mobile-regression` job с собственными
+browser/platform snapshots.
 
 ## Checklist для client-facing tasks 50–70
 
