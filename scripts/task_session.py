@@ -1083,7 +1083,7 @@ class TaskController:
         if not offline:
             try:
                 live_sha = self._github().branch_head(TARGET_BASE_BRANCH)
-            except TaskSessionError, OSError:
+            except (TaskSessionError, OSError) as _error:
                 live_sha = None
             if old_sha and origin_sha and live_sha and old_sha == origin_sha == live_sha:
                 return self._canonical_refresh_payload(
@@ -1123,7 +1123,7 @@ class TaskController:
         root = self._canonical_root()
         try:
             self.store.initialize()
-        except TaskSessionError, OSError:
+        except (TaskSessionError, OSError) as _error:
             return self._canonical_refresh_payload(
                 "BLOCKED",
                 reason="canonical refresh shared controller state could not be initialized",
@@ -1158,7 +1158,7 @@ class TaskController:
 
                 try:
                     canonical_branch = self.repository.git("branch", "--show-current", cwd=root)
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     return self._canonical_refresh_payload(
                         "BLOCKED",
                         reason="canonical controller worktree branch could not be inspected",
@@ -1174,7 +1174,7 @@ class TaskController:
                     )
                 try:
                     dirty = self._canonical_worktree_status(root)
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     return self._canonical_refresh_payload(
                         "BLOCKED",
                         reason="canonical worktree status could not be inspected",
@@ -1221,7 +1221,7 @@ class TaskController:
                             recovery_hint="Wait for production deployment to reach a terminal state, then retry.",
                             delivery_task_id=expected_delivery_task,
                         )
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     return self._canonical_refresh_payload(
                         "BLOCKED",
                         reason="production delivery state could not be verified",
@@ -1232,7 +1232,7 @@ class TaskController:
                 old_sha = self._safe_ref("master")
                 try:
                     self.repository.fetch_origin_master(cwd=root, prune=False)
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     return self._canonical_refresh_payload(
                         "BLOCKED",
                         old_sha=old_sha,
@@ -1244,7 +1244,7 @@ class TaskController:
                 origin_sha = self._safe_ref("origin/master")
                 try:
                     live_sha = self._github().branch_head(TARGET_BASE_BRANCH)
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     return self._canonical_refresh_payload(
                         "BLOCKED",
                         old_sha=old_sha,
@@ -1278,7 +1278,7 @@ class TaskController:
                     )
                 try:
                     ahead_before, behind_before = self.repository.ahead_behind("master", live_sha)
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     return self._canonical_refresh_payload(
                         "BLOCKED",
                         old_sha=old_sha,
@@ -1368,7 +1368,7 @@ class TaskController:
                     )
                 try:
                     live_before_merge = self._github().branch_head(TARGET_BASE_BRANCH)
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     return self._canonical_refresh_payload(
                         "BLOCKED",
                         old_sha=old_sha,
@@ -1417,7 +1417,7 @@ class TaskController:
                 origin_after = self._safe_ref("origin/master")
                 try:
                     live_after = self._github().branch_head(TARGET_BASE_BRANCH)
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     live_after = None
                 changed = new_sha is not None and new_sha != old_sha
                 if not new_sha or not origin_after or not live_after:
@@ -1452,7 +1452,7 @@ class TaskController:
                 try:
                     dirty_after = self._canonical_worktree_status(root)
                     operations_after = self.repository.operation_issues(root)
-                except TaskSessionError, OSError:
+                except (TaskSessionError, OSError) as _error:
                     return self._canonical_refresh_payload(
                         "BLOCKED",
                         old_sha=old_sha,
