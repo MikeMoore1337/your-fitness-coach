@@ -56,6 +56,32 @@ DELIVERY_STATES = frozenset({"delivering", "delivery-refreshing", "delivery-gate
 TERMINAL_LEASE_STATES = frozenset({"production-success"})
 DELIVERY_OWNER_STATES = DELIVERY_STATES | TERMINAL_LEASE_STATES
 DELIVERY_STATE_VERSION = 1
+CANONICAL_REFRESH_RESULTS = frozenset({"ALIGNED", "REFRESHED", "WAITING", "BLOCKED"})
+
+# These paths are intentionally ignored by the repository and are managed by the controller,
+# local tooling, or the owner-only backlog.  They must not make the canonical worktree look
+# dirty for a ref-only fast-forward.  An ignored path outside this list remains a blocker.
+CANONICAL_MANAGED_IGNORED_PATHS = (
+    ".artifacts",
+    ".env",
+    ".idea",
+    ".vscode",
+    "backend/.artifacts",
+    ".venv",
+    "venv",
+    "env",
+    "frontend/node_modules",
+    "frontend/dist",
+    "frontend/coverage",
+    "frontend/playwright-report",
+    "frontend/test-results",
+    "frontend/openapi.json",
+    "codex-backlog",
+    "docs/private",
+)
+CANONICAL_MANAGED_IGNORED_BASENAMES = frozenset(
+    {".pytest_cache", ".ruff_cache", ".mypy_cache", "__pycache__"}
+)
 
 
 class TaskSessionError(RuntimeError):
@@ -264,8 +290,12 @@ class GitRepository:
     def ref_exists(self, name: str) -> bool:
         return self.git("rev-parse", "--verify", "--quiet", name, check=False) != ""
 
-    def fetch_origin_master(self, *, cwd: Path | None = None) -> None:
-        self.git("fetch", "--prune", "origin", "master", cwd=cwd)
+    def fetch_origin_master(self, *, cwd: Path | None = None, prune: bool = True) -> None:
+        args = ["fetch"]
+        if prune:
+            args.append("--prune")
+        args.extend(("origin", "master"))
+        self.git(*args, cwd=cwd)
 
     def head(self, *, cwd: Path | None = None) -> str:
         return self.git("rev-parse", "HEAD", cwd=cwd)
@@ -278,8 +308,16 @@ class GitRepository:
         )
         return result.returncode == 0
 
-    def status(self, path: Path) -> list[str]:
-        output = self.git("status", "--porcelain=v1", "--untracked-files=all", cwd=path)
+    def status(
+        self,
+        path: Path,
+        *,
+        include_ignored: bool = False,
+    ) -> list[str]:
+        args = ["status", "--porcelain=v1", "--untracked-files=all"]
+        if include_ignored:
+            args.append("--ignored=matching")
+        output = self.git(*args, cwd=path)
         return output.splitlines() if output else []
 
     def ahead_behind(self, left: str, right: str) -> tuple[int, int]:
@@ -441,7 +479,14 @@ class StateStore:
         self.history.mkdir(parents=True, exist_ok=True)
         contract = self.root / "contract.json"
         if not contract.exists():
-            self.create_json(contract, {"version": TASK_STATE_VERSION, "created_at": utc_now()})
+            try:
+                self.create_json(contract, {"version": TASK_STATE_VERSION, "created_at": utc_now()})
+            except TaskSessionError:
+                # Two first-time controller calls may initialize the shared state concurrently.
+                # The O_EXCL winner owns creation; a loser may continue only after confirming
+                # that the contract now exists.
+                if not contract.exists():
+                    raise
 
     @contextmanager
     def lock(self) -> Iterator[None]:
@@ -546,7 +591,7 @@ class GitHubClient:
         remote = self.repository.git("remote", "get-url", "origin")
         match = re.search(r"github\.com[/:](?P<slug>[^/]+/[^/.]+)(?:\.git)?$", remote)
         if match is None:
-            raise TaskSessionError(f"Cannot derive GitHub repository from origin URL: {remote}")
+            raise TaskSessionError("Cannot derive GitHub repository from the configured origin")
         return match.group("slug")
 
     def api(self, endpoint: str) -> Any:
@@ -832,6 +877,694 @@ class TaskController:
     def _canonical_root(self) -> Path:
         return self.repository.repository_root
 
+    def _canonical_worktree_status(self, root: Path | None = None) -> list[str]:
+        status = self.repository.status(root or self._canonical_root(), include_ignored=True)
+        unexpected: list[str] = []
+        for item in status:
+            if not item.startswith("!! "):
+                unexpected.append(item)
+                continue
+            ignored_path = item[3:].strip().replace("\\", "/").rstrip("/")
+            path_parts = set(ignored_path.split("/"))
+            if not (
+                any(
+                    ignored_path == managed or ignored_path.startswith(f"{managed}/")
+                    for managed in CANONICAL_MANAGED_IGNORED_PATHS
+                )
+                or bool(path_parts & CANONICAL_MANAGED_IGNORED_BASENAMES)
+            ):
+                unexpected.append(item)
+        return unexpected
+
+    def _canonical_refresh_payload(
+        self,
+        result: str,
+        *,
+        old_sha: str | None = None,
+        new_sha: str | None = None,
+        origin_sha: str | None = None,
+        live_sha: str | None = None,
+        ahead_before: int | None = None,
+        behind_before: int | None = None,
+        ahead_after: int | None = None,
+        behind_after: int | None = None,
+        updated_commits: int = 0,
+        mutation_performed: bool = False,
+        reason: str = "",
+        recovery_hint: str = "Retry canonical master refresh after the blocker is resolved.",
+        delivery_task_id: str | None = None,
+        reread_after_contention: bool = False,
+    ) -> dict[str, Any]:
+        if result not in CANONICAL_REFRESH_RESULTS:
+            raise TaskSessionError(f"Unknown canonical refresh result: {result}")
+        return {
+            "operation": "canonical-master-refresh",
+            "result": result,
+            "canonical_worktree": str(self._canonical_root()),
+            "old_sha": old_sha,
+            "new_sha": new_sha,
+            "local_master_before": old_sha,
+            "local_master_after": new_sha,
+            "origin_master_sha": origin_sha,
+            "verified_remote_sha": origin_sha,
+            "live_master_sha": live_sha,
+            "ahead_before": ahead_before,
+            "behind_before": behind_before,
+            "ahead_after": ahead_after,
+            "behind_after": behind_after,
+            "updated_commits": updated_commits,
+            "mutation_performed": mutation_performed,
+            "mutated_ref": "refs/heads/master" if mutation_performed else None,
+            "reread_after_contention": reread_after_contention,
+            "delivery_task_id": delivery_task_id,
+            "reason": reason,
+            "recovery_hint": recovery_hint,
+        }
+
+    def _safe_ref(self, name: str) -> str | None:
+        try:
+            return self.repository.ref(name)
+        except TaskSessionError:
+            return None
+
+    def _canonical_refresh_controller_blocker(
+        self, *, delivery_task_id: str | None
+    ) -> tuple[str, str] | None:
+        expected_delivery_task = (
+            normalize_task_id(delivery_task_id) if delivery_task_id is not None else None
+        )
+        leases = self.store.all_leases()
+        delivery = self.store.delivery_state()
+        owner = delivery.get("owner")
+        owner_id = str(owner.get("task_id", "")).upper() if isinstance(owner, dict) else ""
+        owner_lease = None
+        if owner_id:
+            owner_lease = next(
+                (item for item in leases if str(item.get("task_id", "")).upper() == owner_id),
+                None,
+            )
+            if owner_lease is None:
+                return (
+                    "BLOCKED",
+                    f"delivery lane owner Task {owner_id} has no matching lease",
+                )
+            owner_state = self._lease_state(owner_lease)
+            if owner_state == "production-success":
+                return (
+                    "WAITING",
+                    f"Task {owner_id} is in terminal production closeout",
+                )
+            if owner_state not in DELIVERY_STATES:
+                return (
+                    "BLOCKED",
+                    f"delivery lane owner Task {owner_id} has ambiguous state {owner_state}",
+                )
+            if owner_id != expected_delivery_task:
+                return ("WAITING", f"delivery lane is occupied by Task {owner_id}")
+
+        task_ids: set[str] = set()
+        lease_branches: dict[str, str] = {}
+        lease_worktrees: dict[str, str] = {}
+        known_states = IMPLEMENTATION_STATES | READY_STATES | WAITING_STATES | DELIVERY_STATES
+        for lease in leases:
+            raw_task_id = str(lease.get("task_id", "")).upper()
+            if not TASK_ID_RE.fullmatch(raw_task_id):
+                return ("BLOCKED", "controller contains a lease with an invalid task ID")
+            if raw_task_id in task_ids:
+                return ("BLOCKED", f"controller contains duplicate Task {raw_task_id} leases")
+            task_ids.add(raw_task_id)
+            if lease.get("mode") != "write":
+                return ("BLOCKED", f"Task {raw_task_id} has an unsupported controller mode")
+            branch = lease.get("branch")
+            if not isinstance(branch, str):
+                return ("BLOCKED", f"Task {raw_task_id} lease has no valid task branch")
+            try:
+                if task_id_from_branch(branch) != raw_task_id:
+                    return (
+                        "BLOCKED",
+                        f"Task {raw_task_id} lease branch does not match its task ID",
+                    )
+            except TaskSessionError:
+                return ("BLOCKED", f"Task {raw_task_id} lease has an invalid task branch")
+            branch_key = branch.casefold()
+            if branch_key in lease_branches:
+                return (
+                    "BLOCKED",
+                    f"controller leases share task branch {branch} "
+                    f"(Tasks {lease_branches[branch_key]} and {raw_task_id})",
+                )
+            lease_branches[branch_key] = raw_task_id
+            worktree_value = lease.get("worktree")
+            if not isinstance(worktree_value, str) or not worktree_value.strip():
+                return ("BLOCKED", f"Task {raw_task_id} lease has no valid worktree")
+            try:
+                worktree_key = str(Path(worktree_value).resolve()).casefold()
+            except (OSError, RuntimeError) as _error:
+                return ("BLOCKED", f"Task {raw_task_id} lease worktree cannot be resolved")
+            if worktree_key == str(self._canonical_root().resolve()).casefold():
+                return (
+                    "BLOCKED",
+                    f"Task {raw_task_id} lease points to the canonical controller worktree",
+                )
+            if worktree_key in lease_worktrees:
+                return (
+                    "BLOCKED",
+                    f"controller leases share worktree {worktree_value} "
+                    f"(Tasks {lease_worktrees[worktree_key]} and {raw_task_id})",
+                )
+            lease_worktrees[worktree_key] = raw_task_id
+            state = self._lease_state(lease)
+            if state in {"recovery-required", "start-failed-recovery-required"}:
+                return ("BLOCKED", f"Task {raw_task_id} requires controller recovery")
+            if state in DELIVERY_STATES:
+                if raw_task_id == owner_id and raw_task_id == expected_delivery_task:
+                    continue
+                return (
+                    "WAITING",
+                    f"Task {raw_task_id} is in an incompatible delivery transition",
+                )
+            if state == "production-success":
+                if raw_task_id == owner_id:
+                    return (
+                        "WAITING",
+                        f"Task {raw_task_id} is in terminal production closeout",
+                    )
+                return (
+                    "BLOCKED",
+                    f"Task {raw_task_id} has terminal success without delivery ownership",
+                )
+            if state == "starting":
+                return (
+                    "WAITING",
+                    f"Task {raw_task_id} is in an active controller start transition",
+                )
+            if state not in known_states:
+                return (
+                    "BLOCKED",
+                    f"Task {raw_task_id} has an ambiguous controller state {state or '<missing>'}",
+                )
+
+        if owner_id and owner_id not in task_ids:
+            return ("BLOCKED", f"delivery lane owner Task {owner_id} is not represented by a lease")
+        if not owner_id and any(
+            self._lease_state(lease) in DELIVERY_STATES | TERMINAL_LEASE_STATES for lease in leases
+        ):
+            return (
+                "BLOCKED",
+                "controller has a delivery/closeout state without delivery ownership",
+            )
+        return None
+
+    def _canonical_refresh_after_contention(
+        self, *, offline: bool, delivery_task_id: str | None
+    ) -> dict[str, Any]:
+        old_sha = self._safe_ref("master")
+        origin_sha = self._safe_ref("origin/master")
+        if not offline:
+            try:
+                live_sha = self._github().branch_head(TARGET_BASE_BRANCH)
+            except (TaskSessionError, OSError) as _error:
+                live_sha = None
+            if old_sha and origin_sha and live_sha and old_sha == origin_sha == live_sha:
+                return self._canonical_refresh_payload(
+                    "ALIGNED",
+                    old_sha=old_sha,
+                    new_sha=old_sha,
+                    origin_sha=origin_sha,
+                    live_sha=live_sha,
+                    ahead_before=0,
+                    behind_before=0,
+                    ahead_after=0,
+                    behind_after=0,
+                    reason="concurrent controller operation completed; verified refs were reread",
+                    recovery_hint="No recovery is required.",
+                    delivery_task_id=delivery_task_id,
+                    reread_after_contention=True,
+                )
+        return self._canonical_refresh_payload(
+            "WAITING",
+            old_sha=old_sha,
+            new_sha=old_sha,
+            origin_sha=origin_sha,
+            reason="another controller operation owns the coordination lock",
+            recovery_hint="Wait for the active controller operation to finish, then retry.",
+            delivery_task_id=delivery_task_id,
+            reread_after_contention=True,
+        )
+
+    def refresh_canonical_master(
+        self, *, offline: bool = False, delivery_task_id: str | None = None
+    ) -> dict[str, Any]:
+        """Safely align the canonical local master with the verified protected master."""
+
+        expected_delivery_task = (
+            normalize_task_id(delivery_task_id) if delivery_task_id is not None else None
+        )
+        root = self._canonical_root()
+        try:
+            self.store.initialize()
+        except (TaskSessionError, OSError) as _error:
+            return self._canonical_refresh_payload(
+                "BLOCKED",
+                reason="canonical refresh shared controller state could not be initialized",
+                recovery_hint="Resolve the controller state filesystem issue owner-safely, then retry.",
+                delivery_task_id=expected_delivery_task,
+            )
+        if self.store.lock_path.exists():
+            return self._canonical_refresh_after_contention(
+                offline=offline, delivery_task_id=expected_delivery_task
+            )
+
+        try:
+            with self.store.lock():
+                controller_blocker = self._canonical_refresh_controller_blocker(
+                    delivery_task_id=expected_delivery_task
+                )
+                if controller_blocker is not None:
+                    result, reason = controller_blocker
+                    old_sha = self._safe_ref("master")
+                    return self._canonical_refresh_payload(
+                        result,
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        reason=reason,
+                        recovery_hint=(
+                            "Retry after the delivery or controller transition completes."
+                            if result == "WAITING"
+                            else "Use the named controller recovery path; do not reset or stash master."
+                        ),
+                        delivery_task_id=expected_delivery_task,
+                    )
+
+                try:
+                    canonical_branch = self.repository.git("branch", "--show-current", cwd=root)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        reason="canonical controller worktree branch could not be inspected",
+                        recovery_hint="Restore a readable canonical worktree on branch master, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if canonical_branch != TARGET_BASE_BRANCH:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        reason=f"canonical controller worktree is not on {TARGET_BASE_BRANCH}",
+                        recovery_hint="Resolve the canonical checkout state manually; no ref was changed.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                try:
+                    dirty = self._canonical_worktree_status(root)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        reason="canonical worktree status could not be inspected",
+                        recovery_hint="Resolve the status/permission issue without stash or reset, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if dirty:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=self._safe_ref("master"),
+                        reason="canonical worktree is dirty, including significant ignored state",
+                        recovery_hint="Preserve the changes, make the canonical worktree clean, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                operations = self.repository.operation_issues(root)
+                if operations:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=self._safe_ref("master"),
+                        reason="canonical worktree has an active Git operation or lock",
+                        recovery_hint="Finish or owner-safely recover the Git operation; do not delete the lock.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if offline:
+                    old_sha = self._safe_ref("master")
+                    origin_sha = self._safe_ref("origin/master")
+                    return self._canonical_refresh_payload(
+                        "WAITING",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        reason="offline mode cannot verify live protected master freshness",
+                        recovery_hint="Retry online after the remote and live protected branch are reachable.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                try:
+                    if self._active_production_deployment():
+                        old_sha = self._safe_ref("master")
+                        return self._canonical_refresh_payload(
+                            "WAITING",
+                            old_sha=old_sha,
+                            new_sha=old_sha,
+                            reason="production deployment is active",
+                            recovery_hint="Wait for production deployment to reach a terminal state, then retry.",
+                            delivery_task_id=expected_delivery_task,
+                        )
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        reason="production delivery state could not be verified",
+                        recovery_hint="Restore the online controller/GitHub verification path, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+
+                old_sha = self._safe_ref("master")
+                try:
+                    self.repository.fetch_origin_master(cwd=root, prune=False)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        reason="fetch of current origin/master failed",
+                        recovery_hint="Verify the configured remote and network, then retry; canonical master was not changed.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                origin_sha = self._safe_ref("origin/master")
+                try:
+                    live_sha = self._github().branch_head(TARGET_BASE_BRANCH)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        reason="live protected master verification failed",
+                        recovery_hint="Restore live branch verification and retry; canonical master was not changed.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if not old_sha or not origin_sha or not live_sha:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        reason="canonical, tracking, or live master SHA is unavailable",
+                        recovery_hint="Repair the missing ref/verification input without resetting master, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if origin_sha != live_sha:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        reason="fetched origin/master does not match live protected master",
+                        recovery_hint="Do not mutate master; investigate remote/live divergence and retry after it is resolved.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                try:
+                    ahead_before, behind_before = self.repository.ahead_behind("master", live_sha)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        reason="canonical master ancestry could not be verified",
+                        recovery_hint="Inspect the canonical refs without reset, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if ahead_before > 0:
+                    reason = (
+                        "canonical master diverges from verified protected master"
+                        if behind_before > 0
+                        else "canonical master contains unpublished commits"
+                    )
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason=f"{reason}: ahead={ahead_before} behind={behind_before}",
+                        recovery_hint="Preserve the canonical commits and resolve the divergence owner-safely; no reset or merge was attempted.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if behind_before == 0:
+                    return self._canonical_refresh_payload(
+                        "ALIGNED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        ahead_before=0,
+                        behind_before=0,
+                        ahead_after=0,
+                        behind_after=0,
+                        reason="canonical master already matches verified protected master",
+                        recovery_hint="No recovery is required.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+
+                # Recheck the safety boundary immediately before the sole canonical mutation.
+                if self._canonical_worktree_status(root):
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason="canonical worktree changed during refresh validation",
+                        recovery_hint="Preserve the change, make the canonical worktree clean, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if self.repository.operation_issues(root):
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason="canonical Git operation appeared during refresh validation",
+                        recovery_hint="Resolve the active Git operation owner-safely, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if (
+                    self._safe_ref("master") != old_sha
+                    or self._safe_ref("origin/master") != origin_sha
+                ):
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=self._safe_ref("master"),
+                        origin_sha=self._safe_ref("origin/master"),
+                        live_sha=live_sha,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason="canonical or tracking ref changed during refresh validation",
+                        recovery_hint="Re-read the refs and retry without resetting master.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                try:
+                    live_before_merge = self._github().branch_head(TARGET_BASE_BRANCH)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason="live protected master verification failed before mutation",
+                        recovery_hint="Restore live branch verification and retry; canonical master was not changed.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if live_before_merge != live_sha:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_before_merge,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason="live protected master changed during refresh validation",
+                        recovery_hint="Re-fetch and re-verify the live branch before retrying; no mutation was attempted.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                try:
+                    final_canonical_branch = self.repository.git(
+                        "branch", "--show-current", cwd=root
+                    )
+                    final_symbolic_head = self.repository.git(
+                        "symbolic-ref", "--quiet", "--short", "HEAD", cwd=root, check=False
+                    )
+                    final_canonical_head = self.repository.head(cwd=root)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=old_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_before_merge,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason="canonical HEAD could not be verified immediately before mutation",
+                        recovery_hint="Restore the canonical master checkout and retry; no mutation was attempted.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if (
+                    final_canonical_branch != TARGET_BASE_BRANCH
+                    or final_symbolic_head != TARGET_BASE_BRANCH
+                    or final_canonical_head != old_sha
+                ):
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=final_canonical_head,
+                        origin_sha=origin_sha,
+                        live_sha=live_before_merge,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        reason=(
+                            "canonical checkout changed during final refresh validation: "
+                            f"branch={final_canonical_branch or '<detached>'}; "
+                            f"symbolic_head={final_symbolic_head or '<detached>'}; "
+                            f"HEAD={final_canonical_head}; expected_branch={TARGET_BASE_BRANCH}; "
+                            f"expected_HEAD={old_sha}"
+                        ),
+                        recovery_hint="Restore the canonical master checkout and retry; no mutation was attempted.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                try:
+                    self.repository.git("merge", "--ff-only", origin_sha, cwd=root)
+                except TaskSessionError:
+                    new_sha = self._safe_ref("master")
+                    changed = new_sha is not None and new_sha != old_sha
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=new_sha,
+                        origin_sha=origin_sha,
+                        live_sha=live_sha,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        mutation_performed=changed,
+                        reason="fast-forward-only canonical master update failed",
+                        recovery_hint="Inspect the canonical Git operation without reset; retry only after the ref state is clear.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+
+                new_sha = self._safe_ref("master")
+                origin_after = self._safe_ref("origin/master")
+                try:
+                    live_after = self._github().branch_head(TARGET_BASE_BRANCH)
+                except (TaskSessionError, OSError) as _error:
+                    live_after = None
+                changed = new_sha is not None and new_sha != old_sha
+                if not new_sha or not origin_after or not live_after:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=new_sha,
+                        origin_sha=origin_after,
+                        live_sha=live_after,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        updated_commits=behind_before,
+                        mutation_performed=changed,
+                        reason="post-refresh master verification could not read all refs",
+                        recovery_hint="Preserve the resulting refs and complete owner-safe verification before retrying.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if new_sha != origin_after or origin_after != live_after:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=new_sha,
+                        origin_sha=origin_after,
+                        live_sha=live_after,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        mutation_performed=changed,
+                        reason="post-refresh canonical, tracking, and live master SHAs do not match",
+                        recovery_hint="Do not reset or repeat blindly; investigate the exact refs and retry after verification is restored.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                try:
+                    dirty_after = self._canonical_worktree_status(root)
+                    operations_after = self.repository.operation_issues(root)
+                except (TaskSessionError, OSError) as _error:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=new_sha,
+                        origin_sha=origin_after,
+                        live_sha=live_after,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        ahead_after=0,
+                        behind_after=0,
+                        updated_commits=behind_before,
+                        mutation_performed=changed,
+                        reason="post-refresh canonical worktree verification failed",
+                        recovery_hint="Preserve the resulting refs and resolve the worktree state owner-safely before retrying.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                if dirty_after or operations_after:
+                    return self._canonical_refresh_payload(
+                        "BLOCKED",
+                        old_sha=old_sha,
+                        new_sha=new_sha,
+                        origin_sha=origin_after,
+                        live_sha=live_after,
+                        ahead_before=ahead_before,
+                        behind_before=behind_before,
+                        ahead_after=0,
+                        behind_after=0,
+                        updated_commits=behind_before,
+                        mutation_performed=changed,
+                        reason="canonical worktree changed during canonical master update",
+                        recovery_hint="Preserve the change, resolve the worktree or Git operation owner-safely, then retry.",
+                        delivery_task_id=expected_delivery_task,
+                    )
+                return self._canonical_refresh_payload(
+                    "REFRESHED",
+                    old_sha=old_sha,
+                    new_sha=new_sha,
+                    origin_sha=origin_after,
+                    live_sha=live_after,
+                    ahead_before=ahead_before,
+                    behind_before=behind_before,
+                    ahead_after=0,
+                    behind_after=0,
+                    updated_commits=behind_before,
+                    mutation_performed=changed,
+                    reason="canonical master was fast-forwarded to the verified protected master",
+                    recovery_hint="No recovery is required.",
+                    delivery_task_id=expected_delivery_task,
+                )
+        except TaskSessionError as error:
+            if str(error).startswith("Coordination state is locked:"):
+                return self._canonical_refresh_after_contention(
+                    offline=offline, delivery_task_id=expected_delivery_task
+                )
+            return self._canonical_refresh_payload(
+                "BLOCKED",
+                reason="canonical refresh controller state could not be validated safely",
+                recovery_hint="Inspect the controller state and active Git operation without deleting or resetting it, then retry.",
+                delivery_task_id=expected_delivery_task,
+            )
+        except OSError:
+            return self._canonical_refresh_payload(
+                "BLOCKED",
+                reason="canonical refresh filesystem operation failed safely",
+                recovery_hint="Resolve the filesystem/permission issue without changing refs, then retry.",
+                delivery_task_id=expected_delivery_task,
+            )
+
     def _completed_dependency_ids(self) -> set[str]:
         roots = (
             self._canonical_root() / "codex-backlog" / "tasks" / "done",
@@ -981,7 +1714,7 @@ class TaskController:
         delivery_blockers: list[str] = []
         recovery_findings: list[str] = []
         informational_findings: list[str] = []
-        dirty = self.repository.status(root)
+        dirty = self._canonical_worktree_status(root)
         if dirty:
             implementation_blockers.append("controller worktree is dirty")
         operations = self.repository.operation_issues(root)
@@ -1238,7 +1971,22 @@ class TaskController:
             raise TaskSessionError("start requires explicit --owner-launch evidence")
         if mode != "write":
             raise TaskSessionError("research-readonly sessions are not part of normal delivery")
-        if not offline:
+        canonical_refresh = self.refresh_canonical_master(offline=offline)
+        if canonical_refresh["result"] == "BLOCKED":
+            raise TaskSessionError(
+                f"Task {expected} blocked by canonical master refresh: "
+                f"{canonical_refresh['reason']}; {canonical_refresh['recovery_hint']}"
+            )
+        if canonical_refresh["result"] == "WAITING" and canonical_refresh["reason"] == (
+            "another controller operation owns the coordination lock"
+        ):
+            raise TaskSessionError(
+                "Coordination state is locked during canonical master refresh; retry start"
+            )
+        if canonical_refresh["result"] == "WAITING" and not offline:
+            # A busy delivery/production lane may still allow a compatible implementation
+            # lease. Keep the historical current-base fetch for that non-mutating path; the
+            # lease acquisition below rechecks the fetched tracking SHA against live master.
             self.repository.fetch_origin_master()
         report = self.doctor(offline=offline)
         if report["implementation_blockers"]:
@@ -1309,6 +2057,7 @@ class TaskController:
                 "concurrency_class": document.concurrency_class,
                 "integration_policy": "task-pr-to-master",
                 "owner_launch": True,
+                "canonical_master_refresh": canonical_refresh,
             }
             self.store.create_json(lease_path, lease)
         try:
@@ -1323,11 +2072,13 @@ class TaskController:
         StateStore.replace_json(lease_path, lease)
         return {
             "lease": lease,
+            "canonical_master_refresh": canonical_refresh,
             "prompt": (
                 f"Worktree: {target.resolve()}\nBranch: {branch}\n"
                 f"Base origin/master: {base_sha}\nTask: {expected} ({document.path})\n"
+                f"Canonical master checkpoint: {canonical_refresh['result']}\n"
                 "Normal path: targeted checks/review/QA/commit -> READY_FOR_DELIVERY -> acquire delivery\n"
-                "-> refresh latest master -> local PRE_PUSH_CI_PASS -> PR master -> production.\n"
+                "-> refresh-delivery task branch -> local PRE_PUSH_CI_PASS -> PR master -> production.\n"
                 "Implementation may run in parallel with compatible tasks. Do not start another task\n"
                 "from this worker. READY_FOR_DELIVERY may wait for the single delivery lane; before\n"
                 "PR/merge refresh onto latest origin/master and rerun the final exact-HEAD gate.\n"
@@ -1337,7 +2088,12 @@ class TaskController:
         }
 
     def adopt_current(
-        self, task_id: str, *, owner_launch: bool, session_label: str
+        self,
+        task_id: str,
+        *,
+        owner_launch: bool,
+        session_label: str,
+        offline: bool = False,
     ) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
         if not owner_launch:
@@ -1345,6 +2101,18 @@ class TaskController:
         branch = self.repository.git("branch", "--show-current")
         if not branch or task_id_from_branch(branch) != expected:
             raise TaskSessionError(f"Current branch {branch!r} does not match Task {expected}")
+        canonical_refresh = self.refresh_canonical_master(offline=offline)
+        if canonical_refresh["result"] == "BLOCKED":
+            raise TaskSessionError(
+                f"Task {expected} blocked by canonical master refresh: "
+                f"{canonical_refresh['reason']}; {canonical_refresh['recovery_hint']}"
+            )
+        if canonical_refresh["result"] == "WAITING" and canonical_refresh["reason"] == (
+            "another controller operation owns the coordination lock"
+        ):
+            raise TaskSessionError(
+                "Coordination state is locked during canonical master refresh; retry adopt-current"
+            )
         matches = [
             item
             for item in self.repository.worktrees()
@@ -1395,6 +2163,7 @@ class TaskController:
             "integration_policy": "task-pr-to-master",
             "owner_launch": True,
             "adopted_existing_session": True,
+            "canonical_master_refresh": canonical_refresh,
         }
         with self.store.lock():
             existing = self.store.all_leases()
@@ -1723,6 +2492,21 @@ class TaskController:
             raise TaskSessionError(
                 f"Task {expected} cannot refresh for delivery from {lease.get('lifecycle_state')}"
             )
+        canonical_refresh = self.refresh_canonical_master(
+            offline=offline, delivery_task_id=expected
+        )
+        if canonical_refresh["result"] == "BLOCKED":
+            reason = (
+                f"Task {expected} canonical master refresh blocked: {canonical_refresh['reason']}"
+            )
+            raise TaskSessionError(f"{reason}; {canonical_refresh['recovery_hint']}")
+        if canonical_refresh["result"] == "WAITING" and not (
+            offline and canonical_refresh["reason"].startswith("offline mode")
+        ):
+            raise TaskSessionError(
+                f"Task {expected} canonical master refresh is waiting: "
+                f"{canonical_refresh['reason']}; {canonical_refresh['recovery_hint']}"
+            )
         worktree = Path(str(lease.get("worktree", ""))).resolve()
         if self.repository.status(worktree):
             raise TaskSessionError(f"Task {expected} delivery refresh refuses dirty worktree")
@@ -1810,6 +2594,7 @@ class TaskController:
                         "previous_base_sha": old_base,
                     },
                     "delivery_gate_pass": None,
+                    "canonical_master_refresh": canonical_refresh,
                     "lifecycle_state": "delivering",
                     "updated_at": now,
                 }
@@ -1965,6 +2750,7 @@ class TaskController:
                 "review_verdict",
                 "qa_verdict",
                 "task_provenance",
+                "canonical_master_refresh",
             ):
                 current.pop(key, None)
             current.update(
@@ -2359,6 +3145,11 @@ def _parser() -> argparse.ArgumentParser:
     adopt.add_argument("task_id")
     adopt.add_argument("--owner-launch", action="store_true")
     adopt.add_argument("--session-label", required=True)
+    adopt.add_argument("--offline", action="store_true")
+    canonical_refresh = subparsers.add_parser(
+        "refresh-canonical-master", aliases=("refresh-canonical",)
+    )
+    canonical_refresh.add_argument("--offline", action="store_true")
     ready = subparsers.add_parser("mark-ready")
     ready.add_argument("task_id")
     ready.add_argument("--head-sha", required=True)
@@ -2404,7 +3195,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         repository = GitRepository(args.repo)
-        github = GitHubClient(repository, args.github_repository)
+        github = (
+            None
+            if bool(getattr(args, "offline", False))
+            else GitHubClient(repository, args.github_repository)
+        )
         controller = TaskController(repository, github=github)
         if args.command == "doctor":
             payload = controller.doctor(offline=args.offline)
@@ -2432,10 +3227,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "adopt-current":
             _print(
                 controller.adopt_current(
-                    args.task_id, owner_launch=args.owner_launch, session_label=args.session_label
+                    args.task_id,
+                    owner_launch=args.owner_launch,
+                    session_label=args.session_label,
+                    offline=args.offline,
                 )
             )
             return 0
+        if args.command in {"refresh-canonical-master", "refresh-canonical"}:
+            payload = controller.refresh_canonical_master(offline=args.offline)
+            _print(payload)
+            return 0 if payload["result"] in {"ALIGNED", "REFRESHED", "WAITING"} else 1
         if args.command == "mark-ready":
             _print(
                 controller.mark_ready(

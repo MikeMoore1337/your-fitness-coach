@@ -145,6 +145,7 @@ human/legal/external/destructive/task-specific gate. Следующая product 
 ```powershell
 python scripts/task_session.py doctor
 python scripts/task_session.py validate-metadata
+python scripts/task_session.py refresh-canonical-master
 python scripts/task_session.py start 135 --owner-launch --session-label codex-135
 python scripts/task_session.py adopt-current 135 --owner-launch --session-label codex-135-resume
 python scripts/task_session.py status
@@ -157,6 +158,32 @@ python scripts/task_session.py reopen-for-review 135 --reason "address review fi
 python scripts/task_session.py complete-production 135 --pr <number> --merge-sha <sha> --deployed-sha <sha>
 python scripts/task_session.py finish 135
 ```
+
+### Безопасный refresh canonical `master`
+
+`refresh-canonical-master` — единственная штатная операция для выравнивания локального
+canonical controller checkout. Она сначала получает актуальный `origin/master`, в online mode
+сверяет его SHA с live protected `master`, проверяет чистый canonical worktree и controller state,
+а затем выполняет только `git merge --ff-only` к проверенному exact SHA. `git pull`, `reset`,
+stash, обычный merge и push не используются. Task branches/worktrees, leases, PR и production
+state этой операцией не меняются.
+
+Операция возвращает machine-readable `result`:
+
+| Result | Значение |
+| --- | --- |
+| `ALIGNED` | `master == origin/master == live/master`, mutation не выполнялась. |
+| `REFRESHED` | canonical `master` fast-forward-нут; `old_sha`, `new_sha`, `behind_before` и `updated_commits` сохранены. |
+| `WAITING` | remote/live freshness или безопасная serialisation временно недоступны: offline, active delivery/production или concurrent controller operation. Refs не меняются. |
+| `BLOCKED` | dirty/ignored significant state, ahead/diverged refs, active Git operation, recovery/ambiguous state либо fetch/verification/fast-forward error. Никакого stash/reset/retry вслепую нет. |
+
+Checkpoint автоматически выполняется перед `start`/`adopt-current` и перед
+`refresh-delivery`. `refresh-delivery` по-прежнему refresh/rebase-ит только task branch и
+инвалидирует старое `PRE_PUSH_CI_PASS`; canonical refresh не является delivery evidence.
+Пути `.artifacts/`, локальное environment/editor state, tooling caches и owner-only backlog
+исключены из проверки ожидаемого ignored state, но неожиданный ignored path за этой границей
+остаётся blocker (включая debug/log артефакты).
+После устранения причины повторный online запуск идемпотентен и даёт `ALIGNED`.
 
 Task-файл не копируется в worktree: owner-local canonical path остаётся единственным источником
 backlog metadata. `validate-metadata` проверяет dependencies, `executable`, concurrency, owner gate
