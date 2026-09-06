@@ -1019,7 +1019,7 @@ class TaskController:
                 return ("BLOCKED", f"Task {raw_task_id} lease has no valid worktree")
             try:
                 worktree_key = str(Path(worktree_value).resolve()).casefold()
-            except OSError, RuntimeError:
+            except (OSError, RuntimeError) as _error:
                 return ("BLOCKED", f"Task {raw_task_id} lease worktree cannot be resolved")
             if worktree_key == str(self._canonical_root().resolve()).casefold():
                 return (
