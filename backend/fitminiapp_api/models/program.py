@@ -34,6 +34,10 @@ class ProgramTemplate(Base):
             "('full_body', 'upper_lower', 'push_pull_legs', 'body_part', 'hybrid')",
             name="ck_program_templates_split_type",
         ),
+        CheckConstraint(
+            "default_duration_weeks >= 1 AND default_duration_weeks <= 24",
+            name="ck_program_templates_default_duration_weeks",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -49,6 +53,9 @@ class ProgramTemplate(Base):
         ForeignKey("users.id"), index=True, nullable=True
     )
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    default_duration_weeks: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=now_msk_naive,
@@ -130,6 +137,55 @@ class ProgramTemplateExercise(Base):
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     day: Mapped[ProgramTemplateDay] = relationship("ProgramTemplateDay", back_populates="exercises")
+    exercise: Mapped[Exercise] = relationship("Exercise")
+    weekly_prescriptions: Mapped[list[ProgramTemplateExerciseWeekPrescription]] = relationship(
+        "ProgramTemplateExerciseWeekPrescription",
+        back_populates="template_exercise",
+        cascade="all, delete-orphan",
+        order_by="ProgramTemplateExerciseWeekPrescription.week_number",
+    )
+
+
+class ProgramTemplateExerciseWeekPrescription(Base):
+    __tablename__ = "program_template_exercise_weeks"
+    __table_args__ = (
+        UniqueConstraint(
+            "template_exercise_id",
+            "week_number",
+            name="uq_program_template_exercise_week",
+        ),
+        CheckConstraint(
+            "week_number >= 1 AND week_number <= 24",
+            name="ck_program_template_exercise_weeks_number",
+        ),
+        CheckConstraint(
+            "prescribed_sets >= 1 AND prescribed_sets <= 10",
+            name="ck_program_template_exercise_weeks_sets",
+        ),
+        CheckConstraint(
+            "prescribed_duration_minutes IS NULL OR prescribed_duration_minutes >= 1",
+            name="ck_program_template_exercise_weeks_duration",
+        ),
+        CheckConstraint(
+            "rest_seconds >= 0 AND rest_seconds <= 600",
+            name="ck_program_template_exercise_weeks_rest",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    template_exercise_id: Mapped[int] = mapped_column(
+        ForeignKey("program_template_exercises.id", ondelete="CASCADE"), index=True
+    )
+    exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
+    week_number: Mapped[int] = mapped_column(Integer)
+    prescribed_sets: Mapped[int] = mapped_column(Integer)
+    prescribed_reps: Mapped[str] = mapped_column(String(32))
+    prescribed_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rest_seconds: Mapped[int] = mapped_column(Integer, default=90)
+
+    template_exercise: Mapped[ProgramTemplateExercise] = relationship(
+        "ProgramTemplateExercise", back_populates="weekly_prescriptions"
+    )
     exercise: Mapped[Exercise] = relationship("Exercise")
 
 

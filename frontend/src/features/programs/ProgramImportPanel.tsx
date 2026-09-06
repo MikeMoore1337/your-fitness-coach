@@ -199,7 +199,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
       collapsible={false}
       family="training"
       title="Импорт программы"
-      description="Загрузите канонический шаблон v1 в XLSX или CSV. Программа появится только после проверки и подтверждения."
+      description="Загрузите XLSX или CSV с программой. YFC извлечёт упражнения и назначения, а программа появится только после проверки и подтверждения."
     >
       {!preview ? (
         <div className="program-import-intro">
@@ -231,8 +231,9 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
             </div>
           </div>
           <p className="muted">
-            Поддерживается только версия v1: один лист, фиксированные поля, UTF-8 и запятая в CSV.
-            Макросы, формулы, внешние ссылки и произвольные выгрузки не принимаются.
+            Поддерживаются каноническая таблица, обычные таблицы и матрицы недель. Макросы и формулы
+            запрещены; внешние ссылки на видео не загружаются. Неоднозначные упражнения можно
+            выбрать вручную перед сохранением.
           </p>
         </div>
       ) : (
@@ -288,6 +289,12 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
             </Field>
           </div>
 
+          <p className="muted program-import-layout-summary">
+            Формат: {preview.layout_version ?? 'определяется'} · Дней:{' '}
+            {new Set(preview.rows.map((row) => row.day_number).filter((day) => day != null)).size}
+            {preview.duration_weeks ? ` · Недель: ${preview.duration_weeks}` : ''}
+          </p>
+
           {!!preview.issues.length && (
             <div className="program-import-issues" role="status">
               <strong>Что нужно проверить</strong>
@@ -305,12 +312,13 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
           <div className="program-import-table-wrap">
             <table className="program-import-table">
               <caption>
-                Строки упражнений: {preview.summary.row_count}; сопоставлено:{' '}
+                Упражнений: {preview.summary.row_count}; сопоставлено:{' '}
                 {preview.summary.matched_row_count}
               </caption>
               <thead>
                 <tr>
                   <th scope="col">Строка</th>
+                  <th scope="col">Неделя</th>
                   <th scope="col">День</th>
                   <th scope="col">Упражнение</th>
                   <th scope="col">Нагрузка</th>
@@ -327,6 +335,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         {row.source_range ?? `строка ${row.row_number}`}
                       </small>
                     </th>
+                    <td>{row.week_number ?? '—'}</td>
                     <td>
                       <strong>{row.day_number ?? '—'}</strong>
                       <small>{row.day_title || 'Название дня не указано'}</small>
@@ -364,6 +373,9 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                         ? `${row.prescribed_duration_minutes ?? '—'} мин`
                         : `${row.prescribed_sets ?? '—'} × ${row.prescribed_reps ?? '—'}`}
                       <small>отдых {row.rest_seconds ?? 90} сек.</small>
+                      {row.source_auxiliary && (
+                        <small>Из файла: {row.source_auxiliary} (не импортируется как вес)</small>
+                      )}
                     </td>
                     <td>
                       <span

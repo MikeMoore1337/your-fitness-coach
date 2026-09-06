@@ -11,6 +11,7 @@ ASSIGNMENT_VALIDATION_PREFIXES = (
     "Program duration must",
     "A weekly program supports",
     "Program is too large",
+    "This periodized template is available",
     "Choose one weekday",
     "Weekdays must",
     "Program weekdays must",
