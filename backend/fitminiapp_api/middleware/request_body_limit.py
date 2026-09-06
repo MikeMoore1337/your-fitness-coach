@@ -8,9 +8,12 @@ from typing import Final
 
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from fitminiapp_api.core.config import settings
+
 DEFAULT_BODY_LIMIT_BYTES: Final = 1024 * 1024
 AUTH_BODY_LIMIT_BYTES: Final = 64 * 1024
 AVATAR_BODY_LIMIT_BYTES: Final = 6 * 1024 * 1024
+PROGRAM_IMPORT_PATH_PREFIX: Final = "/api/v1/programs/imports"
 AUTH_PATH_PREFIX: Final = "/api/v1/auth/"
 AVATAR_PATH: Final = "/api/v1/me/avatar"
 REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
@@ -23,6 +26,8 @@ def _body_limit(path: str) -> int:
         return AUTH_BODY_LIMIT_BYTES
     if path == AVATAR_PATH:
         return AVATAR_BODY_LIMIT_BYTES
+    if path == PROGRAM_IMPORT_PATH_PREFIX or path.startswith(f"{PROGRAM_IMPORT_PATH_PREFIX}/"):
+        return settings.program_import_max_request_bytes
     return DEFAULT_BODY_LIMIT_BYTES
 
 

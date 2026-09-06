@@ -12,6 +12,7 @@ from fitminiapp_api.api.v1 import (
     me,
     notifications,
     nutrition,
+    program_imports,
     programs,
     public,
     report_handoffs,
@@ -25,6 +26,9 @@ api_router.include_router(demo.router, prefix="/demo", tags=["demo"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(me.router, prefix="/me", tags=["me"])
 api_router.include_router(programs.router, prefix="/programs", tags=["programs"])
+api_router.include_router(
+    program_imports.router, prefix="/programs/imports", tags=["program-imports"]
+)
 api_router.include_router(coach.router, prefix="/coach", tags=["coach"])
 api_router.include_router(workouts.router, prefix="/workouts", tags=["workouts"])
 api_router.include_router(check_ins.router, prefix="/check-ins", tags=["check-ins"])

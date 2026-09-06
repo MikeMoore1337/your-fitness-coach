@@ -127,6 +127,10 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "payments": "retired operational billing/provider records",
     "subscriptions": "retired operational billing records",
     "workout_set_mutations": "idempotency fingerprints used only for sync correctness",
+    "program_imports": (
+        "short-lived owner-scoped import drafts; source is never persisted and normalized content "
+        "is cleared on terminal state"
+    ),
 }
 
 
