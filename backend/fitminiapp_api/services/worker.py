@@ -51,6 +51,7 @@ from fitminiapp_api.services.notifications import (
     sync_workout_reminders,
     validate_notification_destination,
 )
+from fitminiapp_api.services.program_imports import expire_program_imports
 from fitminiapp_api.services.reminder_templates import sync_contextual_reminders
 from fitminiapp_api.services.web_push import send_web_push
 from fitminiapp_api.services.weekly_digest import (
@@ -680,6 +681,7 @@ async def _run_web_push_delivery_batch() -> None:
 async def run_once(*, sync_reminders: bool = True) -> None:
     with get_session_context() as db:
         prune_account_exports(db)
+        expire_program_imports(db)
         if sync_reminders:
             prune_audit_events(db, retention_days=settings.audit_event_retention_days)
             prune_weekly_digest(db, retention_days=settings.news_retention_days)

@@ -22,6 +22,7 @@ import { DateInput } from '../../shared/ui/PickerInput';
 import { ProgramRecommendation } from './ProgramRecommendation';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { AssignedProgramDetails } from './AssignedProgramDetails';
+import { ProgramImportPanel } from './ProgramImportPanel';
 
 const goalLabels: Record<string, string> = {
   muscle_gain: 'Набор мышечной массы',
@@ -382,6 +383,7 @@ export function TemplatesList({
         )}
       </section>
       {children}
+      <ProgramImportPanel />
       <ProgramRecommendation
         open={recommendationOpen}
         onOpenChange={setRecommendationOpen}

@@ -13,7 +13,12 @@
 		max_size 65536
 	}
 
-	@default not path /api/v1/auth /api/v1/auth/* /api/v1/me/avatar
+	@program_import path /api/v1/programs/imports /api/v1/programs/imports/*
+	request_body @program_import {
+		max_size 2400000
+	}
+
+	@default not path /api/v1/auth /api/v1/auth/* /api/v1/me/avatar /api/v1/programs/imports /api/v1/programs/imports/*
 	request_body @default {
 		max_size 1048576
 	}

@@ -118,6 +118,20 @@ class Settings(BaseSettings):
     worker_poll_seconds: int = Field(default=10, ge=1, le=3600)
     reminder_sync_seconds: int = Field(default=60, ge=10, le=3600)
     notification_delivery_concurrency: int = Field(default=8, ge=1, le=30)
+    program_import_max_file_bytes: int = Field(default=2_000_000, ge=256_000, le=8_000_000)
+    program_import_max_request_bytes: int = Field(default=2_400_000, ge=300_000, le=10_000_000)
+    program_import_max_rows: int = Field(default=500, ge=20, le=2_000)
+    program_import_max_columns: int = Field(default=18, ge=8, le=32)
+    program_import_max_cells: int = Field(default=8_000, ge=100, le=50_000)
+    program_import_max_cell_chars: int = Field(default=512, ge=64, le=4_096)
+    program_import_max_xlsx_entries: int = Field(default=32, ge=8, le=128)
+    program_import_max_xlsx_expanded_bytes: int = Field(
+        default=4_000_000, ge=512_000, le=20_000_000
+    )
+    program_import_max_xlsx_compression_ratio: int = Field(default=100, ge=10, le=1_000)
+    program_import_parse_timeout_seconds: float = Field(default=5, ge=1, le=30)
+    program_import_draft_ttl_minutes: int = Field(default=60, ge=15, le=24 * 60)
+    program_import_cleanup_batch_size: int = Field(default=100, ge=10, le=1_000)
     web_push_enabled: bool = False
     web_push_vapid_subject: str = ""
     web_push_vapid_public_key: str = ""

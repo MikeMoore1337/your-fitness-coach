@@ -967,6 +967,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/imports/template.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Csv Template */
+        get: operations["download_csv_template_api_v1_programs_imports_template_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/template.xlsx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Xlsx Template */
+        get: operations["download_xlsx_template_api_v1_programs_imports_template_xlsx_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Program Import */
+        post: operations["upload_program_import_api_v1_programs_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Import Preview */
+        get: operations["get_import_preview_api_v1_programs_imports__import_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Import Preview */
+        post: operations["resolve_import_preview_api_v1_programs_imports__import_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Import Preview */
+        post: operations["confirm_import_preview_api_v1_programs_imports__import_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/imports/{import_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Import Preview */
+        post: operations["cancel_import_preview_api_v1_programs_imports__import_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/clients/{client_id}/workouts/{workout_id}/comments": {
         parameters: {
             query?: never;
@@ -3934,6 +4053,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_upload_program_import_api_v1_programs_imports_post */
+        Body_upload_program_import_api_v1_programs_imports_post: {
+            /** File */
+            file: string;
+        };
         /** BotDigestDraftRequest */
         BotDigestDraftRequest: {
             /** Admin Telegram User Id */
@@ -6711,6 +6835,183 @@ export interface components {
             start_date: string;
             /** Duration Weeks */
             duration_weeks: number;
+        };
+        /** ProgramImportCandidate */
+        ProgramImportCandidate: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Title */
+            title: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /**
+             * Match Type
+             * @enum {string}
+             */
+            match_type: "id" | "slug" | "title" | "alias" | "transliteration" | "manual";
+        };
+        /** ProgramImportConfirmResponse */
+        ProgramImportConfirmResponse: {
+            /** Import Id */
+            import_id: string;
+            template: components["schemas"]["ProgramTemplateResponse"];
+            /** Assigned Program Id */
+            assigned_program_id?: number | null;
+            /**
+             * Workouts Created
+             * @default 0
+             */
+            workouts_created: number;
+            target_user: components["schemas"]["ProgramTargetUserResponse"];
+        };
+        /** ProgramImportIssue */
+        ProgramImportIssue: {
+            /** Code */
+            code: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "blocking" | "warning";
+            /** Message */
+            message: string;
+            /** Location */
+            location?: string | null;
+            /** Field */
+            field?: string | null;
+            /** Source Sheet */
+            source_sheet?: string | null;
+            /** Source Row */
+            source_row?: number | null;
+            /** Source Cell */
+            source_cell?: string | null;
+        };
+        /** ProgramImportResolveRequest */
+        ProgramImportResolveRequest: {
+            /** Title */
+            title?: string | null;
+            /** Goal */
+            goal?: ("muscle_gain" | "fat_loss" | "maintenance" | "recomposition") | null;
+            /** Level */
+            level?: ("beginner" | "intermediate" | "advanced") | null;
+            /** Rows */
+            rows?: components["schemas"]["ProgramImportRowResolution"][];
+        };
+        /** ProgramImportResponse */
+        ProgramImportResponse: {
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "cancelled" | "expired";
+            /**
+             * Source Format
+             * @enum {string}
+             */
+            source_format: "csv" | "xlsx";
+            /** Schema Version */
+            schema_version: number;
+            /** Parser Version */
+            parser_version: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Program Title */
+            program_title?: string | null;
+            /** Goal */
+            goal?: ("muscle_gain" | "fat_loss" | "maintenance" | "recomposition") | null;
+            /** Level */
+            level?: ("beginner" | "intermediate" | "advanced") | null;
+            /** Rows */
+            rows: components["schemas"]["ProgramImportRow"][];
+            /** Issues */
+            issues: components["schemas"]["ProgramImportIssue"][];
+            summary: components["schemas"]["ProgramImportSummary"];
+        };
+        /** ProgramImportRow */
+        ProgramImportRow: {
+            /** Row Number */
+            row_number: number;
+            /** Source Sheet */
+            source_sheet?: string | null;
+            /** Source Range */
+            source_range?: string | null;
+            /** Source Cells */
+            source_cells?: {
+                [key: string]: string;
+            };
+            /** Day Number */
+            day_number?: number | null;
+            /** Day Title */
+            day_title?: string | null;
+            /** Exercise Name */
+            exercise_name?: string | null;
+            /** Exercise Id */
+            exercise_id?: number | null;
+            /** Exercise Slug */
+            exercise_slug?: string | null;
+            /** Metric Type */
+            metric_type?: ("strength" | "cardio") | null;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds?: number | null;
+            /** Notes */
+            notes?: string | null;
+            /** Superset Group */
+            superset_group?: number | null;
+            /** Superset Order */
+            superset_order?: number | null;
+            /** Resolved Exercise Id */
+            resolved_exercise_id?: number | null;
+            /** Resolved Exercise Title */
+            resolved_exercise_title?: string | null;
+            /**
+             * Match Status
+             * @enum {string}
+             */
+            match_status: "matched" | "needs_resolution" | "invalid";
+            /** Match Type */
+            match_type?: ("id" | "slug" | "title" | "alias" | "transliteration" | "manual") | null;
+            /** Candidates */
+            candidates?: components["schemas"]["ProgramImportCandidate"][];
+            /** Issues */
+            issues?: components["schemas"]["ProgramImportIssue"][];
+        };
+        /** ProgramImportRowResolution */
+        ProgramImportRowResolution: {
+            /** Row Number */
+            row_number: number;
+            /** Exercise Id */
+            exercise_id?: number | null;
+        };
+        /** ProgramImportSummary */
+        ProgramImportSummary: {
+            /** Row Count */
+            row_count: number;
+            /** Cell Count */
+            cell_count: number;
+            /** Matched Row Count */
+            matched_row_count: number;
+            /** Unresolved Row Count */
+            unresolved_row_count: number;
+            /** Blocking Issue Count */
+            blocking_issue_count: number;
+            /** Warning Count */
+            warning_count: number;
         };
         /** ProgramRecommendationCriteria */
         ProgramRecommendationCriteria: {
@@ -11248,6 +11549,201 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClientResponse"][];
+                };
+            };
+        };
+    };
+    download_csv_template_api_v1_programs_imports_template_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    download_xlsx_template_api_v1_programs_imports_template_xlsx_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    upload_program_import_api_v1_programs_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_program_import_api_v1_programs_imports_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_import_preview_api_v1_programs_imports__import_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_import_preview_api_v1_programs_imports__import_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramImportResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_import_preview_api_v1_programs_imports__import_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_import_preview_api_v1_programs_imports__import_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -21,7 +21,7 @@
 | `91` | Результат `90B` | | | Rollout получил `Go`, а пользователям нужна интерпретация factual report | | |
 | `92A` memory | Результат `90B` | | | Beta доказала конкретный repeated continuity job | | |
 | `92B` provider routing | Результат `90B` | | | Beta выявила измеримый provider outage/capability/cost gap | | |
-| `93A` | Corpus structured XLSX/CSV и baseline ручного переноса | | | Versioned template/approved layouts покрывают полезную долю job; deterministic extraction/matching/preview проходят заданные критерии без AI dependency | | |
+| `93A` | Owner Narrow Go в launch brief Task 93A, 2026-09-06; synthetic versioned corpus добавлен в `backend/tests/test_program_import.py`; реальный пользовательский corpus недоступен | `pre-implementation quantitative baseline: not measured` | Канонический шаблон v1 даёт ограниченный deterministic scope; нужны bounded extraction/matching/preview, manual resolution, privacy-safe telemetry и atomic private unassigned confirm | Versioned canonical template покрывает согласованный v1 job; AI dependency и произвольные layouts исключены | `Narrow Go` | 2026-09-06 |
 | `93B` | Результат и usage baseline `93A`; corpus heterogeneous XLSX/CSV/TXT/DOCX | | | Измеримый unsupported/manual-resolution gap сохраняется; compatible provider privacy/cost contract принят; AI улучшает locked baseline без critical failures | | |
 | `94A` | | | | После AI-блока manual food entry friction измерим; owner одобрил bounded research/provider-cost boundary | | |
 | `94B` | Результат `94A` | | | Только owner `Go/Narrow Go` с locked cases/thresholds/privacy/cost | | |

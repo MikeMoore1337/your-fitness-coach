@@ -61,6 +61,7 @@ from fitminiapp_api.models.program import (
     WorkoutAdaptation,
     WorkoutSetMutation,
 )
+from fitminiapp_api.models.program_import import ProgramImport
 from fitminiapp_api.models.recipe import Recipe, RecipeIngredient
 from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
 from fitminiapp_api.models.report_handoff import ReportHandoff
@@ -130,6 +131,7 @@ __all__ = [
     "OAuthTransaction",
     "Payment",
     "Plan",
+    "ProgramImport",
     "ProgramRevision",
     "ProgramTemplate",
     "ProgramTemplateDay",

@@ -272,10 +272,12 @@ def create_template(
     current_user: User,
     payload: ProgramTemplateCreate,
     target_user: User | None = None,
+    *,
+    force_private: bool = False,
 ) -> ProgramTemplate:
     validate_program_payload(payload)
 
-    is_public = has_verified_root_identity(db, current_user)
+    is_public = not force_private and has_verified_root_identity(db, current_user)
     owner_user = target_user if payload.mode == "coach" else current_user
     if owner_user is None:
         raise ProgramError("Target user is required in coach mode")
