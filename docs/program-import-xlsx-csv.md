@@ -98,6 +98,6 @@ round-trip, обычную CSV-таблицу с разделителем `;`, �
 сопоставление, duplicate/empty rows, adversarial XLSX, owner isolation,
 cancel/expiry и idempotent confirm.
 
-Миграция `0077_periodized_program_templates` добавляет длительность шаблона и
+Миграция `0077_periodized_templates` добавляет длительность шаблона и
 таблицу недельных назначений; существующие шаблоны получают длительность в одну
 неделю и не меняют своё поведение.

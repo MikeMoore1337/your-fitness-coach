@@ -421,6 +421,7 @@ def assign_template_to_user(
     assignment_exercises: dict[int, Exercise] = {}
     assignment_prescriptions: dict[int, ExercisePrescription] = {}
     assignment_week_exercises: dict[tuple[int, int], Exercise] = {}
+    assignment_week_exercise_ids: dict[tuple[int, int], int] = {}
     assignment_week_prescriptions: dict[tuple[int, int], ExercisePrescription] = {}
     has_weekly_prescriptions = template.default_duration_weeks > 1 or any(
         exercise_item.weekly_prescriptions
@@ -449,6 +450,9 @@ def assign_template_to_user(
                 if weekly_exercise is None:
                     raise ProgramError("Weekly exercise is not available for program owner")
                 assignment_week_exercises[(exercise_item.id, weekly.week_number)] = weekly_exercise
+                assignment_week_exercise_ids[(exercise_item.id, weekly.week_number)] = (
+                    weekly.exercise_id
+                )
                 assignment_week_prescriptions[(exercise_item.id, weekly.week_number)] = (
                     normalize_exercise_prescription(
                         weekly_exercise,
@@ -547,9 +551,12 @@ def assign_template_to_user(
                     (exercise_item.id, week_index + 1),
                     assignment_prescriptions[exercise_item.id],
                 )
+                selected_weekly_exercise_id = assignment_week_exercise_ids.get(
+                    (exercise_item.id, week_index + 1)
+                )
                 workout_exercise = UserWorkoutExercise(
                     workout=workout,
-                    exercise_id=exercise.id,
+                    exercise_id=selected_weekly_exercise_id or exercise_item.exercise_id,
                     metric_type=exercise_metric_type(exercise),
                     sort_order=exercise_item.sort_order,
                     prescribed_sets=prescription.prescribed_sets,

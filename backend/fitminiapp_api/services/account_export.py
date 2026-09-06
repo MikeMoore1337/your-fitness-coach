@@ -89,6 +89,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "program_templates": "program_templates",
     "program_template_days": "program_templates",
     "program_template_exercises": "program_templates",
+    "program_template_exercise_weeks": "program_templates",
     "hidden_program_templates": "hidden_program_templates",
     "user_programs": "programs",
     "program_revisions": "programs",
@@ -309,6 +310,7 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
         "level": template.level,
         "split_type": template.split_type,
         "is_public": template.is_public,
+        "default_duration_weeks": template.default_duration_weeks,
         "created_at": template.created_at,
         "days": [
             {
@@ -334,6 +336,21 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
                     | {
                         "exercise_title": exercise.exercise.title,
                         "metric_type": exercise.exercise.metric_type or "strength",
+                        "weekly_prescriptions": [
+                            _fields(
+                                prescription,
+                                (
+                                    "id",
+                                    "exercise_id",
+                                    "week_number",
+                                    "prescribed_sets",
+                                    "prescribed_reps",
+                                    "prescribed_duration_minutes",
+                                    "rest_seconds",
+                                ),
+                            )
+                            for prescription in exercise.weekly_prescriptions
+                        ],
                     }
                     for exercise in day.exercises
                 ],
@@ -614,7 +631,10 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .options(
             selectinload(ProgramTemplate.days)
             .selectinload(ProgramTemplateDay.exercises)
-            .joinedload(ProgramTemplateExercise.exercise)
+            .options(
+                joinedload(ProgramTemplateExercise.exercise),
+                selectinload(ProgramTemplateExercise.weekly_prescriptions),
+            )
         )
         .filter(ProgramTemplate.owner_user_id == user.id)
         .order_by(ProgramTemplate.created_at.asc(), ProgramTemplate.id.asc())

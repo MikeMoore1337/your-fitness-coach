@@ -1,6 +1,6 @@
 """Store week-specific prescriptions for imported program templates.
 
-Revision ID: 0077_periodized_program_templates
+Revision ID: 0077_periodized_templates
 Revises: 0076_program_imports
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "0077_periodized_program_templates"
+revision: str = "0077_periodized_templates"
 down_revision: str | None = "0076_program_imports"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
