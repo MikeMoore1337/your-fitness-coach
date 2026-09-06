@@ -53,11 +53,16 @@ class ProgramTemplate(Base):
         ForeignKey("users.id"), index=True, nullable=True
     )
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
-    # The online expand keeps this column nullable; 0078 backfills existing rows and
-    # application-level creation/update paths continue to provide a validated default.
+    # The online expand keeps this column nullable; legacy NULL rows use the effective
+    # one-week value below while creation/update paths provide a validated default.
     default_duration_weeks: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
+
+    @property
+    def effective_duration_weeks(self) -> int:
+        return self.default_duration_weeks or 1
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=now_msk_naive,

@@ -18,7 +18,8 @@ depends_on: str | Sequence[str] | None = None
 online_rollout_phase = "expand"
 online_rollout_notes = (
     "Adds a nullable duration column and the new week-prescription table without rewriting "
-    "the existing program_templates table; the bounded default backfill runs in 0078."
+    "the existing program_templates table; legacy NULL durations are handled as one week "
+    "by the application until an explicit contract migration is approved."
 )
 
 

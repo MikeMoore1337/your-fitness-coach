@@ -46,6 +46,22 @@ def test_recommendation_requires_authenticated_user(client):
     assert response.status_code == 401
 
 
+def test_legacy_template_duration_defaults_to_one_week_without_backfill():
+    template = ProgramTemplate(
+        slug="legacy-duration-template",
+        title="Legacy duration",
+        goal="recomposition",
+        level="intermediate",
+        is_public=True,
+    )
+
+    assert template.default_duration_weeks is None
+    assert template.effective_duration_weeks == 1
+
+    template.default_duration_weeks = 12
+    assert template.effective_duration_weeks == 12
+
+
 @pytest.mark.parametrize(
     ("goal", "experience", "workouts_per_week", "expected_status"),
     [

@@ -310,7 +310,7 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
         "level": template.level,
         "split_type": template.split_type,
         "is_public": template.is_public,
-        "default_duration_weeks": template.default_duration_weeks,
+        "default_duration_weeks": template.effective_duration_weeks,
         "created_at": template.created_at,
         "days": [
             {
