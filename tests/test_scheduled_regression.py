@@ -130,7 +130,7 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert "ALLURE_PUBLIC_HOSTNAME: ${ALLURE_PUBLIC_HOSTNAME:-}" in public_caddy_block
     assert "ALLURE_BASIC_AUTH_HASH: ${ALLURE_BASIC_AUTH_HASH:-}" in public_caddy_block
     assert "allure_reports:" in public_caddy_block
-    assert "basic_auth" in public_caddy_block
+    assert "basic_auth argon2id {" in public_caddy_block
     assert "reverse_proxy allure-report-origin:8080" in public_caddy_block
     assert "file_server" in caddy
     assert "browse" not in caddy
