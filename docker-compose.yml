@@ -182,6 +182,11 @@ services:
       # Optional for backward compatibility. When set, Caddy serves the same
       # backend on the public landing hostname as well as the app hostname.
       LANDING_DOMAIN: ${LANDING_DOMAIN:-}
+      # Optional private Allure hostname. The route is emitted only when the
+      # hostname is configured and requires a pre-hashed password.
+      ALLURE_PUBLIC_HOSTNAME: ${ALLURE_PUBLIC_HOSTNAME:-}
+      ALLURE_BASIC_AUTH_USER: ${ALLURE_BASIC_AUTH_USER:-}
+      ALLURE_BASIC_AUTH_HASH: ${ALLURE_BASIC_AUTH_HASH:-}
     entrypoint:
       - /bin/sh
       - -ec
@@ -192,6 +197,42 @@ services:
             SITE_ADDRESSES="$${APP_DOMAIN}, $${LANDING_CANONICAL}, www.$${LANDING_CANONICAL}"
         else
             SITE_ADDRESSES="$${APP_DOMAIN}"
+        fi
+        ALLURE_SITE=""
+        if [ -n "$${ALLURE_PUBLIC_HOSTNAME}" ]; then
+            : "$${ALLURE_BASIC_AUTH_USER:?ALLURE_BASIC_AUTH_USER is required when ALLURE_PUBLIC_HOSTNAME is set}"
+            : "$${ALLURE_BASIC_AUTH_HASH:?ALLURE_BASIC_AUTH_HASH is required when ALLURE_PUBLIC_HOSTNAME is set}"
+            case "$${ALLURE_PUBLIC_HOSTNAME}" in
+                *[!A-Za-z0-9.-]*)
+                    echo "ALLURE_PUBLIC_HOSTNAME must be a DNS hostname" >&2
+                    exit 1
+                    ;;
+            esac
+            case "$${ALLURE_BASIC_AUTH_USER}" in
+                *[!A-Za-z0-9._-]*)
+                    echo "ALLURE_BASIC_AUTH_USER contains unsupported characters" >&2
+                    exit 1
+                    ;;
+            esac
+            ALLURE_SITE="$$(cat <<ALLURE_CADDY_EOF
+        $${ALLURE_PUBLIC_HOSTNAME} {
+            encode zstd gzip
+
+            header {
+                Strict-Transport-Security "max-age=31536000; includeSubDomains"
+                X-Content-Type-Options "nosniff"
+                Referrer-Policy "no-referrer"
+                Content-Security-Policy "default-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+            }
+
+            basic_auth {
+                $${ALLURE_BASIC_AUTH_USER} $${ALLURE_BASIC_AUTH_HASH}
+            }
+
+            reverse_proxy allure-report-origin:8080
+        }
+        ALLURE_CADDY_EOF
+        )"
         fi
         cat > /etc/caddy/Caddyfile <<EOF
         $${SITE_ADDRESSES} {
@@ -205,6 +246,8 @@ services:
 
             reverse_proxy edge:8080
         }
+
+        $${ALLURE_SITE}
         EOF
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     depends_on:
@@ -220,6 +263,7 @@ services:
     networks:
       proxy_net:
         ipv4_address: 172.28.0.10
+      allure_reports:
 
   cloudflared:
     image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}

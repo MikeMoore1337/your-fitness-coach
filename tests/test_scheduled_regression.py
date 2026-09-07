@@ -118,6 +118,7 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     action = (root / ".github" / "actions" / "upload-allure-results" / "action.yml").read_text(
         encoding="utf-8"
     )
+    public_caddy_block = compose.split("  caddy:\n", 1)[1].split("\n  cloudflared:\n", 1)[0]
     origin_block = compose.split("  allure-report-origin:\n", 1)[1].split("\n  worker:\n", 1)[0]
 
     assert 'profiles: ["allure-reports"]' in origin_block
@@ -126,6 +127,11 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert "\n    ports:" not in origin_block
     assert "allure_reports:\n    internal: true" in compose
     assert "TUNNEL_TOKEN: ${ALLURE_CLOUDFLARED_TUNNEL_TOKEN:-}" in compose
+    assert "ALLURE_PUBLIC_HOSTNAME: ${ALLURE_PUBLIC_HOSTNAME:-}" in public_caddy_block
+    assert "ALLURE_BASIC_AUTH_HASH: ${ALLURE_BASIC_AUTH_HASH:-}" in public_caddy_block
+    assert "allure_reports:" in public_caddy_block
+    assert "basic_auth" in public_caddy_block
+    assert "reverse_proxy allure-report-origin:8080" in public_caddy_block
     assert "file_server" in caddy
     assert "browse" not in caddy
     assert 'Cache-Control "private, no-store"' in caddy
