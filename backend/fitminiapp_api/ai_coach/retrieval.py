@@ -152,7 +152,11 @@ def _exercise_content(exercise: dict[str, object]) -> str:
     return "\n".join(part for part in parts if part)[: settings.ai_coach_max_context_chars]
 
 
-def _article_ref(article: WebArticle) -> ContextRef | None:
+def _article_ref(
+    article: WebArticle,
+    *,
+    allowed_categories: frozenset[str] | None = None,
+) -> ContextRef | None:
     if (
         article.status != "published"
         or article.published_at is None
@@ -196,7 +200,13 @@ def _article_ref(article: WebArticle) -> ContextRef | None:
     if _PROMPT_INJECTION_PATTERN.search(content):
         raise ContextUnsafe("public_context_contains_instruction_like_text")
     topics = [topic for topic in article.topics if isinstance(topic, str)]
-    category = topics[0] if topics else "public"
+    if allowed_categories is None:
+        category = topics[0] if topics else "public"
+    else:
+        matched_category = next((topic for topic in topics if topic in allowed_categories), None)
+        if matched_category is None:
+            return None
+        category = matched_category
     return ContextRef(
         ref_id=f"article:{article.slug}",
         title=article.title,
@@ -219,12 +229,13 @@ def _page_ref(page: dict[str, object]) -> ContextRef | None:
     path = _as_text(page.get("path"), max_length=256)
     updated = page.get("updated")
     is_guide = page.get("kind") == "guide"
-    if (
-        not page_id
-        or not path
-        or not _SAFE_CONTEXT_ID.fullmatch(page_id)
-        or (is_guide and not _is_current(updated))
-    ):
+    if not path or (is_guide and not _is_current(updated)):
+        return None
+    if not page_id:
+        if page.get("kind") != "product":
+            return None
+        page_id = f"product:{path}"
+    if not _SAFE_CONTEXT_ID.fullmatch(page_id):
         return None
     canonical = _safe_source(_public_url(path))
     if canonical is None:
@@ -263,7 +274,11 @@ def _page_ref(page: dict[str, object]) -> ContextRef | None:
         return None
     if _PROMPT_INJECTION_PATTERN.search(content):
         raise ContextUnsafe("public_context_contains_instruction_like_text")
-    category = _as_text(page.get("category"), max_length=64)
+    category = (
+        "product"
+        if page.get("kind") == "product"
+        else _as_text(page.get("category"), max_length=64)
+    )
     if not category:
         category = path.strip("/").split("/", 1)[0] or "public"
     reviewer = _reviewer_name(page.get("reviewer")) or _reviewer_name(page.get("author"))
@@ -336,7 +351,7 @@ def retrieve_context(db: Session, request: AiCoachRequest) -> tuple[ContextRef, 
             .one_or_none()
         )
         if article is not None:
-            ref = _article_ref(article)
+            ref = _article_ref(article, allowed_categories=_JOB_CATEGORIES[request.job])
     elif request.context_id.startswith("exercise:"):
         ref = _exercise_ref(request.context_id.removeprefix("exercise:"))
     else:

@@ -215,12 +215,12 @@ class AiCoachService:
         outcome = AiCoachOutcome.UNAVAILABLE
         error_code: str | None = None
         try:
-            if request.data_class != AiCoachDataClass.GENERIC:
-                error_code = ProviderErrorCode.POLICY_BLOCKED.value
-                return self._unavailable_response(request, request_id, safety)
             if safety != SafetyCategory.CLEAR:
                 outcome = AiCoachOutcome.SAFETY_REFUSAL
                 return self._safety_response(request, request_id, safety)
+            if request.data_class != AiCoachDataClass.GENERIC:
+                error_code = ProviderErrorCode.POLICY_BLOCKED.value
+                return self._unavailable_response(request, request_id, safety)
             if not settings.ai_coach_enabled or settings.ai_coach_kill_switch:
                 error_code = ProviderErrorCode.DISABLED.value
                 return self._unavailable_response(request, request_id, safety)
@@ -277,9 +277,10 @@ class AiCoachService:
             outcome = AiCoachOutcome.ANSWER
             return self._answer_response(request, request_id, safety, result, context_refs)
         except ContextUnsafe:
+            safety = SafetyCategory.PROMPT_INJECTION
             error_code = "context_safety_blocked"
             outcome = AiCoachOutcome.SAFETY_REFUSAL
-            return self._safety_response(request, request_id, SafetyCategory.PROMPT_INJECTION)
+            return self._safety_response(request, request_id, safety)
         except ContextUnavailable:
             error_code = "context_unavailable"
             return self._unavailable_response(request, request_id, safety)

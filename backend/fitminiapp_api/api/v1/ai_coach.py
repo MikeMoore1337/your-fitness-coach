@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.ai_coach.contracts import AiCoachDataClass, AiCoachRequest, AiCoachResponse
+from fitminiapp_api.ai_coach.safety import SafetyCategory, classify_message
 from fitminiapp_api.ai_coach.service import ai_coach_service
 from fitminiapp_api.api.dependencies.auth import require_user
 from fitminiapp_api.core.rate_limit import limiter
@@ -24,11 +25,19 @@ def generate_ai_coach_answer(
 ) -> AiCoachResponse:
     # This route is physically generic-only: no profile, diary, workout,
     # trainer object or conversation history is loaded or passed downstream.
+    # A message that looks personal is never labelled as trusted generic input;
+    # the service still re-checks the content before any provider call.
+    safety_category = classify_message(payload.message)
+    data_class = (
+        AiCoachDataClass.UNKNOWN
+        if safety_category != SafetyCategory.CLEAR
+        else AiCoachDataClass.GENERIC
+    )
     internal_request = AiCoachRequest(
         job=payload.job,
         context_id=payload.context_id,
         message=payload.message,
-        data_class=AiCoachDataClass.GENERIC,
+        data_class=data_class,
     )
     return ai_coach_service.generate(
         db=db,

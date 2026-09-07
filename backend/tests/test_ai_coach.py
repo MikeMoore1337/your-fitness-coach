@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import ClassVar
 
 import pytest
@@ -21,7 +24,7 @@ from fitminiapp_api.ai_coach.contracts import (
     ProviderStructuredResponse,
 )
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
-from fitminiapp_api.ai_coach.retrieval import _page_ref
+from fitminiapp_api.ai_coach.retrieval import _article_ref, _page_ref
 from fitminiapp_api.ai_coach.service import ai_coach_service
 from fitminiapp_api.core.config import Settings, settings
 from fitminiapp_api.db.session import get_session_context
@@ -195,7 +198,15 @@ def test_public_term_explanation_is_not_blocked_as_personal_inference(monkeypatc
     assert provider.calls
 
 
-@pytest.mark.parametrize("message", ["Сколько мне нужно белка?", "Мой вес 80 кг, объясни норму."])
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Сколько мне нужно белка?",
+        "Мой вес 80 кг, объясни норму.",
+        "Я вешу 80 кг",
+        "Мне 35 лет",
+    ],
+)
 def test_personal_training_or_nutrition_data_is_refused_before_provider(
     monkeypatch, message
 ) -> None:
@@ -213,6 +224,54 @@ def test_personal_training_or_nutrition_data_is_refused_before_provider(
 
     assert response.outcome == "safety_refusal"
     assert response.safety_category == "personal_data"
+    assert provider.calls == []
+
+
+@pytest.mark.parametrize(
+    "answer", ["Принимайте 5 г креатина ежедневно.", "Ваш TDEE составляет 2400 ккал."]
+)
+def test_prohibited_provider_claim_is_rejected_before_response(monkeypatch, answer) -> None:
+    _enable_provider(monkeypatch)
+    provider = StubProvider(calls=[], answer=answer)
+    monkeypatch.setattr(ai_coach_service, "provider", provider)
+
+    with get_session_context() as db:
+        response = ai_coach_service.generate(
+            db=db,
+            request=_request(),
+            user_key="user-prohibited-output",
+            request_id="request-prohibited-output",
+        )
+
+    assert response.outcome == "invalid_output"
+    assert response.answer is None
+    assert provider.calls
+
+
+def test_authenticated_api_does_not_mark_personal_text_as_generic(client, monkeypatch) -> None:
+    _enable_provider(monkeypatch)
+    provider = StubProvider(calls=[])
+    monkeypatch.setattr(ai_coach_service, "provider", provider)
+    login = client.post(
+        "/api/v1/auth/dev-login",
+        json={"telegram_user_id": 987_658, "username": "ai_personal_boundary"},
+    )
+    assert login.status_code == 200
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    response = client.post(
+        "/api/v1/ai-coach/generate",
+        headers=headers,
+        json={
+            "job": "nutrition_knowledge",
+            "context_id": "knowledge-kbju-reference-v1",
+            "message": "Я вешу 80 кг",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "safety_refusal"
+    assert response.json()["safety_category"] == "personal_data"
     assert provider.calls == []
 
 
@@ -420,7 +479,47 @@ def test_retrieval_excludes_draft_and_stale_guides() -> None:
     assert _page_ref(page) is None
 
 
-def test_retrieved_instruction_like_text_is_refused_before_provider(monkeypatch) -> None:
+def test_product_page_gets_stable_context_ref_without_manifest_id() -> None:
+    page = {
+        "kind": "product",
+        "path": "/training",
+        "title": "Тренировки и программы",
+        "description": "Публичное описание раздела.",
+        "heading": "Тренировки",
+        "intro": "Общие правила работы с программой.",
+        "sections": [{"heading": "Раздел", "paragraphs": ["Проверенный текст."]}],
+    }
+
+    ref = _page_ref(page)
+
+    assert ref is not None
+    assert ref.ref_id == "product:/training"
+    assert ref.category == "product"
+
+
+def test_article_topics_use_job_category_intersection() -> None:
+    article = SimpleNamespace(
+        status="published",
+        published_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        slug="multi-topic-article",
+        title="Материал о тренировках",
+        description="Проверенный материал.",
+        lead="Общие сведения о тренировках.",
+        body_sections=[],
+        topics=["strength_hypertrophy", "training"],
+        sources=[],
+        domain_reviewer=None,
+        editor={"name": "Редакция"},
+    )
+
+    ref = _article_ref(article, allowed_categories=frozenset({"training"}))
+
+    assert ref is not None
+    assert ref.category == "training"
+
+
+def test_retrieved_instruction_like_text_is_refused_before_provider(monkeypatch, caplog) -> None:
     _enable_provider(monkeypatch)
     provider = StubProvider(calls=[])
     monkeypatch.setattr(ai_coach_service, "provider", provider)
@@ -457,6 +556,7 @@ def test_retrieved_instruction_like_text_is_refused_before_provider(monkeypatch)
             },
         ),
     )
+    caplog.set_level(logging.INFO, logger="app.ai_coach")
 
     with get_session_context() as db:
         response = ai_coach_service.generate(
@@ -472,6 +572,10 @@ def test_retrieved_instruction_like_text_is_refused_before_provider(monkeypatch)
     assert response.outcome == "safety_refusal"
     assert response.safety_category == "prompt_injection"
     assert provider.calls == []
+    generation_record = next(
+        record for record in caplog.records if record.getMessage() == "ai_coach_generation"
+    )
+    assert generation_record.safety_category == "prompt_injection"
 
 
 def _provider_context() -> tuple[ContextRef, ...]:

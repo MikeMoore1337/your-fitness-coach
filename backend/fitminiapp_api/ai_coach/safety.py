@@ -105,7 +105,13 @@ _PATTERNS: tuple[tuple[SafetyCategory, re.Pattern[str]], ...] = (
             r"(?:вес|рост|возраст)\s*[:=]?\s*\d+(?:[.,]\d+)?|"
             r"(?:сколько|какой|какие).{0,48}\b(?:мне|мой|моя|мои)\b.{0,48}"
             r"(?:калор|ккал|белк|жир|углевод|трениров|программ|нагрузк|"
-            r"weight|calorie|protein|training|workout))",
+            r"weight|calorie|protein|training|workout)|"
+            r"\bя\s+(?:вешу|весом|тренируюсь|занимаюсь|бегаю|сплю|"
+            r"сделал(?:а)?|выполнил(?:а)?|поднял(?:а)?|пробежал(?:а)?)\b|"
+            r"\bмне\s+\d+\s*(?:лет|года|год)\b|"
+            r"\b(?:я|i)\b.{0,64}\b\d+(?:[.,]\d+)?\s*"
+            r"(?:кг|килограмм(?:а|ов)?|см|сантиметр(?:а|ов)?|лет|года|год|"
+            r"ккал|bpm|kg|cm|years?)\b)",
             re.IGNORECASE,
         ),
     ),
@@ -118,6 +124,25 @@ _OUTPUT_BLOCKLIST = re.compile(
     r"игнорируй\s+(?:все\s+)?предыдущие\s+инструкции|developer\s+message)",
     re.IGNORECASE,
 )
+_OUTPUT_PROHIBITED_CLAIM_BLOCKLIST = re.compile(
+    r"(?:"
+    r"\b(?:принимай(?:те)?|принимать|назнач(?:ь|ьте|аю)|используй(?:те)?|"
+    r"начни(?:те)?|пей(?:те)?|рекоменду(?:ю|ется|йте)?|take|use|start|recommend)\b"
+    r".{0,120}(?:\b\d+(?:[.,]\d+)?\s*(?:мг|г|мл|таблет(?:ка|ки|ок)?|mg|g|ml)\b|"
+    r"\b(?:креатин|протеин|витамин(?:ы|ов)?|добавк(?:а|и)?|"
+    r"ибупрофен|парацетамол|аспирин|антибиотик(?:и|ов)?|"
+    r"creatine|protein|vitamin|supplement|medication)\b)|"
+    r"\b\d+(?:[.,]\d+)?\s*(?:мг|г|мл)\s+"
+    r"(?:креатин|протеин|витамин|добавк|creatine|protein|vitamin|supplement)\b|"
+    r"\b(?:у\s+вас|вам|это|похоже\s+на)\s+"
+    r"(?:диагноз|заболев\w*|болезн\w*|травм\w*|синдром\w*|симптом\w*)\b|"
+    r"\b(?:ваш|ваша|ваше|ваши|твой|твоя|твоё|твои|мой|моя|мои|"
+    r"для\s+(?:вас|меня))\b.{0,96}\b"
+    r"(?:tdee|bmr|кбжу|калори\w*|health\s+score|readiness|"
+    r"пульс\w*|восстановлен\w*|fatigue)\b"
+    r")",
+    re.IGNORECASE,
+)
 _URL_PATTERN = re.compile(r"https?://", re.IGNORECASE)
 _CYRILLIC_PATTERN = re.compile(r"[А-Яа-яЁё]")
 
@@ -126,12 +151,16 @@ def normalize_user_text(value: str) -> str:
     return unicodedata.normalize("NFKC", value).strip()
 
 
-def classify_request(request: AiCoachRequest) -> SafetyCategory:
-    text = normalize_user_text(request.message)
+def classify_message(message: str) -> SafetyCategory:
+    text = normalize_user_text(message)
     for category, pattern in _PATTERNS:
         if pattern.search(text):
             return category
     return SafetyCategory.CLEAR
+
+
+def classify_request(request: AiCoachRequest) -> SafetyCategory:
+    return classify_message(request.message)
 
 
 def refusal_text(category: SafetyCategory) -> str:
@@ -178,8 +207,12 @@ def validate_provider_output(
         raise ValueError("answer_language_invalid")
     if _OUTPUT_BLOCKLIST.search(output.answer) or _URL_PATTERN.search(output.answer):
         raise ValueError("answer_contains_untrusted_instruction_or_url")
+    if _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(output.answer):
+        raise ValueError("answer_contains_prohibited_claim")
     if any(_OUTPUT_BLOCKLIST.search(item) for item in output.limitations):
         raise ValueError("limitation_contains_sensitive_content")
+    if any(_OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(item) for item in output.limitations):
+        raise ValueError("limitation_contains_prohibited_claim")
     if not output.citation_ids or any(
         ref_id not in allowed_ref_ids for ref_id in output.citation_ids
     ):
