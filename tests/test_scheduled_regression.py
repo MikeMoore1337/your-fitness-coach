@@ -1,6 +1,8 @@
+import ast
 import io
 import json
 import shutil
+import subprocess
 import tarfile
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -147,6 +149,43 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert not (root / "deploy" / "allure-report-worker").exists()
     assert "testIgnore: ['**/mobile-ui-regression.spec.ts']" in cross_browser
     assert '--run-id "${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"' in workflow
+
+
+def test_publisher_scripts_parse_on_vps_python_310() -> None:
+    root = Path(__file__).parents[1]
+    for relative in (
+        Path("scripts") / "allure_report_origin.py",
+        Path("deploy") / "allure-report-origin" / "publisher.py",
+    ):
+        source = (root / relative).read_text(encoding="utf-8")
+        ast.parse(source, filename=str(root / relative), feature_version=(3, 10))
+
+
+def test_publisher_imports_on_python_310_when_available() -> None:
+    python310 = shutil.which("python3.10")
+    if python310 is None:
+        pytest.skip("python3.10 is unavailable in the local test environment")
+
+    root = Path(__file__).parents[1]
+    result = subprocess.run(
+        [
+            python310,
+            "-c",
+            (
+                "import sys\n"
+                "sys.path.insert(0, 'scripts')\n"
+                "import allure_report_origin\n"
+                "sys.path.insert(0, 'deploy/allure-report-origin')\n"
+                "import publisher\n"
+            ),
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_origin_rejects_noncanonical_state_paths() -> None:
