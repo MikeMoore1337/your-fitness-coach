@@ -16,7 +16,7 @@ import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager, suppress
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO, Final
 from zoneinfo import ZoneInfo
@@ -44,6 +44,12 @@ _CONTROL_CHARACTERS = re.compile(r"[\u0000-\u001f\u007f]")
 
 class ReportOriginError(RuntimeError):
     """The isolated report origin rejected an unsafe or inconsistent request."""
+
+
+_ORIGIN_ERRORS: Final = (ReportOriginError, OSError)
+_MAIN_ERRORS: Final = (ReportOriginError, OSError, ValueError)
+# The publisher runs with the VPS system Python 3.10, where datetime.UTC is unavailable.
+_UTC: Final = timezone.utc  # noqa: UP017
 
 
 def _safe_segment(value: object, *, field: str) -> str:
@@ -117,7 +123,7 @@ def _parse_timestamp(value: object) -> datetime:
         raise ReportOriginError("report timestamp is invalid") from error
     if parsed.tzinfo is None:
         raise ReportOriginError("report timestamp must include a timezone")
-    return parsed.astimezone(UTC)
+    return parsed.astimezone(_UTC)
 
 
 def _local_date(value: object) -> date:
@@ -663,10 +669,10 @@ def _handle_request_unlocked(
     root = root.resolve()
     root.mkdir(parents=True, exist_ok=True)
     os.chmod(root, 0o750)
-    moment = now or datetime.now(UTC)
+    moment = now or datetime.now(_UTC)
     if moment.tzinfo is None:
         raise ReportOriginError("publication timestamp must include a timezone")
-    moment = moment.astimezone(UTC)
+    moment = moment.astimezone(_UTC)
     magic = source.read(len(PROTOCOL_MAGIC))
     if magic != PROTOCOL_MAGIC:
         raise ReportOriginError("unsupported publication protocol")
@@ -771,7 +777,7 @@ def _handle_request_unlocked(
         )
         destination.flush()
         return response
-    except ReportOriginError, OSError:
+    except _ORIGIN_ERRORS:
         if installed and not metadata_committed:
             shutil.rmtree(final_root, ignore_errors=True)
         raise
@@ -853,7 +859,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         handle_request(sys.stdin.buffer, sys.stdout.buffer, root=args.root)
         return 0
-    except ReportOriginError, OSError, ValueError:
+    except _MAIN_ERRORS:
         try:
             sys.stdout.write(
                 json.dumps({"status": "error", "error": "publication rejected"}) + "\n"
