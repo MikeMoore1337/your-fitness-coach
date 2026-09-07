@@ -45,6 +45,36 @@ REPORT_SUITES_BY_RUN_KIND: Mapping[str, tuple[str, ...]] = {
         "migrated-stack",
     ),
 }
+REPORT_BUNDLES_BY_RUN_KIND: Mapping[str, tuple[tuple[str, str], ...]] = {
+    "daily": (
+        ("frontend-checks", "node-unit"),
+        ("frontend-e2e", "chromium-shard-1"),
+        ("frontend-e2e", "chromium-shard-2"),
+        ("frontend-e2e", "chromium-shard-3"),
+        ("frontend-e2e", "chromium-shard-4"),
+        ("frontend-mobile-regression", "mobile-chromium-webkit"),
+        ("python-tests", "python-shard-1"),
+        ("python-tests", "python-shard-2"),
+        ("python-tests", "python-shard-3"),
+        ("python-tests", "python-shard-4"),
+        ("migrated-stack", "chromium-api"),
+    ),
+    "weekly": (
+        ("frontend-checks", "node-unit"),
+        ("frontend-e2e", "chromium-shard-1"),
+        ("frontend-e2e", "chromium-shard-2"),
+        ("frontend-e2e", "chromium-shard-3"),
+        ("frontend-e2e", "chromium-shard-4"),
+        ("frontend-mobile-regression", "mobile-chromium-webkit"),
+        ("frontend-mobile-regression-extended", "mobile-firefox-webkit"),
+        ("frontend-cross-browser", "chromium-firefox-webkit"),
+        ("python-tests", "python-shard-1"),
+        ("python-tests", "python-shard-2"),
+        ("python-tests", "python-shard-3"),
+        ("python-tests", "python-shard-4"),
+        ("migrated-stack", "chromium-api"),
+    ),
+}
 REPORT_JOB_BY_SUITE: Mapping[str, str] = {
     "frontend-checks": "frontend",
     "frontend-e2e": "frontend-smoke",
@@ -105,6 +135,11 @@ def report_suites(run_kind: str) -> tuple[str, ...]:
     return REPORT_SUITES_BY_RUN_KIND[normalized]
 
 
+def report_bundles(run_kind: str) -> tuple[tuple[str, str], ...]:
+    normalized = normalize_run_kind(run_kind)
+    return REPORT_BUNDLES_BY_RUN_KIND[normalized]
+
+
 def report_jobs(run_kind: str) -> tuple[str, ...]:
     return tuple(REPORT_JOB_BY_SUITE[suite] for suite in report_suites(run_kind))
 
@@ -156,6 +191,10 @@ def contract_payload() -> dict[str, object]:
         "timezone": REPORT_TIMEZONE,
         "profiles": dict(PROFILE_BY_RUN_KIND),
         "report_suites": {kind: list(report_suites(kind)) for kind in RUN_KINDS},
+        "report_bundles": {
+            kind: [{"suite": suite, "browser": browser} for suite, browser in report_bundles(kind)]
+            for kind in RUN_KINDS
+        },
         "retention": {
             "daily_html_days": DAILY_RETENTION_DAYS,
             "weekly_report_count": WEEKLY_RETENTION_COUNT,

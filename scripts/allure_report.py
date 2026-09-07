@@ -21,6 +21,7 @@ if __package__:
         REPORT_BASE_URL,
         REPORT_TIMEZONE,
         immutable_report_path,
+        report_bundles,
         report_jobs,
         report_period,
         report_suites,
@@ -32,6 +33,7 @@ else:
         REPORT_BASE_URL,
         REPORT_TIMEZONE,
         immutable_report_path,
+        report_bundles,
         report_jobs,
         report_period,
         report_suites,
@@ -328,6 +330,8 @@ def _merge_bundle(
     run_kind: str,
     tier: str,
     seen_suites: set[str],
+    expected_bundle_keys: set[str],
+    seen_bundle_keys: set[str],
 ) -> tuple[int, list[str]]:
     issues: list[str] = []
     try:
@@ -336,6 +340,9 @@ def _merge_bundle(
         return 0, [str(error)]
     suite = str(manifest["suite"])
     browser = str(manifest["browser"])
+    bundle_key = f"{suite}/{browser}"
+    if bundle_key not in expected_bundle_keys:
+        return 0, [f"unexpected result bundle: {bundle_key}"]
     files: dict[str, Path] = {}
     for path in bundle.rglob("*"):
         if path.is_symlink():
@@ -386,6 +393,7 @@ def _merge_bundle(
             issues.append(str(error))
     if not issues:
         seen_suites.add(suite)
+        seen_bundle_keys.add(bundle_key)
     return len(result_paths) if not issues else 0, issues
 
 
@@ -432,7 +440,9 @@ def aggregate_results(
     output_root.mkdir(parents=True, exist_ok=True)
     now = created_at or datetime.now(UTC)
     expected_suites = report_suites(run_kind)
+    expected_bundle_keys = {f"{suite}/{browser}" for suite, browser in report_bundles(run_kind)}
     seen_suites: set[str] = set()
+    seen_bundle_keys: set[str] = set()
     issues: list[str] = []
     result_count = 0
     bundles = (
@@ -451,11 +461,16 @@ def aggregate_results(
             run_kind=run_kind,
             tier=tier,
             seen_suites=seen_suites,
+            expected_bundle_keys=expected_bundle_keys,
+            seen_bundle_keys=seen_bundle_keys,
         )
         result_count += count
         issues.extend(bundle_issues)
-    missing = sorted(set(expected_suites) - seen_suites)
-    issues.extend(f"required suite produced no valid results: {suite}" for suite in missing)
+    missing_bundles = sorted(expected_bundle_keys - seen_bundle_keys)
+    issues.extend(
+        f"required result bundle produced no valid results: {bundle_key}"
+        for bundle_key in missing_bundles
+    )
     if issues:
         for index, issue in enumerate(dict.fromkeys(issues)):
             synthetic = _synthetic_failure(
@@ -498,6 +513,8 @@ def aggregate_results(
         ),
         "expected_suites": list(expected_suites),
         "present_suites": sorted(seen_suites),
+        "expected_bundles": sorted(expected_bundle_keys),
+        "present_bundles": sorted(seen_bundle_keys),
         "issues": list(dict.fromkeys(issues)),
         "result_files": result_count,
         "duration_seconds": round(max(0.0, duration_seconds), 3),

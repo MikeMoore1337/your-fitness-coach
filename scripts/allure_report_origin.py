@@ -423,15 +423,6 @@ def _assert_layout(
             raise ReportOriginError("stored report size differs from report index")
 
 
-def _pending_bytes(root: Path, pending: Sequence[str]) -> int:
-    total = 0
-    for relative in pending:
-        target = _resolved_target(root, relative)
-        if target.exists():
-            total += _report_bytes(root, relative)
-    return total
-
-
 def _retained_reports(
     reports: Sequence[Mapping[str, object]],
     *,
@@ -713,9 +704,7 @@ def _handle_request_unlocked(
         ):
             if existing.get(field) != current.get(field):
                 raise ReportOriginError("immutable report path contains different metadata")
-    stored_bytes = sum(int(item["bytes"]) for item in reports)
-    stored_bytes += _pending_bytes(root, pending)
-    if _available_bytes(root) < stored_bytes + int(current["bytes"]) + MIN_FREE_BYTES:
+    if _available_bytes(root) < int(current["bytes"]) + MIN_FREE_BYTES:
         raise ReportOriginError("VPS free-space safety reserve is not available")
     report_now = moment.astimezone(ZoneInfo(REPORT_TIMEZONE)).date()
     retained, removed = _retained_reports(reports, current=current, now=report_now)

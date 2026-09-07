@@ -949,7 +949,7 @@ jobs:
             --metadata "$REPORT_METADATA" \
             --run-kind "$RUN_KIND" \
             --tier "$REPORT_TIER" \
-            --run-id "$GITHUB_RUN_ID" \
+            --run-id "${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}" \
             --commit-sha "$GITHUB_SHA" \
             --branch "$GITHUB_REF_NAME" \
             --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \

@@ -3,6 +3,7 @@ import { getPlaywrightReporters } from './playwright-reporting';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testIgnore: ['**/mobile-ui-regression.spec.ts'],
   outputDir: '../.artifacts/runtime/tests/playwright-cross-browser',
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,

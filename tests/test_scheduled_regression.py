@@ -62,11 +62,11 @@ def _aggregate_metadata(
     tmp_path: Path, *, attachment_text: str = "synthetic output"
 ) -> dict[str, object]:
     bundles = tmp_path / "bundles"
-    for suite in scheduled_regression.report_suites("daily"):
+    for suite, browser in scheduled_regression.report_bundles("daily"):
         _write_bundle(
             bundles,
             suite=suite,
-            browser="synthetic",
+            browser=browser,
             attachment_text=attachment_text,
         )
     metadata_path = tmp_path / "metadata.json"
@@ -111,6 +111,9 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     root = Path(__file__).parents[1]
     compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
     caddy = (root / "deploy" / "allure-report-origin" / "Caddyfile").read_text(encoding="utf-8")
+    cross_browser = (root / "frontend" / "playwright.cross-browser.config.ts").read_text(
+        encoding="utf-8"
+    )
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     action = (root / ".github" / "actions" / "upload-allure-results" / "action.yml").read_text(
         encoding="utf-8"
@@ -136,6 +139,8 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert "ALLURE_R2" not in workflow
     assert "allure-report-worker" not in workflow
     assert not (root / "deploy" / "allure-report-worker").exists()
+    assert "testIgnore: ['**/mobile-ui-regression.spec.ts']" in cross_browser
+    assert '--run-id "${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"' in workflow
 
 
 def test_origin_rejects_noncanonical_state_paths() -> None:
@@ -301,6 +306,39 @@ def test_origin_publishes_atomically_and_retries_cleanup_queue(tmp_path: Path, m
     assert not (root / "daily" / "2026-08-23" / "old").exists()
 
 
+def test_origin_free_space_guard_counts_only_incoming_report(tmp_path: Path, monkeypatch) -> None:
+    root = tmp_path / "reports"
+    report_bytes = len(b"<!doctype html><title>synthetic</title>\n") + len(b"trace-safe\n")
+    monkeypatch.setattr(allure_report_origin, "_available_bytes", lambda path: 10 * 1024**3)
+    old_header = _origin_header(
+        period="2026-09-06",
+        run_id="old",
+        created_at="2026-09-06T01:00:00Z",
+        report_bytes=report_bytes,
+    )
+    first = allure_report_origin.handle_request(
+        _origin_payload(old_header),
+        io.BytesIO(),
+        root=root,
+        now=datetime(2026, 9, 6, 2, 0, tzinfo=UTC),
+    )
+    assert first["status"] == "published"
+
+    monkeypatch.setattr(
+        allure_report_origin,
+        "_available_bytes",
+        lambda path: allure_report_origin.MIN_FREE_BYTES + report_bytes + 1,
+    )
+    current_header = _origin_header(report_bytes=report_bytes)
+    second = allure_report_origin.handle_request(
+        _origin_payload(current_header),
+        io.BytesIO(),
+        root=root,
+        now=datetime(2026, 9, 7, 2, 0, tzinfo=UTC),
+    )
+    assert second["status"] == "published"
+
+
 def test_origin_rejects_symlink_archive_members_and_unsupported_ssh_command(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -461,15 +499,20 @@ def test_aggregate_results_merges_current_run_and_adds_allowlisted_metadata(tmp_
     metadata = _aggregate_metadata(tmp_path)
 
     assert metadata["status"] == "complete"
-    assert metadata["result_files"] == len(scheduled_regression.report_suites("daily"))
+    assert metadata["result_files"] == len(scheduled_regression.report_bundles("daily"))
     assert metadata["present_suites"] == sorted(scheduled_regression.report_suites("daily"))
+    expected_bundles = sorted(
+        f"{suite}/{browser}" for suite, browser in scheduled_regression.report_bundles("daily")
+    )
+    assert metadata["expected_bundles"] == expected_bundles
+    assert metadata["present_bundles"] == expected_bundles
     assert metadata["counts"] == {
-        "passed": 5,
+        "passed": 11,
         "failed": 0,
         "broken": 0,
         "skipped": 0,
         "unknown": 0,
-        "total": 5,
+        "total": 11,
     }
     environment = (tmp_path / "merged" / "environment.properties").read_text(encoding="utf-8")
     assert "allure.report.kind=daily" in environment
@@ -507,7 +550,7 @@ def test_aggregate_results_marks_missing_suite_incomplete_with_visible_failure(
     tmp_path: Path,
 ) -> None:
     bundles = tmp_path / "bundles"
-    _write_bundle(bundles, suite="python-tests", browser="shard-1")
+    _write_bundle(bundles, suite="python-tests", browser="python-shard-1")
     metadata_path = tmp_path / "metadata.json"
     metadata = allure_report.aggregate_results(
         bundle_root=bundles,
