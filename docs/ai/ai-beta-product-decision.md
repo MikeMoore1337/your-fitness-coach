@@ -20,7 +20,8 @@ Owner разрешил запустить последовательность A
 
 Это не является разрешением на скрытое списание средств, передачу персональных данных или live
 production smoke. Free tier и paid developer tier считаются разными классами стоимости.
-Пока из изолированного окружения нет `GROQ_API_KEY`, поэтому authenticated provider smoke,
+В изолированном worktree появился непустой `GROQ_API_KEY` (значение не читалось в вывод), но
+authenticated provider smoke вернул `HTTP 403` и не дошёл до schema validation. Поэтому
 Russian/domain eval и проверка фактического лимита аккаунта не завершены. Провайдер остаётся
 `candidate`, а runtime feature flag должен оставаться выключенным.
 
@@ -66,9 +67,9 @@ conversation persistence ещё нет.
 у них другой trust boundary, content workflow и владелец данных. Новая AI Coach конфигурация
 должна быть отдельной, default-off и provider-neutral.
 
-В текущем исходном окружении отсутствуют `.env`, `GROQ_API_KEY` и `NEWS_LLM_API_KEY`. Это
-проверялось только как наличие изолированного test configuration; значения секретов не читались
-и не выводились.
+В исходном worktree на момент старта отсутствовали `.env` и `GROQ_API_KEY`. Перед smoke в
+выделенном worktree было проверено только наличие `.env` и непустого `GROQ_API_KEY`; значение
+секрета не читалось в вывод и не сохранялось в evidence.
 
 ### 2.3. Trigger и фактические пробелы
 
@@ -260,17 +261,19 @@ gates:
 
 | Проверка | Результат 2026-09-07 |
 | --- | --- |
-| Isolated `GROQ_API_KEY` | отсутствует |
-| Authenticated minimal request | не выполнялся |
-| Structured-output smoke | не выполнялся |
-| Russian/domain eval against provider | не выполнялся |
+| Isolated `GROQ_API_KEY` | присутствует; значение не раскрывалось |
+| Authenticated minimal request | выполнен, Groq endpoint вернул `HTTP 403` |
+| Catalog/auth diagnostic | выполнен, `/openai/v1/models` также вернул `HTTP 403`; тело ответа не сохранялось и не выводилось |
+| Structured-output smoke | заблокирован ответом `HTTP 403`, valid schema не получена |
+| Russian/domain eval against provider | не выполнялся из-за `HTTP 403` |
 | Current account tier, quota, billing | не подтверждены |
-| Sensitive logging check | локально secret не читался; runtime provider route отсутствует |
+| Sensitive logging check | в вывод попали только boolean наличия, status и безопасные metadata; raw secret/response не выводились |
 | Production enablement | запрещено |
 
-Следствие: Task 87 оставляет decision `GO_GENERIC_FOUNDATION`, но не утверждает provider as
-production-ready. Нельзя маскировать отсутствие credential mock-ответом и нельзя использовать
-production credential для local smoke.
+Следствие: authenticated provider smoke Task 87 не пройден (`HTTP 403`), а причина отказа
+(ключ, account policy или сетевой gateway) без raw body не установлена. Нельзя считать provider
+production-ready, маскировать отказ mock-ответом или использовать production credential для
+local smoke.
 
 ## 7. Минимальная архитектура и ADR
 
@@ -417,7 +420,7 @@ participant evidence, provider terms, live smoke, or production proof.
 
 The following are intentionally open and block production/provider completion:
 
-- isolated Groq credential and authenticated minimal request;
+- isolated Groq credential, причина `HTTP 403` и успешный authenticated minimal request;
 - current account tier, region/data location, ZDR/retention setting and billing policy;
 - versioned Russian/domain eval results against the selected model;
 - measured latency, rate limit and cost envelope;
