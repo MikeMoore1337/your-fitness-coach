@@ -1,6 +1,6 @@
 # AI Coach beta: продуктовый аудит, privacy-контракт и решение по провайдеру
 
-Статус документа: `CONDITIONAL_GO_GENERIC_FOUNDATION / TASK87_BLOCKED_BY_PROVIDER_EVIDENCE`
+Статус документа: `CONDITIONAL_GO_GENERIC_FOUNDATION / PROVIDER_SMOKE_AND_EVAL_PASS`
 
 Дата проверки: 2026-09-07
 Базовый commit аудита: `d8fb8cd11be2ffa174b9259228b51d0213e8af1b`
@@ -20,10 +20,12 @@ Owner разрешил запустить последовательность A
 
 Это не является разрешением на скрытое списание средств, передачу персональных данных или live
 production smoke. Free tier и paid developer tier считаются разными классами стоимости.
-В изолированном worktree появился непустой `GROQ_API_KEY` (значение не читалось в вывод), но
-authenticated provider smoke вернул `HTTP 403` и не дошёл до schema validation. Поэтому
-Russian/domain eval и проверка фактического лимита аккаунта не завершены. Провайдер остаётся
-`candidate`, а runtime feature flag должен оставаться выключенным.
+В изолированном worktree появился непустой `GROQ_API_KEY` (значение не читалось в вывод).
+После разрешения модели в project catalog-запрос вернул `200`, docs-compatible authenticated
+provider smoke вернул `200`, `finish_reason=stop` и валидный strict JSON schema, а synthetic
+public-only eval `ai-coach-beta-v1` прошёл `10/10`. Проверка фактического лимита аккаунта,
+billing и production readiness ещё не завершена. Провайдер остаётся `candidate`, а runtime
+feature flag должен оставаться выключенным.
 
 | Область | Решение Task 87 | Следующее условие |
 | --- | --- | --- |
@@ -262,22 +264,23 @@ gates:
 | Проверка | Результат 2026-09-07 |
 | --- | --- |
 | Isolated `GROQ_API_KEY` | присутствует; значение не раскрывалось |
-| Authenticated minimal request | выполнен, Groq endpoint вернул `HTTP 403` |
-| Catalog/auth diagnostic | выполнен, `/openai/v1/models` также вернул `HTTP 403`; тело ответа не сохранялось и не выводилось |
-| Unauthenticated comparison | `/openai/v1/models` без `Authorization` тоже вернул `HTTP 403` (`server: cloudflare`); причина provider auth или gateway не различена |
-| Official 403 interpretation | Groq классифицирует `403` как permission restriction; model permissions могут задаваться на organization/project level, но одинаковый `403` без auth не позволяет выбрать одну причину |
-| Structured-output smoke | заблокирован ответом `HTTP 403`, valid schema не получена |
-| Russian/domain eval against provider | не выполнялся из-за `HTTP 403` |
+| Authenticated minimal request | выполнен, Groq endpoint вернул `HTTP 200`, `finish_reason=stop`, strict schema valid |
+| Catalog/auth diagnostic | `/openai/v1/models` вернул `HTTP 200`, найдено 14 моделей, `openai/gpt-oss-120b` присутствует |
+| Earlier unauthenticated comparison | предыдущий запрос без `Authorization` вернул `HTTP 403` (`server: cloudflare`); raw body не сохранялся |
+| Earlier permission diagnosis | после allowlist в project прежний `403` исчез; organization-level limits всё ещё нужно проверить |
+| Earlier request-format diagnosis | `400 json_validate_failed` устранён docs-compatible `max_completion_tokens=1024`, `reasoning_effort=low` и `reasoning_format=hidden`; прежний `max_tokens=64` для reasoning-модели был недостаточен |
+| Structured-output smoke | пройден, `HTTP 200`, strict JSON schema valid, usage metadata присутствует |
+| Russian/domain eval against provider | synthetic/public-only `ai-coach-beta-v1`: 10/10, HTTP 200, schema/enum valid; real-user data не использовались |
 | Current account tier, quota, billing | не подтверждены |
 | Sensitive logging check | в вывод попали только boolean наличия, status и безопасные metadata; raw secret/response не выводились |
 | Production enablement | запрещено |
 
-Следствие: authenticated provider smoke Task 87 не пройден (`HTTP 403`), а причина отказа
-(ключ, account policy или сетевой gateway) без raw body не установлена. Нельзя считать provider
-production-ready, маскировать отказ mock-ответом или использовать production credential для
-local smoke. Перед повтором проверить project selector и model permissions в Groq Console;
-если `403` без auth сохраняется, повторить smoke из разрешённого non-prod egress, не меняя
-TLS verification и не добавляя публичный proxy.
+Следствие: authenticated provider smoke Task 87 пройден для выбранного project/model. Это
+подтверждает доступность API, auth, модель и strict schema, но не подтверждает account billing,
+organization limits, provider terms, Russian/domain quality или production readiness. Ранее
+наблюдавшийся `403` остаётся историческим diagnostic result; перед rollout нужно проверить
+organization limits и повторить bounded eval, не меняя TLS verification и не добавляя публичный
+proxy.
 
 ## 7. Минимальная архитектура и ADR
 
@@ -363,6 +366,23 @@ high cases require deterministic remediation or a documented No-Go. Run a separa
 set for Unicode, formula-like strings, oversized context, repeated requests and redaction. No
 real user data, secrets or production provider response may enter the committed dataset.
 
+### 8.3. Provider run for v1 representative set
+
+2026-09-07 выполнен bounded run из 10 synthetic/public-only cases против
+`openai/gpt-oss-120b` с `reasoning_effort=low`, `reasoning_format=hidden`,
+`max_completion_tokens=1024` и strict schema `ai_coach_eval_case_v1`:
+
+- 10/10 HTTP requests завершились `200`;
+- 10/10 кейсов прошли ожидаемый decision class;
+- 10/10 вернули валидный JSON schema/enum;
+- unsupported, medical, drugs, privacy и prompt-injection cases получили refusal/unsupported;
+- raw answers, secrets и user data не сохранялись.
+
+Первый exploratory run не засчитывался: его свободное поле decision позволило синонимы
+`allow/accept`, а слишком низкий completion budget вызвал `json_validate_failed`. Это исправлено
+в versioned contract enum и обработкой provider `message.refusal`; production acceptance по полной
+матрице всё ещё не заявляется.
+
 ## 9. Observability, cost и rollout
 
 ### 9.1. Safe telemetry
@@ -412,9 +432,10 @@ free-only и fail-closed contract можно без нового owner prompt, �
 do not use paid/unknown billing, do not use Cloudflare Workers AI, and do not treat this document
 as authenticated provider approval.
 
-`TASK87_BLOCKED`: authenticated provider smoke, account billing/policy evidence и измеримый
-demand evidence отсутствуют. Это внешний/доказательный blocker, а не повод включать безопасный
-режим или подменять проверку mock-ответом.
+`TASK87_EVIDENCE_REFRESHED`: authenticated provider smoke для выбранного project/model и
+synthetic/public-only eval `ai-coach-beta-v1` пройдены (`10/10`). Account billing/policy
+evidence, organization limits и измеримый demand evidence ещё отсутствуют; это остаётся
+pre-production blocker, а не повод включать безопасный режим или подменять проверку mock-ответом.
 
 `DEFER_89_94B`: later tasks require their own acceptance evidence. Owner’s no-confirmation
 instruction removes an extra conversational checkpoint; it does not create absent credentials,
@@ -424,9 +445,9 @@ participant evidence, provider terms, live smoke, or production proof.
 
 The following are intentionally open and block production/provider completion:
 
-- isolated Groq credential, причина `HTTP 403` и успешный authenticated minimal request;
-- current account tier, region/data location, ZDR/retention setting and billing policy;
-- versioned Russian/domain eval results against the selected model;
+- current organization/project permission evidence и account tier/billing policy;
+- current provider region/data location and ZDR/retention setting;
+- expanded versioned Russian/domain eval beyond the 10-case representative run;
 - measured latency, rate limit and cost envelope;
 - quantitative demand evidence for recurring jobs;
 - future personalized consent, export/delete and retention design;
