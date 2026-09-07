@@ -9,9 +9,10 @@
 ## 1. Краткое решение
 
 Owner разрешил запустить последовательность AI Coach без дополнительных owner-подтверждений.
-На этом основании разрешён следующий узкий шаг на уровне проектирования:
+На этом основании разрешена подготовка следующего узкого шага на уровне проектирования; его
+исполняемая beta-часть остаётся закрытой до обязательных evidence gates:
 
-- продолжить с Task 88 для provider-neutral generic-only foundation;
+- подготовить Task 88 для provider-neutral generic-only foundation;
 - не отправлять в AI Coach профиль, дневник, тренировки, комментарии тренера, health-adjacent
   данные, conversation history или произвольный free text;
 - выбрать прямой backend adapter к Groq как единственный кандидат primary provider;
@@ -267,7 +268,7 @@ gates:
 | Authenticated minimal request | выполнен, Groq endpoint вернул `HTTP 200`, `finish_reason=stop`, strict schema valid |
 | Catalog/auth diagnostic | `/openai/v1/models` вернул `HTTP 200`, найдено 14 моделей, `openai/gpt-oss-120b` присутствует |
 | Earlier unauthenticated comparison | предыдущий запрос без `Authorization` вернул `HTTP 403` (`server: cloudflare`); raw body не сохранялся |
-| Earlier permission diagnosis | после allowlist в project прежний `403` исчез; organization-level limits всё ещё нужно проверить |
+| Earlier permission diagnosis | project allowlist подтверждён скриншотом и smoke; organization-level limits всё ещё нужно проверить |
 | Earlier request-format diagnosis | `400 json_validate_failed` устранён docs-compatible `max_completion_tokens=1024`, `reasoning_effort=low` и `reasoning_format=hidden`; прежний `max_tokens=64` для reasoning-модели был недостаточен |
 | Structured-output smoke | пройден, `HTTP 200`, strict JSON schema valid, usage metadata присутствует |
 | Russian/domain eval against provider | synthetic/public-only `ai-coach-beta-v1`: 10/10, HTTP 200, schema/enum valid; real-user data не использовались |
@@ -445,7 +446,7 @@ participant evidence, provider terms, live smoke, or production proof.
 
 The following are intentionally open and block production/provider completion:
 
-- current organization/project permission evidence и account tier/billing policy;
+- organization-level permission evidence и account tier/billing policy; project allowlist для выбранной модели уже подтверждён;
 - current provider region/data location and ZDR/retention setting;
 - expanded versioned Russian/domain eval beyond the 10-case representative run;
 - measured latency, rate limit and cost envelope;
