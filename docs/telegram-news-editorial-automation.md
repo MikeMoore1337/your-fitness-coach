@@ -23,6 +23,14 @@ production-конфигурации Hermes оно нормализуется в 
 ручное редактирование/подтверждение, планирование и управление публикацией продолжают работать.
 Его нельзя реализовывать изменением `NEWS_INGESTION_ENABLED`.
 
+При `NEWS_LEGACY_SOURCE_FETCH_ENABLED=false` в review downstream допускаются только revisions с
+canonical marker `evidence_metadata["submitted_by"] == "hermes_narrow_intake"`. Уже сохранённые
+legacy drafts и clusters не удаляются и не переводятся обратно из `deferred`; queued/processing
+legacy `NewsReviewDelivery` безопасно отменяются до Telegram send, а новые legacy delivery и
+preview upgrade не создаются. Hermes owner-edited revisions сохраняют marker и продолжают
+проходить review flow. Действие «Перегенерировать текст» для Hermes повторно ставит принятую
+immutable revision в review flow и не включает legacy candidate generation.
+
 После production release целевые значения для разделения контуров такие:
 
 ```text

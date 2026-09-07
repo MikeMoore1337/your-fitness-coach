@@ -95,6 +95,13 @@ class ReviewArtifact:
 
 HERMES_SUBMISSION_MARKER = "hermes_narrow_intake"
 PREVIEW_OPERATIONAL_BLOCKERS = frozenset({"publishing_disabled", "channel_rights_missing"})
+LEGACY_REVIEW_DELIVERY_DISABLED = "legacy_review_delivery_disabled"
+
+
+def is_hermes_origin_draft(draft: NewsDraftRevision) -> bool:
+    """Return whether a revision came through the canonical Hermes intake marker."""
+
+    return draft.evidence_metadata.get("submitted_by") == HERMES_SUBMISSION_MARKER
 
 
 def review_delivery_blockers(
@@ -103,7 +110,7 @@ def review_delivery_blockers(
 ) -> tuple[str, ...]:
     """Return blockers that make an owner Telegram delivery unsafe or misleading."""
 
-    is_hermes_draft = draft.evidence_metadata.get("submitted_by") == HERMES_SUBMISSION_MARKER
+    is_hermes_draft = is_hermes_origin_draft(draft)
     blockers: list[str] = []
     if is_hermes_draft:
         blockers.extend(
@@ -456,13 +463,26 @@ def moderate_draft(
             outcome = "limit_reached"
         else:
             revoke_active_decisions(db, cluster.id, reason="editorial_regenerate")
-            transition_news_cluster(
-                db,
-                cluster,
-                "candidate",
-                reason_code="owner_regenerate",
-                actor_ref=actor_ref,
-            )
+            if is_hermes_origin_draft(draft):
+                # There is no Hermes text-generation request contract in YFC. Re-queue the
+                # accepted immutable revision instead of routing it through legacy candidate
+                # generation, which is intentionally disabled in Hermes production.
+                cluster.delivery_round += 1
+                transition_news_cluster(
+                    db,
+                    cluster,
+                    "draft_ready",
+                    reason_code="owner_regenerate_hermes_revision",
+                    actor_ref=actor_ref,
+                )
+            else:
+                transition_news_cluster(
+                    db,
+                    cluster,
+                    "candidate",
+                    reason_code="owner_regenerate",
+                    actor_ref=actor_ref,
+                )
             cluster.deferred_until = None
             result_status = "queued"
     db.add(
@@ -488,8 +508,14 @@ def moderate_draft(
 
 def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) -> int:
     now = utcnow()
+    legacy_source_fetch_enabled = settings.news_legacy_source_fetch_enabled
+    if not legacy_source_fetch_enabled:
+        cancel_legacy_review_deliveries(db)
     image_pending = db.query(NewsCluster).filter(NewsCluster.status == "image_pending").all()
     for cluster in image_pending:
+        draft = latest_draft(db, cluster)
+        if not legacy_source_fetch_enabled and (draft is None or not is_hermes_origin_draft(draft)):
+            continue
         transition_news_cluster(
             db,
             cluster,
@@ -506,6 +532,9 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
         .all()
     )
     for cluster in deferred:
+        draft = latest_draft(db, cluster)
+        if not legacy_source_fetch_enabled and (draft is None or not is_hermes_origin_draft(draft)):
+            continue
         transition_news_cluster(
             db,
             cluster,
@@ -523,6 +552,9 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
     for cluster in clusters:
         draft = latest_draft(db, cluster)
         if draft is None:
+            continue
+        if not legacy_source_fetch_enabled and not is_hermes_origin_draft(draft):
+            _cancel_pending_deliveries(db, draft.id)
             continue
         if not source_metadata_is_current_month(draft.evidence_metadata, now=now):
             _cancel_pending_deliveries(db, draft.id)
@@ -621,6 +653,36 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
             )
     db.flush()
     return created
+
+
+def cancel_legacy_review_deliveries(db: Session) -> int:
+    """Cancel queued/processing legacy deliveries while source acquisition is disabled."""
+
+    if settings.news_legacy_source_fetch_enabled:
+        return 0
+    rows = (
+        db.query(NewsReviewDelivery)
+        .filter(NewsReviewDelivery.status.in_({"queued", "processing"}))
+        .all()
+    )
+    if not rows:
+        return 0
+    draft_ids = {row.draft_id for row in rows}
+    drafts = {
+        draft.id: draft
+        for draft in db.query(NewsDraftRevision).filter(NewsDraftRevision.id.in_(draft_ids)).all()
+    }
+    cancelled = 0
+    for delivery in rows:
+        draft = drafts.get(delivery.draft_id)
+        if draft is None or is_hermes_origin_draft(draft):
+            continue
+        delivery.status = "cancelled"
+        delivery.processing_started_at = None
+        delivery.next_attempt_at = None
+        delivery.last_error_code = LEGACY_REVIEW_DELIVERY_DISABLED
+        cancelled += 1
+    return cancelled
 
 
 def compose_review_artifact(

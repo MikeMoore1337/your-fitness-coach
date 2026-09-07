@@ -24,9 +24,12 @@ from fitminiapp_api.models.news import (
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.news_drafts import create_draft_revision
 from fitminiapp_api.services.news_editorial import (
+    LEGACY_REVIEW_DELIVERY_DISABLED,
+    cancel_legacy_review_deliveries,
     compose_review_artifact,
     editorial_actor_ref,
     enqueue_review_deliveries,
+    is_hermes_origin_draft,
     prune_news_editorial,
     review_delivery_blockers,
     review_message,
@@ -446,6 +449,9 @@ async def deliver_review_queue(
         editorial_actor_ref(telegram_id): telegram_id
         for telegram_id in settings.admin_telegram_id_set
     }
+    if not settings.news_legacy_source_fetch_enabled:
+        with get_session_context() as db:
+            cancel_legacy_review_deliveries(db)
     delivered = 0
     for delivery_id in _claim_deliveries():
         with get_session_context() as db:
@@ -464,6 +470,12 @@ async def deliver_review_queue(
             ):
                 delivery.status = "cancelled"
                 delivery.processing_started_at = None
+                continue
+            if not settings.news_legacy_source_fetch_enabled and not is_hermes_origin_draft(draft):
+                delivery.status = "cancelled"
+                delivery.processing_started_at = None
+                delivery.next_attempt_at = None
+                delivery.last_error_code = LEGACY_REVIEW_DELIVERY_DISABLED
                 continue
             review = compose_review_artifact(db, draft, channel_ready=channel_ready)
             delivery_blockers = review_delivery_blockers(draft, review)
