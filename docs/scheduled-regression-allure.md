@@ -173,6 +173,29 @@ traversal, symlink, hardlink, device и превышение size limit, рас�
 Итоговый DNS diff содержит только CNAME Tunnel; прямого DNS/IP bypass нет. Это не является
 подтверждением внешнего применения: DNS, Tunnel и Access остаются owner-gated.
 
+### Альтернатива: direct HTTPS через существующий Caddy
+
+Если Cloudflare Tunnel/Access не используется, тот же report origin можно публиковать через
+уже работающий `caddy` на VPS. В этом варианте authoritative DNS остаётся у текущего DNS-
+провайдера, а `allure.your-fitness-coach.ru` получает A/AAAA на VPS. Публичный Caddy принимает
+только HTTPS, требует `basic_auth` и проксирует запросы в `allure-report-origin:8080` через
+внутреннюю сеть `allure_reports`. Host port для origin по-прежнему не открывается.
+
+Для варианта Caddy в production `.env` задаются только:
+
+    ALLURE_PUBLIC_HOSTNAME=allure.your-fitness-coach.ru
+    ALLURE_BASIC_AUTH_USER=<owner-login>
+    ALLURE_BASIC_AUTH_HASH=<argon2id-or-bcrypt-hash>
+
+`ALLURE_BASIC_AUTH_HASH` получают командой `caddy hash-password`; plaintext-пароль не хранится
+в репозитории и не передаётся publisher-пользователю. Пустой hostname отключает маршрут, а
+заданный hostname без user/hash приводит к fail-closed ошибке запуска Caddy. Cloudflare token
+и `cloudflared-allure` для этой схемы не нужны.
+
+Этот вариант не скрывает IP VPS и не даёт Cloudflare Access/WAF/DDoS-защиту. Доступ к origin
+остаётся только через публичный Caddy с HTTPS и Basic Auth; direct `:8080`, directory listing,
+write methods и служебные пути origin не публикуются.
+
 ## GitHub names и least privilege
 
 Новые/используемые GitHub Actions secrets (значения не приводятся):
