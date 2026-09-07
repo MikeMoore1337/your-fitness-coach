@@ -314,7 +314,11 @@ def _load_state(root: Path) -> tuple[list[dict[str, object]], list[str]]:
     if not state_path.is_file():
         if root.exists():
             children = list(root.iterdir())
-            if any(child.name not in {".publish.lock", ".staging"} for child in children):
+            for child in children:
+                if child.name in {".publish.lock", ".staging"}:
+                    continue
+                if child.name == "metadata" and child.is_dir() and not any(child.iterdir()):
+                    continue
                 raise ReportOriginError("report index is missing while storage is not empty")
             staging = root / ".staging"
             if staging.is_dir() and any(staging.iterdir()):
