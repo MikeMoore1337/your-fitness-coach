@@ -264,6 +264,7 @@ gates:
 | Isolated `GROQ_API_KEY` | присутствует; значение не раскрывалось |
 | Authenticated minimal request | выполнен, Groq endpoint вернул `HTTP 403` |
 | Catalog/auth diagnostic | выполнен, `/openai/v1/models` также вернул `HTTP 403`; тело ответа не сохранялось и не выводилось |
+| Unauthenticated comparison | `/openai/v1/models` без `Authorization` тоже вернул `HTTP 403` (`server: cloudflare`); причина provider auth или gateway не различена |
 | Structured-output smoke | заблокирован ответом `HTTP 403`, valid schema не получена |
 | Russian/domain eval against provider | не выполнялся из-за `HTTP 403` |
 | Current account tier, quota, billing | не подтверждены |
