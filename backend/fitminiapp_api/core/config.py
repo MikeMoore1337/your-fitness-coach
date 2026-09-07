@@ -173,6 +173,29 @@ class Settings(BaseSettings):
     news_llm_model: str = ""
     news_llm_timeout_seconds: float = Field(default=20, ge=5, le=60)
     news_llm_prompt_version: str = "news-draft-v4"
+    # AI Coach is a separate generic-only boundary; NEWS_LLM_* must not be reused here.
+    ai_coach_enabled: bool = False
+    ai_coach_kill_switch: bool = False
+    ai_coach_provider: Literal["disabled", "groq"] = "disabled"
+    groq_api_key: SecretStr = SecretStr("")
+    ai_coach_endpoint: str = "https://api.groq.com/openai/v1/chat/completions"
+    ai_coach_model: Literal["openai/gpt-oss-120b"] = "openai/gpt-oss-120b"
+    ai_coach_cost_policy: Literal["free_only"] = "free_only"
+    ai_coach_cost_class: Literal["free", "developer", "paid", "promo", "trial", "unknown"] = (
+        "unknown"
+    )
+    ai_coach_data_policy: Literal["verified_generic_only", "unknown"] = "unknown"
+    ai_coach_structured_output: bool = True
+    ai_coach_policy_revision: str = "unverified"
+    ai_coach_timeout_seconds: float = Field(default=20, ge=1, le=60)
+    ai_coach_max_attempts: int = Field(default=1, ge=1, le=2)
+    ai_coach_max_output_tokens: int = Field(default=1024, ge=256, le=2048)
+    ai_coach_max_context_chars: int = Field(default=8_000, ge=1_000, le=16_000)
+    ai_coach_content_max_age_days: int = Field(default=365, ge=1, le=1_095)
+    ai_coach_quota_window_seconds: int = Field(default=86_400, ge=60, le=604_800)
+    ai_coach_per_user_request_limit: int = Field(default=5, ge=1, le=100)
+    ai_coach_global_request_limit: int = Field(default=100, ge=1, le=10_000)
+    ai_coach_cooldown_seconds: int = Field(default=30, ge=1, le=3_600)
     news_image_provider: Literal["disabled", "cloudflare_workers_ai"] = "disabled"
     news_image_cloudflare_account_id: str = ""
     news_image_cloudflare_api_token: str = ""
@@ -421,6 +444,39 @@ class Settings(BaseSettings):
             ZoneInfo(self.news_publication_timezone)
         except ZoneInfoNotFoundError as exc:
             raise ValueError("NEWS_PUBLICATION_TIMEZONE must be a valid IANA timezone") from exc
+        return self
+
+    @model_validator(mode="after")
+    def validate_ai_coach(self) -> Settings:
+        if not self.ai_coach_enabled:
+            return self
+        if self.ai_coach_kill_switch:
+            return self
+        if self.ai_coach_provider != "groq":
+            raise ValueError("AI_COACH_PROVIDER must be groq when AI_COACH_ENABLED is true")
+        if not self.groq_api_key.get_secret_value().strip():
+            raise ValueError("GROQ_API_KEY must be configured when AI Coach is enabled")
+        if self.ai_coach_cost_policy != "free_only" or self.ai_coach_cost_class != "free":
+            raise ValueError(
+                "AI Coach requires a verified free provider under the free_only cost policy"
+            )
+        if self.ai_coach_data_policy != "verified_generic_only":
+            raise ValueError("AI_COACH_DATA_POLICY must verify generic-only processing")
+        if not self.ai_coach_structured_output:
+            raise ValueError("AI_COACH_STRUCTURED_OUTPUT must remain true")
+        parsed = urlparse(self.ai_coach_endpoint)
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname != "api.groq.com"
+            or parsed.path != "/openai/v1/chat/completions"
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                "AI_COACH_ENDPOINT must be the credential-free Groq HTTPS chat completions URL"
+            )
         return self
 
     @field_validator("weekly_digest_consent_version")

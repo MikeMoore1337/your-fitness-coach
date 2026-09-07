@@ -379,6 +379,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-coach/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Ai Coach Answer */
+        post: operations["generate_ai_coach_answer_api_v1_ai_coach_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -3765,6 +3782,66 @@ export interface components {
             reason: "security_incident" | "abuse" | "account_recovery" | "support_request" | "relationship_safety";
             /** Is Active */
             is_active: boolean;
+        };
+        /** AiCoachCitation */
+        AiCoachCitation: {
+            /** Title */
+            title: string;
+            /** Publisher */
+            publisher: string;
+            /** Url */
+            url: string;
+            /** Source Type */
+            source_type: string;
+        };
+        /**
+         * AiCoachGenerateRequest
+         * @description A bounded intent plus a server-known public context id.
+         *
+         *     The model intentionally has no provider, model, system prompt, URL, account
+         *     data, file or arbitrary context field.
+         */
+        AiCoachGenerateRequest: {
+            job: components["schemas"]["AiCoachJob"];
+            /** Context Id */
+            context_id: string;
+            /** Message */
+            message: string;
+        };
+        /**
+         * AiCoachJob
+         * @enum {string}
+         */
+        AiCoachJob: "app_help" | "public_knowledge" | "metric_explanation" | "fitness_knowledge" | "nutrition_knowledge" | "progression_explanation";
+        /**
+         * AiCoachOutcome
+         * @enum {string}
+         */
+        AiCoachOutcome: "answer" | "unavailable" | "rate_limited" | "safety_refusal" | "insufficient_data" | "invalid_output";
+        /**
+         * AiCoachResponse
+         * @description Stable user-facing response; provider topology is intentionally absent.
+         */
+        AiCoachResponse: {
+            outcome: components["schemas"]["AiCoachOutcome"];
+            /** Answer */
+            answer?: string | null;
+            /**
+             * Citations
+             * @default []
+             */
+            citations: components["schemas"]["AiCoachCitation"][];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /** Safety Category */
+            safety_category: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Request Id */
+            request_id?: string | null;
         };
         /** ArticleBodySection */
         ArticleBodySection: {
@@ -10336,6 +10413,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_ai_coach_answer_api_v1_ai_coach_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachResponse"];
                 };
             };
             /** @description Validation Error */

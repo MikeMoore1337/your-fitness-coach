@@ -60,6 +60,7 @@ def _application_sensitive_values() -> tuple[str, ...]:
         settings.google_site_verification,
         settings.yandex_verification,
         settings.news_llm_api_key,
+        settings.groq_api_key.get_secret_value(),
         settings.hermes_intake_shared_secret.get_secret_value(),
     )
 
