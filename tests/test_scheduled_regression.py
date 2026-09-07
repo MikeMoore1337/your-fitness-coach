@@ -740,6 +740,17 @@ def test_bundle_round_trip_is_encrypted_and_traversal_safe(tmp_path: Path, monke
     extracted = tmp_path / "extracted"
     opened = allure_bundle.decrypt_bundle(source=encrypted, output=extracted)
     assert opened["suite"] == "python-tests"
+    assert json.loads((extracted / "manifest.json").read_text(encoding="utf-8")) == {
+        key: manifest[key]
+        for key in (
+            "browser",
+            "created_at",
+            "file_count",
+            "schema_version",
+            "source_bytes",
+            "suite",
+        )
+    }
     assert (extracted / "result.json").read_text(encoding="utf-8") == '{"status":"passed"}\n'
 
 
