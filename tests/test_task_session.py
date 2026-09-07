@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import uuid
 from pathlib import Path
@@ -37,12 +38,13 @@ def _write_task(
     slug: str,
     *,
     dependencies: str = "",
-    concurrency: str = "exclusive-write",
+    concurrency: str | None = None,
     owner_gate: str = "explicit-launch",
 ) -> Path:
     tasks = root / "codex-backlog" / "tasks"
     tasks.mkdir(parents=True, exist_ok=True)
     path = tasks / f"{task_id}-{slug}.md"
+    concurrency_metadata = f"concurrency: {concurrency}\n" if concurrency is not None else ""
     path.write_text(
         "# Task fixture\n\n"
         "- **Статус:** owner-selected, not started\n"
@@ -50,7 +52,7 @@ def _write_task(
         "<!-- task-session\n"
         f"dependencies: {dependencies}\n"
         "executable: true\n"
-        f"concurrency: {concurrency}\n"
+        f"{concurrency_metadata}"
         f"owner_gate: {owner_gate}\n"
         "integration: task-pr-to-master\n"
         "-->\n",
@@ -60,11 +62,10 @@ def _write_task(
 
 
 @pytest.fixture
-def repository(tmp_path: Path):
-    test_root = Path(__file__).parents[1] / ".artifacts" / f"task-session-{uuid.uuid4().hex[:8]}"
+def repository():
+    test_root = Path(tempfile.mkdtemp(prefix=f"yfc-task-session-{uuid.uuid4().hex[:8]}-"))
     root = test_root / "repository with spaces"
     remote = test_root / "remote.git"
-    test_root.mkdir(parents=True)
     root.mkdir()
     _git(root, "init", "-b", "master")
     _git(root, "config", "user.name", "Task Session Tests")
@@ -174,7 +175,7 @@ def _success_check(sha: str) -> dict[str, Any]:
 
 
 def _prepare_started(
-    repository: tuple[Path, Any], task_id: str = "301", *, concurrency: str = "exclusive-write"
+    repository: tuple[Path, Any], task_id: str = "301", *, concurrency: str = "independent-write"
 ) -> tuple[Path, Any, Any, Path, str, str]:
     root, git_repository = repository
     _write_task(root, task_id, "synthetic-task", concurrency=concurrency)
@@ -470,6 +471,7 @@ def test_start_uses_exact_origin_master_and_records_no_dev_lane(
     assert lease["base_origin_master_sha"] == git_repository.ref("origin/master")
     assert lease["target_base_branch"] == "master"
     assert lease["integration_policy"] == "task-pr-to-master"
+    assert lease["concurrency_class"] == "independent-write"
     assert "base_origin_dev_sha" not in lease
     assert "PR master" in started["prompt"]
     assert "refresh-delivery task branch" in started["prompt"]
@@ -536,7 +538,7 @@ def test_exclusive_write_is_a_real_implementation_blocker(
         controller.start("226", owner_launch=True, session_label="candidate", offline=True)
 
 
-def test_exclusive_lease_blocks_independent_start_after_delivery_acquisition(
+def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
     repository: tuple[Path, Any],
 ) -> None:
     root, git_repository = repository
@@ -550,10 +552,147 @@ def test_exclusive_lease_blocks_independent_start_after_delivery_acquisition(
     )
     controller.acquire_delivery("226A", offline=True)
 
-    with pytest.raises(
-        task_session.TaskSessionError, match="incompatible implementation write lease"
-    ):
-        controller.start("226B", owner_launch=True, session_label="candidate", offline=True)
+    candidate = controller.start("226B", owner_launch=True, session_label="candidate", offline=True)
+
+    snapshots = {item["task_id"]: item for item in controller.status()["leases"]}
+    assert candidate["lease"]["lifecycle_state"] == "implementation"
+    assert snapshots["226A"]["ownership"] == {
+        "task_session_active": True,
+        "implementation_exclusion_active": False,
+        "delivery_critical_section_active": True,
+    }
+    assert snapshots["226B"]["ownership"]["implementation_exclusion_active"] is False
+
+
+@pytest.mark.parametrize(
+    ("existing_state", "existing_class", "candidate_class", "expected_conflict"),
+    [
+        ("starting", "exclusive-write", "independent-write", True),
+        ("implementation", "exclusive-write", "independent-write", True),
+        ("review", "exclusive-write", "independent-write", True),
+        ("qa", "exclusive-write", "independent-write", True),
+        ("review", "independent-write", "independent-write", False),
+        ("qa", "independent-write", "independent-write", False),
+        ("implementation", "independent-write", "exclusive-write", True),
+        ("ready-for-delivery", "independent-write", "independent-write", False),
+        ("waiting-for-delivery", "independent-write", "independent-write", False),
+        ("ready-for-delivery", "exclusive-write", "independent-write", False),
+        ("ready-for-pr", "exclusive-write", "exclusive-write", False),
+        ("waiting-for-delivery", "exclusive-write", "independent-write", False),
+        ("delivering", "exclusive-write", "exclusive-write", False),
+        ("delivery-refreshing", "exclusive-write", "independent-write", False),
+        ("delivery-gate", "exclusive-write", "exclusive-write", False),
+        ("production-success", "exclusive-write", "independent-write", False),
+    ],
+)
+def test_implementation_exclusion_is_state_aware(
+    existing_state: str,
+    existing_class: str,
+    candidate_class: str,
+    expected_conflict: bool,
+) -> None:
+    existing = {
+        "mode": "write",
+        "task_id": "225",
+        "concurrency_class": existing_class,
+        "lifecycle_state": existing_state,
+    }
+
+    conflicts = task_session.TaskController._implementation_lease_conflicts(
+        [existing], task_id="226", concurrency_class=candidate_class
+    )
+
+    assert bool(conflicts) is expected_conflict
+
+
+def test_missing_concurrency_metadata_defaults_to_independent_write(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    task_path = _write_task(root, "226C", "legacy-without-concurrency")
+    document = task_session.find_task_document(root, "226C")
+    controller = task_session.TaskController(git_repository)
+
+    started = controller.start("226C", owner_launch=True, session_label="legacy", offline=True)
+
+    assert task_path.exists()
+    assert document.concurrency_class == "independent-write"
+    assert started["lease"]["concurrency_class"] == "independent-write"
+
+
+def test_corrupt_lease_concurrency_class_fails_closed(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "226D", "existing", concurrency="independent-write")
+    _write_task(root, "226E", "candidate", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    controller.start("226D", owner_launch=True, session_label="existing", offline=True)
+    lease_path = controller.store.task_lease_path("226D")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["concurrency_class"] = "unknown-write"
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    report = controller.doctor(offline=True)
+
+    assert report["safe_for_implementation"] is False
+    assert any("invalid concurrency class" in item for item in report["implementation_blockers"])
+    with pytest.raises(task_session.TaskSessionError, match="invalid concurrency class"):
+        controller.start("226E", owner_launch=True, session_label="candidate", offline=True)
+
+
+def test_duplicate_task_lease_fails_closed_before_new_start(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "226F", "existing", concurrency="independent-write")
+    _write_task(root, "226G", "candidate", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    controller.start("226F", owner_launch=True, session_label="existing", offline=True)
+    lease_path = controller.store.task_lease_path("226F")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    duplicate_path = controller.store.leases / "duplicate-lease.json"
+    task_session.StateStore.replace_json(duplicate_path, lease)
+
+    with pytest.raises(task_session.TaskSessionError, match="duplicate Task 226F leases"):
+        controller.start("226G", owner_launch=True, session_label="candidate", offline=True)
+
+
+def test_missing_lease_worktree_fails_closed_before_new_start(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "226J", "existing", concurrency="independent-write")
+    _write_task(root, "226K", "candidate", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    controller.start("226J", owner_launch=True, session_label="existing", offline=True)
+    lease_path = controller.store.task_lease_path("226J")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["worktree"] = str(root / ".artifacts" / "worktrees" / "missing-226J")
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    with pytest.raises(task_session.TaskSessionError, match="lease worktree is missing"):
+        controller.start("226K", owner_launch=True, session_label="candidate", offline=True)
+
+
+def test_dirty_exclusive_task_worktree_blocks_new_writer(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, _, _ = _prepare_started(
+        repository, "226H", concurrency="exclusive-write"
+    )
+    _write_task(root, "226I", "candidate")
+    (worktree / "uncommitted.txt").write_text("preserve\n", encoding="utf-8")
+
+    report = controller.doctor(offline=True)
+
+    assert report["safe_for_implementation"] is False
+    assert any("Task 226H worktree is dirty" in item for item in report["implementation_blockers"])
+    with pytest.raises(task_session.TaskSessionError, match="implementation/start blockers"):
+        controller.start("226I", owner_launch=True, session_label="candidate", offline=True)
 
 
 def test_adopt_current_uses_same_compatible_lease_contract(

@@ -145,6 +145,9 @@ def test_policy_docs_remove_dev_from_normal_delivery_and_keep_human_gates() -> N
     assert "implementation lane" in lifecycle
     assert "delivery lane" in lifecycle
     assert "Busy delivery/CI/production" in lifecycle
+    assert "Обычная task без `concurrency`" in lifecycle
+    assert "implementation exclusion" in lifecycle
+    assert "active `exclusive-write` несовместим" in global_rules
     assert "fast-forward/sync `dev`" not in lifecycle
     assert "serial merge в `dev`" not in global_rules
     assert "явно обязательный owner checkpoint/approve, human/device evidence" in lifecycle
