@@ -721,6 +721,22 @@ def test_sensitive_attachment_makes_report_incomplete(tmp_path: Path) -> None:
     assert metadata["issues"]
 
 
+def test_privacy_scanner_ignores_report_code_and_synthetic_credentials() -> None:
+    assert not allure_report._sensitive_text(
+        "const settings = { authorization: undefined, access_token: token };"
+    )
+    assert not allure_report._sensitive_text(
+        '{"access_token":"test-token","Authorization":"Bearer coach-token"}'
+    )
+    assert not allure_report._sensitive_text(
+        'secret_key="task-89-production-secret-key-long-enough"'
+    )
+    assert allure_report._sensitive_text('{"access_token":"aB3dEf7Gh9JkLm2NpQr5StUv"}')
+    assert allure_report._sensitive_text(
+        "Authorization: Bearer eyJ" + "a" * 21 + "." + "b" * 11 + "." + "c" * 11
+    )
+
+
 def test_bundle_round_trip_is_encrypted_and_traversal_safe(tmp_path: Path, monkeypatch) -> None:
     if shutil.which("openssl") is None:
         pytest.skip("openssl is not installed on this development host")
