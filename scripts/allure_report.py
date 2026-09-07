@@ -51,14 +51,62 @@ METADATA_FILES: Final = frozenset(
 )
 MAX_RESULT_FILES: Final = 100_000
 MAX_ZIP_SCAN_BYTES: Final = 16 * 1024 * 1024
-SENSITIVE_PATTERNS: Final = (
-    re.compile(r"(?i)(?:authorization|proxy-authorization|cookie|set-cookie)\s*[:=]"),
-    re.compile(
-        r"(?i)(?:telegram[_ -]?initdata|bot[_ -]?internal[_ -]?token|telegram[_ -]?bot[_ -]?token)"
-    ),
-    re.compile(r"(?i)(?:database_url|secret_key|access_token|refresh_token)\s*[:=]"),
-    re.compile(r"\b(?:ghp|gho|github_pat)_[A-Za-z0-9_]{20,}\b"),
-    re.compile(r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
+GITHUB_TOKEN_PATTERN: Final = re.compile(r"\b(?:ghp|gho|github_pat)_[A-Za-z0-9_]{20,}\b")
+JWT_PATTERN: Final = re.compile(
+    r"\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"
+)
+DATABASE_URL_ASSIGNMENT_PATTERN: Final = re.compile(
+    r"(?ix)\bdatabase_url\s*[:=]\s*(?P<quote>[\"']?)(?P<value>[^\s,}\"']+)(?P=quote)"
+)
+SENSITIVE_LITERAL_ASSIGNMENT_PATTERN: Final = re.compile(
+    r"(?ix)\b(?:"
+    r"telegram[_ -]?initdata|"
+    r"bot[_ -]?internal[_ -]?token|"
+    r"telegram[_ -]?bot[_ -]?token|"
+    r"secret_key|access_token|refresh_token"
+    r")\s*[:=]\s*(?P<quote>[\"'])(?P<value>[^\"'\r\n]*)(?P=quote)"
+)
+SENSITIVE_JSON_ASSIGNMENT_PATTERN: Final = re.compile(
+    r"(?ix)[\"'](?:"
+    r"telegram[_ -]?initdata|"
+    r"bot[_ -]?internal[_ -]?token|"
+    r"telegram[_ -]?bot[_ -]?token|"
+    r"secret_key|access_token|refresh_token"
+    r")[\"']\s*:\s*[\"'](?P<value>[^\"'\r\n]*)[\"']"
+)
+SENSITIVE_UNQUOTED_ASSIGNMENT_PATTERN: Final = re.compile(
+    r"(?ix)\b(?:"
+    r"telegram[_ -]?initdata|"
+    r"bot[_ -]?internal[_ -]?token|"
+    r"telegram[_ -]?bot[_ -]?token|"
+    r"secret_key|access_token|refresh_token"
+    r")\s*=\s*(?P<value>[A-Za-z0-9~+/=:_-]{12,})"
+)
+AUTHORIZATION_LITERAL_PATTERN: Final = re.compile(
+    r"(?ix)\b(?:authorization|proxy-authorization)\s*[:=]\s*"
+    r"(?P<quote>[\"'])(?:bearer\s+)?(?P<value>[^\"'\r\n]*)(?P=quote)"
+)
+AUTHORIZATION_JSON_PATTERN: Final = re.compile(
+    r"(?ix)[\"'](?:authorization|proxy-authorization)[\"']\s*:\s*"
+    r"[\"'](?:bearer\s+)?(?P<value>[^\"'\r\n]*)[\"']"
+)
+AUTHORIZATION_BEARER_PATTERN: Final = re.compile(
+    r"(?ix)\b(?:authorization|proxy-authorization)\s*[:=]\s*"
+    r"bearer\s+(?P<value>[A-Za-z0-9._~+/=-]{8,})"
+)
+COOKIE_LITERAL_PATTERN: Final = re.compile(
+    r"(?ix)\b(?:cookie|set-cookie)\s*[:=]\s*"
+    r"(?P<quote>[\"'])(?P<value>[^\"'\r\n]*=[^\"'\r\n]*)(?P=quote)"
+)
+SYNTHETIC_VALUE_PATTERN: Final = re.compile(
+    r"(?ix)^(?:"
+    r"(?:test|local|dev|e2e|mock|fake|dummy|fixture|synthetic)(?:[-_:].*)?"
+    r"|task[-_:][a-z0-9-]+"
+    r"|[a-z0-9]+(?:-[a-z0-9]+)*-(?:token|key|secret|password)(?:-[a-z0-9]+)*"
+    r")$"
+)
+SAFE_NON_SECRET_VALUE_PATTERN: Final = re.compile(
+    r"(?ix)^(?:undefined|null|none|empty|value|token|header|true|false)$"
 )
 
 
@@ -82,8 +130,48 @@ def _load_object(path: Path) -> dict[str, object]:
     return payload
 
 
+def _is_synthetic_value(value: str) -> bool:
+    normalized = value.strip()
+    return not normalized or bool(SYNTHETIC_VALUE_PATTERN.fullmatch(normalized))
+
+
+def _is_sensitive_literal(value: str) -> bool:
+    normalized = value.strip()
+    return (
+        len(normalized) >= 8
+        and not SAFE_NON_SECRET_VALUE_PATTERN.fullmatch(normalized)
+        and not _is_synthetic_value(normalized)
+    )
+
+
 def _sensitive_text(text: str) -> bool:
-    return any(pattern.search(text) for pattern in SENSITIVE_PATTERNS)
+    if GITHUB_TOKEN_PATTERN.search(text) or JWT_PATTERN.search(text):
+        return True
+    for match in DATABASE_URL_ASSIGNMENT_PATTERN.finditer(text):
+        value = match.group("value")
+        if (
+            "://" in value
+            and not value.lower().startswith("sqlite://")
+            and _is_sensitive_literal(value)
+        ):
+            return True
+    for pattern in (
+        SENSITIVE_LITERAL_ASSIGNMENT_PATTERN,
+        SENSITIVE_JSON_ASSIGNMENT_PATTERN,
+        SENSITIVE_UNQUOTED_ASSIGNMENT_PATTERN,
+        AUTHORIZATION_LITERAL_PATTERN,
+        AUTHORIZATION_JSON_PATTERN,
+        AUTHORIZATION_BEARER_PATTERN,
+    ):
+        for match in pattern.finditer(text):
+            value = match.group("value")
+            if _is_sensitive_literal(value):
+                return True
+    for match in COOKIE_LITERAL_PATTERN.finditer(text):
+        _, value = match.group("value").split("=", 1)
+        if _is_sensitive_literal(value.split(";", 1)[0]):
+            return True
+    return False
 
 
 def _sensitive_bytes(data: bytes) -> bool:
