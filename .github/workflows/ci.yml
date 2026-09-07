@@ -6,8 +6,18 @@ on:
   push:
     branches: [master]
   schedule:
+    # Europe/Moscow: daily at 05:17.
     - cron: "17 2 * * *"
+    # Europe/Moscow: weekly Sunday at 06:43.
+    - cron: "43 3 * * 0"
   workflow_dispatch:
+    inputs:
+      run_kind:
+        description: Scheduled regression tier
+        required: true
+        default: daily
+        type: choice
+        options: [daily, weekly]
 
 permissions:
   contents: read
@@ -41,6 +51,7 @@ jobs:
       run_frontend_smoke: ${{ steps.route.outputs.run_frontend_smoke }}
       run_frontend_mobile_regression: ${{ steps.route.outputs.run_frontend_mobile_regression }}
       run_frontend_mobile_regression_extended: ${{ steps.route.outputs.run_frontend_mobile_regression_extended }}
+      run_frontend_cross_browser: ${{ steps.route.outputs.run_frontend_cross_browser }}
       run_python: ${{ steps.route.outputs.run_python }}
       run_migrated_stack: ${{ steps.route.outputs.run_migrated_stack }}
       run_dependency_audit: ${{ steps.route.outputs.run_dependency_audit }}
@@ -54,6 +65,7 @@ jobs:
       run_image_contract: ${{ steps.route.outputs.run_image_contract }}
       run_deployment_contract: ${{ steps.route.outputs.run_deployment_contract }}
       run_merge_provenance: ${{ steps.route.outputs.run_merge_provenance }}
+      run_scheduled_report: ${{ steps.route.outputs.run_scheduled_report }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,6 +80,8 @@ jobs:
           TARGET_REF: ${{ github.ref }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUN_KIND: ${{ inputs.run_kind || '' }}
+          SCHEDULE_CRON: ${{ github.event.schedule || '' }}
         run: |
           set -Eeuo pipefail
           if [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ]; then
@@ -78,6 +92,16 @@ jobs:
               --event "$EVENT_NAME" \
               --base-sha "$BASE_SHA" \
               --head-sha "$HEAD_SHA" \
+              --github-output "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = schedule ]; then
+            python scripts/ci_contract.py route \
+              --event "$EVENT_NAME" \
+              --schedule-cron "$SCHEDULE_CRON" \
+              --github-output "$GITHUB_OUTPUT"
+          elif [ "$EVENT_NAME" = workflow_dispatch ]; then
+            python scripts/ci_contract.py route \
+              --event "$EVENT_NAME" \
+              --run-kind "$RUN_KIND" \
               --github-output "$GITHUB_OUTPUT"
           else
             python scripts/ci_contract.py route \
@@ -166,6 +190,9 @@ jobs:
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-checks', github.workspace) || '' }}
+      ALLURE_VITEST_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-vitest/dist/reporter.js
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -191,10 +218,26 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Install scheduled Vitest reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Install API schema dependencies
         run: uv pip install -r backend/requirements-runtime.txt
       - name: Run shared frontend checks group
         run: python scripts/ci_contract.py run-group frontend-checks
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-checks.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-checks
+          suite: frontend-checks
+          browser: node-unit
 
   frontend-smoke:
     name: Frontend smoke (${{ matrix.shard }}/4)
@@ -206,6 +249,9 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-e2e-shard-{1}', github.workspace, matrix.shard) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
 
     steps:
       - uses: actions/checkout@v4
@@ -215,6 +261,10 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        with:
+          python-version: "3.14"
       - name: Report npm cache
         run: |
           echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
@@ -222,6 +272,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Build frontend for smoke tests
         working-directory: frontend
         run: npx vite build
@@ -236,7 +290,7 @@ jobs:
       - name: Run shared frontend E2E group
         run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/4"
       - name: Upload Playwright traces on failure
-        if: failure()
+        if: failure() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-failure-${{ github.run_id }}-shard-${{ matrix.shard }}
@@ -244,6 +298,18 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 7
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-e2e-shard-${{ matrix.shard }}.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-e2e-shard-${{ matrix.shard }}
+          suite: frontend-e2e
+          browser: chromium-shard-${{ matrix.shard }}
 
   frontend-mobile-regression:
     name: Mobile regression (Chromium + WebKit)
@@ -253,6 +319,8 @@ jobs:
     timeout-minutes: 15
     env:
       CI_TIMING_FILE: ${{ github.workspace }}/.artifacts/runtime/ci/mobile-regression-timing.jsonl
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-mobile-regression', github.workspace) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -271,6 +339,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command npm-ci -- npm ci
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Build frontend preview
         working-directory: frontend
         run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command vite-build -- npx vite build
@@ -288,7 +360,7 @@ jobs:
       - name: Run shared mobile regression group
         run: python scripts/ci_contract.py run-group frontend-mobile-regression
       - name: Upload mobile regression evidence
-        if: always()
+        if: always() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-mobile-regression-${{ github.run_id }}
@@ -298,15 +370,29 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 7
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-mobile-regression.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-mobile-regression
+          suite: frontend-mobile-regression
+          browser: mobile-chromium-webkit
 
   frontend-mobile-regression-extended:
     name: Extended mobile regression (Firefox + WebKit)
     needs: scope-router
-    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_mobile_regression_extended == 'true'
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_mobile_regression_extended == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       CI_TIMING_FILE: ${{ github.workspace }}/.artifacts/runtime/ci/mobile-regression-extended-timing.jsonl
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-mobile-regression-extended', github.workspace) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -325,6 +411,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: python ../scripts/ci_timing.py --group frontend-mobile-regression-extended --command npm-ci -- npm ci
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Build frontend preview
         working-directory: frontend
         run: python ../scripts/ci_timing.py --group frontend-mobile-regression-extended --command vite-build -- npx vite build
@@ -342,7 +432,7 @@ jobs:
       - name: Run shared extended mobile regression group
         run: python scripts/ci_contract.py run-group frontend-mobile-regression-extended
       - name: Upload extended mobile regression evidence
-        if: always()
+        if: always() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-mobile-regression-extended-${{ github.run_id }}
@@ -352,6 +442,78 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 7
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-mobile-regression-extended.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-mobile-regression-extended
+          suite: frontend-mobile-regression-extended
+          browser: mobile-firefox-webkit
+
+  frontend-cross-browser:
+    name: Weekly cross-browser regression (Chromium + Firefox + WebKit)
+    needs: scope-router
+    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_cross_browser == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-cross-browser', github.workspace) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        id: npm-setup
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Report npm cache
+        run: |
+          echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"
+          echo "CI_CACHE package=npm path=$(npm config get cache)"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Build frontend preview
+        working-directory: frontend
+        run: npx vite build
+      - name: Cache cross-browser Playwright browsers
+        id: cross-browser-playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-cross-browser-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Report cross-browser Playwright cache
+        run: echo "CI_CACHE package=playwright-cross-browser hit=${{ steps.cross-browser-playwright-cache.outputs.cache-hit }}"
+      - name: Install cross-browser Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Run shared cross-browser regression group
+        run: python scripts/ci_contract.py run-group frontend-cross-browser
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser
+          suite: frontend-cross-browser
+          browser: chromium-firefox-webkit
 
   python-tests:
     name: Python tests (${{ matrix.shard }}/4)
@@ -359,6 +521,8 @@ jobs:
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_python == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/python-tests-shard-{1}', github.workspace, matrix.shard) || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -389,11 +553,15 @@ jobs:
           enable-cache: true
           cache-dependency-glob: |
             backend/requirements-dev.txt
+            backend/requirements-scheduled-report.txt
             bot/requirements.txt
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: python-tests
       - name: Install Python dependencies
         run: uv pip install -r backend/requirements-dev.txt -r bot/requirements.txt
+      - name: Install scheduled Pytest Allure adapter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        run: uv pip install -r backend/requirements-scheduled-report.txt
       - name: Run shared Python tests group
         env:
           TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
@@ -402,6 +570,18 @@ jobs:
           BOT_INTERNAL_TOKEN: test-bot-internal-token
           SECRET_KEY: test-secret-key-at-least-thirty-two-characters
         run: python scripts/ci_contract.py run-group python-tests --shard "${{ matrix.shard }}/4"
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/python-tests-shard-${{ matrix.shard }}.enc
+          artifact-name: allure-results-${{ github.run_id }}-python-tests-shard-${{ matrix.shard }}
+          suite: python-tests
+          browser: python-shard-${{ matrix.shard }}
 
   migrated-stack:
     name: Migrated PostgreSQL stack
@@ -409,6 +589,9 @@ jobs:
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_migrated_stack == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/migrated-stack', github.workspace) || '' }}
+      ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
     services:
       postgres:
         image: postgres:16-alpine
@@ -442,7 +625,9 @@ jobs:
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: backend/requirements-dev.txt
+          cache-dependency-glob: |
+            backend/requirements-dev.txt
+            backend/requirements-scheduled-report.txt
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: migrated-stack
       - name: Cache Playwright browsers
@@ -454,6 +639,13 @@ jobs:
         run: |
           uv pip install -r backend/requirements-dev.txt
           npm --prefix frontend ci
+      - name: Install scheduled Pytest Allure adapter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        run: uv pip install -r backend/requirements-scheduled-report.txt
+      - name: Install scheduled Playwright reporter
+        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        working-directory: frontend
+        run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Install Playwright Chromium
         working-directory: frontend
         run: npx playwright install --with-deps chromium
@@ -474,6 +666,18 @@ jobs:
           BOT_INTERNAL_TOKEN: test-bot-internal-token
           SECRET_KEY: test-secret-key-at-least-thirty-two-characters
         run: python scripts/ci_contract.py run-group migrated-stack
+      - name: Upload encrypted Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}
+          bundle: .artifacts/runtime/tests/allure-bundles/migrated-stack.enc
+          artifact-name: allure-results-${{ github.run_id }}-migrated-stack
+          suite: migrated-stack
+          browser: chromium-api
 
   dependency-audit:
     name: Dependency audit
@@ -643,11 +847,155 @@ jobs:
           PUBLISHED_REF: ${{ steps.image.outputs.image_ref }}
         run: docker tag "$LOCAL_TAG" "$PUBLISHED_REF" && docker push "$PUBLISHED_REF"
 
+  scheduled-report:
+    name: Private scheduled Allure report
+    concurrency:
+      group: yfc-scheduled-allure-publication
+      cancel-in-progress: false
+    needs:
+      [scope-router, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack]
+    if: always() && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_scheduled_report == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: read
+    env:
+      RUN_KIND: ${{ needs.scope-router.outputs.profile == 'weekly-exhaustive' && 'weekly' || 'daily' }}
+      REPORT_TIER: ${{ needs.scope-router.outputs.profile }}
+      RUN_STARTED_AT: ${{ github.run_started_at }}
+      TEST_RESULTS_JSON: >-
+        {"frontend":"${{ needs.frontend.result }}","frontend-smoke":"${{ needs.frontend-smoke.result }}","frontend-mobile-regression":"${{ needs.frontend-mobile-regression.result }}","frontend-mobile-regression-extended":"${{ needs.frontend-mobile-regression-extended.result }}","frontend-cross-browser":"${{ needs.frontend-cross-browser.result }}","python-tests":"${{ needs.python-tests.result }}","migrated-stack":"${{ needs.migrated-stack.result }}"}
+      BUNDLE_DOWNLOAD_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/downloaded-allure
+      BUNDLE_DECRYPTED_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/decrypted-allure
+      MERGED_RESULTS_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/allure-results-merged
+      REPORT_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report
+      REPORT_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report-metadata.json
+      PUBLICATION_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-publication.json
+      ALLURE_REPORT_SSH_HOST: ${{ vars.ALLURE_REPORT_SSH_HOST || 'app.your-fitness-coach.ru' }}
+      ALLURE_REPORT_SSH_PORT: ${{ vars.ALLURE_REPORT_SSH_PORT || '22' }}
+      ALLURE_REPORT_SSH_USER: ${{ vars.ALLURE_REPORT_SSH_USER || 'yfc-allure-publisher' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install report and adapter dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+          npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
+      - name: Download encrypted Allure bundles
+        if: always()
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: allure-results-${{ github.run_id }}-*
+          path: .artifacts/runtime/tests/downloaded-allure
+          merge-multiple: true
+      - name: Decrypt only current-run result bundles
+        if: always()
+        continue-on-error: true
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "$BUNDLE_DOWNLOAD_ROOT" "$BUNDLE_DECRYPTED_ROOT"
+          shopt -s nullglob
+          bundles=("$BUNDLE_DOWNLOAD_ROOT"/*.enc)
+          if [ "${#bundles[@]}" -eq 0 ]; then
+            printf '%s\n' 'No encrypted Allure bundles were downloaded' > "$BUNDLE_DECRYPTED_ROOT/decrypt-failed.txt"
+          fi
+          for bundle in "${bundles[@]}"; do
+            filename="${bundle##*/}"
+            stem="${filename%.enc}"
+            if ! python scripts/allure_bundle.py decrypt \
+              --source "$bundle" \
+              --output "$BUNDLE_DECRYPTED_ROOT/$stem"; then
+              printf '%s\n' "$stem" >> "$BUNDLE_DECRYPTED_ROOT/decrypt-failed.txt"
+            fi
+          done
+      - name: Aggregate and enrich Allure results
+        if: always()
+        continue-on-error: true
+        run: |
+          set -Eeuo pipefail
+          duration_seconds="$(python - "$RUN_STARTED_AT" <<'PY'
+          from datetime import UTC, datetime
+          import sys
+
+          value = sys.argv[1].strip()
+          if not value:
+              print("0")
+          else:
+              started = datetime.fromisoformat(value.replace("Z", "+00:00"))
+              print(max(0.0, (datetime.now(UTC) - started.astimezone(UTC)).total_seconds()))
+          PY
+          )"
+          playwright_version="$(node -p "require('./frontend/node_modules/@playwright/test/package.json').version")"
+          python scripts/allure_report.py aggregate \
+            --bundle-root "$BUNDLE_DECRYPTED_ROOT" \
+            --output-root "$MERGED_RESULTS_ROOT" \
+            --metadata "$REPORT_METADATA" \
+            --run-kind "$RUN_KIND" \
+            --tier "$REPORT_TIER" \
+            --run-id "${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}" \
+            --commit-sha "$GITHUB_SHA" \
+            --branch "$GITHUB_REF_NAME" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --operating-system "ubuntu-latest" \
+            --python-version "3.14" \
+            --node-version "24" \
+            --playwright-version "$playwright_version" \
+            --duration-seconds "$duration_seconds"
+      - name: Generate Allure HTML
+        if: always()
+        continue-on-error: true
+        working-directory: frontend
+        run: ./scheduled-report/node_modules/.bin/allure generate "$MERGED_RESULTS_ROOT" -o "$REPORT_ROOT" --clean
+      - name: Validate generated report and privacy boundary
+        if: always()
+        continue-on-error: true
+        run: python scripts/allure_report.py validate --report-root "$REPORT_ROOT" --metadata "$REPORT_METADATA"
+      - name: Publish private report to isolated VPS origin
+        if: always()
+        continue-on-error: true
+        env:
+          ALLURE_REPORT_SSH_PRIVATE_KEY: ${{ secrets.ALLURE_REPORT_SSH_PRIVATE_KEY }}
+          ALLURE_REPORT_SSH_KNOWN_HOSTS: ${{ secrets.ALLURE_REPORT_SSH_KNOWN_HOSTS }}
+        run: |
+          python scripts/publish_allure_report.py publish \
+            --report-root "$REPORT_ROOT" \
+            --metadata "$REPORT_METADATA" \
+            --publication "$PUBLICATION_METADATA"
+      - name: Write scheduled report summary
+        if: always()
+        continue-on-error: true
+        run: |
+          python scripts/allure_report.py summary \
+            --metadata "$REPORT_METADATA" \
+            --publication "$PUBLICATION_METADATA" \
+            --test-results "$TEST_RESULTS_JSON" \
+            --output "$GITHUB_STEP_SUMMARY"
+      - name: Require complete private publication
+        if: always()
+        run: python scripts/allure_report.py finalize --metadata "$REPORT_METADATA" --publication "$PUBLICATION_METADATA"
+
   checks:
     name: ${{ github.event_name == 'pull_request' && 'checks' || 'branch-checks' }}
     if: always()
     needs:
-      [scope-router, task-provenance, merge-provenance, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts]
+      [scope-router, task-provenance, merge-provenance, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts, scheduled-report]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -671,12 +1019,14 @@ jobs:
           FRONTEND_SMOKE_RESULT: ${{ needs.frontend-smoke.result }}
           FRONTEND_MOBILE_REGRESSION_RESULT: ${{ needs.frontend-mobile-regression.result }}
           FRONTEND_MOBILE_REGRESSION_EXTENDED_RESULT: ${{ needs.frontend-mobile-regression-extended.result }}
+          FRONTEND_CROSS_BROWSER_RESULT: ${{ needs.frontend-cross-browser.result }}
           PYTHON_TESTS_RESULT: ${{ needs.python-tests.result }}
           MIGRATED_STACK_RESULT: ${{ needs.migrated-stack.result }}
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           CONTAINERS_RESULT: ${{ needs.containers.result }}
           CRITICAL_SMOKE_RESULT: ${{ needs.critical-smoke.result }}
           WORKFLOW_CONTRACTS_RESULT: ${{ needs.workflow-contracts.result }}
+          SCHEDULED_REPORT_RESULT: ${{ needs.scheduled-report.result }}
         run: |
           set -Eeuo pipefail
           test "$SCOPE_ROUTER_RESULT" = success
@@ -698,12 +1048,14 @@ jobs:
               "frontend-smoke",
               "frontend-mobile-regression",
               "frontend-mobile-regression-extended",
+              "frontend-cross-browser",
               "python-tests",
               "migrated-stack",
               "dependency-audit",
               "containers",
               "critical-smoke",
               "workflow-contracts",
+              "scheduled-report",
           )
           env_names = {
               name: name.upper().replace("-", "_") + "_RESULT"

@@ -20,6 +20,15 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+if __package__:
+    from scripts.scheduled_regression import (
+        profile_for_run_kind,
+        report_suites,
+        resolve_run_kind,
+    )
+else:
+    from scheduled_regression import profile_for_run_kind, report_suites, resolve_run_kind
+
 CONTRACT_VERSION = "ci-contract-v2"
 ROUTER_VERSION = "ci-router-v2"
 CI_SHARD_COUNT = 4
@@ -152,6 +161,17 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
             "npm",
             "frontend/node_modules",
             "frontend/playwright.mobile-regression.extended.config.ts",
+        ),
+    ),
+    "frontend-cross-browser": GroupSpec(
+        name="frontend-cross-browser",
+        commands=(
+            _cmd("frontend-cross-browser", "npm", "run", "e2e:cross-browser", cwd="frontend"),
+        ),
+        prerequisites=(
+            "npm",
+            "frontend/node_modules",
+            "frontend/playwright.cross-browser.config.ts",
         ),
     ),
     "python-tests": GroupSpec(
@@ -291,6 +311,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "tests/test_ci_contract.py",
                 "tests/test_ci_timing.py",
                 "tests/test_run_task_delivery.py",
+                "tests/test_scheduled_regression.py",
                 "tests/test_deployment_contract.py",
                 "tests/test_online_migrations.py",
                 "tests/test_zero_downtime_deploy.py",
@@ -418,9 +439,25 @@ PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
     "documentation": ("quality", "workflow-config"),
 }
 
-PROFILE_GROUPS["scheduled"] = (
-    *PROFILE_GROUPS["cross-stack"],
+PROFILE_GROUPS["daily-regression"] = (
+    "quality",
+    "frontend-checks",
+    "frontend-e2e",
+    "frontend-mobile-regression",
+    "python-tests",
+    "migrated-stack",
+    "critical-smoke",
+    "workflow-config",
+)
+PROFILE_GROUPS["weekly-exhaustive"] = (
+    *PROFILE_GROUPS["daily-regression"],
+    "policy",
+    "dependency-audit",
     "frontend-mobile-regression-extended",
+    "frontend-cross-browser",
+    "image-contract",
+    "deployment-contract",
+    "container-contract",
 )
 
 
@@ -431,6 +468,7 @@ GROUP_TO_JOB: dict[str, str] = {
     "frontend-e2e": "frontend-smoke",
     "frontend-mobile-regression": "frontend-mobile-regression",
     "frontend-mobile-regression-extended": "frontend-mobile-regression-extended",
+    "frontend-cross-browser": "frontend-cross-browser",
     "python-tests": "python-tests",
     "migrated-stack": "migrated-stack",
     "dependency-audit": "dependency-audit",
@@ -452,6 +490,7 @@ ROUTER_JOB_NAMES: tuple[str, ...] = (
     "frontend-smoke",
     "frontend-mobile-regression",
     "frontend-mobile-regression-extended",
+    "frontend-cross-browser",
     "python-tests",
     "migrated-stack",
     "dependency-audit",
@@ -459,6 +498,7 @@ ROUTER_JOB_NAMES: tuple[str, ...] = (
     "critical-smoke",
     "workflow-contracts",
     "merge-provenance",
+    "scheduled-report",
 )
 
 ROUTER_OUTPUTS: dict[str, str] = {
@@ -468,6 +508,7 @@ ROUTER_OUTPUTS: dict[str, str] = {
     "frontend-smoke": "run_frontend_smoke",
     "frontend-mobile-regression": "run_frontend_mobile_regression",
     "frontend-mobile-regression-extended": "run_frontend_mobile_regression_extended",
+    "frontend-cross-browser": "run_frontend_cross_browser",
     "python-tests": "run_python",
     "migrated-stack": "run_migrated_stack",
     "dependency-audit": "run_dependency_audit",
@@ -475,6 +516,7 @@ ROUTER_OUTPUTS: dict[str, str] = {
     "critical-smoke": "run_critical_smoke",
     "workflow-contracts": "run_workflow_contracts",
     "merge-provenance": "run_merge_provenance",
+    "scheduled-report": "run_scheduled_report",
 }
 
 ROUTER_GROUP_OUTPUTS: dict[str, str] = {
@@ -692,6 +734,8 @@ def expected_jobs_for_groups(groups: Sequence[str], *, event: str = "pull_reques
         jobs.add("task-provenance")
     elif event == "push":
         jobs.add("merge-provenance")
+    elif event in {"schedule", "workflow_dispatch"}:
+        jobs.add("scheduled-report")
     for group in groups:
         job = GROUP_TO_JOB.get(group)
         if job is not None:
@@ -809,6 +853,8 @@ def route_repository(
     event: str,
     base_sha: str | None = None,
     head_sha: str | None = None,
+    run_kind: str | None = None,
+    schedule_cron: str | None = None,
 ) -> dict[str, object]:
     """Build the CI route for a GitHub event from the exact repository diff."""
 
@@ -830,12 +876,25 @@ def route_repository(
             event=event,
         )
     if event in {"schedule", "workflow_dispatch"}:
+        resolved_run_kind = resolve_run_kind(
+            event,
+            run_kind=run_kind,
+            schedule_cron=schedule_cron,
+        )
+        profile = profile_for_run_kind(resolved_run_kind)
         return _decision_for_groups(
-            profile="scheduled",
+            profile=profile,
             paths=[],
-            signals={"scheduled_full_regression": True},
-            reasons=["scheduled/manual regression uses the full authoritative scheduled profile"],
-            groups=PROFILE_GROUPS["scheduled"],
+            signals={
+                "scheduled_regression": True,
+                "daily_regression": resolved_run_kind == "daily",
+                "weekly_exhaustive": resolved_run_kind == "weekly",
+            },
+            reasons=[
+                f"{resolved_run_kind} scheduled regression uses the authoritative "
+                f"{profile} profile with report suites {list(report_suites(resolved_run_kind))}"
+            ],
+            groups=PROFILE_GROUPS[profile],
             event=event,
         )
     raise CIContractError(f"Unsupported CI event: {event}")
@@ -1332,6 +1391,7 @@ def validate_contract() -> None:
         "frontend-smoke",
         "frontend-mobile-regression",
         "frontend-mobile-regression-extended",
+        "frontend-cross-browser",
         "python-tests",
         "migrated-stack",
         "dependency-audit",
@@ -1339,6 +1399,7 @@ def validate_contract() -> None:
         "critical-smoke",
         "workflow-contracts",
         "merge-provenance",
+        "scheduled-report",
     }:
         raise CIContractError("CI router outputs do not cover the stable job set")
     if set(ROUTER_GROUP_OUTPUTS) != {
@@ -1367,6 +1428,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     route.add_argument("--base-sha")
     route.add_argument("--head-sha")
+    route.add_argument("--run-kind", choices=("daily", "weekly"))
+    route.add_argument("--schedule-cron")
     route.add_argument("--root", type=Path, default=Path.cwd())
     route.add_argument("--github-output", type=Path)
     route.add_argument("--json", action="store_true")
@@ -1402,6 +1465,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 event=args.event,
                 base_sha=args.base_sha,
                 head_sha=args.head_sha,
+                run_kind=args.run_kind,
+                schedule_cron=args.schedule_cron,
             )
             if args.github_output is not None:
                 write_router_outputs(decision, args.github_output)

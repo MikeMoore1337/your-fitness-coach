@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { getPlaywrightReporters } from './playwright-reporting';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -8,7 +9,7 @@ export default defineConfig({
   outputDir: '../.artifacts/runtime/tests/playwright-mobile-regression',
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  reporter: getPlaywrightReporters(),
   expect: {
     toHaveScreenshot: {
       animations: 'disabled',

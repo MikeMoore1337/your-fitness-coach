@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { getPlaywrightReporters } from './playwright-reporting';
 
 const baseURL = process.env.PW_BASE_URL ?? 'http://127.0.0.1:4179';
 const parsedBaseURL = new URL(baseURL);
@@ -11,7 +12,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: process.env.CI ? 'github' : 'list',
+  reporter: getPlaywrightReporters(),
   use: {
     baseURL,
     trace: 'retain-on-failure',

@@ -193,6 +193,8 @@ git diff --check
 
 Полная CI matrix определена в [`.github/workflows/ci.yml`](.github/workflows/ci.yml). Она включает
 frontend checks, browser tests, Python tests, migrated PostgreSQL smoke и dependency audits.
+Scheduled Daily/Weekly scope и закрытые Allure-отчёты описаны в
+[`docs/scheduled-regression-allure.md`](docs/scheduled-regression-allure.md).
 
 ## Mobile Web и Telegram Mini App
 
@@ -239,8 +241,9 @@ manifest. Fail-closed `scripts/deploy_production.sh` проверяет `.deploy
 preflight, PostgreSQL backup, migrations, blue/green rollout, smoke/observation gates и
 автоматический возврат прежнего slot при ошибке до commit state; host не требует Git checkout.
 
-`workflow_dispatch` не используется, поэтому normal path не выбирает произвольный SHA и не требует
-ручного подтверждения после merge. History rewrite, direct/force push, ручные production-команды,
+`workflow_dispatch` CI используется только для bounded scheduled regression на `master` с явным
+выбором `daily` или `weekly`; он не выбирает произвольный production SHA и не запускает deploy.
+History rewrite, direct/force push, ручные production-команды,
 bootstrap, восстановление инфраструктуры, DNS/Cloudflare/secrets и deployment SHA вне текущего
 merged `master` остаются exceptional production actions и требуют отдельного owner approval,
 проверенной backup-ветки и operator preflight.

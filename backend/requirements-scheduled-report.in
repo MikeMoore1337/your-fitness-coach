@@ -1,0 +1,4 @@
+# Адаптер только для scheduled-контура; не добавлять его в обычное PR development environment.
+# uv pip compile --python-version 3.14 --universal --output-file requirements-scheduled-report.txt requirements-scheduled-report.in
+
+allure-pytest==2.16.0

@@ -34,6 +34,12 @@ def _run(
         f"cache_dir={pytest_cache}",
         f"--basetemp={pytest_tmp}",
     ]
+    allure_results_dir = os.environ.get("ALLURE_RESULTS_DIR")
+    if allure_results_dir:
+        result_path = Path(allure_results_dir).resolve()
+        if not result_path.is_relative_to((root / ".artifacts").resolve()):
+            raise ValueError("ALLURE_RESULTS_DIR must stay under .artifacts")
+        cmd.extend(["--alluredir", str(result_path)])
     return subprocess.call(cmd, cwd=root, env=env)
 
 
