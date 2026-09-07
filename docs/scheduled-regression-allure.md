@@ -178,16 +178,16 @@ traversal, symlink, hardlink, device и превышение size limit, рас�
 Если Cloudflare Tunnel/Access не используется, тот же report origin можно публиковать через
 уже работающий `caddy` на VPS. В этом варианте authoritative DNS остаётся у текущего DNS-
 провайдера, а `allure.your-fitness-coach.ru` получает A/AAAA на VPS. Публичный Caddy принимает
-только HTTPS, требует `basic_auth` и проксирует запросы в `allure-report-origin:8080` через
+только HTTPS, требует `basic_auth argon2id` и проксирует запросы в `allure-report-origin:8080` через
 внутреннюю сеть `allure_reports`. Host port для origin по-прежнему не открывается.
 
 Для варианта Caddy в production `.env` задаются только:
 
     ALLURE_PUBLIC_HOSTNAME=allure.your-fitness-coach.ru
     ALLURE_BASIC_AUTH_USER=<owner-login>
-    ALLURE_BASIC_AUTH_HASH=<argon2id-or-bcrypt-hash>
+    ALLURE_BASIC_AUTH_HASH=<argon2id-hash>
 
-`ALLURE_BASIC_AUTH_HASH` получают командой `caddy hash-password`; plaintext-пароль не хранится
+`ALLURE_BASIC_AUTH_HASH` получают командой `caddy hash-password --algorithm argon2id`; plaintext-пароль не хранится
 в репозитории и не передаётся publisher-пользователю. Пустой hostname отключает маршрут, а
 заданный hostname без user/hash приводит к fail-closed ошибке запуска Caddy. Cloudflare token
 и `cloudflared-allure` для этой схемы не нужны.
