@@ -296,6 +296,12 @@ def decrypt_bundle(
                     shutil.copyfileobj(stream, destination)
             if manifest["file_count"] != file_count or manifest["source_bytes"] != total_bytes:
                 raise AllureBundleError("bundle manifest does not match archive contents")
+        manifest_path = staging_output / "manifest.json"
+        manifest_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, sort_keys=True) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
         if output.exists():
             output.rmdir()
         staging_output.replace(output)
