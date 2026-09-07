@@ -236,6 +236,45 @@ services:
       proxy_net:
         ipv4_address: 172.28.0.11
 
+  allure-report-origin:
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
+    restart: unless-stopped
+    profiles: ["allure-reports"]
+    user: "${ALLURE_REPORT_ORIGIN_UID:-1501}:${ALLURE_REPORT_ORIGIN_GID:-1501}"
+    mem_limit: ${ALLURE_REPORT_ORIGIN_MEMORY_LIMIT:-64m}
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - /srv/yfc-allure-reports:/srv/reports:ro
+      - ./deploy/allure-report-origin/Caddyfile:/etc/caddy/Caddyfile:ro
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      allure_reports:
+
+  cloudflared-allure:
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}
+    restart: unless-stopped
+    profiles: ["allure-reports"]
+    mem_limit: ${ALLURE_CLOUDFLARED_MEMORY_LIMIT:-64m}
+    environment:
+      # This connector token belongs only to the Allure Tunnel and is not the
+      # token used by the existing optional application tunnel.
+      TUNNEL_TOKEN: ${ALLURE_CLOUDFLARED_TUNNEL_TOKEN:-}
+    command: tunnel --no-autoupdate run
+    depends_on:
+      allure-report-origin:
+        condition: service_healthy
+    networks:
+      allure_reports:
+      allure_egress:
+
   worker:
     <<: *backend-image
     restart: unless-stopped
@@ -384,3 +423,6 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/24
+  allure_reports:
+    internal: true
+  allure_egress:

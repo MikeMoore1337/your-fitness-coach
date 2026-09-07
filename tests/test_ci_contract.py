@@ -201,7 +201,11 @@ def test_allure_dependencies_are_scheduled_only() -> None:
     assert workflow.count("--omit=peer") == 7
     assert workflow.count("requirements-scheduled-report.txt") == 4
     assert "./scheduled-report/node_modules/.bin/allure generate" in workflow
-    assert "npm --prefix deploy/allure-report-worker test" in workflow
+    assert "python scripts/publish_allure_report.py publish" in workflow
+    assert "ALLURE_REPORT_SSH_PRIVATE_KEY" in workflow
+    assert "ALLURE_REPORT_SSH_KNOWN_HOSTS" in workflow
+    assert "ALLURE_R2" not in workflow
+    assert "allure-report-worker" not in workflow
     python_job_start = workflow.index("  python-tests:")
     python_steps_start = workflow.index("    steps:", python_job_start)
     assert "ALLURE_RESULTS_DIR:" in workflow[python_job_start:python_steps_start]

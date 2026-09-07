@@ -512,6 +512,8 @@ def aggregate_results(
 def validate_report(
     report_root: Path, *, metadata_path: Path, require_complete: bool = True
 ) -> dict[str, object]:
+    if report_root.is_symlink():
+        raise AllureReportError("generated Allure report root cannot be a symlink")
     report_root = report_root.resolve()
     if not report_root.is_dir() or not (report_root / "index.html").is_file():
         raise AllureReportError("generated Allure report has no index.html")

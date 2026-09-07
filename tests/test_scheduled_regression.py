@@ -1,10 +1,18 @@
+import io
 import json
 import shutil
+import tarfile
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from scripts import allure_bundle, allure_report, publish_allure_report, scheduled_regression
+from scripts import (
+    allure_bundle,
+    allure_report,
+    allure_report_origin,
+    publish_allure_report,
+    scheduled_regression,
+)
 
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
@@ -99,61 +107,65 @@ def test_schedule_contract_resolves_daily_weekly_and_rejects_unknown_cron() -> N
         scheduled_regression.resolve_run_kind("schedule", schedule_cron="0 0 * * *")
 
 
-def test_private_report_origin_uses_worker_and_private_r2_binding() -> None:
+def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> None:
     root = Path(__file__).parents[1]
-    config = (root / "deploy" / "allure-report-worker" / "wrangler.toml").read_text(
+    compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    caddy = (root / "deploy" / "allure-report-origin" / "Caddyfile").read_text(encoding="utf-8")
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    action = (root / ".github" / "actions" / "upload-allure-results" / "action.yml").read_text(
         encoding="utf-8"
     )
-    source = (root / "deploy" / "allure-report-worker" / "src" / "index.js").read_text(
-        encoding="utf-8"
-    )
+    origin_block = compose.split("  allure-report-origin:\n", 1)[1].split("\n  worker:\n", 1)[0]
 
-    assert "workers_dev = false" in config
-    assert 'binding = "REPORTS"' in config
-    assert "custom_domain = true" in config
-    assert "allure.your-fitness-coach.ru" in config
-    assert "r2.dev" not in source
-    assert '"cache-control", "private, no-store"' in source
-    assert "index.html" in source
+    assert 'profiles: ["allure-reports"]' in origin_block
+    assert "allure_reports:" in origin_block
+    assert "allure_egress:" in origin_block
+    assert "\n    ports:" not in origin_block
+    assert "allure_reports:\n    internal: true" in compose
+    assert "TUNNEL_TOKEN: ${ALLURE_CLOUDFLARED_TUNNEL_TOKEN:-}" in compose
+    assert "file_server" in caddy
+    assert "browse" not in caddy
+    assert 'Cache-Control "private, no-store"' in caddy
+    assert 'respond @private "Not Found" 404' in caddy
+    assert "/.publish.lock" in caddy
+    assert "@unsupported not method GET HEAD" in caddy
+    assert "/healthz" in caddy
+    assert "ALLURE_REPORT_SSH_PRIVATE_KEY" in workflow
+    assert "ALLURE_REPORT_SSH_KNOWN_HOSTS" in workflow
+    assert 'default: "3"' in action
+    assert "ALLURE_R2" not in workflow
+    assert "allure-report-worker" not in workflow
+    assert not (root / "deploy" / "allure-report-worker").exists()
 
 
-def test_remote_report_state_rejects_noncanonical_paths_and_urls() -> None:
-    with pytest.raises(publish_allure_report.PublicationError, match="immutable path"):
-        publish_allure_report._state_from_payload(
-            {
-                "schema_version": 1,
-                "reports": [
-                    {
-                        "kind": "daily",
-                        "period": "2026-09-07",
-                        "run_id": "12345",
-                        "path": "daily/2026-09-07/../",
-                        "url": "https://allure.your-fitness-coach.ru/daily/2026-09-07/../",
-                        "created_at": "2026-09-07T01:00:00Z",
-                    }
-                ],
-                "cleanup_pending": [],
-            }
+def test_origin_rejects_noncanonical_state_paths() -> None:
+    base = {
+        "kind": "daily",
+        "period": "2026-09-07",
+        "run_id": "12345",
+        "path": "daily/2026-09-07/12345/",
+        "url": "https://allure.your-fitness-coach.ru/daily/2026-09-07/12345/",
+        "created_at": "2026-09-07T01:00:00Z",
+        "commit_sha": "a" * 40,
+        "workflow_url": "https://github.com/example/run/1",
+        "duration_seconds": 1,
+        "bytes": 1,
+        "counts": {"total": 1},
+        "status": "passed",
+        "expires_at": "2026-09-21",
+    }
+    invalid_path = dict(base, path="daily/2026-09-07/../")
+    with pytest.raises(allure_report_origin.ReportOriginError, match="immutable path"):
+        allure_report_origin._state_from_payload(
+            {"schema_version": 1, "reports": [invalid_path], "cleanup_pending": []}
         )
-    with pytest.raises(publish_allure_report.PublicationError, match="canonical"):
-        publish_allure_report._state_from_payload(
-            {
-                "schema_version": 1,
-                "reports": [
-                    {
-                        "kind": "daily",
-                        "period": "2026-09-07",
-                        "run_id": "12345",
-                        "path": "daily/2026-09-07/12345/",
-                        "url": "https://example.invalid/report/",
-                        "created_at": "2026-09-07T01:00:00Z",
-                    }
-                ],
-                "cleanup_pending": [],
-            }
+    invalid_url = dict(base, url="https://example.invalid/report/")
+    with pytest.raises(allure_report_origin.ReportOriginError, match="canonical"):
+        allure_report_origin._state_from_payload(
+            {"schema_version": 1, "reports": [invalid_url], "cleanup_pending": []}
         )
-    with pytest.raises(publish_allure_report.PublicationError, match="cleanup queue"):
-        publish_allure_report._state_from_payload(
+    with pytest.raises(allure_report_origin.ReportOriginError, match="immutable path"):
+        allure_report_origin._state_from_payload(
             {
                 "schema_version": 1,
                 "reports": [],
@@ -161,29 +173,275 @@ def test_remote_report_state_rejects_noncanonical_paths_and_urls() -> None:
             }
         )
 
-
-def test_missing_remote_report_index_fails_closed_for_nonempty_storage(monkeypatch) -> None:
-    monkeypatch.setattr(
-        publish_allure_report.subprocess,
-        "run",
-        lambda *args, **kwargs: type(
-            "Completed",
-            (),
-            {"returncode": 1, "stderr": "404 Not Found", "stdout": ""},
-        )(),
-    )
-    monkeypatch.setattr(
-        publish_allure_report,
-        "_remote_prefix_exists",
-        lambda **kwargs: True,
-    )
-
-    with pytest.raises(publish_allure_report.PublicationError, match="storage is not empty"):
-        publish_allure_report._read_remote_state(
-            endpoint="https://example.r2.cloudflarestorage.com",
-            bucket="reports",
-            env={},
+    noncanonical_daily = dict(base, path="daily/20260907/12345/", period="20260907")
+    with pytest.raises(allure_report_origin.ReportOriginError, match="immutable path"):
+        allure_report_origin._state_from_payload(
+            {"schema_version": 1, "reports": [noncanonical_daily], "cleanup_pending": []}
         )
+
+    mismatched_timestamp = dict(base, expires_at="2026-09-22")
+    with pytest.raises(allure_report_origin.ReportOriginError, match="expiry"):
+        allure_report_origin._state_from_payload(
+            {"schema_version": 1, "reports": [mismatched_timestamp], "cleanup_pending": []}
+        )
+
+
+def _origin_header(
+    *,
+    kind: str = "daily",
+    period: str = "2026-09-07",
+    run_id: str = "12345",
+    created_at: str = "2026-09-07T01:00:00Z",
+    report_bytes: int = 0,
+    status: str = "complete",
+) -> dict[str, object]:
+    path = f"{kind}/{period}/{run_id}/"
+    return {
+        "run_kind": kind,
+        "period": period,
+        "run_id": run_id,
+        "immutable_path": path,
+        "url": f"https://allure.your-fitness-coach.ru/{path}",
+        "report_status": status,
+        "report_bytes": report_bytes,
+        "created_at": created_at,
+        "commit_sha": "a" * 40,
+        "workflow_url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/12345",
+        "duration_seconds": 12.5,
+        "counts": {
+            "passed": 1,
+            "failed": 0,
+            "broken": 0,
+            "skipped": 0,
+            "unknown": 0,
+            "total": 1,
+        },
+    }
+
+
+def _origin_payload(header: dict[str, object], *, symlink: bool = False) -> io.BytesIO:
+    output = io.BytesIO()
+    output.write(allure_report_origin.PROTOCOL_MAGIC)
+    output.write((json.dumps(header, sort_keys=True) + "\n").encode("utf-8"))
+    with tarfile.open(fileobj=output, mode="w:gz") as archive:
+        index = b"<!doctype html><title>synthetic</title>\n"
+        index_info = tarfile.TarInfo("index.html")
+        index_info.size = len(index)
+        index_info.mode = 0o644
+        archive.addfile(index_info, io.BytesIO(index))
+        attachment = b"trace-safe\n"
+        attachment_info = tarfile.TarInfo("data/attachment.txt")
+        attachment_info.size = len(attachment)
+        attachment_info.mode = 0o644
+        archive.addfile(attachment_info, io.BytesIO(attachment))
+        if symlink:
+            link_info = tarfile.TarInfo("data/link")
+            link_info.type = tarfile.SYMTYPE
+            link_info.linkname = "../index.html"
+            archive.addfile(link_info)
+    output.seek(0)
+    return output
+
+
+def test_origin_publishes_atomically_and_retries_cleanup_queue(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(allure_report_origin, "_available_bytes", lambda path: 10 * 1024**3)
+    root = tmp_path / "reports"
+    report_bytes = len(b"<!doctype html><title>synthetic</title>\n") + len(b"trace-safe\n")
+    old_header = _origin_header(
+        period="2026-08-23",
+        run_id="old",
+        created_at="2026-08-23T01:00:00Z",
+        report_bytes=report_bytes,
+    )
+    allure_report_origin.handle_request(
+        _origin_payload(old_header),
+        io.BytesIO(),
+        root=root,
+        now=datetime(2026, 8, 23, 2, 0, tzinfo=UTC),
+    )
+    header = _origin_header(report_bytes=report_bytes)
+    original_delete = allure_report_origin._delete_report
+
+    def fail_once(root: Path, relative: str) -> None:
+        raise allure_report_origin.ReportOriginError("transient cleanup failure")
+
+    monkeypatch.setattr(allure_report_origin, "_delete_report", fail_once)
+
+    response_stream = io.BytesIO()
+    response = allure_report_origin.handle_request(
+        _origin_payload(header),
+        response_stream,
+        root=root,
+        now=datetime(2026, 9, 7, 2, 0, tzinfo=UTC),
+    )
+
+    assert response["status"] == "cleanup-failed"
+    assert response["idempotent"] is False
+    assert old_header["immutable_path"] in response["cleanup_pending"]
+    report_index = root / "daily" / "2026-09-07" / "12345" / "index.html"
+    assert report_index.is_file()
+    assert (root / "daily" / "latest" / "index.html").is_file()
+    assert (root / "metadata" / "index.json").is_file()
+    assert "12345" in (root / "index.html").read_text(encoding="utf-8")
+    assert "12345" in (root / "daily" / "latest" / "index.html").read_text(encoding="utf-8")
+    assert not (root / "daily" / "latest").is_symlink()
+    assert (root / ".publish.lock").is_file()
+
+    monkeypatch.setattr(allure_report_origin, "_delete_report", original_delete)
+    response_stream = io.BytesIO()
+    duplicate = allure_report_origin.handle_request(
+        _origin_payload(header),
+        response_stream,
+        root=root,
+        now=datetime(2026, 9, 7, 2, 1, tzinfo=UTC),
+    )
+    assert duplicate["status"] == "published"
+    assert duplicate["idempotent"] is True
+    assert report_index.read_text(encoding="utf-8").startswith("<!doctype html>")
+    assert not (root / "daily" / "2026-08-23" / "old").exists()
+
+
+def test_origin_rejects_symlink_archive_members_and_unsupported_ssh_command(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(allure_report_origin, "_available_bytes", lambda path: 10 * 1024**3)
+    header = _origin_header()
+    header["report_bytes"] = len(b"<!doctype html><title>synthetic</title>\n") + len(
+        b"trace-safe\n"
+    )
+    monkeypatch.setenv("SSH_ORIGINAL_COMMAND", "cat /etc/passwd")
+    with pytest.raises(allure_report_origin.ReportOriginError, match="SSH command"):
+        allure_report_origin.handle_request(
+            _origin_payload(header, symlink=True),
+            io.BytesIO(),
+            root=tmp_path / "reports",
+        )
+    monkeypatch.delenv("SSH_ORIGINAL_COMMAND")
+    with pytest.raises(allure_report_origin.ReportOriginError, match="non-regular"):
+        allure_report_origin.handle_request(
+            _origin_payload(header, symlink=True),
+            io.BytesIO(),
+            root=tmp_path / "reports",
+        )
+
+
+def test_origin_rolls_back_installed_report_before_metadata_commit(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(allure_report_origin, "_available_bytes", lambda path: 10 * 1024**3)
+    root = tmp_path / "reports"
+    report_bytes = len(b"<!doctype html><title>synthetic</title>\n") + len(b"trace-safe\n")
+    header = _origin_header(report_bytes=report_bytes)
+    original_atomic_write = allure_report_origin._atomic_write
+
+    def fail_metadata(path: Path, content: bytes) -> None:
+        if path == root / "metadata" / "index.json":
+            raise allure_report_origin.ReportOriginError("metadata write failed")
+        original_atomic_write(path, content)
+
+    monkeypatch.setattr(allure_report_origin, "_atomic_write", fail_metadata)
+    with pytest.raises(allure_report_origin.ReportOriginError, match="metadata write failed"):
+        allure_report_origin.handle_request(
+            _origin_payload(header),
+            io.BytesIO(),
+            root=root,
+            now=datetime(2026, 9, 7, 2, 0, tzinfo=UTC),
+        )
+
+    assert not (root / "daily" / "2026-09-07" / "12345").exists()
+    assert list((root / ".staging").iterdir()) == []
+
+
+def test_publisher_requires_pinned_ssh_and_uses_forced_command(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("ALLURE_REPORT_SSH_HOST", "app.your-fitness-coach.ru")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_PORT", "22")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_USER", "yfc-allure-publisher")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_PRIVATE_KEY", "-----BEGIN OPENSSH PRIVATE KEY-----\nkey")
+    monkeypatch.setenv(
+        "ALLURE_REPORT_SSH_KNOWN_HOSTS",
+        "app.your-fitness-coach.ru ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA",
+    )
+    config = publish_allure_report._ssh_config()
+    args = publish_allure_report._ssh_arguments(
+        host=config[0],
+        port=config[1],
+        user=config[2],
+        private_key_path=tmp_path / "id_ed25519",
+        known_hosts_path=tmp_path / "known_hosts",
+    )
+    assert "StrictHostKeyChecking=yes" in args
+    assert "GlobalKnownHostsFile=none" in args
+    assert "UserKnownHostsFile=" + str(tmp_path / "known_hosts") in args
+    assert "IdentityAgent=none" in args
+    assert args[-1] == "yfc-allure-publish-v1"
+    assert "StrictHostKeyChecking=no" not in args
+
+
+def test_publisher_streams_header_and_archive_over_ssh(monkeypatch, tmp_path: Path) -> None:
+    report_root = tmp_path / "report"
+    report_root.mkdir()
+    report = b"<!doctype html>\n"
+    (report_root / "index.html").write_bytes(report)
+    header = _origin_header(report_bytes=len(report))
+    captured: dict[str, object] = {}
+
+    class CaptureStream(io.BytesIO):
+        def close(self) -> None:
+            captured["payload"] = self.getvalue()
+
+    class FakeProcess:
+        def __init__(self) -> None:
+            self.stdin = CaptureStream()
+            self.returncode = 0
+
+        def communicate(self) -> tuple[bytes, bytes]:
+            return (
+                (
+                    json.dumps(
+                        {
+                            "status": "published",
+                            "report_path": header["immutable_path"],
+                            "url": header["url"],
+                        }
+                    )
+                    + "\n"
+                ).encode("utf-8"),
+                b"",
+            )
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+    process = FakeProcess()
+
+    def fake_popen(args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return process
+
+    monkeypatch.setattr(publish_allure_report.subprocess, "Popen", fake_popen)
+    response = publish_allure_report._publish_over_ssh(
+        report_root=report_root,
+        header=header,
+        host="app.your-fitness-coach.ru",
+        port=22,
+        user="yfc-allure-publisher",
+        private_key="private-key",
+        known_hosts="app.your-fitness-coach.ru ssh-ed25519 AAAA",
+    )
+
+    payload = io.BytesIO(captured["payload"])
+    assert (
+        payload.read(len(allure_report_origin.PROTOCOL_MAGIC))
+        == allure_report_origin.PROTOCOL_MAGIC
+    )
+    received_header = json.loads(payload.readline())
+    assert received_header == header
+    with tarfile.open(fileobj=payload, mode="r:gz") as archive:
+        assert archive.getnames() == ["index.html"]
+    assert response["status"] == "published"
+    assert captured["kwargs"]["shell"] is False
+    assert captured["args"][-1] == "yfc-allure-publish-v1"
 
 
 def test_report_period_uses_moscow_calendar_boundary_and_safe_paths() -> None:
@@ -296,6 +554,20 @@ def test_aggregate_results_marks_missing_suite_incomplete_with_visible_failure(
         )
 
 
+def test_report_validation_rejects_symlink_root(tmp_path: Path) -> None:
+    actual = tmp_path / "actual-report"
+    actual.mkdir()
+    (actual / "index.html").write_text("<!doctype html>", encoding="utf-8")
+    report_root = tmp_path / "report"
+    try:
+        report_root.symlink_to(actual, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlink creation is unavailable on this development host")
+
+    with pytest.raises(allure_report.AllureReportError, match="root cannot be a symlink"):
+        allure_report.validate_report(report_root, metadata_path=tmp_path / "metadata.json")
+
+
 def test_summary_ignores_skipped_weekly_only_jobs_for_daily_runs(tmp_path: Path) -> None:
     metadata = _aggregate_metadata(tmp_path)
     metadata_path = tmp_path / "metadata.json"
@@ -369,9 +641,10 @@ def test_retention_keeps_daily_calendar_window_and_four_weeklies() -> None:
     now = date(2026, 9, 7)
 
     def entry(kind: str, created: date, index: int) -> dict[str, object]:
+        period = created.isoformat() if kind == "daily" else created.strftime("%G-W%V")
         return {
             "kind": kind,
-            "path": f"{kind}/{created.isoformat()}/{index}/",
+            "path": f"{kind}/{period}/{index}/",
             "created_at": datetime.combine(created, datetime.min.time(), tzinfo=UTC).isoformat(),
         }
 
@@ -381,7 +654,7 @@ def test_retention_keeps_daily_calendar_window_and_four_weeklies() -> None:
         *[entry("weekly", now - timedelta(days=offset), offset) for offset in (1, 8, 15, 22, 29)],
     ]
     current = entry("daily", now, 3)
-    retained, removed = publish_allure_report._retained_reports(
+    retained, removed = allure_report_origin._retained_reports(
         reports,
         current=current,
         now=now,
@@ -425,49 +698,3 @@ def test_dry_run_publication_produces_canonical_url_without_storage_access(tmp_p
 
     assert publication["status"] == "dry-run"
     assert publication["url"] == ("https://allure.your-fitness-coach.ru/daily/2026-09-07/12345/")
-
-
-def test_publication_does_not_rewrite_an_existing_immutable_report(
-    tmp_path: Path, monkeypatch
-) -> None:
-    metadata = _aggregate_metadata(tmp_path)
-    metadata_path = tmp_path / "metadata.json"
-    report_root = tmp_path / "report"
-    report_root.mkdir()
-    (report_root / "index.html").write_text("<!doctype html>", encoding="utf-8")
-    report_bytes = (report_root / "index.html").stat().st_size
-    existing = publish_allure_report._entry_from_metadata(metadata, report_bytes=report_bytes)
-    upload_calls: list[Path] = []
-
-    monkeypatch.setattr(
-        publish_allure_report,
-        "_validate_storage_config",
-        lambda: ("https://example.r2.cloudflarestorage.com", "reports", "key", "secret"),
-    )
-    monkeypatch.setattr(
-        publish_allure_report,
-        "_read_remote_state",
-        lambda **kwargs: ([existing], []),
-    )
-    monkeypatch.setattr(
-        publish_allure_report,
-        "_remote_prefix_exists",
-        lambda **kwargs: True,
-    )
-    monkeypatch.setattr(
-        publish_allure_report,
-        "_upload_report",
-        lambda root, **kwargs: upload_calls.append(root),
-    )
-    monkeypatch.setattr(publish_allure_report, "_upload_file", lambda *args, **kwargs: None)
-    monkeypatch.setattr(publish_allure_report, "_delete_prefix", lambda *args, **kwargs: None)
-
-    publication = publish_allure_report.publish(
-        report_root=report_root,
-        metadata_path=metadata_path,
-        publication_path=tmp_path / "publication.json",
-        now=datetime(2026, 9, 7, 1, 1, tzinfo=UTC),
-    )
-
-    assert publication["status"] == "published"
-    assert upload_calls == []

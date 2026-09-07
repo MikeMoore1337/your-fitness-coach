@@ -872,6 +872,9 @@ jobs:
       REPORT_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report
       REPORT_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report-metadata.json
       PUBLICATION_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-publication.json
+      ALLURE_REPORT_SSH_HOST: ${{ vars.ALLURE_REPORT_SSH_HOST || 'app.your-fitness-coach.ru' }}
+      ALLURE_REPORT_SSH_PORT: ${{ vars.ALLURE_REPORT_SSH_PORT || '22' }}
+      ALLURE_REPORT_SSH_USER: ${{ vars.ALLURE_REPORT_SSH_USER || 'yfc-allure-publisher' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -891,8 +894,6 @@ jobs:
         run: |
           npm ci
           npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
-      - name: Validate private report origin routing
-        run: npm --prefix deploy/allure-report-worker test
       - name: Download encrypted Allure bundles
         if: always()
         continue-on-error: true
@@ -966,14 +967,12 @@ jobs:
         if: always()
         continue-on-error: true
         run: python scripts/allure_report.py validate --report-root "$REPORT_ROOT" --metadata "$REPORT_METADATA"
-      - name: Publish private report to Cloudflare R2
+      - name: Publish private report to isolated VPS origin
         if: always()
         continue-on-error: true
         env:
-          ALLURE_R2_ENDPOINT: ${{ secrets.ALLURE_R2_ENDPOINT }}
-          ALLURE_R2_BUCKET: ${{ secrets.ALLURE_R2_BUCKET }}
-          ALLURE_R2_ACCESS_KEY_ID: ${{ secrets.ALLURE_R2_ACCESS_KEY_ID }}
-          ALLURE_R2_SECRET_ACCESS_KEY: ${{ secrets.ALLURE_R2_SECRET_ACCESS_KEY }}
+          ALLURE_REPORT_SSH_PRIVATE_KEY: ${{ secrets.ALLURE_REPORT_SSH_PRIVATE_KEY }}
+          ALLURE_REPORT_SSH_KNOWN_HOSTS: ${{ secrets.ALLURE_REPORT_SSH_KNOWN_HOSTS }}
         run: |
           python scripts/publish_allure_report.py publish \
             --report-root "$REPORT_ROOT" \
