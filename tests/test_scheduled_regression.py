@@ -293,6 +293,24 @@ def _origin_payload(header: dict[str, object], *, symlink: bool = False) -> io.B
     return output
 
 
+def test_origin_accepts_bootstrapped_empty_metadata_directory(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(allure_report_origin, "_available_bytes", lambda path: 10 * 1024**3)
+    root = tmp_path / "reports"
+    (root / "metadata").mkdir(parents=True)
+    report_bytes = len(b"<!doctype html><title>synthetic</title>\n") + len(b"trace-safe\n")
+    header = _origin_header(report_bytes=report_bytes)
+
+    response = allure_report_origin.handle_request(
+        _origin_payload(header),
+        io.BytesIO(),
+        root=root,
+        now=datetime(2026, 9, 7, 2, 0, tzinfo=UTC),
+    )
+
+    assert response["status"] == "published"
+    assert (root / "metadata" / "index.json").is_file()
+
+
 def test_origin_publishes_atomically_and_retries_cleanup_queue(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(allure_report_origin, "_available_bytes", lambda path: 10 * 1024**3)
     root = tmp_path / "reports"
