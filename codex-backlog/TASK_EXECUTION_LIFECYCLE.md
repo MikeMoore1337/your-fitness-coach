@@ -14,10 +14,13 @@ authorization на весь normal path этой task. Launcher/controller ав�
 
 Lifecycle разделён на две coordination boundary:
 
-- `implementation lane`: отдельные task leases и worktrees. Совместимые
-  `independent-write` task могут одновременно находиться в `implementation`, `review`, `qa`,
-  `ready-for-delivery` и `waiting-for-delivery`; `exclusive-write` блокирует новую task при любой
-  несовместимой активной nonterminal lease, включая queued/delivery/recovery states.
+- `implementation lane`: отдельные task leases и worktrees. Обычная task без `concurrency`
+  metadata считается `independent-write`. Такие task могут одновременно находиться в
+  `implementation`, `review`, `qa`, `ready-for-delivery` и `waiting-for-delivery`. Только
+  `exclusive-write` task удерживает implementation exclusion и только в `starting`,
+  `implementation`, `review` или `qa`; queued, delivery, CI и production states этот exclusion
+  не удерживают. Dirty, interrupted, corrupt, missing, duplicate, recovery и ambiguous state
+  остаются fail-closed.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
   может выполнить `refresh/rebase` относительно latest `origin/master`, final exact-HEAD gate,
   PR/CI, merge, production deploy, smoke и terminal closeout. Owner сохраняется до завершения

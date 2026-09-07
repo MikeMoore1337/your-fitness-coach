@@ -45,15 +45,24 @@ DEPENDABOT_LOGIN = "dependabot[bot]"
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
 UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
 
-# A write lease remains an implementation-safety boundary until the task reaches terminal
-# production success.  This keeps an exclusive-write task from being bypassed while it is
-# queued, delivering, or waiting for owner-safe recovery; independent-write pairs remain
-# the only compatible concurrent write leases.
+# A task lease, an implementation exclusion, and delivery ownership are separate controller
+# concerns.  Only an exclusive-write lease in an implementation state owns the implementation
+# exclusion.  A ready, waiting, delivery, or production-success lease remains a task session but
+# does not hold that exclusion; delivery ownership is serialized independently below.
 IMPLEMENTATION_STATES = frozenset({"starting", "implementation", "review", "qa"})
 READY_STATES = frozenset({"ready-for-delivery", "ready-for-pr"})
 WAITING_STATES = frozenset({"waiting-for-delivery"})
 DELIVERY_STATES = frozenset({"delivering", "delivery-refreshing", "delivery-gate"})
 TERMINAL_LEASE_STATES = frozenset({"production-success"})
+RECOVERY_STATES = frozenset({"recovery-required", "start-failed-recovery-required"})
+KNOWN_LEASE_STATES = (
+    IMPLEMENTATION_STATES
+    | READY_STATES
+    | WAITING_STATES
+    | DELIVERY_STATES
+    | TERMINAL_LEASE_STATES
+    | RECOVERY_STATES
+)
 DELIVERY_OWNER_STATES = DELIVERY_STATES | TERMINAL_LEASE_STATES
 DELIVERY_STATE_VERSION = 1
 CANONICAL_REFRESH_RESULTS = frozenset({"ALIGNED", "REFRESHED", "WAITING", "BLOCKED"})
@@ -459,8 +468,10 @@ def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
         )
         or _legacy_dependencies(text, expected),
         executable=metadata.get("executable", str(executable_default)).lower() == "true",
+        # Ordinary tasks are safe to start in separate worktrees.  A task must opt into the
+        # stronger class explicitly because it changes the global implementation lane.
         concurrency_class=normalize_concurrency_class(
-            metadata.get("concurrency", "exclusive-write")
+            metadata.get("concurrency", "independent-write")
         ),
         owner_gate=metadata.get("owner_gate", "explicit-launch"),
         integration_policy=metadata.get("integration", "task-pr-to-master"),
@@ -957,6 +968,7 @@ class TaskController:
         delivery = self.store.delivery_state()
         owner = delivery.get("owner")
         owner_id = str(owner.get("task_id", "")).upper() if isinstance(owner, dict) else ""
+        delivery_waiting_reason: str | None = None
         owner_lease = None
         if owner_id:
             owner_lease = next(
@@ -968,23 +980,31 @@ class TaskController:
                     "BLOCKED",
                     f"delivery lane owner Task {owner_id} has no matching lease",
                 )
+            try:
+                self._validated_lease_concurrency_class(owner_lease)
+            except TaskSessionError as error:
+                return ("BLOCKED", str(error))
             owner_state = self._lease_state(owner_lease)
             if owner_state == "production-success":
-                return (
-                    "WAITING",
-                    f"Task {owner_id} is in terminal production closeout",
-                )
-            if owner_state not in DELIVERY_STATES:
+                delivery_waiting_reason = f"Task {owner_id} is in terminal production closeout"
+            elif owner_state not in DELIVERY_STATES:
                 return (
                     "BLOCKED",
                     f"delivery lane owner Task {owner_id} has ambiguous state {owner_state}",
                 )
-            if owner_id != expected_delivery_task:
-                return ("WAITING", f"delivery lane is occupied by Task {owner_id}")
+            elif owner_id != expected_delivery_task:
+                delivery_waiting_reason = f"delivery lane is occupied by Task {owner_id}"
 
         task_ids: set[str] = set()
         lease_branches: dict[str, str] = {}
         lease_worktrees: dict[str, str] = {}
+        try:
+            repository_worktrees = {
+                str(item.path.resolve()).casefold(): item for item in self.repository.worktrees()
+            }
+        except TaskSessionError as error:
+            return ("BLOCKED", f"cannot inspect controller worktrees: {error}")
+        waiting_reason = delivery_waiting_reason
         known_states = IMPLEMENTATION_STATES | READY_STATES | WAITING_STATES | DELIVERY_STATES
         for lease in leases:
             raw_task_id = str(lease.get("task_id", "")).upper()
@@ -995,6 +1015,10 @@ class TaskController:
             task_ids.add(raw_task_id)
             if lease.get("mode") != "write":
                 return ("BLOCKED", f"Task {raw_task_id} has an unsupported controller mode")
+            try:
+                self._validated_lease_concurrency_class(lease)
+            except TaskSessionError as error:
+                return ("BLOCKED", str(error))
             branch = lease.get("branch")
             if not isinstance(branch, str):
                 return ("BLOCKED", f"Task {raw_task_id} lease has no valid task branch")
@@ -1033,31 +1057,39 @@ class TaskController:
                     f"(Tasks {lease_worktrees[worktree_key]} and {raw_task_id})",
                 )
             lease_worktrees[worktree_key] = raw_task_id
+            repository_worktree = repository_worktrees.get(worktree_key)
+            if repository_worktree is None:
+                return (
+                    "BLOCKED",
+                    f"Task {raw_task_id} lease worktree is missing from Git worktrees",
+                )
+            if repository_worktree.branch != branch:
+                return (
+                    "BLOCKED",
+                    f"Task {raw_task_id} lease worktree branch does not match {branch}",
+                )
             state = self._lease_state(lease)
-            if state in {"recovery-required", "start-failed-recovery-required"}:
+            if state in RECOVERY_STATES:
                 return ("BLOCKED", f"Task {raw_task_id} requires controller recovery")
             if state in DELIVERY_STATES:
-                if raw_task_id == owner_id and raw_task_id == expected_delivery_task:
+                if raw_task_id == owner_id:
                     continue
                 return (
-                    "WAITING",
-                    f"Task {raw_task_id} is in an incompatible delivery transition",
+                    "BLOCKED",
+                    f"Task {raw_task_id} is in delivery state without matching delivery ownership",
                 )
             if state == "production-success":
                 if raw_task_id == owner_id:
-                    return (
-                        "WAITING",
-                        f"Task {raw_task_id} is in terminal production closeout",
-                    )
+                    continue
                 return (
                     "BLOCKED",
                     f"Task {raw_task_id} has terminal success without delivery ownership",
                 )
             if state == "starting":
-                return (
-                    "WAITING",
-                    f"Task {raw_task_id} is in an active controller start transition",
+                waiting_reason = waiting_reason or (
+                    f"Task {raw_task_id} is in an active controller start transition"
                 )
+                continue
             if state not in known_states:
                 return (
                     "BLOCKED",
@@ -1073,6 +1105,8 @@ class TaskController:
                 "BLOCKED",
                 "controller has a delivery/closeout state without delivery ownership",
             )
+        if waiting_reason:
+            return ("WAITING", waiting_reason)
         return None
 
     def _canonical_refresh_after_contention(
@@ -1593,6 +1627,73 @@ class TaskController:
         return lease.get("mode") == "write" and cls._lease_state(lease) not in TERMINAL_LEASE_STATES
 
     @classmethod
+    def _validated_lease_concurrency_class(cls, lease: Mapping[str, Any]) -> str:
+        task_id = str(lease.get("task_id", "")).upper() or "<unknown>"
+        raw_class = lease.get("concurrency_class")
+        if not isinstance(raw_class, str) or not raw_class.strip():
+            raise TaskSessionError(
+                f"Task {task_id} lease has missing concurrency class; recovery is required"
+            )
+        try:
+            return normalize_concurrency_class(raw_class)
+        except TaskSessionError as error:
+            raise TaskSessionError(
+                f"Task {task_id} lease has invalid concurrency class {raw_class!r}; "
+                "recovery is required"
+            ) from error
+
+    @classmethod
+    def _lease_holds_implementation_exclusion(cls, lease: Mapping[str, Any]) -> bool:
+        if lease.get("mode") != "write":
+            return False
+        state = cls._lease_state(lease)
+        if state not in IMPLEMENTATION_STATES | RECOVERY_STATES:
+            return False
+        return cls._validated_lease_concurrency_class(lease) == "exclusive-write"
+
+    @classmethod
+    def _validate_lease_concurrency_classes(cls, leases: Sequence[Mapping[str, Any]]) -> None:
+        for lease in leases:
+            if lease.get("mode") == "write":
+                cls._validated_lease_concurrency_class(lease)
+
+    @classmethod
+    def _lease_ownership_snapshot(
+        cls, lease: Mapping[str, Any], *, delivery_owner_id: str
+    ) -> dict[str, bool]:
+        task_session_active = lease.get("mode") == "write"
+        try:
+            implementation_exclusion_active = cls._lease_holds_implementation_exclusion(lease)
+        except TaskSessionError:
+            # Status/doctor output must remain useful for recovery, while malformed state is
+            # conservatively represented as holding the implementation boundary.
+            implementation_exclusion_active = task_session_active
+        task_id = str(lease.get("task_id", "")).upper()
+        return {
+            "task_session_active": task_session_active,
+            "implementation_exclusion_active": implementation_exclusion_active,
+            "delivery_critical_section_active": bool(task_id and task_id == delivery_owner_id),
+        }
+
+    @classmethod
+    def _lease_snapshots(
+        cls, leases: Sequence[Mapping[str, Any]], delivery: Mapping[str, Any]
+    ) -> list[dict[str, Any]]:
+        owner = delivery.get("owner")
+        delivery_owner_id = (
+            str(owner.get("task_id", "")).upper() if isinstance(owner, Mapping) else ""
+        )
+        return [
+            {
+                **dict(lease),
+                "ownership": cls._lease_ownership_snapshot(
+                    lease, delivery_owner_id=delivery_owner_id
+                ),
+            }
+            for lease in leases
+        ]
+
+    @classmethod
     def _implementation_lease_conflicts(
         cls,
         leases: Sequence[Mapping[str, Any]],
@@ -1607,21 +1708,37 @@ class TaskController:
                 continue
             if str(lease.get("task_id", "")).upper() == task_id.upper():
                 continue
-            if not cls._is_active_write_lease(lease):
-                continue
-            existing_class = normalize_concurrency_class(str(lease.get("concurrency_class", "")))
-            if not write_lanes_compatible(existing_class, candidate_class):
+            existing_class = cls._validated_lease_concurrency_class(lease)
+            state = cls._lease_state(lease)
+            if state not in KNOWN_LEASE_STATES:
+                raise TaskSessionError(
+                    f"Task {str(lease.get('task_id', '')).upper() or '<unknown>'} lease has "
+                    f"ambiguous lifecycle state {state or '<missing>'}; recovery is required"
+                )
+            if state in RECOVERY_STATES:
+                raise TaskSessionError(
+                    f"Task {str(lease.get('task_id', '')).upper() or '<unknown>'} lease "
+                    "requires controller recovery"
+                )
+            existing_holds_exclusion = (
+                state in IMPLEMENTATION_STATES and existing_class == "exclusive-write"
+            )
+            candidate_requires_exclusion = candidate_class == "exclusive-write" and (
+                state in IMPLEMENTATION_STATES
+            )
+            if existing_holds_exclusion or candidate_requires_exclusion:
                 conflicts.append(
                     {
                         "task_id": str(lease.get("task_id", "")).upper(),
                         "concurrency_class": existing_class,
-                        "lifecycle_state": cls._lease_state(lease),
+                        "lifecycle_state": state,
                     }
                 )
         return conflicts
 
     @classmethod
     def _delivery_candidates(cls, leases: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        cls._validate_lease_concurrency_classes(leases)
         candidates = [
             dict(lease)
             for lease in leases
@@ -1781,6 +1898,15 @@ class TaskController:
                     f"Task {item_id} is in delivery state without matching delivery ownership; "
                     "recovery is required"
                 )
+        try:
+            coordination_blocker = self._canonical_refresh_controller_blocker(delivery_task_id=None)
+        except TaskSessionError as error:
+            implementation_blockers.append(f"coordination state validation failed: {error}")
+        else:
+            if coordination_blocker and coordination_blocker[0] == "BLOCKED":
+                implementation_blockers.append(
+                    f"coordination state is fail-closed: {coordination_blocker[1]}"
+                )
         active_runs: list[dict[str, Any]] | str = "offline"
         open_task_prs: list[dict[str, Any]] | str = "offline"
         rulesets: list[dict[str, Any]] | str = "offline"
@@ -1846,6 +1972,7 @@ class TaskController:
         inventory: list[dict[str, Any]] = []
         for worktree in self.repository.worktrees():
             status = self.repository.status(worktree.path)
+            operation_issues = self.repository.operation_issues(worktree.path)
             task_id = None
             if worktree.branch and TASK_BRANCH_RE.fullmatch(worktree.branch):
                 task_id = task_id_from_branch(worktree.branch)
@@ -1857,8 +1984,12 @@ class TaskController:
                 else []
             )
             classification = "ACTIVE" if task_id in active_task_ids else "SAFE_TO_REMOVE"
-            if status or self.repository.operation_issues(worktree.path):
+            if status or operation_issues:
                 classification = "DIRTY_NEEDS_OWNER"
+                if task_id:
+                    implementation_blockers.append(
+                        f"Task {task_id} worktree is dirty or interrupted; recovery is required"
+                    )
             elif unique:
                 classification = "RECOVERY_ANCHOR"
             elif worktree.branch == "dev":
@@ -1889,7 +2020,7 @@ class TaskController:
                 "origin/master": origin_master,
                 "live/master": live_master,
             },
-            "leases": leases,
+            "leases": self._lease_snapshots(leases, delivery),
             "open_task_prs": open_task_prs,
             "active_workflow_runs": active_runs,
             "rulesets": rulesets,
@@ -1903,10 +2034,12 @@ class TaskController:
         }
 
     def status(self) -> dict[str, Any]:
+        delivery = self.store.delivery_state()
+        leases = self.store.all_leases()
         return {
             "state_root": str(self.store.root),
-            "leases": self.store.all_leases(),
-            "delivery": self.store.delivery_state(),
+            "leases": self._lease_snapshots(leases, delivery),
+            "delivery": delivery,
             "history": sorted(path.name for path in self.store.history.glob("*.json"))
             if self.store.history.exists()
             else [],
@@ -2077,6 +2210,10 @@ class TaskController:
                 f"Worktree: {target.resolve()}\nBranch: {branch}\n"
                 f"Base origin/master: {base_sha}\nTask: {expected} ({document.path})\n"
                 f"Canonical master checkpoint: {canonical_refresh['result']}\n"
+                "Concurrency: missing task concurrency metadata defaults to independent-write; "
+                "exclusive-write is reserved for global/coordination-sensitive scope. Only an "
+                "exclusive lease in starting/implementation/review/qa (or unresolved recovery) "
+                "holds implementation exclusion; readiness, waiting, CI and production do not.\n"
                 "Normal path: targeted checks/review/QA/commit -> READY_FOR_DELIVERY -> acquire delivery\n"
                 "-> refresh-delivery task branch -> local PRE_PUSH_CI_PASS -> PR master -> production.\n"
                 "Implementation may run in parallel with compatible tasks. Do not start another task\n"
@@ -2389,6 +2526,7 @@ class TaskController:
                 raise TaskSessionError(f"Task {expected} has no active write lease")
             state = self._lease_state(lease)
             delivery = self.store.delivery_state()
+            self._validate_lease_concurrency_classes(self.store.all_leases())
             owner = delivery.get("owner")
             owner_id = str(owner.get("task_id", "")).upper() if isinstance(owner, dict) else ""
             if owner_id == expected:

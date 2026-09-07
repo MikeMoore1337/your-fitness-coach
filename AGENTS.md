@@ -271,12 +271,14 @@ The normal owner-facing entry is `python scripts/run_task_delivery.py <ID>`; dir
 commands are low-level implementation and recovery operations.
 
 Parallel read-only/research sessions are allowed only when task metadata permits them and each has
-its own lease. Parallel write branches may be prepared only when dependency/concurrency metadata
-explicitly marks them compatible; `independent-write` + `independent-write` is allowed, while any
-active nonterminal lease in a pair containing `exclusive-write` blocks a new implementation lease.
-`READY_FOR_DELIVERY`, waiting delivery, CI and production activity do not block a compatible
-independent implementation; merge into `master` remains protected and serialized. Without explicit
-compatibility, keep one active writer and stop before creating another write lease.
+its own lease. An ordinary executable task without `concurrency` metadata defaults to
+`independent-write`; declare `exclusive-write` only for genuinely global or coordination-sensitive
+changes. Independent implementation branches may run in separate worktrees. An exclusive lease
+holds the implementation exclusion only in `starting`, `implementation`, `review` or `qa`; after
+durable readiness, `READY_FOR_DELIVERY`, waiting delivery, CI and production activity do not hold
+that exclusion. The delivery critical section remains single-owner and serializes refresh/rebase,
+final gate, PR, merge, deploy and smoke; dirty, interrupted, corrupt, missing, duplicate or
+ambiguous state remains fail-closed. Merge into `master` remains protected and serialized.
 
 # Dependencies
 
