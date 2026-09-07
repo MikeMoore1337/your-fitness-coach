@@ -265,6 +265,7 @@ gates:
 | Authenticated minimal request | выполнен, Groq endpoint вернул `HTTP 403` |
 | Catalog/auth diagnostic | выполнен, `/openai/v1/models` также вернул `HTTP 403`; тело ответа не сохранялось и не выводилось |
 | Unauthenticated comparison | `/openai/v1/models` без `Authorization` тоже вернул `HTTP 403` (`server: cloudflare`); причина provider auth или gateway не различена |
+| Official 403 interpretation | Groq классифицирует `403` как permission restriction; model permissions могут задаваться на organization/project level, но одинаковый `403` без auth не позволяет выбрать одну причину |
 | Structured-output smoke | заблокирован ответом `HTTP 403`, valid schema не получена |
 | Russian/domain eval against provider | не выполнялся из-за `HTTP 403` |
 | Current account tier, quota, billing | не подтверждены |
@@ -274,7 +275,9 @@ gates:
 Следствие: authenticated provider smoke Task 87 не пройден (`HTTP 403`), а причина отказа
 (ключ, account policy или сетевой gateway) без raw body не установлена. Нельзя считать provider
 production-ready, маскировать отказ mock-ответом или использовать production credential для
-local smoke.
+local smoke. Перед повтором проверить project selector и model permissions в Groq Console;
+если `403` без auth сохраняется, повторить smoke из разрешённого non-prod egress, не меняя
+TLS verification и не добавляя публичный proxy.
 
 ## 7. Минимальная архитектура и ADR
 
@@ -437,6 +440,11 @@ Until these are resolved, the only honest runtime state is `disabled` or `contro
 
 - [Groq Your Data](https://console.groq.com/docs/your-data) — retention, ZDR и data location.
 - [Groq API reference](https://console.groq.com/docs/api-reference) — endpoint и response contract.
+- [Groq API Error Codes](https://console.groq.com/docs/errors) — различие `401` и `403`.
+- [Groq Model Permissions](https://console.groq.com/docs/model-permissions) — organization/project
+  restrictions, которые могут вернуть `403`.
+- [Groq Projects](https://console.groq.com/docs/projects) — project-specific keys, limits и
+  project selector.
 - [Groq Structured Outputs](https://console.groq.com/docs/structured-outputs) — model allowlist и
   ограничения structured output.
 - [Groq Models](https://console.groq.com/docs/models) — текущий model/catalog contract.
