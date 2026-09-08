@@ -58,6 +58,15 @@ def _enable_provider(monkeypatch, *, max_attempts: int = 1) -> None:
     ai_coach_service.reset_runtime_state()
 
 
+def _enable_cohort_for_current_user(client, monkeypatch, headers) -> int:
+    current = client.get("/api/v1/me", headers=headers)
+    assert current.status_code == 200
+    user_id = current.json()["id"]
+    monkeypatch.setattr(settings, "ai_coach_ui_enabled", True)
+    monkeypatch.setattr(settings, "ai_coach_internal_user_ids", str(user_id))
+    return user_id
+
+
 @dataclass
 class StubProvider:
     calls: list[tuple[AiCoachRequest, tuple[str, ...]]]
@@ -284,6 +293,7 @@ def test_authenticated_api_does_not_mark_personal_text_as_generic(client, monkey
     )
     assert login.status_code == 200
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    _enable_cohort_for_current_user(client, monkeypatch, headers)
 
     response = client.post(
         "/api/v1/ai-coach/generate",
@@ -413,6 +423,7 @@ def test_authenticated_api_assigns_generic_class_and_preserves_structured_states
     )
     assert login.status_code == 200
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    _enable_cohort_for_current_user(client, monkeypatch, headers)
 
     response = client.post(
         "/api/v1/ai-coach/generate",
@@ -504,6 +515,36 @@ def test_ai_coach_status_is_server_gated_to_internal_cohort(client, monkeypatch)
     }
 
 
+def test_ai_coach_generation_is_server_gated_to_internal_cohort(client, monkeypatch) -> None:
+    _enable_provider(monkeypatch)
+    provider = StubProvider(calls=[])
+    monkeypatch.setattr(ai_coach_service, "provider", provider)
+    login = client.post(
+        "/api/v1/auth/dev-login",
+        json={"telegram_user_id": 987_657, "username": "ai_outside_cohort"},
+    )
+    assert login.status_code == 200
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    current = client.get("/api/v1/me", headers=headers)
+    assert current.status_code == 200
+
+    monkeypatch.setattr(settings, "ai_coach_ui_enabled", True)
+    monkeypatch.setattr(settings, "ai_coach_internal_user_ids", str(current.json()["id"] + 1))
+
+    response = client.post(
+        "/api/v1/ai-coach/generate",
+        headers=headers,
+        json={
+            "job": "nutrition_knowledge",
+            "context_id": "knowledge-kbju-reference-v1",
+            "message": "Объясни смысл этой страницы.",
+        },
+    )
+
+    assert response.status_code == 403
+    assert provider.calls == []
+
+
 def test_ai_coach_api_forbids_provider_controls(client, monkeypatch) -> None:
     _enable_provider(monkeypatch)
     provider = StubProvider(calls=[])
@@ -514,6 +555,7 @@ def test_ai_coach_api_forbids_provider_controls(client, monkeypatch) -> None:
     )
     assert login.status_code == 200
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    _enable_cohort_for_current_user(client, monkeypatch, headers)
 
     response = client.post(
         "/api/v1/ai-coach/generate",

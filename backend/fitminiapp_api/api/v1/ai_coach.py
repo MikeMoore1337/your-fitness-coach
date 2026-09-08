@@ -23,7 +23,11 @@ from fitminiapp_api.ai_coach.safety import (
     refusal_text,
 )
 from fitminiapp_api.ai_coach.service import ai_coach_service
-from fitminiapp_api.api.dependencies.auth import require_user
+from fitminiapp_api.api.dependencies.auth import (
+    is_ai_coach_cohort_user,
+    require_ai_coach_cohort,
+    require_user,
+)
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.rate_limit import limiter
 from fitminiapp_api.db.session import get_db
@@ -66,9 +70,7 @@ def get_ai_coach_status(
     current_user: User = Depends(require_user),
 ) -> AiCoachStatusResponse:
     del request
-    ui_enabled = bool(
-        settings.ai_coach_ui_enabled and current_user.id in settings.ai_coach_internal_user_id_set
-    )
+    ui_enabled = is_ai_coach_cohort_user(current_user)
     generic_available = ui_enabled and _generic_runtime_available()
     personal_available = bool(
         generic_available
@@ -105,7 +107,7 @@ def _personal_state_response(
 def generate_ai_coach_answer(
     request: Request,
     payload: AiCoachGenerateRequest,
-    current_user: User = Depends(require_user),
+    current_user: User = Depends(require_ai_coach_cohort),
     db: Session = Depends(get_db),
 ) -> AiCoachResponse:
     # This route is physically generic-only: no profile, diary, workout,
@@ -179,7 +181,7 @@ def update_personal_ai_coach_consent(
 def generate_personal_ai_coach_answer(
     payload: AiCoachPersonalGenerateRequest,
     request: Request,
-    current_user: User = Depends(require_user),
+    current_user: User = Depends(require_ai_coach_cohort),
     db: Session = Depends(get_db),
 ) -> AiCoachResponse:
     request_id = getattr(request.state, "request_id", None)

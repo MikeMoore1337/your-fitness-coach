@@ -858,6 +858,58 @@ def test_reopen_for_review_clears_delivery_snapshot_and_requires_new_readiness(
     assert ready["ready_head_sha"] == new_head
 
 
+def test_resolve_recovery_requires_owner_authorization_and_clean_unique_anchor(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, worktree, _, _ = _prepare_started(
+        repository, "234B", concurrency="independent-write"
+    )
+    lease_path = controller.store.task_lease_path("234B")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease.update(
+        {
+            "lifecycle_state": "recovery-required",
+            "recovery_reason": "synthetic interrupted delivery",
+            "delivery_head_sha": "stale",
+            "ready_head_sha": "stale",
+            "updated_at": task_session.utc_now(),
+        }
+    )
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    with pytest.raises(task_session.TaskSessionError, match="owner authorization"):
+        controller.resolve_recovery("234B", reason="resume after inspection", owner_authorize=False)
+
+    resolved = controller.resolve_recovery(
+        "234B", reason="resume after inspection", owner_authorize=True
+    )
+
+    assert resolved["lifecycle_state"] == "review"
+    assert resolved["recovery_resolution_reason"] == "resume after inspection"
+    assert resolved["pre_push_ci_pass"] is None
+    assert "delivery_head_sha" not in resolved
+    assert "ready_head_sha" not in resolved
+    assert worktree.exists()
+    assert not controller.store.delivery_state()["owner"]
+
+
+def test_resolve_recovery_refuses_dirty_anchor(repository: tuple[Path, Any]) -> None:
+    _, _, controller, worktree, _, _ = _prepare_started(
+        repository, "234C", concurrency="independent-write"
+    )
+    lease_path = controller.store.task_lease_path("234C")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["lifecycle_state"] = "recovery-required"
+    lease["updated_at"] = task_session.utc_now()
+    task_session.StateStore.replace_json(lease_path, lease)
+    (worktree / "uncommitted.txt").write_text("keep\n", encoding="utf-8")
+
+    with pytest.raises(task_session.TaskSessionError, match="dirty worktree"):
+        controller.resolve_recovery("234C", reason="inspect", owner_authorize=True)
+
+
 def test_busy_delivery_lane_does_not_block_compatible_implementation(
     repository: tuple[Path, Any],
 ) -> None:

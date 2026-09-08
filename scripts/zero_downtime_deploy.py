@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from collections.abc import Iterator, Sequence
@@ -151,6 +152,67 @@ def _atomic_text(path: Path, value: str) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(value, encoding="utf-8")
     os.replace(temporary, path)
+
+
+_IMMUTABLE_IMAGE_REF = re.compile(r"^[^@\s]+@sha256:[0-9a-f]{64}$")
+_APPLICATION_IMAGE_ASSIGNMENT = re.compile(
+    r"^(?:\s*export\s+)?(?P<key>BACKEND_IMAGE|BOT_IMAGE)\s*="
+)
+
+
+def _persist_application_image_refs(path: Path, *, backend_image: str, bot_image: str) -> None:
+    """Atomically persist only verified immutable application image references."""
+
+    values = {"BACKEND_IMAGE": backend_image, "BOT_IMAGE": bot_image}
+    for key, value in values.items():
+        if not _IMMUTABLE_IMAGE_REF.fullmatch(value):
+            raise DeploymentError(
+                f"{key} must be an immutable image reference ending in @sha256:<64 hex>"
+            )
+    if not path.is_file():
+        raise DeploymentError(f"environment file does not exist: {path}")
+
+    original = path.read_text(encoding="utf-8")
+    newline = "\r\n" if "\r\n" in original else "\n"
+    trailing_newline = original.endswith(("\n", "\r"))
+    seen: set[str] = set()
+    updated_lines: list[str] = []
+    for line in original.splitlines():
+        match = _APPLICATION_IMAGE_ASSIGNMENT.match(line)
+        if match is None:
+            updated_lines.append(line)
+            continue
+        key = match.group("key")
+        if key not in seen:
+            updated_lines.append(f"{key}={values[key]}")
+            seen.add(key)
+
+    for key, value in values.items():
+        if key not in seen:
+            updated_lines.append(f"{key}={value}")
+
+    content = newline.join(updated_lines) + (newline if trailing_newline else "")
+    mode = path.stat().st_mode
+    temporary_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            temporary.write(content)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary_name = temporary.name
+        os.chmod(temporary_name, mode)
+        os.replace(temporary_name, path)
+    finally:
+        if temporary_name is not None:
+            Path(temporary_name).unlink(missing_ok=True)
 
 
 def _run(
@@ -819,6 +881,7 @@ def rollback(config: DeployConfig) -> None:
     switched = False
     consumers_stopped = False
     state_committed = False
+    persistent_images_updated = False
     try:
         _switch_gateway(state.rollback_slot, state.active_slot)
         switched = True
@@ -847,13 +910,19 @@ def rollback(config: DeployConfig) -> None:
             rollback_backend_image=state.active_backend_image,
             rollback_bot_image=state.active_bot_image,
         )
+        _persist_application_image_refs(
+            config.root / ".env",
+            backend_image=state.rollback_backend_image,
+            bot_image=state.rollback_bot_image,
+        )
+        persistent_images_updated = True
         _public_smoke(config)
         _atomic_json(state_path, asdict(next_state))
         state_committed = True
         _atomic_text(config.state_root / "last-successful-revision", state.rollback_revision + "\n")
     except BaseException:
         if switched and not state_committed:
-            with contextlib.suppress(BaseException):
+            try:
                 _switch_gateway(state.active_slot, state.active_slot)
                 if consumers_stopped:
                     active_env = (
@@ -872,7 +941,18 @@ def rollback(config: DeployConfig) -> None:
                         evidence=rollback_evidence,
                         config=config,
                     )
+                if persistent_images_updated:
+                    _persist_application_image_refs(
+                        config.root / ".env",
+                        backend_image=state.active_backend_image,
+                        bot_image=state.active_bot_image,
+                    )
                 _public_smoke(config)
+            except BaseException as rollback_exc:
+                raise DeploymentError(
+                    "rollback restoration was incomplete: "
+                    f"{type(rollback_exc).__name__}: {rollback_exc}"
+                ) from rollback_exc
         raise
     print(
         f"Rollback verified: active revision={state.rollback_revision}; slot={state.rollback_slot}"
@@ -928,6 +1008,7 @@ def deploy(config: DeployConfig) -> Evidence:
     candidate_backend_mutated = False
     candidate_consumers_mutated = False
     consumers_stopped = False
+    persistent_images_updated = False
 
     try:
         with _stage(evidence, "preflight"):
@@ -1063,6 +1144,12 @@ def deploy(config: DeployConfig) -> Evidence:
             _switch_gateway(candidate_slot, candidate_slot)
             evidence.probe = _finish_probe(probe, probe_path, probe_stop_path)
             probe = None
+            _persist_application_image_refs(
+                config.root / ".env",
+                backend_image=candidate_backend,
+                bot_image=candidate_bot,
+            )
+            persistent_images_updated = True
             _atomic_json(state_path, asdict(next_state))
             state_committed = True
             _atomic_text(
@@ -1107,6 +1194,12 @@ def deploy(config: DeployConfig) -> Evidence:
                 if consumers_stopped:
                     _start_slot_consumers(
                         state.active_slot, env=active_env, evidence=evidence, config=config
+                    )
+                if persistent_images_updated:
+                    _persist_application_image_refs(
+                        config.root / ".env",
+                        backend_image=state.active_backend_image,
+                        bot_image=state.active_bot_image,
                     )
                 _public_smoke(config)
                 evidence.verdict = "rolled back"
@@ -1310,6 +1403,7 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
     old_bot = ""
     target_env: dict[str, str] | None = None
     services_stopped = False
+    persistent_images_updated = False
 
     try:
         with _stage(evidence, "single_slot_legacy_provenance"):
@@ -1416,6 +1510,14 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
                         f"{lease.service} lost current-run ownership after single-slot start"
                     )
             _public_smoke(config, require_progress_report_shell=True)
+            if target_env is None:
+                raise DeploymentError("target images were not resolved before verification")
+            _persist_application_image_refs(
+                config.root / ".env",
+                backend_image=target_env["BACKEND_IMAGE"],
+                bot_image=target_env["BOT_IMAGE"],
+            )
+            persistent_images_updated = True
             _atomic_text(active_revision_path, config.target_revision + "\n")
 
         evidence.verdict = "active"
@@ -1457,6 +1559,18 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
                         "consumers: "
                         f"{type(rollback_consumers_exc).__name__}: {rollback_consumers_exc}"
                     )
+                if persistent_images_updated:
+                    try:
+                        _persist_application_image_refs(
+                            config.root / ".env",
+                            backend_image=old_backend,
+                            bot_image=old_bot,
+                        )
+                    except BaseException as rollback_env_exc:
+                        rollback_errors.append(
+                            "environment image refs: "
+                            f"{type(rollback_env_exc).__name__}: {rollback_env_exc}"
+                        )
                 try:
                     _public_smoke(config)
                 except BaseException as rollback_smoke_exc:

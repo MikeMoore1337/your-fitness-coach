@@ -26,24 +26,30 @@ production runtime и доступном ограниченном telemetry snap
 
 ## 2. Provenance и фактическое состояние production
 
+Ниже зафиксирован production snapshot на момент первоначальной validation-проверки. После неё
+отдельно выполнен release remediation для server-side cohort boundary и persistent image
+provenance; его результат подтверждается release evidence, а не этим историческим snapshot.
+
 ### 2.1. Deployed revision
 
 | Evidence ID | Факт | Provenance |
 | --- | --- | --- |
-| `PROD-REV-01` | Активная production revision: `005068d462a2c617887a2af2b51275d16a785e3c` | production marker и `current` на host, read-only check `2026-09-08T18:30:04Z` |
+| `PROD-REV-01` | На момент snapshot активная production revision: `005068d462a2c617887a2af2b51275d16a785e3c` | production marker и `current` на host, read-only check `2026-09-08T18:30:04Z` |
 | `PROD-REV-02` | Revision `005068d…` успешно прошла production release | GitHub Actions run `34241361787`, head SHA `005068d…`, `success`, 2026-09-08 14:54:59–14:57:46 UTC |
-| `PROD-REV-03` | Последняя merged 90A layout revision `1a27733bd49d881812c7d501c7ee33c49ea24807` не считается deployed | release run `34262002318` остановился на `single_slot_legacy_provenance` до `pull_and_verify`/`traffic_switch`; active marker остался `005068d…` |
+| `PROD-REV-03` | На момент snapshot последняя merged 90A layout revision `1a27733bd49d881812c7d501c7ee33c49ea24807` не считалась deployed | release run `34262002318` остановился на `single_slot_legacy_provenance` до `pull_and_verify`/`traffic_switch`; active marker оставался `005068d…` |
 | `PROD-HEALTH-01` | Public liveness/readiness отвечали `200` (`{"status":"ok"}`) | `https://app.your-fitness-coach.ru/health/live` и `/health/ready`, read-only check `2026-09-08T18:29:20.6016551Z` |
 | `PROD-AUTH-01` | Неаутентифицированный запрос к AI Coach status получил `401` | `GET /api/v1/ai-coach/status`, тот же read-only check |
 
-Проверка `PROD-REV-03` не является частью AI Coach product decision и не исправляется в этой
-research/docs task. Она важна только для того, чтобы не приписывать текущему production UI
-неразвёрнутую revision.
+Проверка `PROD-REV-03` не является частью AI Coach product decision. Она важна для того, чтобы
+не приписывать первоначальному production snapshot неразвёрнутую revision. Выявленный при
+подготовке release blocker исправлен в текущем delivery remediation и не отменяет исходный
+ограниченный beta вывод.
 
 ### 2.2. Effective runtime configuration
 
-Read-only inspection запущенного `fit-mini-app-backend-1` подтвердил следующие значения. Секрет
-`GROQ_API_KEY` проверен только на наличие; его значение, длина и содержимое не сохранялись.
+Read-only inspection запущенного `fit-mini-app-backend-1` на момент snapshot подтвердил
+следующие значения. Секрет `GROQ_API_KEY` проверен только на наличие; его значение, длина и
+содержимое не сохранялись.
 
 | Setting | Effective production value |
 | --- | --- |
@@ -65,7 +71,13 @@ Read-only inspection запущенного `fit-mini-app-backend-1` подтв�
 | `GROQ_API_KEY` | присутствует, redacted |
 
 Effective environment подтверждён именно у running backend container, а не только в persistent
-`.env`. Никаких production config/secrets в рамках Task 90B не изменялось.
+`.env`. В рамках release remediation секреты и значения AI Coach policy не менялись.
+
+После исправления server-side boundary оба generation endpoint — `POST /api/v1/ai-coach/generate`
+и `POST /api/v1/ai-coach/personal/generate` — используют тот же серверный cohort predicate,
+что и status endpoint. Аутентифицированный аккаунт вне allowlist получает `403` до вызова
+provider; скрытие UI не считается authorization boundary. Personal route при этом остаётся
+выключенным production policy.
 
 ## 3. Research method и cohort
 
@@ -234,8 +246,8 @@ decision. Event schema does not permit raw prompt, response, user ID, exact fact
 
 Open finding подтверждён фактическим кодом `backend/fitminiapp_api/ai_coach/service.py`,
 `backend/fitminiapp_api/core/logging_config.py` и безопасным formatter probe. Existing owner-only
-`codex-backlog/bugs/FINDINGS.md` отсутствует в exact task worktree, поэтому новый ignored registry
-file или duplicate bug task не создавался; finding durable зафиксирован здесь для owner triage.
+`codex-backlog/bugs/FINDINGS.md` синхронизирован owner-local записью с тем же ID; duplicate bug
+task не создавался. Finding остаётся открытым для owner triage.
 
 ## 7. Rollout, incident и rollback record
 
@@ -252,6 +264,8 @@ file или duplicate bug task не создавался; finding durable заф
 
 - `AI_COACH_INTERNAL_USER_IDS` — server-side cohort boundary; UI status также требует
   `AI_COACH_UI_ENABLED`.
+- Generation endpoints повторно применяют ту же cohort boundary на сервере и возвращают `403`
+  аккаунтам вне allowlist до обращения к provider; UI visibility не является защитой.
 - `AI_COACH_KILL_SWITCH` — emergency request gate; при `true` AI Coach возвращает controlled
   unavailable, deterministic core не удаляется.
 - `AI_COACH_PER_USER_REQUEST_LIMIT`, `AI_COACH_GLOBAL_REQUEST_LIMIT` и
@@ -303,7 +317,8 @@ Incident owner и kill-switch authority: владелец проекта. В р�
 - quota complaint оставлена принятой beta limitation;
 - новые capabilities уже имеют существующие backlog scopes и не дублируются;
 - observability gap зафиксирован как `OBS-90B-OBS-01` с owner triage, без параллельного task;
-- исправление текущего deployment provenance guard не относится к 90B и не смешивается с docs.
+- release remediation для persistent immutable image refs и строгой provenance-проверки включено
+  в текущий delivery, потому что blocker обнаружился при выпуске этого результата.
 
 Следующая существующая AI-задача по backlog: **Task 91 — `AI Coach: итог выбранного периода с
 ограниченными рекомендациями`**. Её trigger требует successful 90B `Go` и отдельное решение по
@@ -311,11 +326,16 @@ grounded period insights; Task 91 не запускается автоматич
 
 ## 10. Изменения и configuration impact
 
-- Изменено: только этот durable research/decision document.
-- Production code/tests/API/UI: не изменялись.
+- Изменено: durable research/decision document, server-side cohort enforcement с regression
+  tests и deploy persistence для immutable `BACKEND_IMAGE`/`BOT_IMAGE` после verified rollout.
+- API surface расширен не был; generation endpoints получили обязательную server-side проверку
+  существующей cohort policy.
 - Migrations: нет.
 - Dependencies: нет.
-- Production `.env`/secrets: не изменялись; `env change required: no` для Task 90B.
-- Production redeploy: не требуется для этого docs-only результата; runtime остаётся на
-  проверенной active revision `005068d…`.
+- Production `.env`/secrets: новых ключей и значений не требуется; `env change required: no`.
+  Deploy автоматически сохраняет только immutable application image refs в persistent `.env`;
+  значение `GROQ_API_KEY` не читается в report и не изменяется этим task.
+- Production redeploy: требуется и выполняется через normal PR-based release для включения
+  server-side gate и remediation deployment provenance; итоговая revision подтверждается
+  отдельным release evidence.
 - Raw prompts, answers, transcripts, account IDs, API key и personal data: не сохранялись.

@@ -35,6 +35,15 @@ def _login(client, telegram_user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
+def _login_in_cohort(client, monkeypatch, telegram_user_id: int) -> dict[str, str]:
+    headers = _login(client, telegram_user_id)
+    current = client.get("/api/v1/me", headers=headers)
+    assert current.status_code == 200
+    monkeypatch.setattr(settings, "ai_coach_ui_enabled", True)
+    monkeypatch.setattr(settings, "ai_coach_internal_user_ids", str(current.json()["id"]))
+    return headers
+
+
 def _enable_personal(monkeypatch) -> None:
     monkeypatch.setattr(settings, "ai_coach_enabled", True)
     monkeypatch.setattr(settings, "ai_coach_kill_switch", False)
@@ -102,7 +111,7 @@ def test_personal_route_requires_consent_and_does_not_call_provider(client, monk
     _enable_personal(monkeypatch)
     provider = StubPersonalProvider(calls=[])
     monkeypatch.setattr(ai_coach_service, "provider", provider)
-    headers = _login(client, 989_002)
+    headers = _login_in_cohort(client, monkeypatch, 989_002)
 
     response = client.post(
         "/api/v1/ai-coach/personal/generate",
@@ -119,8 +128,32 @@ def test_personal_route_requires_consent_and_does_not_call_provider(client, monk
     assert provider.calls == []
 
 
-def test_personal_request_rejects_unbounded_period_and_identity_fields(client) -> None:
-    headers = _login(client, 989_005)
+def test_personal_generation_is_server_gated_to_internal_cohort(client, monkeypatch) -> None:
+    _enable_personal(monkeypatch)
+    provider = StubPersonalProvider(calls=[])
+    monkeypatch.setattr(ai_coach_service, "provider", provider)
+    headers = _login(client, 989_010)
+    current = client.get("/api/v1/me", headers=headers)
+    assert current.status_code == 200
+    monkeypatch.setattr(settings, "ai_coach_ui_enabled", True)
+    monkeypatch.setattr(settings, "ai_coach_internal_user_ids", str(current.json()["id"] + 1))
+
+    response = client.post(
+        "/api/v1/ai-coach/personal/generate",
+        headers=headers,
+        json={
+            "tool": "get_progress_summary",
+            "period_days": 7,
+            "message": "Объясни эту сводку.",
+        },
+    )
+
+    assert response.status_code == 403
+    assert provider.calls == []
+
+
+def test_personal_request_rejects_unbounded_period_and_identity_fields(client, monkeypatch) -> None:
+    headers = _login_in_cohort(client, monkeypatch, 989_005)
     response = client.post(
         "/api/v1/ai-coach/personal/generate",
         headers=headers,
@@ -137,7 +170,7 @@ def test_personal_request_rejects_unbounded_period_and_identity_fields(client) -
 def test_personal_consent_is_stale_after_provider_policy_revision_changes(
     client, monkeypatch
 ) -> None:
-    headers = _login(client, 989_006)
+    headers = _login_in_cohort(client, monkeypatch, 989_006)
     assert (
         client.put("/api/v1/ai-coach/consent", headers=headers, json={"enabled": True}).json()[
             "status"
@@ -168,6 +201,15 @@ def test_personal_consent_does_not_transfer_between_accounts(client, monkeypatch
     monkeypatch.setattr(ai_coach_service, "provider", provider)
     owner_headers = _login(client, 989_007)
     other_headers = _login(client, 989_008)
+    owner = client.get("/api/v1/me", headers=owner_headers)
+    other = client.get("/api/v1/me", headers=other_headers)
+    assert owner.status_code == 200 and other.status_code == 200
+    monkeypatch.setattr(settings, "ai_coach_ui_enabled", True)
+    monkeypatch.setattr(
+        settings,
+        "ai_coach_internal_user_ids",
+        f"{owner.json()['id']},{other.json()['id']}",
+    )
     assert (
         client.put(
             "/api/v1/ai-coach/consent", headers=owner_headers, json={"enabled": True}
@@ -192,7 +234,7 @@ def test_personal_route_uses_current_user_tool_and_structured_context(client, mo
     _enable_personal(monkeypatch)
     provider = StubPersonalProvider(calls=[])
     monkeypatch.setattr(ai_coach_service, "provider", provider)
-    headers = _login(client, 989_003)
+    headers = _login_in_cohort(client, monkeypatch, 989_003)
     consent = client.put(
         "/api/v1/ai-coach/consent",
         headers=headers,
@@ -263,7 +305,7 @@ def test_personal_answer_uses_grounded_fact_policy_and_personal_limitation(
         "fitminiapp_api.api.v1.ai_coach.run_personal_tool",
         lambda db, user, tool, period_days: tool_result,
     )
-    headers = _login(client, 989_009)
+    headers = _login_in_cohort(client, monkeypatch, 989_009)
     assert (
         client.put("/api/v1/ai-coach/consent", headers=headers, json={"enabled": True}).status_code
         == 200
@@ -289,7 +331,7 @@ def test_personal_prompt_injection_is_refused_before_provider(client, monkeypatc
     _enable_personal(monkeypatch)
     provider = StubPersonalProvider(calls=[])
     monkeypatch.setattr(ai_coach_service, "provider", provider)
-    headers = _login(client, 989_004)
+    headers = _login_in_cohort(client, monkeypatch, 989_004)
     assert (
         client.put("/api/v1/ai-coach/consent", headers=headers, json={"enabled": True}).status_code
         == 200

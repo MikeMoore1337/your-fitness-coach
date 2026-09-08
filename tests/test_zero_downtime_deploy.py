@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
@@ -19,6 +20,17 @@ class FakeProbe:
 
 
 def _config(tmp_path: Path) -> deploy.DeployConfig:
+    environment_file = tmp_path / ".env"
+    if not environment_file.exists():
+        environment_file.write_text(
+            "# preserved deployment settings\n"
+            "POSTGRES_IMAGE=registry/postgres@sha256:"
+            + "e"
+            * 64
+            + "\nBACKEND_IMAGE=registry/backend:legacy\n"
+            "BOT_IMAGE=registry/bot:legacy\n",
+            encoding="utf-8",
+        )
     return deploy.DeployConfig(
         target_revision=NEW_SHA,
         base_url="https://app.example.test",
@@ -69,6 +81,86 @@ def test_image_digest_resolves_repo_digest_from_immutable_image_id(monkeypatch) 
     )
 
     assert deploy._image_digest("sha256:" + "c" * 64, OLD_SHA) == repo_digest
+
+
+def test_persist_application_image_refs_replaces_duplicates_and_preserves_file_contract(
+    tmp_path: Path,
+) -> None:
+    environment_file = tmp_path / ".env"
+    environment_file.write_text(
+        "# keep this comment\n"
+        "APP_ENV=prod\n"
+        "BACKEND_IMAGE=registry/backend:old\n"
+        "BACKEND_IMAGE=registry/backend:duplicate\n"
+        "BOT_IMAGE=registry/bot:old\n"
+        "OTHER=value\n",
+        encoding="utf-8",
+    )
+    os.chmod(environment_file, 0o640)
+    expected_mode = os.stat(environment_file).st_mode & 0o777
+    backend_image = "registry/backend@sha256:" + "1" * 64
+    bot_image = "registry/bot@sha256:" + "2" * 64
+
+    deploy._persist_application_image_refs(
+        environment_file,
+        backend_image=backend_image,
+        bot_image=bot_image,
+    )
+
+    assert environment_file.read_text(encoding="utf-8") == (
+        "# keep this comment\n"
+        "APP_ENV=prod\n"
+        f"BACKEND_IMAGE={backend_image}\n"
+        f"BOT_IMAGE={bot_image}\n"
+        "OTHER=value\n"
+    )
+    assert os.stat(environment_file).st_mode & 0o777 == expected_mode
+
+
+def test_persist_application_image_refs_appends_missing_keys_without_final_newline(
+    tmp_path: Path,
+) -> None:
+    environment_file = tmp_path / ".env"
+    environment_file.write_text("APP_ENV=prod", encoding="utf-8")
+
+    deploy._persist_application_image_refs(
+        environment_file,
+        backend_image="registry/backend@sha256:" + "1" * 64,
+        bot_image="registry/bot@sha256:" + "2" * 64,
+    )
+
+    assert environment_file.read_text(encoding="utf-8") == (
+        "APP_ENV=prod\n"
+        "BACKEND_IMAGE=registry/backend@sha256:" + "1" * 64 + "\n"
+        "BOT_IMAGE=registry/bot@sha256:" + "2" * 64
+    )
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("BACKEND_IMAGE", "registry/backend:tag"),
+        ("BOT_IMAGE", "registry/bot@sha256:" + "A" * 64),
+        ("BOT_IMAGE", "registry/bot@sha256:" + "1" * 63),
+    ],
+)
+def test_persist_application_image_refs_rejects_non_immutable_values(
+    tmp_path: Path, key: str, value: str
+) -> None:
+    environment_file = tmp_path / ".env"
+    environment_file.write_text("APP_ENV=prod\n", encoding="utf-8")
+    values = {
+        "BACKEND_IMAGE": "registry/backend@sha256:" + "1" * 64,
+        "BOT_IMAGE": "registry/bot@sha256:" + "2" * 64,
+    }
+    values[key] = value
+
+    with pytest.raises(deploy.DeploymentError, match=key):
+        deploy._persist_application_image_refs(
+            environment_file,
+            backend_image=values["BACKEND_IMAGE"],
+            bot_image=values["BOT_IMAGE"],
+        )
 
 
 def test_config_can_keep_rollout_state_outside_immutable_release(
@@ -205,7 +297,11 @@ def _patch_runtime(monkeypatch, *, fail_at: str | None = None):
     monkeypatch.setattr(deploy, "_switch_gateway", switch)
     monkeypatch.setattr(deploy, "_candidate_smoke", candidate_smoke)
     monkeypatch.setattr(
-        deploy, "_image_digest", lambda image, revision: image + "@sha256:" + "3" * 64
+        deploy,
+        "_image_digest",
+        lambda image, revision: (
+            image.split("@", maxsplit=1)[0].rsplit(":", maxsplit=1)[0] + "@sha256:" + "3" * 64
+        ),
     )
     monkeypatch.setattr(deploy, "_start_probe", lambda *args: FakeProbe())
     monkeypatch.setattr(deploy, "_finish_probe", lambda *args: {"failure_count": 0})
@@ -235,6 +331,13 @@ def test_successful_rollout_updates_state_only_after_observation(
     assert state.active_slot == "green"
     assert state.active_revision == NEW_SHA
     assert state.rollback_revision == OLD_SHA
+    environment_file = config.root / ".env"
+    assert f"BACKEND_IMAGE=registry/backend@sha256:{'3' * 64}" in environment_file.read_text(
+        encoding="utf-8"
+    )
+    assert f"BOT_IMAGE=registry/bot@sha256:{'3' * 64}" in environment_file.read_text(
+        encoding="utf-8"
+    )
     assert calls["switch"] == [("blue", "blue"), ("green", "blue"), ("green", "green")]
 
 
@@ -575,6 +678,9 @@ def test_manual_rollback_swaps_only_verified_revisions(tmp_path: Path, monkeypat
     assert restored.active_revision == OLD_SHA
     assert restored.rollback_revision == NEW_SHA
     assert calls["switch"] == [("blue", "green")]
+    environment = config.root.joinpath(".env").read_text(encoding="utf-8")
+    assert "BACKEND_IMAGE=registry/backend@sha256:" + "1" * 64 in environment
+    assert "BOT_IMAGE=registry/bot@sha256:" + "2" * 64 in environment
 
 
 def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
@@ -681,6 +787,9 @@ def test_single_slot_rollout_replaces_legacy_services_and_records_success(
         config.state_root.joinpath("last-successful-revision").read_text(encoding="utf-8").strip()
         == NEW_SHA
     )
+    environment = config.root.joinpath(".env").read_text(encoding="utf-8")
+    assert "BACKEND_IMAGE=registry/backend@sha256:" + "b" * 64 in environment
+    assert "BOT_IMAGE=registry/bot@sha256:" + "b" * 64 in environment
     assert not config.state_root.joinpath("state.json").exists()
 
 
