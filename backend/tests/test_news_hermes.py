@@ -5,6 +5,7 @@ import time
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import pytest
 from pydantic import SecretStr
 
 from fitminiapp_api.core.config import settings
@@ -13,10 +14,11 @@ from fitminiapp_api.models.news import (
     HermesEditorialSubmission,
     NewsCluster,
     NewsDraftRevision,
+    NewsItem,
     NewsReviewDelivery,
     NewsSource,
 )
-from fitminiapp_api.services import news_worker
+from fitminiapp_api.services import news_hermes, news_worker
 from fitminiapp_api.services.news_hermes import _canonical_source_hash, hermes_signature
 from fitminiapp_api.services.news_worker import run_news_pipeline_once
 
@@ -78,6 +80,18 @@ def _signed_headers(body: bytes) -> dict[str, str]:
     }
 
 
+def _set_published_at(payload: dict, published_at: datetime | None) -> None:
+    source = payload["source"]
+    assert isinstance(source, dict)
+    source["published_at"] = published_at.isoformat() if published_at else None
+    source["content_hash"] = _canonical_source_hash(
+        title=source["title"],
+        summary=source["summary"],
+        canonical_url=source["canonical_url"],
+        published_at=published_at,
+    )
+
+
 def test_signed_hermes_intake_creates_preview_and_is_idempotent(client, monkeypatch) -> None:
     monkeypatch.setattr(settings, "hermes_intake_enabled", True)
     monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
@@ -116,8 +130,18 @@ def test_signed_hermes_intake_creates_preview_and_is_idempotent(client, monkeypa
         assert db.query(HermesEditorialSubmission).count() == 1
 
 
-def test_signed_hermes_intake_preserves_missing_source_publication_date(
-    client, monkeypatch
+@pytest.mark.parametrize(
+    ("published_at", "expected_status"),
+    [
+        (None, 422),
+        (datetime(2026, 8, 30, 12, 0, 1), 422),
+        (datetime(2026, 6, 30, 11, 59, 59), 422),
+        (datetime(2026, 7, 1, 12, 0, 0), 200),
+        (datetime(2026, 8, 29, 12, 0, 0), 200),
+    ],
+)
+def test_signed_hermes_intake_enforces_source_freshness_before_ingestion(
+    client, monkeypatch, published_at: datetime | None, expected_status: int
 ) -> None:
     monkeypatch.setattr(settings, "hermes_intake_enabled", True)
     monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
@@ -126,6 +150,8 @@ def test_signed_hermes_intake_preserves_missing_source_publication_date(
         "hermes_intake_shared_secret",
         SecretStr("test-hermes-shared-secret-that-is-long-enough"),
     )
+    fixed_now = datetime(2026, 8, 30, 12, 0, 0)
+    monkeypatch.setattr(news_hermes, "utcnow", lambda: fixed_now)
     with get_session_context() as db:
         db.add(
             NewsSource(
@@ -140,16 +166,15 @@ def test_signed_hermes_intake_preserves_missing_source_publication_date(
         )
 
     payload = _payload()
-    payload["idempotency_key"] = "hermes-test-missing-published-at"
+    payload["idempotency_key"] = f"hermes-test-freshness-{expected_status}"
     payload["request_nonce"] = "hermes-test-nonce-1"
-    payload["source"]["published_at"] = None
-    payload["source"]["content_hash"] = _canonical_source_hash(
-        title=payload["source"]["title"],
-        summary=payload["source"]["summary"],
-        canonical_url=payload["source"]["canonical_url"],
-        published_at=None,
-    )
+    _set_published_at(payload, published_at)
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+
+    with get_session_context() as db:
+        before_submissions = db.query(HermesEditorialSubmission).count()
+        before_items = db.query(NewsItem).count()
+        before_drafts = db.query(NewsDraftRevision).count()
 
     response = client.post(
         "/api/v1/hermes/editorial/intake",
@@ -157,13 +182,15 @@ def test_signed_hermes_intake_preserves_missing_source_publication_date(
         headers=_signed_headers(body),
     )
 
-    assert response.status_code == 200, response.text
-    assert response.json()["status"] == "accepted"
+    assert response.status_code == expected_status, response.text
     with get_session_context() as db:
-        submission = db.query(HermesEditorialSubmission).one()
-        draft = db.get(NewsDraftRevision, submission.draft_id)
-        assert draft is not None
-        assert draft.evidence_metadata["source_published_at"] is None
+        if expected_status == 422:
+            assert response.json()["detail"] == "source_publication_not_fresh"
+            assert db.query(HermesEditorialSubmission).count() == before_submissions
+            assert db.query(NewsItem).count() == before_items
+            assert db.query(NewsDraftRevision).count() == before_drafts
+        else:
+            assert response.json()["status"] == "accepted"
 
 
 def test_hermes_intake_rejects_bad_signature_without_source_processing(client, monkeypatch) -> None:

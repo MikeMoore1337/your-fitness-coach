@@ -163,6 +163,61 @@ def test_persist_application_image_refs_rejects_non_immutable_values(
         )
 
 
+def test_legacy_image_digest_accepts_exact_tag_when_oci_label_is_missing(monkeypatch) -> None:
+    image_id = "sha256:" + "c" * 64
+    configured_image = f"registry/backend:{OLD_SHA}"
+    repo_digest = "registry/backend@sha256:" + "d" * 64
+
+    monkeypatch.setattr(deploy, "_legacy_running_image", lambda _service: image_id)
+    monkeypatch.setattr(deploy, "_legacy_configured_image", lambda _service: configured_image)
+
+    def missing_label_digest(image: str, revision: str) -> str:
+        raise deploy.DeploymentError(f"image {image} revision '' does not match {revision}")
+
+    monkeypatch.setattr(deploy, "_image_digest", missing_label_digest)
+    monkeypatch.setattr(
+        deploy,
+        "_run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=(f"{json.dumps([repo_digest])}|{json.dumps([configured_image])}|\n"),
+        ),
+    )
+
+    assert deploy._legacy_image_digest("backend", OLD_SHA) == repo_digest
+
+
+def test_legacy_image_digest_rejects_mutable_tag_when_oci_label_is_missing(monkeypatch) -> None:
+    image_id = "sha256:" + "c" * 64
+    configured_image = "registry/backend:latest"
+    repo_digest = "registry/backend@sha256:" + "d" * 64
+
+    monkeypatch.setattr(deploy, "_legacy_running_image", lambda _service: image_id)
+    monkeypatch.setattr(deploy, "_legacy_configured_image", lambda _service: configured_image)
+
+    def missing_label_digest(image: str, revision: str) -> str:
+        raise deploy.DeploymentError(f"image {image} revision '' does not match {revision}")
+
+    monkeypatch.setattr(
+        deploy,
+        "_image_digest",
+        missing_label_digest,
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args,
+            0,
+            stdout=f"{json.dumps([repo_digest])}|{json.dumps([configured_image])}|\n",
+        ),
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="exact revision tag"):
+        deploy._legacy_image_digest("backend", OLD_SHA)
+
+
 def test_config_can_keep_rollout_state_outside_immutable_release(
     tmp_path: Path, monkeypatch
 ) -> None:
