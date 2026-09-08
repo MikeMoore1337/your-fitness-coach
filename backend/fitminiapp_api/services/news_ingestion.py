@@ -20,7 +20,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.news import NewsCluster, NewsItem, NewsSource
-from fitminiapp_api.services.news_freshness import is_current_month_publication
+from fitminiapp_api.services.news_freshness import is_fresh_publication
 from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.news_taxonomy import (
     classify_editorial_text,
@@ -820,7 +820,10 @@ def score_candidate(
     supporting_source_count: int,
     uncertain_duplicate: bool,
     now: datetime,
+    allow_sensitive_manual_review: bool = False,
 ) -> tuple[int, str, list[str], list[str]]:
+    """Score a source item; Hermes may retain sensitive topics for owner review only."""
+
     text = f"{item.title} {item.summary}"
     topic = _topic(text)
     reasons = [f"source_quality:{SOURCE_QUALITY[source.source_type]}"]
@@ -837,10 +840,10 @@ def score_candidate(
         if any(keyword in normalized_text for keyword in keywords):
             score += 10
             reasons.append(f"priority:{priority}")
-    current_month = is_current_month_publication(item.published_at, now=now)
-    if current_month:
+    fresh = is_fresh_publication(item.published_at, now=now)
+    if fresh:
         score += 15
-        reasons.append("freshness:current_month")
+        reasons.append("freshness:60_days")
     else:
         risks.append("source_not_current_month")
         reasons.append("freshness_gate_failed")
@@ -858,10 +861,14 @@ def score_candidate(
         score -= 10
     prohibited = prohibited_flags(text)
     risks.extend(f"prohibited_{flag}" for flag in prohibited)
-    if prohibited:
+    # Only the authenticated Hermes intake opts into sensitive-topic recall. Legacy source
+    # acquisition keeps the strict rejection path, while publication gates remain unchanged.
+    if prohibited and not allow_sensitive_manual_review:
         score = 0
         reasons.append("prohibited_topic")
-    if not current_month or topic == "other":
+    elif prohibited:
+        reasons.append("sensitive_topic_manual_review")
+    if not fresh or topic == "other":
         score = 0
     return max(0, min(100, score)), topic, reasons, list(dict.fromkeys(risks))
 
@@ -902,6 +909,7 @@ def ingest_items(
     *,
     candidate_threshold: int,
     fetched_at: datetime | None = None,
+    allow_sensitive_manual_review: bool = False,
 ) -> dict[str, int]:
     current = fetched_at or utcnow()
     counts = {
@@ -1029,6 +1037,7 @@ def ingest_items(
             supporting_source_count=max(0, len(representative_items) - 1),
             uncertain_duplicate=uncertain,
             now=current,
+            allow_sensitive_manual_review=allow_sensitive_manual_review,
         )
         classification = classify_editorial_text(
             primary.title,
@@ -1069,9 +1078,10 @@ def ingest_items(
             counts["clustered"] += 1
             continue
         prohibited = any(flag.startswith("prohibited_") for flag in risks)
-        current_month = "source_not_current_month" not in risks
+        hard_prohibited = prohibited and not allow_sensitive_manual_review
+        fresh = "source_not_current_month" not in risks
         broad_recall_candidate = (
-            current_month
+            fresh
             and source.source_type
             in {"primary_research", "systematic_review", "official_organization", "yfc"}
             and topic == "other"
@@ -1083,9 +1093,9 @@ def ingest_items(
                     for marker in ESPORTS_PHYSICAL_CONTEXT
                 )
             )
-            and not prohibited
+            and not hard_prohibited
         )
-        discovery_eligible = not prohibited and (
+        discovery_eligible = not hard_prohibited and (
             score >= candidate_threshold or broad_recall_candidate
         )
         cluster.discovery_eligible = discovery_eligible
@@ -1096,12 +1106,17 @@ def ingest_items(
                     if score >= candidate_threshold
                     else "broad_source_recall",
                     *classification.classification_reasons,
-                    *(["source_not_current_month"] if not current_month else []),
-                    *(["prohibited_content"] if prohibited else []),
+                    *(["source_not_current_month"] if not fresh else []),
+                    *(["prohibited_content"] if hard_prohibited else []),
+                    *(
+                        ["sensitive_topic_manual_review"]
+                        if prohibited and allow_sensitive_manual_review
+                        else []
+                    ),
                 ]
             )
         )
-        if prohibited:
+        if hard_prohibited:
             transition_news_cluster(
                 db,
                 cluster,

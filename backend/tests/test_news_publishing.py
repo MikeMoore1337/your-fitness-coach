@@ -57,6 +57,7 @@ from fitminiapp_api.services.news_publication import (
     reconcile_uncertain_publication,
     retry_uncertain_publication,
 )
+from fitminiapp_api.services.news_review_schedule import current_news_review_slot
 from fitminiapp_api.services.news_sources import apply_source_allowlist, parse_source_allowlist
 from fitminiapp_api.services.news_worker import (
     NewsCycleStats,
@@ -185,15 +186,7 @@ def test_review_artifact_blocks_source_outside_freshness_window() -> None:
     with get_session_context() as db:
         draft = db.get(NewsDraftRevision, draft_id)
         assert draft is not None
-        current_month_start = utcnow().replace(
-            day=1,
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-        previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
-        stale = previous_month_start - timedelta(seconds=1)
+        stale = utcnow() - timedelta(days=61)
         draft.evidence_metadata = {
             **draft.evidence_metadata,
             "source_published_at": stale.isoformat(),
@@ -217,7 +210,7 @@ def test_scheduling_cannot_cross_source_freshness_window(monkeypatch) -> None:
         enqueue_review_deliveries(db, {7001})
         draft.evidence_metadata = {
             **draft.evidence_metadata,
-            "source_published_at": "2026-07-04T00:00:00",
+            "source_published_at": "2026-06-28T12:00:00",
         }
 
         result = approve_publication(
@@ -250,7 +243,7 @@ def test_queued_publication_is_failed_after_freshness_window_rollover(monkeypatc
         enqueue_review_deliveries(db, {7001})
         draft.evidence_metadata = {
             **draft.evidence_metadata,
-            "source_published_at": "2026-07-04T00:00:00",
+            "source_published_at": "2026-06-30T00:00:00",
         }
         approved = approve_publication(
             db,
@@ -1355,6 +1348,168 @@ def test_successful_pipeline_fetches_scores_drafts_and_delivers_for_approval(
         event = db.query(AuditEvent).filter_by(action="news.preview_created").one()
         assert event.details["preview_message_id"] == 301
         assert event.details["control_message_id"] == 302
+
+
+def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatch) -> None:
+    definitions = parse_source_allowlist(
+        [
+            {
+                "id": "batch-journal",
+                "name": "Batch Journal",
+                "type": "primary_research",
+                "fetch_kind": "rss",
+                "url": "https://batch-journal.example/feed",
+                "language": "en",
+                "enabled": True,
+                "fetch_interval_minutes": 60,
+                "trust_notes": "Primary publisher",
+                "licensing_notes": "Metadata and short excerpt only",
+            }
+        ]
+    )
+    titles = (
+        "Resistance training changed measured strength outcome",
+        "Dietary protein review changed nutrition context",
+        "Sleep duration cohort reported recovery associations",
+        "Cardio interval study measured endurance outcome",
+        "Mobility exercise study reported flexibility outcome",
+        "Creatine supplement trial measured performance outcome",
+    )
+    with get_session_context() as db:
+        apply_source_allowlist(db, definitions)
+        source = db.get(NewsSource, "batch-journal")
+        assert source is not None
+        for index, title in enumerate(titles):
+            counts = ingest_items(
+                db,
+                source,
+                [
+                    ParsedNewsItem(
+                        external_id=f"batch-{index}",
+                        canonical_url=f"https://batch-journal.example/batch-{index}",
+                        primary_url=f"https://batch-journal.example/batch-{index}",
+                        title=title,
+                        summary=f"A controlled study reported the {title.lower()}.",
+                        publisher="Batch Journal",
+                        published_at=utcnow(),
+                        doi=f"10.1000/batch-{index}",
+                    )
+                ],
+                candidate_threshold=55,
+            )
+            assert counts["candidate"] == 1
+            item = db.query(NewsItem).filter(NewsItem.external_id == f"batch-{index}").one()
+            assert item.cluster_id is not None
+            cluster = db.get(NewsCluster, item.cluster_id)
+            assert cluster is not None
+            draft = asyncio.run(create_draft_revision(db, cluster))
+            draft.evidence_metadata = {
+                **draft.evidence_metadata,
+                "submitted_by": "hermes_narrow_intake",
+            }
+            draft.warnings = []
+            asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == len(titles)
+
+    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    slot = current_news_review_slot(datetime(2026, 9, 8, 5, 5, 0, tzinfo=UTC))
+    assert slot is not None
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=700 + len(preview_calls), message_date=utcnow())
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 800 + len(control_calls)
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+                review_slot=slot,
+            )
+
+    assert asyncio.run(deliver()) == 5
+    assert len(preview_calls) == 5
+    assert len(control_calls) == 5
+    with get_session_context() as db:
+        statuses = [
+            row.status for row in db.query(NewsReviewDelivery).order_by(NewsReviewDelivery.id)
+        ]
+        assert statuses.count("sent") == 5
+        assert statuses.count("queued") == 1
+
+    assert asyncio.run(deliver()) == 0
+    assert len(preview_calls) == 5
+    assert len(control_calls) == 5
+    with get_session_context() as db:
+        assert (
+            db.query(NewsReviewDelivery).filter(NewsReviewDelivery.status == "queued").count() == 1
+        )
+
+
+def test_sensitive_hermes_warning_reaches_owner_card_but_not_publish_button(monkeypatch) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-sensitive-card")
+    draft_id, _ = _draft(cluster_id)
+    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = ["medical_prescription_language"]
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    control_calls: list[dict[str, object]] = []
+
+    async def send_preview(_client, _chat_id, *_args, **_kwargs):
+        return SimpleNamespace(message_id=631, message_date=utcnow())
+
+    async def send_control(_client, _chat_id, text, *, reply_markup):
+        control_calls.append({"text": text, "reply_markup": reply_markup})
+        return 632
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    assert asyncio.run(deliver()) == 1
+    assert len(control_calls) == 1
+    callback_values = [
+        button["callback_data"]
+        for row in control_calls[0]["reply_markup"]["inline_keyboard"]
+        for button in row
+        if "callback_data" in button
+    ]
+    assert "medical_prescription_language" in control_calls[0]["text"]
+    assert not any(value.startswith("newsp:p:") for value in callback_values)
+    with get_session_context() as db:
+        assert db.query(NewsReviewDelivery).one().status == "sent"
 
 
 def test_legacy_source_fetch_flag_preserves_downstream_pipeline(monkeypatch) -> None:

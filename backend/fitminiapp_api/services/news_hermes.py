@@ -281,6 +281,7 @@ def accept_hermes_submission(
         [parsed],
         candidate_threshold=settings.news_candidate_score_threshold,
         fetched_at=current,
+        allow_sensitive_manual_review=True,
     )
     if counts["rejected"]:
         raise HermesIntakeError("source_packet_rejected")

@@ -6,11 +6,12 @@ import hmac
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from time import monotonic
 from typing import Protocol
 
 import httpx
+from sqlalchemy import func
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import get_session_context
@@ -34,7 +35,7 @@ from fitminiapp_api.services.news_editorial import (
     review_delivery_blockers,
     review_message,
 )
-from fitminiapp_api.services.news_freshness import is_current_month_publication
+from fitminiapp_api.services.news_freshness import is_fresh_publication
 from fitminiapp_api.services.news_images import create_image_revision
 from fitminiapp_api.services.news_ingestion import (
     SafeNewsFetcher,
@@ -47,6 +48,10 @@ from fitminiapp_api.services.news_publication import (
     mark_publication_failed,
     mark_publication_succeeded,
     publication_payload,
+)
+from fitminiapp_api.services.news_review_schedule import (
+    NEWS_REVIEW_BATCH_SIZE,
+    NewsReviewSlot,
 )
 from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.notifications import safe_delivery_error
@@ -278,7 +283,7 @@ async def generate_candidate_drafts(
             if cluster is None:
                 continue
             primary = db.get(NewsItem, cluster.primary_item_id)
-            if primary is None or not is_current_month_publication(
+            if primary is None or not is_fresh_publication(
                 primary.published_at,
                 now=utcnow(),
             ):
@@ -363,7 +368,11 @@ async def generate_pending_images(client: httpx.AsyncClient) -> int:
     return generated
 
 
-def _claim_deliveries() -> list[int]:
+def _claim_deliveries(
+    *,
+    draft_limit: int | None = None,
+    review_slot: NewsReviewSlot | None = None,
+) -> list[int]:
     now = utcnow()
     stale_before = now - PROCESSING_TTL
     with get_session_context() as db:
@@ -378,17 +387,62 @@ def _claim_deliveries() -> list[int]:
             },
             synchronize_session=False,
         )
-        rows = (
-            db.query(NewsReviewDelivery)
-            .filter(
-                NewsReviewDelivery.status == "queued",
-                NewsReviewDelivery.next_attempt_at <= now,
-            )
-            .order_by(NewsReviewDelivery.next_attempt_at.asc(), NewsReviewDelivery.id.asc())
-            .limit(MAX_DELIVERIES_PER_CYCLE)
-            .with_for_update(skip_locked=True)
-            .all()
+        eligible = db.query(NewsReviewDelivery).filter(
+            NewsReviewDelivery.status == "queued",
+            NewsReviewDelivery.next_attempt_at <= now,
         )
+        effective_draft_limit = draft_limit
+        if review_slot is not None:
+            slot_start_utc = review_slot.local_start.astimezone(UTC).replace(tzinfo=None)
+            sent_drafts_in_slot = (
+                db.query(NewsReviewDelivery.draft_id)
+                .filter(
+                    NewsReviewDelivery.status == "sent",
+                    NewsReviewDelivery.sent_at.is_not(None),
+                    NewsReviewDelivery.sent_at >= slot_start_utc,
+                )
+                .distinct()
+            )
+            eligible = eligible.filter(~NewsReviewDelivery.draft_id.in_(sent_drafts_in_slot))
+            remaining_batch_size = max(0, NEWS_REVIEW_BATCH_SIZE - sent_drafts_in_slot.count())
+            effective_draft_limit = (
+                remaining_batch_size
+                if effective_draft_limit is None
+                else min(effective_draft_limit, remaining_batch_size)
+            )
+        if effective_draft_limit is None:
+            rows = (
+                eligible.order_by(
+                    NewsReviewDelivery.next_attempt_at.asc(), NewsReviewDelivery.id.asc()
+                )
+                .limit(MAX_DELIVERIES_PER_CYCLE)
+                .with_for_update(skip_locked=True)
+                .all()
+            )
+        else:
+            selected_drafts = (
+                eligible.with_entities(
+                    NewsReviewDelivery.draft_id,
+                    func.min(NewsReviewDelivery.next_attempt_at).label("next_attempt_at"),
+                    func.min(NewsReviewDelivery.id).label("delivery_id"),
+                )
+                .group_by(NewsReviewDelivery.draft_id)
+                .order_by(
+                    func.min(NewsReviewDelivery.next_attempt_at).asc(),
+                    func.min(NewsReviewDelivery.id).asc(),
+                )
+                .limit(effective_draft_limit)
+                .all()
+            )
+            draft_ids = [row[0] for row in selected_drafts]
+            rows = (
+                eligible.filter(NewsReviewDelivery.draft_id.in_(draft_ids))
+                .order_by(NewsReviewDelivery.next_attempt_at.asc(), NewsReviewDelivery.id.asc())
+                .with_for_update(skip_locked=True)
+                .all()
+                if draft_ids
+                else []
+            )
         result = []
         for row in rows:
             row.status = "processing"
@@ -444,6 +498,7 @@ async def deliver_review_queue(
     channel_ready: bool,
     *,
     cycle_stats: NewsCycleStats | None = None,
+    review_slot: NewsReviewSlot | None = None,
 ) -> int:
     recipient_ids = {
         editorial_actor_ref(telegram_id): telegram_id
@@ -453,7 +508,10 @@ async def deliver_review_queue(
         with get_session_context() as db:
             cancel_legacy_review_deliveries(db)
     delivered = 0
-    for delivery_id in _claim_deliveries():
+    for delivery_id in _claim_deliveries(
+        draft_limit=NEWS_REVIEW_BATCH_SIZE if review_slot is not None else None,
+        review_slot=review_slot,
+    ):
         with get_session_context() as db:
             delivery = db.get(NewsReviewDelivery, delivery_id)
             if delivery is None or delivery.status != "processing":
@@ -702,9 +760,12 @@ async def run_news_pipeline_once(
     send_publication: Callable[..., Awaitable[PublicationResult]],
     publication_ready: bool,
     fetch_sources: bool,
+    review_delivery_due: bool = True,
+    review_slot: NewsReviewSlot | None = None,
 ) -> NewsCycleStats:
     started = monotonic()
     cycle_stats = NewsCycleStats()
+    delivered = 0
     legacy_source_fetch_enabled = settings.news_legacy_source_fetch_enabled
     with get_session_context() as db:
         prune_news_editorial(db, retention_days=settings.news_retention_days)
@@ -733,13 +794,15 @@ async def run_news_pipeline_once(
         await generate_pending_images(client)
         with get_session_context() as db:
             enqueue_review_deliveries(db, settings.admin_telegram_id_set)
-        delivered = await deliver_review_queue(
-            client,
-            send_message,
-            send_preview,
-            publication_ready,
-            cycle_stats=cycle_stats,
-        )
+        if review_delivery_due:
+            delivered = await deliver_review_queue(
+                client,
+                send_message,
+                send_preview,
+                publication_ready,
+                cycle_stats=cycle_stats,
+                review_slot=review_slot,
+            )
     if (legacy_source_fetch_enabled and fetch_sources) or any(
         (
             cycle_stats.drafts_created,

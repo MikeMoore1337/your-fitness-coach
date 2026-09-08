@@ -26,7 +26,7 @@ from fitminiapp_api.models.news import (
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.news_content import parse_editorial_content
 from fitminiapp_api.services.news_drafts import quality_warnings
-from fitminiapp_api.services.news_freshness import source_metadata_is_current_month
+from fitminiapp_api.services.news_freshness import source_metadata_is_fresh
 from fitminiapp_api.services.news_images import create_uploaded_image_revision, current_image
 from fitminiapp_api.services.news_ingestion import utcnow
 from fitminiapp_api.services.news_publication import (
@@ -96,6 +96,12 @@ class ReviewArtifact:
 HERMES_SUBMISSION_MARKER = "hermes_narrow_intake"
 PREVIEW_OPERATIONAL_BLOCKERS = frozenset({"publishing_disabled", "channel_rights_missing"})
 LEGACY_REVIEW_DELIVERY_DISABLED = "legacy_review_delivery_disabled"
+MANUAL_REVIEW_ALLOWED_WARNINGS = frozenset({"medical_prescription_language"})
+MANUAL_REVIEW_ALLOWED_CONTENT_BLOCKERS = frozenset(
+    {
+        "prohibited_medical_or_aas_language",
+    }
+)
 
 
 def is_hermes_origin_draft(draft: NewsDraftRevision) -> bool:
@@ -114,12 +120,20 @@ def review_delivery_blockers(
     blockers: list[str] = []
     if is_hermes_draft:
         blockers.extend(
-            blocker for blocker in review.blockers if blocker not in PREVIEW_OPERATIONAL_BLOCKERS
+            blocker
+            for blocker in review.blockers
+            if blocker not in PREVIEW_OPERATIONAL_BLOCKERS
+            and blocker != "unresolved_warning:medical_prescription_language"
+            and blocker not in MANUAL_REVIEW_ALLOWED_CONTENT_BLOCKERS
         )
         blockers.extend(
             f"unresolved_warning:{warning}"
             for warning in draft.warnings
-            if isinstance(warning, str) and warning
+            if (
+                isinstance(warning, str)
+                and warning
+                and warning not in MANUAL_REVIEW_ALLOWED_WARNINGS
+            )
         )
     if is_hermes_draft and review.artifact is None:
         blockers.append("preview_artifact_unavailable")
@@ -556,7 +570,7 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
         if not legacy_source_fetch_enabled and not is_hermes_origin_draft(draft):
             _cancel_pending_deliveries(db, draft.id)
             continue
-        if not source_metadata_is_current_month(draft.evidence_metadata, now=now):
+        if not source_metadata_is_fresh(draft.evidence_metadata, now=now):
             _cancel_pending_deliveries(db, draft.id)
             transition_news_cluster(
                 db,

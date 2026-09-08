@@ -30,7 +30,7 @@ from fitminiapp_api.services.news_content import (
     EditorialContent,
     editorial_content_from_metadata,
 )
-from fitminiapp_api.services.news_freshness import source_metadata_is_current_month
+from fitminiapp_api.services.news_freshness import source_metadata_is_fresh
 from fitminiapp_api.services.news_images import current_image
 from fitminiapp_api.services.news_ingestion import utcnow
 from fitminiapp_api.services.news_state import transition_news_cluster
@@ -371,7 +371,7 @@ def publication_quality_blockers(
     )
     if not isinstance(draft.evidence_metadata.get("source_published_at"), str):
         blockers.append("source_date_missing")
-    elif not source_metadata_is_current_month(draft.evidence_metadata, now=utcnow()):
+    elif not source_metadata_is_fresh(draft.evidence_metadata, now=utcnow()):
         blockers.append("source_not_current_month")
     if content is not None and draft.evidence_metadata.get("topic") == "research":
         research_context = f"{content.summary} {content.why_it_matters}".casefold()
@@ -531,7 +531,7 @@ def approve_publication(
     if schedule is None:
         return ApprovalResult(status="schedule_invalid")
     scheduled_for_utc, local_date = schedule
-    if not source_metadata_is_current_month(
+    if not source_metadata_is_fresh(
         draft.evidence_metadata,
         now=scheduled_for_utc,
     ):
@@ -681,7 +681,7 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
     for row in candidates:
         cluster = db.get(NewsCluster, row.cluster_id)
         draft = db.get(NewsDraftRevision, row.text_revision_id)
-        if draft is None or not source_metadata_is_current_month(
+        if draft is None or not source_metadata_is_fresh(
             draft.evidence_metadata,
             now=now,
         ):

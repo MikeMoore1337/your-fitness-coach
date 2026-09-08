@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
 from time import monotonic
@@ -17,6 +17,7 @@ from fitminiapp_api.models.program import ProgramTemplate, UserProgram, UserWork
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.services import notifications as notification_service
 from fitminiapp_api.services import worker
+from fitminiapp_api.services.news_review_schedule import current_news_review_slot
 from fitminiapp_api.services.notifications import (
     NOTIFICATION_FALLBACK,
     NotificationDeliveryError,
@@ -657,6 +658,46 @@ def test_worker_finishes_current_cycle_before_graceful_stop(
     asyncio.run(scenario())
 
     assert events == ["cycle:True"]
+
+
+def test_worker_dispatches_news_review_once_per_active_slot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    events: list[dict[str, object]] = []
+
+    async def scenario() -> None:
+        stop_requested = asyncio.Event()
+        iterations = 0
+        slot = current_news_review_slot(datetime(2026, 9, 8, 5, 5, tzinfo=UTC))
+        assert slot is not None
+
+        async def run_once(*, sync_reminders: bool) -> None:
+            del sync_reminders
+            nonlocal iterations
+            iterations += 1
+            if iterations == 2:
+                stop_requested.set()
+
+        async def run_news_pipeline_once(**kwargs) -> None:
+            events.append(kwargs)
+
+        monkeypatch.setattr(worker, "run_once", run_once)
+        monkeypatch.setattr(worker, "run_news_pipeline_once", run_news_pipeline_once)
+        monkeypatch.setattr(worker, "current_news_review_slot", lambda _now: slot)
+        monkeypatch.setattr(worker, "WORKER_HEARTBEAT_PATH", tmp_path / "worker-heartbeat")
+        monkeypatch.setattr(worker.settings, "weekly_digest_enabled", False)
+        monkeypatch.setattr(worker.settings, "news_ingestion_enabled", True)
+
+        await worker.run_until_stopped(
+            stop_requested,
+            news_publication_ready=False,
+        )
+
+    asyncio.run(scenario())
+
+    assert len(events) == 2
+    assert [event["review_delivery_due"] for event in events] == [True, False]
+    assert events[0]["review_slot"] is events[1]["review_slot"]
 
 
 def test_worker_heartbeat_refreshes_during_long_async_cycle(
