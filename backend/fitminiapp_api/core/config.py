@@ -185,6 +185,8 @@ class Settings(BaseSettings):
         "unknown"
     )
     ai_coach_data_policy: Literal["verified_generic_only", "unknown"] = "unknown"
+    ai_coach_personal_enabled: bool = False
+    ai_coach_personal_data_policy: Literal["verified_personal_user", "disabled"] = "disabled"
     ai_coach_structured_output: bool = True
     ai_coach_policy_revision: str = "unverified"
     ai_coach_timeout_seconds: float = Field(default=20, ge=1, le=60)

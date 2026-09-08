@@ -11,10 +11,12 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.ai_coach.contracts import (
+    AI_COACH_PERSONAL_PROMPT_VERSION,
     AI_COACH_PROMPT_VERSION,
     AI_COACH_SCHEMA_VERSION,
     AiCoachCitation,
     AiCoachDataClass,
+    AiCoachJob,
     AiCoachOutcome,
     AiCoachPolicy,
     AiCoachRequest,
@@ -38,6 +40,10 @@ from fitminiapp_api.core.config import settings
 logger = logging.getLogger("app.ai_coach")
 
 _GENERIC_LIMITATION = "Ответ основан только на проверенном публичном материале и не является персональным назначением."
+_PERSONAL_LIMITATION = (
+    "Ответ основан только на вашей ограниченной структурированной сводке за выбранный "
+    "период; AI Coach не делает персональных назначений."
+)
 _UNAVAILABLE_LIMITATION = (
     "AI Coach сейчас недоступен; основные функции приложения продолжают работать."
 )
@@ -145,12 +151,25 @@ class _ProviderCallFailure(RuntimeError):
 
 
 def _policy_for(request: AiCoachRequest) -> AiCoachPolicy:
+    prompt_version = (
+        AI_COACH_PERSONAL_PROMPT_VERSION
+        if request.data_class == AiCoachDataClass.PERSONALIZED
+        else AI_COACH_PROMPT_VERSION
+    )
     return AiCoachPolicy(
         job=request.job,
         data_class=request.data_class,
-        prompt_version=AI_COACH_PROMPT_VERSION,
+        prompt_version=prompt_version,
         schema_version=AI_COACH_SCHEMA_VERSION,
         locale=request.locale,
+    )
+
+
+def _prompt_version_for(request: AiCoachRequest) -> str:
+    return (
+        AI_COACH_PERSONAL_PROMPT_VERSION
+        if request.data_class == AiCoachDataClass.PERSONALIZED
+        else AI_COACH_PROMPT_VERSION
     )
 
 
@@ -204,6 +223,7 @@ class AiCoachService:
         request: AiCoachRequest,
         user_key: str,
         request_id: str | None,
+        context_refs: tuple[ContextRef, ...] | None = None,
     ) -> AiCoachResponse:
         started = time.monotonic()
         safety = classify_request(request)
@@ -218,7 +238,10 @@ class AiCoachService:
             if safety != SafetyCategory.CLEAR:
                 outcome = AiCoachOutcome.SAFETY_REFUSAL
                 return self._safety_response(request, request_id, safety)
-            if request.data_class != AiCoachDataClass.GENERIC:
+            if request.data_class not in {
+                AiCoachDataClass.GENERIC,
+                AiCoachDataClass.PERSONALIZED,
+            }:
                 error_code = ProviderErrorCode.POLICY_BLOCKED.value
                 return self._unavailable_response(request, request_id, safety)
             if not settings.ai_coach_enabled or settings.ai_coach_kill_switch:
@@ -226,8 +249,12 @@ class AiCoachService:
                 return self._unavailable_response(request, request_id, safety)
 
             policy = _policy_for(request)
-            context_refs = retrieve_context(db, request)
-            if not context_refs:
+            resolved_context_refs = (
+                context_refs
+                if request.data_class == AiCoachDataClass.PERSONALIZED
+                else retrieve_context(db, request)
+            )
+            if not resolved_context_refs:
                 outcome = AiCoachOutcome.INSUFFICIENT_DATA
                 return self._insufficient_response(request, request_id, safety)
 
@@ -247,7 +274,7 @@ class AiCoachService:
                 return self._rate_limited_response(request, request_id, safety)
 
             try:
-                result, attempts = self._call_provider(request, policy, context_refs)
+                result, attempts = self._call_provider(request, policy, resolved_context_refs)
             except _ProviderCallFailure as failure:
                 attempts = failure.attempts
                 error_code = failure.error.code.value
@@ -267,7 +294,8 @@ class AiCoachService:
             try:
                 validate_provider_output(
                     result.response,
-                    allowed_ref_ids=frozenset(ref.ref_id for ref in context_refs),
+                    allowed_ref_ids=frozenset(ref.ref_id for ref in resolved_context_refs),
+                    data_class=request.data_class,
                 )
             except ValueError:
                 error_code = ProviderErrorCode.INVALID_OUTPUT.value
@@ -275,7 +303,7 @@ class AiCoachService:
                 return self._invalid_output_response(request, request_id, safety)
             self.cooldown.reset()
             outcome = AiCoachOutcome.ANSWER
-            return self._answer_response(request, request_id, safety, result, context_refs)
+            return self._answer_response(request, request_id, safety, result, resolved_context_refs)
         except ContextUnsafe:
             safety = SafetyCategory.PROMPT_INJECTION
             error_code = "context_safety_blocked"
@@ -291,7 +319,8 @@ class AiCoachService:
                     "request_id": request_id,
                     "job": request.job.value,
                     "data_class": request.data_class.value,
-                    "prompt_version": AI_COACH_PROMPT_VERSION,
+                    "tool_name": request.tool_name.value if request.tool_name else None,
+                    "prompt_version": _prompt_version_for(request),
                     "schema_version": AI_COACH_SCHEMA_VERSION,
                     "policy_revision": settings.ai_coach_policy_revision,
                     "provider": provider_name,
@@ -317,7 +346,14 @@ class AiCoachService:
     ) -> ProviderErrorCode | None:
         if not capability.enabled or capability.provider == "disabled":
             return ProviderErrorCode.DISABLED
-        if policy.data_class != AiCoachDataClass.GENERIC:
+        if policy.data_class == AiCoachDataClass.PERSONALIZED:
+            if not settings.ai_coach_personal_enabled:
+                return ProviderErrorCode.DISABLED
+            if settings.ai_coach_personal_data_policy != "verified_personal_user":
+                return ProviderErrorCode.POLICY_BLOCKED
+            if policy.job != AiCoachJob.METRIC_EXPLANATION:
+                return ProviderErrorCode.POLICY_BLOCKED
+        elif policy.data_class != AiCoachDataClass.GENERIC:
             return ProviderErrorCode.POLICY_BLOCKED
         if capability.provider != "groq" or not _safe_groq_route():
             return ProviderErrorCode.POLICY_BLOCKED
@@ -339,7 +375,11 @@ class AiCoachService:
         policy: AiCoachPolicy,
         context_refs: tuple[ContextRef, ...],
     ) -> tuple[ProviderResult, int]:
-        max_attempts = settings.ai_coach_max_attempts
+        max_attempts = (
+            1
+            if request.data_class == AiCoachDataClass.PERSONALIZED
+            else settings.ai_coach_max_attempts
+        )
         attempts = 0
         while attempts < max_attempts:
             attempts += 1
@@ -380,7 +420,7 @@ class AiCoachService:
             citations=tuple(citations),
             limitations=tuple(limitations),
             safety_category=safety.value,
-            prompt_version=AI_COACH_PROMPT_VERSION,
+            prompt_version=_prompt_version_for(request),
             request_id=request_id,
         )
 
@@ -475,7 +515,12 @@ class AiCoachService:
                     continue
                 seen_urls.add(url)
                 citations.append(AiCoachCitation.model_validate(citation.model_dump()))
-        limitations = tuple(dict.fromkeys((_GENERIC_LIMITATION, *result.response.limitations)))
+        default_limitation = (
+            _PERSONAL_LIMITATION
+            if request.data_class == AiCoachDataClass.PERSONALIZED
+            else _GENERIC_LIMITATION
+        )
+        limitations = tuple(dict.fromkeys((default_limitation, *result.response.limitations)))
         return self._base_response(
             request,
             request_id,
