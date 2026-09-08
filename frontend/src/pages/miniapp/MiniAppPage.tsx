@@ -295,9 +295,14 @@ export default function MiniAppPage() {
     user?.profile?.cardio_trainings_per_week,
     user?.profile?.timezone,
   ]);
+  const revealDetails = (details: HTMLDetailsElement | null) => {
+    if (!details || details.open) return;
+    const summary = details.querySelector('summary');
+    if (summary instanceof HTMLElement) summary.click();
+  };
   const openProfileSection = (detailsId: string, targetId = detailsId) => {
     const details = document.getElementById(detailsId);
-    if (details instanceof HTMLDetailsElement) details.open = true;
+    revealDetails(details instanceof HTMLDetailsElement ? details : null);
     window.requestAnimationFrame(() =>
       document.getElementById(targetId)?.scrollIntoView({ block: 'start' }),
     );
@@ -311,7 +316,7 @@ export default function MiniAppPage() {
       const target = document.getElementById(targetId);
       const details =
         target instanceof HTMLDetailsElement ? target : target?.closest('details.card-disclosure');
-      if (details instanceof HTMLDetailsElement) details.open = true;
+      revealDetails(details instanceof HTMLDetailsElement ? details : null);
       target?.scrollIntoView({ block: 'start' });
     });
     return () => window.cancelAnimationFrame(frame);
