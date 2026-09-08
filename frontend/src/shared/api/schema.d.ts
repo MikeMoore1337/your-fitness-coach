@@ -396,6 +396,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-coach/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Personal Ai Coach Consent */
+        get: operations["get_personal_ai_coach_consent_api_v1_ai_coach_consent_get"];
+        /** Update Personal Ai Coach Consent */
+        put: operations["update_personal_ai_coach_consent_api_v1_ai_coach_consent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/personal/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Personal Ai Coach Answer */
+        post: operations["generate_personal_ai_coach_answer_api_v1_ai_coach_personal_generate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -3794,6 +3829,39 @@ export interface components {
             /** Source Type */
             source_type: string;
         };
+        /** AiCoachConsentResponse */
+        AiCoachConsentResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "granted" | "revoked";
+            /** Scope */
+            scope: string;
+            /** Consent Version */
+            consent_version: string;
+            /** Categories */
+            categories: string[];
+            /** Purpose */
+            purpose: string;
+            /** Provider Name */
+            provider_name: string;
+            /** Provider Policy Revision */
+            provider_policy_revision: string;
+            /** Retention Notice */
+            retention_notice: string;
+            /** Consent Source */
+            consent_source: string;
+            /** Granted At */
+            granted_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+        };
+        /** AiCoachConsentUpdateRequest */
+        AiCoachConsentUpdateRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /**
          * AiCoachGenerateRequest
          * @description A bounded intent plus a server-known public context id.
@@ -3817,7 +3885,27 @@ export interface components {
          * AiCoachOutcome
          * @enum {string}
          */
-        AiCoachOutcome: "answer" | "unavailable" | "rate_limited" | "safety_refusal" | "insufficient_data" | "invalid_output";
+        AiCoachOutcome: "answer" | "unavailable" | "rate_limited" | "safety_refusal" | "insufficient_data" | "invalid_output" | "consent_required";
+        /**
+         * AiCoachPersonalGenerateRequest
+         * @description A server-selected read-only tool and one of three bounded periods.
+         */
+        AiCoachPersonalGenerateRequest: {
+            tool: components["schemas"]["AiCoachPersonalTool"];
+            /**
+             * Period Days
+             * @default 30
+             * @enum {integer}
+             */
+            period_days: 7 | 30 | 90;
+            /** Message */
+            message: string;
+        };
+        /**
+         * AiCoachPersonalTool
+         * @enum {string}
+         */
+        AiCoachPersonalTool: "get_progress_summary" | "get_recent_training_summary" | "get_nutrition_summary";
         /**
          * AiCoachResponse
          * @description Stable user-facing response; provider topology is intentionally absent.
@@ -10436,6 +10524,92 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AiCoachGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_personal_ai_coach_consent_api_v1_ai_coach_consent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConsentResponse"];
+                };
+            };
+        };
+    };
+    update_personal_ai_coach_consent_api_v1_ai_coach_consent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachConsentUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConsentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_personal_ai_coach_answer_api_v1_ai_coach_personal_generate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachPersonalGenerateRequest"];
             };
         };
         responses: {

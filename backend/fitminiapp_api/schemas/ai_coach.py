@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import unicodedata
+from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from fitminiapp_api.ai_coach.contracts import AiCoachJob, AiCoachResponse
+from fitminiapp_api.ai_coach.contracts import (
+    AiCoachJob,
+    AiCoachPersonalTool,
+    AiCoachResponse,
+)
 
 
 class AiCoachGenerateRequest(BaseModel):
@@ -44,4 +50,50 @@ class AiCoachGenerateRequest(BaseModel):
         return normalized
 
 
-__all__ = ["AiCoachGenerateRequest", "AiCoachResponse"]
+class AiCoachPersonalGenerateRequest(BaseModel):
+    """A server-selected read-only tool and one of three bounded periods."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tool: AiCoachPersonalTool
+    period_days: Literal[7, 30, 90] = 30
+    message: str = Field(..., min_length=1, max_length=320)
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
+            raise ValueError("message must be a single safe text value")
+        return normalized
+
+
+class AiCoachConsentUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+
+
+class AiCoachConsentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["granted", "revoked"]
+    scope: str
+    consent_version: str
+    categories: tuple[str, ...]
+    purpose: str
+    provider_name: str
+    provider_policy_revision: str
+    retention_notice: str
+    consent_source: str
+    granted_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
+__all__ = [
+    "AiCoachConsentResponse",
+    "AiCoachConsentUpdateRequest",
+    "AiCoachGenerateRequest",
+    "AiCoachPersonalGenerateRequest",
+    "AiCoachResponse",
+]

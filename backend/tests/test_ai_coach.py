@@ -25,6 +25,7 @@ from fitminiapp_api.ai_coach.contracts import (
 )
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
 from fitminiapp_api.ai_coach.retrieval import _article_ref, _page_ref
+from fitminiapp_api.ai_coach.safety import validate_provider_output
 from fitminiapp_api.ai_coach.service import ai_coach_service
 from fitminiapp_api.core.config import Settings, settings
 from fitminiapp_api.db.session import get_session_context
@@ -246,6 +247,31 @@ def test_prohibited_provider_claim_is_rejected_before_response(monkeypatch, answ
     assert response.outcome == "invalid_output"
     assert response.answer is None
     assert provider.calls
+
+
+def test_personal_provider_fact_is_allowed_but_unsupported_calculation_is_rejected() -> None:
+    grounded = ProviderStructuredResponse(
+        answer="Ваши средние калории за неделю составили 2100 ккал.",
+        citation_ids=("personal-tool:get_nutrition_summary",),
+        limitations=(),
+    )
+    validate_provider_output(
+        grounded,
+        allowed_ref_ids=frozenset({"personal-tool:get_nutrition_summary"}),
+        data_class=AiCoachDataClass.PERSONALIZED,
+    )
+
+    unsupported = ProviderStructuredResponse(
+        answer="Рассчитайте ваш TDEE по этим данным.",
+        citation_ids=("personal-tool:get_nutrition_summary",),
+        limitations=(),
+    )
+    with pytest.raises(ValueError, match="unsupported_personal_calculation"):
+        validate_provider_output(
+            unsupported,
+            allowed_ref_ids=frozenset({"personal-tool:get_nutrition_summary"}),
+            data_class=AiCoachDataClass.PERSONALIZED,
+        )
 
 
 def test_authenticated_api_does_not_mark_personal_text_as_generic(client, monkeypatch) -> None:

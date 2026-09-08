@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from fitminiapp_api.models.ai_coach import AiCoachConsent
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthIdentity, LocalCredential
 from fitminiapp_api.models.cardio import CardioSession
@@ -59,7 +60,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 9
+ACCOUNT_EXPORT_SCHEMA_VERSION = 10
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -117,6 +118,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "weekly_digest_preferences": "weekly_digest_preference",
     "weekly_digest_deliveries": "weekly_digest_deliveries",
     "audit_events": "audit_events",
+    "ai_coach_consents": "ai_coach_consent",
 }
 
 ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
@@ -752,6 +754,9 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(AuditEvent.created_at.asc(), AuditEvent.id.asc())
         .all()
     )
+    ai_coach_consent = (
+        db.query(AiCoachConsent).filter(AiCoachConsent.user_id == user.id).one_or_none()
+    )
     workout_comments = (
         db.query(WorkoutComment)
         .options(joinedload(WorkoutComment.revisions))
@@ -1222,4 +1227,23 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             )
             for event in audit_events
         ],
+        "ai_coach_consent": (
+            _fields(
+                ai_coach_consent,
+                (
+                    "status",
+                    "scope",
+                    "consent_version",
+                    "provider_name",
+                    "provider_policy_revision",
+                    "consent_source",
+                    "granted_at",
+                    "revoked_at",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            if ai_coach_consent is not None
+            else None
+        ),
     }

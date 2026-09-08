@@ -6,7 +6,11 @@ import re
 import unicodedata
 from enum import StrEnum
 
-from fitminiapp_api.ai_coach.contracts import AiCoachRequest, ProviderStructuredResponse
+from fitminiapp_api.ai_coach.contracts import (
+    AiCoachDataClass,
+    AiCoachRequest,
+    ProviderStructuredResponse,
+)
 
 
 class SafetyCategory(StrEnum):
@@ -143,6 +147,15 @@ _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST = re.compile(
     r")",
     re.IGNORECASE,
 )
+_OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST = re.compile(
+    r"(?:"
+    r"\b(?:tdee|bmr|health\s+score|readiness|fatigue)\b|"
+    r"\b(?:рассчита\w*|расч[её]т\w*|вычисл\w*|подсчита\w*|определ\w*)\b"
+    r".{0,120}\b(?:tdee|bmr|кбжу|калори\w*|health\s+score|readiness|"
+    r"восстановлен\w*|fatigue)\b"
+    r")",
+    re.IGNORECASE,
+)
 _URL_PATTERN = re.compile(r"https?://", re.IGNORECASE)
 _CYRILLIC_PATTERN = re.compile(r"[А-Яа-яЁё]")
 
@@ -160,7 +173,10 @@ def classify_message(message: str) -> SafetyCategory:
 
 
 def classify_request(request: AiCoachRequest) -> SafetyCategory:
-    return classify_message(request.message)
+    category = classify_message(request.message)
+    if request.data_class.value == "personalized" and category == SafetyCategory.PERSONAL_DATA:
+        return SafetyCategory.CLEAR
+    return category
 
 
 def refusal_text(category: SafetyCategory) -> str:
@@ -202,17 +218,32 @@ def validate_provider_output(
     output: ProviderStructuredResponse,
     *,
     allowed_ref_ids: frozenset[str],
+    data_class: AiCoachDataClass = AiCoachDataClass.GENERIC,
 ) -> None:
     if not output.answer.strip() or not _CYRILLIC_PATTERN.search(output.answer):
         raise ValueError("answer_language_invalid")
     if _OUTPUT_BLOCKLIST.search(output.answer) or _URL_PATTERN.search(output.answer):
         raise ValueError("answer_contains_untrusted_instruction_or_url")
-    if _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(output.answer):
+    if data_class != AiCoachDataClass.PERSONALIZED and _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(
+        output.answer
+    ):
         raise ValueError("answer_contains_prohibited_claim")
+    if (
+        data_class == AiCoachDataClass.PERSONALIZED
+        and _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(output.answer)
+    ):
+        raise ValueError("answer_contains_unsupported_personal_calculation")
     if any(_OUTPUT_BLOCKLIST.search(item) for item in output.limitations):
         raise ValueError("limitation_contains_sensitive_content")
-    if any(_OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(item) for item in output.limitations):
+    if data_class != AiCoachDataClass.PERSONALIZED and any(
+        _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(item) for item in output.limitations
+    ):
         raise ValueError("limitation_contains_prohibited_claim")
+    if data_class == AiCoachDataClass.PERSONALIZED and any(
+        _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(item)
+        for item in output.limitations
+    ):
+        raise ValueError("limitation_contains_unsupported_personal_calculation")
     if not output.citation_ids or any(
         ref_id not in allowed_ref_ids for ref_id in output.citation_ids
     ):

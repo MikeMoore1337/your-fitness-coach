@@ -6,6 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.account import AccountDataExport
+from fitminiapp_api.models.ai_coach import AiCoachConsent
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity, LocalCredential
 from fitminiapp_api.models.billing import Payment, Subscription
@@ -359,6 +360,9 @@ def delete_user_cascade(db: Session, user: User) -> None:
         synchronize_session=False
     )
     db.query(AccountDataExport).filter(AccountDataExport.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(AiCoachConsent).filter(AiCoachConsent.user_id == user.id).delete(
         synchronize_session=False
     )
     db.query(RefreshToken).filter(RefreshToken.user_id == user.id).delete(synchronize_session=False)

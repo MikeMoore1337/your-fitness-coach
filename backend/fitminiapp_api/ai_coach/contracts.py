@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AI_COACH_DATA_CLASS = "generic"
 AI_COACH_PROMPT_VERSION = "ai-coach-beta-v1"
+AI_COACH_PERSONAL_PROMPT_VERSION = "ai-coach-personal-v1"
 AI_COACH_SCHEMA_VERSION = "ai-coach-answer-v1"
 _BoundedLimitation = Annotated[str, Field(max_length=240)]
 
@@ -52,6 +53,12 @@ class AiCoachJob(StrEnum):
     PROGRESSION_EXPLANATION = "progression_explanation"
 
 
+class AiCoachPersonalTool(StrEnum):
+    GET_PROGRESS_SUMMARY = "get_progress_summary"
+    GET_RECENT_TRAINING_SUMMARY = "get_recent_training_summary"
+    GET_NUTRITION_SUMMARY = "get_nutrition_summary"
+
+
 class AiCoachOutcome(StrEnum):
     ANSWER = "answer"
     UNAVAILABLE = "unavailable"
@@ -59,6 +66,7 @@ class AiCoachOutcome(StrEnum):
     SAFETY_REFUSAL = "safety_refusal"
     INSUFFICIENT_DATA = "insufficient_data"
     INVALID_OUTPUT = "invalid_output"
+    CONSENT_REQUIRED = "consent_required"
 
 
 class ProviderErrorCode(StrEnum):
@@ -82,6 +90,7 @@ class AiCoachRequest(BaseModel):
     context_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:/-]+$")
     message: str = Field(..., min_length=1, max_length=320)
     data_class: AiCoachDataClass
+    tool_name: AiCoachPersonalTool | None = None
     locale: Literal["ru"] = "ru"
 
     @field_validator("context_id")
