@@ -1251,6 +1251,11 @@ export async function installPlatformApi(
     if (path.endsWith('/auth/dev-login')) {
       return route.fulfill({ json: { access_token: 'dev-test-token', token_type: 'bearer' } });
     }
+    if (path.endsWith('/ai-coach/status')) {
+      return route.fulfill({
+        json: { ui_enabled: false, generic_available: false, personal_available: false },
+      });
+    }
     if (path.endsWith('/me/trainer-capability')) {
       if (request.method() === 'POST') {
         trainerActivationCalls += 1;

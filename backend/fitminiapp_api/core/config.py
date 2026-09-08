@@ -176,6 +176,10 @@ class Settings(BaseSettings):
     # AI Coach is a separate generic-only boundary; NEWS_LLM_* must not be reused here.
     ai_coach_enabled: bool = False
     ai_coach_kill_switch: bool = False
+    # The UI is separately gated for a small internal cohort. A runtime provider
+    # flag must never implicitly expose a user-facing beta entry point.
+    ai_coach_ui_enabled: bool = False
+    ai_coach_internal_user_ids: str = ""
     ai_coach_provider: Literal["disabled", "groq"] = "disabled"
     groq_api_key: SecretStr = SecretStr("")
     ai_coach_endpoint: str = "https://api.groq.com/openai/v1/chat/completions"
@@ -540,6 +544,19 @@ class Settings(BaseSettings):
                 result.add(int(value))
             except ValueError as exc:
                 raise ValueError(f"Invalid ADMIN_TELEGRAM_USER_IDS value: {value}") from exc
+        return result
+
+    @property
+    def ai_coach_internal_user_id_set(self) -> set[int]:
+        result: set[int] = set()
+        for item in self.ai_coach_internal_user_ids.replace(";", ",").split(","):
+            value = item.strip()
+            if not value:
+                continue
+            try:
+                result.add(int(value))
+            except ValueError as exc:
+                raise ValueError(f"Invalid AI_COACH_INTERNAL_USER_IDS value: {value}") from exc
         return result
 
     @property

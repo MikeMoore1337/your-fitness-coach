@@ -12,6 +12,7 @@ import type { WorkoutNavigationTarget } from '../../features/workouts/WorkoutHis
 import { AppLink, focusedContextReturn, useNavigation } from '../../shared/navigation/router';
 import { Badge, Card } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
+import { AiCoachSettingsCard, useAiCoachStatus } from '../../features/ai/AiCoachExperience';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { programProfileReadiness } from '../../features/profile/programReadiness';
@@ -198,6 +199,7 @@ export default function MiniAppPage() {
       : 'today';
   });
   const section = requestedSection(search) ?? fallbackSection;
+  const aiCoachStatus = useAiCoachStatus(section === 'profile');
   const nutritionDate = requestedNutritionDate(search);
   const nutritionMeal = requestedNutritionMeal(search);
   const nutritionHydrationOpen = requestedHydrationQuick(search);
@@ -474,6 +476,14 @@ export default function MiniAppPage() {
                   >
                     <Icon name="permission-denied" size={16} /> Доступ и безопасность
                   </a>
+                  {aiCoachStatus.data?.ui_enabled && (
+                    <a
+                      href="#profile-ai-coach"
+                      onClick={() => openProfileSection('profile-ai-coach')}
+                    >
+                      <Icon name="star" size={16} /> AI Coach beta
+                    </a>
+                  )}
                 </nav>
 
                 <ProfileForm key={profileFormKey} />
@@ -495,6 +505,12 @@ export default function MiniAppPage() {
                   />
                   <TrainerCapabilityCard />
                 </Card>
+                {aiCoachStatus.data?.ui_enabled && (
+                  <AiCoachSettingsCard
+                    defaultOpen={window.location.hash === '#profile-ai-coach'}
+                    status={aiCoachStatus.data}
+                  />
+                )}
                 <Card
                   className="profile-settings-group"
                   family="neutral"

@@ -449,6 +449,60 @@ def test_ai_coach_api_requires_authentication(client, monkeypatch) -> None:
     assert response.status_code == 401
     assert provider.calls == []
 
+    status = client.get("/api/v1/ai-coach/status")
+    assert status.status_code == 401
+
+
+def test_ai_coach_status_is_server_gated_to_internal_cohort(client, monkeypatch) -> None:
+    login = client.post(
+        "/api/v1/auth/dev-login",
+        json={"telegram_user_id": 987_656, "username": "ai_status_test"},
+    )
+    assert login.status_code == 200
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    current = client.get("/api/v1/me", headers=headers)
+    assert current.status_code == 200
+
+    monkeypatch.setattr(settings, "ai_coach_ui_enabled", True)
+    monkeypatch.setattr(settings, "ai_coach_internal_user_ids", str(current.json()["id"]))
+    monkeypatch.setattr(settings, "ai_coach_enabled", False)
+    monkeypatch.setattr(settings, "ai_coach_personal_enabled", True)
+    monkeypatch.setattr(settings, "ai_coach_personal_data_policy", "verified_personal_user")
+
+    disabled = client.get("/api/v1/ai-coach/status", headers=headers)
+    assert disabled.status_code == 200
+    assert disabled.json() == {
+        "ui_enabled": True,
+        "generic_available": False,
+        "personal_available": False,
+    }
+
+    monkeypatch.setattr(settings, "ai_coach_enabled", True)
+    monkeypatch.setattr(settings, "ai_coach_kill_switch", False)
+    monkeypatch.setattr(settings, "ai_coach_provider", "groq")
+    monkeypatch.setattr(settings, "groq_api_key", SecretStr("test-groq-key"))
+    monkeypatch.setattr(settings, "ai_coach_cost_policy", "free_only")
+    monkeypatch.setattr(settings, "ai_coach_cost_class", "free")
+    monkeypatch.setattr(settings, "ai_coach_data_policy", "verified_generic_only")
+    monkeypatch.setattr(settings, "ai_coach_structured_output", True)
+
+    enabled = client.get("/api/v1/ai-coach/status", headers=headers)
+    assert enabled.status_code == 200
+    assert enabled.json() == {
+        "ui_enabled": True,
+        "generic_available": True,
+        "personal_available": True,
+    }
+
+    monkeypatch.setattr(settings, "ai_coach_internal_user_ids", "999999999")
+    outside_cohort = client.get("/api/v1/ai-coach/status", headers=headers)
+    assert outside_cohort.status_code == 200
+    assert outside_cohort.json() == {
+        "ui_enabled": False,
+        "generic_available": False,
+        "personal_available": False,
+    }
+
 
 def test_ai_coach_api_forbids_provider_controls(client, monkeypatch) -> None:
     _enable_provider(monkeypatch)

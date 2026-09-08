@@ -47,6 +47,7 @@ import {
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
 import { isPwaStandalone } from '../../shared/pwa/pwaRuntime';
+import { AiCoachEntry } from '../ai/AiCoachExperience';
 
 export function formatTodayHeading(value: string): { title: string } {
   const weekday = formatCalendarDate(value, { weekday: 'long' });
@@ -1001,6 +1002,7 @@ export function TodayDashboard({
         <div className="today-dashboard__facts">
           <NutritionSummary date={selectedDate} />
           <ProgressSummaryPanel summary={progress} />
+          <AiCoachEntry entryPoint="today" />
           {user && (
             <DailyWellbeingCheckIn
               autoFocus={initialWellbeingOpen}

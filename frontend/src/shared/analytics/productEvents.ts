@@ -19,6 +19,18 @@ export type LandingTelegramPlacement = 'hero' | 'continuity' | 'footer';
 export type EditorialCtaDestination = 'tma' | 'web' | 'landing' | 'article';
 export type EditorialCtaCampaign = 'telegram_editorial_v1';
 export type PublicArticleCtaDestination = 'tma' | 'web' | 'landing';
+export type AiCoachEntryPoint = 'today' | 'progress' | 'nutrition' | 'profile';
+export type AiCoachMode = 'generic' | 'personal';
+export type AiCoachOutcome =
+  | 'answer'
+  | 'unavailable'
+  | 'rate_limited'
+  | 'safety_refusal'
+  | 'insufficient_data'
+  | 'invalid_output'
+  | 'consent_required';
+export type AiCoachFailureClass = 'network' | 'timeout' | 'validation' | 'unknown';
+export type AiCoachHelpfulness = 'helpful' | 'not_helpful';
 
 type ContextFreeProductEventName =
   | 'landing_viewed'
@@ -143,6 +155,38 @@ export type ProductEvent =
       name: 'pwa_service_worker_error';
       surface: ProductSurface;
       category: PwaServiceWorkerErrorCategory;
+    }
+  | {
+      name: 'ai_coach_entry_opened';
+      surface: ProductSurface;
+      entry_point: AiCoachEntryPoint;
+    }
+  | {
+      name: 'ai_coach_request_started';
+      surface: ProductSurface;
+      mode: AiCoachMode;
+    }
+  | {
+      name: 'ai_coach_response_received';
+      surface: ProductSurface;
+      mode: AiCoachMode;
+      outcome: AiCoachOutcome;
+    }
+  | {
+      name: 'ai_coach_request_failed';
+      surface: ProductSurface;
+      mode: AiCoachMode;
+      failure: AiCoachFailureClass;
+    }
+  | {
+      name: 'ai_coach_consent_changed';
+      surface: ProductSurface;
+      enabled: boolean;
+    }
+  | {
+      name: 'ai_coach_helpfulness_submitted';
+      surface: ProductSurface;
+      value: AiCoachHelpfulness;
     };
 
 export type ProductEventName = ProductEvent['name'];
@@ -283,6 +327,29 @@ const PWA_SERVICE_WORKER_ERROR_CATEGORIES = new Set<PwaServiceWorkerErrorCategor
   'install',
   'activate',
 ]);
+const AI_COACH_ENTRY_POINTS = new Set<AiCoachEntryPoint>([
+  'today',
+  'progress',
+  'nutrition',
+  'profile',
+]);
+const AI_COACH_MODES = new Set<AiCoachMode>(['generic', 'personal']);
+const AI_COACH_OUTCOMES = new Set<AiCoachOutcome>([
+  'answer',
+  'unavailable',
+  'rate_limited',
+  'safety_refusal',
+  'insufficient_data',
+  'invalid_output',
+  'consent_required',
+]);
+const AI_COACH_FAILURES = new Set<AiCoachFailureClass>([
+  'network',
+  'timeout',
+  'validation',
+  'unknown',
+]);
+const AI_COACH_HELPFULNESS = new Set<AiCoachHelpfulness>(['helpful', 'not_helpful']);
 const LANDING_TELEGRAM_PLACEMENTS = new Set<LandingTelegramPlacement>([
   'hero',
   'continuity',
@@ -314,6 +381,12 @@ function eventPropertyKeys(name: string): readonly string[] {
   if (name === 'article_viewed') return ['content_key'];
   if (name === 'article_cta_clicked') return ['content_key', 'destination'];
   if (name === 'pwa_service_worker_error') return ['category'];
+  if (name === 'ai_coach_entry_opened') return ['entry_point'];
+  if (name === 'ai_coach_request_started') return ['mode'];
+  if (name === 'ai_coach_response_received') return ['mode', 'outcome'];
+  if (name === 'ai_coach_request_failed') return ['mode', 'failure'];
+  if (name === 'ai_coach_consent_changed') return ['enabled'];
+  if (name === 'ai_coach_helpfulness_submitted') return ['value'];
   return [];
 }
 
@@ -357,6 +430,30 @@ function hasValidEventProperties(value: Record<string, unknown>): boolean {
   }
   if (value.name === 'pwa_service_worker_error') {
     return PWA_SERVICE_WORKER_ERROR_CATEGORIES.has(value.category as PwaServiceWorkerErrorCategory);
+  }
+  if (value.name === 'ai_coach_entry_opened') {
+    return AI_COACH_ENTRY_POINTS.has(value.entry_point as AiCoachEntryPoint);
+  }
+  if (value.name === 'ai_coach_request_started') {
+    return AI_COACH_MODES.has(value.mode as AiCoachMode);
+  }
+  if (value.name === 'ai_coach_response_received') {
+    return (
+      AI_COACH_MODES.has(value.mode as AiCoachMode) &&
+      AI_COACH_OUTCOMES.has(value.outcome as AiCoachOutcome)
+    );
+  }
+  if (value.name === 'ai_coach_request_failed') {
+    return (
+      AI_COACH_MODES.has(value.mode as AiCoachMode) &&
+      AI_COACH_FAILURES.has(value.failure as AiCoachFailureClass)
+    );
+  }
+  if (value.name === 'ai_coach_consent_changed') {
+    return typeof value.enabled === 'boolean';
+  }
+  if (value.name === 'ai_coach_helpfulness_submitted') {
+    return AI_COACH_HELPFULNESS.has(value.value as AiCoachHelpfulness);
   }
   return false;
 }

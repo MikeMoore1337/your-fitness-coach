@@ -283,6 +283,33 @@ describe('product event contract', () => {
     ).toBe(false);
   });
 
+  it('keeps AI Coach analytics at outcome level without accepting prompt-like fields', () => {
+    expect(
+      isProductEvent({
+        name: 'ai_coach_response_received',
+        surface: 'mobile_web',
+        mode: 'personal',
+        outcome: 'insufficient_data',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'ai_coach_response_received',
+        surface: 'mobile_web',
+        mode: 'personal',
+        outcome: 'secret-provider-error',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'ai_coach_request_started',
+        surface: 'mobile_web',
+        mode: 'generic',
+        prompt: 'private question',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
   it('rejects unknown schema versions, legacy surfaces and malformed timestamps', () => {
     const envelope = {
       name: 'workout_started',
