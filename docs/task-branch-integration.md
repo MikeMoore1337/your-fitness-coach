@@ -128,6 +128,12 @@ commits, divergence refs, changed head и artifact cleanup error останав�
 operations для owner-safe решения. Ни `recover`, ни `finish` не выполняют `reset --hard`, force
 delete или несанкционированное восстановление.
 
+Если recovery lease возник из-за прерванного delivery, а его единственный task worktree чист,
+не имеет Git-операций и однозначно совпадает с lease, владелец может явно вернуть его в `review`:
+`resolve-recovery <ID> --owner-authorize --reason <...>`. Команда проверяет branch/worktree,
+base ancestry и отсутствие delivery owner, затем атомарно инвалидирует старый readiness snapshot;
+она не удаляет файлы, ветки или lease и не выполняет `reset`/`stash`.
+
 ## Один пользовательский запуск
 
 ```powershell
@@ -152,6 +158,7 @@ python scripts/task_session.py start 135 --owner-launch --session-label codex-13
 python scripts/task_session.py adopt-current 135 --owner-launch --session-label codex-135-resume
 python scripts/task_session.py status
 python scripts/task_session.py recover 135
+python scripts/task_session.py resolve-recovery 135 --owner-authorize --reason "resume after verified recovery"
 python scripts/task_session.py mark-ready 135 --head-sha <sha> --review-verdict APPROVED --qa-verdict PASS
 python scripts/task_session.py acquire-delivery 135
 python scripts/task_session.py refresh-delivery 135

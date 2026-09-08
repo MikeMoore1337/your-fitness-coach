@@ -2911,6 +2911,142 @@ class TaskController:
             StateStore.replace_json(self.store.delivery_path, delivery)
         return current
 
+    def resolve_recovery(
+        self, task_id: str, *, reason: str, owner_authorize: bool
+    ) -> dict[str, Any]:
+        """Return a clean, uniquely anchored recovery lease to review safely."""
+
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError("resolve-recovery requires explicit owner authorization")
+        if not reason.strip():
+            raise TaskSessionError("resolve-recovery requires a non-empty reason")
+
+        lease_path = self.store.task_lease_path(expected)
+        lease = self.store.read_json(lease_path)
+        if not isinstance(lease, dict):
+            raise TaskSessionError(f"Task {expected} has no active recovery lease")
+        if self._lease_state(lease) not in RECOVERY_STATES:
+            raise TaskSessionError(
+                f"Task {expected} cannot resolve recovery from {lease.get('lifecycle_state')}"
+            )
+        delivery = self.store.delivery_state()
+        if delivery.get("owner") is not None:
+            raise TaskSessionError(
+                "resolve-recovery refuses to change a task while the delivery lane has an owner"
+            )
+
+        def verify_anchor(current: Mapping[str, Any]) -> tuple[Path, str]:
+            if current.get("mode") != "write":
+                raise TaskSessionError(f"Task {expected} recovery lease is not writable")
+            if str(current.get("task_id", "")).upper() != expected:
+                raise TaskSessionError(f"Task {expected} recovery lease has mismatched task ID")
+            branch = current.get("branch")
+            worktree_value = current.get("worktree")
+            if not isinstance(branch, str) or not isinstance(worktree_value, str):
+                raise TaskSessionError(
+                    f"Task {expected} recovery lease has no valid branch/worktree anchor"
+                )
+            if task_id_from_branch(branch) != expected:
+                raise TaskSessionError(f"Task {expected} recovery lease has an invalid branch")
+            worktree = Path(worktree_value).resolve()
+            matches = [
+                item
+                for item in self.repository.worktrees()
+                if str(item.path.resolve()).casefold() == str(worktree).casefold()
+                or item.branch == branch
+            ]
+            if len(matches) != 1 or matches[0].branch != branch:
+                raise TaskSessionError(
+                    f"Task {expected} recovery requires exactly one matching branch/worktree"
+                )
+            branch_refs = [
+                line.removeprefix("refs/heads/")
+                for line in self.repository.git(
+                    "for-each-ref", "--format=%(refname)", f"refs/heads/{branch}"
+                ).splitlines()
+                if line
+            ]
+            if branch_refs != [branch]:
+                raise TaskSessionError(
+                    f"Task {expected} recovery requires exactly one local task branch"
+                )
+            if self.repository.status(worktree):
+                raise TaskSessionError(
+                    f"Task {expected} recovery resolution refuses a dirty worktree"
+                )
+            operations = self.repository.operation_issues(worktree)
+            if operations:
+                raise TaskSessionError(
+                    f"Task {expected} recovery resolution refuses interrupted Git operation: "
+                    f"{operations}"
+                )
+            head = self.repository.head(cwd=worktree)
+            base_sha = str(current.get("base_origin_master_sha", ""))
+            if not base_sha or not self.repository.is_ancestor(base_sha, head):
+                raise TaskSessionError(
+                    f"Task {expected} recovery worktree does not descend from its leased base"
+                )
+            return worktree, head
+
+        verify_anchor(lease)
+        with self.store.lock():
+            current = self.store.read_json(lease_path)
+            current_delivery = self.store.delivery_state()
+            if not isinstance(current, dict):
+                raise TaskSessionError(f"Task {expected} recovery lease disappeared")
+            if current.get("updated_at") != lease.get("updated_at"):
+                raise TaskSessionError("Task recovery lease changed during resolution")
+            if current_delivery.get("owner") is not None:
+                raise TaskSessionError(
+                    "resolve-recovery refuses to change a task while the delivery lane has an owner"
+                )
+            if self._lease_state(current) not in RECOVERY_STATES:
+                raise TaskSessionError("Task recovery state changed during resolution")
+            verify_anchor(current)
+            self._validated_lease_concurrency_class(current)
+            now = utc_now()
+            for key in (
+                "delivery_owner",
+                "delivery_acquired_at",
+                "delivery_base_origin_master_sha",
+                "delivery_head_sha",
+                "delivery_generation",
+                "delivery_gate_pass",
+                "delivery_released_at",
+                "delivery_failed_at",
+                "delivery_handoff_blocker",
+                "delivery_next_owner",
+                "ready_head_sha",
+                "ready_base_origin_master_sha",
+                "ready_for_delivery_at",
+                "ready_sequence",
+                "review_verdict",
+                "qa_verdict",
+                "task_provenance",
+                "canonical_master_refresh",
+            ):
+                current.pop(key, None)
+            current.update(
+                {
+                    "lifecycle_state": "review",
+                    "recovery_resolved_at": now,
+                    "recovery_resolution_reason": reason,
+                    "pre_push_ci_pass": None,
+                    "local_evidence": {
+                        "status": "invalidated-before-recovery-resolution",
+                        "invalidated_at": now,
+                        "reason": reason,
+                    },
+                    "updated_at": now,
+                }
+            )
+            current_delivery["owner"] = None
+            current_delivery["updated_at"] = now
+            StateStore.replace_json(lease_path, current)
+            StateStore.replace_json(self.store.delivery_path, current_delivery)
+        return current
+
     def record_production_success(
         self,
         task_id: str,
@@ -3313,6 +3449,10 @@ def _parser() -> argparse.ArgumentParser:
     reopen_review = subparsers.add_parser("reopen-for-review")
     reopen_review.add_argument("task_id")
     reopen_review.add_argument("--reason", required=True)
+    resolve_recovery = subparsers.add_parser("resolve-recovery")
+    resolve_recovery.add_argument("task_id")
+    resolve_recovery.add_argument("--reason", required=True)
+    resolve_recovery.add_argument("--owner-authorize", action="store_true")
     production = subparsers.add_parser("complete-production")
     production.add_argument("task_id")
     production.add_argument("--pr", type=int, required=True)
@@ -3402,6 +3542,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "reopen-for-review":
             _print(controller.reopen_for_review(args.task_id, reason=args.reason))
+            return 0
+        if args.command == "resolve-recovery":
+            _print(
+                controller.resolve_recovery(
+                    args.task_id,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            )
             return 0
         if args.command == "complete-production":
             _print(

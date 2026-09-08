@@ -120,6 +120,8 @@ def test_delivery_contract_is_master_only_and_approval_gated() -> None:
     assert '"ready-for-delivery"' in controller
     assert "delivery.json" in controller
     assert "refresh_for_delivery" in controller
+    assert "resolve-recovery" in controller
+    assert "owner_authorize" in controller
     assert "enqueue_integration" not in controller
     assert "release_freeze" not in controller
     assert "verify_dev_provenance" not in controller
