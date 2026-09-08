@@ -136,7 +136,15 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert "reverse_proxy allure-report-origin:8080" in public_caddy_block
     assert "file_server" in caddy
     assert "browse" not in caddy
+    allure_csp = (
+        "Content-Security-Policy \"default-src 'self'; base-uri 'none'; "
+        "frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "font-src 'self' data:; connect-src 'self'\""
+    )
     assert 'Cache-Control "private, no-store"' in caddy
+    assert allure_csp in caddy
+    assert allure_csp in public_caddy_block
     assert 'respond @private "Not Found" 404' in caddy
     assert "/.publish.lock" in caddy
     assert "@unsupported not method GET HEAD" in caddy
