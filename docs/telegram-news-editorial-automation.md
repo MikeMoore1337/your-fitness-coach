@@ -31,6 +31,22 @@ preview upgrade не создаются. Hermes owner-edited revisions сохр�
 проходить review flow. Действие «Перегенерировать текст» для Hermes повторно ставит принятую
 immutable revision в review flow и не включает legacy candidate generation.
 
+Для editorial intake действует rolling-окно свежести в 60 дней: границы включаются, будущие и
+неизвестные даты отклоняются. Это product/discovery heuristic, а не медицинская норма. Owner-
+карточки отправляются из очереди пачками до 5 различных drafts в окнах 08:00, 13:00 и 18:00
+по `Europe/Moscow`; если доступно меньше пяти, отправляется доступное количество без filler.
+Пятнадцатиминутное окно допускает обычный polling worker и не меняет расписание самого Hermes.
+Очередь, изображения и другие downstream-этапы продолжают обрабатываться между слотами, но новые
+Telegram review cards вне этих окон не отправляются.
+
+Hermes может передавать владельцу полноценный exact preview и управляющую карточку для тем,
+которые требуют ручного решения: AAS/фармакология/пептиды/БАДы и дозировки. Такие карточки не
+включаются в autopublish: `NEWS_AUTO_PUBLISH_LOW_RISK` остаётся `false`, а существующие
+publication quality gates сохраняют право скрыть кнопку публикации до редактирования текста.
+Это расширяет только ручной editorial recall; отсутствие exact image/caption, malformed provider
+response, fallback-заглушка, неподтверждённые числа и другие технические blockers по-прежнему
+fail-closed и не отправляются владельцу как будто это готовая новость.
+
 После production release целевые значения для разделения контуров такие:
 
 ```text
@@ -110,13 +126,15 @@ draft и transient retry; paid/cloud fallback, новые credentials и provide
 publisher.
 
 YFC имеет дополнительный final delivery gate: Hermes draft не отправляется владельцу в Telegram,
-пока не собраны exact image и rendered caption и не сняты content/publication blockers. Fallback-
-заглушки, unresolved provider warnings, переполненный caption и отсутствие artifact не создают
-ни preview, ни управляющую карточку. Заблокированная попытка фиксируется как bounded failure и
-не повторяется для той же text/image revision; новая попытка появляется только после новой
-ревизии текста или изображения. Операционные состояния `publishing_disabled` и
-`channel_rights_missing` не меняют требование наличия image+text preview и не считаются
-содержательным fallback.
+пока не собраны exact image и rendered caption и не сняты технические delivery blockers.
+Fallback-заглушки, unresolved provider warnings, переполненный caption и отсутствие artifact не
+создают ни preview, ни управляющую карточку. Разрешённые для owner review sensitive warnings
+могут оставаться publication blockers: они показываются в полноценной карточке, но скрывают
+кнопку публикации до ручного решения/редактирования. Заблокированная техническая попытка
+фиксируется как bounded failure и не повторяется для той же text/image revision; новая попытка
+появляется только после новой ревизии текста или изображения. Операционные состояния
+`publishing_disabled` и `channel_rights_missing` не меняют требование наличия image+text preview и
+не считаются содержательным fallback.
 
 ## Taxonomy and policy
 
@@ -134,12 +152,13 @@ food, medicine and peptides.  Research is a `content_type` and never replaces th
 Unknown or ambiguous classification goes to manual review; it is not silently promoted to a safe
 topic or auto-publication.
 
-Discovery recall and publication eligibility are separate.  A primary/official current item with
-semantic topic evidence can remain a discovery candidate even when the legacy coarse topic scorer
-does not match.  Unsafe/prescriptive content still hard-blocks.  Existing counters distinguish
-`duplicate`, `stale`, `below_threshold`, `rejected`, `candidate` and `eligible`; source fetch
-failures remain visible on `NewsSource` as error code/time/consecutive count and are not reported as
-“no news”.
+Recall discovery и eligibility публикации разделены. Primary/official fresh item с семантическими
+признаками темы может остаться discovery candidate, даже если legacy coarse topic scorer не дал
+совпадения. Чувствительный/предписывающий Hermes-контент сохраняется для owner review, а
+publication quality gates по-прежнему блокируют unsafe или технически невалидный output. Счётчики
+различают `duplicate`, `stale`, `below_threshold`, `rejected`, `candidate` и `eligible`; ошибки
+загрузки источников остаются видимыми в `NewsSource` с code/time/consecutive count и не
+отчитываются как «новостей нет».
 
 The server-side policy is:
 
@@ -147,12 +166,14 @@ The server-side policy is:
 blocked | manual_required | auto_eligible
 ```
 
-Sensitive medical/pharmacology, peptides, AAS/SARMs, dosage/cycle/protocol, individualized
-recommendations, pregnancy/minors/chronic disease/symptoms, interactions, recalls/contamination,
-preliminary or conflicting evidence and any ambiguity are at least `manual_required`.  Prompt
-injection, unsupported numbers and explicit unsafe/guaranteed claims are blocked.  `auto_eligible`
-also requires the owner-controlled `NEWS_AUTO_PUBLISH_LOW_RISK=true`, valid source provenance,
-quality checks, an exact snapshot and an active kill-switch.  The committed default is false.
+Чувствительные medical/pharmacology, peptides, AAS/SARMs, dosage/cycle/protocol,
+индивидуальные рекомендации, pregnancy/minors/chronic disease/symptoms, interactions,
+recalls/contamination, preliminary или conflicting evidence и любая неоднозначность имеют как
+минимум `manual_required`; Hermes intake может доставить их владельцу как полноценный preview для
+ручного решения. Prompt injection, unsupported numbers и явные unsafe/guaranteed claims по-прежнему
+заблокированы для delivery или publication. `auto_eligible` дополнительно требует
+owner-controlled `NEWS_AUTO_PUBLISH_LOW_RISK=true`, valid source provenance, quality checks, exact
+snapshot и active kill-switch. Committed default — `false`.
 
 The deterministic style checklist checks template/AI meta language, fake personal voice, clickbait,
 invented quotes, excessive exclamation and mechanical repetition.  It does not use an AI detector,

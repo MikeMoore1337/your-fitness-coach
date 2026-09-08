@@ -29,6 +29,8 @@ from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery
 from fitminiapp_api.services.account_exports import prune_account_exports
 from fitminiapp_api.services.audit import prune_audit_events
 from fitminiapp_api.services.bot_support import prune_support_cases
+from fitminiapp_api.services.news_ingestion import utcnow
+from fitminiapp_api.services.news_review_schedule import current_news_review_slot
 from fitminiapp_api.services.news_worker import run_news_pipeline_once
 from fitminiapp_api.services.notifications import (
     MAX_DELIVERY_ATTEMPTS,
@@ -810,6 +812,7 @@ async def run_until_stopped(
 ) -> None:
     next_reminder_sync = 0.0
     next_news_sync = 0.0
+    last_news_review_slot_key: str | None = None
     WORKER_HEARTBEAT_PATH.touch()
     while not stop_requested.is_set():
         current = monotonic()
@@ -821,6 +824,10 @@ async def run_until_stopped(
             next_reminder_sync = current + settings.reminder_sync_seconds
         if settings.news_ingestion_enabled:
             should_fetch_news = current >= next_news_sync
+            review_slot = current_news_review_slot(utcnow())
+            review_delivery_due = (
+                review_slot is not None and review_slot.key != last_news_review_slot_key
+            )
             try:
                 await run_news_pipeline_once(
                     send_message=send_telegram_message,
@@ -828,6 +835,8 @@ async def run_until_stopped(
                     send_publication=send_telegram_publication,
                     publication_ready=news_publication_ready,
                     fetch_sources=should_fetch_news,
+                    review_delivery_due=review_delivery_due,
+                    review_slot=review_slot,
                 )
             except Exception as exc:
                 logger.error(
@@ -837,6 +846,9 @@ async def run_until_stopped(
                         "reason": type(exc).__name__,
                     },
                 )
+            else:
+                if review_delivery_due and review_slot is not None:
+                    last_news_review_slot_key = review_slot.key
             if should_fetch_news:
                 next_news_sync = current + settings.news_ingestion_cycle_seconds
         WORKER_HEARTBEAT_PATH.touch()

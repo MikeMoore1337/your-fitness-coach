@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 
+FRESHNESS_WINDOW_DAYS = 60
+FRESHNESS_WINDOW = timedelta(days=FRESHNESS_WINDOW_DAYS)
+
 
 def _as_utc_naive(value: datetime) -> datetime:
     if value.tzinfo is None:
@@ -20,29 +23,42 @@ def parse_source_published_at(value: object) -> datetime | None:
     return _as_utc_naive(parsed)
 
 
-def is_current_month_publication(
+def is_fresh_publication(
     published_at: datetime | None,
     *,
     now: datetime,
 ) -> bool:
-    """Return whether a source date is inside the current or previous calendar month.
+    """Return whether a source date is inside the inclusive 60-day freshness window.
 
-    The legacy function name is kept because it is part of the existing news pipeline
-    contract. The accepted freshness window now intentionally spans two calendar months.
+    Naive datetimes are the existing UTC-naive storage format. Future-dated and missing
+    source dates fail closed.
     """
     if published_at is None:
         return False
     current = _as_utc_naive(now)
     published = _as_utc_naive(published_at)
-    current_month_start = current.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    previous_month_start = (current_month_start - timedelta(days=1)).replace(
-        day=1,
-        hour=0,
-        minute=0,
-        second=0,
-        microsecond=0,
+    return current - FRESHNESS_WINDOW <= published <= current
+
+
+def source_metadata_is_fresh(
+    metadata: Mapping[str, object],
+    *,
+    now: datetime,
+) -> bool:
+    return is_fresh_publication(
+        parse_source_published_at(metadata.get("source_published_at")),
+        now=now,
     )
-    return previous_month_start <= published <= current
+
+
+def is_current_month_publication(
+    published_at: datetime | None,
+    *,
+    now: datetime,
+) -> bool:
+    """Backward-compatible name for the 60-day freshness check."""
+
+    return is_fresh_publication(published_at, now=now)
 
 
 def source_metadata_is_current_month(
@@ -50,7 +66,6 @@ def source_metadata_is_current_month(
     *,
     now: datetime,
 ) -> bool:
-    return is_current_month_publication(
-        parse_source_published_at(metadata.get("source_published_at")),
-        now=now,
-    )
+    """Backward-compatible name for :func:`source_metadata_is_fresh`."""
+
+    return source_metadata_is_fresh(metadata, now=now)

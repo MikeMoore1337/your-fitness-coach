@@ -267,3 +267,96 @@ def test_hermes_image_pending_downstream_survives_disabled_legacy_fetch(
         assert cluster.current_image_revision == 1
         delivery = db.query(NewsReviewDelivery).one()
         assert delivery.status == "sent"
+
+
+def test_hermes_sensitive_source_reaches_full_owner_card(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    monkeypatch.setattr(settings, "news_ingestion_enabled", True)
+    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    payload = _payload()
+    payload["idempotency_key"] = "hermes-sensitive-idempotency"
+    payload["request_nonce"] = "hermes-sensitive-nonce"
+    payload["source"]["title"] = "Исследование дозировки пептида для спорта"
+    payload["source"]["summary"] = (
+        "Фармакологическая работа рассмотрела дозировку пептида и ограничения "
+        "результатов для самостоятельной интерпретации."
+    )
+    payload["draft"]["headline"] = "Исследование пептида: контекст результатов"
+    payload["draft"]["summary"] = (
+        "Работа описывает дозировку пептида и ограничения результатов без "
+        "индивидуального назначения."
+    )
+    payload["source"]["content_hash"] = _canonical_source_hash(
+        title=payload["source"]["title"],
+        summary=payload["source"]["summary"],
+        canonical_url=payload["source"]["canonical_url"],
+        published_at=datetime.fromisoformat(payload["source"]["published_at"]),
+    )
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+    intake = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+    assert intake.status_code == 200, intake.text
+    assert intake.json()["status"] == "accepted"
+    assert intake.json()["publication_policy"] == "manual_required"
+
+    preview_calls: list[int] = []
+    control_calls: list[int] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=511, message_date=datetime.now(UTC))
+
+    async def send_control(_client, chat_id, *_args, **_kwargs):
+        control_calls.append(chat_id)
+        return 512
+
+    async def send_publication(*_args, **_kwargs):
+        raise AssertionError("manual-sensitive intake must not publish automatically")
+
+    asyncio.run(
+        run_news_pipeline_once(
+            send_message=send_control,
+            send_preview=send_preview,
+            send_publication=send_publication,
+            publication_ready=True,
+            fetch_sources=True,
+        )
+    )
+
+    assert preview_calls == [7001]
+    assert control_calls == [7001]
+    with get_session_context() as db:
+        submission = db.query(HermesEditorialSubmission).one()
+        draft = db.get(NewsDraftRevision, submission.draft_id)
+        cluster = db.get(NewsCluster, submission.cluster_id)
+        delivery = db.query(NewsReviewDelivery).one()
+        assert draft is not None and cluster is not None
+        assert "medical_prescription_language" in draft.warnings
+        assert any(flag.startswith("prohibited_") for flag in cluster.risk_flags)
+        assert cluster.status == "awaiting_review"
+        assert delivery.status == "sent"
