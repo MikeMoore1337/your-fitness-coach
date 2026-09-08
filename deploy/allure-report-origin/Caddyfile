@@ -9,7 +9,10 @@
 		Cache-Control "private, no-store"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
-		Content-Security-Policy "default-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+		# Allure 2.43 injects its application stylesheet at runtime and contains
+		# a small inline bootstrap script in index.html. Keep the report isolated
+		# while allowing those report-local assets.
+		Content-Security-Policy "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'"
 	}
 	@unsupported not method GET HEAD
 	@private path /.publish.lock /.publish.lock/* /.staging /.staging/* /metadata /metadata/*
