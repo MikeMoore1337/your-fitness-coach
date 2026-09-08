@@ -8454,6 +8454,14 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     border-bottom: 0;
   }
 
+  .profile-settings-nav--ai-enabled a:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+
+  .profile-settings-nav--ai-enabled a:last-child {
+    grid-column: auto;
+  }
+
   .app-section--profile .profile-primary-card,
   .app-section--profile .training-preferences-card {
     padding: var(--v2-space-4);
