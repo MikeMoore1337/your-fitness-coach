@@ -151,6 +151,9 @@ export type NutritionReportPeriod = ApiSchemas['NutritionReportPeriod'];
 export type TrainingAnalytics = ApiSchemas['TrainingAnalyticsResponse'];
 export type TrainerClientProgressSummary = ApiSchemas['TrainerClientProgressSummary'];
 export type TrainerClientProgressList = ApiSchemas['TrainerClientProgressListResponse'];
+export type AiCoachResponse = ApiSchemas['AiCoachResponse'];
+export type AiCoachConsentResponse = ApiSchemas['AiCoachConsentResponse'];
+export type AiCoachStatus = ApiSchemas['AiCoachStatusResponse'];
 
 export interface PublicConfig {
   app_env: string;

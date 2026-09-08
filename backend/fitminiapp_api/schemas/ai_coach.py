@@ -90,10 +90,21 @@ class AiCoachConsentResponse(BaseModel):
     revoked_at: datetime | None = None
 
 
+class AiCoachStatusResponse(BaseModel):
+    """Safe server-authoritative state for the internal beta UI."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ui_enabled: bool
+    generic_available: bool
+    personal_available: bool
+
+
 __all__ = [
     "AiCoachConsentResponse",
     "AiCoachConsentUpdateRequest",
     "AiCoachGenerateRequest",
     "AiCoachPersonalGenerateRequest",
     "AiCoachResponse",
+    "AiCoachStatusResponse",
 ]

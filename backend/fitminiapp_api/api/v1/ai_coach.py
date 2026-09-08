@@ -33,6 +33,7 @@ from fitminiapp_api.schemas.ai_coach import (
     AiCoachConsentUpdateRequest,
     AiCoachGenerateRequest,
     AiCoachPersonalGenerateRequest,
+    AiCoachStatusResponse,
 )
 from fitminiapp_api.services.ai_coach_consent import (
     get_ai_coach_consent,
@@ -43,6 +44,42 @@ from fitminiapp_api.services.ai_coach_consent import (
 from fitminiapp_api.services.audit import record_audit_event
 
 router = APIRouter()
+
+
+def _generic_runtime_available() -> bool:
+    return bool(
+        settings.ai_coach_enabled
+        and not settings.ai_coach_kill_switch
+        and settings.ai_coach_provider == "groq"
+        and settings.groq_api_key.get_secret_value().strip()
+        and settings.ai_coach_cost_policy == "free_only"
+        and settings.ai_coach_cost_class == "free"
+        and settings.ai_coach_data_policy == "verified_generic_only"
+        and settings.ai_coach_structured_output
+    )
+
+
+@router.get("/status", response_model=AiCoachStatusResponse)
+@limiter.limit("60/hour")
+def get_ai_coach_status(
+    request: Request,
+    current_user: User = Depends(require_user),
+) -> AiCoachStatusResponse:
+    del request
+    ui_enabled = bool(
+        settings.ai_coach_ui_enabled and current_user.id in settings.ai_coach_internal_user_id_set
+    )
+    generic_available = ui_enabled and _generic_runtime_available()
+    personal_available = bool(
+        generic_available
+        and settings.ai_coach_personal_enabled
+        and settings.ai_coach_personal_data_policy == "verified_personal_user"
+    )
+    return AiCoachStatusResponse(
+        ui_enabled=ui_enabled,
+        generic_available=generic_available,
+        personal_available=personal_available,
+    )
 
 
 def _personal_state_response(

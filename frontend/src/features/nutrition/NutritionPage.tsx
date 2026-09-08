@@ -3,6 +3,7 @@ import { AppLink } from '../../shared/navigation/router';
 import { NutritionDiary } from './NutritionDiary';
 import { NutritionForm } from './NutritionForm';
 import type { MealType } from './FoodPickerDialog';
+import { AiCoachEntry } from '../ai/AiCoachExperience';
 
 export function NutritionPage({
   initial,
@@ -30,6 +31,7 @@ export function NutritionPage({
           </AppLink>
         </nav>
       )}
+      <AiCoachEntry entryPoint="nutrition" />
       <NutritionDiary
         initialDate={initialDate}
         initialMealType={initialMealType}

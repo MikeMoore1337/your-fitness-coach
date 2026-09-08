@@ -21,6 +21,7 @@ import {
 } from '../../shared/ui/common';
 import { NutritionPeriodReport, type ControlledNutritionPeriod } from './NutritionReport';
 import { Icon } from '../../shared/ui/Icon';
+import { AiCoachEntry } from '../ai/AiCoachExperience';
 import { CardioHistory } from '../cardio/CardioLogging';
 import {
   nutritionPeriodForProgress,
@@ -1091,6 +1092,8 @@ export function ProgressExperience({
           </AppLink>
         </div>
       </header>
+
+      <AiCoachEntry entryPoint="progress" />
 
       {summary.isLoading ? (
         <LoadingState label="Собираем динамику за период…" />
