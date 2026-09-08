@@ -448,7 +448,12 @@ export default function MiniAppPage() {
                   </section>
                 )}
 
-                <nav className="profile-settings-nav" aria-label="Разделы профиля">
+                <nav
+                  className={`profile-settings-nav${
+                    aiCoachStatus.data?.ui_enabled ? ' profile-settings-nav--ai-enabled' : ''
+                  }`}
+                  aria-label="Разделы профиля"
+                >
                   <a
                     href="#profile-personal"
                     onClick={() => openProfileSection('profile-personal')}

@@ -80,6 +80,22 @@ async function openAiCoachSurface(
   await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
   await expect(page.locator('#profile-ai-coach')).toHaveAttribute('open');
   await expect(page.getByTestId('ai-coach-experience')).toBeVisible();
+
+  if (viewport.width <= 640) {
+    const securityLink = page.getByRole('link', { name: 'Доступ и безопасность', exact: true });
+    const aiCoachLink = page.getByRole('link', { name: 'AI Coach beta', exact: true });
+    const [securityBox, aiCoachBox] = await Promise.all([
+      securityLink.boundingBox(),
+      aiCoachLink.boundingBox(),
+    ]);
+
+    if (!securityBox || !aiCoachBox) {
+      throw new Error('Profile settings navigation links are not measurable');
+    }
+
+    expect(Math.abs(aiCoachBox.y - securityBox.y)).toBeLessThan(1);
+    expect(aiCoachBox.x).toBeGreaterThan(securityBox.x);
+  }
 }
 
 test('AI Coach internal beta keeps honest states and responsive boundaries', async ({
