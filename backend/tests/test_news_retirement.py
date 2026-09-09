@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from fitminiapp_api.core.config import Settings, settings
-from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.db.session import SessionLocal, engine, get_session_context
 from fitminiapp_api.models.news import (
     NewsCluster,
     NewsDraftRevision,
@@ -473,10 +473,13 @@ def test_retrying_uncertain_retired_snapshot_cannot_rewind_hermes_flow() -> None
         assert cluster.status == "image_pending"
         assert cluster.latest_draft_revision == hermes_revision
 
-        assert retry_uncertain_publication(
-            db,
-            snapshot_id=snapshot.id,
-            admin_telegram_user_id=7001,
+        assert (
+            retry_uncertain_publication(
+                db,
+                snapshot_id=snapshot.id,
+                admin_telegram_user_id=7001,
+            )
+            == "cancelled"
         )
         db.expire(snapshot)
         db.expire(cluster)
@@ -506,6 +509,98 @@ def test_retrying_uncertain_retired_snapshot_cannot_rewind_hermes_flow() -> None
         assert cluster.status in {"draft_ready", "awaiting_review"}
         assert cluster.latest_draft_revision == hermes_revision
         assert claim_due_publications(db) == []
+
+
+def test_retired_uncertain_retry_api_reports_cancelled_status(client, monkeypatch) -> None:
+    cluster_id = _source_candidate(external_id="uncertain-legacy-api-status")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        legacy_draft = _draft(db, cluster, hermes=False)
+        cluster.status = "publication_approved"
+        snapshot = _legacy_publication_snapshot(
+            db,
+            cluster,
+            legacy_draft,
+            status="uncertain",
+        )
+        snapshot_id = snapshot.id
+
+    response = client.post(
+        f"/api/v1/bot/news/publications/{snapshot_id}/retry",
+        headers={"X-Bot-Token": settings.bot_internal_token},
+        json={"admin_telegram_user_id": 7001},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "cancelled"
+    with get_session_context() as db:
+        persisted = db.get(NewsPublicationSnapshot, snapshot_id)
+        assert persisted is not None
+        assert persisted.status == "cancelled"
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_retry_refreshes_cluster_after_hermes_revision_commits() -> None:
+    cluster_id = _source_candidate(external_id="uncertain-legacy-concurrent-hermes")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        legacy_draft = _draft(db, cluster, hermes=False)
+        cluster.status = "publication_approved"
+        snapshot = _legacy_publication_snapshot(
+            db,
+            cluster,
+            legacy_draft,
+            status="uncertain",
+        )
+        snapshot_id = snapshot.id
+
+    retry_db = SessionLocal()
+    try:
+        locked_snapshot = (
+            retry_db.query(NewsPublicationSnapshot)
+            .filter(NewsPublicationSnapshot.id == snapshot_id)
+            .with_for_update()
+            .one()
+        )
+        stale_legacy_draft = retry_db.get(NewsDraftRevision, locked_snapshot.text_revision_id)
+        stale_cluster = retry_db.get(NewsCluster, cluster_id)
+        assert stale_legacy_draft is not None
+        assert stale_cluster is not None
+        assert stale_cluster.latest_draft_revision == stale_legacy_draft.revision
+
+        with get_session_context() as hermes_db:
+            hermes_cluster = hermes_db.get(NewsCluster, cluster_id)
+            assert hermes_cluster is not None
+            hermes_draft = _draft(hermes_db, hermes_cluster, hermes=True)
+            hermes_revision = hermes_draft.revision
+
+        assert stale_cluster.latest_draft_revision == stale_legacy_draft.revision
+        assert (
+            retry_uncertain_publication(
+                retry_db,
+                snapshot_id=snapshot_id,
+                admin_telegram_user_id=7001,
+            )
+            == "cancelled"
+        )
+        retry_db.commit()
+    finally:
+        retry_db.rollback()
+        retry_db.close()
+
+    with get_session_context() as db:
+        persisted_cluster = db.get(NewsCluster, cluster_id)
+        persisted_snapshot = db.get(NewsPublicationSnapshot, snapshot_id)
+        assert persisted_cluster is not None
+        assert persisted_snapshot is not None
+        assert persisted_snapshot.status == "cancelled"
+        assert persisted_cluster.status == "image_pending"
+        assert persisted_cluster.latest_draft_revision == hermes_revision
 
 
 def test_hermes_origin_is_not_quarantined() -> None:

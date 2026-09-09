@@ -39,6 +39,7 @@ from fitminiapp_api.services.news_state import transition_news_cluster
 logger = logging.getLogger(__name__)
 
 PublicationMode = Literal["immediate", "scheduled"]
+RetryStatus = Literal["queued", "cancelled", "stale"]
 ApprovalStatus = Literal[
     "queued",
     "scheduled",
@@ -982,11 +983,18 @@ def retry_uncertain_publication(
     *,
     snapshot_id: str,
     admin_telegram_user_id: int,
-) -> bool:
+) -> RetryStatus:
     row = db.query(NewsPublicationSnapshot).filter_by(id=snapshot_id).with_for_update().first()
     if row is None or row.status != "uncertain":
-        return False
+        return "stale"
     draft = db.get(NewsDraftRevision, row.text_revision_id)
+    cluster = (
+        db.query(NewsCluster)
+        .filter(NewsCluster.id == row.cluster_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if draft is None or not is_hermes_origin_draft(draft):
         row.status = "cancelled"
         row.next_attempt_at = utcnow()
@@ -1003,7 +1011,6 @@ def retry_uncertain_publication(
                 "reason": "non_hermes_news_pipeline_retired",
             },
         )
-        cluster = db.get(NewsCluster, row.cluster_id)
         if cluster is not None:
             latest_draft = (
                 db.query(NewsDraftRevision)
@@ -1029,7 +1036,7 @@ def retry_uncertain_publication(
                     actor_ref=reviewer_ref,
                 )
         db.flush()
-        return True
+        return "cancelled"
     row.status = "queued" if row.publication_mode == "immediate" else "scheduled"
     row.next_attempt_at = utcnow()
     row.last_error_code = "owner_confirmed_message_not_found_retry"
@@ -1042,7 +1049,6 @@ def retry_uncertain_publication(
         resource_id=row.id,
         details={"attempt_count": row.attempt_count},
     )
-    cluster = db.get(NewsCluster, row.cluster_id)
     if cluster is not None:
         transition_news_cluster(
             db,
@@ -1054,4 +1060,4 @@ def retry_uncertain_publication(
             actor_ref=reviewer_ref,
         )
     db.flush()
-    return True
+    return "queued"

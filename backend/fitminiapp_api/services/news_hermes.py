@@ -302,7 +302,16 @@ def accept_hermes_submission(
     )
     if item is None or item.cluster_id is None:
         raise HermesIntakeError("source_item_missing")
-    cluster = db.get(NewsCluster, item.cluster_id)
+    # Persist ingestion updates before refreshing the identity-mapped cluster while taking the
+    # lock; otherwise populate_existing() could discard changes made in this transaction.
+    db.flush()
+    cluster = (
+        db.query(NewsCluster)
+        .filter(NewsCluster.id == item.cluster_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if cluster is None:
         raise HermesIntakeError("cluster_missing")
 

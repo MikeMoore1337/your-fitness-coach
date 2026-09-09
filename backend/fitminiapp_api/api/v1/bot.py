@@ -599,9 +599,9 @@ def retry_news_publication_from_bot(
     _check_bot_token(x_bot_token)
     _check_support_admin(payload.admin_telegram_user_id)
     with get_session_context() as db:
-        queued = retry_uncertain_publication(
+        retry_status = retry_uncertain_publication(
             db,
             snapshot_id=snapshot_id,
             admin_telegram_user_id=payload.admin_telegram_user_id,
         )
-        return BotNewsRevisionActionResponse(status="queued" if queued else "stale")
+        return BotNewsRevisionActionResponse(status=retry_status)

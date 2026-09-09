@@ -1139,10 +1139,13 @@ def test_uncertain_send_never_retries_until_owner_reconciles(monkeypatch) -> Non
             uncertain=True,
         )
         assert claim_due_publications(db) == []
-        assert retry_uncertain_publication(
-            db,
-            snapshot_id=approved.snapshot_id,
-            admin_telegram_user_id=7001,
+        assert (
+            retry_uncertain_publication(
+                db,
+                snapshot_id=approved.snapshot_id,
+                admin_telegram_user_id=7001,
+            )
+            == "queued"
         )
         assert claim_due_publications(db) == [approved.snapshot_id]
         mark_publication_failed(
