@@ -65,10 +65,12 @@ conversation persistence ещё нет.
 
 ### 2.2. Existing AI-related configuration
 
-В текущем `Settings` есть только news-specific `NEWS_LLM_*`; в `.env.example` он выключен через
-`NEWS_LLM_PROVIDER=disabled`. Эти поля, prompt и adapter нельзя переиспользовать для AI Coach:
-у них другой trust boundary, content workflow и владелец данных. Новая AI Coach конфигурация
-должна быть отдельной, default-off и provider-neutral.
+В текущем `Settings` больше нет news-specific `NEWS_LLM_*`: локальный news LLM pipeline удалён
+в рамках Task 224, и `.env.example` больше не объявляет эти параметры. Downstream-обработка
+editorial-материалов Hermes управляется отдельными `NEWS_INGESTION_*` и `HERMES_INTAKE_*`
+настройками. Эти контуры нельзя переиспользовать для AI Coach: у них другой trust boundary,
+content workflow и владелец данных. Новая AI Coach конфигурация должна быть отдельной,
+default-off и provider-neutral.
 
 В исходном worktree на момент старта отсутствовали `.env` и `GROQ_API_KEY`. Перед smoke в
 выделенном worktree было проверено только наличие `.env` и непустого `GROQ_API_KEY`; значение

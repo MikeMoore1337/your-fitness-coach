@@ -32,6 +32,7 @@ from fitminiapp_api.services.news_images import (
     current_image,
 )
 from fitminiapp_api.services.news_ingestion import utcnow
+from fitminiapp_api.services.news_origin import is_hermes_origin_draft
 from fitminiapp_api.services.news_publication import (
     ARTIFACT_HASH_PREFIX_LENGTH,
     PUBLICATION_RENDERER_VERSION,
@@ -67,6 +68,19 @@ REVISION_EDITABLE_STATUSES = {
     "publication_scheduled",
     "publication_failed",
 }
+RETIRED_NON_HERMES_ACTIVE_STATUSES = frozenset(
+    {
+        "candidate",
+        "image_pending",
+        "draft_ready",
+        "awaiting_review",
+        "deferred",
+        "publication_approved",
+        "publication_scheduled",
+        "publication_failed",
+    }
+)
+
 OWNER_EDIT_REVALIDATED_WARNINGS = {
     "deterministic_fallback_requires_editor",
     "invalid_draft_schema",
@@ -96,9 +110,8 @@ class ReviewArtifact:
     limit: int | None
 
 
-HERMES_SUBMISSION_MARKER = "hermes_narrow_intake"
 PREVIEW_OPERATIONAL_BLOCKERS = frozenset({"publishing_disabled", "channel_rights_missing"})
-LEGACY_REVIEW_DELIVERY_DISABLED = "legacy_review_delivery_disabled"
+NON_HERMES_REVIEW_DELIVERY_DISABLED = "non_hermes_news_pipeline_retired"
 MANUAL_REVIEW_ALLOWED_WARNINGS = frozenset(
     {
         "medical_prescription_language",
@@ -119,12 +132,6 @@ MANUAL_REVIEW_ALLOWED_CONTENT_BLOCKERS = frozenset(
         "prohibited_medical_or_aas_language",
     }
 )
-
-
-def is_hermes_origin_draft(draft: NewsDraftRevision) -> bool:
-    """Return whether a revision came through the canonical Hermes intake marker."""
-
-    return draft.evidence_metadata.get("submitted_by") == HERMES_SUBMISSION_MARKER
 
 
 def review_delivery_blockers(
@@ -243,6 +250,8 @@ def edit_text_revision(
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
         return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
+        return ModerationResult(status="unavailable")
     cluster = db.query(NewsCluster).filter_by(id=draft.cluster_id).with_for_update().first()
     if (
         cluster is None
@@ -338,6 +347,8 @@ def queue_image_regeneration(
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
         return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
+        return ModerationResult(status="unavailable")
     cluster = db.query(NewsCluster).filter_by(id=draft.cluster_id).with_for_update().first()
     if (
         cluster is None
@@ -371,6 +382,8 @@ def remove_current_image(
 ) -> ModerationResult:
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
+        return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
         return ModerationResult(status="unavailable")
     cluster = db.query(NewsCluster).filter_by(id=draft.cluster_id).with_for_update().first()
     if (
@@ -408,6 +421,8 @@ def replace_current_image(
 ) -> ModerationResult:
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
+        return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
         return ModerationResult(status="unavailable")
     cluster = db.query(NewsCluster).filter_by(id=draft.cluster_id).with_for_update().first()
     if (
@@ -456,6 +471,8 @@ def moderate_draft(
 ) -> ModerationResult:
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
+        return ModerationResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
         return ModerationResult(status="unavailable")
     cluster = (
         db.query(NewsCluster).filter(NewsCluster.id == draft.cluster_id).with_for_update().first()
@@ -513,26 +530,17 @@ def moderate_draft(
             outcome = "limit_reached"
         else:
             revoke_active_decisions(db, cluster.id, reason="editorial_regenerate")
-            if is_hermes_origin_draft(draft):
-                # There is no Hermes text-generation request contract in YFC. Re-queue the
-                # accepted immutable revision instead of routing it through legacy candidate
-                # generation, which is intentionally disabled in Hermes production.
-                cluster.delivery_round += 1
-                transition_news_cluster(
-                    db,
-                    cluster,
-                    "draft_ready",
-                    reason_code="owner_regenerate_hermes_revision",
-                    actor_ref=actor_ref,
-                )
-            else:
-                transition_news_cluster(
-                    db,
-                    cluster,
-                    "candidate",
-                    reason_code="owner_regenerate",
-                    actor_ref=actor_ref,
-                )
+            # Hermes text generation lives outside YFC. Requeue the accepted
+            # immutable Hermes revision for owner review instead of manufacturing
+            # a new local candidate/draft.
+            cluster.delivery_round += 1
+            transition_news_cluster(
+                db,
+                cluster,
+                "draft_ready",
+                reason_code="owner_regenerate_hermes_revision",
+                actor_ref=actor_ref,
+            )
             cluster.deferred_until = None
             result_status = "queued"
     db.add(
@@ -558,13 +566,10 @@ def moderate_draft(
 
 def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) -> int:
     now = utcnow()
-    legacy_source_fetch_enabled = settings.news_legacy_source_fetch_enabled
-    if not legacy_source_fetch_enabled:
-        cancel_legacy_review_deliveries(db)
     image_pending = db.query(NewsCluster).filter(NewsCluster.status == "image_pending").all()
     for cluster in image_pending:
         draft = latest_draft(db, cluster)
-        if not legacy_source_fetch_enabled and (draft is None or not is_hermes_origin_draft(draft)):
+        if draft is None or not is_hermes_origin_draft(draft):
             continue
         transition_news_cluster(
             db,
@@ -583,7 +588,7 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
     )
     for cluster in deferred:
         draft = latest_draft(db, cluster)
-        if not legacy_source_fetch_enabled and (draft is None or not is_hermes_origin_draft(draft)):
+        if draft is None or not is_hermes_origin_draft(draft):
             continue
         transition_news_cluster(
             db,
@@ -603,7 +608,7 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
         draft = latest_draft(db, cluster)
         if draft is None:
             continue
-        if not legacy_source_fetch_enabled and not is_hermes_origin_draft(draft):
+        if not is_hermes_origin_draft(draft):
             _cancel_pending_deliveries(db, draft.id)
             continue
         if not source_metadata_is_fresh(draft.evidence_metadata, now=now):
@@ -705,11 +710,9 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
     return created
 
 
-def cancel_legacy_review_deliveries(db: Session) -> int:
-    """Cancel queued/processing legacy deliveries while source acquisition is disabled."""
+def cancel_non_hermes_review_deliveries(db: Session) -> int:
+    """Cancel executable owner deliveries that do not originate from Hermes."""
 
-    if settings.news_legacy_source_fetch_enabled:
-        return 0
     rows = (
         db.query(NewsReviewDelivery)
         .filter(NewsReviewDelivery.status.in_({"queued", "processing"}))
@@ -717,22 +720,101 @@ def cancel_legacy_review_deliveries(db: Session) -> int:
     )
     if not rows:
         return 0
+
     draft_ids = {row.draft_id for row in rows}
     drafts = {
         draft.id: draft
         for draft in db.query(NewsDraftRevision).filter(NewsDraftRevision.id.in_(draft_ids)).all()
     }
+
     cancelled = 0
     for delivery in rows:
         draft = drafts.get(delivery.draft_id)
-        if draft is None or is_hermes_origin_draft(draft):
+        if draft is not None and is_hermes_origin_draft(draft):
             continue
+
         delivery.status = "cancelled"
         delivery.processing_started_at = None
         delivery.next_attempt_at = None
-        delivery.last_error_code = LEGACY_REVIEW_DELIVERY_DISABLED
+        delivery.last_error_code = NON_HERMES_REVIEW_DELIVERY_DISABLED
         cancelled += 1
+
     return cancelled
+
+
+def quarantine_non_hermes_news_work(db: Session) -> tuple[int, int]:
+    """Terminally quarantine active work left by the retired local news pipeline."""
+
+    cancelled_deliveries = cancel_non_hermes_review_deliveries(db)
+    clusters = (
+        db.query(NewsCluster)
+        .filter(NewsCluster.status.in_(RETIRED_NON_HERMES_ACTIVE_STATUSES))
+        .with_for_update()
+        .all()
+    )
+
+    quarantined = 0
+    for cluster in clusters:
+        # SessionLocal uses autoflush=False. A caller may already have moved
+        # this identity to a terminal state in memory while the SELECT above
+        # still observed its previous persisted status.
+        if cluster.status not in RETIRED_NON_HERMES_ACTIVE_STATUSES:
+            continue
+
+        draft = latest_draft(db, cluster)
+        if draft is not None and is_hermes_origin_draft(draft):
+            continue
+
+        previous_status = cluster.status
+
+        revoke_active_decisions(
+            db,
+            cluster.id,
+            reason="non_hermes_news_pipeline_retired",
+        )
+
+        db.query(NewsPublicationSnapshot).filter(
+            NewsPublicationSnapshot.cluster_id == cluster.id,
+            NewsPublicationSnapshot.status.in_({"queued", "scheduled", "failed"}),
+        ).update(
+            {
+                NewsPublicationSnapshot.status: "cancelled",
+                NewsPublicationSnapshot.processing_started_at: None,
+                NewsPublicationSnapshot.last_error_code: "non_hermes_news_pipeline_retired",
+            },
+            synchronize_session=False,
+        )
+        db.query(NewsPublicationSnapshot).filter(
+            NewsPublicationSnapshot.cluster_id == cluster.id,
+            NewsPublicationSnapshot.status == "processing",
+        ).update(
+            {
+                NewsPublicationSnapshot.status: "uncertain",
+                NewsPublicationSnapshot.processing_started_at: None,
+                NewsPublicationSnapshot.last_error_code: "worker_interrupted_send_uncertain",
+            },
+            synchronize_session=False,
+        )
+
+        transition_news_cluster(
+            db,
+            cluster,
+            "rejected",
+            reason_code="non_hermes_news_pipeline_retired",
+        )
+        cluster.deferred_until = None
+
+        record_audit_event(
+            db,
+            action="news.non_hermes_work_quarantined",
+            resource_type="news_cluster",
+            resource_id=cluster.id,
+            details={"previous_status": previous_status},
+        )
+        quarantined += 1
+
+    db.flush()
+    return cancelled_deliveries, quarantined
 
 
 def compose_review_artifact(

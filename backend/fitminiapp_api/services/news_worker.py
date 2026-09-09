@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import hashlib
-import hmac
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -18,31 +15,23 @@ from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.news import (
     NewsCluster,
     NewsDraftRevision,
-    NewsItem,
     NewsReviewDelivery,
-    NewsSource,
 )
 from fitminiapp_api.services.audit import record_audit_event
-from fitminiapp_api.services.news_drafts import create_draft_revision
 from fitminiapp_api.services.news_editorial import (
-    LEGACY_REVIEW_DELIVERY_DISABLED,
-    cancel_legacy_review_deliveries,
+    NON_HERMES_REVIEW_DELIVERY_DISABLED,
+    cancel_non_hermes_review_deliveries,
     compose_review_artifact,
     editorial_actor_ref,
     enqueue_review_deliveries,
     is_hermes_origin_draft,
     prune_news_editorial,
+    quarantine_non_hermes_news_work,
     review_delivery_blockers,
     review_message,
 )
-from fitminiapp_api.services.news_freshness import is_fresh_publication
 from fitminiapp_api.services.news_images import create_image_revision
-from fitminiapp_api.services.news_ingestion import (
-    SafeNewsFetcher,
-    SourceFetchError,
-    ingest_items,
-    utcnow,
-)
+from fitminiapp_api.services.news_ingestion import utcnow
 from fitminiapp_api.services.news_publication import (
     claim_due_publications,
     mark_publication_failed,
@@ -53,7 +42,6 @@ from fitminiapp_api.services.news_review_schedule import (
     NEWS_REVIEW_BATCH_SIZE,
     NewsReviewSlot,
 )
-from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.notifications import safe_delivery_error
 
 logger = logging.getLogger(__name__)
@@ -111,225 +99,6 @@ class PublicationResult(Protocol):
 
     @property
     def message_date(self) -> datetime: ...
-
-
-def _source_ref(source_id: str) -> str:
-    return hmac.new(
-        settings.secret_key.encode("utf-8"),
-        f"news-source:{source_id}".encode(),
-        hashlib.sha256,
-    ).hexdigest()[:16]
-
-
-async def _fetch_source(
-    source_id: str,
-    client: httpx.AsyncClient,
-    semaphore: asyncio.Semaphore,
-) -> dict[str, int]:
-    started = monotonic()
-    async with semaphore:
-        with get_session_context() as db:
-            source = db.get(NewsSource, source_id)
-            if source is None or not source.enabled:
-                return {}
-            fetcher = SafeNewsFetcher(client, max_bytes=settings.news_source_max_bytes)
-            try:
-                result = await fetcher.fetch(source)
-            except SourceFetchError as exc:
-                current = utcnow()
-                source.last_error_code = exc.code
-                source.last_error_at = current
-                source.consecutive_error_count += 1
-                backoff_minutes = min(
-                    source.fetch_interval_minutes,
-                    5 * (2 ** min(source.consecutive_error_count - 1, 6)),
-                )
-                source.next_fetch_at = current + timedelta(minutes=backoff_minutes)
-                logger.error(
-                    "news_source_fetch_failed",
-                    extra={
-                        "source_ref": _source_ref(source.id),
-                        "reason": exc.code,
-                        "pipeline_stage": "fetch",
-                        "latency_ms": round((monotonic() - started) * 1000, 2),
-                    },
-                )
-                return {"sources_failed": 1}
-            current = utcnow()
-            source.last_success_at = current
-            source.last_error_code = None
-            source.last_error_at = None
-            source.consecutive_error_count = 0
-            source.next_fetch_at = current + timedelta(minutes=source.fetch_interval_minutes)
-            if result.status == "not_modified":
-                counts = {
-                    "new": 0,
-                    "duplicate": 0,
-                    "candidate": 0,
-                    "stale": 0,
-                    "below_threshold": 0,
-                    "eligible": 0,
-                }
-            else:
-                source.etag = result.etag
-                source.last_modified = result.last_modified
-                counts = ingest_items(
-                    db,
-                    source,
-                    result.items,
-                    candidate_threshold=settings.news_candidate_score_threshold,
-                    fetched_at=current,
-                )
-            counts["sources_success"] = 1
-            counts["fetched"] = len(result.items)
-            logger.info(
-                "news_source_fetch_succeeded",
-                extra={
-                    "source_ref": _source_ref(source.id),
-                    "outcome": result.status,
-                    "pipeline_stage": "fetch",
-                    "items_count": counts.get("new", 0),
-                    "duplicate_count": counts.get("duplicate", 0),
-                    "candidate_count": counts.get("candidate", 0),
-                    "latency_ms": round((monotonic() - started) * 1000, 2),
-                },
-            )
-            return counts
-
-
-async def fetch_due_sources(client: httpx.AsyncClient) -> dict[str, int]:
-    current = utcnow()
-    with get_session_context() as db:
-        sources_total = db.query(NewsSource.id).filter(NewsSource.enabled.is_(True)).count()
-        source_ids = [
-            row.id
-            for row in db.query(NewsSource.id)
-            .filter(
-                NewsSource.enabled.is_(True),
-                (NewsSource.next_fetch_at.is_(None) | (NewsSource.next_fetch_at <= current)),
-            )
-            .order_by(NewsSource.next_fetch_at.asc(), NewsSource.id.asc())
-            .limit(40)
-            .all()
-        ]
-    if sources_total == 0:
-        logger.error(
-            "news_pipeline_no_enabled_sources",
-            extra={"pipeline_stage": "fetch", "reason": "no_enabled_sources"},
-        )
-    semaphore = asyncio.Semaphore(settings.news_fetch_concurrency)
-    results = await asyncio.gather(
-        *(_fetch_source(source_id, client, semaphore) for source_id in source_ids)
-    )
-    keys = (
-        "new",
-        "duplicate",
-        "candidate",
-        "stale",
-        "below_threshold",
-        "eligible",
-        "fetched",
-        "sources_success",
-        "sources_failed",
-    )
-    counts = {key: sum(item.get(key, 0) for item in results) for key in keys}
-    counts["sources_total"] = sources_total
-    counts["sources_checked"] = len(source_ids)
-    return counts
-
-
-async def generate_candidate_drafts(
-    client: httpx.AsyncClient,
-    *,
-    cycle_stats: NewsCycleStats | None = None,
-) -> int:
-    with get_session_context() as db:
-        generated_since = utcnow() - timedelta(days=1)
-        generated_last_day = (
-            db.query(NewsDraftRevision.id)
-            .filter(
-                NewsDraftRevision.created_at >= generated_since,
-                NewsDraftRevision.revision == 1,
-            )
-            .count()
-        )
-        remaining_daily = max(0, settings.news_daily_draft_limit - generated_last_day)
-        if remaining_daily == 0:
-            if cycle_stats is not None:
-                cycle_stats.drafts_skipped_daily_limit += (
-                    db.query(NewsCluster.id).filter(NewsCluster.status == "candidate").count()
-                )
-            return 0
-        cluster_ids = [
-            row.id
-            for row in db.query(NewsCluster.id)
-            .filter(NewsCluster.status == "candidate")
-            .order_by(NewsCluster.score.desc(), NewsCluster.created_at.asc())
-            .limit(MAX_GENERATIONS_PER_CYCLE)
-            .all()
-        ]
-    generated = 0
-    for cluster_id in cluster_ids:
-        if generated >= remaining_daily:
-            break
-        started = monotonic()
-        with get_session_context() as db:
-            cluster = (
-                db.query(NewsCluster)
-                .filter(NewsCluster.id == cluster_id, NewsCluster.status == "candidate")
-                .with_for_update()
-                .first()
-            )
-            if cluster is None:
-                continue
-            primary = db.get(NewsItem, cluster.primary_item_id)
-            if primary is None or not is_fresh_publication(
-                primary.published_at,
-                now=utcnow(),
-            ):
-                transition_news_cluster(
-                    db,
-                    cluster,
-                    "clustered",
-                    reason_code="source_not_current_month",
-                )
-                continue
-            try:
-                draft = await create_draft_revision(db, cluster, client=client)
-                await create_image_revision(db, cluster, draft, client=client)
-            except Exception as exc:
-                logger.error(
-                    "news_draft_generation_failed",
-                    extra={
-                        "pipeline_stage": "generation",
-                        "reason": getattr(exc, "code", type(exc).__name__),
-                        "latency_ms": round((monotonic() - started) * 1000, 2),
-                    },
-                )
-                continue
-            generated += 1
-            if cycle_stats is not None:
-                cycle_stats.drafts_created += 1
-                if (
-                    settings.news_llm_provider == "openai_compatible"
-                    and draft.provider == "deterministic"
-                ):
-                    cycle_stats.llm_failures += 1
-            logger.info(
-                "news_draft_generation_succeeded",
-                extra={
-                    "pipeline_stage": "generation",
-                    "provider": draft.provider,
-                    "outcome": "fallback" if draft.provider == "deterministic" else "generated",
-                    "latency_ms": draft.generation_latency_ms,
-                },
-            )
-    if cycle_stats is not None and generated >= remaining_daily:
-        with get_session_context() as db:
-            cycle_stats.drafts_skipped_daily_limit += (
-                db.query(NewsCluster.id).filter(NewsCluster.status == "candidate").count()
-            )
-    return generated
 
 
 async def generate_pending_images(client: httpx.AsyncClient) -> int:
@@ -504,9 +273,8 @@ async def deliver_review_queue(
         editorial_actor_ref(telegram_id): telegram_id
         for telegram_id in settings.admin_telegram_id_set
     }
-    if not settings.news_legacy_source_fetch_enabled:
-        with get_session_context() as db:
-            cancel_legacy_review_deliveries(db)
+    with get_session_context() as db:
+        cancel_non_hermes_review_deliveries(db)
     delivered = 0
     for delivery_id in _claim_deliveries(
         draft_limit=NEWS_REVIEW_BATCH_SIZE if review_slot is not None else None,
@@ -529,11 +297,11 @@ async def deliver_review_queue(
                 delivery.status = "cancelled"
                 delivery.processing_started_at = None
                 continue
-            if not settings.news_legacy_source_fetch_enabled and not is_hermes_origin_draft(draft):
+            if not is_hermes_origin_draft(draft):
                 delivery.status = "cancelled"
                 delivery.processing_started_at = None
                 delivery.next_attempt_at = None
-                delivery.last_error_code = LEGACY_REVIEW_DELIVERY_DISABLED
+                delivery.last_error_code = NON_HERMES_REVIEW_DELIVERY_DISABLED
                 continue
             review = compose_review_artifact(db, draft, channel_ready=channel_ready)
             delivery_blockers = review_delivery_blockers(draft, review)
@@ -759,16 +527,19 @@ async def run_news_pipeline_once(
     send_preview: Callable[..., Awaitable[PublicationResult]],
     send_publication: Callable[..., Awaitable[PublicationResult]],
     publication_ready: bool,
-    fetch_sources: bool,
     review_delivery_due: bool = True,
     review_slot: NewsReviewSlot | None = None,
 ) -> NewsCycleStats:
+    """Run the Hermes-origin downstream editorial pipeline once."""
+
     started = monotonic()
     cycle_stats = NewsCycleStats()
     delivered = 0
-    legacy_source_fetch_enabled = settings.news_legacy_source_fetch_enabled
+
     with get_session_context() as db:
         prune_news_editorial(db, retention_days=settings.news_retention_days)
+        quarantine_non_hermes_news_work(db)
+
     timeout = httpx.Timeout(settings.news_source_timeout_seconds)
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
         published = (
@@ -776,24 +547,12 @@ async def run_news_pipeline_once(
             if publication_ready
             else 0
         )
-        counts = (
-            await fetch_due_sources(client) if legacy_source_fetch_enabled and fetch_sources else {}
-        )
-        cycle_stats.sources_total = counts.get("sources_total", 0)
-        cycle_stats.sources_checked = counts.get("sources_checked", 0)
-        cycle_stats.sources_success = counts.get("sources_success", 0)
-        cycle_stats.sources_failed = counts.get("sources_failed", 0)
-        cycle_stats.candidates_fetched = counts.get("fetched", 0)
-        cycle_stats.candidates_new = counts.get("new", 0)
-        cycle_stats.candidates_duplicate = counts.get("duplicate", 0)
-        cycle_stats.candidates_stale = counts.get("stale", 0)
-        cycle_stats.candidates_below_threshold = counts.get("below_threshold", 0)
-        cycle_stats.candidates_eligible = counts.get("eligible", 0)
-        if legacy_source_fetch_enabled:
-            await generate_candidate_drafts(client, cycle_stats=cycle_stats)
+
         await generate_pending_images(client)
+
         with get_session_context() as db:
             enqueue_review_deliveries(db, settings.admin_telegram_id_set)
+
         if review_delivery_due:
             delivered = await deliver_review_queue(
                 client,
@@ -803,15 +562,8 @@ async def run_news_pipeline_once(
                 cycle_stats=cycle_stats,
                 review_slot=review_slot,
             )
-    if (legacy_source_fetch_enabled and fetch_sources) or any(
-        (
-            cycle_stats.drafts_created,
-            delivered,
-            published,
-            cycle_stats.llm_failures,
-            cycle_stats.telegram_delivery_failures,
-        )
-    ):
+
+    if any((delivered, published, cycle_stats.telegram_delivery_failures)):
         logger.info(
             "news_pipeline_cycle_completed",
             extra={
@@ -823,4 +575,5 @@ async def run_news_pipeline_once(
                 "latency_ms": round((monotonic() - started) * 1000, 2),
             },
         )
+
     return cycle_stats

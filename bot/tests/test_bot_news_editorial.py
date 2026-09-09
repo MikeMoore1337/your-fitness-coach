@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import httpx
 from bot.fitminiapp_bot import bot as bot_runtime
 from bot.fitminiapp_bot import feedback, news_editorial
 
@@ -278,6 +279,42 @@ def test_uncertain_retry_calls_exact_owner_bound_snapshot(monkeypatch) -> None:
     state.set_state.assert_not_awaited()
     callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
     callback.answer.assert_awaited_once_with("Повтор поставлен в очередь", show_alert=False)
+
+
+def test_retry_client_preserves_cancelled_status(monkeypatch) -> None:
+    real_async_client = httpx.AsyncClient
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, request=request, json={"status": "cancelled"})
+
+    transport = httpx.MockTransport(respond)
+
+    def client_factory(*, timeout: int):
+        return real_async_client(timeout=timeout, transport=transport)
+
+    monkeypatch.setattr(news_editorial.httpx, "AsyncClient", client_factory)
+
+    status = asyncio.run(
+        news_editorial.retry_uncertain_publication(
+            snapshot_id="c" * 32,
+            admin_telegram_user_id=7001,
+        )
+    )
+
+    assert status == "cancelled"
+
+
+def test_uncertain_retry_reports_retired_snapshot_cancellation(monkeypatch) -> None:
+    callback = _callback(user_id=7001, data=f"newsrec:t:{'c' * 32}")
+    state = AsyncMock()
+    retry = AsyncMock(return_value="cancelled")
+    monkeypatch.setattr(news_editorial, "Message", FakeMessage)
+    monkeypatch.setattr(news_editorial, "retry_uncertain_publication", retry)
+
+    asyncio.run(news_editorial.news_reconcile_callback(callback, state))
+
+    callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
+    callback.answer.assert_awaited_once_with("Устаревшая публикация отменена", show_alert=True)
 
 
 def test_news_fsm_router_precedes_generic_support_handlers() -> None:

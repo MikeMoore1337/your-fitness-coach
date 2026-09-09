@@ -171,7 +171,8 @@ async def retry_uncertain_publication(
         payload = response.json() if response.is_success else {}
     except httpx.HTTPError, ValueError:
         return "unavailable"
-    return "queued" if payload.get("status") == "queued" else "unavailable"
+    status = payload.get("status")
+    return status if status in {"queued", "cancelled"} else "unavailable"
 
 
 def _state_expired(data: dict[str, object]) -> bool:
@@ -585,10 +586,12 @@ async def news_reconcile_callback(callback: CallbackQuery, state: FSMContext) ->
             admin_telegram_user_id=callback.from_user.id,
         )
         await callback.message.edit_reply_markup(reply_markup=None)
-        await callback.answer(
-            "Повтор поставлен в очередь" if status == "queued" else "Повтор недоступен",
-            show_alert=status != "queued",
-        )
+        retry_feedback = {
+            "queued": ("Повтор поставлен в очередь", False),
+            "cancelled": ("Устаревшая публикация отменена", True),
+        }
+        feedback_text, show_alert = retry_feedback.get(status, ("Повтор недоступен", True))
+        await callback.answer(feedback_text, show_alert=show_alert)
         return
     await state.set_state(NewsEditorialStates.awaiting_reconcile_message_id)
     await state.set_data({"snapshot_id": snapshot_id, "started_at": time.monotonic()})

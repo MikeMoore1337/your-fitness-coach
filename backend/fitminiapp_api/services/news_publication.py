@@ -33,11 +33,13 @@ from fitminiapp_api.services.news_content import (
 from fitminiapp_api.services.news_freshness import source_metadata_is_fresh
 from fitminiapp_api.services.news_images import current_image
 from fitminiapp_api.services.news_ingestion import utcnow
+from fitminiapp_api.services.news_origin import is_hermes_origin_draft
 from fitminiapp_api.services.news_state import transition_news_cluster
 
 logger = logging.getLogger(__name__)
 
 PublicationMode = Literal["immediate", "scheduled"]
+RetryStatus = Literal["queued", "cancelled", "stale"]
 ApprovalStatus = Literal[
     "queued",
     "scheduled",
@@ -431,6 +433,8 @@ def approve_publication(
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
         return ApprovalResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
+        return ApprovalResult(status="unavailable")
     cluster = (
         db.query(NewsCluster).filter(NewsCluster.id == draft.cluster_id).with_for_update().first()
     )
@@ -679,9 +683,57 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
     claimed: list[str] = []
     missed_before = now - timedelta(minutes=settings.news_schedule_missed_minutes)
     for row in candidates:
-        cluster = db.get(NewsCluster, row.cluster_id)
+        # Keep the publication snapshot -> cluster order used by retry/reconcile.  Hermes
+        # intake takes the cluster lock before creating its revision, so refreshing this
+        # locked identity is the serialization point for the retired-snapshot decision.
+        cluster = (
+            db.query(NewsCluster)
+            .filter(NewsCluster.id == row.cluster_id)
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
         draft = db.get(NewsDraftRevision, row.text_revision_id)
-        if draft is None or not source_metadata_is_fresh(
+        if draft is None or not is_hermes_origin_draft(draft):
+            row.status = "cancelled"
+            row.last_error_code = "non_hermes_news_pipeline_retired"
+            row.processing_started_at = None
+
+            latest_draft = None
+            if cluster is not None and cluster.latest_draft_revision > 0:
+                latest_draft = (
+                    db.query(NewsDraftRevision)
+                    .filter(
+                        NewsDraftRevision.cluster_id == cluster.id,
+                        NewsDraftRevision.revision == cluster.latest_draft_revision,
+                    )
+                    .populate_existing()
+                    .first()
+                )
+            latest_draft_is_hermes = latest_draft is not None and is_hermes_origin_draft(
+                latest_draft
+            )
+
+            if (
+                cluster is not None
+                and not latest_draft_is_hermes
+                and cluster.status
+                not in {
+                    "published",
+                    "accepted_for_design",
+                    "rejected",
+                    "rejected_by_rules",
+                }
+            ):
+                transition_news_cluster(
+                    db,
+                    cluster,
+                    "rejected",
+                    reason_code="non_hermes_news_pipeline_retired",
+                )
+            continue
+
+        if not source_metadata_is_fresh(
             draft.evidence_metadata,
             now=now,
         ):
@@ -755,6 +807,12 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
 def publication_payload(db: Session, snapshot_id: str) -> PublicationPayload | None:
     row = db.get(NewsPublicationSnapshot, snapshot_id)
     if row is None or row.status != "processing":
+        return None
+    draft = db.get(NewsDraftRevision, row.text_revision_id)
+    if draft is None or not is_hermes_origin_draft(draft):
+        row.status = "cancelled"
+        row.last_error_code = "non_hermes_news_pipeline_retired"
+        row.processing_started_at = None
         return None
     image = db.get(NewsImageRevision, row.image_revision_id) if row.image_revision_id else None
     if image is not None and image.sha256 != row.image_sha256:
@@ -900,7 +958,7 @@ def reconcile_uncertain_publication(
     admin_telegram_user_id: int,
     channel_message_id: int,
 ) -> bool:
-    row = db.get(NewsPublicationSnapshot, snapshot_id)
+    row = db.query(NewsPublicationSnapshot).filter_by(id=snapshot_id).with_for_update().first()
     if row is None or row.status != "uncertain" or channel_message_id < 1:
         return False
     reviewer_ref = _reviewer_ref(admin_telegram_user_id)
@@ -911,8 +969,24 @@ def reconcile_uncertain_publication(
     row.last_error_code = "owner_reconciled_uncertain_send"
     if row.target_channel_username:
         row.telegram_permalink = f"https://t.me/{row.target_channel_username}/{channel_message_id}"
-    cluster = db.get(NewsCluster, row.cluster_id)
+    cluster = (
+        db.query(NewsCluster)
+        .filter(NewsCluster.id == row.cluster_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    latest_draft_id = None
     if cluster is not None:
+        latest_draft_id = (
+            db.query(NewsDraftRevision.id)
+            .filter(
+                NewsDraftRevision.cluster_id == cluster.id,
+                NewsDraftRevision.revision == cluster.latest_draft_revision,
+            )
+            .scalar()
+        )
+    if cluster is not None and latest_draft_id == row.text_revision_id:
         transition_news_cluster(
             db,
             cluster,
@@ -935,10 +1009,60 @@ def retry_uncertain_publication(
     *,
     snapshot_id: str,
     admin_telegram_user_id: int,
-) -> bool:
+) -> RetryStatus:
     row = db.query(NewsPublicationSnapshot).filter_by(id=snapshot_id).with_for_update().first()
     if row is None or row.status != "uncertain":
-        return False
+        return "stale"
+    draft = db.get(NewsDraftRevision, row.text_revision_id)
+    cluster = (
+        db.query(NewsCluster)
+        .filter(NewsCluster.id == row.cluster_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    if draft is None or not is_hermes_origin_draft(draft):
+        row.status = "cancelled"
+        row.next_attempt_at = utcnow()
+        row.processing_started_at = None
+        row.last_error_code = "non_hermes_news_pipeline_retired"
+        reviewer_ref = _reviewer_ref(admin_telegram_user_id)
+        record_audit_event(
+            db,
+            action="news.publication_retry_cancelled",
+            resource_type="news_publication_snapshot",
+            resource_id=row.id,
+            details={
+                "attempt_count": row.attempt_count,
+                "reason": "non_hermes_news_pipeline_retired",
+            },
+        )
+        if cluster is not None:
+            latest_draft = (
+                db.query(NewsDraftRevision)
+                .filter(
+                    NewsDraftRevision.cluster_id == cluster.id,
+                    NewsDraftRevision.revision == cluster.latest_draft_revision,
+                )
+                .first()
+            )
+            if not (
+                latest_draft is not None and is_hermes_origin_draft(latest_draft)
+            ) and cluster.status not in {
+                "published",
+                "accepted_for_design",
+                "rejected",
+                "rejected_by_rules",
+            }:
+                transition_news_cluster(
+                    db,
+                    cluster,
+                    "rejected",
+                    reason_code="non_hermes_news_pipeline_retired",
+                    actor_ref=reviewer_ref,
+                )
+        db.flush()
+        return "cancelled"
     row.status = "queued" if row.publication_mode == "immediate" else "scheduled"
     row.next_attempt_at = utcnow()
     row.last_error_code = "owner_confirmed_message_not_found_retry"
@@ -951,7 +1075,6 @@ def retry_uncertain_publication(
         resource_id=row.id,
         details={"attempt_count": row.attempt_count},
     )
-    cluster = db.get(NewsCluster, row.cluster_id)
     if cluster is not None:
         transition_news_cluster(
             db,
@@ -963,4 +1086,4 @@ def retry_uncertain_publication(
             actor_ref=reviewer_ref,
         )
     db.flush()
-    return True
+    return "queued"

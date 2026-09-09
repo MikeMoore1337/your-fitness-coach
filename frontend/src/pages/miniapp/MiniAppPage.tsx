@@ -312,14 +312,23 @@ export default function MiniAppPage() {
     if (section !== 'profile') return;
     const targetId = window.location.hash.slice(1);
     if (!targetId.startsWith('profile-')) return;
-    const frame = window.requestAnimationFrame(() => {
+    const revealHashTarget = () => {
       const target = document.getElementById(targetId);
+      if (!target) return false;
       const details =
         target instanceof HTMLDetailsElement ? target : target?.closest('details.card-disclosure');
       revealDetails(details instanceof HTMLDetailsElement ? details : null);
       target?.scrollIntoView({ block: 'start' });
+      return true;
+    };
+
+    if (revealHashTarget()) return;
+
+    const observer = new MutationObserver(() => {
+      if (revealHashTarget()) observer.disconnect();
     });
-    return () => window.cancelAnimationFrame(frame);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
   }, [section, search]);
 
   return (
@@ -525,6 +534,7 @@ export default function MiniAppPage() {
                   className="profile-settings-group"
                   family="neutral"
                   id="profile-notifications"
+                  defaultOpen={window.location.hash === '#profile-notifications'}
                   title={
                     <>
                       <Icon name="nav-today" size={20} /> Уведомления

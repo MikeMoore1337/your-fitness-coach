@@ -43,6 +43,7 @@ from fitminiapp_api.services.news_ingestion import (
     sha256_text,
     utcnow,
 )
+from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER
 from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.news_taxonomy import (
     RISK_POLICY_VERSION,
@@ -301,7 +302,16 @@ def accept_hermes_submission(
     )
     if item is None or item.cluster_id is None:
         raise HermesIntakeError("source_item_missing")
-    cluster = db.get(NewsCluster, item.cluster_id)
+    # Persist ingestion updates before refreshing the identity-mapped cluster while taking the
+    # lock; otherwise populate_existing() could discard changes made in this transaction.
+    db.flush()
+    cluster = (
+        db.query(NewsCluster)
+        .filter(NewsCluster.id == item.cluster_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
     if cluster is None:
         raise HermesIntakeError("cluster_missing")
 
@@ -363,7 +373,7 @@ def accept_hermes_submission(
             "risk_policy_version": RISK_POLICY_VERSION,
             "voice_profile_version": VOICE_PROFILE_VERSION,
             "editorial_profile": settings.news_draft_profile,
-            "submitted_by": "hermes_narrow_intake",
+            "submitted_by": HERMES_SUBMISSION_MARKER,
             "hermes_skill_version": payload.provenance.skill_version,
             "hermes_schema_version": payload.schema_version,
             "hermes_submission_id": submission_id,
