@@ -51,6 +51,16 @@ REVIEWED_COMMIT_RE = re.compile(
     r"(?im)\b(?:reviewed\s+commit|reviewed\s+head|commit)\b\s*\*{0,2}\s*[:=]\s*\*{0,2}\s*`?([0-9a-f]{7,40})`?"
 )
 REVIEW_COMPLETED_MARKERS = ("codex review", "review status completed")
+REVIEW_APPROVAL_RE = re.compile(
+    r"(?ix)"
+    r"(?:didn['’]t|did\s+not)\s+find\s+any\s+(?:major\s+)?issues"
+    r"|(?:^|[\n:])\s*no\s+blocking\s+(?:findings|issues)\b"
+    r"|(?:^|[\n:])\s*(?:review\s+)?(?:verdict|status)\s*[:=-]\s*(?:pass|approved)\b"
+    r"|(?:^|[\n:])\s*approved(?:\s+for\s+merge)?\b"
+)
+REVIEW_BLOCKING_MARKER_RE = re.compile(
+    r"(?i)(?<![a-z0-9])(?:P[0-2]|BLOCKER|HIGH|MEDIUM)(?![a-z0-9])"
+)
 
 # A task lease, an implementation exclusion, and delivery ownership are separate controller
 # concerns.  Only an exclusive-write lease in an implementation state owns the implementation
@@ -785,7 +795,9 @@ def _review_login(item: Mapping[str, Any]) -> str:
     for key in ("user", "author"):
         value = item.get(key)
         if isinstance(value, Mapping) and value.get("login"):
-            return str(value["login"])
+            # GitHub exposes App/bot accounts with a trailing ``[bot]`` suffix while
+            # the trusted identity is configured by its canonical login.
+            return re.sub(r"\[bot\]$", "", str(value["login"]).strip().casefold())
     return ""
 
 
@@ -796,6 +808,14 @@ def _marker_matches_head(marker: str, head_sha: str) -> bool:
 
 def _review_body(item: Mapping[str, Any]) -> str:
     return str(item.get("body") or item.get("text") or "")
+
+
+def _is_approving_codex_review(body: str) -> bool:
+    """Accept only an explicit no-findings/approval verdict from the connector."""
+
+    return bool(REVIEW_APPROVAL_RE.search(body)) and not bool(
+        REVIEW_BLOCKING_MARKER_RE.search(body)
+    )
 
 
 def _effective_current_head_reviews(
@@ -923,7 +943,9 @@ def validate_pull_request_review_contract(
         )
 
     exact_codex_comments: list[Mapping[str, Any]] = []
+    current_head_codex_comments: list[tuple[str, int, Mapping[str, Any]]] = []
     stale_codex_markers: list[str] = []
+    rejected_codex_markers: list[str] = []
     for comment in issue_comments:
         if _review_login(comment) not in TRUSTED_REVIEW_LOGINS:
             continue
@@ -934,12 +956,34 @@ def validate_pull_request_review_contract(
         markers = reviewed_commit_markers(body)
         if not markers:
             continue
-        if any(_marker_matches_head(marker, head_sha) for marker in markers) and any(
-            marker in lowered for marker in REVIEW_COMPLETED_MARKERS
-        ):
-            exact_codex_comments.append(comment)
+        exact_head = any(_marker_matches_head(marker, head_sha) for marker in markers)
+        completed = any(marker in lowered for marker in REVIEW_COMPLETED_MARKERS)
+        if exact_head and completed:
+            timestamp = str(
+                comment.get("updated_at")
+                or comment.get("updatedAt")
+                or comment.get("created_at")
+                or comment.get("createdAt")
+                or ""
+            )
+            try:
+                comment_id = int(comment.get("id", 0))
+            except TypeError, ValueError:
+                comment_id = 0
+            current_head_codex_comments.append((timestamp, comment_id, comment))
         else:
             stale_codex_markers.extend(markers)
+
+    if current_head_codex_comments:
+        _, _, latest_codex_comment = max(
+            current_head_codex_comments, key=lambda item: (item[0], item[1])
+        )
+        if _is_approving_codex_review(_review_body(latest_codex_comment)):
+            exact_codex_comments.append(latest_codex_comment)
+        else:
+            rejected_codex_markers.extend(
+                reviewed_commit_markers(_review_body(latest_codex_comment))
+            )
 
     if not exact_approvals and not exact_codex_comments:
         details = (
@@ -947,6 +991,11 @@ def validate_pull_request_review_contract(
             if stale_codex_markers
             else ""
         )
+        if rejected_codex_markers:
+            details += (
+                "; exact-head Codex review has no explicit approving verdict or contains "
+                "blocking findings"
+            )
         raise TaskSessionError(
             f"PR review gate has no completed approval for exact current head {head_sha}{details}"
         )

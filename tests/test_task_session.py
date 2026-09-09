@@ -546,7 +546,7 @@ def test_review_contract_accepts_exact_codex_comment_and_resolved_threads() -> N
     comments = [
         {
             "id": 12,
-            "user": {"login": "chatgpt-codex-connector"},
+            "user": {"login": "chatgpt-codex-connector[bot]"},
             "body": (
                 "Codex Review: Didn't find any major issues. "
                 f"**Reviewed commit:** `{head_sha[:10]}`"
@@ -566,6 +566,52 @@ def test_review_contract_accepts_exact_codex_comment_and_resolved_threads() -> N
     assert result["head_sha"] == head_sha
 
 
+def test_review_contract_rejects_exact_codex_summary_without_approval() -> None:
+    head_sha = "b" * 40
+    comments = [
+        {
+            "id": 15,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                "Codex Review Summary: Completed. **Reviewed commit:** "
+                f"`{head_sha[:10]}`\n\nP1 blocking finding"
+            ),
+        }
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit approving verdict"):
+        task_session.validate_pull_request_review_contract(_review_pr(head_sha), [], comments, [])
+
+
+def test_review_contract_uses_latest_exact_head_codex_verdict() -> None:
+    head_sha = "b" * 40
+    comments = [
+        {
+            "id": 16,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "created_at": "2026-09-09T05:00:00Z",
+            "updated_at": "2026-09-09T05:00:00Z",
+            "body": (
+                "Codex Review: Didn't find any major issues. "
+                f"**Reviewed commit:** `{head_sha[:10]}`"
+            ),
+        },
+        {
+            "id": 17,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "created_at": "2026-09-09T06:00:00Z",
+            "updated_at": "2026-09-09T06:00:00Z",
+            "body": (
+                "Codex Review Summary: Completed. **Reviewed commit:** "
+                f"`{head_sha[:10]}`\n\nP1 blocking finding"
+            ),
+        },
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit approving verdict"):
+        task_session.validate_pull_request_review_contract(_review_pr(head_sha), [], comments, [])
+
+
 @pytest.mark.parametrize("mergeable_state", ["blocked", "unstable"])
 def test_review_event_accepts_exact_review_before_aggregate_check_is_green(
     mergeable_state: str,
@@ -576,9 +622,10 @@ def test_review_event_accepts_exact_review_before_aggregate_check_is_green(
     comments = [
         {
             "id": 14,
-            "user": {"login": "chatgpt-codex-connector"},
+            "user": {"login": "chatgpt-codex-connector[bot]"},
             "body": (
-                f"Codex Review: review status completed; **Reviewed commit:** `{head_sha[:10]}`"
+                "Codex Review: Didn't find any major issues. review status completed; "
+                f"**Reviewed commit:** `{head_sha[:10]}`"
             ),
         }
     ]

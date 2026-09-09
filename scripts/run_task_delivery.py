@@ -27,6 +27,7 @@ try:
         DEFAULT_QUEUE_BUDGET,
         IssueWorkflowError,
         control_state_payload,
+        control_states,
         latest_control_state,
         parse_control_state_comment,
         parse_queue_budget_report,
@@ -44,6 +45,7 @@ except ModuleNotFoundError:
         DEFAULT_QUEUE_BUDGET,
         IssueWorkflowError,
         control_state_payload,
+        control_states,
         latest_control_state,
         parse_control_state_comment,
         parse_queue_budget_report,
@@ -276,7 +278,59 @@ def _queue_authorization_snapshot(
         )
     except IssueWorkflowError as error:
         raise DeliveryError(str(error)) from error
+    try:
+        states = control_states(comments, authorized_logins=allowed_logins)
+    except IssueWorkflowError as error:
+        raise DeliveryError(str(error)) from error
+    queue_stops = [
+        state
+        for state in states
+        if state.get("state") == "human_required" and state.get("terminal_verdict") == "queue_stop"
+    ]
+    if queue_stops:
+        authorization = {**authorization, "queue_stop": queue_stops[-1]}
     return issue, comments, authorization
+
+
+def _post_queue_stop(
+    control_issue: int,
+    *,
+    task_id: str,
+    status_issue: int | None,
+    branch: str,
+    blocker: str,
+) -> None:
+    """Latch a post-finish queue failure on the durable central control Issue."""
+
+    issue, _ = _control_issue_snapshot(control_issue)
+    match = CONTROL_ISSUE_RE.match(str(issue.get("title", "")))
+    if match is None:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: control Issue #{control_issue} has no Task control title"
+        )
+    control_task_id = match.group("task_id").upper()
+    _post_control_state(
+        control_issue,
+        control_state_payload(
+            task_id=control_task_id,
+            state="human_required",
+            issue_number=status_issue or control_issue,
+            branch=branch,
+            terminal_verdict="queue_stop",
+            blocker=f"Task {task_id}: {blocker}",
+        ),
+    )
+
+
+def _raise_if_queue_stop(authorization: Mapping[str, Any]) -> None:
+    queue_stop = authorization.get("queue_stop")
+    if not isinstance(queue_stop, Mapping):
+        return
+    task_id = str(queue_stop.get("task_id", "unknown"))
+    blocker = str(queue_stop.get("blocker") or "durable queue-stop state")
+    raise DeliveryError(
+        f"HUMAN_REQUIRED: CONTINUE_QUEUE is durably stopped by Task {task_id}: {blocker}"
+    )
 
 
 def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
@@ -878,6 +932,14 @@ def _deliver_one(
                 )
             budget_report = durable_budget
         except DeliveryError as error:
+            if control_issue is not None:
+                _post_queue_stop(
+                    control_issue,
+                    task_id=task_id,
+                    status_issue=status_issue,
+                    branch=started["lease"]["branch"],
+                    blocker=str(error),
+                )
             if status_issue is not None:
                 _post_control_state(
                     status_issue,
@@ -946,6 +1008,7 @@ def _run_continuous_queue(
     if max_tasks < 1 or max_tasks > DEFAULT_QUEUE_BUDGET.max_tasks_per_batch:
         raise DeliveryError("max-tasks must be between 1 and 4")
     _, _, authorization = _queue_authorization_snapshot(control_issue)
+    _raise_if_queue_stop(authorization)
     if not authorization["active"]:
         raise DeliveryError(
             f"HUMAN_REQUIRED: CONTINUE_QUEUE is not active ({authorization['reason']})"
@@ -965,6 +1028,7 @@ def _run_continuous_queue(
     last_task_issue: int | None = None
     while completed < max_tasks:
         _, _, current_authorization = _queue_authorization_snapshot(control_issue)
+        _raise_if_queue_stop(current_authorization)
         if not current_authorization["active"]:
             _event(
                 "QUEUE_PAUSED",

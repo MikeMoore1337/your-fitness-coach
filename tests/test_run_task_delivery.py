@@ -202,6 +202,100 @@ def test_queue_rejects_batch_larger_than_contract(monkeypatch: pytest.MonkeyPatc
         )
 
 
+def test_queue_honors_durable_queue_stop_before_candidate_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stop = delivery.control_state_payload(
+        task_id="150",
+        state="human_required",
+        issue_number=219,
+        terminal_verdict="queue_stop",
+        blocker="Task 91: worker budget mismatch after finish",
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue: (
+            {
+                "state": "open",
+                "body": "CONTINUE_QUEUE",
+                "user": {"login": "owner"},
+                "title": "[Task 150] queue control",
+            },
+            [
+                {
+                    "id": 1,
+                    "created_at": "2026-09-09T06:00:00Z",
+                    "user": {"login": "owner"},
+                    "body": delivery.render_control_state_comment(stop),
+                }
+            ],
+        ),
+    )
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(
+        delivery,
+        "_queue_candidates",
+        lambda: (_ for _ in ()).throw(AssertionError("candidate scan must not run")),
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="durably stopped"):
+        delivery._run_continuous_queue(
+            control_issue=218,
+            max_tasks=1,
+            poll_seconds=10,
+            max_wait_minutes=1,
+        )
+
+
+def test_post_queue_stop_projects_failure_to_central_control_issue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stop_payloads: list[tuple[int, dict[str, object]]] = []
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue: (
+            {"title": "[Task 150] queue control", "state": "open"},
+            [],
+        ),
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_post_control_state",
+        lambda issue, payload: stop_payloads.append((issue, dict(payload))),
+    )
+
+    delivery._post_queue_stop(
+        218,
+        task_id="91",
+        status_issue=219,
+        branch="task/91-period-report-insights",
+        blocker="HUMAN_REQUIRED: worker budget mismatch after finish",
+    )
+
+    assert stop_payloads == [
+        (
+            218,
+            {
+                "version": 1,
+                "task_id": "150",
+                "state": "human_required",
+                "issue_number": 219,
+                "branch": "task/91-period-report-insights",
+                "pr_number": None,
+                "head_sha": None,
+                "terminal_verdict": "queue_stop",
+                "blocker": ("Task 91: HUMAN_REQUIRED: worker budget mismatch after finish"),
+                "review_fix_cycles": 0,
+                "ci_fix_cycles": 0,
+                "scope_expansions": 0,
+            },
+        )
+    ]
+
+
 def test_queue_stops_on_human_required_candidate_without_starting_worker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

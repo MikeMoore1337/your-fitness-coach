@@ -56,6 +56,11 @@ scope expansion равен нулю. После достижения лимит�
 содержит только проверяемый worker cross-check и не может занизить ledger. Повторная публикация
 уже актуального состояния `queued` не выполняется.
 
+Если после controller `finish` проверка worker budget или closeout обнаруживает terminal failure,
+launcher публикует queue-wide `human_required` с `terminal_verdict=queue_stop` на центральном
+control Issue. Следующий запуск сначала проверяет этот durable stop и не сканирует следующий task,
+пока владелец не разберёт blocker.
+
 Machine-readable control-state comment использует маркер `yfc-control-state:v1` и состояния
 `queued`, `in_progress`, `review_wait`, `fix_required`, `ci_wait`, `merge_ready`, `merged`,
 `deploy_wait`, `production_verified`, `human_required`, `blocked`, `cleanup_deferred`.
