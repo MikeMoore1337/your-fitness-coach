@@ -16,8 +16,9 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -52,6 +53,8 @@ REVIEWED_COMMIT_RE = re.compile(
     r"(?im)\b(?:reviewed\s+commit|reviewed\s+head|commit)\b\s*\*{0,2}\s*[:=]\s*\*{0,2}\s*`?([0-9a-f]{7,40})`?"
 )
 REVIEW_COMPLETED_MARKERS = ("codex review", "review status completed")
+REVIEW_MERGEABILITY_TIMEOUT_SECONDS = 30.0
+REVIEW_MERGEABILITY_POLL_SECONDS = 1.0
 REVIEW_APPROVAL_RE = re.compile(
     r"(?ix)"
     r"(?:didn['’]t|did\s+not)\s+find\s+any\s+(?:major\s+)?issues"
@@ -808,6 +811,32 @@ query($owner: String!, $name: String!, $number: Int!) {
         return False
 
 
+def _pull_request_with_resolved_mergeability(
+    github: GitHubClient,
+    number: int,
+    *,
+    timeout_seconds: float = REVIEW_MERGEABILITY_TIMEOUT_SECONDS,
+    poll_seconds: float = REVIEW_MERGEABILITY_POLL_SECONDS,
+    clock: Callable[[], float] | None = None,
+    sleeper: Callable[[float], None] | None = None,
+) -> dict[str, Any]:
+    """Poll GitHub until the PR mergeability calculation is available or times out."""
+
+    if timeout_seconds <= 0 or poll_seconds <= 0:
+        raise TaskSessionError("PR mergeability polling requires positive timeout and interval")
+    clock = time.monotonic if clock is None else clock
+    sleeper = time.sleep if sleeper is None else sleeper
+    deadline = clock() + timeout_seconds
+    pull_request = github.pull_request(number)
+    while pull_request.get("mergeable") is None:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return pull_request
+        sleeper(min(poll_seconds, remaining))
+        pull_request = github.pull_request(number)
+    return pull_request
+
+
 def _successful_exact_check(checks: Sequence[Mapping[str, Any]], name: str, sha: str) -> bool:
     return any(
         item.get("name") == name
@@ -1259,7 +1288,7 @@ def validate_pr_review_event(
         if isinstance(event_pull_request, Mapping)
         else ""
     )
-    pull_request = github.pull_request(number)
+    pull_request = _pull_request_with_resolved_mergeability(github, number)
     live_head_sha = str(pull_request.get("head", {}).get("sha", ""))
     if event_head_sha and event_head_sha != live_head_sha:
         raise TaskSessionError(
@@ -4169,7 +4198,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     validate_pr_review_event(github, args.event, expected_head_sha=args.head_sha)
                 )
             else:
-                pull_request = github.pull_request(args.pr)
+                pull_request = _pull_request_with_resolved_mergeability(github, args.pr)
                 commits = github.pull_request_commits(args.pr)
                 evidence = validate_pull_request_review_contract(
                     pull_request,

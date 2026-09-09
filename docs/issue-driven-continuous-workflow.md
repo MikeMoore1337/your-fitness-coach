@@ -51,12 +51,14 @@ canonical backlog и проверяет подтверждённые terminal de
 scope expansion равен нулю. После достижения лимита, ошибки CI/deploy, dependency blocker или
 отсутствия безопасной Issue contract очередь останавливается.
 
-Единый queue claim хранится в shared Git common directory. При collision launcher валидирует
-запись и проверяет liveness её PID: на Windows используется non-destructive process-handle query,
-а на POSIX — signal-zero probe. Только подтверждённый stale claim после аварийного завершения
-процесса атомарно переносится в quarantine, повторно сверяется и удаляется, после чего acquire
-повторяется. Активный, повреждённый, изменившийся во время recovery или непроверяемый claim
-остаётся `HUMAN_REQUIRED` и не удаляется автоматически.
+Единый queue claim хранится в shared Git common directory. Запись содержит PID и process-instance
+identity: на Windows — время создания процесса, на Linux/POSIX с `/proc` — boot ID и start ticks.
+При collision launcher проверяет liveness и совпадение этой identity; один PID без identity не
+считается достаточным, поэтому повторно выданный PID после crash или reboot не блокирует очередь.
+Только подтверждённый stale claim после аварийного завершения процесса атомарно переносится в
+quarantine, повторно сверяется и удаляется, после чего acquire повторяется. Активный,
+повреждённый, изменившийся во время recovery или непроверяемый claim остаётся `HUMAN_REQUIRED`
+и не удаляется автоматически.
 
 Для queue-mode authoritative-счётчики review-fix и CI-fix хранятся в durable controller ledger.
 Перед каждым фактическим fix cycle worker обязан выполнить `record-queue-cycle`; `final.md`

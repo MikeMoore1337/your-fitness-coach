@@ -25,6 +25,10 @@ def _load_module():
 delivery = _load_module()
 
 
+def _claim_process_instance(*, boot_id: str = "a" * 32, start_ticks: str = "1") -> dict[str, str]:
+    return {"kind": "linux-proc", "boot_id": boot_id, "start_ticks": start_ticks}
+
+
 def test_run_scopes_git_safety_to_exact_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -324,6 +328,7 @@ def test_continuous_queue_claim_recovers_dead_owner(
             {
                 "control_issue": 218,
                 "pid": 424242,
+                "process_instance": _claim_process_instance(),
                 "started_at": "2026-09-09T08:00:00+00:00",
             },
             sort_keys=True,
@@ -332,7 +337,8 @@ def test_continuous_queue_claim_recovers_dead_owner(
         encoding="utf-8",
     )
     monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
-    monkeypatch.setattr(delivery, "_queue_owner_is_alive", lambda pid: False)
+    monkeypatch.setattr(delivery, "_queue_owner_process_instance", lambda pid: None)
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
 
     with delivery._continuous_queue_claim(218):
         assert claim_path.is_file()
@@ -352,6 +358,7 @@ def test_continuous_queue_claim_reclaims_dead_owner_via_atomic_quarantine(
             {
                 "control_issue": 218,
                 "pid": 424242,
+                "process_instance": _claim_process_instance(),
                 "started_at": "2026-09-09T08:00:00+00:00",
             },
             sort_keys=True,
@@ -367,7 +374,8 @@ def test_continuous_queue_claim_reclaims_dead_owner_via_atomic_quarantine(
         real_rename(source, destination)
 
     monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
-    monkeypatch.setattr(delivery, "_queue_owner_is_alive", lambda pid: False)
+    monkeypatch.setattr(delivery, "_queue_owner_process_instance", lambda pid: None)
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
     monkeypatch.setattr(delivery.os, "rename", record_rename)
 
     with delivery._continuous_queue_claim(218):
@@ -378,6 +386,39 @@ def test_continuous_queue_claim_reclaims_dead_owner_via_atomic_quarantine(
     assert renames[0][1].name.startswith("continuous-queue.lock.stale-")
     assert not claim_path.exists()
     assert not renames[0][1].exists()
+
+
+def test_continuous_queue_claim_reclaims_pid_reuse_with_different_process_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+    claim_path.parent.mkdir(parents=True)
+    claim_path.write_text(
+        json.dumps(
+            {
+                "control_issue": 218,
+                "pid": 424242,
+                "process_instance": _claim_process_instance(),
+                "started_at": "2026-09-09T08:00:00+00:00",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(
+        delivery,
+        "_queue_owner_process_instance",
+        lambda pid: _claim_process_instance(boot_id="b" * 32, start_ticks="2"),
+    )
+
+    with delivery._continuous_queue_claim(218):
+        assert claim_path.is_file()
+        assert "424242" not in claim_path.read_text(encoding="utf-8")
+
+    assert not claim_path.exists()
 
 
 def test_continuous_queue_claim_keeps_corrupted_claim_fail_closed(
@@ -396,6 +437,35 @@ def test_continuous_queue_claim_keeps_corrupted_claim_fail_closed(
         pass
 
     assert claim_path.read_text(encoding="utf-8") == "partial claim"
+
+
+def test_continuous_queue_claim_rejects_missing_process_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+    claim_path.parent.mkdir(parents=True)
+    claim_path.write_text(
+        json.dumps(
+            {
+                "control_issue": 218,
+                "pid": 424242,
+                "started_at": "2026-09-09T08:00:00+00:00",
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
+
+    with (
+        pytest.raises(delivery.DeliveryError, match="invalid process identity"),
+        delivery._continuous_queue_claim(218),
+    ):
+        pass
+
+    assert "process_instance" not in json.loads(claim_path.read_text(encoding="utf-8"))
 
 
 def test_queue_owner_liveness_rejects_ambiguous_os_errors(

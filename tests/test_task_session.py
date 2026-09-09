@@ -607,7 +607,9 @@ def test_review_contract_rejects_exact_codex_summary_without_approval() -> None:
     ]
 
     with pytest.raises(task_session.TaskSessionError, match="explicit approving verdict"):
-        task_session.validate_pull_request_review_contract(_review_pr(head_sha), [], comments, [])
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha), [], comments, [], known_commit_shas=(head_sha,)
+        )
 
 
 def test_review_contract_uses_latest_exact_head_codex_verdict() -> None:
@@ -636,7 +638,9 @@ def test_review_contract_uses_latest_exact_head_codex_verdict() -> None:
     ]
 
     with pytest.raises(task_session.TaskSessionError, match="explicit approving verdict"):
-        task_session.validate_pull_request_review_contract(_review_pr(head_sha), [], comments, [])
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha), [], comments, [], known_commit_shas=(head_sha,)
+        )
 
 
 def test_review_contract_negative_codex_verdict_vetoes_formal_approval() -> None:
@@ -663,7 +667,7 @@ def test_review_contract_negative_codex_verdict_vetoes_formal_approval() -> None
 
     with pytest.raises(task_session.TaskSessionError, match="blocking exact-head Codex verdict"):
         task_session.validate_pull_request_review_contract(
-            _review_pr(head_sha), reviews, comments, []
+            _review_pr(head_sha), reviews, comments, [], known_commit_shas=(head_sha,)
         )
 
 
@@ -698,6 +702,49 @@ def test_review_event_accepts_exact_review_before_aggregate_check_is_green(
     )
     assert result["status"] == "PASS"
     assert result["head_sha"] == head_sha
+
+
+def test_review_event_polls_transient_mergeability_before_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _review_pr(head_sha)
+    github = FakeGitHub(base_sha)
+    github.pulls[219] = pull_request
+    github.commits[219] = []
+    responses = [
+        {**pull_request, "mergeable": None, "mergeable_state": None},
+        {**pull_request, "mergeable": None, "mergeable_state": None},
+        pull_request,
+    ]
+    fetches: list[int] = []
+
+    def fetch(number: int) -> dict[str, Any]:
+        fetches.append(number)
+        return responses.pop(0)
+
+    monkeypatch.setattr(github, "pull_request", fetch)
+    current_time = [0.0]
+    waits: list[float] = []
+
+    def monotonic() -> float:
+        return current_time[0]
+
+    def sleep(seconds: float) -> None:
+        waits.append(seconds)
+        current_time[0] += seconds
+
+    monkeypatch.setattr(task_session.time, "monotonic", monotonic)
+    monkeypatch.setattr(task_session.time, "sleep", sleep)
+    event_path = tmp_path / "review-event.json"
+    event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
+
+    result = task_session.validate_pr_review_event(github, event_path)  # type: ignore[arg-type]
+
+    assert result["status"] == "PASS"
+    assert fetches == [219, 219, 219]
+    assert waits == [1.0, 1.0]
 
 
 def test_master_ruleset_requires_pr_current_base_and_aggregate_check() -> None:

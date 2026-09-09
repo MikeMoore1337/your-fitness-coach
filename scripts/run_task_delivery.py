@@ -390,6 +390,46 @@ def _raise_if_queue_stop(authorization: Mapping[str, Any]) -> None:
     )
 
 
+def _queue_claim_process_instance(value: Any, claim_path: Path) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue claim has invalid process identity; "
+            f"inspect {claim_path}"
+        )
+    kind = value.get("kind")
+    if kind == "windows":
+        creation_time = value.get("creation_time_100ns")
+        if (
+            set(value) != {"kind", "creation_time_100ns"}
+            or not isinstance(creation_time, str)
+            or re.fullmatch(r"[0-9]{1,32}", creation_time) is None
+        ):
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: continuous queue claim has invalid process identity; "
+                f"inspect {claim_path}"
+            )
+        return {"kind": kind, "creation_time_100ns": creation_time}
+    if kind == "linux-proc":
+        boot_id = value.get("boot_id")
+        start_ticks = value.get("start_ticks")
+        if (
+            set(value) != {"kind", "boot_id", "start_ticks"}
+            or not isinstance(boot_id, str)
+            or re.fullmatch(r"[0-9a-fA-F-]{1,128}", boot_id) is None
+            or not isinstance(start_ticks, str)
+            or re.fullmatch(r"[0-9]{1,32}", start_ticks) is None
+            or int(start_ticks) < 1
+        ):
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: continuous queue claim has invalid process identity; "
+                f"inspect {claim_path}"
+            )
+        return {"kind": kind, "boot_id": boot_id, "start_ticks": start_ticks}
+    raise DeliveryError(
+        f"HUMAN_REQUIRED: continuous queue claim has invalid process identity; inspect {claim_path}"
+    )
+
+
 def _read_queue_claim(claim_path: Path) -> tuple[str, dict[str, Any]] | None:
     try:
         content = claim_path.read_text(encoding="utf-8")
@@ -436,24 +476,34 @@ def _read_queue_claim(claim_path: Path) -> tuple[str, dict[str, Any]] | None:
         raise DeliveryError(
             f"HUMAN_REQUIRED: continuous queue claim timestamp has no timezone; inspect {claim_path}"
         )
+    claim["process_instance"] = _queue_claim_process_instance(
+        claim.get("process_instance"), claim_path
+    )
     return content, claim
 
 
-def _windows_queue_owner_is_alive(pid: int) -> bool:
+def _windows_process_snapshot(pid: int) -> tuple[dict[str, str] | None, bool]:
     import ctypes
     from ctypes import wintypes
 
-    error_access_denied = 5
     error_invalid_parameter = 87
     process_query_limited_information = 0x1000
     still_active = 259
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-    kernel32.OpenProcess.restype = wintypes.HANDLE
     kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
     kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.GetProcessTimes.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    ]
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
     kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
     kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
 
     try:
         handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
@@ -464,16 +514,35 @@ def _windows_queue_owner_is_alive(pid: int) -> bool:
     if not handle:
         error_code = ctypes.get_last_error()
         if error_code == error_invalid_parameter:
-            return False
-        if error_code == error_access_denied:
-            return True
+            return None, False
         raise DeliveryError(f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}")
 
     try:
         exit_code = wintypes.DWORD()
         if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            error_code = ctypes.get_last_error()
+            if error_code == error_invalid_parameter:
+                return None, False
             raise DeliveryError(f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}")
-        return exit_code.value == still_active
+        if exit_code.value != still_active:
+            return None, False
+        creation_time = wintypes.FILETIME()
+        kernel_time = wintypes.FILETIME()
+        user_time = wintypes.FILETIME()
+        exit_time = wintypes.FILETIME()
+        if not kernel32.GetProcessTimes(
+            handle,
+            ctypes.byref(creation_time),
+            ctypes.byref(exit_time),
+            ctypes.byref(kernel_time),
+            ctypes.byref(user_time),
+        ):
+            error_code = ctypes.get_last_error()
+            if error_code == error_invalid_parameter:
+                return None, False
+            raise DeliveryError(f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}")
+        creation_value = (creation_time.dwHighDateTime << 32) | creation_time.dwLowDateTime
+        return {"kind": "windows", "creation_time_100ns": str(creation_value)}, True
     finally:
         if not kernel32.CloseHandle(handle):
             raise DeliveryError(
@@ -481,7 +550,74 @@ def _windows_queue_owner_is_alive(pid: int) -> bool:
             )
 
 
-def _queue_owner_is_alive(pid: int) -> bool:
+def _windows_queue_owner_is_alive(pid: int) -> bool:
+    _, alive = _windows_process_snapshot(pid)
+    return alive
+
+
+def _linux_process_instance_identity(pid: int) -> dict[str, str] | None:
+    stat_path = Path("/proc") / str(pid) / "stat"
+    try:
+        stat_content = stat_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}"
+        ) from error
+    closing_parenthesis = stat_content.rfind(")")
+    if closing_parenthesis < 0:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot parse continuous queue owner PID {pid} identity"
+        )
+    fields = stat_content[closing_parenthesis + 2 :].split()
+    if len(fields) <= 19:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot parse continuous queue owner PID {pid} identity"
+        )
+    if fields[0] in {"Z", "X"}:
+        return None
+    start_ticks = fields[19]
+    if re.fullmatch(r"[0-9]{1,32}", start_ticks) is None or int(start_ticks) < 1:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot parse continuous queue owner PID {pid} identity"
+        )
+    boot_path = Path("/proc/sys/kernel/random/boot_id")
+    try:
+        boot_id = boot_path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot verify continuous queue boot identity for PID {pid}"
+        ) from error
+    if re.fullmatch(r"[0-9a-fA-F-]{1,128}", boot_id) is None:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot parse continuous queue boot identity for PID {pid}"
+        )
+    return {"kind": "linux-proc", "boot_id": boot_id, "start_ticks": start_ticks}
+
+
+def _queue_owner_process_instance(pid: int) -> dict[str, str] | None:
+    if os.name == "nt":
+        identity, alive = _windows_process_snapshot(pid)
+        return identity if alive else None
+    if os.name == "posix":
+        return _linux_process_instance_identity(pid)
+    raise DeliveryError("HUMAN_REQUIRED: unsupported platform for queue owner identity")
+
+
+def _current_process_instance_identity() -> dict[str, str]:
+    identity = _queue_owner_process_instance(os.getpid())
+    if identity is None:
+        raise DeliveryError("HUMAN_REQUIRED: cannot identify the current continuous queue owner")
+    return identity
+
+
+def _queue_owner_is_alive(
+    pid: int,
+    process_instance: Mapping[str, str] | None = None,
+) -> bool:
+    if process_instance is not None:
+        return _queue_owner_process_instance(pid) == dict(process_instance)
     if os.name == "nt":
         return _windows_queue_owner_is_alive(pid)
     try:
@@ -507,7 +643,8 @@ def _recover_stale_queue_claim(claim_path: Path) -> bool:
         return True
     content, claim = snapshot
     pid = int(claim["pid"])
-    if _queue_owner_is_alive(pid):
+    process_instance = _queue_claim_process_instance(claim.get("process_instance"), claim_path)
+    if _queue_owner_is_alive(pid, process_instance):
         return False
     quarantine_path = claim_path.with_name(f"{claim_path.name}.stale-{uuid4().hex}")
     try:
@@ -534,7 +671,7 @@ def _recover_stale_queue_claim(claim_path: Path) -> bool:
             f"HUMAN_REQUIRED: continuous queue claim changed during atomic stale-owner "
             f"recovery; inspect {quarantine_path}"
         )
-    if _queue_owner_is_alive(pid):
+    if _queue_owner_is_alive(pid, process_instance):
         raise DeliveryError(
             f"HUMAN_REQUIRED: continuous queue owner PID {pid} became live during recovery; "
             f"inspect {quarantine_path}"
@@ -559,10 +696,12 @@ def _continuous_queue_claim(control_issue: int) -> Iterator[None]:
     state_root = _git_common_dir() / "codex-task-sessions-v1"
     state_root.mkdir(parents=True, exist_ok=True)
     claim_path = state_root / "continuous-queue.lock"
+    process_instance = _current_process_instance_identity()
     claim = json.dumps(
         {
             "control_issue": control_issue,
             "pid": os.getpid(),
+            "process_instance": process_instance,
             "started_at": datetime.now(UTC).isoformat(timespec="microseconds"),
         },
         ensure_ascii=True,
