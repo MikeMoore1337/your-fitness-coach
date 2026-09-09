@@ -507,6 +507,61 @@ def test_old_non_hermes_snapshot_does_not_reject_new_hermes_revision() -> None:
         assert cluster.latest_draft_revision == hermes_draft.revision
 
 
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_claim_refreshes_cluster_after_hermes_revision_commits() -> None:
+    cluster_id = _source_candidate(external_id="queued-legacy-concurrent-hermes")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        legacy_draft = _draft(db, cluster, hermes=False)
+        cluster.status = "publication_approved"
+        snapshot = _legacy_publication_snapshot(
+            db,
+            cluster,
+            legacy_draft,
+            status="queued",
+        )
+        snapshot_id = snapshot.id
+
+    claim_db = SessionLocal()
+    try:
+        locked_snapshot = (
+            claim_db.query(NewsPublicationSnapshot)
+            .filter(NewsPublicationSnapshot.id == snapshot_id)
+            .with_for_update()
+            .one()
+        )
+        stale_legacy_draft = claim_db.get(NewsDraftRevision, locked_snapshot.text_revision_id)
+        stale_cluster = claim_db.get(NewsCluster, cluster_id)
+        assert stale_legacy_draft is not None
+        assert stale_cluster is not None
+        assert stale_cluster.latest_draft_revision == stale_legacy_draft.revision
+
+        with get_session_context() as hermes_db:
+            hermes_cluster = hermes_db.get(NewsCluster, cluster_id)
+            assert hermes_cluster is not None
+            hermes_draft = _draft(hermes_db, hermes_cluster, hermes=True)
+            hermes_revision = hermes_draft.revision
+
+        assert stale_cluster.latest_draft_revision == stale_legacy_draft.revision
+        assert claim_due_publications(claim_db) == []
+        claim_db.commit()
+    finally:
+        claim_db.rollback()
+        claim_db.close()
+
+    with get_session_context() as db:
+        persisted_cluster = db.get(NewsCluster, cluster_id)
+        persisted_snapshot = db.get(NewsPublicationSnapshot, snapshot_id)
+        assert persisted_cluster is not None
+        assert persisted_snapshot is not None
+        assert persisted_snapshot.status == "cancelled"
+        assert persisted_snapshot.last_error_code == "non_hermes_news_pipeline_retired"
+        assert persisted_cluster.status == "image_pending"
+        assert persisted_cluster.latest_draft_revision == hermes_revision
+
+
 def test_retrying_uncertain_retired_snapshot_cannot_rewind_hermes_flow() -> None:
     cluster_id = _source_candidate(external_id="uncertain-legacy-before-hermes")
 

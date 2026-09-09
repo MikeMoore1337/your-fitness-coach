@@ -683,7 +683,16 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
     claimed: list[str] = []
     missed_before = now - timedelta(minutes=settings.news_schedule_missed_minutes)
     for row in candidates:
-        cluster = db.get(NewsCluster, row.cluster_id)
+        # Keep the publication snapshot -> cluster order used by retry/reconcile.  Hermes
+        # intake takes the cluster lock before creating its revision, so refreshing this
+        # locked identity is the serialization point for the retired-snapshot decision.
+        cluster = (
+            db.query(NewsCluster)
+            .filter(NewsCluster.id == row.cluster_id)
+            .populate_existing()
+            .with_for_update()
+            .first()
+        )
         draft = db.get(NewsDraftRevision, row.text_revision_id)
         if draft is None or not is_hermes_origin_draft(draft):
             row.status = "cancelled"
@@ -698,6 +707,7 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
                         NewsDraftRevision.cluster_id == cluster.id,
                         NewsDraftRevision.revision == cluster.latest_draft_revision,
                     )
+                    .populate_existing()
                     .first()
                 )
             latest_draft_is_hermes = latest_draft is not None and is_hermes_origin_draft(
