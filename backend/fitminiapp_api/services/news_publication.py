@@ -948,7 +948,7 @@ def reconcile_uncertain_publication(
     admin_telegram_user_id: int,
     channel_message_id: int,
 ) -> bool:
-    row = db.get(NewsPublicationSnapshot, snapshot_id)
+    row = db.query(NewsPublicationSnapshot).filter_by(id=snapshot_id).with_for_update().first()
     if row is None or row.status != "uncertain" or channel_message_id < 1:
         return False
     reviewer_ref = _reviewer_ref(admin_telegram_user_id)
@@ -959,8 +959,24 @@ def reconcile_uncertain_publication(
     row.last_error_code = "owner_reconciled_uncertain_send"
     if row.target_channel_username:
         row.telegram_permalink = f"https://t.me/{row.target_channel_username}/{channel_message_id}"
-    cluster = db.get(NewsCluster, row.cluster_id)
+    cluster = (
+        db.query(NewsCluster)
+        .filter(NewsCluster.id == row.cluster_id)
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    latest_draft_id = None
     if cluster is not None:
+        latest_draft_id = (
+            db.query(NewsDraftRevision.id)
+            .filter(
+                NewsDraftRevision.cluster_id == cluster.id,
+                NewsDraftRevision.revision == cluster.latest_draft_revision,
+            )
+            .scalar()
+        )
+    if cluster is not None and latest_draft_id == row.text_revision_id:
         transition_news_cluster(
             db,
             cluster,

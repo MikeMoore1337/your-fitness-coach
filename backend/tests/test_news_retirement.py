@@ -416,6 +416,39 @@ def test_processing_non_hermes_publication_remains_reconcilable() -> None:
         assert cluster.status == "published"
 
 
+def test_reconciling_old_snapshot_preserves_new_hermes_flow() -> None:
+    cluster_id = _source_candidate(external_id="uncertain-legacy-reconcile-hermes")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        legacy_draft = _draft(db, cluster, hermes=False)
+        cluster.status = "publication_approved"
+        snapshot = _legacy_publication_snapshot(
+            db,
+            cluster,
+            legacy_draft,
+            status="uncertain",
+        )
+
+        hermes_draft = _draft(db, cluster, hermes=True)
+        hermes_revision = hermes_draft.revision
+
+        assert reconcile_uncertain_publication(
+            db,
+            snapshot_id=snapshot.id,
+            admin_telegram_user_id=7001,
+            channel_message_id=12346,
+        )
+        db.flush()
+        db.expire(snapshot)
+        db.expire(cluster)
+        assert snapshot.status == "published"
+        assert snapshot.telegram_message_id == 12346
+        assert cluster.status == "image_pending"
+        assert cluster.latest_draft_revision == hermes_revision
+
+
 def test_old_non_hermes_snapshot_does_not_reject_new_hermes_revision() -> None:
     cluster_id = _source_candidate(external_id="legacy-snapshot-hermes-revision")
 
