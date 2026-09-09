@@ -52,7 +52,8 @@ scope expansion равен нулю. После достижения лимит�
 отсутствия безопасной Issue contract очередь останавливается.
 
 Единый queue claim хранится в shared Git common directory. Запись содержит PID и process-instance
-identity: на Windows — время создания процесса, на Linux/POSIX с `/proc` — boot ID и start ticks.
+identity: на Windows — время создания процесса, на Linux — boot ID и start ticks из `/proc`, а на
+macOS — bounded probes системного времени запуска процесса и boot time.
 При collision launcher проверяет liveness и совпадение этой identity; один PID без identity не
 считается достаточным, поэтому повторно выданный PID после crash или reboot не блокирует очередь.
 Только подтверждённый stale claim после аварийного завершения процесса атомарно переносится в

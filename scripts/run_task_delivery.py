@@ -408,7 +408,7 @@ def _queue_claim_process_instance(value: Any, claim_path: Path) -> dict[str, str
                 f"HUMAN_REQUIRED: continuous queue claim has invalid process identity; "
                 f"inspect {claim_path}"
             )
-        return {"kind": kind, "creation_time_100ns": creation_time}
+        return {"kind": "windows", "creation_time_100ns": creation_time}
     if kind == "linux-proc":
         boot_id = value.get("boot_id")
         start_ticks = value.get("start_ticks")
@@ -424,7 +424,22 @@ def _queue_claim_process_instance(value: Any, claim_path: Path) -> dict[str, str
                 f"HUMAN_REQUIRED: continuous queue claim has invalid process identity; "
                 f"inspect {claim_path}"
             )
-        return {"kind": kind, "boot_id": boot_id, "start_ticks": start_ticks}
+        return {"kind": "linux-proc", "boot_id": boot_id, "start_ticks": start_ticks}
+    if kind == "macos":
+        boot_time = value.get("boot_time")
+        start_time = value.get("start_time")
+        if (
+            set(value) != {"kind", "boot_time", "start_time"}
+            or not isinstance(boot_time, str)
+            or re.fullmatch(r"[A-Za-z0-9 :_={},.+-]{1,128}", boot_time) is None
+            or not isinstance(start_time, str)
+            or re.fullmatch(r"[A-Za-z0-9 :_={},.+-]{1,128}", start_time) is None
+        ):
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: continuous queue claim has invalid process identity; "
+                f"inspect {claim_path}"
+            )
+        return {"kind": "macos", "boot_time": boot_time, "start_time": start_time}
     raise DeliveryError(
         f"HUMAN_REQUIRED: continuous queue claim has invalid process identity; inspect {claim_path}"
     )
@@ -555,6 +570,85 @@ def _windows_queue_owner_is_alive(pid: int) -> bool:
     return alive
 
 
+def _posix_queue_owner_is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError as error:
+        if error.errno == errno.ESRCH:
+            return False
+        if error.errno == errno.EPERM:
+            return True
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}"
+        ) from error
+    return True
+
+
+def _macos_identity_value(raw_value: str, *, label: str, pid: int) -> str:
+    value = " ".join(raw_value.split())
+    if re.fullmatch(r"[A-Za-z0-9 :_={},.+-]{1,128}", value) is None:
+        raise DeliveryError(f"HUMAN_REQUIRED: cannot parse continuous queue {label} for PID {pid}")
+    return value
+
+
+def _macos_process_instance_identity(pid: int) -> dict[str, str] | None:
+    environment = os.environ.copy()
+    environment["LC_ALL"] = "C"
+    environment["LANG"] = "C"
+    try:
+        process = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "lstart="],
+            check=False,
+            shell=False,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            timeout=5,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}"
+        ) from error
+    if process.returncode != 0:
+        if process.stdout.strip() or process.stderr.strip() or _posix_queue_owner_is_alive(pid):
+            raise DeliveryError(f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}")
+        return None
+    start_lines = [line.strip() for line in process.stdout.splitlines() if line.strip()]
+    if len(start_lines) != 1:
+        if not start_lines and not _posix_queue_owner_is_alive(pid):
+            return None
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot parse continuous queue owner PID {pid} identity"
+        )
+    start_time = _macos_identity_value(start_lines[0], label="process identity", pid=pid)
+    try:
+        boot = subprocess.run(
+            ["sysctl", "-n", "kern.boottime"],
+            check=False,
+            shell=False,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            timeout=5,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot verify continuous queue boot identity for PID {pid}"
+        ) from error
+    if boot.returncode != 0 or not boot.stdout.strip() or boot.stderr.strip():
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot verify continuous queue boot identity for PID {pid}"
+        )
+    boot_time = _macos_identity_value(boot.stdout, label="boot identity", pid=pid)
+    return {"kind": "macos", "boot_time": boot_time, "start_time": start_time}
+
+
 def _linux_process_instance_identity(pid: int) -> dict[str, str] | None:
     stat_path = Path("/proc") / str(pid) / "stat"
     try:
@@ -600,6 +694,8 @@ def _queue_owner_process_instance(pid: int) -> dict[str, str] | None:
     if os.name == "nt":
         identity, alive = _windows_process_snapshot(pid)
         return identity if alive else None
+    if sys.platform == "darwin":
+        return _macos_process_instance_identity(pid)
     if os.name == "posix":
         return _linux_process_instance_identity(pid)
     raise DeliveryError("HUMAN_REQUIRED: unsupported platform for queue owner identity")
@@ -620,21 +716,9 @@ def _queue_owner_is_alive(
         return _queue_owner_process_instance(pid) == dict(process_instance)
     if os.name == "nt":
         return _windows_queue_owner_is_alive(pid)
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError as error:
-        if error.errno == errno.ESRCH:
-            return False
-        if error.errno == errno.EPERM:
-            return True
-        raise DeliveryError(
-            f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}"
-        ) from error
-    return True
+    if os.name == "posix":
+        return _posix_queue_owner_is_alive(pid)
+    raise DeliveryError("HUMAN_REQUIRED: unsupported platform for queue owner liveness")
 
 
 def _recover_stale_queue_claim(claim_path: Path) -> bool:

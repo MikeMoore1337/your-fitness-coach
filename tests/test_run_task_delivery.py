@@ -502,6 +502,36 @@ def test_queue_owner_liveness_uses_non_destructive_windows_probe(
     assert observed == [424242]
 
 
+def test_queue_owner_identity_supports_macos_without_proc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, Any]]] = []
+
+    def fake_run(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        calls.append((args, kwargs))
+        if args[0] == "ps":
+            return subprocess.CompletedProcess(
+                args, 0, stdout="Wed Sep  9 10:00:00 2026\n", stderr=""
+            )
+        assert args == ["sysctl", "-n", "kern.boottime"]
+        return subprocess.CompletedProcess(args, 0, stdout="{ sec = 123, usec = 456 }\n", stderr="")
+
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "darwin")
+    monkeypatch.setattr(delivery.subprocess, "run", fake_run)
+
+    assert delivery._queue_owner_process_instance(424242) == {
+        "kind": "macos",
+        "boot_time": "{ sec = 123, usec = 456 }",
+        "start_time": "Wed Sep 9 10:00:00 2026",
+    }
+    assert [call[0] for call in calls] == [
+        ["ps", "-p", "424242", "-o", "lstart="],
+        ["sysctl", "-n", "kern.boottime"],
+    ]
+    assert all(call[1]["shell"] is False and call[1]["timeout"] == 5 for call in calls)
+
+
 def test_queue_rejects_batch_larger_than_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: ({"state": "open"}, []))
     with pytest.raises(delivery.DeliveryError, match="between 1 and 4"):
