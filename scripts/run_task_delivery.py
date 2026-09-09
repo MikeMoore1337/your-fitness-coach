@@ -694,7 +694,6 @@ def _queue_candidates() -> list[dict[str, Any]]:
     order = _read_task_order(root)
     task_roots = (
         tasks_root,
-        root / "codex-backlog" / "bugs" / "pending",
         root / "codex-backlog" / "telegram-core-release-backlog" / "tasks",
     )
     documents = []
@@ -1264,21 +1263,32 @@ def _deliver_one(
             )
         raise
     if status_issue is not None:
-        _post_control_state(
-            status_issue,
-            control_state_payload(
-                task_id=task_id,
-                state="production_verified",
-                issue_number=status_issue,
-                branch=started["lease"]["branch"],
-                pr_number=history.get("pr_number"),
-                head_sha=history.get("deployed_sha"),
-                terminal_verdict="production_success",
-                review_fix_cycles=(budget_report or {}).get("review_fix_cycles", 0),
-                ci_fix_cycles=(budget_report or {}).get("ci_fix_cycles", 0),
-                scope_expansions=(budget_report or {}).get("scope_expansions", 0),
-            ),
-        )
+        try:
+            _post_control_state(
+                status_issue,
+                control_state_payload(
+                    task_id=task_id,
+                    state="production_verified",
+                    issue_number=status_issue,
+                    branch=started["lease"]["branch"],
+                    pr_number=history.get("pr_number"),
+                    head_sha=history.get("deployed_sha"),
+                    terminal_verdict="production_success",
+                    review_fix_cycles=(budget_report or {}).get("review_fix_cycles", 0),
+                    ci_fix_cycles=(budget_report or {}).get("ci_fix_cycles", 0),
+                    scope_expansions=(budget_report or {}).get("scope_expansions", 0),
+                ),
+            )
+        except DeliveryError as error:
+            if control_issue is not None:
+                _post_queue_stop(
+                    control_issue,
+                    task_id=task_id,
+                    status_issue=status_issue,
+                    branch=started["lease"]["branch"],
+                    blocker=str(error),
+                )
+            raise
     _event(
         "DONE",
         task_id=task_id,

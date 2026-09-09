@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -223,6 +224,68 @@ def test_task_issue_inventory_authenticates_before_parsing_or_duplicate_detectio
     contracts = delivery._task_issue_contracts()
 
     assert contracts["91"]["issue_number"] == 902
+
+
+def test_queue_candidates_excludes_pending_bug_documents(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    bugs_root = tmp_path / "codex-backlog" / "bugs" / "pending"
+    tasks_root.mkdir(parents=True)
+    bugs_root.mkdir(parents=True)
+    (tasks_root / "1-product-task.md").write_text("product", encoding="utf-8")
+    (bugs_root / "2-pending-bug.md").write_text("bug", encoding="utf-8")
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return []
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return set()
+
+    documents_seen: list[str] = []
+
+    def fake_find_task_document(root: Path, task_id: str) -> SimpleNamespace:
+        documents_seen.append(task_id)
+        return SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug=f"task-{task_id}",
+            path=root / "codex-backlog" / "tasks" / f"{task_id}-product-task.md",
+        )
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(delivery, "find_task_document", fake_find_task_document)
+    monkeypatch.setattr(
+        delivery,
+        "_task_issue_contracts",
+        lambda: {
+            "1": {
+                "task_id": "1",
+                "issue_number": 101,
+                "issue_state": "open",
+                "latest_control_state": {"state": "queued"},
+                "dependencies": [],
+                "risk_lane": "GREEN",
+                "owner_gate": "none",
+            }
+        },
+    )
+
+    candidates = delivery._queue_candidates()
+
+    assert documents_seen == ["1"]
+    assert [candidate["task_id"] for candidate in candidates] == ["1"]
 
 
 def test_queue_parser_requires_control_issue_and_bounds_batch() -> None:
@@ -777,6 +840,77 @@ def test_continuous_worker_exit_after_finish_posts_central_queue_stop(
         )
     ]
     assert status_updates[-1][0][1]["state"] == "blocked"
+
+
+def test_terminal_state_publication_failure_posts_central_queue_stop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    started = {
+        "lease": {
+            "branch": "task/91-synthetic-task",
+            "worktree": str(tmp_path / "worktree"),
+        }
+    }
+    history = {
+        "state": "finished",
+        "pr_number": 223,
+        "deployed_sha": "a" * 40,
+    }
+    queue_stops: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    status_updates: list[dict[str, Any]] = []
+
+    monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
+    monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(delivery, "_history", lambda task_id: history)
+    monkeypatch.setattr(delivery, "_queue_budget_from_controller_history", lambda history: {})
+    monkeypatch.setattr(delivery, "_queue_budget_from_worker", lambda artifacts: {})
+    monkeypatch.setattr(delivery, "_verify_closeout", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        delivery,
+        "_cleanup_delivery_artifacts",
+        lambda *args, **kwargs: {"status": "completed"},
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_post_queue_stop",
+        lambda *args, **kwargs: queue_stops.append((args, kwargs)),
+    )
+
+    def fail_terminal_state(issue: int, payload: dict[str, Any]) -> None:
+        del issue
+        status_updates.append(payload)
+        if payload["state"] == "production_verified":
+            raise delivery.DeliveryError("terminal state publication failed")
+
+    monkeypatch.setattr(delivery, "_post_control_state", fail_terminal_state)
+
+    with pytest.raises(delivery.DeliveryError, match="terminal state publication failed"):
+        delivery._deliver_one(
+            "91",
+            session_label="test",
+            poll_seconds=10,
+            max_wait_minutes=1,
+            offline=False,
+            control_issue=218,
+            state_issue=219,
+            issue_contract={"dependencies": []},
+        )
+
+    assert status_updates[-1]["state"] == "production_verified"
+    assert queue_stops == [
+        (
+            (218,),
+            {
+                "task_id": "91",
+                "status_issue": 219,
+                "branch": "task/91-synthetic-task",
+                "blocker": "terminal state publication failed",
+            },
+        )
+    ]
 
 
 def test_control_state_post_rejects_invalid_remote_transition(

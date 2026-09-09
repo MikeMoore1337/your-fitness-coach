@@ -559,11 +559,38 @@ def test_review_contract_accepts_exact_codex_comment_and_resolved_threads() -> N
         },
     ]
     result = task_session.validate_pull_request_review_contract(
-        _review_pr(head_sha), [], comments, [{"isResolved": True}]
+        _review_pr(head_sha),
+        [],
+        comments,
+        [{"isResolved": True}],
+        known_commit_shas=(head_sha,),
     )
     assert result["status"] == "PASS"
     assert result["sources"] == ["codex-completed-review-comment"]
     assert result["head_sha"] == head_sha
+
+
+def test_review_contract_rejects_ambiguous_abbreviated_codex_marker() -> None:
+    head_sha = "abcdef0" + "1" * 33
+    other_sha = "abcdef0" + "2" * 33
+    comments = [
+        {
+            "id": 14,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                f"Codex Review: Didn't find any major issues. **Reviewed commit:** `{head_sha[:7]}`"
+            ),
+        }
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="stale review markers"):
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha),
+            [],
+            comments,
+            [],
+            known_commit_shas=(head_sha, other_sha),
+        )
 
 
 def test_review_contract_rejects_exact_codex_summary_without_approval() -> None:
@@ -666,6 +693,7 @@ def test_review_event_accepts_exact_review_before_aggregate_check_is_green(
         [],
         comments,
         [],
+        known_commit_shas=(head_sha,),
         allow_blocked_mergeable_state=True,
     )
     assert result["status"] == "PASS"

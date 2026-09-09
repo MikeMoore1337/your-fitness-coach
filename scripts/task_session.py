@@ -824,6 +824,15 @@ def reviewed_commit_markers(body: str) -> tuple[str, ...]:
     return tuple(match.group(1).lower() for match in REVIEWED_COMMIT_RE.finditer(body))
 
 
+def _commit_shas(commits: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
+    return tuple(
+        sha
+        for item in commits
+        if (sha := str(item.get("sha") or item.get("oid") or "").strip().lower())
+        and re.fullmatch(r"[0-9a-f]{40}", sha)
+    )
+
+
 def _review_login(item: Mapping[str, Any]) -> str:
     for key in ("user", "author"):
         value = item.get(key)
@@ -834,9 +843,26 @@ def _review_login(item: Mapping[str, Any]) -> str:
     return ""
 
 
-def _marker_matches_head(marker: str, head_sha: str) -> bool:
+def _marker_matches_head(
+    marker: str,
+    head_sha: str,
+    *,
+    known_commit_shas: Sequence[str] | None = None,
+) -> bool:
     normalized = marker.strip().lower()
-    return len(normalized) >= 7 and head_sha.lower().startswith(normalized)
+    normalized_head = head_sha.strip().lower()
+    if len(normalized) == 40:
+        return normalized == normalized_head
+    if len(normalized) < 7 or not normalized_head.startswith(normalized):
+        return False
+    matching_shas = {
+        candidate
+        for raw_candidate in known_commit_shas or ()
+        if (candidate := str(raw_candidate).strip().lower())
+        and re.fullmatch(r"[0-9a-f]{40}", candidate)
+        and candidate.startswith(normalized)
+    }
+    return matching_shas == {normalized_head}
 
 
 def _review_body(item: Mapping[str, Any]) -> str:
@@ -852,7 +878,10 @@ def _is_approving_codex_review(body: str) -> bool:
 
 
 def _effective_current_head_reviews(
-    reviews: Sequence[Mapping[str, Any]], head_sha: str
+    reviews: Sequence[Mapping[str, Any]],
+    head_sha: str,
+    *,
+    known_commit_shas: Sequence[str] | None = None,
 ) -> list[Mapping[str, Any]]:
     """Keep the latest state-changing review from each reviewer for this exact head."""
 
@@ -860,7 +889,7 @@ def _effective_current_head_reviews(
     state_changers = {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}
     for index, review in enumerate(reviews):
         review_head = str(review.get("commit_id", review.get("commitId", "")))
-        if not _marker_matches_head(review_head, head_sha):
+        if not _marker_matches_head(review_head, head_sha, known_commit_shas=known_commit_shas):
             continue
         state = str(review.get("state", "")).upper()
         if state not in state_changers:
@@ -892,6 +921,7 @@ def validate_pull_request_review_contract(
     review_threads: Sequence[Mapping[str, Any]],
     *,
     expected_head_sha: str | None = None,
+    known_commit_shas: Sequence[str] | None = None,
     require_open: bool = True,
     require_mergeable: bool = True,
     allow_blocked_mergeable_state: bool = False,
@@ -900,8 +930,10 @@ def validate_pull_request_review_contract(
 
     GitHub formal approvals are authoritative when their ``commit_id`` is the current head.
     The Codex connector currently records its completed review as a trusted issue comment, so
-    that representation is accepted only with an explicit exact-head marker.  Skipped bot
-    comments, old-head reviews, unresolved threads and non-mergeable PRs never satisfy this gate.
+    that representation is accepted only with an exact-head marker.  Abbreviated markers are
+    accepted only when they resolve uniquely to the current head among the supplied PR commit
+    SHAs.  Skipped bot comments, old-head reviews, unresolved threads and non-mergeable PRs never
+    satisfy this gate.
     """
 
     head = pull_request.get("head", {})
@@ -944,7 +976,9 @@ def validate_pull_request_review_contract(
             + ", ".join(str(item) for item in unresolved_threads)
         )
 
-    effective_reviews = _effective_current_head_reviews(reviews, head_sha)
+    effective_reviews = _effective_current_head_reviews(
+        reviews, head_sha, known_commit_shas=known_commit_shas
+    )
     exact_approvals = [
         item for item in effective_reviews if str(item.get("state", "")).upper() == "APPROVED"
     ]
@@ -989,7 +1023,10 @@ def validate_pull_request_review_contract(
         markers = reviewed_commit_markers(body)
         if not markers:
             continue
-        exact_head = any(_marker_matches_head(marker, head_sha) for marker in markers)
+        exact_head = any(
+            _marker_matches_head(marker, head_sha, known_commit_shas=known_commit_shas)
+            for marker in markers
+        )
         completed = any(marker in lowered for marker in REVIEW_COMPLETED_MARKERS)
         if exact_head and completed:
             timestamp = str(
@@ -1238,6 +1275,7 @@ def validate_pr_review_event(
         github.issue_comments(number),
         github.review_threads(number),
         expected_head_sha=live_head_sha,
+        known_commit_shas=_commit_shas(github.pull_request_commits(number)),
         allow_blocked_mergeable_state=True,
     )
     return {"kind": "pull-request-review", "pr_number": number, **evidence}
@@ -3582,16 +3620,17 @@ class TaskController:
             )
         self._verify_live_master(deployed_sha)
         pull_request = self._github().pull_request(pr_number)
+        commits = self._github().pull_request_commits(pr_number)
         review_contract = validate_pull_request_review_contract(
             pull_request,
             self._github().pull_request_reviews(pr_number),
             self._github().issue_comments(pr_number),
             self._github().review_threads(pr_number),
             expected_head_sha=str(pull_request.get("head", {}).get("sha", "")),
+            known_commit_shas=_commit_shas(commits),
             require_open=False,
             require_mergeable=False,
         )
-        commits = self._github().pull_request_commits(pr_number)
         checks = self._github().check_runs(str(pull_request["head"]["sha"]))
         files = self._github().pull_request_files(pr_number)
         worktree = Path(str(lease.get("worktree", ""))).resolve()
@@ -4131,12 +4170,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             else:
                 pull_request = github.pull_request(args.pr)
+                commits = github.pull_request_commits(args.pr)
                 evidence = validate_pull_request_review_contract(
                     pull_request,
                     github.pull_request_reviews(args.pr),
                     github.issue_comments(args.pr),
                     github.review_threads(args.pr),
                     expected_head_sha=args.head_sha,
+                    known_commit_shas=_commit_shas(commits),
                 )
                 _print({"kind": "pull-request-review", "pr_number": args.pr, **evidence})
             return 0
