@@ -398,7 +398,9 @@ def queue_authorization(
         created_at = str(comment.get("created_at") or comment.get("createdAt") or "")
         try:
             comment_id = int(comment.get("id", 0))
-        except TypeError, ValueError:
+        except TypeError:
+            comment_id = 0
+        except ValueError:
             comment_id = 0
         for token in (CONTINUE_QUEUE_TOKEN, *sorted(STOP_QUEUE_TOKENS)):
             if _standalone_token(body, token):
