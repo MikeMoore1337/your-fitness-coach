@@ -1390,6 +1390,32 @@ def _cleanup_delivery_artifacts(task_id: str, artifacts: Path) -> dict[str, Any]
     return result
 
 
+def _linux_worker_parent_death_signal(parent_pid: int) -> None:
+    """Bind a pre-exec child to its Linux supervisor and fail closed on a race."""
+
+    import ctypes
+
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        prctl = libc.prctl
+        prctl.argtypes = [
+            ctypes.c_int,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+        ]
+        prctl.restype = ctypes.c_int
+        if prctl(1, signal.SIGKILL, 0, 0, 0) != 0 or os.getppid() != parent_pid:
+            os._exit(WORKER_PARENT_LOST_EXIT_CODE)
+    except AttributeError, OSError:
+        os._exit(WORKER_PARENT_LOST_EXIT_CODE)
+
+
+def _linux_worker_preexec(parent_pid: int) -> Callable[[], None]:
+    return lambda: _linux_worker_parent_death_signal(parent_pid)
+
+
 class _WindowsWorkerJob:
     def __init__(self, close_handle: Callable[[Any], Any], handle: Any) -> None:
         self._close_handle = close_handle
@@ -1551,9 +1577,11 @@ def _run_worker_supervisor(
         "stderr": subprocess.STDOUT,
     }
     if os.name == "nt":
-        launch_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        launch_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     else:
         launch_kwargs["start_new_session"] = True
+        if sys.platform == "linux":
+            launch_kwargs["preexec_fn"] = _linux_worker_preexec(os.getpid())
     try:
         process = popen(list(command), **launch_kwargs)
     except OSError as error:
@@ -1664,9 +1692,11 @@ def _launch_worker(
             "env": worker_env,
         }
         if os.name == "nt":
-            launch_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            launch_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         else:
             launch_kwargs["start_new_session"] = True
+            if sys.platform == "linux":
+                launch_kwargs["preexec_fn"] = _linux_worker_preexec(os.getpid())
         completed = subprocess.run(
             supervisor_command,
             **launch_kwargs,

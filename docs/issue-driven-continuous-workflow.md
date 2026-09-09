@@ -58,6 +58,11 @@ macOS — bounded probes системного времени запуска пр
 считается достаточным, поэтому повторно выданный PID после crash или reboot не блокирует очередь.
 Codex worker запускается через отдельный supervisor, который также проверяет exact parent
 identity и при потере launcher завершает worker process group до возврата orphaned lock в очередь.
+На Linux child Codex получает `PR_SET_PDEATHSIG=SIGKILL` до `exec` и проверяет PID supervisor
+после установки сигнала: смерть supervisor прекращает сам Codex даже при SIGKILL/OOM, а race
+при установке binding завершается fail-closed. На POSIX intentional parent-loss по-прежнему
+завершает отдельную worker process group; если авария оставляет descendant вне этой границы,
+durable active claim не позволяет новому launcher reclaim queue до reconciliation.
 На Windows supervisor помещает worker и его дочерние процессы в Job Object с
 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, поэтому потеря launcher не оставляет дочерний Codex
 процесс вне termination boundary.

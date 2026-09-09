@@ -82,6 +82,8 @@ def test_worker_launch_passes_active_delivery_artifacts_to_child(
     command_index = observed["args"].index("--worker-command")
     assert observed["args"][command_index + 1 : command_index + 3] == ["codex", "exec"]
     assert observed["kwargs"]["shell"] is False
+    if delivery.os.name != "nt" and delivery.sys.platform == "linux":
+        assert callable(observed["kwargs"]["preexec_fn"])
 
 
 class _FakeSupervisedWorker:
@@ -125,18 +127,28 @@ class _FakeWindowsWorkerJob:
 def test_worker_supervisor_terminates_codex_when_parent_instance_is_lost(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "linux")
     process = _FakeSupervisedWorker()
     observed: dict[str, Any] = {}
+    killpg_calls: list[tuple[int, int]] = []
+
+    def fake_killpg(process_group_id: int, signal_number: int) -> None:
+        killpg_calls.append((process_group_id, signal_number))
+        process.returncode = -signal_number
 
     def fake_popen(command: list[str], **kwargs: Any) -> _FakeSupervisedWorker:
         observed["command"] = command
         observed["kwargs"] = kwargs
         return process
 
+    monkeypatch.setattr(delivery.os, "getpgid", lambda pid: 1700, raising=False)
+    monkeypatch.setattr(delivery.os, "killpg", fake_killpg, raising=False)
+
     result = delivery._run_worker_supervisor(
         ["codex", "exec"],
         parent_pid=42,
-        parent_identity={"kind": "windows", "creation_time_100ns": "123"},
+        parent_identity=_claim_process_instance(),
         popen=fake_popen,
         owner_probe=lambda pid, identity: False,
         sleeper=lambda seconds: pytest.fail("parent loss must terminate without polling sleep"),
@@ -144,9 +156,12 @@ def test_worker_supervisor_terminates_codex_when_parent_instance_is_lost(
     )
 
     assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
-    assert process.terminated is True
+    assert process.terminated is False
+    assert killpg_calls == [(1700, delivery.signal.SIGTERM)]
     assert observed["command"] == ["codex", "exec"]
     assert observed["kwargs"]["shell"] is False
+    assert observed["kwargs"]["start_new_session"] is True
+    assert callable(observed["kwargs"]["preexec_fn"])
 
 
 def test_worker_supervisor_returns_codex_exit_code_when_parent_stays_alive() -> None:
@@ -174,12 +189,18 @@ def test_worker_supervisor_uses_windows_job_for_process_tree_termination(
     monkeypatch.setattr(delivery.os, "name", "nt")
     process = _FakeSupervisedWorker()
     job = _FakeWindowsWorkerJob(process)
+    observed: dict[str, Any] = {}
+
+    def fake_popen(command: list[str], **kwargs: Any) -> _FakeSupervisedWorker:
+        observed["command"] = command
+        observed["kwargs"] = kwargs
+        return process
 
     result = delivery._run_worker_supervisor(
         ["codex", "exec"],
         parent_pid=42,
         parent_identity={"kind": "windows", "creation_time_100ns": "123"},
-        popen=lambda command, **kwargs: process,
+        popen=fake_popen,
         owner_probe=lambda pid, identity: False,
         sleeper=lambda seconds: pytest.fail("parent loss must terminate without polling sleep"),
         job_factory=lambda worker: job,
@@ -188,6 +209,78 @@ def test_worker_supervisor_uses_windows_job_for_process_tree_termination(
     assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
     assert job.closed is True
     assert process.terminated is False
+    assert observed["kwargs"]["creationflags"] == getattr(
+        delivery.subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+    )
+
+
+def test_linux_worker_supervisor_binds_codex_to_supervisor_lifetime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "linux")
+    process = _FakeSupervisedWorker(exit_after_polls=0)
+    observed: dict[str, Any] = {}
+    bound_parent_pids: list[int] = []
+    supervisor_pid = delivery.os.getpid()
+
+    def fake_popen(command: list[str], **kwargs: Any) -> _FakeSupervisedWorker:
+        observed["command"] = command
+        observed["kwargs"] = kwargs
+        return process
+
+    monkeypatch.setattr(
+        delivery,
+        "_linux_worker_parent_death_signal",
+        lambda parent_pid: bound_parent_pids.append(parent_pid),
+    )
+
+    result = delivery._run_worker_supervisor(
+        ["codex", "exec"],
+        parent_pid=42,
+        parent_identity=_claim_process_instance(),
+        popen=fake_popen,
+        owner_probe=lambda pid, identity: True,
+        sleeper=lambda seconds: pytest.fail("already exited worker must not sleep"),
+    )
+
+    assert result == 0
+    preexec_fn = observed["kwargs"]["preexec_fn"]
+    assert callable(preexec_fn)
+    preexec_fn()
+    assert bound_parent_pids == [supervisor_pid]
+
+
+def test_linux_worker_parent_death_binding_fails_closed_on_parent_race(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import ctypes
+
+    calls: list[tuple[int, int]] = []
+    exits: list[int] = []
+    linux_sigkill = getattr(delivery.signal, "SIGKILL", 9)
+
+    class _FakePrctl:
+        argtypes: list[Any] | None = None
+        restype: Any = None
+
+        def __call__(self, option: int, death_signal: int, *args: int) -> int:
+            del args
+            calls.append((option, death_signal))
+            return 0
+
+    class _FakeLibc:
+        prctl = _FakePrctl()
+
+    monkeypatch.setattr(ctypes, "CDLL", lambda *args, **kwargs: _FakeLibc())
+    monkeypatch.setattr(delivery.os, "getppid", lambda: 99)
+    monkeypatch.setattr(delivery.os, "_exit", exits.append)
+    monkeypatch.setattr(delivery.signal, "SIGKILL", linux_sigkill, raising=False)
+
+    delivery._linux_worker_parent_death_signal(42)
+
+    assert calls == [(1, linux_sigkill)]
+    assert exits == [delivery.WORKER_PARENT_LOST_EXIT_CODE]
 
 
 def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
