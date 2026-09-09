@@ -820,10 +820,12 @@ def _effective_current_head_reviews(
             or review.get("createdAt")
             or ""
         )
+        # fmt: off
         try:
             review_id = int(review.get("id", index))
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             review_id = index
+        # fmt: on
         previous = effective.get(reviewer)
         if previous is None or (timestamp, review_id) >= (previous[0], previous[1]):
             effective[reviewer] = (timestamp, review_id, review)
