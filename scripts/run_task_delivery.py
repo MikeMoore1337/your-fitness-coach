@@ -14,10 +14,11 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -81,6 +82,9 @@ TASK_ID_RE = re.compile(r"^[0-9]+[A-Z]?$", re.IGNORECASE)
 TRANSIENT_START_MARKERS = ("coordination state is locked",)
 TASK_FILE_RE = re.compile(r"^(?P<task_id>[0-9]+[A-Z]?)-.+\.md$", re.IGNORECASE)
 CONTROL_ISSUE_RE = re.compile(r"^\[Task (?P<task_id>[0-9]+[A-Z]?)\]", re.IGNORECASE)
+WORKER_PARENT_LOST_EXIT_CODE = 125
+WORKER_SUPERVISOR_POLL_SECONDS = 0.25
+WORKER_TERMINATION_TIMEOUT_SECONDS = 5
 
 
 class DeliveryError(RuntimeError):
@@ -1243,6 +1247,99 @@ def _cleanup_delivery_artifacts(task_id: str, artifacts: Path) -> dict[str, Any]
     return result
 
 
+def _terminate_supervised_worker(process: Any) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            process.terminate()
+        else:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except OSError as error:
+        raise DeliveryError("HUMAN_REQUIRED: cannot terminate orphaned Codex worker") from error
+    try:
+        process.wait(timeout=WORKER_TERMINATION_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        try:
+            if os.name == "nt":
+                process.kill()
+            else:
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            process.wait(timeout=WORKER_TERMINATION_TIMEOUT_SECONDS)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise DeliveryError("HUMAN_REQUIRED: cannot terminate orphaned Codex worker") from error
+
+
+def _run_worker_supervisor(
+    command: Sequence[str],
+    *,
+    parent_pid: int,
+    parent_identity: Mapping[str, str],
+    popen: Callable[..., Any] = subprocess.Popen,
+    owner_probe: Callable[[int, Mapping[str, str]], bool] = _queue_owner_is_alive,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> int:
+    if parent_pid < 1 or not command:
+        raise DeliveryError("HUMAN_REQUIRED: worker supervisor received invalid process metadata")
+    launch_kwargs: dict[str, Any] = {
+        "shell": False,
+        "stdin": subprocess.DEVNULL,
+        "stderr": subprocess.STDOUT,
+    }
+    if os.name == "nt":
+        launch_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        launch_kwargs["start_new_session"] = True
+    try:
+        process = popen(list(command), **launch_kwargs)
+    except OSError as error:
+        raise DeliveryError("HUMAN_REQUIRED: cannot start Codex worker supervisor child") from error
+    try:
+        while process.poll() is None:
+            try:
+                owner_alive = owner_probe(parent_pid, parent_identity)
+            except DeliveryError:
+                _terminate_supervised_worker(process)
+                raise
+            if not owner_alive:
+                _terminate_supervised_worker(process)
+                _event("WORKER_ABORTED_PARENT_LOST", parent_pid=parent_pid)
+                return WORKER_PARENT_LOST_EXIT_CODE
+            sleeper(WORKER_SUPERVISOR_POLL_SECONDS)
+        return int(process.returncode)
+    finally:
+        if process.poll() is None:
+            _terminate_supervised_worker(process)
+
+
+def _worker_supervisor_from_args(
+    *,
+    parent_pid: int | None,
+    parent_identity_json: str | None,
+    command: Sequence[str] | None,
+) -> int:
+    if parent_pid is None or parent_identity_json is None or not command:
+        raise DeliveryError("HUMAN_REQUIRED: worker supervisor arguments are incomplete")
+    if len(parent_identity_json) > 1024:
+        raise DeliveryError("HUMAN_REQUIRED: worker supervisor process identity is too large")
+    try:
+        parent_identity_value = json.loads(parent_identity_json)
+    except json.JSONDecodeError as error:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: worker supervisor process identity is malformed"
+        ) from error
+    parent_identity = _queue_claim_process_instance(
+        parent_identity_value, Path("worker-supervisor-parent")
+    )
+    return _run_worker_supervisor(
+        command,
+        parent_pid=parent_pid,
+        parent_identity=parent_identity,
+    )
+
+
 def _launch_worker(
     task_id: str,
     started: dict[str, Any],
@@ -1258,29 +1355,50 @@ def _launch_worker(
     log_path = artifacts / "events.jsonl"
     worker_env = os.environ.copy()
     worker_env[ACTIVE_DELIVERY_ARTIFACTS_ENV] = str(artifacts.resolve())
+    parent_identity = _current_process_instance_identity()
+    worker_command = [
+        codex,
+        "exec",
+        "--approve-for-me",
+        "-s",
+        "workspace-write",
+        "-C",
+        str(worktree),
+        "--add-dir",
+        str(REPOSITORY_ROOT),
+        "--json",
+        "-o",
+        str(result_path),
+        _worker_prompt(task_id, started, issue_contract=issue_contract),
+    ]
+    supervisor_command = [
+        sys.executable,
+        str(SCRIPT_PATH),
+        "--worker-supervisor",
+        "--parent-pid",
+        str(os.getpid()),
+        "--parent-identity",
+        json.dumps(parent_identity, ensure_ascii=True, sort_keys=True),
+        "--worker-command",
+        *worker_command,
+    ]
     with log_path.open("wb") as log:
+        launch_kwargs: dict[str, Any] = {
+            "cwd": worktree,
+            "stdin": subprocess.DEVNULL,
+            "stdout": log,
+            "stderr": subprocess.STDOUT,
+            "check": False,
+            "shell": False,
+            "env": worker_env,
+        }
+        if os.name == "nt":
+            launch_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            launch_kwargs["start_new_session"] = True
         completed = subprocess.run(
-            [
-                codex,
-                "exec",
-                "--approve-for-me",
-                "-s",
-                "workspace-write",
-                "-C",
-                str(worktree),
-                "--add-dir",
-                str(REPOSITORY_ROOT),
-                "--json",
-                "-o",
-                str(result_path),
-                _worker_prompt(task_id, started, issue_contract=issue_contract),
-            ],
-            cwd=worktree,
-            stdin=subprocess.DEVNULL,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            check=False,
-            env=worker_env,
+            supervisor_command,
+            **launch_kwargs,
         )
     return completed.returncode
 
@@ -1676,12 +1794,22 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--control-issue", type=int)
     parser.add_argument("--max-tasks", type=int, default=4)
     parser.add_argument("--offline", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--worker-supervisor", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--parent-pid", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--parent-identity", help=argparse.SUPPRESS)
+    parser.add_argument("--worker-command", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.worker_supervisor:
+            return _worker_supervisor_from_args(
+                parent_pid=args.parent_pid,
+                parent_identity_json=args.parent_identity,
+                command=args.worker_command,
+            )
         if args.poll_seconds < 10:
             raise DeliveryError("poll-seconds must be at least 10")
         if args.max_wait_minutes < 1:

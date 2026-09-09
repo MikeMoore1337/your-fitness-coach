@@ -77,6 +77,83 @@ def test_worker_launch_passes_active_delivery_artifacts_to_child(
         == 0
     )
     assert observed["kwargs"]["env"]["YFC_ACTIVE_DELIVERY_ARTIFACTS"] == str(artifacts.resolve())
+    assert observed["args"][:2] == [sys.executable, str(delivery.SCRIPT_PATH)]
+    assert "--worker-supervisor" in observed["args"]
+    command_index = observed["args"].index("--worker-command")
+    assert observed["args"][command_index + 1 : command_index + 3] == ["codex", "exec"]
+    assert observed["kwargs"]["shell"] is False
+
+
+class _FakeSupervisedWorker:
+    pid = 700
+
+    def __init__(self, *, exit_after_polls: int | None = None) -> None:
+        self.returncode: int | None = None
+        self.exit_after_polls = exit_after_polls
+        self.poll_count = 0
+        self.terminated = False
+
+    def poll(self) -> int | None:
+        self.poll_count += 1
+        if (
+            self.returncode is None
+            and self.exit_after_polls is not None
+            and self.poll_count > self.exit_after_polls
+        ):
+            self.returncode = 0
+        return self.returncode
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.returncode = -15
+
+    def wait(self, *, timeout: float) -> int:
+        assert timeout == delivery.WORKER_TERMINATION_TIMEOUT_SECONDS
+        return self.returncode or 0
+
+
+def test_worker_supervisor_terminates_codex_when_parent_instance_is_lost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    process = _FakeSupervisedWorker()
+    observed: dict[str, Any] = {}
+
+    def fake_popen(command: list[str], **kwargs: Any) -> _FakeSupervisedWorker:
+        observed["command"] = command
+        observed["kwargs"] = kwargs
+        return process
+
+    result = delivery._run_worker_supervisor(
+        ["codex", "exec"],
+        parent_pid=42,
+        parent_identity={"kind": "windows", "creation_time_100ns": "123"},
+        popen=fake_popen,
+        owner_probe=lambda pid, identity: False,
+        sleeper=lambda seconds: pytest.fail("parent loss must terminate without polling sleep"),
+    )
+
+    assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
+    assert process.terminated is True
+    assert observed["command"] == ["codex", "exec"]
+    assert observed["kwargs"]["shell"] is False
+
+
+def test_worker_supervisor_returns_codex_exit_code_when_parent_stays_alive() -> None:
+    process = _FakeSupervisedWorker(exit_after_polls=1)
+    sleeps: list[float] = []
+
+    result = delivery._run_worker_supervisor(
+        ["codex", "exec"],
+        parent_pid=42,
+        parent_identity={"kind": "windows", "creation_time_100ns": "123"},
+        popen=lambda command, **kwargs: process,
+        owner_probe=lambda pid, identity: True,
+        sleeper=sleeps.append,
+    )
+
+    assert result == 0
+    assert process.terminated is False
+    assert sleeps == [delivery.WORKER_SUPERVISOR_POLL_SECONDS]
 
 
 def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
