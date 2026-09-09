@@ -144,7 +144,6 @@ class Settings(BaseSettings):
     web_push_delivery_timeout_seconds: float = Field(default=10, ge=3, le=30)
     audit_event_retention_days: int = Field(default=365, ge=90, le=3650)
     news_ingestion_enabled: bool = False
-    news_legacy_source_fetch_enabled: bool = True
     news_channel_id: int | None = None
     news_channel_username: str = ""
     news_ingestion_cycle_seconds: int = Field(default=900, ge=60, le=86400)
@@ -167,13 +166,7 @@ class Settings(BaseSettings):
     hermes_intake_clock_skew_seconds: int = Field(default=300, ge=30, le=900)
     hermes_intake_replay_ttl_seconds: int = Field(default=900, ge=60, le=86400)
     hermes_intake_rate_limit_per_minute: int = Field(default=30, ge=1, le=600)
-    news_llm_provider: Literal["disabled", "openai_compatible"] = "disabled"
-    news_llm_endpoint: str = ""
-    news_llm_api_key: str = ""
-    news_llm_model: str = ""
-    news_llm_timeout_seconds: float = Field(default=20, ge=5, le=60)
-    news_llm_prompt_version: str = "news-draft-v4"
-    # AI Coach is a separate generic-only boundary; NEWS_LLM_* must not be reused here.
+    # AI Coach is a separate generic-only boundary.
     ai_coach_enabled: bool = False
     ai_coach_kill_switch: bool = False
     # The UI is separately gated for a small internal cohort. A runtime provider
@@ -386,19 +379,6 @@ class Settings(BaseSettings):
         if username and not re.fullmatch(r"[a-z][a-z0-9_]{4,31}", username):
             raise ValueError("NEWS_CHANNEL_USERNAME is invalid")
         self.news_channel_username = username
-        if self.news_llm_provider != "disabled":
-            parsed = urlparse(self.news_llm_endpoint)
-            if (
-                parsed.scheme != "https"
-                or not parsed.hostname
-                or parsed.username
-                or parsed.password
-            ):
-                raise ValueError("NEWS_LLM_ENDPOINT must be an absolute credential-free HTTPS URL")
-            if not self.news_llm_api_key.strip() or not self.news_llm_model.strip():
-                raise ValueError(
-                    "NEWS_LLM_API_KEY and NEWS_LLM_MODEL are required for openai_compatible drafts"
-                )
         if self.news_image_provider == "cloudflare_workers_ai":
             if not self.news_image_cloudflare_account_id.strip() or not (
                 self.news_image_cloudflare_api_token.strip()

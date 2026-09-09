@@ -33,6 +33,7 @@ from fitminiapp_api.services.news_content import (
 from fitminiapp_api.services.news_freshness import source_metadata_is_fresh
 from fitminiapp_api.services.news_images import current_image
 from fitminiapp_api.services.news_ingestion import utcnow
+from fitminiapp_api.services.news_origin import is_hermes_origin_draft
 from fitminiapp_api.services.news_state import transition_news_cluster
 
 logger = logging.getLogger(__name__)
@@ -431,6 +432,8 @@ def approve_publication(
     draft = db.get(NewsDraftRevision, draft_id)
     if draft is None:
         return ApprovalResult(status="unavailable")
+    if not is_hermes_origin_draft(draft):
+        return ApprovalResult(status="unavailable")
     cluster = (
         db.query(NewsCluster).filter(NewsCluster.id == draft.cluster_id).with_for_update().first()
     )
@@ -681,7 +684,24 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
     for row in candidates:
         cluster = db.get(NewsCluster, row.cluster_id)
         draft = db.get(NewsDraftRevision, row.text_revision_id)
-        if draft is None or not source_metadata_is_fresh(
+        if draft is None or not is_hermes_origin_draft(draft):
+            row.status = "cancelled"
+            row.last_error_code = "non_hermes_news_pipeline_retired"
+            row.processing_started_at = None
+            if cluster is not None and cluster.status not in {
+                "published",
+                "rejected",
+                "rejected_by_rules",
+            }:
+                transition_news_cluster(
+                    db,
+                    cluster,
+                    "rejected",
+                    reason_code="non_hermes_news_pipeline_retired",
+                )
+            continue
+
+        if not source_metadata_is_fresh(
             draft.evidence_metadata,
             now=now,
         ):
@@ -755,6 +775,12 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
 def publication_payload(db: Session, snapshot_id: str) -> PublicationPayload | None:
     row = db.get(NewsPublicationSnapshot, snapshot_id)
     if row is None or row.status != "processing":
+        return None
+    draft = db.get(NewsDraftRevision, row.text_revision_id)
+    if draft is None or not is_hermes_origin_draft(draft):
+        row.status = "cancelled"
+        row.last_error_code = "non_hermes_news_pipeline_retired"
+        row.processing_started_at = None
         return None
     image = db.get(NewsImageRevision, row.image_revision_id) if row.image_revision_id else None
     if image is not None and image.sha256 != row.image_sha256:

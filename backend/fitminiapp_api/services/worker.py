@@ -811,7 +811,6 @@ async def run_until_stopped(
     news_publication_ready: bool,
 ) -> None:
     next_reminder_sync = 0.0
-    next_news_sync = 0.0
     last_news_review_slot_key: str | None = None
     WORKER_HEARTBEAT_PATH.touch()
     while not stop_requested.is_set():
@@ -823,7 +822,6 @@ async def run_until_stopped(
         if should_sync:
             next_reminder_sync = current + settings.reminder_sync_seconds
         if settings.news_ingestion_enabled:
-            should_fetch_news = current >= next_news_sync
             review_slot = current_news_review_slot(utcnow())
             review_delivery_due = (
                 review_slot is not None and review_slot.key != last_news_review_slot_key
@@ -834,7 +832,6 @@ async def run_until_stopped(
                     send_preview=send_telegram_preview,
                     send_publication=send_telegram_publication,
                     publication_ready=news_publication_ready,
-                    fetch_sources=should_fetch_news,
                     review_delivery_due=review_delivery_due,
                     review_slot=review_slot,
                 )
@@ -849,8 +846,6 @@ async def run_until_stopped(
             else:
                 if review_delivery_due and review_slot is not None:
                     last_news_review_slot_key = review_slot.key
-            if should_fetch_news:
-                next_news_sync = current + settings.news_ingestion_cycle_seconds
         WORKER_HEARTBEAT_PATH.touch()
         if stop_requested.is_set():
             break
@@ -884,7 +879,6 @@ async def main() -> None:
             settings.yandex_oauth_client_secret,
             settings.apple_oauth_client_secret,
             settings.database_url,
-            settings.news_llm_api_key,
             settings.news_image_cloudflare_api_token,
             settings.web_push_vapid_private_key.get_secret_value(),
         ),

@@ -2,9 +2,10 @@
 
 ## Status and ownership
 
-The canonical source of truth remains the YFC backend.  Hermes is an optional external discovery
-and drafting worker behind `POST /api/v1/hermes/editorial/intake`; it is not a publisher, source
-database, Telegram bot runtime or production shell.
+The canonical source of truth remains the YFC backend. Hermes is the only allowed origin for
+new editorial drafts and submits them through `POST /api/v1/hermes/editorial/intake`; it is not a
+publisher, Telegram bot runtime or production shell. YFC no longer contains a local source-fetch
+or local LLM/deterministic draft-generation fallback.
 
 The intake flag is off by default:
 
@@ -12,24 +13,19 @@ The intake flag is off by default:
 HERMES_INTAKE_ENABLED=false
 NEWS_AUTO_PUBLISH_LOW_RISK=false
 NEWS_INGESTION_ENABLED=false
-NEWS_LEGACY_SOURCE_FETCH_ENABLED=true
 NEWS_PUBLICATION_ENABLED=false
 ```
 
-`NEWS_LEGACY_SOURCE_FETCH_ENABLED=true` — обратно совместимое локальное значение по умолчанию. В
-production-конфигурации Hermes оно нормализуется в `false`, а `NEWS_INGESTION_ENABLED=true`
-остаётся включённым для downstream-этапов YFC. Этот флаг отключает только legacy-получение
-источников YFC и генерацию candidate-draft; intake Hermes, обработка изображений, очередь review,
-ручное редактирование/подтверждение, планирование и управление публикацией продолжают работать.
-Его нельзя реализовывать изменением `NEWS_INGESTION_ENABLED`.
+`NEWS_INGESTION_ENABLED` включает YFC downstream worker для изображений, owner review,
+планирования, публикации, retention и safety-проверок. Он больше не включает локальное
+получение источников или генерацию текста: этих production capabilities в YFC нет.
 
-При `NEWS_LEGACY_SOURCE_FETCH_ENABLED=false` в review downstream допускаются только revisions с
-canonical marker `evidence_metadata["submitted_by"] == "hermes_narrow_intake"`. Уже сохранённые
-legacy drafts и clusters не удаляются и не переводятся обратно из `deferred`; queued/processing
-legacy `NewsReviewDelivery` безопасно отменяются до Telegram send, а новые legacy delivery и
-preview upgrade не создаются. Hermes owner-edited revisions сохраняют marker и продолжают
-проходить review flow. Действие «Перегенерировать текст» для Hermes повторно ставит принятую
-immutable revision в review flow и не включает legacy candidate generation.
+В downstream допускаются только revisions с canonical marker
+`evidence_metadata["submitted_by"] == "hermes_narrow_intake"`. Активные non-Hermes leftovers
+fail-closed: owner deliveries и исполняемые publication snapshots отменяются, а активные legacy
+clusters переводятся в terminal quarantine. Уже опубликованная история остаётся читаемой.
+Hermes owner-edited revisions сохраняют marker. Действие «Перегенерировать текст» повторно
+ставит принятую immutable Hermes revision в review flow и не создаёт локальный candidate/draft.
 
 Для editorial intake действует rolling-окно свежести в 60 дней: границы включаются, будущие и
 неизвестные даты отклоняются. Это product/discovery heuristic, а не медицинская норма. Owner-
@@ -52,12 +48,14 @@ publication-quality warnings `unsupported_number` и `telegram_photo_caption_too
 
 ```text
 NEWS_INGESTION_ENABLED=true
-NEWS_LEGACY_SOURCE_FETCH_ENABLED=false
 NEWS_AUTO_PUBLISH_LOW_RISK=false
 ```
 
-`NEWS_INGESTION_ENABLED` поддерживает downstream-обработку; `NEWS_PUBLICATION_ENABLED` и
-остальные существующие `NEWS_*` flags не меняются этим follow-up.
+`NEWS_INGESTION_ENABLED` поддерживает только downstream-обработку Hermes-origin material.
+Отдельного legacy enable/disable switch больше нет. Старое значение
+`NEWS_LEGACY_SOURCE_FETCH_ENABLED` в stale `.env` игнорируется settings-моделью и не способно
+включить source fetching или local draft generation. `NEWS_PUBLICATION_ENABLED` и остальные
+downstream safety flags сохраняют свои существующие контракты.
 
 Telegram Bot API polling continues to have one owner.  No second polling process, bot token,
 channel id or BotFather change is introduced by this task.
@@ -391,13 +389,14 @@ account до owner verification не считаются подтверждённ
 
 Kill switch — `HERMES_INTAKE_ENABLED=false`; keep it off until Gate A. The existing production
 `NEWS_INGESTION_ENABLED` and `NEWS_PUBLICATION_ENABLED` values are not changed by this integration,
-and `NEWS_AUTO_PUBLISH_LOW_RISK=false` remains required. Production задаёт
-`NEWS_LEGACY_SOURCE_FETCH_ENABLED=false` через штатный deployment normalizer; rollback этого
-ограниченного изменения флага восстанавливает прежнее значение окружения только через
-owner-approved release. Rollback — это остановка/удаление
-the separate worker workload, revoke only its approved intake/provider identities, remove its
-egress rules, and return to the existing YFC manual/editorial path. Existing news pipeline flags
-and publisher ownership are not rollback targets. Any later production rollback must use the
+and `NEWS_AUTO_PUBLISH_LOW_RISK=false` remains required. There is no legacy source-fetch
+deployment normalizer or rollback flag anymore. A stale `NEWS_LEGACY_SOURCE_FETCH_ENABLED` entry
+has no application setting or executable path behind it. Restoring YFC-local acquisition or draft
+generation requires a new source-code change, review, CI and production release.
+
+Rollback of the separate Hermes workload means stopping/removing that workload and revoking its
+approved intake/provider identities. It does not restore a YFC-local news generator. Existing
+downstream publisher ownership and safety flags are not rollback targets. Any later production rollback must use the
 previously verified immutable application/image SHA and the normal release procedure; no blind
 migration downgrade is permitted.
 

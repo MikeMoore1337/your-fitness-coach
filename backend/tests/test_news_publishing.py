@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import io
+import secrets
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
@@ -24,12 +25,16 @@ from fitminiapp_api.models.news import (
     NewsReviewDelivery,
     NewsSource,
 )
-from fitminiapp_api.services import news_images, news_publication, news_worker
+from fitminiapp_api.services import news_images, news_publication
 from fitminiapp_api.services.news_content import (
     EditorialContent,
     parse_editorial_content,
 )
-from fitminiapp_api.services.news_drafts import create_draft_revision
+from fitminiapp_api.services.news_drafts import (
+    _validated_fields,
+    evidence_packet,
+    render_draft,
+)
 from fitminiapp_api.services.news_editorial import (
     compose_review_artifact,
     edit_text_revision,
@@ -49,6 +54,7 @@ from fitminiapp_api.services.news_ingestion import (
     ingest_items,
     utcnow,
 )
+from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER
 from fitminiapp_api.services.news_post_management import manage_published_post
 from fitminiapp_api.services.news_publication import (
     ARTIFACT_HASH_PREFIX_LENGTH,
@@ -61,6 +67,7 @@ from fitminiapp_api.services.news_publication import (
     retry_uncertain_publication,
 )
 from fitminiapp_api.services.news_review_schedule import current_news_review_slot
+from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.news_sources import (
     apply_source_allowlist,
     parse_source_allowlist,
@@ -75,6 +82,77 @@ from fitminiapp_api.services.worker import (
     check_news_channel_rights,
     send_telegram_publication,
 )
+
+
+
+# Test-only stand-in for the state produced by the signed Hermes intake.
+# The production YFC-local create_draft_revision capability is intentionally retired.
+async def create_draft_revision(db, cluster, *, client=None) -> NewsDraftRevision:
+    del client
+
+    packet = evidence_packet(db, cluster)
+    fields = _validated_fields(
+        {
+            "headline": "Исследование тренировок: результаты для изученной группы",
+            "summary": (
+                "Авторы описали результаты исследования тренировок "
+                "и ограничения их интерпретации."
+            ),
+            "why_it_matters": (
+                "Материал помогает оценивать применимость результатов на практике."
+            ),
+        }
+    )
+    revision = cluster.latest_draft_revision + 1
+    draft = NewsDraftRevision(
+        id=secrets.token_hex(16),
+        cluster_id=cluster.id,
+        primary_item_id=packet.primary_item_id,
+        revision=revision,
+        provider="groq-free-candidate",
+        model="test-hermes-model",
+        prompt_version="test-hermes-editorial-v1",
+        source_digest=packet.source_digest,
+        evidence_item_ids=list(packet.evidence_item_ids),
+        evidence_metadata={
+            "topic": packet.topic,
+            "score": packet.score,
+            "score_version": cluster.score_version,
+            "score_reasons": list(packet.score_reasons[:10]),
+            "risk_flags": list(packet.risk_flags[:10]),
+            "conflict_notes": list(cluster.conflict_notes[:10]),
+            "supporting_source_count": len(packet.supporting_sources),
+            "source_published_at": (
+                packet.published_at.isoformat()
+                if packet.published_at is not None
+                else None
+            ),
+            "source_publisher": packet.publisher or packet.source_name,
+            "image_context_headline": packet.title[:180],
+            "editorial_contract_version": "news-editorial-v2",
+            "editorial_fields": dict(fields),
+            "trusted_source_url": packet.primary_url or packet.canonical_url,
+            "publication_policy": "manual_required",
+            "submitted_by": HERMES_SUBMISSION_MARKER,
+        },
+        draft_text=render_draft(fields, packet),
+        warnings=[],
+        generation_latency_ms=0,
+    )
+    db.add(draft)
+
+    cluster.latest_draft_revision = revision
+    cluster.current_image_revision = 0
+    cluster.generation_attempt_count += 1
+
+    transition_news_cluster(
+        db,
+        cluster,
+        "image_pending",
+        reason_code="test_hermes_draft_received",
+    )
+    db.flush()
+    return draft
 
 
 def _source_and_candidate(*, external_id: str = "publication-1") -> str:
@@ -722,7 +800,7 @@ def test_exact_approval_is_idempotent_and_edit_revokes_schedule(monkeypatch) -> 
             expected_image_revision=image_revision,
             admin_telegram_user_id=7001,
             draft_text=draft.draft_text.replace(
-                "Новый материал о фитнесе и тренировках требует редакторской проверки",
+                "Исследование тренировок: результаты для изученной группы",
                 "Проверенный материал о фитнесе и тренировках",
             ),
         )
@@ -1233,129 +1311,6 @@ def test_private_preview_matches_exact_artifact_and_retry_does_not_duplicate_it(
         assert event.details["control_message_id"] == 202
 
 
-def test_successful_pipeline_fetches_scores_drafts_and_delivers_for_approval(
-    monkeypatch,
-) -> None:
-    definitions = parse_source_allowlist(
-        [
-            {
-                "id": "pipeline-journal",
-                "name": "Pipeline Journal",
-                "type": "primary_research",
-                "fetch_kind": "rss",
-                "url": "https://pipeline-journal.example/feed",
-                "language": "en",
-                "enabled": True,
-                "fetch_interval_minutes": 60,
-                "trust_notes": "Primary publisher",
-                "licensing_notes": "Metadata and short excerpt only",
-            }
-        ]
-    )
-    with get_session_context() as db:
-        apply_source_allowlist(db, definitions)
-
-    async def fetch(_self, _source):
-        return SourceFetchResult(
-            status="fetched",
-            items=(
-                ParsedNewsItem(
-                    external_id="pipeline-study-1",
-                    canonical_url="https://pipeline-journal.example/pipeline-study-1",
-                    primary_url="https://pipeline-journal.example/pipeline-study-1",
-                    title="Resistance training improved measured strength in adults",
-                    summary=(
-                        "A randomized controlled exercise study measured strength and "
-                        "muscle recovery outcomes."
-                    ),
-                    publisher="Pipeline Journal",
-                    published_at=utcnow(),
-                    doi="10.1000/pipeline.1",
-                ),
-            ),
-        )
-
-    monkeypatch.setattr(SafeNewsFetcher, "fetch", fetch)
-    monkeypatch.setattr(settings, "news_llm_provider", "disabled")
-    monkeypatch.setattr(settings, "news_image_provider", "disabled")
-    monkeypatch.setattr(settings, "news_daily_draft_limit", 3)
-    monkeypatch.setattr(settings, "news_publication_enabled", True)
-    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
-    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
-    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
-    preview_calls: list[dict[str, object]] = []
-    control_calls: list[dict[str, object]] = []
-
-    async def send_preview(
-        _client,
-        chat_id,
-        text,
-        image_data,
-        *,
-        parse_mode,
-        link_preview_disabled,
-    ):
-        preview_calls.append(
-            {
-                "chat_id": chat_id,
-                "text": text,
-                "image_data": image_data,
-                "parse_mode": parse_mode,
-                "link_preview_disabled": link_preview_disabled,
-            }
-        )
-        return SimpleNamespace(message_id=301, message_date=utcnow())
-
-    async def send_control(_client, chat_id, text, *, reply_markup):
-        control_calls.append(
-            {
-                "chat_id": chat_id,
-                "text": text,
-                "reply_markup": reply_markup,
-            }
-        )
-        return 302
-
-    async def unexpected_publication(*_args, **_kwargs):
-        raise AssertionError("approval pipeline must not publish without an owner action")
-
-    stats = asyncio.run(
-        run_news_pipeline_once(
-            send_message=send_control,
-            send_preview=send_preview,
-            send_publication=unexpected_publication,
-            publication_ready=True,
-            fetch_sources=True,
-        )
-    )
-
-    assert stats == NewsCycleStats(
-        sources_total=1,
-        sources_checked=1,
-        sources_success=1,
-        candidates_fetched=1,
-        candidates_new=1,
-        candidates_eligible=1,
-        drafts_created=1,
-    )
-    assert len(preview_calls) == 1
-    assert preview_calls[0]["chat_id"] == 7001
-    assert len(control_calls) == 1
-    assert control_calls[0]["chat_id"] == 7001
-    with get_session_context() as db:
-        draft = db.query(NewsDraftRevision).one()
-        delivery = db.query(NewsReviewDelivery).one()
-        cluster = db.query(NewsCluster).one()
-        assert draft.provider == "deterministic"
-        assert delivery.status == "sent"
-        assert delivery.telegram_message_id == 301
-        assert cluster.status == "awaiting_review"
-        assert db.query(NewsPublicationSnapshot).count() == 0
-        event = db.query(AuditEvent).filter_by(action="news.preview_created").one()
-        assert event.details["preview_message_id"] == 301
-        assert event.details["control_message_id"] == 302
-
-
 def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatch) -> None:
     definitions = parse_source_allowlist(
         [
@@ -1417,7 +1372,6 @@ def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatc
             asyncio.run(create_image_revision(db, cluster, draft, client=None))
         assert enqueue_review_deliveries(db, {7001}) == len(titles)
 
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
@@ -1468,7 +1422,6 @@ def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatc
 def test_sensitive_hermes_warning_reaches_owner_card_but_not_publish_button(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="hermes-sensitive-card")
     draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
@@ -1518,176 +1471,9 @@ def test_sensitive_hermes_warning_reaches_owner_card_but_not_publish_button(monk
         assert db.query(NewsReviewDelivery).one().status == "sent"
 
 
-def test_legacy_source_fetch_flag_preserves_downstream_pipeline(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "news_ingestion_enabled", True)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
-    calls: list[str] = []
-
-    async def unexpected_fetch(_client):
-        raise AssertionError("legacy source fetching must be disabled")
-
-    async def unexpected_candidate_generation(*_args, **_kwargs):
-        raise AssertionError("legacy candidate draft generation must be disabled")
-
-    async def publish(_client, _send_publication, _send_message):
-        calls.append("publish")
-        return 1
-
-    async def generate_images(_client):
-        calls.append("images")
-        return 0
-
-    def enqueue(_db, _admin_telegram_user_ids):
-        calls.append("enqueue")
-        return 0
-
-    async def deliver(*_args, **_kwargs):
-        calls.append("deliver")
-        return 0
-
-    monkeypatch.setattr(news_worker, "fetch_due_sources", unexpected_fetch)
-    monkeypatch.setattr(news_worker, "generate_candidate_drafts", unexpected_candidate_generation)
-    monkeypatch.setattr(news_worker, "publish_due_snapshots", publish)
-    monkeypatch.setattr(news_worker, "generate_pending_images", generate_images)
-    monkeypatch.setattr(news_worker, "enqueue_review_deliveries", enqueue)
-    monkeypatch.setattr(news_worker, "deliver_review_queue", deliver)
-
-    async def unused(*_args, **_kwargs):
-        return None
-
-    asyncio.run(
-        run_news_pipeline_once(
-            send_message=unused,
-            send_preview=unused,
-            send_publication=unused,
-            publication_ready=True,
-            fetch_sources=True,
-        )
-    )
-
-    assert calls == ["publish", "images", "enqueue", "deliver"]
-
-
-def test_legacy_draft_ready_stays_silent_when_legacy_fetch_is_disabled(monkeypatch) -> None:
-    cluster_id = _source_and_candidate(external_id="legacy-draft-ready-silent")
-    draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
-
-    with get_session_context() as db:
-        cluster = db.get(NewsCluster, cluster_id)
-        assert cluster is not None
-        cluster.status = "draft_ready"
-
-        assert enqueue_review_deliveries(db, {7001}) == 0
-        assert cluster.status == "draft_ready"
-        assert db.get(NewsDraftRevision, draft_id) is not None
-        assert db.query(NewsReviewDelivery).count() == 0
-
-
-def test_expired_legacy_deferred_stays_silent_when_legacy_fetch_is_disabled(monkeypatch) -> None:
-    cluster_id = _source_and_candidate(external_id="legacy-deferred-silent")
-    draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
-
-    with get_session_context() as db:
-        cluster = db.get(NewsCluster, cluster_id)
-        assert cluster is not None
-        cluster.status = "deferred"
-        cluster.deferred_until = utcnow() - timedelta(seconds=1)
-
-        assert enqueue_review_deliveries(db, {7001}) == 0
-        assert cluster.status == "deferred"
-        assert cluster.deferred_until is not None
-        assert db.get(NewsDraftRevision, draft_id) is not None
-        assert db.query(NewsReviewDelivery).count() == 0
-
-
-def test_legacy_publication_failed_does_not_create_owner_delivery_when_disabled(
-    monkeypatch,
-) -> None:
-    cluster_id = _source_and_candidate(external_id="legacy-publication-failed-silent")
-    draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
-
-    with get_session_context() as db:
-        cluster = db.get(NewsCluster, cluster_id)
-        assert cluster is not None
-        cluster.status = "publication_failed"
-
-        assert enqueue_review_deliveries(db, {7001}) == 0
-        assert cluster.status == "publication_failed"
-        assert db.get(NewsDraftRevision, draft_id) is not None
-        assert db.query(NewsReviewDelivery).count() == 0
-
-
-def test_legacy_awaiting_review_does_not_get_preview_upgrade_when_disabled(monkeypatch) -> None:
-    cluster_id = _source_and_candidate(external_id="legacy-awaiting-review-silent")
-    draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
-
-    with get_session_context() as db:
-        cluster = db.get(NewsCluster, cluster_id)
-        assert cluster is not None
-        cluster.status = "awaiting_review"
-        delivery_round = cluster.delivery_round
-
-        assert enqueue_review_deliveries(db, {7001}) == 0
-        assert cluster.status == "awaiting_review"
-        assert cluster.delivery_round == delivery_round
-        assert db.query(NewsReviewDelivery).count() == 0
-        assert (
-            db.query(AuditEvent)
-            .filter_by(action="news.preview_upgrade_queued", resource_id=draft_id)
-            .count()
-            == 0
-        )
-
-
-@pytest.mark.parametrize("delivery_status", ["queued", "processing"])
-def test_pending_legacy_delivery_is_cancelled_before_telegram_send(
-    monkeypatch, delivery_status
-) -> None:
-    cluster_id = _source_and_candidate(external_id="legacy-queued-cancel")
-    draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", True)
-    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
-    with get_session_context() as db:
-        assert enqueue_review_deliveries(db, {7001}) == 1
-        delivery = db.query(NewsReviewDelivery).one()
-        delivery.status = delivery_status
-        delivery.processing_started_at = utcnow() if delivery_status == "processing" else None
-
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
-    calls: list[str] = []
-
-    async def unexpected_send(*_args, **_kwargs):
-        calls.append("telegram")
-        raise AssertionError("legacy delivery must be cancelled before Telegram send")
-
-    async def deliver() -> int:
-        async with httpx.AsyncClient() as client:
-            return await deliver_review_queue(
-                client,
-                unexpected_send,
-                unexpected_send,
-                channel_ready=True,
-            )
-
-    assert asyncio.run(deliver()) == 0
-    assert calls == []
-    with get_session_context() as db:
-        delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.draft_id == draft_id
-        assert delivery.status == "cancelled"
-        assert delivery.processing_started_at is None
-        assert delivery.next_attempt_at is None
-        assert delivery.last_error_code == "legacy_review_delivery_disabled"
-
-
 def test_hermes_draft_reaches_telegram_when_legacy_fetch_is_disabled(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="hermes-downstream-enabled")
     draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
     with get_session_context() as db:
@@ -1736,7 +1522,6 @@ def test_hermes_draft_reaches_telegram_when_legacy_fetch_is_disabled(monkeypatch
 def test_owner_edited_hermes_revision_keeps_delivery_eligibility(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="hermes-owner-edit-marker")
     draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
@@ -1775,7 +1560,6 @@ def test_hermes_regenerate_requeues_revision_without_legacy_candidate_generation
     cluster_id = _source_and_candidate(external_id="hermes-regenerate-disabled-legacy")
     draft_id, _ = _draft(cluster_id)
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
     with get_session_context() as db:
@@ -1801,10 +1585,6 @@ def test_hermes_regenerate_requeues_revision_without_legacy_candidate_generation
         assert cluster.delivery_round == 1
         assert db.query(NewsReviewDelivery).one().status == "cancelled"
 
-    async def unexpected_candidate_generation(*_args, **_kwargs):
-        raise AssertionError("Hermes regeneration must not call legacy candidate generation")
-
-    monkeypatch.setattr(news_worker, "generate_candidate_drafts", unexpected_candidate_generation)
     preview_calls: list[int] = []
     control_calls: list[int] = []
 
@@ -1825,7 +1605,6 @@ def test_hermes_regenerate_requeues_revision_without_legacy_candidate_generation
             send_preview=send_preview,
             send_publication=unused_publication,
             publication_ready=False,
-            fetch_sources=True,
         )
     )
     assert preview_calls == [7001]
@@ -1983,58 +1762,6 @@ def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None
         assert delivery.last_error_code == "preview_delivery_blocked"
 
 
-def test_legacy_overlong_preview_keeps_recovery_control_card(monkeypatch) -> None:
-    cluster_id = _source_and_candidate(external_id="legacy-overlong-delivery")
-    draft_id, _ = _draft(cluster_id)
-    monkeypatch.setattr(settings, "news_image_provider", "disabled")
-    monkeypatch.setattr(settings, "news_publication_enabled", True)
-    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
-    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
-    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
-    with get_session_context() as db:
-        cluster = db.get(NewsCluster, cluster_id)
-        draft = db.get(NewsDraftRevision, draft_id)
-        assert cluster is not None and draft is not None
-        metadata = dict(draft.evidence_metadata)
-        metadata["editorial_fields"] = {
-            "headline": "Тест",
-            "summary": "Я" * 1009,
-            "why_it_matters": "",
-        }
-        draft.evidence_metadata = metadata
-        draft.warnings = []
-        asyncio.run(create_image_revision(db, cluster, draft, client=None))
-        assert enqueue_review_deliveries(db, {7001}) == 1
-
-    preview_calls: list[int] = []
-    control_calls: list[dict[str, object]] = []
-
-    async def send_preview(_client, chat_id, *_args, **_kwargs):
-        preview_calls.append(chat_id)
-        raise AssertionError("legacy overlong delivery must keep the control-card path")
-
-    async def send_control(_client, chat_id, text, *, reply_markup):
-        control_calls.append({"chat_id": chat_id, "text": text, "reply_markup": reply_markup})
-        return 605
-
-    async def deliver() -> int:
-        async with httpx.AsyncClient() as client:
-            return await deliver_review_queue(
-                client,
-                send_control,
-                send_preview,
-                channel_ready=True,
-            )
-
-    assert asyncio.run(deliver()) == 1
-    assert preview_calls == []
-    assert len(control_calls) == 1
-    assert "Точный preview: недоступен" in control_calls[0]["text"]
-    with get_session_context() as db:
-        delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.status == "sent"
-
-
 def test_over_limit_photo_control_card_shows_measurement_and_recovery_actions(
     monkeypatch,
 ) -> None:
@@ -2127,7 +1854,6 @@ def test_hermes_unsupported_number_reaches_owner_review_but_cannot_publish(
     cluster_id = _source_and_candidate(external_id="hermes-unsupported-number-review")
     draft_id, _ = _draft(cluster_id)
 
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)

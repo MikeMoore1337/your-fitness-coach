@@ -18,7 +18,7 @@ from fitminiapp_api.models.news import (
     NewsReviewDelivery,
     NewsSource,
 )
-from fitminiapp_api.services import news_hermes, news_worker
+from fitminiapp_api.services import news_hermes
 from fitminiapp_api.services.news_hermes import _canonical_source_hash, hermes_signature
 from fitminiapp_api.services.news_worker import run_news_pipeline_once
 
@@ -221,7 +221,6 @@ def test_hermes_image_pending_downstream_survives_disabled_legacy_fetch(
         SecretStr("test-hermes-shared-secret-that-is-long-enough"),
     )
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
 
@@ -247,14 +246,6 @@ def test_hermes_image_pending_downstream_survives_disabled_legacy_fetch(
     assert intake.status_code == 200, intake.text
     assert intake.json()["status"] == "accepted"
 
-    async def unexpected_fetch(_client):
-        raise AssertionError("legacy source fetching must be disabled")
-
-    async def unexpected_candidate_generation(*_args, **_kwargs):
-        raise AssertionError("legacy candidate draft generation must be disabled")
-
-    monkeypatch.setattr(news_worker, "fetch_due_sources", unexpected_fetch)
-    monkeypatch.setattr(news_worker, "generate_candidate_drafts", unexpected_candidate_generation)
     preview_calls: list[int] = []
     control_calls: list[int] = []
 
@@ -275,7 +266,6 @@ def test_hermes_image_pending_downstream_survives_disabled_legacy_fetch(
             send_preview=send_preview,
             send_publication=send_publication,
             publication_ready=True,
-            fetch_sources=True,
         )
     )
 
@@ -305,7 +295,6 @@ def test_hermes_sensitive_source_reaches_full_owner_card(client, monkeypatch) ->
         SecretStr("test-hermes-shared-secret-that-is-long-enough"),
     )
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
-    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
 
@@ -371,7 +360,6 @@ def test_hermes_sensitive_source_reaches_full_owner_card(client, monkeypatch) ->
             send_preview=send_preview,
             send_publication=send_publication,
             publication_ready=True,
-            fetch_sources=True,
         )
     )
 
