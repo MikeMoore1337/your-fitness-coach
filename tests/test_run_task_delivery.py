@@ -511,7 +511,7 @@ def test_queue_owner_identity_supports_macos_without_proc(
         calls.append((args, kwargs))
         if args[0] == "ps":
             return subprocess.CompletedProcess(
-                args, 0, stdout="S Wed Sep  9 10:00:00 2026\n", stderr=""
+                args, 0, stdout="S<+ Wed Sep  9 10:00:00 2026\n", stderr=""
             )
         assert args == ["sysctl", "-n", "kern.boottime"]
         return subprocess.CompletedProcess(args, 0, stdout="{ sec = 123, usec = 456 }\n", stderr="")

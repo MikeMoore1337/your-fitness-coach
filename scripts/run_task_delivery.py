@@ -627,7 +627,7 @@ def _macos_process_instance_identity(pid: int) -> dict[str, str] | None:
             f"HUMAN_REQUIRED: cannot parse continuous queue owner PID {pid} identity"
         )
     process_fields = process_lines[0].split(maxsplit=1)
-    if len(process_fields) != 2 or not re.fullmatch(r"[A-Za-z+?-]{1,8}", process_fields[0]):
+    if len(process_fields) != 2 or re.fullmatch(r"[A-Za-z?]", process_fields[0][0]) is None:
         raise DeliveryError(
             f"HUMAN_REQUIRED: cannot parse continuous queue owner PID {pid} identity"
         )
