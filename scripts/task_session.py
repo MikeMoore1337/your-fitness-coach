@@ -966,10 +966,12 @@ def validate_pull_request_review_contract(
                 or comment.get("createdAt")
                 or ""
             )
+            # fmt: off
             try:
                 comment_id = int(comment.get("id", 0))
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 comment_id = 0
+            # fmt: on
             current_head_codex_comments.append((timestamp, comment_id, comment))
         else:
             stale_codex_markers.extend(markers)
