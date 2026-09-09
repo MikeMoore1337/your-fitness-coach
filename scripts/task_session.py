@@ -86,6 +86,7 @@ KNOWN_LEASE_STATES = (
 )
 DELIVERY_OWNER_STATES = DELIVERY_STATES | TERMINAL_LEASE_STATES
 DELIVERY_STATE_VERSION = 1
+DELIVERY_PRIORITY_REASON_MAX_LENGTH = 1024
 CANONICAL_REFRESH_RESULTS = frozenset({"ALIGNED", "REFRESHED", "WAITING", "BLOCKED"})
 
 # These paths are intentionally ignored by the repository and are managed by the controller,
@@ -127,6 +128,17 @@ def normalize_task_id(value: str) -> str:
     if not TASK_ID_RE.fullmatch(task_id):
         raise TaskSessionError(f"Invalid task ID: {value!r}")
     return task_id
+
+
+def normalize_delivery_priority_reason(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        raise TaskSessionError("owner-priority requires a non-empty reason")
+    if len(normalized) > DELIVERY_PRIORITY_REASON_MAX_LENGTH:
+        raise TaskSessionError("owner-priority reason exceeds the bounded length")
+    return normalized
 
 
 def _active_delivery_exclude_prefixes(root: Path, task_id: str) -> tuple[str, ...]:
@@ -647,6 +659,33 @@ class StateStore:
             raise TaskSessionError(
                 f"Invalid delivery sequence in coordination state: {self.delivery_path}"
             )
+        priority_override = payload.get("priority_override")
+        if priority_override is not None:
+            if not isinstance(priority_override, dict):
+                raise TaskSessionError(
+                    f"Invalid delivery priority override in coordination state: {self.delivery_path}"
+                )
+            override_task_id = priority_override.get("task_id")
+            skipped_task_ids = priority_override.get("skipped_task_ids")
+            reason = priority_override.get("reason")
+            authorized_at = priority_override.get("authorized_at")
+            if (
+                not isinstance(override_task_id, str)
+                or not TASK_ID_RE.fullmatch(override_task_id)
+                or not isinstance(skipped_task_ids, list)
+                or any(
+                    not isinstance(task_id, str) or not TASK_ID_RE.fullmatch(task_id)
+                    for task_id in skipped_task_ids
+                )
+                or not isinstance(reason, str)
+                or not reason.strip()
+                or len(reason.strip()) > DELIVERY_PRIORITY_REASON_MAX_LENGTH
+                or not isinstance(authorized_at, str)
+                or not authorized_at.strip()
+            ):
+                raise TaskSessionError(
+                    f"Malformed delivery priority override in coordination state: {self.delivery_path}"
+                )
         return payload
 
     def all_leases(self) -> list[dict[str, Any]]:
@@ -2252,13 +2291,35 @@ class TaskController:
 
         return sorted(candidates, key=queue_key)
 
-    def _promote_next_delivery_locked(self, delivery: dict[str, Any]) -> dict[str, Any] | None:
+    def _promote_next_delivery_locked(
+        self,
+        delivery: dict[str, Any],
+        *,
+        requested_task_id: str | None = None,
+        priority_override: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         if delivery.get("owner") is not None:
             return dict(delivery["owner"])
+        delivery.pop("priority_override", None)
         candidates = self._delivery_candidates(self.store.all_leases())
         if not candidates:
             return None
-        candidate = candidates[0]
+        if requested_task_id is None:
+            candidate = candidates[0]
+        else:
+            expected = normalize_task_id(requested_task_id)
+            candidate = next(
+                (
+                    item
+                    for item in candidates
+                    if normalize_task_id(str(item["task_id"])) == expected
+                ),
+                None,
+            )
+            if candidate is None:
+                raise TaskSessionError(
+                    f"Requested delivery priority task {expected} is not a queue candidate"
+                )
         task_id = normalize_task_id(str(candidate["task_id"]))
         lease_path = self.store.task_lease_path(task_id)
         lease = self.store.read_json(lease_path)
@@ -2279,6 +2340,8 @@ class TaskController:
             }
         )
         delivery["owner"] = owner
+        if priority_override is not None:
+            delivery["priority_override"] = dict(priority_override)
         delivery["updated_at"] = now
         StateStore.replace_json(lease_path, lease)
         StateStore.replace_json(self.store.delivery_path, delivery)
@@ -3092,8 +3155,15 @@ class TaskController:
             StateStore.replace_json(lease_path, current)
         return current
 
-    def acquire_delivery(self, task_id: str, *, offline: bool = False) -> dict[str, Any]:
+    def acquire_delivery(
+        self,
+        task_id: str,
+        *,
+        offline: bool = False,
+        owner_priority_reason: str | None = None,
+    ) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
+        priority_reason = normalize_delivery_priority_reason(owner_priority_reason)
         lease_path = self.store.task_lease_path(expected)
         with self.store.lock():
             lease = self.store.read_json(lease_path)
@@ -3142,7 +3212,7 @@ class TaskController:
                 }
             if not candidate_ids:
                 raise TaskSessionError("Delivery queue is empty while acquiring a task")
-            if candidate_ids[0] != expected:
+            if candidate_ids[0] != expected and priority_reason is None:
                 lease["lifecycle_state"] = "waiting-for-delivery"
                 lease["delivery_waiting_since"] = lease.get("delivery_waiting_since") or utc_now()
                 lease["updated_at"] = utc_now()
@@ -3155,7 +3225,19 @@ class TaskController:
                     "queue_position": candidate_ids.index(expected) + 1,
                     "queue_head": candidate_ids[0],
                 }
-            promoted = self._promote_next_delivery_locked(delivery)
+            priority_override: dict[str, Any] | None = None
+            if candidate_ids[0] != expected:
+                priority_override = {
+                    "task_id": expected,
+                    "skipped_task_ids": candidate_ids[: candidate_ids.index(expected)],
+                    "reason": priority_reason,
+                    "authorized_at": utc_now(),
+                }
+            promoted = self._promote_next_delivery_locked(
+                delivery,
+                requested_task_id=expected if priority_override is not None else None,
+                priority_override=priority_override,
+            )
             if promoted is None or str(promoted.get("task_id", "")).upper() != expected:
                 raise TaskSessionError("Delivery lane promotion did not select the requested task")
             current = self.store.read_json(lease_path)
@@ -3163,11 +3245,15 @@ class TaskController:
                 raise TaskSessionError(
                     f"Task {expected} lease disappeared after delivery acquisition"
                 )
+            if priority_override is not None:
+                current["delivery_priority_override"] = priority_override
+                StateStore.replace_json(lease_path, current)
             return {
                 "acquired": True,
                 "task_id": expected,
                 "lifecycle_state": self._lease_state(current),
                 "delivery": delivery,
+                "priority_override": priority_override,
             }
 
     def _mark_delivery_refresh_failure(self, task_id: str, reason: str) -> None:
@@ -3467,6 +3553,7 @@ class TaskController:
                 "qa_verdict",
                 "task_provenance",
                 "canonical_master_refresh",
+                "delivery_priority_override",
             ):
                 current.pop(key, None)
             current.update(
@@ -3484,6 +3571,7 @@ class TaskController:
                 }
             )
             delivery["owner"] = None
+            delivery.pop("priority_override", None)
             delivery["updated_at"] = now
             StateStore.replace_json(lease_path, current)
             StateStore.replace_json(self.store.delivery_path, delivery)
@@ -3714,6 +3802,8 @@ class TaskController:
                 )
             if "queue_budget" in current:
                 history["queue_budget"] = current["queue_budget"]
+            if "delivery_priority_override" in current:
+                history["delivery_priority_override"] = current["delivery_priority_override"]
             history_path = self.store.history / f"task-{expected}.json"
             if history_path.exists():
                 raise TaskSessionError(
@@ -3940,6 +4030,7 @@ class TaskController:
             StateStore.replace_json(history_path, history)
             lease_path.unlink()
             latest_delivery["owner"] = None
+            latest_delivery.pop("priority_override", None)
             latest_delivery["updated_at"] = utc_now()
             StateStore.replace_json(self.store.delivery_path, latest_delivery)
             next_owner = self._promote_next_delivery_locked(latest_delivery)
@@ -4023,6 +4114,7 @@ def _parser() -> argparse.ArgumentParser:
     acquire_delivery = subparsers.add_parser("acquire-delivery")
     acquire_delivery.add_argument("task_id")
     acquire_delivery.add_argument("--offline", action="store_true")
+    acquire_delivery.add_argument("--owner-priority-reason")
     refresh_delivery = subparsers.add_parser("refresh-delivery")
     refresh_delivery.add_argument("task_id")
     refresh_delivery.add_argument("--offline", action="store_true")
@@ -4120,7 +4212,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 0
         if args.command == "acquire-delivery":
-            _print(controller.acquire_delivery(args.task_id, offline=args.offline))
+            _print(
+                controller.acquire_delivery(
+                    args.task_id,
+                    offline=args.offline,
+                    owner_priority_reason=args.owner_priority_reason,
+                )
+            )
             return 0
         if args.command == "refresh-delivery":
             _print(controller.refresh_for_delivery(args.task_id, offline=args.offline))

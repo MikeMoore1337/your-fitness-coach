@@ -42,6 +42,12 @@ PR владелец delivery должен получить актуальный 
 `rebase`, инвалидировать старое exact-HEAD evidence и пройти новый final gate. Конфликт rebase,
 dirty/interrupted worktree или missing/ambiguous lease сохраняются fail-closed для recovery.
 
+При явном owner decision текущая task может получить ограниченный priority promotion через
+`acquire-delivery --owner-priority-reason <reason>`, если lane свободна. Операция не меняет и не
+удаляет чужие leases, сохраняет пропущенные candidates в FIFO для следующего handoff и записывает
+bounded reason в shared delivery state и task history. Она не обходится при активном delivery или
+production deployment и не заменяет refresh, exact-head gate, PR checks, merge или closeout.
+
 ## 0A. Structured task artifacts
 
 Every new task artifact uses one canonical `.artifacts/` layout:

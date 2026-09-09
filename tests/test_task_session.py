@@ -1128,6 +1128,63 @@ def test_delivery_lane_is_serial_and_handoff_is_deterministic(
     ] == ("delivering")
 
 
+def test_owner_priority_promotes_current_task_and_preserves_fifo_handoff(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    for task_id in ("246", "247", "248"):
+        _write_task(root, task_id, f"priority-{task_id}", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    started = {
+        task_id: controller.start(
+            task_id, owner_launch=True, session_label=f"priority-{task_id}", offline=True
+        )
+        for task_id in ("246", "247", "248")
+    }
+    for task_id in ("246", "247", "248"):
+        head_sha = _commit_task(Path(started[task_id]["lease"]["worktree"]), task_id)
+        controller.mark_ready(task_id, head_sha=head_sha, quality_verdict="PASS")
+
+    acquired = controller.acquire_delivery(
+        "247", offline=True, owner_priority_reason="Owner requested current task first"
+    )
+
+    assert acquired["acquired"] is True
+    priority_override = acquired["priority_override"]
+    assert priority_override["task_id"] == "247"
+    assert priority_override["skipped_task_ids"] == ["246"]
+    assert priority_override["reason"] == "Owner requested current task first"
+    assert priority_override["authorized_at"]
+    assert controller.store.delivery_state()["owner"]["task_id"] == "247"
+    assert controller.store.delivery_state()["priority_override"]["skipped_task_ids"] == ["246"]
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("246"))["lifecycle_state"]
+        == "ready-for-delivery"
+    )
+
+    released = controller.release_delivery(
+        "247", reason="synthetic priority delivery interruption", offline=True
+    )
+
+    assert released["lifecycle_state"] == "recovery-required"
+    assert controller.store.delivery_state()["owner"]["task_id"] == "246"
+    assert "priority_override" not in controller.store.delivery_state()
+
+
+def test_owner_priority_requires_a_bounded_reason(repository: tuple[Path, Any]) -> None:
+    root, git_repository = repository
+    _write_task(root, "249", "priority-reason", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    started = controller.start(
+        "249", owner_launch=True, session_label="priority-reason", offline=True
+    )
+    head_sha = _commit_task(Path(started["lease"]["worktree"]), "249")
+    controller.mark_ready("249", head_sha=head_sha, quality_verdict="PASS")
+
+    with pytest.raises(task_session.TaskSessionError, match="non-empty reason"):
+        controller.acquire_delivery("249", offline=True, owner_priority_reason=" ")
+
+
 def test_release_delivery_does_not_handoff_during_active_production(
     repository: tuple[Path, Any],
 ) -> None:
