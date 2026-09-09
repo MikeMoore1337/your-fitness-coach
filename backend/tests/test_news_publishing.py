@@ -25,7 +25,10 @@ from fitminiapp_api.models.news import (
     NewsSource,
 )
 from fitminiapp_api.services import news_images, news_publication, news_worker
-from fitminiapp_api.services.news_content import EditorialContent, parse_editorial_content
+from fitminiapp_api.services.news_content import (
+    EditorialContent,
+    parse_editorial_content,
+)
 from fitminiapp_api.services.news_drafts import create_draft_revision
 from fitminiapp_api.services.news_editorial import (
     compose_review_artifact,
@@ -58,7 +61,10 @@ from fitminiapp_api.services.news_publication import (
     retry_uncertain_publication,
 )
 from fitminiapp_api.services.news_review_schedule import current_news_review_slot
-from fitminiapp_api.services.news_sources import apply_source_allowlist, parse_source_allowlist
+from fitminiapp_api.services.news_sources import (
+    apply_source_allowlist,
+    parse_source_allowlist,
+)
 from fitminiapp_api.services.news_worker import (
     NewsCycleStats,
     deliver_review_queue,
@@ -1890,7 +1896,7 @@ def test_hermes_fallback_draft_is_not_delivered_or_requeued(monkeypatch) -> None
         assert enqueue_review_deliveries(db, {7001}) == 0
 
 
-def test_overlong_preview_never_sends_control_card_without_artifact(monkeypatch) -> None:
+def test_overlong_hermes_preview_sends_recovery_control_card(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="overlong-delivery-guard")
     draft_id, _ = _draft(cluster_id)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
@@ -1935,12 +1941,13 @@ def test_overlong_preview_never_sends_control_card_without_artifact(monkeypatch)
             )
 
     delivered = asyncio.run(deliver())
-    assert delivered == 0
+    assert delivered == 1
     assert preview_calls == []
-    assert control_calls == []
+    assert control_calls == [7001]
     with get_session_context() as db:
         delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.last_error_code == "preview_delivery_blocked"
+        assert delivery.status == "sent"
+        assert delivery.last_error_code is None
 
 
 def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None:
@@ -2112,3 +2119,79 @@ def test_legacy_plain_snapshot_does_not_block_html_renderer_approval(monkeypatch
         assert current.renderer_version == "news-publication-html-v1"
         assert current.parse_mode == "HTML"
         assert current.link_preview_disabled is True
+
+
+def test_hermes_unsupported_number_reaches_owner_review_but_cannot_publish(
+    monkeypatch,
+) -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-unsupported-number-review")
+    draft_id, _ = _draft(cluster_id)
+
+    monkeypatch.setattr(settings, "news_legacy_source_fetch_enabled", False)
+    monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+
+        draft.evidence_metadata = {
+            **draft.evidence_metadata,
+            "submitted_by": "hermes_narrow_intake",
+        }
+        draft.warnings = ["unsupported_number"]
+
+        asyncio.run(create_image_revision(db, cluster, draft, client=None))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+
+    preview_calls: list[int] = []
+    control_calls: list[dict[str, object]] = []
+
+    async def send_preview(_client, chat_id, *_args, **_kwargs):
+        preview_calls.append(chat_id)
+        return SimpleNamespace(message_id=901, message_date=utcnow())
+
+    async def send_control(_client, chat_id, text, *, reply_markup):
+        control_calls.append(
+            {
+                "chat_id": chat_id,
+                "text": text,
+                "reply_markup": reply_markup,
+            }
+        )
+        return 902
+
+    async def deliver() -> int:
+        async with httpx.AsyncClient() as client:
+            return await deliver_review_queue(
+                client,
+                send_control,
+                send_preview,
+                channel_ready=True,
+            )
+
+    assert asyncio.run(deliver()) == 1
+    assert preview_calls == [7001]
+    assert len(control_calls) == 1
+
+    control = control_calls[0]
+    assert "unsupported_number" in control["text"]
+
+    callback_values = [
+        button["callback_data"]
+        for row in control["reply_markup"]["inline_keyboard"]
+        for button in row
+        if "callback_data" in button
+    ]
+
+    assert not any(value.startswith("newsp:p:") for value in callback_values)
+    assert not any(value.startswith("newsp:s:") for value in callback_values)
+
+    with get_session_context() as db:
+        delivery = db.query(NewsReviewDelivery).one()
+        assert delivery.status == "sent"
+        assert delivery.last_error_code is None

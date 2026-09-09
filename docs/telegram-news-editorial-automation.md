@@ -43,9 +43,10 @@ Hermes может передавать владельцу полноценный
 которые требуют ручного решения: AAS/фармакология/пептиды/БАДы и дозировки. Такие карточки не
 включаются в autopublish: `NEWS_AUTO_PUBLISH_LOW_RISK` остаётся `false`, а существующие
 publication quality gates сохраняют право скрыть кнопку публикации до редактирования текста.
-Это расширяет только ручной editorial recall; отсутствие exact image/caption, malformed provider
-response, fallback-заглушка, неподтверждённые числа и другие технические blockers по-прежнему
-fail-closed и не отправляются владельцу как будто это готовая новость.
+Это расширяет только ручной editorial recall. Malformed provider response, fallback-заглушка и
+отсутствующее Hermes image по-прежнему остаются hard delivery blockers. Recoverable
+publication-quality warnings `unsupported_number` и `telegram_photo_caption_too_long` могут
+дойти до owner review, но продолжают блокировать publication до исправления.
 
 После production release целевые значения для разделения контуров такие:
 
@@ -125,16 +126,19 @@ draft и transient retry; paid/cloud fallback, новые credentials и provide
 публикацию. YFC по-прежнему применяет `manual_required`, Gate B/C и остаётся единственным
 publisher.
 
-YFC имеет дополнительный final delivery gate: Hermes draft не отправляется владельцу в Telegram,
-пока не собраны exact image и rendered caption и не сняты технические delivery blockers.
-Fallback-заглушки, unresolved provider warnings, переполненный caption и отсутствие artifact не
-создают ни preview, ни управляющую карточку. Разрешённые для owner review sensitive warnings
-могут оставаться publication blockers: они показываются в полноценной карточке, но скрывают
-кнопку публикации до ручного решения/редактирования. Заблокированная техническая попытка
-фиксируется как bounded failure и не повторяется для той же text/image revision; новая попытка
-появляется только после новой ревизии текста или изображения. Операционные состояния
-`publishing_disabled` и `channel_rights_missing` не меняют требование наличия image+text preview и
-не считаются содержательным fallback.
+YFC имеет дополнительный final delivery gate. Hard preview states — fallback/provider failure и
+отсутствующее Hermes image — остаются fail-closed и не отправляются владельцу как готовый
+review item. Recoverable publication-quality warnings `unsupported_number` и
+`telegram_photo_caption_too_long` не должны скрывать материал из owner review queue: они
+остаются publication blockers и поэтому не дают кнопок publish/schedule.
+
+При `unsupported_number`, если exact artifact и image доступны, владельцу отправляются private
+preview и управляющая карточка. При `telegram_photo_caption_too_long` exact publication artifact
+может быть недоступен из-за лимита Telegram; тогда photo preview не отправляется, но владелец
+получает recovery/control card с действиями редактирования, перегенерации, отклонения и defer.
+Публикация остаётся запрещённой, пока blocker не устранён. Операционные состояния
+`publishing_disabled` и `channel_rights_missing` не превращают blocked material в publishable
+fallback.
 
 ## Taxonomy and policy
 
@@ -170,8 +174,9 @@ blocked | manual_required | auto_eligible
 индивидуальные рекомендации, pregnancy/minors/chronic disease/symptoms, interactions,
 recalls/contamination, preliminary или conflicting evidence и любая неоднозначность имеют как
 минимум `manual_required`; Hermes intake может доставить их владельцу как полноценный preview для
-ручного решения. Prompt injection, unsupported numbers и явные unsafe/guaranteed claims по-прежнему
-заблокированы для delivery или publication. `auto_eligible` дополнительно требует
+ручного решения. Prompt injection и явные unsafe/guaranteed claims по-прежнему остаются hard
+blockers. `unsupported_number` может быть доставлен владельцу для ручного исправления, но
+остаётся publication blocker. `auto_eligible` дополнительно требует
 owner-controlled `NEWS_AUTO_PUBLISH_LOW_RISK=true`, valid source provenance, quality checks, exact
 snapshot и active kill-switch. Committed default — `false`.
 

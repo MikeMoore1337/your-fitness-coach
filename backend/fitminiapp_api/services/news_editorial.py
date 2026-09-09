@@ -27,7 +27,10 @@ from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.news_content import parse_editorial_content
 from fitminiapp_api.services.news_drafts import quality_warnings
 from fitminiapp_api.services.news_freshness import source_metadata_is_fresh
-from fitminiapp_api.services.news_images import create_uploaded_image_revision, current_image
+from fitminiapp_api.services.news_images import (
+    create_uploaded_image_revision,
+    current_image,
+)
 from fitminiapp_api.services.news_ingestion import utcnow
 from fitminiapp_api.services.news_publication import (
     ARTIFACT_HASH_PREFIX_LENGTH,
@@ -96,7 +99,21 @@ class ReviewArtifact:
 HERMES_SUBMISSION_MARKER = "hermes_narrow_intake"
 PREVIEW_OPERATIONAL_BLOCKERS = frozenset({"publishing_disabled", "channel_rights_missing"})
 LEGACY_REVIEW_DELIVERY_DISABLED = "legacy_review_delivery_disabled"
-MANUAL_REVIEW_ALLOWED_WARNINGS = frozenset({"medical_prescription_language"})
+MANUAL_REVIEW_ALLOWED_WARNINGS = frozenset(
+    {
+        "medical_prescription_language",
+        "unsupported_number",
+        "telegram_photo_caption_too_long",
+    }
+)
+MANUAL_REVIEW_ALLOWED_BLOCKERS = frozenset(
+    {
+        "unresolved_warning:medical_prescription_language",
+        "unresolved_warning:unsupported_number",
+        "unresolved_warning:telegram_photo_caption_too_long",
+        "telegram_photo_caption_too_long",
+    }
+)
 MANUAL_REVIEW_ALLOWED_CONTENT_BLOCKERS = frozenset(
     {
         "prohibited_medical_or_aas_language",
@@ -114,16 +131,22 @@ def review_delivery_blockers(
     draft: NewsDraftRevision,
     review: ReviewArtifact,
 ) -> tuple[str, ...]:
-    """Return blockers that make an owner Telegram delivery unsafe or misleading."""
+    """Block only owner-preview states that cannot be reviewed safely.
+
+    Publication-quality warnings remain visible on the owner control card and
+    continue to block publication. Recoverable editorial issues must not make
+    the review item disappear from the owner's Telegram queue.
+    """
 
     is_hermes_draft = is_hermes_origin_draft(draft)
     blockers: list[str] = []
+
     if is_hermes_draft:
         blockers.extend(
             blocker
             for blocker in review.blockers
             if blocker not in PREVIEW_OPERATIONAL_BLOCKERS
-            and blocker != "unresolved_warning:medical_prescription_language"
+            and blocker not in MANUAL_REVIEW_ALLOWED_BLOCKERS
             and blocker not in MANUAL_REVIEW_ALLOWED_CONTENT_BLOCKERS
         )
         blockers.extend(
@@ -135,10 +158,23 @@ def review_delivery_blockers(
                 and warning not in MANUAL_REVIEW_ALLOWED_WARNINGS
             )
         )
+
+    # An overlong photo caption is recoverable in the owner UI: the exact
+    # publication artifact is unavailable, but review_message() can still
+    # deliver a control card with edit/regenerate actions.
     if is_hermes_draft and review.artifact is None:
-        blockers.append("preview_artifact_unavailable")
+        recoverable_overlong_caption = (
+            "telegram_photo_caption_too_long" in review.blockers and not blockers
+        )
+        if not recoverable_overlong_caption:
+            blockers.append("preview_artifact_unavailable")
+
+    # Hermes publication still requires its image path. Keep this as a hard
+    # preview gate rather than silently degrading to a publishable text-only
+    # item.
     if is_hermes_draft and (review.image is None or not review.image.image_data):
         blockers.append("preview_image_missing")
+
     return tuple(dict.fromkeys(blockers))
 
 
