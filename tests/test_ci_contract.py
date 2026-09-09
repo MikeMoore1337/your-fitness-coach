@@ -160,6 +160,18 @@ def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> Non
     assert "scripts/run_pytest.py backend/tests" not in workflow
 
 
+def test_pr_ci_requires_exact_head_review_before_aggregate_checks() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+    required = ci_contract.expected_jobs_for_groups(("quality",), event="pull_request")
+    assert "review-contract" in required
+    assert "pull_request_review:" in workflow
+    assert "review-contract:" in workflow
+    assert 'validate-pr-review --event "$GITHUB_EVENT_PATH"' in workflow
+    assert "review-contract" in workflow[workflow.index("  checks:") :]
+
+
 def test_workflow_uses_lockfile_download_cache_without_audit_installation() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

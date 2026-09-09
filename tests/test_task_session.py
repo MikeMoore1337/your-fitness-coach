@@ -95,6 +95,9 @@ class FakeGitHub:
         self.pulls: dict[int, dict[str, Any]] = {}
         self.commits: dict[int, list[dict[str, Any]]] = {}
         self.files: dict[int, list[dict[str, Any]]] = {}
+        self.reviews: dict[int, list[dict[str, Any]]] = {}
+        self.comments: dict[int, list[dict[str, Any]]] = {}
+        self.threads: dict[int, list[dict[str, Any]]] = {}
         self.checks: dict[str, list[dict[str, Any]]] = {}
         self.open_prs: list[dict[str, Any]] = []
         self.active_runs: list[dict[str, Any]] = []
@@ -118,6 +121,18 @@ class FakeGitHub:
 
     def pull_request_files(self, number: int) -> list[dict[str, Any]]:
         return self.files.get(number, [{"filename": "README.md"}])
+
+    def pull_request_reviews(self, number: int) -> list[dict[str, Any]]:
+        if number in self.reviews:
+            return self.reviews[number]
+        head_sha = str(self.pulls[number].get("head", {}).get("sha", ""))
+        return [{"state": "APPROVED", "commit_id": head_sha, "user": {"login": "pytest"}}]
+
+    def issue_comments(self, number: int) -> list[dict[str, Any]]:
+        return self.comments.get(number, [])
+
+    def review_threads(self, number: int) -> list[dict[str, Any]]:
+        return self.threads.get(number, [])
 
     def check_runs(self, sha: str) -> list[dict[str, Any]]:
         return self.checks.get(sha, [])
@@ -422,6 +437,77 @@ def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(
         task_session.validate_pr_event(object(), github, event_path)  # type: ignore[arg-type]
 
 
+def _review_pr(head_sha: str) -> dict[str, Any]:
+    pull_request = _task_pr(219, "219", "a" * 40, head_sha)
+    pull_request.update({"state": "open", "mergeable": True, "mergeable_state": "clean"})
+    return pull_request
+
+
+def test_review_contract_rejects_pending_review_for_current_head() -> None:
+    with pytest.raises(task_session.TaskSessionError, match="no completed approval"):
+        task_session.validate_pull_request_review_contract(_review_pr("b" * 40), [], [], [])
+
+
+def test_review_contract_rejects_old_codex_review_marker() -> None:
+    pull_request = _review_pr("b" * 40)
+    comments = [
+        {
+            "user": {"login": "chatgpt-codex-connector"},
+            "body": "Codex Review: **Reviewed commit:** `aaaaaaa`",
+        }
+    ]
+    with pytest.raises(task_session.TaskSessionError, match="stale review markers"):
+        task_session.validate_pull_request_review_contract(pull_request, [], comments, [])
+
+
+def test_review_contract_rejects_current_blocking_finding() -> None:
+    head_sha = "b" * 40
+    reviews = [
+        {
+            "id": 1,
+            "state": "CHANGES_REQUESTED",
+            "commit_id": head_sha,
+            "body": "P1 functional defect",
+        }
+    ]
+    with pytest.raises(task_session.TaskSessionError, match="blocking current-head"):
+        task_session.validate_pull_request_review_contract(_review_pr(head_sha), reviews, [], [])
+
+
+def test_review_contract_rejects_unresolved_thread_even_with_exact_approval() -> None:
+    head_sha = "b" * 40
+    reviews = [{"state": "APPROVED", "commit_id": head_sha, "user": {"login": "owner"}}]
+    with pytest.raises(task_session.TaskSessionError, match="unresolved review threads"):
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha), reviews, [], [{"isResolved": False}]
+        )
+
+
+def test_review_contract_accepts_exact_codex_comment_and_resolved_threads() -> None:
+    head_sha = "b" * 40
+    comments = [
+        {
+            "id": 12,
+            "user": {"login": "chatgpt-codex-connector"},
+            "body": (
+                "Codex Review: Didn't find any major issues. "
+                f"**Reviewed commit:** `{head_sha[:10]}`"
+            ),
+        },
+        {
+            "id": 13,
+            "user": {"login": "codereviewbot-ai"},
+            "body": "Review skipped: Repository Owner rate limit exceeded",
+        },
+    ]
+    result = task_session.validate_pull_request_review_contract(
+        _review_pr(head_sha), [], comments, [{"isResolved": True}]
+    )
+    assert result["status"] == "PASS"
+    assert result["sources"] == ["codex-completed-review-comment"]
+    assert result["head_sha"] == head_sha
+
+
 def test_master_ruleset_requires_pr_current_base_and_aggregate_check() -> None:
     weak = [
         {
@@ -475,6 +561,28 @@ def test_start_uses_exact_origin_master_and_records_no_dev_lane(
     assert "base_origin_dev_sha" not in lease
     assert "PR master" in started["prompt"]
     assert "refresh-delivery task branch" in started["prompt"]
+
+
+def test_issue_dependency_override_is_recorded_as_source_of_truth(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "202", "issue-dependencies", dependencies="999")
+    controller = task_session.TaskController(
+        git_repository, github=FakeGitHub(git_repository.ref("origin/master"))
+    )
+
+    started = controller.start(
+        "202",
+        owner_launch=True,
+        session_label="issue-contract",
+        dependency_ids=(),
+        offline=True,
+    )
+
+    assert started["lease"]["dependency_ids"] == []
+    assert started["lease"]["dependency_source"] == "github-issue"
+    assert "Dependencies (Issue source): none" in started["prompt"]
 
 
 def test_two_independent_write_tasks_get_distinct_leases_and_worktrees(

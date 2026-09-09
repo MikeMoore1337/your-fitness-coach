@@ -93,6 +93,14 @@ evidence. Если HEAD изменился после `READY_FOR_DELIVERY`, `ref
 `reopen-for-review --reason <...>`, который освобождает delivery lane и удаляет старый readiness
 snapshot.
 
+PR CI дополнительно выполняет `review-contract`. Merge-ready возможен только после formal GitHub
+approval на exact current head или trusted завершённого Codex review comment с exact-head marker,
+при отсутствии unresolved review threads, blocking current-head findings и dirty/non-mergeable PR.
+После нового commit старое review не считается; `pull_request_review` запускает повторную
+проверку. Для текущего Codex connector, который публикует review summary как Issue comment,
+worker должен вызвать `scripts/task_session.py validate-pr-review` и дождаться нового exact-head
+CI перед merge.
+
 ## Leases и безопасный closeout
 
 Controller хранит machine-local coordination state в shared Git common dir:
@@ -146,7 +154,9 @@ base ancestry и отсутствие delivery owner, затем атомарн�
 до запуска worker: waiting после `READY_FOR_DELIVERY` — нормальное состояние, а не terminal blocker.
 Останавливает только точный implementation/recovery blocker либо явно объявленный
 human/legal/external/destructive/task-specific gate. Следующая product task автоматически не
-запускается.
+запускается в разовом режиме. Явный `CONTINUE_QUEUE` через control Issue включает только bounded
+batch существующих Issue-backed GREEN tasks; лимиты и точные правила описаны в
+[`docs/issue-driven-continuous-workflow.md`](issue-driven-continuous-workflow.md).
 
 Низкоуровневые команды:
 

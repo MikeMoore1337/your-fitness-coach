@@ -74,6 +74,9 @@ def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
     assert "final applicable gate" in prompt
     assert "reopen-for-review" in prompt
     assert "Не запускай следующую product task" in prompt
+    assert "validate-pr-review --pr <N> --head-sha <SHA>" in prompt
+    assert "3 review-fix cycles" in prompt
+    assert "3 CI-fix cycles" in prompt
 
 
 def test_only_live_lane_contention_is_retried() -> None:
@@ -137,6 +140,121 @@ def test_task_id_normalization_is_strict() -> None:
         assert "Invalid task ID" in str(error)
     else:
         raise AssertionError("invalid task ID was accepted")
+
+
+def test_queue_parser_requires_control_issue_and_bounds_batch() -> None:
+    args = delivery._parser().parse_args(["--continue-queue", "--control-issue", "218"])
+    assert args.continue_queue is True
+    assert args.control_issue == 218
+    assert args.max_tasks == 4
+
+
+def test_queue_rejects_batch_larger_than_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: ({"state": "open"}, []))
+    with pytest.raises(delivery.DeliveryError, match="between 1 and 4"):
+        delivery._run_continuous_queue(
+            control_issue=218,
+            max_tasks=5,
+            poll_seconds=10,
+            max_wait_minutes=1,
+        )
+
+
+def test_queue_stops_on_human_required_candidate_without_starting_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    posted: list[dict[str, object]] = []
+    started: list[str] = []
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue: (
+            {
+                "state": "open",
+                "body": "CONTINUE_QUEUE",
+                "user": {"login": "MikeMoore1337"},
+            },
+            [],
+        ),
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_queue_candidates",
+        lambda: [
+            {
+                "task_id": "124B",
+                "state": "human_required",
+                "risk_lane": "RED",
+                "blocker": "real-user evidence",
+                "issue_number": 223,
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        delivery, "_post_control_state", lambda issue, payload: posted.append(payload)
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_deliver_one",
+        lambda *args, **kwargs: started.append(str(args[0])),
+    )
+
+    assert (
+        delivery._run_continuous_queue(
+            control_issue=218,
+            max_tasks=4,
+            poll_seconds=10,
+            max_wait_minutes=1,
+        )
+        == 1
+    )
+    assert started == []
+    assert posted[0]["state"] == "human_required"
+
+
+def test_control_state_post_rejects_invalid_remote_transition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    previous = delivery.control_state_payload(task_id="150", state="production_verified")
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue: (
+            {"state": "open"},
+            [
+                {
+                    "id": 1,
+                    "created_at": "2026-09-09T00:00:00Z",
+                    "body": delivery.render_control_state_comment(previous),
+                }
+            ],
+        ),
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="Invalid control-state transition"):
+        delivery._post_control_state(
+            218,
+            delivery.control_state_payload(task_id="150", state="merged", issue_number=218),
+        )
+
+
+def test_continuous_worker_budget_report_is_fail_closed(tmp_path: Path) -> None:
+    final = tmp_path / "final.md"
+    final.write_text(
+        "result\n"
+        + delivery.render_queue_budget_report(
+            review_fix_cycles=1, ci_fix_cycles=2, scope_expansions=0
+        ),
+        encoding="utf-8",
+    )
+    assert delivery._queue_budget_from_worker(tmp_path) == {
+        "review_fix_cycles": 1,
+        "ci_fix_cycles": 2,
+        "scope_expansions": 0,
+    }
+    final.write_text("result", encoding="utf-8")
+    with pytest.raises(delivery.DeliveryError, match="no bounded queue budget block"):
+        delivery._queue_budget_from_worker(tmp_path)
 
 
 def test_verify_closeout_requires_archive_and_manifest_check(

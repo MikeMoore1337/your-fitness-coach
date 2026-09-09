@@ -26,8 +26,10 @@ from typing import Any
 
 try:
     from scripts.artifact_manager import ArtifactError, ArtifactManager
+    from scripts.issue_workflow import IssueWorkflowError, normalize_severity
 except ModuleNotFoundError:
     from artifact_manager import ArtifactError, ArtifactManager
+    from issue_workflow import IssueWorkflowError, normalize_severity
 
 TASK_ID_PATTERN = r"[0-9]+[A-Z]?"
 TASK_ID_RE = re.compile(rf"^{TASK_ID_PATTERN}$", re.IGNORECASE)
@@ -44,6 +46,11 @@ TARGET_BASE_BRANCH = "master"
 DEPENDABOT_LOGIN = "dependabot[bot]"
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
 UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
+TRUSTED_REVIEW_LOGINS = frozenset({"chatgpt-codex-connector"})
+REVIEWED_COMMIT_RE = re.compile(
+    r"(?im)\b(?:reviewed\s+commit|reviewed\s+head|commit)\b\s*\*{0,2}\s*[:=]\s*\*{0,2}\s*`?([0-9a-f]{7,40})`?"
+)
+REVIEW_COMPLETED_MARKERS = ("codex review", "review status completed")
 
 # A task lease, an implementation exclusion, and delivery ownership are separate controller
 # concerns.  Only an exclusive-write lease in an implementation state owns the implementation
@@ -478,6 +485,21 @@ def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
     )
 
 
+def _resolved_dependency_ids(
+    raw_dependencies: Sequence[str] | None,
+    fallback: Sequence[str],
+) -> tuple[str, ...]:
+    if raw_dependencies is None:
+        return tuple(fallback)
+    if isinstance(raw_dependencies, (str, bytes)):
+        raise TaskSessionError("Issue dependency contract must be an array of task IDs")
+    try:
+        normalized = [normalize_task_id(item) for item in raw_dependencies]
+    except (TypeError, TaskSessionError) as error:
+        raise TaskSessionError("Issue dependency contract contains an invalid task ID") from error
+    return tuple(dict.fromkeys(normalized))
+
+
 class StateStore:
     def __init__(self, common_dir: Path) -> None:
         self.root = common_dir / STATE_DIRECTORY_NAME
@@ -634,6 +656,79 @@ class GitHubClient:
                 return files
             page += 1
 
+    def pull_request_reviews(self, number: int) -> list[dict[str, Any]]:
+        reviews: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            batch = list(self.api(f"pulls/{number}/reviews?per_page=100&page={page}"))
+            reviews.extend(batch)
+            if len(batch) < 100:
+                return reviews
+            page += 1
+
+    def issue_comments(self, number: int) -> list[dict[str, Any]]:
+        comments: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            batch = list(self.api(f"issues/{number}/comments?per_page=100&page={page}"))
+            comments.extend(batch)
+            if len(batch) < 100:
+                return comments
+            page += 1
+
+    def review_threads(self, number: int) -> list[dict[str, Any]]:
+        owner, separator, name = self.repo_slug.partition("/")
+        if not separator or not owner or not name:
+            raise TaskSessionError("Cannot query review threads without an owner/repository slug")
+        query = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes { isResolved }
+        pageInfo { hasNextPage }
+      }
+    }
+  }
+}
+""".strip()
+        result = _run(
+            [
+                "gh",
+                "api",
+                "graphql",
+                "-f",
+                f"query={query}",
+                "-F",
+                f"owner={owner}",
+                "-F",
+                f"name={name}",
+                "-F",
+                f"number={number}",
+            ],
+            cwd=self.repository.current_worktree,
+        )
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as error:
+            raise TaskSessionError("GitHub returned invalid review-thread JSON") from error
+        errors = payload.get("errors")
+        if errors:
+            raise TaskSessionError(f"GitHub review-thread query failed: {errors}")
+        pull_request = payload.get("data", {}).get("repository", {}).get("pullRequest")
+        if not isinstance(pull_request, Mapping):
+            raise TaskSessionError("GitHub review-thread query returned no pull request")
+        threads = pull_request.get("reviewThreads", {})
+        if not isinstance(threads, Mapping):
+            raise TaskSessionError("GitHub review-thread query returned an invalid connection")
+        page_info = threads.get("pageInfo", {})
+        if isinstance(page_info, Mapping) and page_info.get("hasNextPage"):
+            raise TaskSessionError("GitHub review-thread inventory exceeds the bounded page size")
+        nodes = threads.get("nodes", [])
+        if not isinstance(nodes, list):
+            raise TaskSessionError("GitHub review-thread query returned invalid nodes")
+        return [dict(item) for item in nodes if isinstance(item, Mapping)]
+
     def check_runs(self, sha: str) -> list[dict[str, Any]]:
         payload = self.api(f"commits/{sha}/check-runs?per_page=100")
         return list(payload.get("check_runs", []))
@@ -678,6 +773,168 @@ def _successful_exact_check(checks: Sequence[Mapping[str, Any]], name: str, sha:
         and str(item.get("conclusion", "")).upper() in VALID_CHECK_CONCLUSIONS
         for item in checks
     )
+
+
+def reviewed_commit_markers(body: str) -> tuple[str, ...]:
+    """Return bounded commit markers found in a review summary."""
+
+    return tuple(match.group(1).lower() for match in REVIEWED_COMMIT_RE.finditer(body))
+
+
+def _review_login(item: Mapping[str, Any]) -> str:
+    for key in ("user", "author"):
+        value = item.get(key)
+        if isinstance(value, Mapping) and value.get("login"):
+            return str(value["login"])
+    return ""
+
+
+def _marker_matches_head(marker: str, head_sha: str) -> bool:
+    normalized = marker.strip().lower()
+    return len(normalized) >= 7 and head_sha.lower().startswith(normalized)
+
+
+def _review_body(item: Mapping[str, Any]) -> str:
+    return str(item.get("body") or item.get("text") or "")
+
+
+def validate_pull_request_review_contract(
+    pull_request: Mapping[str, Any],
+    reviews: Sequence[Mapping[str, Any]],
+    issue_comments: Sequence[Mapping[str, Any]],
+    review_threads: Sequence[Mapping[str, Any]],
+    *,
+    expected_head_sha: str | None = None,
+    require_open: bool = True,
+    require_mergeable: bool = True,
+) -> dict[str, Any]:
+    """Require a completed review for the current clean PR head.
+
+    GitHub formal approvals are authoritative when their ``commit_id`` is the current head.
+    The Codex connector currently records its completed review as a trusted issue comment, so
+    that representation is accepted only with an explicit exact-head marker.  Skipped bot
+    comments, old-head reviews, unresolved threads and non-mergeable PRs never satisfy this gate.
+    """
+
+    head = pull_request.get("head", {})
+    head_sha = str(head.get("sha", "")).lower()
+    if not head_sha:
+        raise TaskSessionError("PR review gate requires a current head SHA")
+    if expected_head_sha and head_sha != expected_head_sha.lower():
+        raise TaskSessionError(
+            f"PR review gate received stale head {head_sha}; expected {expected_head_sha}"
+        )
+    state = str(pull_request.get("state", "")).lower()
+    if require_open and state != "open":
+        raise TaskSessionError(f"PR review gate requires an open PR, found {state}")
+    if require_open and pull_request.get("draft") is True:
+        raise TaskSessionError("PR review gate refuses a draft PR")
+    if require_mergeable:
+        if pull_request.get("mergeable") is not True:
+            raise TaskSessionError("PR review gate requires an explicitly mergeable PR")
+        mergeable_state = str(pull_request.get("mergeable_state", "")).lower()
+        if mergeable_state not in {"clean", "has_hooks"}:
+            raise TaskSessionError(
+                "PR review gate requires a clean mergeable PR, found "
+                f"{mergeable_state or '<missing>'}"
+            )
+
+    unresolved_threads = [
+        index
+        for index, thread in enumerate(review_threads, start=1)
+        if thread.get("isResolved") is not True
+    ]
+    if unresolved_threads:
+        raise TaskSessionError(
+            "PR review gate refuses unresolved review threads: "
+            + ", ".join(str(item) for item in unresolved_threads)
+        )
+
+    exact_approvals = [
+        item
+        for item in reviews
+        if str(item.get("state", "")).upper() == "APPROVED"
+        and _marker_matches_head(str(item.get("commit_id", item.get("commitId", ""))), head_sha)
+    ]
+    current_changes = [
+        item
+        for item in reviews
+        if str(item.get("state", "")).upper() == "CHANGES_REQUESTED"
+        and _marker_matches_head(str(item.get("commit_id", item.get("commitId", ""))), head_sha)
+    ]
+    if current_changes:
+        findings = []
+        for item in current_changes:
+            body = _review_body(item)
+            severities = []
+            for raw in re.findall(r"(?i)\b(?:P[0-3]|BLOCKER|HIGH|MEDIUM|LOW|NIT)\b", body):
+                try:
+                    severities.append(normalize_severity(raw))
+                except IssueWorkflowError:
+                    continue
+            findings.append(
+                {
+                    "review_id": item.get("id"),
+                    "severity": severities or ["HIGH"],
+                    "body_present": bool(body.strip()),
+                }
+            )
+        raise TaskSessionError(
+            "PR review gate found blocking current-head review findings: "
+            + json.dumps(findings, ensure_ascii=False, sort_keys=True)
+        )
+
+    exact_codex_comments: list[Mapping[str, Any]] = []
+    stale_codex_markers: list[str] = []
+    for comment in issue_comments:
+        if _review_login(comment) not in TRUSTED_REVIEW_LOGINS:
+            continue
+        body = _review_body(comment)
+        lowered = body.casefold()
+        if "review skipped" in lowered or "rate limit exceeded" in lowered:
+            continue
+        markers = reviewed_commit_markers(body)
+        if not markers:
+            continue
+        if any(_marker_matches_head(marker, head_sha) for marker in markers) and any(
+            marker in lowered for marker in REVIEW_COMPLETED_MARKERS
+        ):
+            exact_codex_comments.append(comment)
+        else:
+            stale_codex_markers.extend(markers)
+
+    if not exact_approvals and not exact_codex_comments:
+        details = (
+            f"; stale review markers: {', '.join(stale_codex_markers)}"
+            if stale_codex_markers
+            else ""
+        )
+        raise TaskSessionError(
+            f"PR review gate has no completed approval for exact current head {head_sha}{details}"
+        )
+
+    sources: list[str] = []
+    if exact_approvals:
+        sources.append("github-formal-approval")
+    if exact_codex_comments:
+        sources.append("codex-completed-review-comment")
+    return {
+        "status": "PASS",
+        "head_sha": head_sha,
+        "reviewed_head_sha": head_sha,
+        "sources": sources,
+        "formal_approval_count": len(exact_approvals),
+        "codex_review_comment_count": len(exact_codex_comments),
+        "unresolved_thread_count": 0,
+        "blocking_finding_count": 0,
+        "severity_mapping": {
+            "P0": "BLOCKER",
+            "P1": "HIGH",
+            "P2": "MEDIUM",
+            "P3": "LOW",
+            "NIT": "LOW",
+        },
+    }
 
 
 def validate_task_pull_request(
@@ -819,6 +1076,43 @@ def validate_pr_event(
         files, expected_count=int(pull_request.get("changed_files", len(files)))
     )
     return {"kind": "task-pr", "task_id": task_id, "head_sha": pull_request["head"]["sha"]}
+
+
+def validate_pr_review_event(
+    github: GitHubClient,
+    event_path: Path,
+    *,
+    pr_number: int | None = None,
+    expected_head_sha: str | None = None,
+) -> dict[str, Any]:
+    event = json.loads(event_path.read_text(encoding="utf-8"))
+    event_pull_request = event.get("pull_request")
+    if not isinstance(event_pull_request, Mapping) and pr_number is None:
+        raise TaskSessionError("Review gate event does not contain a pull request")
+    number = pr_number or int(event_pull_request["number"])
+    event_head_sha = (
+        str(event_pull_request.get("head", {}).get("sha", ""))
+        if isinstance(event_pull_request, Mapping)
+        else ""
+    )
+    pull_request = github.pull_request(number)
+    live_head_sha = str(pull_request.get("head", {}).get("sha", ""))
+    if event_head_sha and event_head_sha != live_head_sha:
+        raise TaskSessionError(
+            f"Review gate event is stale: event head {event_head_sha} != live head {live_head_sha}"
+        )
+    if expected_head_sha and live_head_sha != expected_head_sha:
+        raise TaskSessionError(
+            f"Review gate head {live_head_sha} != expected current head {expected_head_sha}"
+        )
+    evidence = validate_pull_request_review_contract(
+        pull_request,
+        github.pull_request_reviews(number),
+        github.issue_comments(number),
+        github.review_threads(number),
+        expected_head_sha=live_head_sha,
+    )
+    return {"kind": "pull-request-review", "pr_number": number, **evidence}
 
 
 def verify_master_merge(
@@ -2097,6 +2391,7 @@ class TaskController:
         session_label: str,
         mode: str = "write",
         slug: str | None = None,
+        dependency_ids: Sequence[str] | None = None,
         offline: bool = False,
     ) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
@@ -2139,7 +2434,8 @@ class TaskController:
             raise TaskSessionError(
                 f"Task {expected} blocked: {gate_name} is missing: {concrete_requirement}"
             )
-        missing = sorted(set(document.dependencies) - self._completed_dependency_ids())
+        resolved_dependencies = _resolved_dependency_ids(dependency_ids, document.dependencies)
+        missing = sorted(set(resolved_dependencies) - self._completed_dependency_ids())
         if missing:
             raise TaskSessionError(
                 f"Task {expected} has incomplete dependencies: {', '.join(missing)}"
@@ -2189,6 +2485,8 @@ class TaskController:
                 "session_label": session_label,
                 "concurrency_class": document.concurrency_class,
                 "integration_policy": "task-pr-to-master",
+                "dependency_ids": list(resolved_dependencies),
+                "dependency_source": "github-issue" if dependency_ids is not None else "task-spec",
                 "owner_launch": True,
                 "canonical_master_refresh": canonical_refresh,
             }
@@ -2209,6 +2507,8 @@ class TaskController:
             "prompt": (
                 f"Worktree: {target.resolve()}\nBranch: {branch}\n"
                 f"Base origin/master: {base_sha}\nTask: {expected} ({document.path})\n"
+                f"Dependencies ({'Issue' if dependency_ids is not None else 'task spec'} source): "
+                f"{', '.join(resolved_dependencies) or 'none'}\n"
                 f"Canonical master checkpoint: {canonical_refresh['result']}\n"
                 "Concurrency: missing task concurrency metadata defaults to independent-write; "
                 "exclusive-write is reserved for global/coordination-sensitive scope. Only an "
@@ -2447,10 +2747,13 @@ class TaskController:
         if not self.repository.is_ancestor(base_sha, head_sha):
             raise TaskSessionError("Task HEAD does not descend from leased origin/master base")
         document = find_task_document(self._canonical_root(), expected)
+        dependency_ids = _resolved_dependency_ids(
+            lease.get("dependency_ids"), document.dependencies
+        )
         validate_task_commit_messages(
             expected,
             self.repository.commits(f"{base_sha}..{head_sha}"),
-            dependency_ids=document.dependencies,
+            dependency_ids=dependency_ids,
         )
         gate: dict[str, Any] | None = None
         gate_issue: str | None = None
@@ -2766,10 +3069,13 @@ class TaskController:
                 f"Task {expected} delivery HEAD changed after refresh: {head_sha}"
             )
         document = find_task_document(self._canonical_root(), expected)
+        dependency_ids = _resolved_dependency_ids(
+            lease.get("dependency_ids"), document.dependencies
+        )
         validate_task_commit_messages(
             expected,
             self.repository.commits(f"{base_sha}..{head_sha}"),
-            dependency_ids=document.dependencies,
+            dependency_ids=dependency_ids,
         )
         with self.store.lock():
             lease_path = self.store.task_lease_path(expected)
@@ -3071,6 +3377,15 @@ class TaskController:
             )
         self._verify_live_master(deployed_sha)
         pull_request = self._github().pull_request(pr_number)
+        review_contract = validate_pull_request_review_contract(
+            pull_request,
+            self._github().pull_request_reviews(pr_number),
+            self._github().issue_comments(pr_number),
+            self._github().review_threads(pr_number),
+            expected_head_sha=str(pull_request.get("head", {}).get("sha", "")),
+            require_open=False,
+            require_mergeable=False,
+        )
         commits = self._github().pull_request_commits(pr_number)
         checks = self._github().check_runs(str(pull_request["head"]["sha"]))
         files = self._github().pull_request_files(pr_number)
@@ -3109,6 +3424,7 @@ class TaskController:
             "merge_sha": merge_sha,
             "deployed_sha": deployed_sha,
             "pr_number": pr_number,
+            "review_contract": review_contract,
             "completed_at": utc_now(),
         }
         with self.store.lock():
@@ -3143,6 +3459,7 @@ class TaskController:
             current["lifecycle_state"] = "production-success"
             current["merge_sha"] = merge_sha
             current["deployed_sha"] = deployed_sha
+            current["review_contract"] = review_contract
             current["updated_at"] = now
             StateStore.replace_json(lease_path, current)
             history["closeout_required"] = True
@@ -3414,6 +3731,7 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument("--session-label", required=True)
     start.add_argument("--mode", choices=("write",), default="write")
     start.add_argument("--slug")
+    start.add_argument("--dependency-id", action="append")
     start.add_argument("--offline", action="store_true")
     adopt = subparsers.add_parser("adopt-current")
     adopt.add_argument("task_id")
@@ -3464,6 +3782,11 @@ def _parser() -> argparse.ArgumentParser:
     finish.add_argument("task_id")
     validate_pr = subparsers.add_parser("validate-pr")
     validate_pr.add_argument("--event", type=Path, required=True)
+    validate_pr_review = subparsers.add_parser("validate-pr-review")
+    review_source = validate_pr_review.add_mutually_exclusive_group(required=True)
+    review_source.add_argument("--event", type=Path)
+    review_source.add_argument("--pr", type=int)
+    validate_pr_review.add_argument("--head-sha")
     merge = subparsers.add_parser("verify-master-merge")
     merge.add_argument("--sha", required=True)
     return parser
@@ -3498,6 +3821,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     session_label=args.session_label,
                     mode=args.mode,
                     slug=args.slug,
+                    dependency_ids=args.dependency_id,
                     offline=args.offline,
                 )
             )
@@ -3570,6 +3894,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "validate-pr":
             _print(validate_pr_event(repository, github, args.event))
+            return 0
+        if args.command == "validate-pr-review":
+            if github is None:
+                raise TaskSessionError("validate-pr-review requires online GitHub access")
+            if args.event is not None:
+                _print(
+                    validate_pr_review_event(github, args.event, expected_head_sha=args.head_sha)
+                )
+            else:
+                pull_request = github.pull_request(args.pr)
+                evidence = validate_pull_request_review_contract(
+                    pull_request,
+                    github.pull_request_reviews(args.pr),
+                    github.issue_comments(args.pr),
+                    github.review_threads(args.pr),
+                    expected_head_sha=args.head_sha,
+                )
+                _print({"kind": "pull-request-review", "pr_number": args.pr, **evidence})
             return 0
         if args.command == "verify-master-merge":
             _print(verify_master_merge(repository, github, sha=args.sha))
