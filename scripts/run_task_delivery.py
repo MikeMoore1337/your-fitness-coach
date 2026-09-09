@@ -19,7 +19,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -85,6 +85,8 @@ CONTROL_ISSUE_RE = re.compile(r"^\[Task (?P<task_id>[0-9]+[A-Z]?)\]", re.IGNOREC
 WORKER_PARENT_LOST_EXIT_CODE = 125
 WORKER_SUPERVISOR_POLL_SECONDS = 0.25
 WORKER_TERMINATION_TIMEOUT_SECONDS = 5
+WORKER_KILL_SIGNAL = getattr(signal, "SIGKILL", 9)
+WORKER_STATE_VERSION = 1
 QUEUE_CLAIM_IDLE_PHASE = "idle"
 QUEUE_CLAIM_TASK_PHASE = "task_running"
 QUEUE_CLAIM_IDLE_WORKER_STATE = "idle"
@@ -458,11 +460,23 @@ def _validate_queue_claim_task_state(claim: dict[str, Any], claim_path: Path) ->
     task_id = claim.get("task_id")
     task_issue = claim.get("task_issue")
     worker_state = claim.get("worker_state")
+    worker_state_path = claim.get("worker_state_path")
+    if worker_state_path is not None and (
+        not isinstance(worker_state_path, str)
+        or not worker_state_path
+        or len(worker_state_path) > 1024
+        or not Path(worker_state_path).is_absolute()
+    ):
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue claim has invalid worker state path; "
+            f"inspect {claim_path}"
+        )
     if (
         queue_phase == QUEUE_CLAIM_IDLE_PHASE
         and task_id is None
         and task_issue is None
         and worker_state == QUEUE_CLAIM_IDLE_WORKER_STATE
+        and worker_state_path is None
     ):
         return
     if queue_phase == QUEUE_CLAIM_TASK_PHASE:
@@ -594,8 +608,17 @@ class _ContinuousQueueClaim:
                 "task_id": normalized_task_id,
                 "task_issue": task_issue,
                 "worker_state": QUEUE_CLAIM_RUNNING_WORKER_STATE,
+                "worker_state_path": None,
             }
         )
+
+    def set_worker_state_path(self, worker_state_path: Path) -> None:
+        path = worker_state_path.resolve()
+        if len(str(path)) > 1024:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: continuous queue worker state path is too long; inspect {path}"
+            )
+        self._update({"worker_state_path": str(path)})
 
     def clear_task(self) -> None:
         self._update(
@@ -604,6 +627,7 @@ class _ContinuousQueueClaim:
                 "task_id": None,
                 "task_issue": None,
                 "worker_state": QUEUE_CLAIM_IDLE_WORKER_STATE,
+                "worker_state_path": None,
             }
         )
 
@@ -939,6 +963,7 @@ def _continuous_queue_claim(control_issue: int) -> Iterator[_ContinuousQueueClai
             "task_id": None,
             "task_issue": None,
             "worker_state": QUEUE_CLAIM_IDLE_WORKER_STATE,
+            "worker_state_path": None,
         },
     )
     descriptor: int | None = None
@@ -957,12 +982,17 @@ def _continuous_queue_claim(control_issue: int) -> Iterator[_ContinuousQueueClai
             ) from error
     if descriptor is None:
         raise DeliveryError(f"HUMAN_REQUIRED: cannot acquire continuous queue claim {claim_path}")
+    failed = False
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(claim)
             handle.write("\n")
         queue_claim = _ContinuousQueueClaim(claim_path, claim + "\n")
-        yield queue_claim
+        try:
+            yield queue_claim
+        except BaseException:
+            failed = True
+            raise
     finally:
         try:
             if (
@@ -971,7 +1001,22 @@ def _continuous_queue_claim(control_issue: int) -> Iterator[_ContinuousQueueClai
                 or claim_path.read_text(encoding="utf-8") != queue_claim.content
             ):
                 raise DeliveryError("HUMAN_REQUIRED: continuous queue claim changed before release")
-            claim_path.unlink()
+            current_claim = _read_queue_claim(claim_path)
+            if current_claim is None:
+                raise DeliveryError("HUMAN_REQUIRED: continuous queue claim disappeared")
+            if failed and current_claim[1].get("queue_phase") == QUEUE_CLAIM_TASK_PHASE:
+                _event(
+                    "CONTINUOUS_QUEUE_CLAIM_PRESERVED",
+                    claim_path=str(claim_path),
+                    task_id=current_claim[1].get("task_id"),
+                    worker_state_path=current_claim[1].get("worker_state_path"),
+                )
+            else:
+                if current_claim[1].get("queue_phase") != QUEUE_CLAIM_IDLE_PHASE:
+                    raise DeliveryError(
+                        "HUMAN_REQUIRED: continuous queue claim still records an active task"
+                    )
+                claim_path.unlink()
         except FileNotFoundError as error:
             raise DeliveryError("HUMAN_REQUIRED: continuous queue claim disappeared") from error
         except OSError as error:
@@ -1390,9 +1435,7 @@ def _cleanup_delivery_artifacts(task_id: str, artifacts: Path) -> dict[str, Any]
     return result
 
 
-def _linux_worker_parent_death_signal(parent_pid: int) -> None:
-    """Bind a pre-exec child to its Linux supervisor and fail closed on a race."""
-
+def _linux_set_parent_death_signal(parent_pid: int, death_signal: int) -> bool:
     import ctypes
 
     try:
@@ -1406,14 +1449,293 @@ def _linux_worker_parent_death_signal(parent_pid: int) -> None:
             ctypes.c_ulong,
         ]
         prctl.restype = ctypes.c_int
-        if prctl(1, signal.SIGKILL, 0, 0, 0) != 0 or os.getppid() != parent_pid:
-            os._exit(WORKER_PARENT_LOST_EXIT_CODE)
-    except AttributeError, OSError:
+        return prctl(1, death_signal, 0, 0, 0) == 0 and os.getppid() == parent_pid
+    except AttributeError, OSError, TypeError:
+        return False
+
+
+def _linux_worker_parent_death_signal(parent_pid: int) -> None:
+    """Bind a pre-exec child to its Linux supervisor and fail closed on a race."""
+
+    if not _linux_set_parent_death_signal(parent_pid, WORKER_KILL_SIGNAL):
         os._exit(WORKER_PARENT_LOST_EXIT_CODE)
 
 
 def _linux_worker_preexec(parent_pid: int) -> Callable[[], None]:
     return lambda: _linux_worker_parent_death_signal(parent_pid)
+
+
+def _kill_posix_worker_group(process_group_id: int) -> None:
+    if isinstance(process_group_id, bool) or not isinstance(process_group_id, int):
+        raise DeliveryError("HUMAN_REQUIRED: worker process group identity is invalid")
+    try:
+        os.killpg(process_group_id, WORKER_KILL_SIGNAL)
+    except ProcessLookupError:
+        return
+    except OSError as error:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: cannot terminate the complete POSIX Codex worker group"
+        ) from error
+
+
+def _posix_worker_group_is_alive(process_group_id: int) -> bool:
+    try:
+        os.killpg(process_group_id, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError as error:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: cannot verify the POSIX Codex worker process group"
+        ) from error
+    except OSError as error:
+        if error.errno == errno.ESRCH:
+            return False
+        raise DeliveryError(
+            "HUMAN_REQUIRED: cannot verify the POSIX Codex worker process group"
+        ) from error
+    return True
+
+
+def _worker_state_payload(process: Any, process_group_id: int | None) -> dict[str, Any]:
+    process_id = getattr(process, "pid", None)
+    if isinstance(process_id, bool) or not isinstance(process_id, int) or process_id < 1:
+        raise DeliveryError("HUMAN_REQUIRED: Codex worker has invalid PID")
+    process_instance = _queue_owner_process_instance(process_id)
+    if process_instance is None:
+        raise DeliveryError("HUMAN_REQUIRED: cannot identify the Codex worker process")
+    if process_group_id is not None and (
+        isinstance(process_group_id, bool)
+        or not isinstance(process_group_id, int)
+        or process_group_id < 1
+    ):
+        raise DeliveryError("HUMAN_REQUIRED: Codex worker has invalid process group identity")
+    return {
+        "version": WORKER_STATE_VERSION,
+        "pid": process_id,
+        "process_group_id": process_group_id,
+        "process_instance": process_instance,
+        "started_at": datetime.now(UTC).isoformat(timespec="microseconds"),
+    }
+
+
+def _write_worker_state(path: Path, process: Any, process_group_id: int | None) -> None:
+    payload = _worker_state_payload(process, process_group_id)
+    serialized = json.dumps(payload, ensure_ascii=True, sort_keys=True) + "\n"
+    try:
+        descriptor = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: worker state already exists; inspect {path}"
+        ) from error
+    except OSError as error:
+        raise DeliveryError(f"HUMAN_REQUIRED: cannot persist Codex worker state {path}") from error
+
+
+def _read_worker_state(path: Path) -> dict[str, Any]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: Codex worker state is missing; inspect {path}"
+        ) from error
+    except OSError as error:
+        raise DeliveryError(f"HUMAN_REQUIRED: cannot inspect Codex worker state {path}") from error
+    except json.JSONDecodeError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: Codex worker state is malformed; inspect {path}"
+        ) from error
+    if not isinstance(raw, dict) or raw.get("version") != WORKER_STATE_VERSION:
+        raise DeliveryError(f"HUMAN_REQUIRED: Codex worker state is invalid; inspect {path}")
+    process_id = raw.get("pid")
+    process_group_id = raw.get("process_group_id")
+    process_instance = raw.get("process_instance")
+    if (
+        isinstance(process_id, bool)
+        or not isinstance(process_id, int)
+        or process_id < 1
+        or (
+            process_group_id is not None
+            and (
+                isinstance(process_group_id, bool)
+                or not isinstance(process_group_id, int)
+                or process_group_id < 1
+            )
+        )
+    ):
+        raise DeliveryError(f"HUMAN_REQUIRED: Codex worker state has invalid PID; inspect {path}")
+    raw["process_instance"] = _queue_claim_process_instance(process_instance, path)
+    return raw
+
+
+def _reconcile_worker_state(path: Path) -> None:
+    state = _read_worker_state(path)
+    process_id = int(state["pid"])
+    process_group_id = state.get("process_group_id")
+    process_instance = state["process_instance"]
+    if os.name == "nt":
+        if _queue_owner_is_alive(process_id, process_instance):
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Windows Codex worker remains live after supervisor exit; inspect {path}"
+            )
+    else:
+        if process_group_id is None:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: POSIX Codex worker has no process group identity; inspect {path}"
+            )
+        observed_instance = _queue_owner_process_instance(process_id)
+        if observed_instance is not None and observed_instance != process_instance:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Codex worker PID was reused during reconciliation; inspect {path}"
+            )
+        if _posix_worker_group_is_alive(int(process_group_id)):
+            _kill_posix_worker_group(int(process_group_id))
+            if _posix_worker_group_is_alive(int(process_group_id)):
+                raise DeliveryError(
+                    f"HUMAN_REQUIRED: POSIX Codex worker group remains live; inspect {path}"
+                )
+    try:
+        path.unlink()
+    except FileNotFoundError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: Codex worker state disappeared; inspect {path}"
+        ) from error
+    except OSError as error:
+        raise DeliveryError(f"HUMAN_REQUIRED: cannot remove Codex worker state {path}") from error
+
+
+def _worker_bootstrap_command(
+    command: Sequence[str], *, parent_pid: int, worker_state_path: Path | None
+) -> list[str]:
+    bootstrap = [
+        sys.executable,
+        str(SCRIPT_PATH),
+        "--worker-bootstrap",
+        "--parent-pid",
+        str(parent_pid),
+    ]
+    if worker_state_path is not None:
+        bootstrap.extend(("--worker-state-path", str(worker_state_path)))
+    bootstrap.extend(("--worker-command", *command))
+    return bootstrap
+
+
+def _worker_parent_is_alive(parent_pid: int) -> bool:
+    return os.getppid() == parent_pid
+
+
+def _wait_for_windows_worker_release() -> None:
+    try:
+        release = sys.stdin.buffer.read(1)
+    except (AttributeError, OSError, ValueError) as error:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: Windows Codex worker release channel failed"
+        ) from error
+    if release != b"\n":
+        raise DeliveryError(
+            "HUMAN_REQUIRED: Windows Codex worker was not released by its supervisor"
+        )
+
+
+def _release_windows_worker(process: Any) -> None:
+    stream = getattr(process, "stdin", None)
+    if stream is None:
+        raise DeliveryError("HUMAN_REQUIRED: Windows Codex worker has no release channel")
+    try:
+        stream.write(b"\n")
+        stream.flush()
+        stream.close()
+    except (AttributeError, OSError, ValueError) as error:
+        raise DeliveryError("HUMAN_REQUIRED: cannot release Windows Codex worker") from error
+
+
+def _run_worker_bootstrap(
+    command: Sequence[str],
+    *,
+    parent_pid: int,
+    worker_state_path: Path | None,
+    popen: Callable[..., Any] = subprocess.Popen,
+    parent_probe: Callable[[int], bool] = _worker_parent_is_alive,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> int:
+    if parent_pid < 1 or not command:
+        raise DeliveryError("HUMAN_REQUIRED: worker bootstrap received invalid process metadata")
+    if os.name == "nt":
+        _wait_for_windows_worker_release()
+
+    worker_process: Any | None = None
+    process_group_id: int | None = None
+
+    def terminate_from_parent_loss(signum: int = 0, frame: Any = None) -> None:
+        del signum, frame
+        if process_group_id is not None:
+            with suppress(DeliveryError):
+                _kill_posix_worker_group(process_group_id)
+        os._exit(WORKER_PARENT_LOST_EXIT_CODE)
+
+    if os.name != "nt":
+        try:
+            signal.signal(signal.SIGTERM, terminate_from_parent_loss)
+        except OSError, ValueError:
+            os._exit(WORKER_PARENT_LOST_EXIT_CODE)
+        if sys.platform == "linux" and not _linux_set_parent_death_signal(
+            parent_pid, signal.SIGTERM
+        ):
+            terminate_from_parent_loss()
+    if not parent_probe(parent_pid):
+        return WORKER_PARENT_LOST_EXIT_CODE
+
+    launch_kwargs: dict[str, Any] = {
+        "shell": False,
+        "stdin": subprocess.DEVNULL,
+        "stderr": subprocess.STDOUT,
+    }
+    if os.name != "nt":
+        launch_kwargs["start_new_session"] = True
+    try:
+        worker_process = popen(list(command), **launch_kwargs)
+        if os.name != "nt":
+            try:
+                process_group_id = os.getpgid(worker_process.pid)
+            except ProcessLookupError:
+                # start_new_session=True makes the worker PID its process-group ID;
+                # retain that identity when the leader exits before getpgid runs.
+                process_group_id = worker_process.pid
+        if worker_state_path is not None:
+            _write_worker_state(worker_state_path, worker_process, process_group_id)
+    except OSError as error:
+        if process_group_id is not None:
+            _kill_posix_worker_group(process_group_id)
+        raise DeliveryError("HUMAN_REQUIRED: cannot start Codex worker") from error
+    except DeliveryError:
+        if process_group_id is not None:
+            _kill_posix_worker_group(process_group_id)
+        raise
+
+    try:
+        while worker_process.poll() is None:
+            if not parent_probe(parent_pid):
+                if process_group_id is not None:
+                    _kill_posix_worker_group(process_group_id)
+                else:
+                    worker_process.terminate()
+                worker_process.wait(timeout=WORKER_TERMINATION_TIMEOUT_SECONDS)
+                _event("WORKER_BOOTSTRAP_ABORTED_PARENT_LOST", parent_pid=parent_pid)
+                return WORKER_PARENT_LOST_EXIT_CODE
+            sleeper(WORKER_SUPERVISOR_POLL_SECONDS)
+        if process_group_id is not None and _posix_worker_group_is_alive(process_group_id):
+            _kill_posix_worker_group(process_group_id)
+            raise DeliveryError("HUMAN_REQUIRED: Codex worker left live POSIX descendants")
+        return int(worker_process.returncode)
+    finally:
+        if worker_process.poll() is None:
+            if process_group_id is not None:
+                _kill_posix_worker_group(process_group_id)
+            else:
+                worker_process.terminate()
 
 
 class _WindowsWorkerJob:
@@ -1551,7 +1873,7 @@ def _terminate_supervised_worker(
             if os.name == "nt" and windows_job is None:
                 process.kill()
             elif os.name != "nt":
-                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                os.killpg(os.getpgid(process.pid), WORKER_KILL_SIGNAL)
             elif windows_job is not None:
                 windows_job.close()
             process.wait(timeout=WORKER_TERMINATION_TIMEOUT_SECONDS)
@@ -1564,6 +1886,7 @@ def _run_worker_supervisor(
     *,
     parent_pid: int,
     parent_identity: Mapping[str, str],
+    worker_state_path: Path | None = None,
     popen: Callable[..., Any] = subprocess.Popen,
     owner_probe: Callable[[int, Mapping[str, str]], bool] = _queue_owner_is_alive,
     sleeper: Callable[[float], None] = time.sleep,
@@ -1571,9 +1894,14 @@ def _run_worker_supervisor(
 ) -> int:
     if parent_pid < 1 or not command:
         raise DeliveryError("HUMAN_REQUIRED: worker supervisor received invalid process metadata")
+    worker_command = _worker_bootstrap_command(
+        command,
+        parent_pid=os.getpid(),
+        worker_state_path=worker_state_path,
+    )
     launch_kwargs: dict[str, Any] = {
         "shell": False,
-        "stdin": subprocess.DEVNULL,
+        "stdin": subprocess.PIPE if os.name == "nt" else subprocess.DEVNULL,
         "stderr": subprocess.STDOUT,
     }
     if os.name == "nt":
@@ -1583,15 +1911,18 @@ def _run_worker_supervisor(
         if sys.platform == "linux":
             launch_kwargs["preexec_fn"] = _linux_worker_preexec(os.getpid())
     try:
-        process = popen(list(command), **launch_kwargs)
+        process = popen(worker_command, **launch_kwargs)
     except OSError as error:
         raise DeliveryError("HUMAN_REQUIRED: cannot start Codex worker supervisor child") from error
     windows_job: _WindowsWorkerJob | None = None
     if os.name == "nt":
         try:
             windows_job = (job_factory or _create_windows_worker_job)(process)
+            if windows_job is None:
+                raise DeliveryError("HUMAN_REQUIRED: Windows Codex worker job was not installed")
+            _release_windows_worker(process)
         except DeliveryError:
-            _terminate_supervised_worker(process)
+            _terminate_supervised_worker(process, windows_job=windows_job)
             raise
     try:
         while process.poll() is None:
@@ -1618,6 +1949,7 @@ def _worker_supervisor_from_args(
     parent_pid: int | None,
     parent_identity_json: str | None,
     command: Sequence[str] | None,
+    worker_state_path_value: str | None,
 ) -> int:
     if parent_pid is None or parent_identity_json is None or not command:
         raise DeliveryError("HUMAN_REQUIRED: worker supervisor arguments are incomplete")
@@ -1632,10 +1964,39 @@ def _worker_supervisor_from_args(
     parent_identity = _queue_claim_process_instance(
         parent_identity_value, Path("worker-supervisor-parent")
     )
+    worker_state_path = _worker_state_path_from_arg(worker_state_path_value)
     return _run_worker_supervisor(
         command,
         parent_pid=parent_pid,
         parent_identity=parent_identity,
+        worker_state_path=worker_state_path,
+    )
+
+
+def _worker_state_path_from_arg(value: str | None) -> Path | None:
+    if value is None:
+        return None
+    if not value or len(value) > 1024:
+        raise DeliveryError("HUMAN_REQUIRED: worker state path is invalid")
+    path = Path(value)
+    if not path.is_absolute():
+        raise DeliveryError("HUMAN_REQUIRED: worker state path must be absolute")
+    return path
+
+
+def _worker_bootstrap_from_args(
+    *,
+    parent_pid: int | None,
+    command: Sequence[str] | None,
+    worker_state_path_value: str | None,
+) -> int:
+    if parent_pid is None or not command:
+        raise DeliveryError("HUMAN_REQUIRED: worker bootstrap arguments are incomplete")
+    worker_state_path = _worker_state_path_from_arg(worker_state_path_value)
+    return _run_worker_bootstrap(
+        command,
+        parent_pid=parent_pid,
+        worker_state_path=worker_state_path,
     )
 
 
@@ -1645,6 +2006,7 @@ def _launch_worker(
     artifacts: Path,
     *,
     issue_contract: Mapping[str, Any] | None = None,
+    worker_state_path: Path | None = None,
 ) -> int:
     codex = shutil.which("codex")
     if codex is None:
@@ -1652,6 +2014,7 @@ def _launch_worker(
     worktree = Path(str(started["lease"]["worktree"]))
     result_path = artifacts / "final.md"
     log_path = artifacts / "events.jsonl"
+    worker_state_path = (worker_state_path or artifacts / "worker-state.json").resolve()
     worker_env = os.environ.copy()
     worker_env[ACTIVE_DELIVERY_ARTIFACTS_ENV] = str(artifacts.resolve())
     parent_identity = _current_process_instance_identity()
@@ -1678,6 +2041,8 @@ def _launch_worker(
         str(os.getpid()),
         "--parent-identity",
         json.dumps(parent_identity, ensure_ascii=True, sort_keys=True),
+        "--worker-state-path",
+        str(worker_state_path),
         "--worker-command",
         *worker_command,
     ]
@@ -1701,6 +2066,7 @@ def _launch_worker(
             supervisor_command,
             **launch_kwargs,
         )
+    _reconcile_worker_state(worker_state_path)
     return completed.returncode
 
 
@@ -1775,6 +2141,7 @@ def _deliver_one(
     control_issue: int | None = None,
     state_issue: int | None = None,
     issue_contract: Mapping[str, Any] | None = None,
+    queue_claim: _ContinuousQueueClaim | None = None,
 ) -> dict[str, Any]:
     started = _start(
         task_id,
@@ -1801,6 +2168,9 @@ def _deliver_one(
             ),
         )
     artifacts = _artifact_root(task_id)
+    worker_state_path = artifacts / "worker-state.json"
+    if queue_claim is not None:
+        queue_claim.set_worker_state_path(worker_state_path)
     _event(
         "STARTED",
         task_id=task_id,
@@ -1808,7 +2178,13 @@ def _deliver_one(
         worktree=started["lease"]["worktree"],
         artifacts=str(artifacts),
     )
-    worker_exit = _launch_worker(task_id, started, artifacts, issue_contract=issue_contract)
+    worker_exit = _launch_worker(
+        task_id,
+        started,
+        artifacts,
+        issue_contract=issue_contract,
+        worker_state_path=worker_state_path,
+    )
     history = _history(task_id)
     budget_report: dict[str, int] | None = None
     if worker_exit != 0:
@@ -2065,6 +2441,7 @@ def _run_continuous_queue_locked(
             control_issue=control_issue,
             state_issue=task_issue,
             issue_contract=candidate.get("contract"),
+            queue_claim=queue_claim,
         )
         queue_claim.clear_task()
         completed += 1
@@ -2100,8 +2477,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-tasks", type=int, default=4)
     parser.add_argument("--offline", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--worker-supervisor", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--worker-bootstrap", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--parent-pid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--parent-identity", help=argparse.SUPPRESS)
+    parser.add_argument("--worker-state-path", help=argparse.SUPPRESS)
     parser.add_argument("--worker-command", nargs=argparse.REMAINDER, help=argparse.SUPPRESS)
     return parser
 
@@ -2109,11 +2488,18 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.worker_bootstrap:
+            return _worker_bootstrap_from_args(
+                parent_pid=args.parent_pid,
+                command=args.worker_command,
+                worker_state_path_value=args.worker_state_path,
+            )
         if args.worker_supervisor:
             return _worker_supervisor_from_args(
                 parent_pid=args.parent_pid,
                 parent_identity_json=args.parent_identity,
                 command=args.worker_command,
+                worker_state_path_value=args.worker_state_path,
             )
         if args.poll_seconds < 10:
             raise DeliveryError("poll-seconds must be at least 10")

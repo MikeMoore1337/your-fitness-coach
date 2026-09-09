@@ -57,15 +57,19 @@ macOS — bounded probes системного времени запуска пр
 При collision launcher проверяет liveness и совпадение этой identity; один PID без identity не
 считается достаточным, поэтому повторно выданный PID после crash или reboot не блокирует очередь.
 Codex worker запускается через отдельный supervisor, который также проверяет exact parent
-identity и при потере launcher завершает worker process group до возврата orphaned lock в очередь.
-На Linux child Codex получает `PR_SET_PDEATHSIG=SIGKILL` до `exec` и проверяет PID supervisor
-после установки сигнала: смерть supervisor прекращает сам Codex даже при SIGKILL/OOM, а race
-при установке binding завершается fail-closed. На POSIX intentional parent-loss по-прежнему
-завершает отдельную worker process group; если авария оставляет descendant вне этой границы,
-durable active claim не позволяет новому launcher reclaim queue до reconciliation.
-На Windows supervisor помещает worker и его дочерние процессы в Job Object с
-`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, поэтому потеря launcher не оставляет дочерний Codex
-процесс вне termination boundary.
+identity и запускает worker через bounded bootstrap guard. На POSIX guard запускает Codex в
+отдельной process group, наблюдает lifetime supervisor и при parent-loss завершает всю группу;
+это покрывает и Codex, и его tool/shell descendants. На Linux guard получает
+`PR_SET_PDEATHSIG` до `exec`, а после старта переключается на обработчик, который уничтожает
+worker group, поэтому SIGKILL/OOM supervisor не оставляет Codex descendants работать дальше.
+На macOS тот же guard использует bounded parent-polling и тот же group kill.
+Worker state с PID, process-instance identity и process-group ID записывается атомарно до
+начала дальнейшей работы. При ошибке supervisor launcher сверяет и при необходимости
+завершает эту группу; active queue claim сохраняется при любом abnormal worker exit, поэтому
+новый launcher не reclaim-ит очередь до reconciliation.
+На Windows guard сначала ждёт release от supervisor. Supervisor сначала помещает этот ещё
+не запустивший Codex guard в Job Object с `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, затем отправляет
+release; Codex и его дочерние процессы наследуют Job Object без assignment gap.
 Claim атомарно обновляет `queue_phase`, `task_id`, `task_issue` и `worker_state` перед запуском
 каждой задачи и очищает их только после полного `_deliver_one`. Если owner провалился, пока claim
 содержит активную задачу, recovery сначала читает durable controller history и останавливается

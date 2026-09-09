@@ -60,6 +60,11 @@ def test_worker_launch_passes_active_delivery_artifacts_to_child(
     monkeypatch.setenv("YFC_ACTIVE_DELIVERY_ARTIFACTS", "C:/untrusted/stale-path")
     monkeypatch.setattr(delivery.shutil, "which", lambda name: "codex")
     monkeypatch.setattr(delivery, "_worker_prompt", lambda *args, **kwargs: "prompt")
+    monkeypatch.setattr(
+        delivery,
+        "_reconcile_worker_state",
+        lambda path: observed.setdefault("worker_state_path", path),
+    )
 
     def fake_run(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         observed["args"] = args
@@ -79,8 +84,10 @@ def test_worker_launch_passes_active_delivery_artifacts_to_child(
     assert observed["kwargs"]["env"]["YFC_ACTIVE_DELIVERY_ARTIFACTS"] == str(artifacts.resolve())
     assert observed["args"][:2] == [sys.executable, str(delivery.SCRIPT_PATH)]
     assert "--worker-supervisor" in observed["args"]
+    assert "--worker-state-path" in observed["args"]
     command_index = observed["args"].index("--worker-command")
     assert observed["args"][command_index + 1 : command_index + 3] == ["codex", "exec"]
+    assert observed["worker_state_path"].name == "worker-state.json"
     assert observed["kwargs"]["shell"] is False
     if delivery.os.name != "nt" and delivery.sys.platform == "linux":
         assert callable(observed["kwargs"]["preexec_fn"])
@@ -94,6 +101,7 @@ class _FakeSupervisedWorker:
         self.exit_after_polls = exit_after_polls
         self.poll_count = 0
         self.terminated = False
+        self.stdin = _FakeWorkerStdin()
 
     def poll(self) -> int | None:
         self.poll_count += 1
@@ -112,6 +120,21 @@ class _FakeSupervisedWorker:
     def wait(self, *, timeout: float) -> int:
         assert timeout == delivery.WORKER_TERMINATION_TIMEOUT_SECONDS
         return self.returncode or 0
+
+
+class _FakeWorkerStdin:
+    def __init__(self) -> None:
+        self.writes: list[bytes] = []
+        self.closed = False
+
+    def write(self, value: bytes) -> None:
+        self.writes.append(value)
+
+    def flush(self) -> None:
+        return None
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class _FakeWindowsWorkerJob:
@@ -158,20 +181,30 @@ def test_worker_supervisor_terminates_codex_when_parent_instance_is_lost(
     assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
     assert process.terminated is False
     assert killpg_calls == [(1700, delivery.signal.SIGTERM)]
-    assert observed["command"] == ["codex", "exec"]
+    assert observed["command"][:3] == [
+        sys.executable,
+        str(delivery.SCRIPT_PATH),
+        "--worker-bootstrap",
+    ]
+    command_index = observed["command"].index("--worker-command")
+    assert observed["command"][command_index + 1 :] == ["codex", "exec"]
     assert observed["kwargs"]["shell"] is False
     assert observed["kwargs"]["start_new_session"] is True
     assert callable(observed["kwargs"]["preexec_fn"])
 
 
-def test_worker_supervisor_returns_codex_exit_code_when_parent_stays_alive() -> None:
+def test_worker_supervisor_returns_codex_exit_code_when_parent_stays_alive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "linux")
     process = _FakeSupervisedWorker(exit_after_polls=1)
     sleeps: list[float] = []
 
     result = delivery._run_worker_supervisor(
         ["codex", "exec"],
         parent_pid=42,
-        parent_identity={"kind": "windows", "creation_time_100ns": "123"},
+        parent_identity=_claim_process_instance(),
         popen=lambda command, **kwargs: process,
         owner_probe=lambda pid, identity: True,
         sleeper=sleeps.append,
@@ -209,6 +242,13 @@ def test_worker_supervisor_uses_windows_job_for_process_tree_termination(
     assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
     assert job.closed is True
     assert process.terminated is False
+    assert process.stdin.writes == [b"\n"]
+    assert process.stdin.closed is True
+    assert observed["command"][:3] == [
+        sys.executable,
+        str(delivery.SCRIPT_PATH),
+        "--worker-bootstrap",
+    ]
     assert observed["kwargs"]["creationflags"] == getattr(
         delivery.subprocess, "CREATE_NEW_PROCESS_GROUP", 0
     )
@@ -251,6 +291,67 @@ def test_linux_worker_supervisor_binds_codex_to_supervisor_lifetime(
     assert bound_parent_pids == [supervisor_pid]
 
 
+def test_posix_worker_bootstrap_terminates_complete_worker_group_on_parent_loss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "darwin")
+    process = _FakeSupervisedWorker()
+    killpg_calls: list[tuple[int, int]] = []
+    parent_results = iter((True, False))
+
+    def fake_killpg(process_group_id: int, signal_number: int) -> None:
+        killpg_calls.append((process_group_id, signal_number))
+        if signal_number == delivery.WORKER_KILL_SIGNAL:
+            process.returncode = -signal_number
+
+    monkeypatch.setattr(delivery.os, "getpgid", lambda pid: 1700, raising=False)
+    monkeypatch.setattr(delivery.os, "killpg", fake_killpg, raising=False)
+
+    result = delivery._run_worker_bootstrap(
+        ["codex", "exec"],
+        parent_pid=42,
+        worker_state_path=None,
+        popen=lambda command, **kwargs: process,
+        parent_probe=lambda pid: next(parent_results),
+        sleeper=lambda seconds: pytest.fail("parent loss must terminate without polling sleep"),
+    )
+
+    assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
+    assert killpg_calls == [(1700, delivery.WORKER_KILL_SIGNAL)]
+    assert process.terminated is False
+
+
+def test_posix_worker_bootstrap_persists_worker_group_identity(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "darwin")
+    process = _FakeSupervisedWorker(exit_after_polls=0)
+    state_path = tmp_path / "worker-state.json"
+
+    monkeypatch.setattr(delivery.os, "getpgid", lambda pid: 1700, raising=False)
+    monkeypatch.setattr(
+        delivery, "_queue_owner_process_instance", lambda pid: _claim_process_instance()
+    )
+    monkeypatch.setattr(delivery, "_posix_worker_group_is_alive", lambda process_group_id: False)
+
+    result = delivery._run_worker_bootstrap(
+        ["codex", "exec"],
+        parent_pid=42,
+        worker_state_path=state_path,
+        popen=lambda command, **kwargs: process,
+        parent_probe=lambda pid: True,
+        sleeper=lambda seconds: pytest.fail("already exited worker must not sleep"),
+    )
+
+    assert result == 0
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["pid"] == process.pid
+    assert state["process_group_id"] == 1700
+    assert state["process_instance"] == _claim_process_instance()
+
+
 def test_linux_worker_parent_death_binding_fails_closed_on_parent_race(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -281,6 +382,48 @@ def test_linux_worker_parent_death_binding_fails_closed_on_parent_race(
 
     assert calls == [(1, linux_sigkill)]
     assert exits == [delivery.WORKER_PARENT_LOST_EXIT_CODE]
+
+
+def test_reconcile_worker_state_terminates_live_posix_group_before_cleanup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "linux")
+    process_state = tmp_path / "worker-state.json"
+    process_state.write_text(
+        json.dumps(
+            {
+                "version": delivery.WORKER_STATE_VERSION,
+                "pid": 700,
+                "process_group_id": 1700,
+                "process_instance": _claim_process_instance(),
+                "started_at": "2026-09-09T12:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        delivery, "_queue_owner_process_instance", lambda pid: _claim_process_instance()
+    )
+    killpg_calls: list[tuple[int, int]] = []
+
+    def fake_killpg(process_group_id: int, signal_number: int) -> None:
+        killpg_calls.append((process_group_id, signal_number))
+        if signal_number == delivery.WORKER_KILL_SIGNAL:
+            return None
+
+    group_checks = iter((True, False))
+    monkeypatch.setattr(delivery.os, "killpg", fake_killpg, raising=False)
+    monkeypatch.setattr(
+        delivery,
+        "_posix_worker_group_is_alive",
+        lambda process_group_id: next(group_checks),
+    )
+
+    delivery._reconcile_worker_state(process_state)
+
+    assert killpg_calls == [(1700, delivery.WORKER_KILL_SIGNAL)]
+    assert not process_state.exists()
 
 
 def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
@@ -550,6 +693,28 @@ def test_continuous_queue_claim_persists_active_task_until_delivery_finishes(
         assert cleared["worker_state"] == "idle"
 
     assert not claim_path.exists()
+
+
+def test_continuous_queue_claim_preserves_active_task_after_worker_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+
+    with (
+        pytest.raises(delivery.DeliveryError, match="worker failed"),
+        delivery._continuous_queue_claim(218) as queue_claim,
+    ):
+        queue_claim.mark_task("91", 219)
+        raise delivery.DeliveryError("worker failed")
+
+    claim = json.loads(claim_path.read_text(encoding="utf-8"))
+    assert claim["queue_phase"] == "task_running"
+    assert claim["task_id"] == "91"
+    assert claim["worker_state"] == "running"
+    claim_path.unlink()
 
 
 def test_continuous_queue_claim_recovers_dead_owner(
