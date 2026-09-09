@@ -34,6 +34,7 @@ from fitminiapp_api.services.news_publication import (
     approve_publication,
     claim_due_publications,
     reconcile_uncertain_publication,
+    retry_uncertain_publication,
 )
 from fitminiapp_api.services.news_sources import (
     apply_source_allowlist,
@@ -434,7 +435,6 @@ def test_old_non_hermes_snapshot_does_not_reject_new_hermes_revision() -> None:
         hermes_draft = _draft(db, cluster, hermes=True)
         assert cluster.latest_draft_revision == hermes_draft.revision
         assert cluster.status == "image_pending"
-
         assert claim_due_publications(db) == []
 
         db.flush()
@@ -443,6 +443,69 @@ def test_old_non_hermes_snapshot_does_not_reject_new_hermes_revision() -> None:
         assert snapshot.last_error_code == "non_hermes_news_pipeline_retired"
         assert cluster.status == "image_pending"
         assert cluster.latest_draft_revision == hermes_draft.revision
+
+
+def test_retrying_uncertain_retired_snapshot_cannot_rewind_hermes_flow() -> None:
+    cluster_id = _source_candidate(external_id="uncertain-legacy-before-hermes")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+
+        legacy_draft = _draft(db, cluster, hermes=False)
+        cluster.status = "publication_approved"
+        snapshot = _legacy_publication_snapshot(
+            db,
+            cluster,
+            legacy_draft,
+            status="processing",
+        )
+
+        cancelled, quarantined = quarantine_non_hermes_news_work(db)
+        assert cancelled == 0
+        assert quarantined == 1
+        db.expire(snapshot)
+        assert snapshot.status == "uncertain"
+        assert snapshot.last_error_code == "worker_interrupted_send_uncertain"
+
+        hermes_draft = _draft(db, cluster, hermes=True)
+        hermes_revision = hermes_draft.revision
+        assert cluster.status == "image_pending"
+        assert cluster.latest_draft_revision == hermes_revision
+
+        assert retry_uncertain_publication(
+            db,
+            snapshot_id=snapshot.id,
+            admin_telegram_user_id=7001,
+        )
+        db.expire(snapshot)
+        db.expire(cluster)
+        assert snapshot.status == "cancelled"
+        assert snapshot.last_error_code == "non_hermes_news_pipeline_retired"
+        assert cluster.status == "image_pending"
+        assert cluster.latest_draft_revision == hermes_revision
+        assert claim_due_publications(db) == []
+
+    async def unused(*_args, **_kwargs):
+        return None
+
+    asyncio.run(
+        run_news_pipeline_once(
+            send_message=unused,
+            send_preview=unused,
+            send_publication=unused,
+            publication_ready=True,
+        )
+    )
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        snapshot = db.query(NewsPublicationSnapshot).one()
+        assert cluster is not None
+        assert snapshot.status == "cancelled"
+        assert cluster.status == "draft_ready"
+        assert cluster.latest_draft_revision == hermes_revision
+        assert claim_due_publications(db) == []
 
 
 def test_hermes_origin_is_not_quarantined() -> None:

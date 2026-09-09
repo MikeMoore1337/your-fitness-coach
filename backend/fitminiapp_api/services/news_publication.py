@@ -986,6 +986,50 @@ def retry_uncertain_publication(
     row = db.query(NewsPublicationSnapshot).filter_by(id=snapshot_id).with_for_update().first()
     if row is None or row.status != "uncertain":
         return False
+    draft = db.get(NewsDraftRevision, row.text_revision_id)
+    if draft is None or not is_hermes_origin_draft(draft):
+        row.status = "cancelled"
+        row.next_attempt_at = utcnow()
+        row.processing_started_at = None
+        row.last_error_code = "non_hermes_news_pipeline_retired"
+        reviewer_ref = _reviewer_ref(admin_telegram_user_id)
+        record_audit_event(
+            db,
+            action="news.publication_retry_cancelled",
+            resource_type="news_publication_snapshot",
+            resource_id=row.id,
+            details={
+                "attempt_count": row.attempt_count,
+                "reason": "non_hermes_news_pipeline_retired",
+            },
+        )
+        cluster = db.get(NewsCluster, row.cluster_id)
+        if cluster is not None:
+            latest_draft = (
+                db.query(NewsDraftRevision)
+                .filter(
+                    NewsDraftRevision.cluster_id == cluster.id,
+                    NewsDraftRevision.revision == cluster.latest_draft_revision,
+                )
+                .first()
+            )
+            if not (
+                latest_draft is not None and is_hermes_origin_draft(latest_draft)
+            ) and cluster.status not in {
+                "published",
+                "accepted_for_design",
+                "rejected",
+                "rejected_by_rules",
+            }:
+                transition_news_cluster(
+                    db,
+                    cluster,
+                    "rejected",
+                    reason_code="non_hermes_news_pipeline_retired",
+                    actor_ref=reviewer_ref,
+                )
+        db.flush()
+        return True
     row.status = "queued" if row.publication_mode == "immediate" else "scheduled"
     row.next_attempt_at = utcnow()
     row.last_error_code = "owner_confirmed_message_not_found_retry"
