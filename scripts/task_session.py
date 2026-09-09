@@ -807,8 +807,9 @@ def validate_pull_request_review_contract(
     expected_head_sha: str | None = None,
     require_open: bool = True,
     require_mergeable: bool = True,
+    allow_blocked_mergeable_state: bool = False,
 ) -> dict[str, Any]:
-    """Require a completed review for the current clean PR head.
+    """Require a completed review for the current PR head.
 
     GitHub formal approvals are authoritative when their ``commit_id`` is the current head.
     The Codex connector currently records its completed review as a trusted issue comment, so
@@ -833,7 +834,12 @@ def validate_pull_request_review_contract(
         if pull_request.get("mergeable") is not True:
             raise TaskSessionError("PR review gate requires an explicitly mergeable PR")
         mergeable_state = str(pull_request.get("mergeable_state", "")).lower()
-        if mergeable_state not in {"clean", "has_hooks"}:
+        allowed_mergeable_states = {"clean", "has_hooks"}
+        if allow_blocked_mergeable_state:
+            # The review-event run is itself one of the required checks. GitHub can therefore
+            # report ``blocked`` until the aggregate check containing this gate succeeds.
+            allowed_mergeable_states.add("blocked")
+        if mergeable_state not in allowed_mergeable_states:
             raise TaskSessionError(
                 "PR review gate requires a clean mergeable PR, found "
                 f"{mergeable_state or '<missing>'}"
@@ -1111,6 +1117,7 @@ def validate_pr_review_event(
         github.issue_comments(number),
         github.review_threads(number),
         expected_head_sha=live_head_sha,
+        allow_blocked_mergeable_state=True,
     )
     return {"kind": "pull-request-review", "pr_number": number, **evidence}
 

@@ -26,6 +26,11 @@ PR`; implementation остаётся в task worktree, а refresh, merge, deploy
 - отсутствие unresolved review threads и актуальных blocking findings;
 - clean/mergeable PR.
 
+На самом `pull_request_review` event GitHub может временно вернуть `mergeable_state=blocked`,
+поскольку aggregate `checks` ещё ждёт результат самого `review-contract`. Event-проверка
+разрешает это состояние только вместе с exact-head завершённым review; прямой
+`validate-pr-review` перед merge остаётся строгим и принимает только clean/has_hooks.
+
 Проверка выполняется командой `scripts/task_session.py validate-pr-review`. Review старого head
 не переносится на новый commit. Mapping severity не меняет blocking semantics: `P0 -> BLOCKER`,
 `P1 -> HIGH`, `P2 -> MEDIUM`, `P3 -> LOW`, `NIT -> LOW`.

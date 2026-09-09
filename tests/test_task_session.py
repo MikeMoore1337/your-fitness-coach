@@ -508,6 +508,34 @@ def test_review_contract_accepts_exact_codex_comment_and_resolved_threads() -> N
     assert result["head_sha"] == head_sha
 
 
+def test_review_event_accepts_exact_review_before_aggregate_check_is_green() -> None:
+    head_sha = "b" * 40
+    pull_request = _review_pr(head_sha)
+    pull_request["mergeable_state"] = "blocked"
+    comments = [
+        {
+            "id": 14,
+            "user": {"login": "chatgpt-codex-connector"},
+            "body": (
+                f"Codex Review: review status completed; **Reviewed commit:** `{head_sha[:10]}`"
+            ),
+        }
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="clean mergeable"):
+        task_session.validate_pull_request_review_contract(pull_request, [], comments, [])
+
+    result = task_session.validate_pull_request_review_contract(
+        pull_request,
+        [],
+        comments,
+        [],
+        allow_blocked_mergeable_state=True,
+    )
+    assert result["status"] == "PASS"
+    assert result["head_sha"] == head_sha
+
+
 def test_master_ruleset_requires_pr_current_base_and_aggregate_check() -> None:
     weak = [
         {

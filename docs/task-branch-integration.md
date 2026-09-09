@@ -97,7 +97,10 @@ PR CI дополнительно выполняет `review-contract`. Merge-rea
 approval на exact current head или trusted завершённого Codex review comment с exact-head marker,
 при отсутствии unresolved review threads, blocking current-head findings и dirty/non-mergeable PR.
 После нового commit старое review не считается; `pull_request_review` запускает повторную
-проверку. Для текущего Codex connector, который публикует review summary как Issue comment,
+проверку. Во время этого event GitHub может вернуть `mergeable_state=blocked`, пока aggregate
+`checks` ожидает сам `review-contract`; event gate допускает только это временное состояние при
+наличии exact-head review, а прямой pre-merge `validate-pr-review` требует clean/has_hooks. Для
+текущего Codex connector, который публикует review summary как Issue comment,
 worker должен вызвать `scripts/task_session.py validate-pr-review` и дождаться нового exact-head
 CI перед merge.
 
