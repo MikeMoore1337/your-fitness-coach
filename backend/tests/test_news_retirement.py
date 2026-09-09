@@ -12,6 +12,8 @@ from fitminiapp_api.models.news import (
     NewsCluster,
     NewsDraftRevision,
     NewsItem,
+    NewsPublicationSnapshot,
+    NewsReviewDecision,
     NewsReviewDelivery,
     NewsSource,
 )
@@ -28,7 +30,11 @@ from fitminiapp_api.services.news_editorial import (
 )
 from fitminiapp_api.services.news_ingestion import ParsedNewsItem, ingest_items, utcnow
 from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER
-from fitminiapp_api.services.news_publication import approve_publication
+from fitminiapp_api.services.news_publication import (
+    approve_publication,
+    claim_due_publications,
+    reconcile_uncertain_publication,
+)
 from fitminiapp_api.services.news_sources import (
     apply_source_allowlist,
     parse_source_allowlist,
@@ -141,6 +147,63 @@ def _draft(db, cluster: NewsCluster, *, hermes: bool) -> NewsDraftRevision:
     )
     db.flush()
     return draft
+
+
+def _legacy_publication_snapshot(
+    db,
+    cluster: NewsCluster,
+    draft: NewsDraftRevision,
+    *,
+    status: str,
+) -> NewsPublicationSnapshot:
+    now = utcnow()
+    decision = NewsReviewDecision(
+        id=secrets.token_hex(16),
+        cluster_id=cluster.id,
+        text_revision_id=draft.id,
+        image_revision_id=None,
+        explicit_no_image=True,
+        target_channel_id=-1001234567890,
+        publication_mode="immediate",
+        scheduled_for_utc=None,
+        timezone="UTC",
+        reviewer_ref="a" * 24,
+        approved_at=now,
+        status="active",
+    )
+    snapshot = NewsPublicationSnapshot(
+        id=secrets.token_hex(16),
+        decision_id=decision.id,
+        cluster_id=cluster.id,
+        text_revision_id=draft.id,
+        image_revision_id=None,
+        target_channel_id=-1001234567890,
+        target_channel_username="",
+        publication_mode="immediate",
+        scheduled_for_utc=now,
+        publication_local_date=now.date(),
+        timezone="UTC",
+        reviewer_ref="a" * 24,
+        approved_at=now,
+        status=status,
+        urgent_override=False,
+        publication_text="<b>Retired legacy snapshot</b>",
+        renderer_version="news-publication-html-v1",
+        transport="message",
+        parse_mode="HTML",
+        link_preview_disabled=True,
+        image_sha256=None,
+        content_hash="a" * 64,
+        idempotency_key=secrets.token_hex(32),
+        attempt_count=1 if status == "processing" else 0,
+        next_attempt_at=now,
+        processing_started_at=now if status == "processing" else None,
+    )
+    db.add(decision)
+    db.flush()
+    db.add(snapshot)
+    db.flush()
+    return snapshot
 
 
 def test_retired_configuration_and_runtime_symbols_are_absent() -> None:
@@ -312,6 +375,73 @@ def test_non_hermes_draft_cannot_create_publication_approval(monkeypatch) -> Non
         )
 
         assert result.status == "unavailable"
+
+
+def test_processing_non_hermes_publication_remains_reconcilable() -> None:
+    cluster_id = _source_candidate(external_id="processing-publication")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+
+        draft = _draft(db, cluster, hermes=False)
+        cluster.status = "publication_approved"
+        snapshot = _legacy_publication_snapshot(
+            db,
+            cluster,
+            draft,
+            status="processing",
+        )
+
+        cancelled, quarantined = quarantine_non_hermes_news_work(db)
+
+        assert cancelled == 0
+        assert quarantined == 1
+        assert cluster.status == "rejected"
+
+        db.expire(snapshot)
+        assert snapshot.status == "uncertain"
+        assert snapshot.processing_started_at is None
+        assert snapshot.last_error_code == "worker_interrupted_send_uncertain"
+
+        assert reconcile_uncertain_publication(
+            db,
+            snapshot_id=snapshot.id,
+            admin_telegram_user_id=7001,
+            channel_message_id=12345,
+        )
+        assert snapshot.status == "published"
+        assert snapshot.telegram_message_id == 12345
+        assert cluster.status == "published"
+
+
+def test_old_non_hermes_snapshot_does_not_reject_new_hermes_revision() -> None:
+    cluster_id = _source_candidate(external_id="legacy-snapshot-hermes-revision")
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+
+        legacy_draft = _draft(db, cluster, hermes=False)
+        cluster.status = "publication_approved"
+        snapshot = _legacy_publication_snapshot(
+            db,
+            cluster,
+            legacy_draft,
+            status="queued",
+        )
+
+        hermes_draft = _draft(db, cluster, hermes=True)
+        assert cluster.latest_draft_revision == hermes_draft.revision
+        assert cluster.status == "image_pending"
+
+        assert claim_due_publications(db) == []
+
+        db.expire(snapshot)
+        assert snapshot.status == "cancelled"
+        assert snapshot.last_error_code == "non_hermes_news_pipeline_retired"
+        assert cluster.status == "image_pending"
+        assert cluster.latest_draft_revision == hermes_draft.revision
 
 
 def test_hermes_origin_is_not_quarantined() -> None:

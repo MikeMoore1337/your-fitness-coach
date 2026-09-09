@@ -688,12 +688,32 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
             row.status = "cancelled"
             row.last_error_code = "non_hermes_news_pipeline_retired"
             row.processing_started_at = None
-            if cluster is not None and cluster.status not in {
-                "published",
-                "accepted_for_design",
-                "rejected",
-                "rejected_by_rules",
-            }:
+
+            latest_draft = None
+            if cluster is not None and cluster.latest_draft_revision > 0:
+                latest_draft = (
+                    db.query(NewsDraftRevision)
+                    .filter(
+                        NewsDraftRevision.cluster_id == cluster.id,
+                        NewsDraftRevision.revision == cluster.latest_draft_revision,
+                    )
+                    .first()
+                )
+            latest_draft_is_hermes = latest_draft is not None and is_hermes_origin_draft(
+                latest_draft
+            )
+
+            if (
+                cluster is not None
+                and not latest_draft_is_hermes
+                and cluster.status
+                not in {
+                    "published",
+                    "accepted_for_design",
+                    "rejected",
+                    "rejected_by_rules",
+                }
+            ):
                 transition_news_cluster(
                     db,
                     cluster,

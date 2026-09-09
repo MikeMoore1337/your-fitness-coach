@@ -776,12 +776,23 @@ def quarantine_non_hermes_news_work(db: Session) -> tuple[int, int]:
 
         db.query(NewsPublicationSnapshot).filter(
             NewsPublicationSnapshot.cluster_id == cluster.id,
-            NewsPublicationSnapshot.status.in_({"queued", "scheduled", "processing", "failed"}),
+            NewsPublicationSnapshot.status.in_({"queued", "scheduled", "failed"}),
         ).update(
             {
                 NewsPublicationSnapshot.status: "cancelled",
                 NewsPublicationSnapshot.processing_started_at: None,
                 NewsPublicationSnapshot.last_error_code: "non_hermes_news_pipeline_retired",
+            },
+            synchronize_session=False,
+        )
+        db.query(NewsPublicationSnapshot).filter(
+            NewsPublicationSnapshot.cluster_id == cluster.id,
+            NewsPublicationSnapshot.status == "processing",
+        ).update(
+            {
+                NewsPublicationSnapshot.status: "uncertain",
+                NewsPublicationSnapshot.processing_started_at: None,
+                NewsPublicationSnapshot.last_error_code: "worker_interrupted_send_uncertain",
             },
             synchronize_session=False,
         )

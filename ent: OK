@@ -1,0 +1,238 @@
+[1mdiff --git a/backend/fitminiapp_api/services/news_editorial.py b/backend/fitminiapp_api/services/news_editorial.py[m
+[1mindex d8791d3..7b15962 100644[m
+[1m--- a/backend/fitminiapp_api/services/news_editorial.py[m
+[1m+++ b/backend/fitminiapp_api/services/news_editorial.py[m
+[36m@@ -776,7 +776,7 @@[m [mdef quarantine_non_hermes_news_work(db: Session) -> tuple[int, int]:[m
+ [m
+         db.query(NewsPublicationSnapshot).filter([m
+             NewsPublicationSnapshot.cluster_id == cluster.id,[m
+[31m-            NewsPublicationSnapshot.status.in_({"queued", "scheduled", "processing", "failed"}),[m
+[32m+[m[32m            NewsPublicationSnapshot.status.in_({"queued", "scheduled", "failed"}),[m
+         ).update([m
+             {[m
+                 NewsPublicationSnapshot.status: "cancelled",[m
+[36m@@ -785,6 +785,17 @@[m [mdef quarantine_non_hermes_news_work(db: Session) -> tuple[int, int]:[m
+             },[m
+             synchronize_session=False,[m
+         )[m
+[32m+[m[32m        db.query(NewsPublicationSnapshot).filter([m
+[32m+[m[32m            NewsPublicationSnapshot.cluster_id == cluster.id,[m
+[32m+[m[32m            NewsPublicationSnapshot.status == "processing",[m
+[32m+[m[32m        ).update([m
+[32m+[m[32m            {[m
+[32m+[m[32m                NewsPublicationSnapshot.status: "uncertain",[m
+[32m+[m[32m                NewsPublicationSnapshot.processing_started_at: None,[m
+[32m+[m[32m                NewsPublicationSnapshot.last_error_code: "worker_interrupted_send_uncertain",[m
+[32m+[m[32m            },[m
+[32m+[m[32m            synchronize_session=False,[m
+[32m+[m[32m        )[m
+ [m
+         transition_news_cluster([m
+             db,[m
+[1mdiff --git a/backend/fitminiapp_api/services/news_publication.py b/backend/fitminiapp_api/services/news_publication.py[m
+[1mindex f38365f..38d231b 100644[m
+[1m--- a/backend/fitminiapp_api/services/news_publication.py[m
+[1m+++ b/backend/fitminiapp_api/services/news_publication.py[m
+[36m@@ -688,12 +688,32 @@[m [mdef claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:[m
+             row.status = "cancelled"[m
+             row.last_error_code = "non_hermes_news_pipeline_retired"[m
+             row.processing_started_at = None[m
+[31m-            if cluster is not None and cluster.status not in {[m
+[31m-                "published",[m
+[31m-                "accepted_for_design",[m
+[31m-                "rejected",[m
+[31m-                "rejected_by_rules",[m
+[31m-            }:[m
+[32m+[m
+[32m+[m[32m            latest_draft = None[m
+[32m+[m[32m            if cluster is not None and cluster.latest_draft_revision > 0:[m
+[32m+[m[32m                latest_draft = ([m
+[32m+[m[32m                    db.query(NewsDraftRevision)[m
+[32m+[m[32m                    .filter([m
+[32m+[m[32m                        NewsDraftRevision.cluster_id == cluster.id,[m
+[32m+[m[32m                        NewsDraftRevision.revision == cluster.latest_draft_revision,[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                    .first()[m
+[32m+[m[32m                )[m
+[32m+[m[32m            latest_draft_is_hermes = latest_draft is not None and is_hermes_origin_draft([m
+[32m+[m[32m                latest_draft[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            if ([m
+[32m+[m[32m                cluster is not None[m
+[32m+[m[32m                and not latest_draft_is_hermes[m
+[32m+[m[32m                and cluster.status[m
+[32m+[m[32m                not in {[m
+[32m+[m[32m                    "published",[m
+[32m+[m[32m                    "accepted_for_design",[m
+[32m+[m[32m                    "rejected",[m
+[32m+[m[32m                    "rejected_by_rules",[m
+[32m+[m[32m                }[m
+[32m+[m[32m            ):[m
+                 transition_news_cluster([m
+                     db,[m
+                     cluster,[m
+[1mdiff --git a/backend/tests/test_news_retirement.py b/backend/tests/test_news_retirement.py[m
+[1mindex 535eb81..bc29270 100644[m
+[1m--- a/backend/tests/test_news_retirement.py[m
+[1m+++ b/backend/tests/test_news_retirement.py[m
+[36m@@ -12,6 +12,8 @@[m [mfrom fitminiapp_api.models.news import ([m
+     NewsCluster,[m
+     NewsDraftRevision,[m
+     NewsItem,[m
+[32m+[m[32m    NewsPublicationSnapshot,[m
+[32m+[m[32m    NewsReviewDecision,[m
+     NewsReviewDelivery,[m
+     NewsSource,[m
+ )[m
+[36m@@ -28,7 +30,11 @@[m [mfrom fitminiapp_api.services.news_editorial import ([m
+ )[m
+ from fitminiapp_api.services.news_ingestion import ParsedNewsItem, ingest_items, utcnow[m
+ from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER[m
+[31m-from fitminiapp_api.services.news_publication import approve_publication[m
+[32m+[m[32mfrom fitminiapp_api.services.news_publication import ([m
+[32m+[m[32m    approve_publication,[m
+[32m+[m[32m    claim_due_publications,[m
+[32m+[m[32m    reconcile_uncertain_publication,[m
+[32m+[m[32m)[m
+ from fitminiapp_api.services.news_sources import ([m
+     apply_source_allowlist,[m
+     parse_source_allowlist,[m
+[36m@@ -143,6 +149,63 @@[m [mdef _draft(db, cluster: NewsCluster, *, hermes: bool) -> NewsDraftRevision:[m
+     return draft[m
+ [m
+ [m
+[32m+[m[32mdef _legacy_publication_snapshot([m
+[32m+[m[32m    db,[m
+[32m+[m[32m    cluster: NewsCluster,[m
+[32m+[m[32m    draft: NewsDraftRevision,[m
+[32m+[m[32m    *,[m
+[32m+[m[32m    status: str,[m
+[32m+[m[32m) -> NewsPublicationSnapshot:[m
+[32m+[m[32m    now = utcnow()[m
+[32m+[m[32m    decision = NewsReviewDecision([m
+[32m+[m[32m        id=secrets.token_hex(16),[m
+[32m+[m[32m        cluster_id=cluster.id,[m
+[32m+[m[32m        text_revision_id=draft.id,[m
+[32m+[m[32m        image_revision_id=None,[m
+[32m+[m[32m        explicit_no_image=True,[m
+[32m+[m[32m        target_channel_id=-1001234567890,[m
+[32m+[m[32m        publication_mode="immediate",[m
+[32m+[m[32m        scheduled_for_utc=None,[m
+[32m+[m[32m        timezone="UTC",[m
+[32m+[m[32m        reviewer_ref="a" * 24,[m
+[32m+[m[32m        approved_at=now,[m
+[32m+[m[32m        status="active",[m
+[32m+[m[32m    )[m
+[32m+[m[32m    snapshot = NewsPublicationSnapshot([m
+[32m+[m[32m        id=secrets.token_hex(16),[m
+[32m+[m[32m        decision_id=decision.id,[m
+[32m+[m[32m        cluster_id=cluster.id,[m
+[32m+[m[32m        text_revision_id=draft.id,[m
+[32m+[m[32m        image_revision_id=None,[m
+[32m+[m[32m        target_channel_id=-1001234567890,[m
+[32m+[m[32m        target_channel_username="",[m
+[32m+[m[32m        publication_mode="immediate",[m
+[32m+[m[32m        scheduled_for_utc=now,[m
+[32m+[m[32m        publication_local_date=now.date(),[m
+[32m+[m[32m        timezone="UTC",[m
+[32m+[m[32m        reviewer_ref="a" * 24,[m
+[32m+[m[32m        approved_at=now,[m
+[32m+[m[32m        status=status,[m
+[32m+[m[32m        urgent_override=False,[m
+[32m+[m[32m        publication_text="<b>Retired legacy snapshot</b>",[m
+[32m+[m[32m        renderer_version="news-publication-html-v1",[m
+[32m+[m[32m        transport="message",[m
+[32m+[m[32m        parse_mode="HTML",[m
+[32m+[m[32m        link_preview_disabled=True,[m
+[32m+[m[32m        image_sha256=None,[m
+[32m+[m[32m        content_hash="a" * 64,[m
+[32m+[m[32m        idempotency_key=secrets.token_hex(32),[m
+[32m+[m[32m        attempt_count=1 if status == "processing" else 0,[m
+[32m+[m[32m        next_attempt_at=now,[m
+[32m+[m[32m        processing_started_at=now if status == "processing" else None,[m
+[32m+[m[32m    )[m
+[32m+[m[32m    db.add(decision)[m
+[32m+[m[32m    db.flush()[m
+[32m+[m[32m    db.add(snapshot)[m
+[32m+[m[32m    db.flush()[m
+[32m+[m[32m    return snapshot[m
+[32m+[m
+[32m+[m
+ def test_retired_configuration_and_runtime_symbols_are_absent() -> None:[m
+     retired_settings = {[m
+         "news_legacy_source_fetch_enabled",[m
+[36m@@ -314,6 +377,73 @@[m [mdef test_non_hermes_draft_cannot_create_publication_approval(monkeypatch) -> Non[m
+         assert result.status == "unavailable"[m
+ [m
+ [m
+[32m+[m[32mdef test_processing_non_hermes_publication_remains_reconcilable() -> None:[m
+[32m+[m[32m    cluster_id = _source_candidate(external_id="processing-publication")[m
+[32m+[m
+[32m+[m[32m    with get_session_context() as db:[m
+[32m+[m[32m        cluster = db.get(NewsCluster, cluster_id)[m
+[32m+[m[32m        assert cluster is not None[m
+[32m+[m
+[32m+[m[32m        draft = _draft(db, cluster, hermes=False)[m
+[32m+[m[32m        cluster.status = "publication_approved"[m
+[32m+[m[32m        snapshot = _legacy_publication_snapshot([m
+[32m+[m[32m            db,[m
+[32m+[m[32m            cluster,[m
+[32m+[m[32m            draft,[m
+[32m+[m[32m            status="processing",[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        cancelled, quarantined = quarantine_non_hermes_news_work(db)[m
+[32m+[m
+[32m+[m[32m        assert cancelled == 0[m
+[32m+[m[32m        assert quarantined == 1[m
+[32m+[m[32m        assert cluster.status == "rejected"[m
+[32m+[m
+[32m+[m[32m        db.expire(snapshot)[m
+[32m+[m[32m        assert snapshot.status == "uncertain"[m
+[32m+[m[32m        assert snapshot.processing_started_at is None[m
+[32m+[m[32m        assert snapshot.last_error_code == "worker_interrupted_send_uncertain"[m
+[32m+[m
+[32m+[m[32m        assert reconcile_uncertain_publication([m
+[32m+[m[32m            db,[m
+[32m+[m[32m            snapshot_id=snapshot.id,[m
+[32m+[m[32m            admin_telegram_user_id=7001,[m
+[32m+[m[32m            channel_message_id=12345,[m
+[32m+[m[32m        )[m
+[32m+[m[32m        assert snapshot.status == "published"[m
+[32m+[m[32m        assert snapshot.telegram_message_id == 12345[m
+[32m+[m[32m        assert cluster.status == "published"[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef test_old_non_hermes_snapshot_does_not_reject_new_hermes_revision() -> None:[m
+[32m+[m[32m    cluster_id = _source_candidate(external_id="legacy-snapshot-hermes-revision")[m
+[32m+[m
+[32m+[m[32m    with get_session_context() as db:[m
+[32m+[m[32m        cluster = db.get(NewsCluster, cluster_id)[m
+[32m+[m[32m        assert cluster is not None[m
+[32m+[m
+[32m+[m[32m        legacy_draft = _draft(db, cluster, hermes=False)[m
+[32m+[m[32m        cluster.status = "publication_approved"[m
+[32m+[m[32m        snapshot = _legacy_publication_snapshot([m
+[32m+[m[32m            db,[m
+[32m+[m[32m            cluster,[m
+[32m+[m[32m            legacy_draft,[m
+[32m+[m[32m            status="queued",[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        hermes_draft = _draft(db, cluster, hermes=True)[m
+[32m+[m[32m        assert cluster.latest_draft_revision == hermes_draft.revision[m
+[32m+[m[32m        assert cluster.status == "image_pending"[m
+[32m+[m
+[32m+[m[32m        assert claim_due_publications(db) == [][m
+[32m+[m
+[32m+[m[32m        db.expire(snapshot)[m
+[32m+[m[32m        assert snapshot.status == "cancelled"[m
+[32m+[m[32m        assert snapshot.last_error_code == "non_hermes_news_pipeline_retired"[m
+[32m+[m[32m        assert cluster.status == "image_pending"[m
+[32m+[m[32m        assert cluster.latest_draft_revision == hermes_draft.revision[m
+[32m+[m
+[32m+[m
+ def test_hermes_origin_is_not_quarantined() -> None:[m
+     cluster_id = _source_candidate(external_id="hermes-preserved")[m
+ [m
