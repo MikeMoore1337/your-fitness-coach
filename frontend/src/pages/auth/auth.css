@@ -9,7 +9,7 @@
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   font-size: 0.86rem;
   font-weight: 800;
   text-decoration: none;
@@ -90,7 +90,7 @@
   gap: 22px;
   padding: clamp(24px, 4vw, 38px);
   border: 1px solid var(--landing-card-border);
-  border-radius: 26px;
+  border-radius: var(--radius-control);
   background: var(--landing-card);
   box-shadow: 0 22px 60px rgba(23, 32, 24, 0.13);
 }
@@ -126,7 +126,7 @@
   min-height: 54px;
   padding-inline: 16px;
   border-color: var(--landing-border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--landing-ink);
   transition:
@@ -157,7 +157,7 @@
   display: grid;
   gap: 5px;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--landing-secondary);
 }
 
@@ -287,7 +287,7 @@
 .auth-aux-layout .auth-panel {
   width: 100%;
   border-color: var(--landing-card-border);
-  border-radius: 24px;
+  border-radius: var(--radius-control);
   background: var(--landing-card);
   color: var(--landing-ink);
   box-shadow: 0 22px 60px rgba(23, 32, 24, 0.13);
@@ -338,7 +338,7 @@
 
   .login-card {
     padding: 22px 18px;
-    border-radius: 22px;
+    border-radius: var(--radius-control);
   }
 
   .auth-aux-layout {

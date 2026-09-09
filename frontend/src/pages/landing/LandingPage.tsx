@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ImgHTMLAttributes } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { WebArticleCard } from '../../shared/api/types';
 import { api } from '../../shared/api/client';
@@ -15,12 +15,14 @@ import {
 import { AppLink } from '../../shared/navigation/router';
 import { applyRouteMetadata } from '../../shared/seo/metadata';
 import { PUBLIC_TELEGRAM_LINKS } from '../../shared/telegram/publicLinks';
-import { BrandLockup, BrandLogo } from '../../shared/ui/BrandLogo';
+import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { Icon, type IconName } from '../../shared/ui/Icon';
 import { PublicShell } from '../../shared/ui/PublicShell';
-import { useWebTheme } from '../../shared/useWebTheme';
+import { LandingPractice } from './LandingPractice';
+import { LandingProgress } from './LandingProgress';
 import { StrengthScene } from './StrengthScene';
 import { LandingChapter } from './LandingChapter';
+import { useLandingHeroMotion } from './useLandingHeroMotion';
 import './landing.css';
 
 export {
@@ -155,39 +157,13 @@ function cabinetScenarioUrl(baseUrl: string, scenario: DemoScenario): string {
   return `${baseUrl}?cabinet=1&scenario=${scenario}&section=${section}`;
 }
 
-type ProductScreenshotProps = Pick<
-  ImgHTMLAttributes<HTMLImageElement>,
-  'alt' | 'className' | 'fetchPriority' | 'height' | 'loading' | 'src' | 'width'
-> & { fallback: string };
-
-function ProductScreenshot({ fallback, className = '', ...imageProps }: ProductScreenshotProps) {
-  const [failedSrc, setFailedSrc] = useState<string>();
-  const [loadedSrc, setLoadedSrc] = useState<string>();
-  const failed = failedSrc === imageProps.src;
-  const loaded = loadedSrc === imageProps.src;
-
-  return (
-    <span className={`landing-product-image ${loaded ? 'is-loaded' : ''} ${className}`.trim()}>
-      <span className="landing-product-image__fallback">{fallback}</span>
-      {!failed && (
-        <img
-          {...imageProps}
-          className={loaded ? 'is-loaded' : ''}
-          decoding="async"
-          onLoad={() => setLoadedSrc(imageProps.src)}
-          onError={() => setFailedSrc(imageProps.src)}
-        />
-      )}
-    </span>
-  );
-}
-
 export default function LandingPage() {
+  useLandingHeroMotion();
   const appUrl = appUrlForHostname(window.location.hostname);
   const loginUrl = loginUrlForHostname(window.location.hostname);
   const demoUrl = demoUrlForHostname(window.location.hostname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { colorScheme } = useWebTheme();
+  const [heroUnavailable, setHeroUnavailable] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const navigationRef = useRef<HTMLElement>(null);
   const publishedArticles = useQuery({
@@ -292,14 +268,23 @@ export default function LandingPage() {
     >
       <main id="landing-content" tabIndex={-1}>
         <section className="landing-hero" aria-labelledby="landing-title">
+          <img
+            className="landing-hero__image"
+            src="/assets/marketing/strength-hero.webp"
+            alt="Спортсменка толкает тренировочные сани"
+            fetchPriority="high"
+            width="1536"
+            height="1024"
+            onError={() => setHeroUnavailable(true)}
+            hidden={heroUnavailable}
+          />
           <div className="landing-hero__copy">
-            <p className="landing-kicker">Тренировки. Питание. Ваш прогресс.</p>
+            {heroUnavailable && <p role="status">Фото не загрузилось. Все действия доступны.</p>}
+            <p className="landing-kicker">ПЛАН. ДЕЙСТВИЕ. РЕЗУЛЬТАТ.</p>
             <h1 id="landing-title">
-              <span>Движение.</span> <span>Запись.</span> <span>Прогресс.</span>
+              <span>СИЛА</span> <span>В ДЕЙСТВИИ.</span>
             </h1>
-            <p className="landing-hero__lead">
-              Тренировки и питание — в фактах. Прогресс — по вашим записям.
-            </p>
+            <p className="landing-hero__lead">Тренировки, питание и прогресс — в одном месте.</p>
             <div className="landing-hero__actions">
               <a className="landing-button" href={appUrl} onClick={trackAppSelection}>
                 Начать <Icon name="arrow-right" size={20} />
@@ -328,76 +313,57 @@ export default function LandingPage() {
               </a>
             </div>
           </div>
-
-          <StrengthScene />
         </section>
+        <StrengthScene />
 
-        <LandingChapter id="product" className="landing-core" aria-labelledby="product-title">
-          <div className="landing-core__intro">
-            <header>
-              <p className="landing-kicker">Продукт в действии</p>
-              <h2 id="product-title">Один цикл — от плана до следующего шага.</h2>
-              <p>
-                «Сегодня» показывает план. Выполненные тренировки, питание и замеры добавляют факты.
-                Progress показывает динамику и честно отмечает, когда данных пока мало.
-              </p>
-              <div className="landing-core__self">
-                <p className="landing-kicker">Занимаетесь самостоятельно?</p>
-                <h3>Начните сами. Тренера можно подключить позже.</h3>
-                <p>
-                  Выберите готовую программу или соберите свою. Выполняйте занятия и отслеживайте
-                  фактическую динамику в браузере — Telegram для этого не нужен.
-                </p>
-                <AppLink className="landing-core__self-link" to="/training">
-                  Начать с тренировок <Icon name="arrow-right" size={20} />
-                </AppLink>
-              </div>
-            </header>
-            <div className="landing-core__proof" aria-label="Актуальные Web и Mobile Web экраны">
-              <figure className="landing-core__desktop">
-                <ProductScreenshot
-                  src={`/assets/product/landing-today-desktop-${colorScheme}.webp`}
-                  alt="Актуальный экран Сегодня в desktop Web"
-                  width={1440}
-                  height={900}
-                  loading="lazy"
-                  fallback="Desktop proof временно недоступен."
-                />
-              </figure>
-              <figure className="landing-core__mobile">
-                <ProductScreenshot
-                  src={`/assets/product/landing-today-mobile-${colorScheme}.webp`}
-                  alt="Актуальный экран Сегодня в Mobile Web"
-                  width={390}
-                  height={844}
-                  loading="lazy"
-                  fallback="Mobile proof временно недоступен."
-                />
-              </figure>
-              <div className="landing-core__context">
-                <BrandLogo decorative surface={colorScheme} variant="mark" width={38} height={38} />
-                <span>Один профиль</span>
-                <strong>План → факт → динамика → следующий шаг</strong>
-              </div>
+        <LandingChapter id="product" className="landing-practice" aria-labelledby="product-title">
+          <div>
+            <p className="landing-kicker">02 / В ДЕЛЕ</p>
+            <h2 id="product-title">
+              Вошёл в ритм.
+              <br />
+              <em>Продолжай.</em>
+            </h2>
+            <p>Попробуй сам: начни тренировку и запиши подход.</p>
+            <div className="landing-practice__note">
+              <img src="/assets/icons/flat-dumbbell.webp" alt="" width="80" height="80" />
+              <small>
+                Демо без регистрации.
+                <br />
+                Отдельная подготовленная сессия.
+              </small>
             </div>
           </div>
-
-          <div className="landing-core__features" aria-label="Тренировки, питание и прогресс">
-            {coreFeatures.map((feature) => (
-              <article key={feature.index}>
-                <div className="landing-core__feature-label">
-                  <span>{feature.index}</span>
-                  <Icon name={feature.icon} size={20} />
-                  <small>{feature.label}</small>
-                </div>
-                <h3>{feature.title}</h3>
-                <p>{feature.text}</p>
-                <AppLink to={feature.href}>{feature.linkLabel}</AppLink>
-              </article>
-            ))}
-          </div>
+          <LandingPractice />
         </LandingChapter>
-
+        {coreFeatures.slice(1).map((feature, index) => (
+          <LandingChapter
+            className={`landing-feature landing-feature--${index}`}
+            key={feature.title}
+          >
+            <div>
+              <p className="landing-kicker">{feature.label}</p>
+              <h2>{index === 0 ? 'Питание без догадок.' : 'Замечай своё движение.'}</h2>
+              <p>{feature.text}</p>
+              <AppLink className="landing-button landing-button--secondary" to={feature.href}>
+                {feature.linkLabel}
+              </AppLink>
+            </div>
+            {index === 0 ? (
+              <img
+                src="/assets/marketing/nutrition-photo.webp"
+                alt="Овсянка с фруктами и ягодами"
+                width="1024"
+                height="1024"
+                loading="lazy"
+              />
+            ) : (
+              <LandingProgress
+                href={`${demoUrl}?cabinet=1&scenario=self_training&section=progress`}
+              />
+            )}
+          </LandingChapter>
+        ))}
         {publishedArticles.data && publishedArticles.data.length > 0 && (
           <section className="landing-articles" aria-labelledby="landing-articles-title">
             <div className="landing-articles__intro">
@@ -428,7 +394,7 @@ export default function LandingPage() {
         <LandingChapter className="landing-trainer" aria-labelledby="trainer-title">
           <div className="landing-trainer__copy">
             <p className="landing-kicker">04 · Работа с тренером</p>
-            <h2 id="trainer-title">У каждого клиента — видимый контекст.</h2>
+            <h2 id="trainer-title">Тренер рядом с планом.</h2>
             <p>
               Тренер включает режим из профиля, приглашает клиента, назначает программу, видит
               выполненную работу и оставляет комментарии к конкретным тренировкам. CRM, платежи и
@@ -438,16 +404,14 @@ export default function LandingPage() {
               Посмотреть кабинет тренера <Icon name="arrow-right" size={20} />
             </AppLink>
           </div>
-          <figure className="landing-trainer__proof">
-            <ProductScreenshot
-              src={`/assets/product/landing-trainer-desktop-${colorScheme}.webp`}
-              alt="Актуальный кабинет тренера с подготовленными данными клиента"
-              width={1280}
-              height={972}
-              loading="lazy"
-              fallback="Экран кабинета тренера временно недоступен."
-            />
-          </figure>
+          <img
+            className="landing-trainer__proof"
+            src="/assets/marketing/trainer-photo.webp"
+            alt="Тренер и спортсменка обсуждают план"
+            width="1536"
+            height="1024"
+            loading="lazy"
+          />
         </LandingChapter>
 
         <LandingChapter id="demo" className="landing-start" aria-labelledby="start-title">

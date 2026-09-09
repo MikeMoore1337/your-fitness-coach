@@ -4,7 +4,8 @@ import { api } from '../../shared/api/client';
 import type { Workout } from '../../shared/api/types';
 import { formatCalendarDate } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
-import { Badge, Button, CheckIcon } from '../../shared/ui/common';
+import { Badge, Button } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
@@ -121,7 +122,7 @@ export function WorkoutCompletionSummary({
     >
       <header className="workout-completion__hero">
         <span className="workout-completion__check" aria-hidden="true">
-          <CheckIcon />
+          <Icon name="week-strength" style={{ width: 110, height: 110 }} />
         </span>
         <div>
           <Badge tone="success">Результат сохранён</Badge>

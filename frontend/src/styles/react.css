@@ -32,7 +32,7 @@
   gap: 6px;
   padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--nav-bg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
   backdrop-filter: blur(16px);
@@ -41,7 +41,7 @@
   min-width: 0;
   min-height: 44px;
   padding: 9px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   font-size: 0.875rem;
   line-height: 1.2;
   white-space: normal;
@@ -161,7 +161,7 @@
   min-height: 112px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
   cursor: pointer;
   transition:
@@ -245,7 +245,7 @@
   min-height: 78px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
   color: var(--text);
   text-align: left;
@@ -307,7 +307,7 @@ select:not([multiple]) {
   gap: 12px;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
 }
 .workout-day-link {
@@ -333,7 +333,7 @@ select:not([multiple]) {
 }
 .workout-history__adaptation {
   margin: 6px 0 0;
-  color: var(--accent);
+  color: var(--v2-accent-text);
   font-size: 0.82rem;
 }
 .workout-day-link:active {
@@ -394,7 +394,7 @@ select:not([multiple]) {
 }
 .metric {
   padding: 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
   display: grid;
   gap: 4px;
@@ -471,7 +471,7 @@ select:not([multiple]) {
   min-height: 44px;
   padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
   color: var(--text);
   font: inherit;
@@ -536,7 +536,7 @@ select:not([multiple]) {
   min-height: 44px;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
   color: var(--text);
   font-weight: 700;
@@ -598,7 +598,7 @@ select:not([multiple]) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
 }
 .email-auth__tabs button {
@@ -632,7 +632,7 @@ select:not([multiple]) {
   margin: 0;
   padding: 12px;
   border: 1px solid var(--success-strong);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--success-soft);
   color: var(--text);
   line-height: 1.5;
@@ -666,7 +666,7 @@ select:not([multiple]) {
 }
 .exercise-guide-images img {
   width: 100%;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
 }
 .workout-set-row {
   display: grid;
@@ -679,7 +679,7 @@ select:not([multiple]) {
 }
 .program-day {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   padding: 12px;
 }
 .program-exercise-row {
@@ -834,18 +834,14 @@ select:not([multiple]) {
   background: var(--bg-soft);
   color: var(--muted);
 }
-.disclosure-icon svg {
+.disclosure-icon .yfc-icon {
   display: block;
   width: 14px;
   height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 1.8;
   transition: transform var(--motion-state) var(--motion-ease);
 }
 
-details[open] > summary .disclosure-icon svg {
+details[open] > summary .disclosure-icon .yfc-icon {
   transform: rotate(90deg);
 }
 .profile-disclosure__body,
@@ -921,7 +917,7 @@ details[open] > summary .disclosure-icon svg {
   width: min(calc(100% - 24px), 540px);
   transform: translateX(-50%);
   border: 1px solid var(--warning-line);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   padding: 10px 14px;
   background: var(--warning-soft);
   color: var(--warning-text);
@@ -1142,7 +1138,7 @@ details[open] > summary .disclosure-icon svg {
   overscroll-behavior: contain;
   padding: 5px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--card);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
@@ -1159,7 +1155,7 @@ details[open] > summary .disclosure-icon svg {
   min-height: 44px;
   padding: 9px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text);
   text-align: left;
@@ -1579,7 +1575,7 @@ details[open] > summary .disclosure-icon svg {
   display: grid;
   gap: 4px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
   line-height: 1.45;
 }
@@ -1612,7 +1608,7 @@ details[open] > summary .disclosure-icon svg {
   gap: 10px;
   padding: 18px;
   border: 1px solid var(--accent-line);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--accent-soft);
 }
 .program-wizard-result__alternatives {
@@ -1631,7 +1627,7 @@ details[open] > summary .disclosure-icon svg {
   gap: 12px;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
 }
 .program-wizard-result__alternatives p {
   margin-top: 4px;
@@ -1737,7 +1733,7 @@ details[open] > summary .disclosure-icon svg {
   min-width: 0;
   padding: 13px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
 }
 .program-example-day ol {
@@ -2006,7 +2002,7 @@ details[open] > summary .disclosure-icon svg {
   max-width: 100%;
   max-height: calc(100dvh - 125px);
   margin: auto;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   object-fit: contain;
 }
 .exercise-lightbox figcaption {
@@ -2125,14 +2121,14 @@ details[open] > summary .disclosure-icon svg {
   gap: 4px;
   padding: 4px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-target-mode > button {
   min-height: 44px;
   padding: 9px 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--muted);
   box-shadow: none;
@@ -2159,7 +2155,7 @@ details[open] > summary .disclosure-icon svg {
   gap: 4px 12px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-energy-check > strong {
@@ -2205,7 +2201,7 @@ details[open] > summary .disclosure-icon svg {
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-current-target__heading {
@@ -2232,7 +2228,7 @@ details[open] > summary .disclosure-icon svg {
   gap: 2px;
   min-width: 0;
   padding: 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   font-size: 0.76rem;
   font-variant-numeric: tabular-nums;
@@ -2258,7 +2254,7 @@ details[open] > summary .disclosure-icon svg {
 .nutrition-target-history__list > li {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
 }
 .nutrition-target-history__list summary {
@@ -2946,7 +2942,7 @@ details[open] > summary .disclosure-icon svg {
   overflow: hidden;
   padding: clamp(18px, 3vw, 28px);
   border: 1px solid var(--accent-line);
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -2996,7 +2992,7 @@ details[open] > summary .disclosure-icon svg {
 .program-active__source {
   justify-content: flex-start;
   padding: 11px 13px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
   font-size: 0.82rem;
 }
@@ -3035,7 +3031,7 @@ details[open] > summary .disclosure-icon svg {
   min-width: 0;
   padding: 15px;
   border: 1px solid var(--border);
-  border-radius: 15px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 .program-template-card__main {
@@ -3083,7 +3079,7 @@ details[open] > summary .disclosure-icon svg {
   min-width: 0;
   padding: 16px;
   border: 0;
-  border-radius: 15px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
   color: var(--text);
 }
@@ -3096,7 +3092,7 @@ details[open] > summary .disclosure-icon svg {
 .program-builder-tools {
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 15px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 .program-builder-tools__body,
@@ -3110,7 +3106,7 @@ details[open] > summary .disclosure-icon svg {
 .program-builder-settings {
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 15px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 .program-builder summary {
@@ -3243,7 +3239,7 @@ details[open] > summary .disclosure-icon svg {
   margin: 0;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--card-bg) 94%, transparent);
   box-shadow: 0 -10px 30px color-mix(in srgb, var(--text) 8%, transparent);
   backdrop-filter: none;
@@ -3297,7 +3293,7 @@ details[open] > summary .disclosure-icon svg {
   margin-top: 14px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .exercise-create__form {
@@ -3335,7 +3331,7 @@ details[open] > summary .disclosure-icon svg {
   min-width: 0;
   padding: 2px 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -3701,7 +3697,7 @@ details[open] > summary .disclosure-icon svg {
   min-width: 0;
   padding: clamp(18px, 2.6vw, 26px);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
 }
 .today-panel__head {
@@ -3757,7 +3753,7 @@ button.today-text-link {
   gap: 1px;
   overflow: hidden;
   margin-top: 20px;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--border);
 }
 .today-macro {
@@ -3818,7 +3814,7 @@ button.today-text-link {
   padding-top: 34px;
 }
 .today-progress-skeleton {
-  border-radius: 20px;
+  border-radius: var(--radius-control);
 }
 .today-inline-state {
   display: grid;
@@ -3900,7 +3896,7 @@ button.today-text-link {
   .today-workout-spotlight {
     gap: 20px;
     padding: 22px 19px 20px;
-    border-radius: 22px;
+    border-radius: var(--radius-control);
   }
   .today-workout-spotlight__label {
     top: 22px;
@@ -4032,7 +4028,7 @@ button.today-text-link {
   gap: 9px;
   min-height: 44px;
   padding: 8px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--bg-soft);
 }
 .active-workout-sync__dot {
@@ -4079,7 +4075,7 @@ button.today-text-link {
   min-width: 0;
   padding: clamp(16px, 2.4vw, 24px);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
 }
 .active-workout-exercise.is-current {
@@ -4126,7 +4122,7 @@ button.today-text-link {
   width: fit-content;
   margin-top: 3px;
   padding: 5px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--accent-soft);
   color: var(--accent-strong, var(--accent));
   font-size: 0.72rem;
@@ -4142,7 +4138,7 @@ button.today-text-link {
   min-width: 0;
   padding: 13px;
   border: 1px solid var(--border);
-  border-radius: 15px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .active-workout-set.is-current {
@@ -4188,7 +4184,7 @@ button.today-text-link {
   place-items: center;
   width: 38px;
   height: 38px;
-  border-radius: 11px;
+  border-radius: var(--radius-control);
   background: var(--surface-active);
   font-size: 0.92rem;
   font-weight: 900;
@@ -4239,7 +4235,7 @@ button.today-text-link {
   min-width: 0;
   min-height: 48px;
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -4444,7 +4440,7 @@ button.today-text-link {
   min-width: 0;
   padding: clamp(17px, 3vw, 24px);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
 }
 .workout-completion__next,
@@ -4593,7 +4589,7 @@ button.today-text-link {
   margin-inline: auto;
   padding: 10px 12px;
   border: 1px solid var(--accent-line);
-  border-radius: 16px;
+  border-radius: var(--radius-control);
   background: var(--nav-bg);
   box-shadow: var(--elevation-overlay);
   animation: active-workout-rest-enter var(--motion-state) var(--motion-ease);
@@ -4910,7 +4906,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   margin: 0;
   padding: 4px 2px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -5081,7 +5077,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   flex: 0 0 44px;
   padding: 0;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-active);
   color: var(--text);
 }
@@ -5110,7 +5106,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   gap: 12px;
   padding: 8px 10px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -5253,7 +5249,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     justify-content: flex-start;
     gap: 11px;
     padding: 6px 9px;
-    border-radius: 11px;
+    border-radius: var(--radius-control);
   }
   .app-bottom-nav__btn.is-active {
     box-shadow: inset 3px 0 var(--accent);
@@ -5305,7 +5301,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     align-items: center;
     gap: 9px;
     padding: 3px 4px;
-    border-radius: 11px;
+    border-radius: var(--radius-control);
     text-align: left;
   }
   .app-bottom-nav__account-entry:hover {
@@ -5342,7 +5338,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     width: 36px;
     height: 36px;
     flex-basis: 36px;
-    border-radius: 11px;
+    border-radius: var(--radius-control);
     font-size: 1rem;
   }
   .app-bottom-nav__logout {
@@ -5387,7 +5383,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .hydration-card {
   overflow: hidden;
   border: 1px solid var(--v2-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--v2-surface);
   box-shadow: none;
 }
@@ -5494,7 +5490,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   margin: 0 20px 12px;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
 
@@ -5506,7 +5502,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   margin: 0 20px 12px;
   padding: 10px 12px;
   border: 1px solid var(--danger-line);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--danger-soft);
   color: var(--danger-text);
 }
@@ -5629,7 +5625,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   min-height: 52px;
   padding: 8px 10px 8px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -5640,7 +5636,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   gap: 12px;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -5681,7 +5677,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   gap: 20px;
   padding: 18px;
   border: 1px solid color-mix(in srgb, var(--v2-lime, var(--accent)) 32%, var(--border));
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--v2-lime, var(--accent)) 6%, var(--surface));
 }
 
@@ -5696,7 +5692,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   display: grid;
   gap: 3px;
   padding: 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -5898,7 +5894,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   display: grid;
   grid-template-columns: minmax(250px, 0.9fr) minmax(0, 1.7fr);
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   box-shadow: var(--elevation-raised);
 }
@@ -5983,7 +5979,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   min-width: 0;
   padding: clamp(18px, 3vw, 30px);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
 }
 
@@ -6164,7 +6160,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   display: grid;
   gap: 12px;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 
@@ -6198,7 +6194,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -6207,7 +6203,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface-active);
   font-size: 0.76rem;
 }
@@ -6279,7 +6275,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .progress-methodology {
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
   font-size: 0.8rem;
 }
@@ -6715,7 +6711,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
   .progress-summary {
     grid-template-columns: 1fr;
-    border-radius: 18px;
+    border-radius: var(--radius-control);
   }
 
   .progress-summary__lead {
@@ -6750,7 +6746,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   .progress-section {
     gap: 15px;
     padding: 16px;
-    border-radius: 16px;
+    border-radius: var(--radius-control);
   }
 
   .progress-section__head,
@@ -6971,7 +6967,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   min-width: 0;
   padding: 17px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   box-shadow: var(--shadow-sm);
 }
@@ -7008,7 +7004,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .nutrition-day-balance__metrics > div {
   min-width: 0;
   padding: 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-day-balance__value {
@@ -7056,7 +7052,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 .nutrition-meal__header {
@@ -7095,7 +7091,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   gap: 10px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
   box-shadow: var(--shadow-sm);
 }
@@ -7149,7 +7145,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .nutrition-meal__empty {
   margin: 0 14px 14px;
   padding: 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
   color: var(--muted);
   font-size: 0.82rem;
@@ -7254,7 +7250,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   align-items: end;
   gap: 10px;
   padding: 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-entry-editor__actions {
@@ -7272,7 +7268,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   gap: 10px;
   padding: 9px 11px;
   border: 1px solid var(--danger-line);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--danger-soft);
   color: var(--danger-text);
   font-size: 0.8rem;
@@ -7294,7 +7290,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   min-width: 0;
   padding: 17px;
   border: 1px solid var(--accent-line);
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   background: linear-gradient(155deg, var(--accent-soft), transparent 42%), var(--surface);
   box-shadow: var(--shadow-sm);
 }
@@ -7367,7 +7363,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .nutrition-target--unknown {
   padding: 10px;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
 }
 .nutrition-day-summary__totals {
   display: grid;
@@ -7378,7 +7374,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .nutrition-day-summary__totals > div {
   min-width: 0;
   padding: 9px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-day-summary__totals dt {
@@ -7397,7 +7393,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .nutrition-targets--unset {
   gap: 7px;
   padding: 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-targets--unset p {
@@ -7424,7 +7420,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   max-height: min(760px, calc(var(--yfc-viewport-height, 100dvh) - 32px));
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   box-shadow: var(--elevation-overlay);
 }
@@ -7486,7 +7482,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   margin: 0;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
 }
 .nutrition-quick-add__macros legend {
   padding: 0 4px;
@@ -7503,7 +7499,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
   padding: 4px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-picker__tabs button {
@@ -7527,7 +7523,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 .nutrition-food-result__select {
@@ -7593,7 +7589,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 .nutrition-picker__empty {
   padding: 18px;
   border: 1px dashed var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   color: var(--muted);
   font-size: 0.82rem;
   line-height: 1.45;
@@ -7611,7 +7607,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   display: grid;
   gap: 5px;
   padding: 16px;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--accent-soft);
 }
 .nutrition-picker__selected span,
@@ -7647,7 +7643,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   gap: 7px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-provider-fallback span,
@@ -7671,7 +7667,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   gap: 9px;
   padding: 13px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 .nutrition-external-result > div:first-child {
@@ -7715,7 +7711,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 .nutrition-form-error {
   padding: 10px 12px;
   border: 1px solid var(--danger-line);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--danger-soft);
   color: var(--danger-text);
   font-size: 0.78rem;
@@ -7747,7 +7743,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   align-items: center;
   gap: 7px;
   padding: 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-ingredient > div:first-child {
@@ -7790,7 +7786,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   gap: 9px;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 .nutrition-recipe__select {
@@ -7861,7 +7857,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   display: none;
   width: 100%;
   max-height: 280px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: #111;
   object-fit: cover;
 }
@@ -7882,7 +7878,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   max-height: calc(100dvh - 32px);
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   background: var(--card-bg);
   box-shadow: var(--elevation-overlay);
 }
@@ -7900,7 +7896,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 }
 .nutrition-copy__source > div {
   padding: 12px;
-  border-radius: 11px;
+  border-radius: var(--radius-control);
   background: var(--surface-subtle);
 }
 .nutrition-copy__source dt {
@@ -7928,7 +7924,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
     gap: 13px;
     margin-inline: -2px;
     padding: 15px 12px;
-    border-radius: 18px;
+    border-radius: var(--radius-control);
   }
   .nutrition-diary--design-v2 {
     padding: 0;
@@ -7953,11 +7949,11 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   .nutrition-day-summary {
     gap: 13px;
     padding: 14px;
-    border-radius: 15px;
+    border-radius: var(--radius-control);
   }
   .nutrition-section-card {
     padding: 14px;
-    border-radius: 15px;
+    border-radius: var(--radius-control);
   }
   .nutrition-food-card {
     padding: 0;

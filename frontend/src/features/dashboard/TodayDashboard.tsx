@@ -261,23 +261,46 @@ function NutritionSummary({ date }: { date: string }) {
     : hydration.isLoading
       ? 'вода загружается…'
       : 'вода недоступна';
-  const summary = (
-    <>
-      <span>{foodSummary}</span>
-      <span> · {hydrationSummary}</span>
-    </>
-  );
-
   return (
-    <SemanticCard
-      action={<AppLink to={`/app?section=nutrition&date=${date}&hydration=quick`}>+ Вода</AppLink>}
-      className="today-panel today-summary-card today-summary-card--nutrition today-nutrition"
-      family="nutrition"
-      icon="nav-nutrition"
-      summary={summary}
-      title="Питание"
-      variant="action"
-    />
+    <section className="today-nutrition" aria-label="Питание на сегодня">
+      <h2>Питание на сегодня</h2>
+      <div className="today-nutrition__content">
+        <Icon name="nav-nutrition" style={{ width: 72, height: 72 }} />
+        <div className="today-nutrition__values">
+          {diary.data.meals.some((meal) => meal.entries.length > 0) && (
+            <p aria-label={foodSummary}>
+              <strong>{formatAmount(diary.data.totals.energy_kcal)}</strong>
+              {diary.data.targets ? ` / ${formatAmount(diary.data.targets.energy_kcal)}` : ''} ккал
+            </p>
+          )}
+          {!diary.data.meals.some((meal) => meal.entries.length > 0) && <p>{foodSummary}</p>}
+          {diary.data.meals.some((meal) => meal.entries.length > 0) &&
+            diary.data.targets &&
+            Number(diary.data.targets.energy_kcal) > 0 && (
+              <progress
+                aria-label="Калории за сегодня"
+                max={diary.data.targets.energy_kcal}
+                value={diary.data.totals.energy_kcal}
+              />
+            )}
+          <AppLink
+            className="today-summary-card__action"
+            to={`/app?section=nutrition&date=${date}`}
+          >
+            Открыть дневник питания
+          </AppLink>
+        </div>
+      </div>
+      <div className="today-nutrition__water">
+        <span>{hydrationSummary}</span>
+        <AppLink
+          className="today-summary-card__action"
+          to={`/app?section=nutrition&date=${date}&hydration=quick`}
+        >
+          + Вода
+        </AppLink>
+      </div>
+    </section>
   );
 }
 
@@ -449,6 +472,13 @@ function WorkoutOverview({
               День {workout.day_number}
             </span>
           </div>
+          <img
+            className="today-workout-photo"
+            src="/assets/marketing/strength-row.webp"
+            alt=""
+            width="1536"
+            height="1024"
+          />
           <h2 id="today-workout-title">{workout.title}</h2>
           <p>
             {started
@@ -883,121 +913,122 @@ export function TodayDashboard({
   return (
     <div className="today-dashboard today-dashboard--design-v2">
       <header className="today-dashboard__header">
-        <h1>{heading.title}</h1>
+        <p className="today-dashboard__date">{heading.title.replace(/^Сегодня · /, '')}</p>
+        <h1 aria-label={heading.title}>СЕГОДНЯ</h1>
       </header>
 
-      <WeekContext
-        cardio={cardioWeek.data}
-        selectedDate={selectedDate}
-        today={today}
-        timeZone={timeZone}
-        workouts={week.data}
-        loading={week.isLoading || cardioWeek.isLoading}
-        error={Boolean(week.error || cardioWeek.error)}
-        onRetry={() => void Promise.all([week.refetch(), cardioWeek.refetch()])}
-        onSelect={(date) => {
-          setSelectedDate(date);
-          setDetailsOpen(false);
-          if (date !== today) {
-            trackProductEvent({
-              name: 'today_week_navigated',
-              surface: productEventSurface(),
-              direction: 'workout_day',
-            });
-          }
-        }}
-      />
-
       <div className="today-dashboard__overview">
-        <section
-          className={`today-workout-spotlight semantic-card semantic-card--action semantic-card--training${noTodayWorkout ? ' today-workout-spotlight--rest-day' : ''}`}
-          data-card-variant="action"
-          data-semantic-family="training"
-          aria-labelledby="today-workout-title"
-        >
-          <span className="today-workout-spotlight__label">Тренировка</span>
-          {selectedDate !== today ? (
-            week.isLoading ? (
+        <div className="today-dashboard__training">
+          <section
+            className={`today-workout-spotlight semantic-card semantic-card--action semantic-card--training${noTodayWorkout ? ' today-workout-spotlight--rest-day' : ''}`}
+            data-card-variant="action"
+            data-semantic-family="training"
+            aria-labelledby="today-workout-title"
+          >
+            {selectedDate !== today ? (
+              week.isLoading ? (
+                <div
+                  className="today-summary-skeleton"
+                  aria-label="Загружаем выбранный день"
+                  role="status"
+                >
+                  <Skeleton height="34px" width="62%" />
+                  <Skeleton height="20px" width="44%" />
+                </div>
+              ) : week.error ? (
+                <div className="today-inline-state" role="alert">
+                  <strong id="today-workout-title">Не удалось загрузить выбранный день</strong>
+                  <button
+                    className="today-text-link"
+                    type="button"
+                    onClick={() => void week.refetch()}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              ) : selectedScheduleItem ? (
+                <div className="today-selected-day">
+                  <h2 id="today-workout-title">{selectedScheduleItem.title}</h2>
+                  <p>
+                    {workoutStatusLabel(selectedScheduleItem.status)} ·{' '}
+                    {formatWorkoutDate(selectedScheduleItem.scheduled_date, today)}
+                  </p>
+                  <AppLink
+                    className="today-text-link"
+                    to={`/app?section=progress&workout_id=${selectedScheduleItem.id}`}
+                  >
+                    Открыть тренировку
+                  </AppLink>
+                </div>
+              ) : (
+                <div className="today-selected-day">
+                  <h2 id="today-workout-title">Силовая тренировка не запланирована</h2>
+                  <p>Выберите другой день или откройте программу тренировок.</p>
+                </div>
+              )
+            ) : workout.isLoading ||
+              priorityContextLoading ||
+              (noTodayWorkout && progress.isLoading && user?.has_active_program) ? (
               <div
                 className="today-summary-skeleton"
-                aria-label="Загружаем выбранный день"
+                aria-label="Проверяем план на сегодня"
                 role="status"
               >
                 <Skeleton height="34px" width="62%" />
                 <Skeleton height="20px" width="44%" />
+                <Skeleton height="48px" width="100%" />
               </div>
-            ) : week.error ? (
+            ) : workoutFailed ? (
               <div className="today-inline-state" role="alert">
-                <strong id="today-workout-title">Не удалось загрузить выбранный день</strong>
+                <strong id="today-workout-title">Не удалось проверить тренировку</strong>
+                <span>Остальные данные на экране доступны.</span>
                 <button
                   className="today-text-link"
                   type="button"
-                  onClick={() => void week.refetch()}
+                  onClick={() => void workout.refetch()}
                 >
                   Повторить
                 </button>
               </div>
-            ) : selectedScheduleItem ? (
-              <div className="today-selected-day">
-                <h2 id="today-workout-title">{selectedScheduleItem.title}</h2>
-                <p>
-                  {workoutStatusLabel(selectedScheduleItem.status)} ·{' '}
-                  {formatWorkoutDate(selectedScheduleItem.scheduled_date, today)}
-                </p>
-                <AppLink
-                  className="today-text-link"
-                  to={`/app?section=progress&workout_id=${selectedScheduleItem.id}`}
-                >
-                  Открыть тренировку
-                </AppLink>
-              </div>
             ) : (
-              <div className="today-selected-day">
-                <h2 id="today-workout-title">Силовая тренировка не запланирована</h2>
-                <p>Выберите другой день или откройте программу тренировок.</p>
-              </div>
-            )
-          ) : workout.isLoading ||
-            priorityContextLoading ||
-            (noTodayWorkout && progress.isLoading && user?.has_active_program) ? (
-            <div
-              className="today-summary-skeleton"
-              aria-label="Проверяем план на сегодня"
-              role="status"
-            >
-              <Skeleton height="34px" width="62%" />
-              <Skeleton height="20px" width="44%" />
-              <Skeleton height="48px" width="100%" />
-            </div>
-          ) : workoutFailed ? (
-            <div className="today-inline-state" role="alert">
-              <strong id="today-workout-title">Не удалось проверить тренировку</strong>
-              <span>Остальные данные на экране доступны.</span>
-              <button
-                className="today-text-link"
-                type="button"
-                onClick={() => void workout.refetch()}
-              >
-                Повторить
-              </button>
-            </div>
-          ) : (
-            <WorkoutOverview
-              today={today}
-              workout={visibleWorkout}
-              todayScheduleItem={todayScheduleItem}
-              weeklyReview={weeklyReview.data}
-              trainerComment={trainerComment}
-              progress={progress}
-              detailsOpen={detailsOpen}
-              startPending={start.isPending}
-              onOpenDetails={() => setDetailsOpen(true)}
-              onAddActivity={() => setCardioOpenRequest((request) => request + 1)}
-              onStart={() => visibleWorkout && start.mutate(visibleWorkout.id)}
-            />
-          )}
-        </section>
+              <WorkoutOverview
+                today={today}
+                workout={visibleWorkout}
+                todayScheduleItem={todayScheduleItem}
+                weeklyReview={weeklyReview.data}
+                trainerComment={trainerComment}
+                progress={progress}
+                detailsOpen={detailsOpen}
+                startPending={start.isPending}
+                onOpenDetails={() => setDetailsOpen(true)}
+                onAddActivity={() => setCardioOpenRequest((request) => request + 1)}
+                onStart={() => visibleWorkout && start.mutate(visibleWorkout.id)}
+              />
+            )}
+          </section>
 
+          <WeekContext
+            cardio={cardioWeek.data}
+            selectedDate={selectedDate}
+            today={today}
+            timeZone={timeZone}
+            workouts={week.data}
+            loading={week.isLoading || cardioWeek.isLoading}
+            error={Boolean(week.error || cardioWeek.error)}
+            onRetry={() => void Promise.all([week.refetch(), cardioWeek.refetch()])}
+            onSelect={(date) => {
+              setSelectedDate(date);
+              setDetailsOpen(false);
+              if (date !== today) {
+                trackProductEvent({
+                  name: 'today_week_navigated',
+                  surface: productEventSurface(),
+                  direction: 'workout_day',
+                });
+              }
+            }}
+          />
+        </div>
         <div className="today-dashboard__facts">
           <NutritionSummary date={selectedDate} />
           <ProgressSummaryPanel summary={progress} />

@@ -1,19 +1,19 @@
 /* Shared semantic foundation. Legacy aliases remain available while screens migrate gradually. */
 :root {
-  /* Design V2 / Quiet Pace semantic contract. Pilot surfaces opt in explicitly. */
-  --v2-canvas: #111111;
-  --v2-surface: #191919;
-  --v2-surface-secondary: #222222;
+  /* Сила в действии: общие токены всех пользовательских экранов. */
+  --v2-canvas: #090b0b;
+  --v2-surface: #141717;
+  --v2-surface-secondary: #1b1f1f;
   --v2-surface-strong: #303030;
   --v2-text-primary: #f5f5f5;
   --v2-text-secondary: #b8b8b8;
   --v2-border: #404040;
   --v2-border-strong: #787878;
-  --v2-lime: #b5ef32;
-  --v2-focus: #b5ef32;
+  --v2-lime: #b2f520;
+  --v2-focus: #b2f520;
   --v2-lime-hover: #98d62f;
   --v2-accent-text: #b9ea72;
-  --v2-on-lime: #102015;
+  --v2-on-lime: #090b0b;
   --v2-danger: #ef7474;
   --v2-danger-surface: #2c1717;
   --v2-warning: #e5b963;
@@ -43,11 +43,11 @@
   --semantic-wellbeing-ink: var(--semantic-neutral-ink);
   --semantic-wellbeing-tint: var(--semantic-neutral-tint);
   --semantic-wellbeing-line: var(--semantic-neutral-line);
-  --v2-control-radius: 12px;
+  --v2-control-radius: 14px;
   --radius-action: var(--v2-control-radius);
-  --v2-compact-radius: 8px;
-  --v2-region-radius: 8px;
-  --v2-panel-radius: 12px;
+  --v2-compact-radius: 10px;
+  --v2-region-radius: 20px;
+  --v2-panel-radius: 24px;
   --v2-space-1: 4px;
   --v2-space-2: 8px;
   --v2-space-3: 12px;
@@ -97,9 +97,9 @@
   --space-8: 2rem;
   --space-10: 2.5rem;
   --space-12: 3rem;
-  --radius-control: 0.75rem;
-  --radius-section: 1rem;
-  --radius-panel: 1.25rem;
+  --radius-control: 0.875rem;
+  --radius-section: 1.25rem;
+  --radius-panel: 1.5rem;
   --content-width: 61.25rem;
   --content-width-narrow: 47.5rem;
   --touch-target: 2.75rem;
@@ -112,7 +112,7 @@
   --motion-data: 560ms;
   --motion-data-total: 760ms;
   --motion-data-stagger: 25ms;
-  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease: cubic-bezier(0.23, 1, 0.32, 1);
   /* Compatibility aliases for pre-74A styles. New rules use semantic names above. */
   --motion-fast: var(--motion-press);
   --motion-standard: var(--motion-state);
@@ -121,17 +121,13 @@
   --elevation-overlay: 0 18px 42px rgba(0, 0, 0, 0.28);
 }
 
-/* Task 69B: one optical/currentColor contract for all YFC functional glyphs. */
+/* Общая геометрия растровых объектов и служебных пиктограмм. */
 .yfc-icon {
+  position: relative;
   display: block;
   overflow: visible;
   flex: 0 0 auto;
   color: inherit;
-  shape-rendering: geometricPrecision;
-}
-
-.yfc-icon[data-icon='star-filled'] {
-  fill: currentColor;
 }
 
 @media (forced-colors: active) {
@@ -142,7 +138,7 @@
 }
 
 :root[data-color-scheme='light'] {
-  --v2-canvas: #fafafa;
+  --v2-canvas: #ffffff;
   --v2-surface: #ffffff;
   --v2-surface-secondary: #f0f0f0;
   --v2-surface-strong: #dedede;
@@ -150,11 +146,11 @@
   --v2-text-secondary: #606060;
   --v2-border: #d0d0d0;
   --v2-border-strong: #808080;
-  --v2-lime: #b5ef32;
-  --v2-focus: #527613;
+  --v2-lime: #b2f520;
+  --v2-focus: #111111;
   --v2-lime-hover: #8dce20;
   --v2-accent-text: #486414;
-  --v2-on-lime: #102015;
+  --v2-on-lime: #090b0b;
   --v2-danger: #b93838;
   --v2-danger-surface: #f9e7e7;
   --v2-warning: #98600f;
@@ -163,7 +159,7 @@
   --v2-success-surface: #f0f0f0;
   --v2-success-border: #9aac7b;
   --v2-success-text: #486414;
-  --v2-progress-fill: var(--v2-text-primary);
+  --v2-progress-fill: var(--v2-lime);
   --semantic-training-ink: #486414;
   --semantic-training-tint: #f0f0f0;
   --semantic-training-line: #7baa24;
@@ -798,4 +794,41 @@ body {
   gap: var(--space-1);
   color: var(--color-accent);
   font-weight: 700;
+}
+
+.yfc-icon > img {
+  display: block;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.yfc-icon > .yfc-icon__light {
+  display: none;
+}
+:root[data-color-scheme='light'] .yfc-icon > .yfc-icon__light,
+.public-shell--light .yfc-icon > .yfc-icon__light {
+  display: block;
+}
+:root[data-color-scheme='light'] .yfc-icon > .yfc-icon__dark,
+.public-shell--light .yfc-icon > .yfc-icon__dark {
+  display: none;
+}
+.public-shell--dark .yfc-icon > .yfc-icon__dark {
+  display: block;
+}
+.public-shell--dark .yfc-icon > .yfc-icon__light {
+  display: none;
+}
+.ui-button--primary .yfc-icon:not(.yfc-icon--object) > .yfc-icon__light,
+.landing-button .yfc-icon:not(.yfc-icon--object) > .yfc-icon__light {
+  display: block;
+}
+.ui-button--primary .yfc-icon:not(.yfc-icon--object) > .yfc-icon__dark,
+.landing-button .yfc-icon:not(.yfc-icon--object) > .yfc-icon__dark {
+  display: none;
+}
+.app-bottom-nav__icon .yfc-icon--object {
+  transform: scale(1.4);
 }

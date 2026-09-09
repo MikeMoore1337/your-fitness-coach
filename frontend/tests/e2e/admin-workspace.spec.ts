@@ -257,7 +257,7 @@ test('mobile destructive confirmation names the subject and preserves touch geom
     }),
   );
   expect(actionBoxes.every((box) => box.width >= 44 && box.height >= 44)).toBe(true);
-  await expect(dialog.locator('.modal__panel')).toHaveCSS('background-color', 'rgb(25, 25, 25)');
+  await expect(dialog.locator('.modal__panel')).toHaveCSS('background-color', 'rgb(20, 23, 23)');
   await expect(dialog.locator('.modal__panel')).toHaveCSS('opacity', '1');
   const [cancelBox, confirmBox] = await Promise.all([
     dialog.getByRole('button', { name: 'Отмена' }).boundingBox(),

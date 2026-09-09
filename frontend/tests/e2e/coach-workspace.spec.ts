@@ -447,7 +447,7 @@ test('dashboard даёт обзор и фильтрует клиентов бе�
   await expect(page.getByText('16 учтённых дней питания за период')).toBeVisible();
   await expect(page.locator('.coach-client-program .ui-badge--success')).toHaveCSS(
     'border-radius',
-    '8px',
+    '10px',
   );
   await expect(page.locator('.coach-client-program .ui-badge--success')).toHaveCSS(
     'padding-top',
@@ -480,12 +480,12 @@ test('dashboard даёт обзор и фильтрует клиентов бе�
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await expect(page.getByRole('tab', { name: 'Клиенты' })).toHaveCSS(
     'background-color',
-    'rgb(25, 25, 25)',
+    'rgb(20, 23, 23)',
   );
-  await expect(page.getByLabel('Найти клиента')).toHaveCSS('background-color', 'rgb(25, 25, 25)');
+  await expect(page.getByLabel('Найти клиента')).toHaveCSS('background-color', 'rgb(20, 23, 23)');
   await expect(page.getByRole('button', { name: 'Пригласить клиента', exact: true })).toHaveCSS(
     'background-color',
-    'rgb(181, 239, 50)',
+    'rgb(178, 245, 32)',
   );
   if (captureAudit) {
     await page.screenshot({
@@ -660,7 +660,7 @@ test('mobile использует список и отдельный конте�
   await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await page.keyboard.press('Escape');
-  await expect(dayInput).toHaveCSS('background-color', 'rgb(25, 25, 25)');
+  await expect(dayInput).toHaveCSS('background-color', 'rgb(20, 23, 23)');
   await expect(dayControls.getByRole('button', { name: 'Переместить день 1 выше' })).toHaveCSS(
     'background-color',
     'rgba(0, 0, 0, 0)',
@@ -763,7 +763,7 @@ test('trainer leaves contextual workout and exercise feedback without messenger 
   await expect(feedback.getByText('Колени держите по направлению носков.')).toBeVisible();
   await expect(feedback.getByRole('textbox', { name: 'Комментарий' })).toHaveCSS(
     'background-color',
-    'rgb(25, 25, 25)',
+    'rgb(20, 23, 23)',
   );
   const mobileContextField = await feedback
     .getByRole('combobox', { name: 'Контекст комментария' })

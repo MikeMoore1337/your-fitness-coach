@@ -116,13 +116,19 @@ describe('WeekStrip', () => {
       container.querySelector('[data-pictogram="in-progress"] [data-icon="week-in-progress"]'),
     ).toBeInTheDocument();
     expect(
-      container.querySelector('[data-icon="week-planned"] circle[cx="17"][cy="17"]'),
+      container.querySelector(
+        '[data-icon="week-planned"] img[src="/assets/icons/action-week-planned-dark.png"]',
+      ),
     ).toBeInTheDocument();
     expect(
-      container.querySelector('[data-icon="week-in-progress"] line[x1="10"][y1="9"]'),
+      container.querySelector(
+        '[data-icon="week-in-progress"] img[src="/assets/icons/action-week-in-progress-dark.png"]',
+      ),
     ).toBeInTheDocument();
     expect(
-      container.querySelector('[data-icon="week-skipped"] path[d="M8 7l6 5-6 5Z"]'),
+      container.querySelector(
+        '[data-icon="week-skipped"] img[src="/assets/icons/action-week-skipped-dark.png"]',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Выполнено.*Открыть тренировку/i })).toHaveAttribute(
       'href',

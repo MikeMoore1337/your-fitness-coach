@@ -90,7 +90,7 @@ body.public-shell-mode #root {
   top: 10px;
   left: 10px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--landing-dark);
   color: #fff !important;
   font-size: 0.85rem;
@@ -138,7 +138,7 @@ body.public-shell-mode #root {
   height: var(--landing-header-control-size);
   padding: 0;
   border: 1px solid var(--landing-border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   color: var(--landing-ink);
   cursor: pointer;
   font: inherit;

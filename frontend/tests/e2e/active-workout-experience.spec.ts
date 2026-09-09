@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+test.use({ video: 'on' });
+
 const captureLandingProductProofs =
   (
     globalThis as typeof globalThis & {
@@ -293,7 +295,7 @@ async function mockActiveWorkout(page: Page, mixed = false) {
 test('active workout keeps one obvious next action through logging, timer and finish', async ({
   page,
 }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 390, height: 844 });
   if (captureLandingProductProofs) {
     await page.addInitScript(() => {
@@ -652,4 +654,36 @@ test('save failure stays compact, keeps controls open and retries explicitly', a
   server.failSetPatch(false);
   await page.getByRole('button', { name: 'Повторить' }).click();
   await expect(page.getByText('Синхронизировано')).toBeVisible();
+});
+
+test('rest timer reconciles its deadline after a simulated hidden-tab return', async ({ page }) => {
+  const start = new Date('2026-09-09T12:00:00Z');
+  await page.clock.setFixedTime(start);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const firstSet = page.locator('[data-workout-set-id="201"]');
+  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
+  await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
+  const timer = page.getByRole('timer').filter({ hasText: 'Отдых' });
+  await expect(timer).toContainText('1:30');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.clock.setFixedTime(new Date(start.getTime() + 65_000));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(timer).toContainText('0:25');
+  await page.clock.setFixedTime(new Date(start.getTime() + 100_000));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(timer).toHaveCount(0);
 });

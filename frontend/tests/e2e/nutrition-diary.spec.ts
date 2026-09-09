@@ -713,7 +713,9 @@ test('hydration visual evidence: mocked TMA dark expanded and reduced motion', a
     };
   });
   await mockNutritionApi(page);
-  await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+  await page.goto(
+    '/app?section=nutrition&date=2026-08-19&hydration=quick#tgWebAppPlatform=android',
+  );
   const hydration = page.getByRole('region', { name: 'Гидратация' });
   await expect(hydration.getByRole('heading', { name: 'Личный ориентир' })).toBeVisible();
   await expect(hydration.getByText(/для здоровых взрослых/i)).toBeVisible();
@@ -1017,10 +1019,10 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   await expect(status).toHaveCSS('color', 'rgb(185, 234, 114)');
   await expect(
     page.getByRole('progressbar', { name: /Калории:/ }).locator(':scope > span'),
-  ).toHaveCSS('background-color', 'rgb(181, 239, 50)');
+  ).toHaveCSS('background-color', 'rgb(178, 245, 32)');
   await expect(page.getByRole('link', { name: 'Питание', exact: true })).toHaveCSS(
     'background-color',
-    'rgb(34, 34, 34)',
+    'rgb(27, 31, 31)',
   );
   const lunch = page.getByRole('region', { name: 'Обед' });
   await expect(lunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(

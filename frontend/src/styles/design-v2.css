@@ -121,7 +121,7 @@ body:has(.app-shell--design-v2) {
   gap: 8px;
   padding: 8px 12px;
   border: 1px solid var(--v2-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--v2-surface);
 }
 
@@ -146,7 +146,7 @@ body:has(.app-shell--design-v2) {
   margin-block: 28px;
   padding: 24px;
   border: 1px solid var(--v2-border);
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   background: var(--v2-surface-secondary);
 }
 
@@ -261,7 +261,7 @@ body:has(.app-shell--design-v2) {
   min-height: 64px;
   padding: 12px 14px;
   border: 1px solid var(--v2-border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--v2-surface);
   cursor: pointer;
 }
@@ -344,7 +344,7 @@ body:has(.app-shell--design-v2) {
   margin-top: 28px;
   padding: 28px;
   border: 1px solid var(--v2-border);
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   background: var(--v2-surface);
 }
 
@@ -1059,7 +1059,7 @@ body:has(.app-shell--design-v2) {
 
 .today-dashboard--design-v2 .today-dashboard__header h1 {
   color: var(--v2-text-primary);
-  font-size: clamp(1.1rem, 2vw, 1.4rem);
+  font-size: clamp(3rem, 7vw, 4.5rem);
   font-weight: 800;
   letter-spacing: -0.025em;
   line-height: 1.35;
@@ -1383,10 +1383,10 @@ body:has(.app-shell--design-v2) {
   grid-template-columns: minmax(0, 1fr);
   align-content: end;
   gap: var(--v2-space-4);
-  padding: 20px;
-  border: 1px solid var(--v2-border);
-  border-radius: 8px;
-  background: var(--v2-surface);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -1542,7 +1542,8 @@ body:has(.app-shell--design-v2) {
   border-radius: var(--v2-control-radius);
   color: var(--v2-text-primary);
   font-size: 0.75rem;
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   text-decoration: none;
 }
 
@@ -1702,7 +1703,8 @@ body:has(.app-shell--design-v2) {
   margin-top: var(--v2-space-1);
   color: var(--v2-text-primary);
   font-size: clamp(2.7rem, 5vw, 4rem);
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   letter-spacing: -0.055em;
   line-height: 0.95;
   font-family: var(--font-display);
@@ -1845,7 +1847,8 @@ body:has(.app-shell--design-v2) {
   margin-top: var(--v2-space-2);
   color: var(--v2-text-primary);
   font-size: 1.75rem;
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   letter-spacing: -0.035em;
 }
 
@@ -1979,7 +1982,8 @@ body:has(.app-shell--design-v2) {
   margin: 0 0 var(--v2-space-2);
   padding: 0;
   font-size: 1.125rem;
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   line-height: 1.2;
 }
 
@@ -2250,7 +2254,8 @@ body:has(.app-shell--design-v2) {
 .active-workout--design-v2 .active-workout-hero__copy h2,
 .active-workout--design-v2 .active-workout-exercise__copy h3 {
   color: var(--v2-text-primary);
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
 }
 
 .active-workout--design-v2 .active-workout-sync {
@@ -2459,16 +2464,16 @@ body:has(.app-shell--design-v2) {
 
 .active-workout--design-v2 .active-workout-input input,
 .active-workout--design-v2 .active-workout-advanced-field select {
-  border: 0;
-  border-bottom: 2px solid var(--v2-text-primary);
-  border-radius: 0;
-  background: transparent;
-  color: var(--v2-text-primary);
+  border: 1px solid #d3d6d6;
+  padding: 12px 6px;
+  border-radius: var(--radius-control);
+  background: #fff;
+  color: #111;
 }
 
 .active-workout--design-v2 .active-workout-set.is-current .active-workout-input input {
-  font-size: clamp(2rem, 7vw, 3rem);
-  text-align: left;
+  font-size: clamp(2.75rem, 9vw, 4rem);
+  text-align: center;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -2628,7 +2633,8 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   max-width: 640px;
   color: var(--v2-text-primary);
   font-size: clamp(3rem, 5.3vw, 4.6rem);
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   letter-spacing: -0.055em;
   line-height: 0.95;
   font-family: var(--font-display);
@@ -3094,7 +3100,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .today-dashboard--design-v2 .today-dashboard__header h1 {
-    font-size: clamp(1.1rem, 2vw, 1.4rem);
+    font-size: clamp(3rem, 7vw, 4.5rem);
     color: var(--v2-text-primary);
     letter-spacing: -0.025em;
     font-family: var(--font-display);
@@ -3103,9 +3109,9 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   .today-dashboard--design-v2 .today-workout-spotlight {
     min-height: 0;
     gap: var(--v2-space-3);
-    padding: 20px;
-    border-radius: 8px;
-    background: var(--v2-surface);
+    padding: 0;
+    border-radius: var(--radius-control);
+    background: transparent;
   }
 
   .today-dashboard--design-v2 .today-workout-spotlight__label {
@@ -3930,7 +3936,8 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   margin-bottom: var(--v2-space-2);
   padding: 0;
   color: var(--v2-text-primary);
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
 }
 
 .daily-wellbeing__options legend small,
@@ -4327,7 +4334,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   --muted: var(--v2-text-secondary);
   --field-label: var(--v2-text-primary);
   --placeholder: var(--v2-text-secondary);
-  --accent: var(--v2-text-primary);
+  --accent: var(--v2-lime);
   --accent-hover: var(--v2-surface-strong);
   --accent-strong: var(--v2-accent-text);
   --accent-line: var(--v2-lime);
@@ -4955,7 +4962,8 @@ body:has(.standalone-page--design-v2) {
   border-right: 1px solid var(--v2-border);
   color: var(--v2-text-primary);
   font-size: 0.82rem;
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   line-height: 1.25;
   text-decoration: none;
   gap: var(--v2-space-2);
@@ -5099,7 +5107,8 @@ body:has(.standalone-page--design-v2) {
 .training-preferences-weekdays legend,
 .training-preferences-locations legend {
   margin-bottom: var(--v2-space-2);
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
 }
 
 .training-preferences-weekdays > div,
@@ -6274,7 +6283,7 @@ button.notification-row__main:focus-visible {
 }
 
 .app-section--progress .progress-summary__lead {
-  border-radius: 0;
+  border-radius: var(--v2-region-radius);
   background: var(--v2-surface-secondary);
   color: var(--v2-text-primary);
 }
@@ -6349,7 +6358,7 @@ button.notification-row__main:focus-visible {
 
 .app-section--progress .progress-exercise {
   border-color: var(--v2-border);
-  border-radius: 0;
+  border-radius: var(--v2-region-radius);
   background: transparent;
 }
 
@@ -7330,7 +7339,8 @@ button.notification-row__main:focus-visible {
 
 .app-section--progress .program-history-workout__facts dd {
   margin: 0;
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
 }
 
 .app-section--progress .program-history-workout__plan {
@@ -7390,7 +7400,7 @@ button.notification-row__main:focus-visible {
 
 .app-section--programs :where(.program-day, .program-exercise-row) {
   border-color: var(--v2-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: transparent;
   box-shadow: none;
 }
@@ -7610,7 +7620,7 @@ button.notification-row__main:focus-visible {
 
 .app-section--nutrition :where(.nutrition-food-result, .nutrition-ingredient) {
   border-color: var(--v2-border);
-  border-radius: 0;
+  border-radius: var(--v2-region-radius);
   background: transparent;
 }
 
@@ -8657,7 +8667,8 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   max-width: 780px;
   margin: 0;
   font-size: clamp(2.55rem, 5vw, 4.35rem);
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   letter-spacing: -0.055em;
   line-height: 0.95;
   font-family: var(--font-display);
@@ -8719,7 +8730,8 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 .coach-client-detail__identity h2 {
   margin: var(--v2-space-1) 0 0;
   font-size: clamp(1.65rem, 3vw, 2.35rem);
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   letter-spacing: -0.035em;
 }
 
@@ -8759,7 +8771,8 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 .coach-fact-strip dd {
   margin: 0;
   font-size: 2rem;
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   letter-spacing: -0.04em;
 }
 
@@ -9023,7 +9036,8 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   padding: 11px 0;
   color: var(--v2-text-primary);
   font-size: 0.82rem;
-  font-weight: 750;
+  font-weight: 700;
+  font-family: var(--font-display);
   text-decoration-color: var(--v2-lime);
   text-underline-offset: 5px;
 }
@@ -9726,4 +9740,113 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Editorial workout imagery belongs to the real workout card; actions remain in flow. */
+.today-nutrition {
+  padding: 16px 0;
+  border-block: 1px solid var(--v2-border);
+}
+.today-nutrition h2 {
+  margin: 0 0 12px;
+  font: 600 1.3rem var(--font-display);
+}
+.today-nutrition__content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.today-nutrition__values {
+  flex: 1;
+  min-width: 0;
+}
+.today-nutrition__values p {
+  margin: 0 0 8px;
+}
+.today-nutrition__values strong {
+  font: 700 2rem var(--font-display);
+}
+.today-nutrition progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin-bottom: 12px;
+  border: 0;
+  appearance: none;
+  background: var(--v2-border);
+}
+.today-nutrition progress::-webkit-progress-bar {
+  background: var(--v2-border);
+}
+.today-nutrition progress::-webkit-progress-value {
+  background: var(--v2-lime);
+}
+.today-nutrition progress::-moz-progress-bar {
+  background: var(--v2-lime);
+}
+.today-nutrition__water {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--v2-text-secondary);
+  font-size: 0.85rem;
+}
+.today-dashboard__date {
+  font-size: 12px;
+  color: var(--v2-text-secondary);
+  margin: 0 0 8px;
+  text-transform: capitalize;
+}
+.today-workout-photo {
+  display: block;
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  margin: 0 0 12px;
+  border-radius: var(--radius-panel);
+}
+.workout-completion__check img {
+  display: block;
+  object-fit: contain;
+  width: 110px;
+  height: 110px;
+}
+
+.today-dashboard__training {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.today-workout-copy:has(.today-workout-photo) {
+  position: relative;
+  isolation: isolate;
+  min-height: 220px;
+  align-content: start;
+  padding: 18px;
+  color: white;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+}
+.today-workout-copy .today-workout-photo {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  margin: 0;
+  z-index: -1;
+  filter: brightness(0.7);
+}
+.today-dashboard--design-v2
+  .today-workout-copy:has(.today-workout-photo)
+  :is(h2, p, .today-workout-copy__status) {
+  color: white;
+}
+.today-workout-copy:has(.today-workout-photo) h2 {
+  font-family: var(--font-display);
+  font-size: 32px;
+}
+.today-workout-copy:has(.today-workout-photo) .ui-badge {
+  background: #090b0bc9;
+  color: white;
 }

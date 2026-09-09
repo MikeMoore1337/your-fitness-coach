@@ -42,9 +42,8 @@ async function expectNoHorizontalOverflow(page: Page, width: number) {
 }
 
 async function expectLandingReady(page: Page) {
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'Движение. Запись. Прогресс.' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'СИЛА В ДЕЙСТВИИ.' })).toBeVisible();
+  await page.locator('.strength-scene').scrollIntoViewIfNeeded();
   for (const image of await page.locator('.strength-scene img').all()) {
     await expect(image).toHaveJSProperty('complete', true);
     expect(
@@ -52,6 +51,7 @@ async function expectLandingReady(page: Page) {
     ).toBeGreaterThan(0);
     await image.evaluate((element) => (element as HTMLImageElement).decode());
   }
+  await page.locator('h1').scrollIntoViewIfNeeded();
   await page.evaluate(
     () =>
       new Promise<void>((resolve) =>
@@ -109,7 +109,7 @@ test('landing keeps the approved sports composition across themes and viewports'
       await expectLandingReady(page);
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       await expect(page.locator('h1')).toHaveCount(1);
-      await expect(page.locator('.strength-scene img')).toHaveCount(1);
+      await expect(page.locator('.strength-scene img')).toHaveCount(4);
       await expect(page.locator('.landing-energy-path')).toHaveCount(0);
       await expect(page.getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute(
         'href',
@@ -118,8 +118,8 @@ test('landing keeps the approved sports composition across themes and viewports'
       await expect(
         page.locator('.landing-hero__actions').getByRole('link', { name: 'Попробовать демо' }),
       ).toHaveAttribute('href', '/demo?cabinet=1&scenario=self_training&section=today');
-      await expect(page.locator('.strength-scene')).toContainText('Пример записи');
-      await expect(page.locator('.landing-core__features article')).toHaveCount(3);
+      await expect(page.locator('.strength-scene')).toContainText('Иллюстрация движения');
+      await expect(page.locator('.landing-feature')).toHaveCount(2);
       await expect(page.locator('.landing-trainer')).toBeVisible();
       await expectNoHorizontalOverflow(page, viewport.width);
       const geometry = await page.evaluate(() => {
@@ -152,50 +152,22 @@ test('landing keeps the approved sports composition across themes and viewports'
   expect(errors).toEqual([]);
 });
 
-test('media failures preserve the story and product proofs reserve their layout', async ({
-  page,
-}) => {
+test('media failures preserve the story and reserve the scene layout', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  let releaseDesktop: (() => void) | undefined;
-  const desktopGate = new Promise<void>((resolve) => {
-    releaseDesktop = resolve;
-  });
-  await page.route('**/assets/marketing/strength-protocol-*', (route) => route.abort());
-  await page.route('**/assets/product/landing-today-desktop-light.webp', async (route) => {
-    await desktopGate;
-    await route.continue();
-  });
-  await page.route('**/assets/product/landing-trainer-desktop-light.webp', (route) =>
-    route.abort(),
-  );
+  await page.route('**/assets/marketing/**', (route) => route.abort());
   await openLanding(page, 'light');
-
-  await expect(
-    page.getByText(/Изображение недоступно. Тренировки и демо остаются доступны/i),
-  ).toBeVisible();
+  await expect(page.getByText('Фото не загрузилось. Все действия доступны.')).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute(
     'href',
     '/app',
   );
-
-  const desktopFrame = page.locator('.landing-core__desktop');
-  const reserved = await desktopFrame.boundingBox();
-  await desktopFrame.scrollIntoViewIfNeeded();
-  const desktopImage = desktopFrame.locator('img');
-  await expect(desktopImage).not.toHaveClass(/is-loaded/);
-  await expect(desktopFrame.getByText('Desktop proof временно недоступен.')).toBeVisible();
-  releaseDesktop?.();
-  await expect(desktopImage).toHaveJSProperty('complete', true);
-  await expect(desktopImage).toHaveClass(/is-loaded/);
-  await expect(desktopFrame.getByText('Desktop proof временно недоступен.')).toBeHidden();
-  const loaded = await desktopFrame.boundingBox();
-  expect(loaded?.width).toBeCloseTo(reserved?.width ?? 0, 0);
-  expect(loaded?.height).toBeCloseTo(reserved?.height ?? 0, 0);
-
-  const trainerFrame = page.locator('.landing-trainer__proof');
-  await trainerFrame.scrollIntoViewIfNeeded();
-  await expect(trainerFrame.getByText('Экран кабинета тренера временно недоступен.')).toBeVisible();
+  const frame = page.locator('.strength-scene__photo');
+  await frame.scrollIntoViewIfNeeded();
+  const bounds = await frame.boundingBox();
+  expect(bounds?.height).toBeGreaterThanOrEqual(260);
+  expect(bounds?.width).toBeGreaterThan(400);
+  await expect(page.locator('.strength-scene__record')).toBeVisible();
   await expectNoHorizontalOverflow(page, 1280);
 });
 
@@ -245,13 +217,13 @@ test('keyboard, menu, FAQ and canonical public actions stay operable', async ({ 
     const linkSelectors = [
       '.landing-hero__telegram-link',
       '.landing-continuity__action',
-      '.landing-core__features a',
+      '.landing-feature a',
       '.landing-core__self-link',
       '.landing-assurance__details nav a',
       '.landing-footer nav a',
     ];
     const textSelectors = [
-      '.landing-core__features p',
+      '.landing-feature p:not(.landing-kicker)',
       '.landing-trainer__copy > p:not(.landing-kicker)',
       '.landing-start__steps p',
       '.landing-faq-list details > p',
@@ -312,13 +284,13 @@ test('motion has an immediate reduced-motion final state', async ({ page }) => {
   await expectLandingReady(page);
 
   const motionState = await page.locator('.strength-scene').evaluate((element) => ({
-    phase: element.getAttribute('data-motion-phase'),
+    phase: element.getAttribute('data-phase'),
     animations: element
       .getAnimations({ subtree: true })
       .filter((animation) => animation.playState === 'running').length,
     clip: getComputedStyle(element.querySelector('.strength-scene__photo')!).clipPath,
   }));
-  expect(motionState.phase).toBe('idle');
+  expect(motionState.phase).toBe('2');
   expect(motionState.animations).toBe(0);
   expect(motionState.clip).toBe('none');
   await expect(page.getByRole('link', { name: 'Начать', exact: true })).toBeInViewport();

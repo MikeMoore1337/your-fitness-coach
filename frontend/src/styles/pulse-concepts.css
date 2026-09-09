@@ -37,7 +37,7 @@
   padding: clamp(18px, 2.5vw, 24px);
   border: 2px solid color-mix(in srgb, var(--v2-text-secondary) 58%, var(--v2-border));
   border-left: 7px solid var(--v2-lime);
-  border-radius: 24px;
+  border-radius: var(--radius-control);
   background: var(--v2-surface) !important;
   box-shadow: none;
 }
@@ -49,7 +49,7 @@
 
 .progress-body-metric--data-insight .data-viz-chart__plot {
   border-width: 2px;
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   box-shadow: none;
 }
 
@@ -89,7 +89,7 @@
   padding: 24px;
   border-color: color-mix(in srgb, var(--v2-lime) 48%, var(--v2-border));
   border-left-width: 3px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--v2-surface);
   box-shadow: none;
 }
@@ -117,7 +117,7 @@
 @media (max-width: 640px) {
   .progress-body-metric--data-insight {
     padding: 18px 16px;
-    border-radius: 22px;
+    border-radius: var(--radius-control);
   }
 
   .workout-completion__hero {
