@@ -341,10 +341,32 @@ def test_queue_owner_liveness_rejects_ambiguous_os_errors(
     def raise_ambiguous_error(pid: int, signal: int) -> None:
         raise OSError("ambiguous liveness result")
 
+    monkeypatch.setattr(delivery.os, "name", "posix")
     monkeypatch.setattr(delivery.os, "kill", raise_ambiguous_error)
 
     with pytest.raises(delivery.DeliveryError, match="cannot verify continuous queue owner PID"):
         delivery._queue_owner_is_alive(424242)
+
+
+def test_queue_owner_liveness_uses_non_destructive_windows_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: list[int] = []
+
+    monkeypatch.setattr(delivery.os, "name", "nt")
+    monkeypatch.setattr(
+        delivery,
+        "_windows_queue_owner_is_alive",
+        lambda pid: observed.append(pid) or True,
+    )
+
+    def unexpected_signal_probe(pid: int, signal: int) -> None:
+        raise AssertionError("Windows liveness must not call os.kill")
+
+    monkeypatch.setattr(delivery.os, "kill", unexpected_signal_probe)
+
+    assert delivery._queue_owner_is_alive(424242) is True
+    assert observed == [424242]
 
 
 def test_queue_rejects_batch_larger_than_contract(monkeypatch: pytest.MonkeyPatch) -> None:

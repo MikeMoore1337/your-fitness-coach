@@ -439,7 +439,51 @@ def _read_queue_claim(claim_path: Path) -> tuple[str, dict[str, Any]] | None:
     return content, claim
 
 
+def _windows_queue_owner_is_alive(pid: int) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    error_access_denied = 5
+    error_invalid_parameter = 87
+    process_query_limited_information = 0x1000
+    still_active = 259
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    try:
+        handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    except OverflowError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}"
+        ) from error
+    if not handle:
+        error_code = ctypes.get_last_error()
+        if error_code == error_invalid_parameter:
+            return False
+        if error_code == error_access_denied:
+            return True
+        raise DeliveryError(f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}")
+
+    try:
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            raise DeliveryError(f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}")
+        return exit_code.value == still_active
+    finally:
+        if not kernel32.CloseHandle(handle):
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: cannot close continuous queue owner handle for PID {pid}"
+            )
+
+
 def _queue_owner_is_alive(pid: int) -> bool:
+    if os.name == "nt":
+        return _windows_queue_owner_is_alive(pid)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -447,9 +491,9 @@ def _queue_owner_is_alive(pid: int) -> bool:
     except PermissionError:
         return True
     except OSError as error:
-        if error.errno == errno.ESRCH or getattr(error, "winerror", None) == 87:
+        if error.errno == errno.ESRCH:
             return False
-        if error.errno == errno.EPERM or getattr(error, "winerror", None) == 5:
+        if error.errno == errno.EPERM:
             return True
         raise DeliveryError(
             f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}"

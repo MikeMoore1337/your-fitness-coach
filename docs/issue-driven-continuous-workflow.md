@@ -52,7 +52,8 @@ scope expansion равен нулю. После достижения лимит�
 отсутствия безопасной Issue contract очередь останавливается.
 
 Единый queue claim хранится в shared Git common directory. При collision launcher валидирует
-запись и проверяет liveness её PID; только подтверждённый stale claim после аварийного завершения
+запись и проверяет liveness её PID: на Windows используется non-destructive process-handle query,
+а на POSIX — signal-zero probe. Только подтверждённый stale claim после аварийного завершения
 процесса атомарно переносится в quarantine, повторно сверяется и удаляется, после чего acquire
 повторяется. Активный, повреждённый, изменившийся во время recovery или непроверяемый claim
 остаётся `HUMAN_REQUIRED` и не удаляется автоматически.
