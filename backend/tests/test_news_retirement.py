@@ -235,9 +235,11 @@ def test_retired_configuration_and_runtime_symbols_are_absent() -> None:
 
     root = Path(__file__).resolve().parents[2]
     env_example = (root / ".env.example").read_text(encoding="utf-8")
+    ai_decision = (root / "docs" / "ai" / "ai-beta-product-decision.md").read_text(encoding="utf-8")
 
     assert "NEWS_LEGACY_SOURCE_FETCH_ENABLED" not in env_example
     assert "NEWS_LLM_PROVIDER" not in env_example
+    assert "NEWS_LLM_PROVIDER=disabled" not in ai_decision
     assert not (root / "scripts" / "normalize_production_news_legacy_source_fetch.py").exists()
 
 
