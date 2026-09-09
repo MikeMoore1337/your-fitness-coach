@@ -103,7 +103,6 @@ class PublicationResult(Protocol):
 
 async def generate_pending_images(client: httpx.AsyncClient) -> int:
     with get_session_context() as db:
-        quarantine_non_hermes_news_work(db)
         cluster_ids = [
             row.id
             for row in db.query(NewsCluster.id)

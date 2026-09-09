@@ -566,7 +566,6 @@ def moderate_draft(
 
 def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) -> int:
     now = utcnow()
-    quarantine_non_hermes_news_work(db)
     image_pending = db.query(NewsCluster).filter(NewsCluster.status == "image_pending").all()
     for cluster in image_pending:
         draft = latest_draft(db, cluster)

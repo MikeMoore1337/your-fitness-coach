@@ -17,7 +17,7 @@ from fitminiapp_api.models.news import (
     NewsReviewDelivery,
     NewsSource,
 )
-from fitminiapp_api.services import news_drafts, news_worker
+from fitminiapp_api.services import news_drafts, news_editorial, news_worker
 from fitminiapp_api.services.news_drafts import (
     _validated_fields,
     evidence_packet,
@@ -285,6 +285,33 @@ def test_worker_cycle_has_no_local_fetch_or_candidate_generation(monkeypatch) ->
         assert cluster is not None
         assert cluster.status == "rejected"
         assert db.query(NewsDraftRevision).count() == 0
+
+
+def test_worker_cycle_quarantines_retired_work_once(monkeypatch) -> None:
+    quarantine_calls = 0
+
+    def quarantine_once(_db) -> tuple[int, int]:
+        nonlocal quarantine_calls
+        quarantine_calls += 1
+        return 0, 0
+
+    monkeypatch.setattr(news_worker, "quarantine_non_hermes_news_work", quarantine_once)
+    monkeypatch.setattr(news_editorial, "quarantine_non_hermes_news_work", quarantine_once)
+
+    async def unused(*_args, **_kwargs):
+        return None
+
+    asyncio.run(
+        run_news_pipeline_once(
+            send_message=unused,
+            send_preview=unused,
+            send_publication=unused,
+            publication_ready=False,
+            review_delivery_due=False,
+        )
+    )
+
+    assert quarantine_calls == 1
 
 
 @pytest.mark.parametrize(
