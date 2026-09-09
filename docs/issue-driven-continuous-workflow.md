@@ -26,9 +26,9 @@ PR`; implementation остаётся в task worktree, а refresh, merge, deploy
 - отсутствие unresolved review threads и актуальных blocking findings;
 - clean/mergeable PR.
 
-На самом `pull_request_review` event GitHub может временно вернуть `mergeable_state=blocked`,
-поскольку aggregate `checks` ещё ждёт результат самого `review-contract`. Event-проверка
-разрешает это состояние только вместе с exact-head завершённым review; прямой
+На самом `pull_request_review` event GitHub может временно вернуть `mergeable_state=blocked` или
+`unstable`, поскольку aggregate `checks` ещё ждёт результат самого `review-contract`.
+Event-проверка разрешает эти состояния только вместе с exact-head завершённым review; прямой
 `validate-pr-review` перед merge остаётся строгим и принимает только clean/has_hooks.
 
 Проверка выполняется командой `scripts/task_session.py validate-pr-review`. Review старого head
@@ -50,6 +50,11 @@ canonical backlog и проверяет подтверждённые terminal de
 более четырёх задач. На одну задачу допускается не более трёх review-fix и трёх CI-fix cycles;
 scope expansion равен нулю. После достижения лимита, ошибки CI/deploy, dependency blocker или
 отсутствия безопасной Issue contract очередь останавливается.
+
+Для queue-mode authoritative-счётчики review-fix и CI-fix хранятся в durable controller ledger.
+Перед каждым фактическим fix cycle worker обязан выполнить `record-queue-cycle`; `final.md`
+содержит только проверяемый worker cross-check и не может занизить ledger. Повторная публикация
+уже актуального состояния `queued` не выполняется.
 
 Machine-readable control-state comment использует маркер `yfc-control-state:v1` и состояния
 `queued`, `in_progress`, `review_wait`, `fix_required`, `ci_wait`, `merge_ready`, `merged`,

@@ -345,9 +345,30 @@ def parse_control_state_comment(body: str) -> dict[str, Any] | None:
     )
 
 
-def control_states(comments: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+def _authorized_logins(logins: Sequence[str]) -> frozenset[str]:
+    normalized = frozenset(login.strip().casefold() for login in logins if login.strip())
+    if not normalized:
+        raise IssueWorkflowError(
+            "control-state parsing requires an explicit authorized login allowlist"
+        )
+    return normalized
+
+
+def _comment_login(comment: Mapping[str, Any]) -> str:
+    author = comment.get("user") or comment.get("author") or {}
+    if not isinstance(author, Mapping):
+        return ""
+    return str(author.get("login", "")).strip().casefold()
+
+
+def control_states(
+    comments: Sequence[Mapping[str, Any]], *, authorized_logins: Sequence[str]
+) -> list[dict[str, Any]]:
+    allowed = _authorized_logins(authorized_logins)
     parsed: list[tuple[str, int, dict[str, Any]]] = []
     for comment in comments:
+        if _comment_login(comment) not in allowed:
+            continue
         payload = parse_control_state_comment(str(comment.get("body", "")))
         if payload is None:
             continue
@@ -365,10 +386,13 @@ def control_states(comments: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]
 
 
 def latest_control_state(
-    comments: Sequence[Mapping[str, Any]], *, task_id: str | None = None
+    comments: Sequence[Mapping[str, Any]],
+    *,
+    task_id: str | None = None,
+    authorized_logins: Sequence[str],
 ) -> dict[str, Any] | None:
     expected = _task_id(task_id) if task_id is not None else None
-    states = control_states(comments)
+    states = control_states(comments, authorized_logins=authorized_logins)
     matching = [item for item in states if expected is None or item["task_id"] == expected]
     return matching[-1] if matching else None
 
@@ -387,12 +411,12 @@ def queue_authorization(
     if str(issue.get("state", "")).upper() != "OPEN":
         raise IssueWorkflowError("HUMAN_REQUIRED: control Issue is not open")
     body_contract = CONTINUE_QUEUE_TOKEN in str(issue.get("body", ""))
-    allowed = {login.strip().casefold() for login in authorized_logins if login.strip()}
+    allowed = _authorized_logins(authorized_logins)
     commands: list[tuple[str, int, str]] = []
     for comment in comments:
         author = comment.get("user") or comment.get("author") or {}
         login = str(author.get("login", "")) if isinstance(author, Mapping) else ""
-        if allowed and login.casefold() not in allowed:
+        if login.casefold() not in allowed:
             continue
         body = str(comment.get("body", ""))
         created_at = str(comment.get("created_at") or comment.get("createdAt") or "")

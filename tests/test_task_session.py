@@ -190,14 +190,24 @@ def _success_check(sha: str) -> dict[str, Any]:
 
 
 def _prepare_started(
-    repository: tuple[Path, Any], task_id: str = "301", *, concurrency: str = "independent-write"
+    repository: tuple[Path, Any],
+    task_id: str = "301",
+    *,
+    concurrency: str = "independent-write",
+    queue_mode: bool = False,
 ) -> tuple[Path, Any, Any, Path, str, str]:
     root, git_repository = repository
     _write_task(root, task_id, "synthetic-task", concurrency=concurrency)
     controller = task_session.TaskController(
         git_repository, github=FakeGitHub(git_repository.ref("origin/master"))
     )
-    started = controller.start(task_id, owner_launch=True, session_label="pytest", offline=True)
+    started = controller.start(
+        task_id,
+        owner_launch=True,
+        session_label="pytest",
+        offline=True,
+        queue_mode=queue_mode,
+    )
     worktree = Path(started["lease"]["worktree"])
     branch = str(started["lease"]["branch"])
     base_sha = str(started["lease"]["base_origin_master_sha"])
@@ -206,6 +216,26 @@ def _prepare_started(
     _git(worktree, "commit", "-m", f"feat: [Task {task_id}] synthetic change")
     head_sha = _git(worktree, "rev-parse", "HEAD")
     return root, git_repository, controller, worktree, branch, base_sha + ":" + head_sha
+
+
+def test_record_queue_cycle_is_durable_and_bounded(repository: tuple[Path, Any]) -> None:
+    _, _, controller, _, _, _ = _prepare_started(repository, "250", queue_mode=True)
+
+    for index in range(3):
+        budget = controller.record_queue_cycle(
+            "250", kind="review", reason=f"bounded review fix {index + 1}"
+        )
+
+    assert budget["task_id"] == "250"
+    assert budget["queue_budget"]["review_fix_cycles"] == 3
+    assert budget["queue_budget"]["ci_fix_cycles"] == 0
+    assert budget["queue_budget"]["scope_expansions"] == 0
+    with pytest.raises(task_session.TaskSessionError, match="HUMAN_REQUIRED"):
+        controller.record_queue_cycle("250", kind="review", reason="fourth review fix")
+
+    lease = next(item for item in controller.status()["leases"] if item["task_id"] == "250")
+    assert lease["queue_budget"]["review_fix_cycles"] == 3
+    assert len(lease["queue_budget"]["events"]) == 3
 
 
 def _write_gate_evidence(
@@ -474,6 +504,34 @@ def test_review_contract_rejects_current_blocking_finding() -> None:
         task_session.validate_pull_request_review_contract(_review_pr(head_sha), reviews, [], [])
 
 
+def test_review_contract_uses_latest_state_changing_review_for_each_reviewer() -> None:
+    head_sha = "b" * 40
+    reviews = [
+        {
+            "id": 1,
+            "state": "CHANGES_REQUESTED",
+            "commit_id": head_sha,
+            "submitted_at": "2026-09-09T01:00:00Z",
+            "user": {"login": "reviewer"},
+            "body": "P1 old finding",
+        },
+        {
+            "id": 2,
+            "state": "APPROVED",
+            "commit_id": head_sha,
+            "submitted_at": "2026-09-09T02:00:00Z",
+            "user": {"login": "reviewer"},
+        },
+    ]
+
+    result = task_session.validate_pull_request_review_contract(
+        _review_pr(head_sha), reviews, [], []
+    )
+
+    assert result["status"] == "PASS"
+    assert result["formal_approval_count"] == 1
+
+
 def test_review_contract_rejects_unresolved_thread_even_with_exact_approval() -> None:
     head_sha = "b" * 40
     reviews = [{"state": "APPROVED", "commit_id": head_sha, "user": {"login": "owner"}}]
@@ -508,10 +566,13 @@ def test_review_contract_accepts_exact_codex_comment_and_resolved_threads() -> N
     assert result["head_sha"] == head_sha
 
 
-def test_review_event_accepts_exact_review_before_aggregate_check_is_green() -> None:
+@pytest.mark.parametrize("mergeable_state", ["blocked", "unstable"])
+def test_review_event_accepts_exact_review_before_aggregate_check_is_green(
+    mergeable_state: str,
+) -> None:
     head_sha = "b" * 40
     pull_request = _review_pr(head_sha)
-    pull_request["mergeable_state"] = "blocked"
+    pull_request["mergeable_state"] = mergeable_state
     comments = [
         {
             "id": 14,

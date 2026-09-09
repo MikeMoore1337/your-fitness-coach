@@ -26,10 +26,10 @@ from typing import Any
 
 try:
     from scripts.artifact_manager import ArtifactError, ArtifactManager
-    from scripts.issue_workflow import IssueWorkflowError, normalize_severity
+    from scripts.issue_workflow import DEFAULT_QUEUE_BUDGET, IssueWorkflowError, normalize_severity
 except ModuleNotFoundError:
     from artifact_manager import ArtifactError, ArtifactManager
-    from issue_workflow import IssueWorkflowError, normalize_severity
+    from issue_workflow import DEFAULT_QUEUE_BUDGET, IssueWorkflowError, normalize_severity
 
 TASK_ID_PATTERN = r"[0-9]+[A-Z]?"
 TASK_ID_RE = re.compile(rf"^{TASK_ID_PATTERN}$", re.IGNORECASE)
@@ -798,6 +798,38 @@ def _review_body(item: Mapping[str, Any]) -> str:
     return str(item.get("body") or item.get("text") or "")
 
 
+def _effective_current_head_reviews(
+    reviews: Sequence[Mapping[str, Any]], head_sha: str
+) -> list[Mapping[str, Any]]:
+    """Keep the latest state-changing review from each reviewer for this exact head."""
+
+    effective: dict[str, tuple[str, int, Mapping[str, Any]]] = {}
+    state_changers = {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}
+    for index, review in enumerate(reviews):
+        review_head = str(review.get("commit_id", review.get("commitId", "")))
+        if not _marker_matches_head(review_head, head_sha):
+            continue
+        state = str(review.get("state", "")).upper()
+        if state not in state_changers:
+            continue
+        reviewer = _review_login(review) or f"review-{review.get('id', index)}"
+        timestamp = str(
+            review.get("submitted_at")
+            or review.get("submittedAt")
+            or review.get("created_at")
+            or review.get("createdAt")
+            or ""
+        )
+        try:
+            review_id = int(review.get("id", index))
+        except TypeError, ValueError:
+            review_id = index
+        previous = effective.get(reviewer)
+        if previous is None or (timestamp, review_id) >= (previous[0], previous[1]):
+            effective[reviewer] = (timestamp, review_id, review)
+    return [item[2] for item in sorted(effective.values(), key=lambda item: (item[0], item[1]))]
+
+
 def validate_pull_request_review_contract(
     pull_request: Mapping[str, Any],
     reviews: Sequence[Mapping[str, Any]],
@@ -837,8 +869,9 @@ def validate_pull_request_review_contract(
         allowed_mergeable_states = {"clean", "has_hooks"}
         if allow_blocked_mergeable_state:
             # The review-event run is itself one of the required checks. GitHub can therefore
-            # report ``blocked`` until the aggregate check containing this gate succeeds.
-            allowed_mergeable_states.add("blocked")
+            # report ``blocked`` or ``unstable`` until the aggregate check containing this gate
+            # succeeds. ``mergeable=True`` above still makes an actual merge conflict fail closed.
+            allowed_mergeable_states.update({"blocked", "unstable"})
         if mergeable_state not in allowed_mergeable_states:
             raise TaskSessionError(
                 "PR review gate requires a clean mergeable PR, found "
@@ -856,17 +889,14 @@ def validate_pull_request_review_contract(
             + ", ".join(str(item) for item in unresolved_threads)
         )
 
+    effective_reviews = _effective_current_head_reviews(reviews, head_sha)
     exact_approvals = [
-        item
-        for item in reviews
-        if str(item.get("state", "")).upper() == "APPROVED"
-        and _marker_matches_head(str(item.get("commit_id", item.get("commitId", ""))), head_sha)
+        item for item in effective_reviews if str(item.get("state", "")).upper() == "APPROVED"
     ]
     current_changes = [
         item
-        for item in reviews
+        for item in effective_reviews
         if str(item.get("state", "")).upper() == "CHANGES_REQUESTED"
-        and _marker_matches_head(str(item.get("commit_id", item.get("commitId", ""))), head_sha)
     ]
     if current_changes:
         findings = []
@@ -2400,6 +2430,7 @@ class TaskController:
         slug: str | None = None,
         dependency_ids: Sequence[str] | None = None,
         offline: bool = False,
+        queue_mode: bool = False,
     ) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
         if not owner_launch:
@@ -2497,6 +2528,14 @@ class TaskController:
                 "owner_launch": True,
                 "canonical_master_refresh": canonical_refresh,
             }
+            if queue_mode:
+                lease["queue_mode"] = True
+                lease["queue_budget"] = {
+                    "review_fix_cycles": 0,
+                    "ci_fix_cycles": 0,
+                    "scope_expansions": 0,
+                    "events": [],
+                }
             self.store.create_json(lease_path, lease)
         try:
             self.repository.create_task_worktree(branch, target, base_sha)
@@ -2530,6 +2569,74 @@ class TaskController:
                 f"Recovery: python scripts/task_session.py recover {expected}\n"
             ),
         }
+
+    def record_queue_cycle(
+        self,
+        task_id: str,
+        *,
+        kind: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        """Record one bounded continuous-queue fix cycle in durable controller state."""
+
+        expected = normalize_task_id(task_id)
+        normalized_kind = kind.strip().lower()
+        if normalized_kind not in {"review", "ci"}:
+            raise TaskSessionError("queue cycle kind must be review or ci")
+        if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 4096:
+            raise TaskSessionError("queue cycle reason must be a bounded non-empty string")
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            lease = self.store.read_json(lease_path)
+            if not isinstance(lease, dict) or lease.get("task_id") != expected:
+                raise TaskSessionError(f"No active queue lease exists for Task {expected}")
+            if lease.get("queue_mode") is not True:
+                raise TaskSessionError(f"Task {expected} is not running in continuous queue mode")
+            if self._lease_state(lease) in TERMINAL_LEASE_STATES:
+                raise TaskSessionError(f"Task {expected} is already terminal")
+            raw_budget = lease.get("queue_budget")
+            if not isinstance(raw_budget, dict):
+                raise TaskSessionError(f"Task {expected} queue budget state is missing")
+            review_cycles = raw_budget.get("review_fix_cycles", 0)
+            ci_cycles = raw_budget.get("ci_fix_cycles", 0)
+            scope_expansions = raw_budget.get("scope_expansions", 0)
+            if any(
+                isinstance(value, bool) or not isinstance(value, int)
+                for value in (review_cycles, ci_cycles, scope_expansions)
+            ):
+                raise TaskSessionError(f"Task {expected} queue budget state is malformed")
+            if normalized_kind == "review":
+                review_cycles += 1
+            else:
+                ci_cycles += 1
+            try:
+                DEFAULT_QUEUE_BUDGET.check_counters(
+                    tasks_started=1,
+                    review_fix_cycles=review_cycles,
+                    ci_fix_cycles=ci_cycles,
+                    scope_expansions=scope_expansions,
+                )
+            except IssueWorkflowError as error:
+                raise TaskSessionError(str(error)) from error
+            raw_events = raw_budget.get("events", [])
+            if not isinstance(raw_events, list) or len(raw_events) >= 6:
+                raise TaskSessionError(f"Task {expected} queue cycle ledger is malformed or full")
+            event = {
+                "kind": normalized_kind,
+                "reason": reason.strip(),
+                "recorded_at": utc_now(),
+                "sequence": len(raw_events) + 1,
+            }
+            budget = {
+                "review_fix_cycles": review_cycles,
+                "ci_fix_cycles": ci_cycles,
+                "scope_expansions": scope_expansions,
+                "events": [*raw_events, event],
+            }
+            lease["queue_budget"] = budget
+            lease["updated_at"] = utc_now()
+            StateStore.replace_json(lease_path, lease)
+        return {"task_id": expected, "queue_budget": budget}
 
     def adopt_current(
         self,
@@ -3457,6 +3564,8 @@ class TaskController:
                 raise TaskSessionError(
                     "Delivery gate evidence changed before production completion"
                 )
+            if "queue_budget" in current:
+                history["queue_budget"] = current["queue_budget"]
             history_path = self.store.history / f"task-{expected}.json"
             if history_path.exists():
                 raise TaskSessionError(
@@ -3740,6 +3849,7 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument("--slug")
     start.add_argument("--dependency-id", action="append")
     start.add_argument("--offline", action="store_true")
+    start.add_argument("--queue-mode", action="store_true")
     adopt = subparsers.add_parser("adopt-current")
     adopt.add_argument("task_id")
     adopt.add_argument("--owner-launch", action="store_true")
@@ -3778,6 +3888,10 @@ def _parser() -> argparse.ArgumentParser:
     resolve_recovery.add_argument("task_id")
     resolve_recovery.add_argument("--reason", required=True)
     resolve_recovery.add_argument("--owner-authorize", action="store_true")
+    queue_cycle = subparsers.add_parser("record-queue-cycle")
+    queue_cycle.add_argument("task_id")
+    queue_cycle.add_argument("--kind", choices=("review", "ci"), required=True)
+    queue_cycle.add_argument("--reason", required=True)
     production = subparsers.add_parser("complete-production")
     production.add_argument("task_id")
     production.add_argument("--pr", type=int, required=True)
@@ -3830,6 +3944,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     slug=args.slug,
                     dependency_ids=args.dependency_id,
                     offline=args.offline,
+                    queue_mode=args.queue_mode,
                 )
             )
             return 0
@@ -3880,6 +3995,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                     args.task_id,
                     reason=args.reason,
                     owner_authorize=args.owner_authorize,
+                )
+            )
+            return 0
+        if args.command == "record-queue-cycle":
+            _print(
+                controller.record_queue_cycle(
+                    args.task_id,
+                    kind=args.kind,
+                    reason=args.reason,
                 )
             )
             return 0

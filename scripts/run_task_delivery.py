@@ -28,6 +28,7 @@ try:
         IssueWorkflowError,
         control_state_payload,
         latest_control_state,
+        parse_control_state_comment,
         parse_queue_budget_report,
         parse_task_contract,
         queue_authorization,
@@ -44,6 +45,7 @@ except ModuleNotFoundError:
         IssueWorkflowError,
         control_state_payload,
         latest_control_state,
+        parse_control_state_comment,
         parse_queue_budget_report,
         parse_task_contract,
         queue_authorization,
@@ -209,13 +211,20 @@ def _control_issue_snapshot(issue_number: int) -> tuple[dict[str, Any], list[dic
 
 def _post_control_state(issue_number: int, payload: Mapping[str, Any]) -> dict[str, Any]:
     body = render_control_state_comment(payload)
-    parsed = latest_control_state(
-        [{"id": 0, "created_at": "", "body": body}], task_id=str(payload["task_id"])
-    )
+    parsed = parse_control_state_comment(body)
     if parsed is None:
         raise DeliveryError("Rendered control-state comment could not be parsed")
-    _, comments = _control_issue_snapshot(issue_number)
-    previous = latest_control_state(comments, task_id=str(parsed["task_id"]))
+    issue, comments = _control_issue_snapshot(issue_number)
+    if not _issue_authorized(issue):
+        raise DeliveryError(
+            "HUMAN_REQUIRED: task control Issue must be authored by the repository owner "
+            "or the trusted ChatGPT connector"
+        )
+    previous = latest_control_state(
+        comments,
+        task_id=str(parsed["task_id"]),
+        authorized_logins=_trusted_issue_logins(issue),
+    )
     try:
         validate_control_transition(
             previous["state"] if previous is not None else None,
@@ -289,6 +298,8 @@ def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
         if match is None:
             continue
         task_id = match.group("task_id").upper()
+        if not _issue_authorized(issue):
+            continue
         if task_id in contracts:
             raise DeliveryError(f"Multiple GitHub Issues claim Task {task_id}")
         try:
@@ -296,14 +307,15 @@ def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
         except IssueWorkflowError as error:
             raise DeliveryError(f"Task {task_id} Issue contract is malformed: {error}") from error
         if contracts[task_id] is not None:
-            if not _issue_authorized(issue):
-                contracts[task_id] = None
-                continue
             issue_number = issue.get("number")
             if not isinstance(issue_number, int) or isinstance(issue_number, bool):
                 raise DeliveryError(f"Task {task_id} Issue has no valid number")
             _, comments = _control_issue_snapshot(issue_number)
-            latest = latest_control_state(comments, task_id=task_id)
+            latest = latest_control_state(
+                comments,
+                task_id=task_id,
+                authorized_logins=_trusted_issue_logins(issue),
+            )
             contracts[task_id] = {
                 **contracts[task_id],
                 "issue_number": issue_number,
@@ -504,6 +516,7 @@ def _start(
     max_wait_minutes: int,
     offline: bool,
     dependency_ids: Sequence[str] | None = None,
+    queue_mode: bool = False,
 ) -> dict[str, Any]:
     deadline = time.monotonic() + max_wait_minutes * 60
     command = [
@@ -521,6 +534,8 @@ def _start(
         command.extend(("--dependency-id", str(dependency_id)))
     if offline:
         command.append("--offline")
+    if queue_mode:
+        command.append("--queue-mode")
 
     while True:
         completed = _run(command, check=False)
@@ -560,6 +575,12 @@ def _worker_prompt(
             "budget block, with actual counters (do not omit it):\n"
             + render_queue_budget_report(review_fix_cycles=0, ci_fix_cycles=0, scope_expansions=0)
             + "\n"
+            "The controller keeps the authoritative durable queue budget outside final.md. Before "
+            "each actual review fix, run `python scripts/task_session.py record-queue-cycle "
+            f"{task_id} --kind review --reason <bounded reason>`; before each actual CI fix, use "
+            "`--kind ci`. Record exactly one cycle before making that fix. A failed recording is a "
+            "terminal HUMAN_REQUIRED condition. The final report counters must exactly match the "
+            "durable controller ledger; do not under-report or invent cycles.\n"
         )
     return (
         f"Выполни только Task {task_id}: {started['lease']['canonical_task_path']}.\n"
@@ -708,6 +729,46 @@ def _launch_worker(
     return completed.returncode
 
 
+def _queue_budget_from_controller_history(history: Mapping[str, Any]) -> dict[str, int]:
+    raw_budget = history.get("queue_budget")
+    if not isinstance(raw_budget, Mapping):
+        raise DeliveryError(
+            "HUMAN_REQUIRED: finished queue task has no durable controller budget ledger"
+        )
+    values = {
+        "review_fix_cycles": raw_budget.get("review_fix_cycles"),
+        "ci_fix_cycles": raw_budget.get("ci_fix_cycles"),
+        "scope_expansions": raw_budget.get("scope_expansions"),
+    }
+    if any(isinstance(value, bool) or not isinstance(value, int) for value in values.values()):
+        raise DeliveryError("HUMAN_REQUIRED: durable controller queue budget is malformed")
+    events = raw_budget.get("events")
+    if (
+        not isinstance(events, list)
+        or len(events) != values["review_fix_cycles"] + values["ci_fix_cycles"]
+    ):
+        raise DeliveryError("HUMAN_REQUIRED: durable controller queue cycle ledger is inconsistent")
+    event_counts = {"review": 0, "ci": 0}
+    for event in events:
+        if not isinstance(event, Mapping) or event.get("kind") not in event_counts:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: durable controller queue cycle ledger is malformed"
+            )
+        event_counts[str(event["kind"])] += 1
+    if event_counts != {
+        "review": values["review_fix_cycles"],
+        "ci": values["ci_fix_cycles"],
+    }:
+        raise DeliveryError("HUMAN_REQUIRED: durable controller queue cycle ledger is inconsistent")
+    try:
+        DEFAULT_QUEUE_BUDGET.check_counters(tasks_started=1, **values)
+    except IssueWorkflowError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: durable controller queue budget is invalid: {error}"
+        ) from error
+    return {key: int(value) for key, value in values.items()}
+
+
 def _queue_budget_from_worker(artifacts: Path) -> dict[str, int]:
     final = artifacts / "final.md"
     try:
@@ -751,6 +812,7 @@ def _deliver_one(
             if issue_contract is not None
             else None
         ),
+        queue_mode=issue_contract is not None,
     )
     status_issue = state_issue or control_issue
     if status_issue is not None:
@@ -808,7 +870,13 @@ def _deliver_one(
         )
     if issue_contract is not None:
         try:
-            budget_report = _queue_budget_from_worker(artifacts)
+            durable_budget = _queue_budget_from_controller_history(history)
+            worker_budget = _queue_budget_from_worker(artifacts)
+            if worker_budget != durable_budget:
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: worker budget report does not match durable controller ledger"
+                )
+            budget_report = durable_budget
         except DeliveryError as error:
             if status_issue is not None:
                 _post_control_state(
@@ -920,20 +988,28 @@ def _run_continuous_queue(
         state = str(candidate["state"])
         if state == "queued" and not candidate.get("issue_number"):
             raise DeliveryError(f"Task {task_id} has no dedicated GitHub control Issue")
-        _post_control_state(
-            task_issue,
-            control_state_payload(
-                task_id=task_id,
-                state=state,
-                issue_number=task_issue,
-                branch=(
-                    f"task/{task_id}-{candidate['branch_slug']}"
-                    if candidate.get("branch_slug")
-                    else None
-                ),
-                blocker=candidate.get("blocker"),
-            ),
+        latest = candidate.get("contract", {}).get("latest_control_state")
+        already_queued = (
+            state == "queued"
+            and isinstance(latest, Mapping)
+            and str(latest.get("task_id", "")).upper() == task_id
+            and latest.get("state") == "queued"
         )
+        if not already_queued:
+            _post_control_state(
+                task_issue,
+                control_state_payload(
+                    task_id=task_id,
+                    state=state,
+                    issue_number=task_issue,
+                    branch=(
+                        f"task/{task_id}-{candidate['branch_slug']}"
+                        if candidate.get("branch_slug")
+                        else None
+                    ),
+                    blocker=candidate.get("blocker"),
+                ),
+            )
         if state != "queued":
             _event(
                 "QUEUE_STOPPED",

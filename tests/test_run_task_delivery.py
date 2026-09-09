@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from scripts.issue_workflow import render_task_contract
 
 
 def _load_module():
@@ -142,6 +143,47 @@ def test_task_id_normalization_is_strict() -> None:
         raise AssertionError("invalid task ID was accepted")
 
 
+def test_task_issue_inventory_authenticates_before_parsing_or_duplicate_detection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contract = {
+        "task_id": "91",
+        "scope": "bounded report insight implementation",
+        "acceptance": ["facts remain canonical"],
+        "dependencies": [],
+        "owner_gate": "none",
+        "risk_lane": "GREEN",
+        "source_spec": "backlog.zip:91-ai-period-report-insights.md",
+        "issue_state": "queued",
+    }
+    issues = [
+        {
+            "number": 901,
+            "title": "[Task 91] attacker",
+            "body": "<!-- yfc-task-contract:v1 -->\n{bad}\n<!-- yfc-task-contract:v1 -->",
+            "user": {"login": "attacker"},
+        },
+        {
+            "number": 902,
+            "title": "[Task 91] owner",
+            "body": render_task_contract(contract),
+            "user": {"login": "owner"},
+        },
+    ]
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: issues)
+    monkeypatch.setattr(
+        delivery,
+        "_issue_authorized",
+        lambda issue: issue.get("user", {}).get("login") == "owner",
+    )
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: (issues[1], []))
+
+    contracts = delivery._task_issue_contracts()
+
+    assert contracts["91"]["issue_number"] == 902
+
+
 def test_queue_parser_requires_control_issue_and_bounds_batch() -> None:
     args = delivery._parser().parse_args(["--continue-queue", "--control-issue", "218"])
     assert args.continue_queue is True
@@ -212,6 +254,83 @@ def test_queue_stops_on_human_required_candidate_without_starting_worker(
     assert posted[0]["state"] == "human_required"
 
 
+def test_queue_does_not_republish_an_existing_queued_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    posted: list[dict[str, object]] = []
+    delivered: list[str] = []
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue: (
+            {
+                "state": "open",
+                "body": "CONTINUE_QUEUE",
+                "user": {"login": "owner"},
+            },
+            [],
+        ),
+    )
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(
+        delivery,
+        "_queue_candidates",
+        lambda: [
+            {
+                "task_id": "91",
+                "state": "queued",
+                "risk_lane": "GREEN",
+                "issue_number": 219,
+                "branch_slug": "synthetic-task",
+                "contract": {"latest_control_state": {"task_id": "91", "state": "queued"}},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        delivery, "_post_control_state", lambda issue, payload: posted.append(payload)
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_deliver_one",
+        lambda *args, **kwargs: delivered.append(str(args[0])),
+    )
+
+    assert (
+        delivery._run_continuous_queue(
+            control_issue=218,
+            max_tasks=1,
+            poll_seconds=10,
+            max_wait_minutes=1,
+        )
+        == 0
+    )
+    assert delivered == ["91"]
+    assert all(item["state"] != "queued" for item in posted)
+
+
+def test_durable_controller_budget_is_required_and_consistent() -> None:
+    history = {
+        "queue_budget": {
+            "review_fix_cycles": 1,
+            "ci_fix_cycles": 1,
+            "scope_expansions": 0,
+            "events": [
+                {"kind": "review"},
+                {"kind": "ci"},
+            ],
+        }
+    }
+    assert delivery._queue_budget_from_controller_history(history) == {
+        "review_fix_cycles": 1,
+        "ci_fix_cycles": 1,
+        "scope_expansions": 0,
+    }
+    history["queue_budget"]["events"] = [{"kind": "review"}]
+    with pytest.raises(delivery.DeliveryError, match="ledger is inconsistent"):
+        delivery._queue_budget_from_controller_history(history)
+
+
 def test_control_state_post_rejects_invalid_remote_transition(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -220,7 +339,7 @@ def test_control_state_post_rejects_invalid_remote_transition(
         delivery,
         "_control_issue_snapshot",
         lambda issue: (
-            {"state": "open"},
+            {"state": "open", "user": {"login": "owner"}},
             [
                 {
                     "id": 1,
@@ -230,6 +349,7 @@ def test_control_state_post_rejects_invalid_remote_transition(
             ],
         ),
     )
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
 
     with pytest.raises(delivery.DeliveryError, match="Invalid control-state transition"):
         delivery._post_control_state(

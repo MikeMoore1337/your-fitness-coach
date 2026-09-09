@@ -30,18 +30,42 @@ def test_control_state_round_trip_is_machine_readable_and_latest_is_deterministi
         {
             "id": 2,
             "created_at": "2026-09-09T01:00:00Z",
+            "user": {"login": "owner"},
             "body": render_control_state_comment(second),
         },
         {
             "id": 1,
             "created_at": "2026-09-09T00:00:00Z",
+            "user": {"login": "owner"},
             "body": render_control_state_comment(first),
         },
     ]
 
     assert parse_control_state_comment(render_control_state_comment(first)) == first
-    assert latest_control_state(comments, task_id="150") == second
+    assert latest_control_state(comments, task_id="150", authorized_logins=("owner",)) == second
     assert CONTROL_STATE_MARKER in render_control_state_comment(second)
+
+
+def test_control_state_ignores_untrusted_comments_before_parsing() -> None:
+    queued = control_state_payload(task_id="150", state="queued", issue_number=218)
+    comments = [
+        {
+            "id": 2,
+            "created_at": "2026-09-09T02:00:00Z",
+            "user": {"login": "attacker"},
+            "body": f"{CONTROL_STATE_MARKER}\n{{bad}}\n{CONTROL_STATE_MARKER}",
+        },
+        {
+            "id": 1,
+            "created_at": "2026-09-09T01:00:00Z",
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(queued),
+        },
+    ]
+
+    assert latest_control_state(comments, task_id="150", authorized_logins=("owner",)) == queued
+    with pytest.raises(IssueWorkflowError, match="explicit authorized login allowlist"):
+        latest_control_state(comments, task_id="150", authorized_logins=())
 
 
 def test_control_state_rejects_unknown_or_malformed_payload() -> None:
