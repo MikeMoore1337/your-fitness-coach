@@ -599,9 +599,10 @@ def _macos_process_instance_identity(pid: int) -> dict[str, str] | None:
     environment = os.environ.copy()
     environment["LC_ALL"] = "C"
     environment["LANG"] = "C"
+    environment["TZ"] = "UTC"
     try:
         process = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "lstart="],
+            ["ps", "-p", str(pid), "-o", "state=", "-o", "lstart="],
             check=False,
             shell=False,
             text=True,
@@ -618,14 +619,21 @@ def _macos_process_instance_identity(pid: int) -> dict[str, str] | None:
         if process.stdout.strip() or process.stderr.strip() or _posix_queue_owner_is_alive(pid):
             raise DeliveryError(f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}")
         return None
-    start_lines = [line.strip() for line in process.stdout.splitlines() if line.strip()]
-    if len(start_lines) != 1:
-        if not start_lines and not _posix_queue_owner_is_alive(pid):
+    process_lines = [line.strip() for line in process.stdout.splitlines() if line.strip()]
+    if len(process_lines) != 1:
+        if not process_lines and not _posix_queue_owner_is_alive(pid):
             return None
         raise DeliveryError(
             f"HUMAN_REQUIRED: cannot parse continuous queue owner PID {pid} identity"
         )
-    start_time = _macos_identity_value(start_lines[0], label="process identity", pid=pid)
+    process_fields = process_lines[0].split(maxsplit=1)
+    if len(process_fields) != 2 or not re.fullmatch(r"[A-Za-z+?-]{1,8}", process_fields[0]):
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot parse continuous queue owner PID {pid} identity"
+        )
+    if process_fields[0][0] in {"Z", "X"}:
+        return None
+    start_time = _macos_identity_value(process_fields[1], label="process identity", pid=pid)
     try:
         boot = subprocess.run(
             ["sysctl", "-n", "kern.boottime"],

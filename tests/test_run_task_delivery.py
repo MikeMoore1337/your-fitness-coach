@@ -511,7 +511,7 @@ def test_queue_owner_identity_supports_macos_without_proc(
         calls.append((args, kwargs))
         if args[0] == "ps":
             return subprocess.CompletedProcess(
-                args, 0, stdout="Wed Sep  9 10:00:00 2026\n", stderr=""
+                args, 0, stdout="S Wed Sep  9 10:00:00 2026\n", stderr=""
             )
         assert args == ["sysctl", "-n", "kern.boottime"]
         return subprocess.CompletedProcess(args, 0, stdout="{ sec = 123, usec = 456 }\n", stderr="")
@@ -526,10 +526,32 @@ def test_queue_owner_identity_supports_macos_without_proc(
         "start_time": "Wed Sep 9 10:00:00 2026",
     }
     assert [call[0] for call in calls] == [
-        ["ps", "-p", "424242", "-o", "lstart="],
+        ["ps", "-p", "424242", "-o", "state=", "-o", "lstart="],
         ["sysctl", "-n", "kern.boottime"],
     ]
-    assert all(call[1]["shell"] is False and call[1]["timeout"] == 5 for call in calls)
+    assert all(
+        call[1]["shell"] is False and call[1]["timeout"] == 5 and call[1]["env"]["TZ"] == "UTC"
+        for call in calls
+    )
+
+
+def test_queue_owner_identity_treats_macos_zombie_as_dead(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        return subprocess.CompletedProcess(
+            args, 0, stdout="Z Wed Sep  9 10:00:00 2026\n", stderr=""
+        )
+
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "darwin")
+    monkeypatch.setattr(delivery.subprocess, "run", fake_run)
+
+    assert delivery._queue_owner_process_instance(424242) is None
+    assert calls == [["ps", "-p", "424242", "-o", "state=", "-o", "lstart="]]
 
 
 def test_queue_rejects_batch_larger_than_contract(monkeypatch: pytest.MonkeyPatch) -> None:
