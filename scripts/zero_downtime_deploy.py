@@ -329,6 +329,68 @@ def _image_digest(image: str, expected_revision: str) -> str:
     return digest
 
 
+def _image_digest_from_exact_revision_tag(
+    image: str,
+    *,
+    configured_image: str,
+    expected_revision: str,
+) -> str:
+    """Resolve a legacy image by its exact immutable revision tag.
+
+    Older single-slot images may not retain the OCI revision label after a Docker
+    reclaim.  The fallback still requires the running image ID to expose the exact
+    revision tag and a repository digest; a mutable tag or an unrelated digest is
+    never accepted as provenance.
+    """
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", image):
+        raise DeploymentError(f"legacy image reference {image!r} is not an immutable image ID")
+    if not re.fullmatch(rf".+:{re.escape(expected_revision)}", configured_image):
+        raise DeploymentError(
+            f"legacy service image {configured_image!r} is not an exact revision tag"
+        )
+    result = _run(
+        [
+            "docker",
+            "image",
+            "inspect",
+            "--format",
+            '{{json .RepoDigests}}|{{json .RepoTags}}|{{index .Config.Labels "org.opencontainers.image.revision"}}',
+            image,
+        ],
+        capture=True,
+    ).stdout.strip()
+    digests_json, separator, remainder = result.partition("|")
+    tags_json, tags_separator, revision = remainder.partition("|")
+    if not separator or not tags_separator or revision not in {"", "<no value>"}:
+        raise DeploymentError(
+            f"legacy image {image} has an unexpected OCI revision label {revision!r}"
+        )
+    try:
+        digests = json.loads(digests_json)
+        tags = json.loads(tags_json)
+    except json.JSONDecodeError as exc:
+        raise DeploymentError(f"legacy image {image} returned invalid Docker metadata") from exc
+    if not isinstance(digests, list) or not digests:
+        raise DeploymentError(f"legacy image {image} has no immutable repository digest")
+    if not isinstance(tags, list) or configured_image not in tags:
+        raise DeploymentError(
+            f"legacy image {image} is not tagged with its configured exact revision image"
+        )
+    repository = configured_image.rsplit(":", 1)[0]
+    matching = [
+        value
+        for value in digests
+        if isinstance(value, str)
+        and value.startswith(repository + "@sha256:")
+        and re.fullmatch(r".+@sha256:[0-9a-f]{64}", value)
+    ]
+    if not matching:
+        raise DeploymentError(
+            f"legacy image {image} has no immutable digest for repository {repository!r}"
+        )
+    return matching[0]
+
+
 def _capacity() -> dict[str, int]:
     memory_kib = 0
     meminfo = Path("/proc/meminfo")
@@ -1252,6 +1314,34 @@ def _legacy_running_image(service: str) -> str:
     return image
 
 
+def _legacy_configured_image(service: str) -> str:
+    container_id = _compose("ps", "-q", service, capture=True).stdout.strip()
+    if not container_id or not _service_is_running(service):
+        raise DeploymentError(f"single-slot rollout requires running legacy service {service}")
+    image = _run(
+        ["docker", "inspect", "--format", "{{.Config.Image}}", container_id],
+        capture=True,
+    ).stdout.strip()
+    if not image:
+        raise DeploymentError(f"legacy service {service} has no configured image reference")
+    return image
+
+
+def _legacy_image_digest(service: str, expected_revision: str) -> str:
+    image = _legacy_running_image(service)
+    try:
+        return _image_digest(image, expected_revision)
+    except DeploymentError as exc:
+        if not re.search(r"revision (?:''|'<no value>') does not match ", str(exc)):
+            raise
+    configured_image = _legacy_configured_image(service)
+    return _image_digest_from_exact_revision_tag(
+        image,
+        configured_image=configured_image,
+        expected_revision=expected_revision,
+    )
+
+
 def _stop_legacy_services(config: DeployConfig) -> None:
     for service, timeout in (
         ("worker", config.worker_drain_seconds),
@@ -1407,9 +1497,9 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
 
     try:
         with _stage(evidence, "single_slot_legacy_provenance"):
-            old_backend = _image_digest(_legacy_running_image("backend"), active_revision)
-            old_bot = _image_digest(_legacy_running_image("bot"), active_revision)
-            old_worker = _image_digest(_legacy_running_image("worker"), active_revision)
+            old_backend = _legacy_image_digest("backend", active_revision)
+            old_bot = _legacy_image_digest("bot", active_revision)
+            old_worker = _legacy_image_digest("worker", active_revision)
             if old_worker != old_backend:
                 raise DeploymentError(
                     "legacy backend and worker do not use the same verified image digest"

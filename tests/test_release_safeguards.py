@@ -108,6 +108,16 @@ def test_deploy_recovers_legacy_revision_before_migration_and_rollout() -> None:
     assert 'install -d -m 700 \\"\\$(dirname \\"\\$active_marker\\")\\"' in deploy
 
 
+def test_deploy_bounds_transient_production_ssh_failures() -> None:
+    deploy = _sources()["deploy"]
+
+    assert "for attempt in 1 2 3; do" in deploy
+    assert "ConnectTimeout=10" in deploy
+    assert "ConnectionAttempts=1" in deploy
+    assert "Unable to read active production revision after 3 SSH attempts" in deploy
+    assert 'sleep "$delay"' in deploy
+
+
 def test_delivery_contract_is_master_only_and_approval_gated() -> None:
     sources = _sources()
     controller = sources["controller"]

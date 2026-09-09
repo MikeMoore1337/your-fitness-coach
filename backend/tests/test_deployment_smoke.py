@@ -48,6 +48,13 @@ def test_deployment_smoke_separates_compatible_preflight_from_release_contract()
             final_url=f"{BASE_URL}/api/v1/me",
             headers={"cache-control": "no-store"},
         ),
+        "/api/v1/auth/refresh": HttpResponse(
+            status=401,
+            body=b'{"detail":"Not authenticated"}',
+            content_type="application/json",
+            final_url=f"{BASE_URL}/api/v1/auth/refresh",
+            headers={"cache-control": "no-store"},
+        ),
         "/app": _response("/app", body=HTML, content_type="text/html"),
         "/app/report?period=days_30": _response(
             "/app/report?period=days_30", body=HTML, content_type="text/html"
@@ -66,9 +73,25 @@ def test_deployment_smoke_separates_compatible_preflight_from_release_contract()
 
     requested_paths: list[str] = []
 
-    def read(_base_url: str, path: str, *, timeout: float) -> HttpResponse:
+    def read(
+        _base_url: str,
+        path: str,
+        *,
+        timeout: float,
+        method: str = "GET",
+        body: bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> HttpResponse:
         assert timeout == 3
         requested_paths.append(path)
+        if path == "/api/v1/auth/refresh":
+            assert method == "POST"
+            assert body == b"{}"
+            assert headers == {"Accept": "application/json", "Content-Type": "application/json"}
+        else:
+            assert method == "GET"
+            assert body is None
+            assert headers is None
         return responses[path]
 
     assert (

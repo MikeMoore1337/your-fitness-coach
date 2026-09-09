@@ -33,6 +33,7 @@ from fitminiapp_api.services.news_drafts import (
     quality_warnings,
     render_draft,
 )
+from fitminiapp_api.services.news_freshness import is_fresh_publication
 from fitminiapp_api.services.news_growth import article_candidate_handoff
 from fitminiapp_api.services.news_ingestion import (
     ParsedNewsItem,
@@ -237,6 +238,8 @@ def accept_hermes_submission(
     )
     if recent_count >= settings.hermes_intake_rate_limit_per_minute:
         raise HermesIntakeError("rate_limited")
+    if not is_fresh_publication(payload.source.published_at, now=current):
+        raise HermesIntakeError("source_publication_not_fresh")
 
     source = db.get(NewsSource, payload.source.source_id)
     if source is None or not source.enabled:

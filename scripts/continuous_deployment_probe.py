@@ -16,6 +16,11 @@ else:
     from check_deployment import _first_versioned_asset, _read, check_deployment
 
 
+# The anonymous refresh endpoint is limited to 10 requests per minute. Seven
+# seconds keeps the continuous probe below that limit even with a sliding window.
+AUTH_REFRESH_PROBE_INTERVAL_SECONDS = 7.0
+
+
 @dataclass
 class ProbeReport:
     started_at: float
@@ -86,16 +91,23 @@ def run_probe(
     report.requests += 1
     report.compatibility_asset = _first_versioned_asset(initial_document.body)
     on_started()
+    next_refresh_boundary_at = started
 
     while True:
         sample_started = clock()
+        check_refresh_boundary = sample_started >= next_refresh_boundary_at
+        if check_refresh_boundary:
+            next_refresh_boundary_at = sample_started + max(
+                interval, AUTH_REFRESH_PROBE_INTERVAL_SECONDS
+            )
         try:
             check_deployment(
                 base_url,
                 timeout=timeout,
                 expected_environment=expected_environment,
+                check_refresh_boundary=check_refresh_boundary,
             )
-            report.requests += 8
+            report.requests += 8 + int(check_refresh_boundary)
             if compatibility_required():
                 old_asset = _read(base_url, report.compatibility_asset, timeout=timeout)
                 report.requests += 1

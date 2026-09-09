@@ -23,6 +23,7 @@ _CLIENT_ERROR_CODES = {
     "source_packet_invalid",
     "source_content_hash_mismatch",
     "source_packet_rejected",
+    "source_publication_not_fresh",
     "source_item_missing",
     "cluster_missing",
     "draft_schema_invalid",
@@ -52,7 +53,7 @@ def _intake_http_error(error: HermesIntakeError) -> HTTPException:
     if error.code in _CONFLICT_CODES:
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=error.code)
     if error.code in _CLIENT_ERROR_CODES:
-        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=error.code)
+        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error.code)
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="intake_failed")
 
 

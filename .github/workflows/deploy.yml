@@ -100,7 +100,17 @@ jobs:
         id: migration
         run: |
           set -Eeuo pipefail
-          ACTIVE_REVISION="$(ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -p "$PROD_PORT" "$PROD_USER@$PROD_HOST" "set -Eeuo pipefail
+          ACTIVE_REVISION=""
+          for attempt in 1 2 3; do
+            if ACTIVE_REVISION="$(ssh \
+              -o BatchMode=yes \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=10 \
+              -o ConnectionAttempts=1 \
+              -p "$PROD_PORT" \
+              "$PROD_USER@$PROD_HOST" \
+              "set -Eeuo pipefail
             marker='$PROD_PATH/.artifacts/operations/deployments/last-successful-revision'
             if [ -f \"\$marker\" ]; then
               cat \"\$marker\"
@@ -141,7 +151,17 @@ jobs:
             bot_revision=\$(docker image inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' \"\$bot_image\")
             test \"\$backend_revision\" = \"\$bot_revision\"
             printf '%s\\n' \"\$backend_revision\"
-          ")"
+          ")"; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Unable to read active production revision after 3 SSH attempts" >&2
+              exit 1
+            fi
+            delay=$((attempt * 5))
+            echo "Active revision SSH read attempt $attempt failed; retrying in $delay seconds" >&2
+            sleep "$delay"
+          done
           if [[ ! "$ACTIVE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
             echo "Production active revision is missing or not a full lowercase SHA" >&2
             exit 1
@@ -178,6 +198,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           scp -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -P "$PROD_PORT" \
+            -o ConnectTimeout=10 -o ConnectionAttempts=1 \
             "${{ steps.bundle.outputs.name }}" \
             "$PROD_USER@$PROD_HOST:/tmp/${{ steps.bundle.outputs.name }}"
 
@@ -198,6 +219,8 @@ jobs:
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
             -p "$PROD_PORT" \
             "$PROD_USER@$PROD_HOST" \
             "set -Eeuo pipefail
