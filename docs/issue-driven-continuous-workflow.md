@@ -58,6 +58,14 @@ macOS — bounded probes системного времени запуска пр
 считается достаточным, поэтому повторно выданный PID после crash или reboot не блокирует очередь.
 Codex worker запускается через отдельный supervisor, который также проверяет exact parent
 identity и при потере launcher завершает worker process group до возврата orphaned lock в очередь.
+На Windows supervisor помещает worker и его дочерние процессы в Job Object с
+`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, поэтому потеря launcher не оставляет дочерний Codex
+процесс вне termination boundary.
+Claim атомарно обновляет `queue_phase`, `task_id`, `task_issue` и `worker_state` перед запуском
+каждой задачи и очищает их только после полного `_deliver_one`. Если owner провалился, пока claim
+содержит активную задачу, recovery сначала читает durable controller history и останавливается
+с `HUMAN_REQUIRED`: claim не переносится в quarantine и не удаляется до ручной reconciliation
+controller, supervisor и control Issue.
 Только подтверждённый stale claim после аварийного завершения процесса атомарно переносится в
 quarantine, повторно сверяется и удаляется, после чего acquire повторяется. Активный,
 повреждённый, изменившийся во время recovery или непроверяемый claim остаётся `HUMAN_REQUIRED`

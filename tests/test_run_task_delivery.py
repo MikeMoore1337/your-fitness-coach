@@ -112,6 +112,16 @@ class _FakeSupervisedWorker:
         return self.returncode or 0
 
 
+class _FakeWindowsWorkerJob:
+    def __init__(self, process: _FakeSupervisedWorker) -> None:
+        self.process = process
+        self.closed = False
+
+    def close(self) -> None:
+        self.closed = True
+        self.process.returncode = -9
+
+
 def test_worker_supervisor_terminates_codex_when_parent_instance_is_lost(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -130,6 +140,7 @@ def test_worker_supervisor_terminates_codex_when_parent_instance_is_lost(
         popen=fake_popen,
         owner_probe=lambda pid, identity: False,
         sleeper=lambda seconds: pytest.fail("parent loss must terminate without polling sleep"),
+        job_factory=lambda process: None,
     )
 
     assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
@@ -149,11 +160,34 @@ def test_worker_supervisor_returns_codex_exit_code_when_parent_stays_alive() -> 
         popen=lambda command, **kwargs: process,
         owner_probe=lambda pid, identity: True,
         sleeper=sleeps.append,
+        job_factory=lambda process: None,
     )
 
     assert result == 0
     assert process.terminated is False
     assert sleeps == [delivery.WORKER_SUPERVISOR_POLL_SECONDS]
+
+
+def test_worker_supervisor_uses_windows_job_for_process_tree_termination(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "nt")
+    process = _FakeSupervisedWorker()
+    job = _FakeWindowsWorkerJob(process)
+
+    result = delivery._run_worker_supervisor(
+        ["codex", "exec"],
+        parent_pid=42,
+        parent_identity={"kind": "windows", "creation_time_100ns": "123"},
+        popen=lambda command, **kwargs: process,
+        owner_probe=lambda pid, identity: False,
+        sleeper=lambda seconds: pytest.fail("parent loss must terminate without polling sleep"),
+        job_factory=lambda worker: job,
+    )
+
+    assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
+    assert job.closed is True
+    assert process.terminated is False
 
 
 def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
@@ -394,6 +428,37 @@ def test_continuous_queue_claim_serializes_the_whole_batch(
     assert not claim_path.exists()
 
 
+def test_continuous_queue_claim_persists_active_task_until_delivery_finishes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+
+    with delivery._continuous_queue_claim(218) as queue_claim:
+        initial = json.loads(claim_path.read_text(encoding="utf-8"))
+        assert initial["queue_phase"] == "idle"
+        assert initial["task_id"] is None
+        assert initial["worker_state"] == "idle"
+
+        queue_claim.mark_task("91", 219)
+        active = json.loads(claim_path.read_text(encoding="utf-8"))
+        assert active["queue_phase"] == "task_running"
+        assert active["task_id"] == "91"
+        assert active["task_issue"] == 219
+        assert active["worker_state"] == "running"
+
+        queue_claim.clear_task()
+        cleared = json.loads(claim_path.read_text(encoding="utf-8"))
+        assert cleared["queue_phase"] == "idle"
+        assert cleared["task_id"] is None
+        assert cleared["task_issue"] is None
+        assert cleared["worker_state"] == "idle"
+
+    assert not claim_path.exists()
+
+
 def test_continuous_queue_claim_recovers_dead_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -407,6 +472,10 @@ def test_continuous_queue_claim_recovers_dead_owner(
                 "pid": 424242,
                 "process_instance": _claim_process_instance(),
                 "started_at": "2026-09-09T08:00:00+00:00",
+                "queue_phase": "idle",
+                "task_id": None,
+                "task_issue": None,
+                "worker_state": "idle",
             },
             sort_keys=True,
         )
@@ -424,6 +493,43 @@ def test_continuous_queue_claim_recovers_dead_owner(
     assert not claim_path.exists()
 
 
+def test_continuous_queue_claim_refuses_reclaim_of_interrupted_task(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+    claim_path.parent.mkdir(parents=True)
+    claim_path.write_text(
+        json.dumps(
+            {
+                "control_issue": 218,
+                "pid": 424242,
+                "process_instance": _claim_process_instance(),
+                "started_at": "2026-09-09T08:00:00+00:00",
+                "queue_phase": "task_running",
+                "task_id": "91",
+                "task_issue": 219,
+                "worker_state": "running",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(delivery, "_queue_owner_process_instance", lambda pid: None)
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
+
+    with (
+        pytest.raises(delivery.DeliveryError, match="interrupted Task 91"),
+        delivery._continuous_queue_claim(218),
+    ):
+        pass
+
+    assert claim_path.is_file()
+    assert not list(claim_path.parent.glob("continuous-queue.lock.stale-*"))
+
+
 def test_continuous_queue_claim_reclaims_dead_owner_via_atomic_quarantine(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -437,6 +543,10 @@ def test_continuous_queue_claim_reclaims_dead_owner_via_atomic_quarantine(
                 "pid": 424242,
                 "process_instance": _claim_process_instance(),
                 "started_at": "2026-09-09T08:00:00+00:00",
+                "queue_phase": "idle",
+                "task_id": None,
+                "task_issue": None,
+                "worker_state": "idle",
             },
             sort_keys=True,
         )
@@ -478,6 +588,10 @@ def test_continuous_queue_claim_reclaims_pid_reuse_with_different_process_identi
                 "pid": 424242,
                 "process_instance": _claim_process_instance(),
                 "started_at": "2026-09-09T08:00:00+00:00",
+                "queue_phase": "idle",
+                "task_id": None,
+                "task_issue": None,
+                "worker_state": "idle",
             },
             sort_keys=True,
         )
@@ -528,6 +642,10 @@ def test_continuous_queue_claim_rejects_missing_process_identity(
                 "control_issue": 218,
                 "pid": 424242,
                 "started_at": "2026-09-09T08:00:00+00:00",
+                "queue_phase": "idle",
+                "task_id": None,
+                "task_issue": None,
+                "worker_state": "idle",
             },
             sort_keys=True,
         ),

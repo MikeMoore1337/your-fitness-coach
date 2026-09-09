@@ -85,6 +85,10 @@ CONTROL_ISSUE_RE = re.compile(r"^\[Task (?P<task_id>[0-9]+[A-Z]?)\]", re.IGNOREC
 WORKER_PARENT_LOST_EXIT_CODE = 125
 WORKER_SUPERVISOR_POLL_SECONDS = 0.25
 WORKER_TERMINATION_TIMEOUT_SECONDS = 5
+QUEUE_CLAIM_IDLE_PHASE = "idle"
+QUEUE_CLAIM_TASK_PHASE = "task_running"
+QUEUE_CLAIM_IDLE_WORKER_STATE = "idle"
+QUEUE_CLAIM_RUNNING_WORKER_STATE = "running"
 
 
 class DeliveryError(RuntimeError):
@@ -449,6 +453,42 @@ def _queue_claim_process_instance(value: Any, claim_path: Path) -> dict[str, str
     )
 
 
+def _validate_queue_claim_task_state(claim: dict[str, Any], claim_path: Path) -> None:
+    queue_phase = claim.get("queue_phase")
+    task_id = claim.get("task_id")
+    task_issue = claim.get("task_issue")
+    worker_state = claim.get("worker_state")
+    if (
+        queue_phase == QUEUE_CLAIM_IDLE_PHASE
+        and task_id is None
+        and task_issue is None
+        and worker_state == QUEUE_CLAIM_IDLE_WORKER_STATE
+    ):
+        return
+    if queue_phase == QUEUE_CLAIM_TASK_PHASE:
+        if (
+            not isinstance(task_id, str)
+            or TASK_ID_RE.fullmatch(task_id.strip()) is None
+            or isinstance(task_issue, bool)
+            or not isinstance(task_issue, int)
+            or task_issue < 1
+            or worker_state != QUEUE_CLAIM_RUNNING_WORKER_STATE
+        ):
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: continuous queue claim has invalid task state; "
+                f"inspect {claim_path}"
+            )
+        claim["task_id"] = task_id.strip().upper()
+        return
+    raise DeliveryError(
+        f"HUMAN_REQUIRED: continuous queue claim has invalid task state; inspect {claim_path}"
+    )
+
+
+def _serialize_queue_claim(claim: Mapping[str, Any]) -> str:
+    return json.dumps(claim, ensure_ascii=True, sort_keys=True)
+
+
 def _read_queue_claim(claim_path: Path) -> tuple[str, dict[str, Any]] | None:
     try:
         content = claim_path.read_text(encoding="utf-8")
@@ -495,10 +535,77 @@ def _read_queue_claim(claim_path: Path) -> tuple[str, dict[str, Any]] | None:
         raise DeliveryError(
             f"HUMAN_REQUIRED: continuous queue claim timestamp has no timezone; inspect {claim_path}"
         )
+    _validate_queue_claim_task_state(claim, claim_path)
     claim["process_instance"] = _queue_claim_process_instance(
         claim.get("process_instance"), claim_path
     )
     return content, claim
+
+
+class _ContinuousQueueClaim:
+    def __init__(self, claim_path: Path, content: str) -> None:
+        self.path = claim_path
+        self.content = content
+
+    def _update(self, updates: Mapping[str, Any]) -> None:
+        snapshot = _read_queue_claim(self.path)
+        if snapshot is None:
+            raise DeliveryError("HUMAN_REQUIRED: continuous queue claim disappeared")
+        current_content, current_claim = snapshot
+        if current_content != self.content:
+            raise DeliveryError("HUMAN_REQUIRED: continuous queue claim changed before update")
+        current_claim.update(updates)
+        _validate_queue_claim_task_state(current_claim, self.path)
+        serialized = _serialize_queue_claim(current_claim)
+        temporary_path = self.path.with_name(f"{self.path.name}.update-{uuid4().hex}")
+        try:
+            descriptor = os.open(
+                str(temporary_path),
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            )
+            with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(serialized)
+                handle.write("\n")
+            os.replace(temporary_path, self.path)
+        except OSError as error:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: cannot persist continuous queue claim {self.path}"
+            ) from error
+        finally:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as error:
+                raise DeliveryError(
+                    f"HUMAN_REQUIRED: cannot remove temporary queue claim {temporary_path}"
+                ) from error
+        self.content = serialized + "\n"
+
+    def mark_task(self, task_id: str, task_issue: int) -> None:
+        normalized_task_id = _normalize_task_id(task_id)
+        if isinstance(task_issue, bool) or not isinstance(task_issue, int) or task_issue < 1:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Task {normalized_task_id} has no valid Issue number"
+            )
+        self._update(
+            {
+                "queue_phase": QUEUE_CLAIM_TASK_PHASE,
+                "task_id": normalized_task_id,
+                "task_issue": task_issue,
+                "worker_state": QUEUE_CLAIM_RUNNING_WORKER_STATE,
+            }
+        )
+
+    def clear_task(self) -> None:
+        self._update(
+            {
+                "queue_phase": QUEUE_CLAIM_IDLE_PHASE,
+                "task_id": None,
+                "task_issue": None,
+                "worker_state": QUEUE_CLAIM_IDLE_WORKER_STATE,
+            }
+        )
 
 
 def _windows_process_snapshot(pid: int) -> tuple[dict[str, str] | None, bool]:
@@ -733,6 +840,34 @@ def _queue_owner_is_alive(
     raise DeliveryError("HUMAN_REQUIRED: unsupported platform for queue owner liveness")
 
 
+def _controller_state_for_interrupted_claim(claim_path: Path, task_id: str) -> str:
+    history_path = claim_path.parent / "history" / f"task-{task_id}.json"
+    try:
+        history = json.loads(history_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return "missing"
+    except OSError, json.JSONDecodeError:
+        return "unreadable_or_malformed"
+    if not isinstance(history, dict):
+        return "malformed"
+    state = history.get("state")
+    return state if isinstance(state, str) and state else "missing"
+
+
+def _reject_interrupted_queue_claim(claim_path: Path, claim: Mapping[str, Any]) -> None:
+    if claim.get("queue_phase") == QUEUE_CLAIM_IDLE_PHASE:
+        return
+    task_id = str(claim["task_id"])
+    task_issue = int(claim["task_issue"])
+    controller_state = _controller_state_for_interrupted_claim(claim_path, task_id)
+    raise DeliveryError(
+        f"HUMAN_REQUIRED: stale continuous queue claim records interrupted Task {task_id} "
+        f"(phase={claim['queue_phase']}, worker_state={claim['worker_state']}, "
+        f"controller_state={controller_state}); reconcile controller history, worker "
+        f"supervisor and control Issue #{task_issue} before reclaim; inspect {claim_path}"
+    )
+
+
 def _recover_stale_queue_claim(claim_path: Path) -> bool:
     snapshot = _read_queue_claim(claim_path)
     if snapshot is None:
@@ -742,6 +877,7 @@ def _recover_stale_queue_claim(claim_path: Path) -> bool:
     process_instance = _queue_claim_process_instance(claim.get("process_instance"), claim_path)
     if _queue_owner_is_alive(pid, process_instance):
         return False
+    _reject_interrupted_queue_claim(claim_path, claim)
     quarantine_path = claim_path.with_name(f"{claim_path.name}.stale-{uuid4().hex}")
     try:
         os.rename(claim_path, quarantine_path)
@@ -788,20 +924,22 @@ def _recover_stale_queue_claim(claim_path: Path) -> bool:
 
 
 @contextmanager
-def _continuous_queue_claim(control_issue: int) -> Iterator[None]:
+def _continuous_queue_claim(control_issue: int) -> Iterator[_ContinuousQueueClaim]:
     state_root = _git_common_dir() / "codex-task-sessions-v1"
     state_root.mkdir(parents=True, exist_ok=True)
     claim_path = state_root / "continuous-queue.lock"
     process_instance = _current_process_instance_identity()
-    claim = json.dumps(
+    claim = _serialize_queue_claim(
         {
             "control_issue": control_issue,
             "pid": os.getpid(),
             "process_instance": process_instance,
             "started_at": datetime.now(UTC).isoformat(timespec="microseconds"),
+            "queue_phase": QUEUE_CLAIM_IDLE_PHASE,
+            "task_id": None,
+            "task_issue": None,
+            "worker_state": QUEUE_CLAIM_IDLE_WORKER_STATE,
         },
-        ensure_ascii=True,
-        sort_keys=True,
     )
     descriptor: int | None = None
     for attempt in range(2):
@@ -823,10 +961,15 @@ def _continuous_queue_claim(control_issue: int) -> Iterator[None]:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(claim)
             handle.write("\n")
-        yield
+        queue_claim = _ContinuousQueueClaim(claim_path, claim + "\n")
+        yield queue_claim
     finally:
         try:
-            if not claim_path.is_file() or claim_path.read_text(encoding="utf-8") != claim + "\n":
+            if (
+                not claim_path.is_file()
+                or "queue_claim" not in locals()
+                or claim_path.read_text(encoding="utf-8") != queue_claim.content
+            ):
                 raise DeliveryError("HUMAN_REQUIRED: continuous queue claim changed before release")
             claim_path.unlink()
         except FileNotFoundError as error:
@@ -1247,12 +1390,128 @@ def _cleanup_delivery_artifacts(task_id: str, artifacts: Path) -> dict[str, Any]
     return result
 
 
-def _terminate_supervised_worker(process: Any) -> None:
+class _WindowsWorkerJob:
+    def __init__(self, close_handle: Callable[[Any], Any], handle: Any) -> None:
+        self._close_handle = close_handle
+        self._handle = handle
+
+    def close(self) -> None:
+        if self._handle is None:
+            return
+        if not self._close_handle(self._handle):
+            raise DeliveryError("HUMAN_REQUIRED: cannot close Windows Codex worker job")
+        self._handle = None
+
+
+def _create_windows_worker_job(process: Any) -> _WindowsWorkerJob:
+    import ctypes
+    from ctypes import wintypes
+
+    class JobObjectBasicLimitInformation(ctypes.Structure):
+        _fields_ = [
+            ("PerProcessUserTimeLimit", ctypes.c_longlong),
+            ("PerJobUserTimeLimit", ctypes.c_longlong),
+            ("LimitFlags", wintypes.DWORD),
+            ("MinimumWorkingSetSize", ctypes.c_size_t),
+            ("MaximumWorkingSetSize", ctypes.c_size_t),
+            ("ActiveProcessLimit", wintypes.DWORD),
+            ("Affinity", ctypes.c_size_t),
+            ("PriorityClass", wintypes.DWORD),
+            ("SchedulingClass", wintypes.DWORD),
+        ]
+
+    class IoCounters(ctypes.Structure):
+        _fields_ = [
+            ("ReadOperationCount", ctypes.c_ulonglong),
+            ("WriteOperationCount", ctypes.c_ulonglong),
+            ("OtherOperationCount", ctypes.c_ulonglong),
+            ("ReadTransferCount", ctypes.c_ulonglong),
+            ("WriteTransferCount", ctypes.c_ulonglong),
+            ("OtherTransferCount", ctypes.c_ulonglong),
+        ]
+
+    class JobObjectExtendedLimitInformation(ctypes.Structure):
+        _fields_ = [
+            ("BasicLimitInformation", JobObjectBasicLimitInformation),
+            ("IoInfo", IoCounters),
+            ("ProcessMemoryLimit", ctypes.c_size_t),
+            ("JobMemoryLimit", ctypes.c_size_t),
+            ("PeakProcessMemoryUsed", ctypes.c_size_t),
+            ("PeakJobMemoryUsed", ctypes.c_size_t),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+    kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+    kernel32.SetInformationJobObject.argtypes = [
+        wintypes.HANDLE,
+        wintypes.INT,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+    ]
+    kernel32.SetInformationJobObject.restype = wintypes.BOOL
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    job_handle = kernel32.CreateJobObjectW(None, None)
+    if not job_handle:
+        raise DeliveryError("HUMAN_REQUIRED: cannot create Windows Codex worker job")
+    try:
+        information = JobObjectExtendedLimitInformation()
+        information.BasicLimitInformation.LimitFlags = 0x2000
+        if not kernel32.SetInformationJobObject(
+            job_handle,
+            9,
+            ctypes.byref(information),
+            ctypes.sizeof(information),
+        ):
+            raise DeliveryError(
+                "HUMAN_REQUIRED: cannot configure Windows Codex worker job termination"
+            )
+        process_id = getattr(process, "pid", None)
+        if isinstance(process_id, bool) or not isinstance(process_id, int) or process_id < 1:
+            raise DeliveryError("HUMAN_REQUIRED: Windows Codex worker has invalid PID")
+        try:
+            process_handle = kernel32.OpenProcess(0x1000 | 0x0100 | 0x0001, False, process_id)
+        except (OSError, OverflowError) as error:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: cannot open Windows Codex worker process"
+            ) from error
+        if not process_handle:
+            raise DeliveryError("HUMAN_REQUIRED: cannot open Windows Codex worker process")
+        try:
+            if not kernel32.AssignProcessToJobObject(job_handle, process_handle):
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: cannot assign Windows Codex worker process to job"
+                )
+        finally:
+            if not kernel32.CloseHandle(process_handle):
+                raise DeliveryError("HUMAN_REQUIRED: cannot close Windows Codex worker handle")
+    except DeliveryError:
+        kernel32.CloseHandle(job_handle)
+        raise
+    return _WindowsWorkerJob(kernel32.CloseHandle, job_handle)
+
+
+def _terminate_supervised_worker(
+    process: Any,
+    *,
+    windows_job: _WindowsWorkerJob | None = None,
+) -> None:
     if process.poll() is not None:
+        if windows_job is not None:
+            windows_job.close()
         return
     try:
         if os.name == "nt":
-            process.terminate()
+            if windows_job is not None:
+                windows_job.close()
+            else:
+                process.terminate()
         else:
             os.killpg(os.getpgid(process.pid), signal.SIGTERM)
     except ProcessLookupError:
@@ -1263,10 +1522,12 @@ def _terminate_supervised_worker(process: Any) -> None:
         process.wait(timeout=WORKER_TERMINATION_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         try:
-            if os.name == "nt":
+            if os.name == "nt" and windows_job is None:
                 process.kill()
-            else:
+            elif os.name != "nt":
                 os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            elif windows_job is not None:
+                windows_job.close()
             process.wait(timeout=WORKER_TERMINATION_TIMEOUT_SECONDS)
         except (OSError, subprocess.TimeoutExpired) as error:
             raise DeliveryError("HUMAN_REQUIRED: cannot terminate orphaned Codex worker") from error
@@ -1280,6 +1541,7 @@ def _run_worker_supervisor(
     popen: Callable[..., Any] = subprocess.Popen,
     owner_probe: Callable[[int, Mapping[str, str]], bool] = _queue_owner_is_alive,
     sleeper: Callable[[float], None] = time.sleep,
+    job_factory: Callable[[Any], _WindowsWorkerJob | None] | None = None,
 ) -> int:
     if parent_pid < 1 or not command:
         raise DeliveryError("HUMAN_REQUIRED: worker supervisor received invalid process metadata")
@@ -1296,22 +1558,31 @@ def _run_worker_supervisor(
         process = popen(list(command), **launch_kwargs)
     except OSError as error:
         raise DeliveryError("HUMAN_REQUIRED: cannot start Codex worker supervisor child") from error
+    windows_job: _WindowsWorkerJob | None = None
+    if os.name == "nt":
+        try:
+            windows_job = (job_factory or _create_windows_worker_job)(process)
+        except DeliveryError:
+            _terminate_supervised_worker(process)
+            raise
     try:
         while process.poll() is None:
             try:
                 owner_alive = owner_probe(parent_pid, parent_identity)
             except DeliveryError:
-                _terminate_supervised_worker(process)
+                _terminate_supervised_worker(process, windows_job=windows_job)
                 raise
             if not owner_alive:
-                _terminate_supervised_worker(process)
+                _terminate_supervised_worker(process, windows_job=windows_job)
                 _event("WORKER_ABORTED_PARENT_LOST", parent_pid=parent_pid)
                 return WORKER_PARENT_LOST_EXIT_CODE
             sleeper(WORKER_SUPERVISOR_POLL_SECONDS)
         return int(process.returncode)
     finally:
         if process.poll() is None:
-            _terminate_supervised_worker(process)
+            _terminate_supervised_worker(process, windows_job=windows_job)
+        elif windows_job is not None:
+            windows_job.close()
 
 
 def _worker_supervisor_from_args(
@@ -1659,12 +1930,13 @@ def _run_continuous_queue(
 ) -> int:
     if max_tasks < 1 or max_tasks > DEFAULT_QUEUE_BUDGET.max_tasks_per_batch:
         raise DeliveryError("max-tasks must be between 1 and 4")
-    with _continuous_queue_claim(control_issue):
+    with _continuous_queue_claim(control_issue) as queue_claim:
         return _run_continuous_queue_locked(
             control_issue=control_issue,
             max_tasks=max_tasks,
             poll_seconds=poll_seconds,
             max_wait_minutes=max_wait_minutes,
+            queue_claim=queue_claim,
         )
 
 
@@ -1674,6 +1946,7 @@ def _run_continuous_queue_locked(
     max_tasks: int,
     poll_seconds: int,
     max_wait_minutes: int,
+    queue_claim: _ContinuousQueueClaim,
 ) -> int:
     _, _, authorization = _queue_authorization_snapshot(control_issue)
     _raise_if_queue_stop(authorization)
@@ -1752,6 +2025,7 @@ def _run_continuous_queue_locked(
                 completed=completed,
             )
             return 1
+        queue_claim.mark_task(task_id, task_issue)
         _deliver_one(
             task_id,
             session_label=f"continuous-queue-task-{task_id.lower()}",
@@ -1762,6 +2036,7 @@ def _run_continuous_queue_locked(
             state_issue=task_issue,
             issue_contract=candidate.get("contract"),
         )
+        queue_claim.clear_task()
         completed += 1
         DEFAULT_QUEUE_BUDGET.check_counters(tasks_started=completed)
     _event(
