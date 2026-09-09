@@ -4,7 +4,7 @@ import { api } from '../../shared/api/client';
 import type { Workout } from '../../shared/api/types';
 import { formatCalendarDate } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
-import { Badge, Button, CheckIcon, SemanticArtwork } from '../../shared/ui/common';
+import { Badge, Button, CheckIcon } from '../../shared/ui/common';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
@@ -120,7 +120,6 @@ export function WorkoutCompletionSummary({
       onAnimationEnd={motion.onMotionAnimationEnd}
     >
       <header className="workout-completion__hero">
-        <SemanticArtwork variant="workout-completion" />
         <span className="workout-completion__check" aria-hidden="true">
           <CheckIcon />
         </span>

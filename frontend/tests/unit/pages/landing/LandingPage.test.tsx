@@ -60,11 +60,9 @@ describe('LandingPage', () => {
     const { container } = renderLanding();
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Знайте, что делать сегодня.',
+      'Движение. Запись. Прогресс.',
     );
-    expect(
-      screen.getByText(/yfc связывает план на сегодня.*питание и замеры/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Тренировки и питание — в фактах/i)).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         name: 'Начните сами. Тренера можно подключить позже.',
@@ -77,9 +75,9 @@ describe('LandingPage', () => {
     expect(screen.getByText('План → факт → динамика → следующий шаг')).toBeInTheDocument();
     expect(screen.getAllByText(/web.*telegram.*общие данные/i).length).toBeGreaterThan(0);
     expect(
-      screen.getByRole('group', { name: 'Силовая тренировка и актуальный интерфейс YFC' }),
-    ).toHaveTextContent(/актуальный интерфейс.*подготовленные данные/i);
-    expect(screen.getByText('Актуальный интерфейс · подготовленные данные')).toBeInTheDocument();
+      screen.getByRole('group', { name: 'Движение спортсмена и пример записи подхода' }),
+    ).toHaveTextContent(/Пример записи/i);
+    expect(screen.getByText('Пример записи')).toBeInTheDocument();
     expect(screen.queryByText('Демо · подготовленные данные')).not.toBeInTheDocument();
 
     expect(
@@ -146,72 +144,33 @@ describe('LandingPage', () => {
     expect(container.querySelectorAll('img[src*="/assets/brand/yfc-mark-"]')).toHaveLength(3);
     expect(container.querySelectorAll('img[src*="/assets/brand/yfc-logo-"]')).toHaveLength(0);
 
-    const energyFlow = container.querySelector<HTMLElement>('.energy-flow')!;
-    const desktopFilaments = Array.from(
-      energyFlow.querySelectorAll<SVGPathElement>(
-        '.energy-flow__scene--desktop .energy-flow__filament',
-      ),
-    );
-    const mobileFilaments = Array.from(
-      energyFlow.querySelectorAll<SVGPathElement>(
-        '.energy-flow__scene--mobile .energy-flow__filament',
-      ),
-    );
-    expect(energyFlow).toHaveAttribute('aria-hidden', 'true');
-    expect(desktopFilaments).toHaveLength(12);
-    expect(mobileFilaments).toHaveLength(8);
-    expect(new Set(desktopFilaments.map((path) => path.getAttribute('d'))).size).toBe(12);
-    expect(new Set(mobileFilaments.map((path) => path.getAttribute('d'))).size).toBe(8);
-    expect(
-      [...desktopFilaments, ...mobileFilaments].every(
-        (path) => path.getAttribute('fill') === 'none',
-      ),
-    ).toBe(true);
-    expect(energyFlow.querySelectorAll('filter')).toHaveLength(2);
-    expect(energyFlow.querySelector('.energy-flow__volume')?.getAttribute('mask')).toMatch(
-      /^url\(#energy-flow-fade-/,
-    );
+    expect(container.querySelector('.energy-flow')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeInTheDocument();
   });
 
   it('uses responsive athlete derivatives, eager hero proof and lazy below-fold images', () => {
     renderLanding();
 
-    const athlete = screen.getByAltText(/атлет выполняет.*становую тягу/i);
-    expect(athlete).toHaveAttribute(
-      'src',
-      '/assets/marketing/landing-athlete-deadlift-cutout-1280.webp',
-    );
-    expect(athlete).toHaveAttribute('width', '1280');
-    expect(athlete).toHaveAttribute('height', '1171');
-    expect(athlete).toHaveAttribute('loading', 'eager');
+    const athlete = screen.getByAltText('Атлет выполняет жим гантелей лёжа');
+    expect(athlete).toHaveAttribute('src', '/assets/marketing/strength-protocol-960.webp');
+    expect(athlete).toHaveAttribute('width', '1536');
+    expect(athlete).toHaveAttribute('height', '1024');
     expect(athlete).toHaveAttribute('fetchpriority', 'high');
-    expect(athlete.closest('picture')?.querySelector('source[type="image/webp"]')).toHaveAttribute(
-      'srcset',
-      expect.stringContaining('landing-athlete-deadlift-cutout-640.webp 640w'),
-    );
-    expect(athlete).not.toHaveClass('is-loaded');
-    fireEvent.load(athlete);
-    expect(athlete).toHaveClass('is-loaded');
-
-    const heroProof = screen.getByAltText(
-      'Актуальный экран Сегодня и текущей силовой тренировки в Mobile Web',
-    );
-    expect(heroProof).toHaveAttribute('src', '/assets/product/landing-workout-mobile-light.png');
-    expect(heroProof).toHaveAttribute('width', '390');
-    expect(heroProof).toHaveAttribute('height', '844');
-    expect(heroProof).toHaveAttribute('loading', 'eager');
-    expect(heroProof.closest('.landing-product-image')).not.toHaveClass('is-loaded');
-    fireEvent.load(heroProof);
-    expect(heroProof.closest('.landing-product-image')).toHaveClass('is-loaded');
+    expect(athlete).toHaveAttribute('srcset', expect.stringContaining('640.webp 640w'));
+    fireEvent.error(athlete);
+    expect(
+      screen.getByText('Изображение недоступно. Тренировки и демо остаются доступны.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Начать$/ })).toHaveAttribute('href', '/app');
 
     const desktopProof = screen.getByAltText(/экран сегодня.*desktop web/i);
-    expect(desktopProof).toHaveAttribute('src', '/assets/product/landing-today-desktop-light.png');
+    expect(desktopProof).toHaveAttribute('src', '/assets/product/landing-today-desktop-light.webp');
     expect(desktopProof).toHaveAttribute('width', '1440');
     expect(desktopProof).toHaveAttribute('height', '900');
     expect(desktopProof).toHaveAttribute('loading', 'lazy');
 
     const mobileProof = screen.getByAltText('Актуальный экран Сегодня в Mobile Web');
-    expect(mobileProof).toHaveAttribute('src', '/assets/product/landing-today-mobile-light.png');
+    expect(mobileProof).toHaveAttribute('src', '/assets/product/landing-today-mobile-light.webp');
     expect(mobileProof).toHaveAttribute('width', '390');
     expect(mobileProof).toHaveAttribute('height', '844');
     expect(mobileProof).toHaveAttribute('loading', 'lazy');

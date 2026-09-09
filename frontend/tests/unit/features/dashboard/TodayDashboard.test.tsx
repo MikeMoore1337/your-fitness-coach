@@ -456,7 +456,7 @@ describe('TodayDashboard', () => {
     expect(
       await screen.findByRole('heading', { name: 'Сегодня без тренировки' }),
     ).toBeInTheDocument();
-    expect(document.querySelector('.ui-semantic-artwork--current-action')).toBeInTheDocument();
+    expect(document.querySelector('.ui-semantic-artwork--current-action')).not.toBeInTheDocument();
     expect(screen.getByText(/Ближайшая .*Верх тела/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Добавить питание' })).toHaveAttribute(
       'href',

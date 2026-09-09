@@ -315,7 +315,9 @@ test('active workout keeps one obvious next action through logging, timer and fi
 
   if (captureLandingProductProofs) {
     await expect(page.getByRole('heading', { name: 'Жим штанги лёжа' })).toBeVisible();
-    await page.screenshot({ path: 'public/assets/product/landing-workout-mobile-light.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-workout-mobile-light.png',
+    });
     await page.evaluate(() => localStorage.setItem('app-theme', 'dark'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     const darkClientEntry = page.getByRole('button', { name: 'Клиент' });
@@ -325,7 +327,9 @@ test('active workout keeps one obvious next action through logging, timer and fi
     await darkWorkoutEntry.click();
     await expect(page.getByRole('heading', { name: 'Жим штанги лёжа' })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-    await page.screenshot({ path: 'public/assets/product/landing-workout-mobile-dark.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-workout-mobile-dark.png',
+    });
     return;
   }
 
@@ -362,7 +366,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(completedHeading).toBeVisible();
   await completedHeading.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-62/mobile-web-390x844-light-workout-completed.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-62/mobile-web-390x844-light-workout-completed.png',
   });
   const analyticsEvents = await page.evaluate(
     () =>
@@ -385,9 +389,9 @@ test('active workout has touch-size controls and no horizontal overflow', async 
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const exercise = page.locator('.active-workout-exercise').first();
-  await expect(exercise).toHaveCSS('border-radius', '16px');
-  await expect(exercise).toHaveCSS('border-top-color', 'rgb(158, 224, 43)');
-  await expect(exercise).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(exercise).toHaveCSS('border-radius', '0px');
+  await expect(exercise).toHaveCSS('border-top-color', 'rgb(208, 208, 208)');
+  await expect(exercise).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const guideButton = page.getByRole('button', { name: 'Техника' });
   await expect(guideButton).toHaveText('Техника');
   await guideButton.click();
@@ -482,7 +486,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await expect(cardio.locator('details')).toHaveAttribute('open', '');
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-119/mobile-web-390x844-dark-mixed-workout.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-119/mobile-web-390x844-dark-mixed-workout.png',
     fullPage: true,
   });
 
@@ -529,7 +533,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
     )
     .toBe(true);
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-119/desktop-web-1280x900-light-mixed-workout.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-119/desktop-web-1280x900-light-mixed-workout.png',
     fullPage: true,
   });
 });

@@ -49,7 +49,7 @@ test('canonical brand assets render on light and dark public surfaces', async ({
 
     await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
     await assertHeaderMark(page, 'dark', viewport.name === 'mobile' ? 34 : 42);
-    await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(238, 240, 234)');
+    await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(245, 245, 245)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
 
     if (viewport.name === 'mobile') {

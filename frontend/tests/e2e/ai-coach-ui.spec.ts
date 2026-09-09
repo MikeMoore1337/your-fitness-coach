@@ -8,7 +8,7 @@ import {
   installTelegramHarness,
 } from './fixtures/mobile-tma';
 
-const evidenceDir = resolve(process.cwd(), '../.artifacts/tasks/90A/evidence/ui-evaluation');
+const evidenceDir = resolve(process.cwd(), '../.artifacts/runtime/tests/ai-coach-ui');
 
 async function installAiCoachApi(page: Page): Promise<void> {
   await page.route('**/api/v1/ai-coach/**', async (route: Route) => {

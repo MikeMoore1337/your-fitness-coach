@@ -21,6 +21,7 @@ import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
 import './styles/legacy.css';
 import './styles/react.css';
+import './styles/fonts.css';
 import './styles/design-system.css';
 import './styles/design-v2.css';
 

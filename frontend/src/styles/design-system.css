@@ -1,15 +1,16 @@
 /* Shared semantic foundation. Legacy aliases remain available while screens migrate gradually. */
 :root {
   /* Design V2 / Quiet Pace semantic contract. Pilot surfaces opt in explicitly. */
-  --v2-canvas: #101310;
-  --v2-surface: #161916;
-  --v2-surface-secondary: #1e221e;
-  --v2-surface-strong: #292e29;
-  --v2-text-primary: #eef0ea;
-  --v2-text-secondary: #afb5ad;
-  --v2-border: #3a413a;
-  --v2-border-strong: #6d756e;
-  --v2-lime: #a8e83a;
+  --v2-canvas: #111111;
+  --v2-surface: #191919;
+  --v2-surface-secondary: #222222;
+  --v2-surface-strong: #303030;
+  --v2-text-primary: #f5f5f5;
+  --v2-text-secondary: #b8b8b8;
+  --v2-border: #404040;
+  --v2-border-strong: #787878;
+  --v2-lime: #b5ef32;
+  --v2-focus: #b5ef32;
   --v2-lime-hover: #98d62f;
   --v2-accent-text: #b9ea72;
   --v2-on-lime: #102015;
@@ -18,18 +19,18 @@
   --v2-warning: #e5b963;
   --v2-warning-surface: #2b2314;
   --v2-success: #a8e83a;
-  --v2-success-surface: #1e221e;
+  --v2-success-surface: #222222;
   --v2-success-border: #596f38;
   --v2-success-text: #b9ea72;
   --v2-progress-fill: var(--v2-lime);
   --semantic-training-accent: var(--v2-lime);
   --semantic-training-ink: #b9ea72;
-  --semantic-training-tint: #1d2919;
+  --semantic-training-tint: #222222;
   --semantic-training-line: #719f2c;
   --semantic-neutral-accent: var(--v2-text-secondary);
   --semantic-neutral-ink: var(--v2-text-primary);
-  --semantic-neutral-tint: #202420;
-  --semantic-neutral-line: #59605b;
+  --semantic-neutral-tint: #222222;
+  --semantic-neutral-line: #606060;
   --semantic-nutrition-accent: var(--semantic-neutral-accent);
   --semantic-nutrition-ink: var(--semantic-neutral-ink);
   --semantic-nutrition-tint: var(--semantic-neutral-tint);
@@ -45,8 +46,8 @@
   --v2-control-radius: 12px;
   --radius-action: var(--v2-control-radius);
   --v2-compact-radius: 8px;
-  --v2-region-radius: 16px;
-  --v2-panel-radius: 20px;
+  --v2-region-radius: 8px;
+  --v2-panel-radius: 12px;
   --v2-space-1: 4px;
   --v2-space-2: 8px;
   --v2-space-3: 12px;
@@ -75,6 +76,7 @@
 
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: Oswald, 'Arial Narrow', var(--font-sans);
   --font-size-caption: 0.75rem;
   --font-size-body: 0.9375rem;
   --font-size-body-lg: 1rem;
@@ -140,15 +142,16 @@
 }
 
 :root[data-color-scheme='light'] {
-  --v2-canvas: #f4f5f2;
+  --v2-canvas: #fafafa;
   --v2-surface: #ffffff;
-  --v2-surface-secondary: #ecede9;
-  --v2-surface-strong: #dadcd7;
-  --v2-text-primary: #161a17;
-  --v2-text-secondary: #59605b;
-  --v2-border: #c9cdc8;
-  --v2-border-strong: #7f8680;
-  --v2-lime: #9ee02b;
+  --v2-surface-secondary: #f0f0f0;
+  --v2-surface-strong: #dedede;
+  --v2-text-primary: #151515;
+  --v2-text-secondary: #606060;
+  --v2-border: #d0d0d0;
+  --v2-border-strong: #808080;
+  --v2-lime: #b5ef32;
+  --v2-focus: #527613;
   --v2-lime-hover: #8dce20;
   --v2-accent-text: #486414;
   --v2-on-lime: #102015;
@@ -157,17 +160,17 @@
   --v2-warning: #98600f;
   --v2-warning-surface: #f5ead5;
   --v2-success: #486414;
-  --v2-success-surface: #ecede9;
+  --v2-success-surface: #f0f0f0;
   --v2-success-border: #9aac7b;
   --v2-success-text: #486414;
   --v2-progress-fill: var(--v2-text-primary);
   --semantic-training-ink: #486414;
-  --semantic-training-tint: #eff7df;
+  --semantic-training-tint: #f0f0f0;
   --semantic-training-line: #7baa24;
   --semantic-neutral-accent: var(--v2-text-secondary);
   --semantic-neutral-ink: var(--v2-text-primary);
-  --semantic-neutral-tint: #eff0ed;
-  --semantic-neutral-line: #8c938d;
+  --semantic-neutral-tint: #f0f0f0;
+  --semantic-neutral-line: #888888;
   --elevation-raised: 0 8px 24px rgba(23, 32, 24, 0.08);
   --elevation-overlay: 0 18px 42px rgba(23, 32, 24, 0.14);
 }
@@ -712,7 +715,7 @@ body {
 .data-confidence__action > a:focus-visible,
 .data-confidence__details > summary:focus-visible {
   border-radius: var(--radius-action);
-  outline: var(--focus-width) solid var(--v2-lime);
+  outline: var(--focus-width) solid var(--v2-focus);
   outline-offset: var(--focus-offset);
 }
 

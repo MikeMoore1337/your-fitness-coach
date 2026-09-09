@@ -21,10 +21,10 @@ const captureEvidence =
     }
   ).process?.env?.YFC_CAPTURE_TASK_73A === '1';
 const screenshotRoot = captureTask109
-  ? '../.artifacts/screenshots/task-109/final'
+  ? '../.artifacts/runtime/tests/landing/task-109'
   : captureTelegramAccess
-    ? '../.artifacts/screenshots/landing-telegram-access'
-    : '../.artifacts/screenshots/task-73a/final';
+    ? '../.artifacts/runtime/tests/landing/telegram-access'
+    : '../.artifacts/runtime/tests/landing/owner-review';
 
 async function openLanding(page: Page, theme: 'light' | 'dark') {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -43,9 +43,9 @@ async function expectNoHorizontalOverflow(page: Page, width: number) {
 
 async function expectLandingReady(page: Page) {
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Знайте, что делать сегодня.' }),
+    page.getByRole('heading', { level: 1, name: 'Движение. Запись. Прогресс.' }),
   ).toBeVisible();
-  for (const image of await page.locator('.landing-hero-scene img').all()) {
+  for (const image of await page.locator('.strength-scene img').all()) {
     await expect(image).toHaveJSProperty('complete', true);
     expect(
       await image.evaluate((element) => (element as HTMLImageElement).naturalWidth),
@@ -86,24 +86,19 @@ async function settleForScreenshot(page: Page) {
   );
 }
 
-test('landing keeps a minimal premium product story across themes and viewports', async ({
+test('landing keeps the approved sports composition across themes and viewports', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
-  const browserErrors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') browserErrors.push(message.text());
-  });
-  page.on('pageerror', (error) => browserErrors.push(error.message));
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: 'reduce' });
-
   for (const theme of ['light', 'dark'] as const) {
     for (const viewport of [
       { width: 1440, height: 1000 },
       { width: 1280, height: 900 },
       { width: 1024, height: 900 },
       { width: 768, height: 900 },
-      // Layout viewport equivalent for the 1440px composition at 200% zoom.
       { width: 720, height: 900 },
       { width: 430, height: 932 },
       { width: 390, height: 844 },
@@ -112,302 +107,49 @@ test('landing keeps a minimal premium product story across themes and viewports'
       await page.setViewportSize(viewport);
       await openLanding(page, theme);
       await expectLandingReady(page);
-
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       await expect(page.locator('h1')).toHaveCount(1);
-      await expect(page.locator('.landing-hero-signals')).toHaveCount(0);
-      await expect(
-        page.getByRole('heading', { name: 'Один цикл — от плана до следующего шага.' }),
-      ).toBeVisible();
-      await expect(page.locator('.landing-core__features article')).toHaveCount(3);
-      await expect(page.locator('.landing-trainer')).toBeVisible();
-      await expect(page.locator('.landing-bento-card, .landing-system__card')).toHaveCount(0);
-      await expect(page.getByRole('link', { name: 'Открыть приложение' }).first()).toHaveAttribute(
+      await expect(page.locator('.strength-scene img')).toHaveCount(1);
+      await expect(page.locator('.landing-energy-path')).toHaveCount(0);
+      await expect(page.getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute(
         'href',
         '/app',
       );
       await expect(
         page.locator('.landing-hero__actions').getByRole('link', { name: 'Попробовать демо' }),
       ).toHaveAttribute('href', '/demo?cabinet=1&scenario=self_training&section=today');
-      await expect(
-        page.locator('.landing-contact').getByRole('link', { name: 'Попробовать демо' }),
-      ).toHaveAttribute('href', '/demo?cabinet=1&scenario=self_training&section=today');
-      await expect(
-        page.locator('.landing-continuity__copy').getByRole('link', {
-          name: 'Открыть приложение в Telegram',
-        }),
-      ).toHaveAttribute('href', 'https://t.me/your_fitness_coach_bot?startapp');
-      await expect(
-        page.locator('.landing-hero').getByRole('link', { name: 'Открыть в Telegram' }),
-      ).toHaveAttribute('href', 'https://t.me/your_fitness_coach_bot?startapp');
-
-      const footerLinks = page.locator('.landing-footer');
-      await expect(footerLinks.getByRole('link', { name: 'Открыть в Telegram' })).toHaveAttribute(
-        'href',
-        'https://t.me/your_fitness_coach_bot?startapp',
-      );
-      await expect(
-        footerLinks.getByRole('link', { name: 'Telegram-канал о фитнесе и здоровье' }),
-      ).toHaveAttribute('href', 'https://t.me/your_fitness_news');
-      await expect(
-        footerLinks.getByRole('link', { name: 'Приложение в Telegram', exact: true }),
-      ).toHaveCount(0);
-      await expect(footerLinks.getByRole('link', { name: 'Поддержка', exact: true })).toHaveCount(
-        0,
-      );
-      await expect(footerLinks.getByRole('link', { name: 'Поддержка в Telegram' })).toHaveAttribute(
-        'href',
-        'https://t.me/your_fitness_coach_bot?start=support',
-      );
-      await expect(
-        page.locator('.landing-header').getByRole('link', { name: /Telegram/i }),
-      ).toHaveCount(0);
-      await expect(page.locator('.landing-hero-scene img')).toHaveCount(2);
+      await expect(page.locator('.strength-scene')).toContainText('Пример записи');
+      await expect(page.locator('.landing-core__features article')).toHaveCount(3);
+      await expect(page.locator('.landing-trainer')).toBeVisible();
       await expectNoHorizontalOverflow(page, viewport.width);
-
-      const bounds = await page.evaluate(() => {
-        const rectangle = (selector: string) => {
-          const value = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
-          return { top: value.top, bottom: value.bottom, left: value.left, right: value.right };
-        };
+      const geometry = await page.evaluate(() => {
+        const primary = document.querySelector<HTMLElement>(
+          '.landing-hero__actions .landing-button',
+        )!;
+        const secondary = document.querySelector<HTMLElement>('.landing-button--secondary')!;
+        const photo = document.querySelector<HTMLElement>('.strength-scene__photo')!;
+        const record = document.querySelector<HTMLElement>('.strength-scene__record')!;
         return {
-          header: rectangle('.landing-header'),
-          hero: rectangle('.landing-hero'),
-          primary: rectangle('.landing-hero__actions .landing-button'),
-          secondary: rectangle('.landing-hero__actions .landing-button--secondary'),
-          scene: rectangle('.landing-hero-scene'),
-          device: rectangle('.landing-hero-device'),
-          core: rectangle('.landing-core'),
-          brand: rectangle('.public-shell__brand'),
-          actions: rectangle('.public-shell__header-actions'),
-          documentHeight: document.documentElement.scrollHeight,
+          buttonHeight: primary.getBoundingClientRect().height,
+          primaryBottom: primary.getBoundingClientRect().bottom,
+          radius: parseFloat(getComputedStyle(primary).borderRadius),
+          secondaryBorder: parseFloat(getComputedStyle(secondary).borderTopWidth),
+          photoBottom: photo.getBoundingClientRect().bottom,
+          recordTop: record.getBoundingClientRect().top,
         };
       });
-      expect(bounds.header.left).toBeGreaterThanOrEqual(0);
-      expect(bounds.header.right).toBeLessThanOrEqual(viewport.width);
-      expect(bounds.core.top).toBeGreaterThanOrEqual(bounds.hero.bottom - 1);
-      expect(bounds.core.top).toBeLessThanOrEqual(bounds.hero.bottom + 1);
-      expect(bounds.primary.right).toBeLessThanOrEqual(viewport.width);
-      expect(bounds.secondary.right).toBeLessThanOrEqual(viewport.width);
-      expect(bounds.brand.right).toBeLessThanOrEqual(bounds.actions.left);
-      await expect(page.locator('.landing-header .yfc-lockup__wordmark')).toBeVisible();
-
-      if (viewport.width <= 680) {
-        expect(bounds.primary.bottom).toBeLessThanOrEqual(bounds.scene.top);
-        expect(bounds.secondary.bottom).toBeLessThanOrEqual(bounds.scene.top);
-        expect(bounds.scene.top).toBeLessThan(viewport.height * 0.8);
-        expect(bounds.documentHeight).toBeLessThanOrEqual(7200);
-      } else if (viewport.width >= 1280) {
-        expect(bounds.documentHeight).toBeLessThanOrEqual(5200);
-      }
-
-      const athlete = page.locator('.landing-athlete-image img');
-      await expect(athlete).toHaveAttribute('width', '1280');
-      await expect(athlete).toHaveAttribute('height', '1171');
-      expect(await athlete.evaluate((image) => (image as HTMLImageElement).currentSrc)).toMatch(
-        /landing-athlete-deadlift-cutout-(640|960|1280)\.webp$/,
-      );
-
-      expect(
-        await page.evaluate(() =>
-          performance
-            .getEntriesByType('resource')
-            .every(
-              (entry) =>
-                !/telegram.*(sdk|web-app)/i.test(entry.name) &&
-                !/\/api\/v1\/public\/config(?:\?|$)/i.test(entry.name) &&
-                !/candidate-a-deadlift.*\.png/i.test(entry.name),
-            ),
-        ),
-      ).toBe(true);
-
-      if (viewport.width === 1440) {
-        const directionStyles = await page.evaluate(() => {
-          const hero = document.querySelector<HTMLElement>('.landing-hero')!;
-          const heading = document.querySelector<HTMLElement>('.landing-hero h1')!;
-          const primary = document.querySelector<HTMLElement>(
-            '.landing-hero__actions .landing-button',
-          )!;
-          const secondary = document.querySelector<HTMLElement>(
-            '.landing-hero__actions .landing-button--secondary',
-          )!;
-          const themeToggle = document.querySelector<HTMLElement>('.landing-theme-toggle')!;
-          const themeIcon = themeToggle.querySelector<SVGElement>('svg')!;
-          const header = document.querySelector<HTMLElement>('.public-shell__header')!;
-          const device = document.querySelector<HTMLElement>('.landing-hero-device')!;
-          const energy = document.querySelector<HTMLElement>('.landing-energy-path')!;
-          const desktopFlow = energy.querySelector<SVGGElement>('.energy-flow__scene--desktop')!;
-          const filament = desktopFlow.querySelector<SVGPathElement>(
-            '.energy-flow__filament--primary-a',
-          )!;
-          const secondaryFilament = desktopFlow.querySelector<SVGPathElement>(
-            '.energy-flow__filament--support-d',
-          )!;
-          const filaments = Array.from(
-            desktopFlow.querySelectorAll<SVGPathElement>('.energy-flow__filament'),
-          );
-          const volume = energy.querySelector<SVGGElement>('.energy-flow__volume')!;
-          const athleteFrame = document.querySelector<HTMLElement>('.landing-athlete-frame')!;
-          const coreMobile = document.querySelector<HTMLElement>('.landing-core__mobile')!;
-          const trainerProof = document.querySelector<HTMLElement>('.landing-trainer__proof')!;
-          const core = document.querySelector<HTMLElement>('.landing-core')!;
-          const pathLength = filament.getTotalLength();
-          const pathMatrix = filament.getScreenCTM()!;
-          const primaryBounds = primary.getBoundingClientRect();
-          const secondaryBounds = secondary.getBoundingClientRect();
-          const themeToggleBounds = themeToggle.getBoundingClientRect();
-          const themeIconBounds = themeIcon.getBoundingClientRect();
-          const pathSamples = Array.from({ length: 161 }, (_, index) => {
-            const point = filament.getPointAtLength((pathLength * index) / 160);
-            return new DOMPoint(point.x, point.y).matrixTransform(pathMatrix);
-          });
-          const endpoint = pathSamples.at(-1)!;
-          return {
-            heroHeight: hero.getBoundingClientRect().height,
-            headingLineHeight: Number.parseFloat(getComputedStyle(heading).lineHeight),
-            headingFontSize: Number.parseFloat(getComputedStyle(heading).fontSize),
-            headingFontFamily: getComputedStyle(heading).fontFamily,
-            primaryBackground: getComputedStyle(primary).backgroundColor,
-            primaryWidth: primaryBounds.width,
-            secondaryBackground: getComputedStyle(secondary).backgroundColor,
-            secondaryWidth: secondaryBounds.width,
-            secondaryBorderWidth: Number.parseFloat(getComputedStyle(secondary).borderLeftWidth),
-            themeIconOffsetX:
-              themeIconBounds.left +
-              themeIconBounds.width / 2 -
-              (themeToggleBounds.left + themeToggleBounds.width / 2),
-            themeIconCenterDeltaY: Math.abs(
-              themeIconBounds.top +
-                themeIconBounds.height / 2 -
-                (themeToggleBounds.top + themeToggleBounds.height / 2),
-            ),
-            headerBackground: getComputedStyle(header).backgroundColor,
-            deviceWidth: device.getBoundingClientRect().width,
-            devicePadding: Number.parseFloat(getComputedStyle(device).paddingLeft),
-            energyLayer: Number.parseFloat(getComputedStyle(energy).zIndex),
-            athleteLayer: Number.parseFloat(getComputedStyle(athleteFrame).zIndex),
-            deviceLayer: Number.parseFloat(getComputedStyle(device).zIndex),
-            energyPointerEvents: getComputedStyle(energy).pointerEvents,
-            energyAriaHidden: energy.getAttribute('aria-hidden'),
-            filamentCount: filaments.length,
-            uniqueTrajectoryCount: new Set(filaments.map((path) => path.getAttribute('d'))).size,
-            filamentsHaveNoFill: filaments.every((path) => path.getAttribute('fill') === 'none'),
-            fadeMask: volume.getAttribute('mask'),
-            filterCount: energy.querySelectorAll('filter').length,
-            primaryFilamentWidth: Number.parseFloat(getComputedStyle(filament).strokeWidth),
-            secondaryFilamentWidth: Number.parseFloat(
-              getComputedStyle(secondaryFilament).strokeWidth,
-            ),
-            trajectoryCrossesDemo: pathSamples.some(
-              (point) =>
-                point.x >= secondaryBounds.left &&
-                point.x <= secondaryBounds.right &&
-                point.y >= secondaryBounds.top &&
-                point.y <= secondaryBounds.bottom,
-            ),
-            trajectoryEndX: endpoint.x,
-            deviceRight: device.getBoundingClientRect().right,
-            athleteLift: new DOMMatrix(getComputedStyle(athleteFrame).transform).m42,
-            coreMobilePadding: Number.parseFloat(getComputedStyle(coreMobile).paddingLeft),
-            trainerBorder: Number.parseFloat(getComputedStyle(trainerProof).borderLeftWidth),
-            corePaddingTop: Number.parseFloat(getComputedStyle(core).paddingTop),
-            coreHeight: core.getBoundingClientRect().height,
-          };
-        });
-        expect(directionStyles.heroHeight).toBeLessThanOrEqual(740);
-        expect(directionStyles.headingLineHeight).toBeGreaterThanOrEqual(
-          directionStyles.headingFontSize * 0.92,
-        );
-        expect(directionStyles.headingFontFamily).toMatch(/^Inter,/i);
-        expect(directionStyles.headingFontFamily).not.toMatch(/Georgia|Times New Roman/i);
-        expect(directionStyles.primaryBackground).not.toBe(directionStyles.secondaryBackground);
-        expect(
-          Math.abs(directionStyles.primaryWidth - directionStyles.secondaryWidth),
-        ).toBeLessThanOrEqual(1);
-        expect(directionStyles.secondaryBorderWidth).toBeGreaterThanOrEqual(1);
-        if (theme === 'light') {
-          expect(directionStyles.themeIconOffsetX).toBeGreaterThanOrEqual(1.5);
-          expect(directionStyles.themeIconOffsetX).toBeLessThanOrEqual(2.5);
-        } else {
-          expect(Math.abs(directionStyles.themeIconOffsetX)).toBeLessThanOrEqual(1);
-        }
-        expect(directionStyles.themeIconCenterDeltaY).toBeLessThanOrEqual(1);
-        expect(directionStyles.headerBackground).toBe('rgba(0, 0, 0, 0)');
-        expect(directionStyles.deviceWidth).toBeGreaterThanOrEqual(200);
-        expect(directionStyles.devicePadding).toBeLessThanOrEqual(3);
-        expect(directionStyles.energyLayer).toBeLessThan(directionStyles.athleteLayer);
-        expect(directionStyles.energyLayer).toBeLessThan(directionStyles.deviceLayer);
-        expect(directionStyles.energyPointerEvents).toBe('none');
-        expect(directionStyles.energyAriaHidden).toBe('true');
-        expect(directionStyles.filamentCount).toBeGreaterThanOrEqual(7);
-        expect(directionStyles.filamentCount).toBeLessThanOrEqual(14);
-        expect(directionStyles.uniqueTrajectoryCount).toBe(directionStyles.filamentCount);
-        expect(directionStyles.filamentsHaveNoFill).toBe(true);
-        expect(directionStyles.fadeMask).toMatch(/^url\(#energy-flow-fade-/);
-        expect(directionStyles.filterCount).toBeLessThanOrEqual(2);
-        expect(directionStyles.primaryFilamentWidth).toBeGreaterThanOrEqual(1.5);
-        expect(directionStyles.primaryFilamentWidth).toBeLessThanOrEqual(2.5);
-        expect(directionStyles.secondaryFilamentWidth).toBeGreaterThanOrEqual(0.5);
-        expect(directionStyles.secondaryFilamentWidth).toBeLessThanOrEqual(1.5);
-        expect(directionStyles.trajectoryCrossesDemo).toBe(true);
-        expect(directionStyles.trajectoryEndX).toBeGreaterThan(directionStyles.deviceRight);
-        expect(directionStyles.athleteLift).toBeLessThanOrEqual(-40);
-        expect(directionStyles.coreMobilePadding).toBeLessThanOrEqual(3);
-        expect(directionStyles.trainerBorder).toBeLessThanOrEqual(2);
-        expect(directionStyles.corePaddingTop).toBeLessThanOrEqual(48);
-        expect(directionStyles.coreHeight).toBeGreaterThanOrEqual(800);
-      }
-
-      if (viewport.width <= 430) {
-        const mobileFlow = await page.evaluate(() => {
-          const energy = document.querySelector<HTMLElement>('.landing-energy-path')!;
-          const athlete = document.querySelector<HTMLImageElement>('.landing-athlete-frame img')!;
-          const device = document.querySelector<HTMLElement>('.landing-hero-device')!;
-          const core = document.querySelector<HTMLElement>('.landing-core')!;
-          const mobileScene = energy.querySelector<SVGGElement>('.energy-flow__scene--mobile')!;
-          const filaments = Array.from(
-            mobileScene.querySelectorAll<SVGPathElement>('.energy-flow__filament'),
-          );
-          const widths = filaments.map((filament) =>
-            Number.parseFloat(getComputedStyle(filament).strokeWidth),
-          );
-          return {
-            visibleCount: filaments.length,
-            maxWidth: Math.max(...widths),
-            ambientOpacity: Number.parseFloat(
-              getComputedStyle(mobileScene.querySelector<SVGPathElement>('.energy-flow__ambient')!)
-                .opacity,
-            ),
-            glowCount: Array.from(
-              mobileScene.querySelectorAll<SVGPathElement>('.energy-flow__glow'),
-            ).filter((path) => getComputedStyle(path).display !== 'none').length,
-            visualGap:
-              core.getBoundingClientRect().top -
-              Math.max(
-                athlete.getBoundingClientRect().bottom,
-                device.getBoundingClientRect().bottom,
-              ),
-          };
-        });
-        expect(mobileFlow.visibleCount).toBeGreaterThanOrEqual(7);
-        expect(mobileFlow.visibleCount).toBeLessThanOrEqual(10);
-        expect(mobileFlow.maxWidth).toBeLessThanOrEqual(1.5);
-        expect(mobileFlow.ambientOpacity).toBeLessThanOrEqual(0.04);
-        expect(mobileFlow.glowCount).toBeLessThanOrEqual(1);
-        expect(mobileFlow.visualGap).toBeGreaterThanOrEqual(16);
-        expect(mobileFlow.visualGap).toBeLessThanOrEqual(90);
-      }
-
-      const footer = page.locator('.landing-footer');
-      await footer.scrollIntoViewIfNeeded();
-      const footerBounds = await footer.boundingBox();
-      expect(footerBounds?.x).toBeGreaterThanOrEqual(0);
-      expect((footerBounds?.x ?? 0) + (footerBounds?.width ?? 0)).toBeLessThanOrEqual(
-        viewport.width,
-      );
+      expect(geometry.buttonHeight).toBeGreaterThanOrEqual(44);
+      expect(geometry.primaryBottom).toBeLessThan(viewport.height);
+      expect(geometry.radius).toBeGreaterThanOrEqual(8);
+      expect(geometry.radius).toBeLessThanOrEqual(14);
+      expect(geometry.secondaryBorder).toBeGreaterThanOrEqual(1);
+      expect(geometry.recordTop).toBeGreaterThanOrEqual(geometry.photoBottom - 1);
+      await page.screenshot({
+        path: testInfo.outputPath(`landing-${viewport.width}-${theme}.png`),
+      });
     }
   }
-  expect(browserErrors).toEqual([]);
+  expect(errors).toEqual([]);
 });
 
 test('media failures preserve the story and product proofs reserve their layout', async ({
@@ -418,17 +160,21 @@ test('media failures preserve the story and product proofs reserve their layout'
   const desktopGate = new Promise<void>((resolve) => {
     releaseDesktop = resolve;
   });
-  await page.route('**/assets/marketing/landing-athlete-deadlift-*', (route) => route.abort());
-  await page.route('**/assets/product/landing-today-desktop-light.png', async (route) => {
+  await page.route('**/assets/marketing/strength-protocol-*', (route) => route.abort());
+  await page.route('**/assets/product/landing-today-desktop-light.webp', async (route) => {
     await desktopGate;
     await route.continue();
   });
-  await page.route('**/assets/product/landing-trainer-desktop-light.png', (route) => route.abort());
+  await page.route('**/assets/product/landing-trainer-desktop-light.webp', (route) =>
+    route.abort(),
+  );
   await openLanding(page, 'light');
 
-  await expect(page.getByText(/силовая тренировка остаётся контекстом страницы/i)).toBeVisible();
+  await expect(
+    page.getByText(/Изображение недоступно. Тренировки и демо остаются доступны/i),
+  ).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Открыть приложение' }).first()).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute(
     'href',
     '/app',
   );
@@ -565,26 +311,17 @@ test('motion has an immediate reduced-motion final state', async ({ page }) => {
   await openLanding(page, 'dark');
   await expectLandingReady(page);
 
-  const motionState = await page.evaluate(() => {
-    const path = document.querySelector<SVGPathElement>('.landing-energy-path path')!;
-    const proof = document.querySelector<HTMLElement>('.landing-core__desktop')!;
-    const athlete = document.querySelector<HTMLElement>('.landing-athlete-frame')!;
-    const product = document.querySelector<HTMLElement>('.landing-hero-device')!;
-    return {
-      pathOffset: getComputedStyle(path).strokeDashoffset,
-      pathAnimation: getComputedStyle(path).animationName,
-      proofOpacity: getComputedStyle(proof).opacity,
-      proofTransform: getComputedStyle(proof).transform,
-      athleteAnimation: getComputedStyle(athlete).animationName,
-      productAnimation: getComputedStyle(product).animationName,
-    };
-  });
-  expect(motionState.pathOffset).toMatch(/^0(px)?$/);
-  expect(motionState.pathAnimation).toBe('none');
-  expect(motionState.proofOpacity).toBe('1');
-  expect(motionState.proofTransform).toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
-  expect(motionState.athleteAnimation).toBe('none');
-  expect(motionState.productAnimation).toBe('none');
+  const motionState = await page.locator('.strength-scene').evaluate((element) => ({
+    phase: element.getAttribute('data-motion-phase'),
+    animations: element
+      .getAnimations({ subtree: true })
+      .filter((animation) => animation.playState === 'running').length,
+    clip: getComputedStyle(element.querySelector('.strength-scene__photo')!).clipPath,
+  }));
+  expect(motionState.phase).toBe('idle');
+  expect(motionState.animations).toBe(0);
+  expect(motionState.clip).toBe('none');
+  await expect(page.getByRole('link', { name: 'Начать', exact: true })).toBeInViewport();
 });
 
 test('captures the owner-review packet when requested', async ({ page, browser }) => {

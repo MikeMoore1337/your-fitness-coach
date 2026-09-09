@@ -19,7 +19,8 @@ import { BrandLockup, BrandLogo } from '../../shared/ui/BrandLogo';
 import { Icon, type IconName } from '../../shared/ui/Icon';
 import { PublicShell } from '../../shared/ui/PublicShell';
 import { useWebTheme } from '../../shared/useWebTheme';
-import { EnergyFlow } from './EnergyFlow';
+import { StrengthScene } from './StrengthScene';
+import { LandingChapter } from './LandingChapter';
 import './landing.css';
 
 export {
@@ -181,44 +182,6 @@ function ProductScreenshot({ fallback, className = '', ...imageProps }: ProductS
   );
 }
 
-function AthleteVisual() {
-  const [failedStem, setFailedStem] = useState<string>();
-  const [loadedStem, setLoadedStem] = useState<string>();
-  const assetStem = '/assets/marketing/landing-athlete-deadlift-cutout';
-  const failed = failedStem === assetStem;
-  const loaded = loadedStem === assetStem;
-
-  return (
-    <span className={`landing-athlete-image ${loaded ? 'is-loaded' : ''}`}>
-      <span className="landing-athlete-image__fallback">
-        Силовая тренировка остаётся контекстом страницы. Продукт и основные действия доступны без
-        изображения.
-      </span>
-      {!failed && (
-        <picture>
-          <source
-            type="image/webp"
-            srcSet={`${assetStem}-640.webp 640w, ${assetStem}-960.webp 960w, ${assetStem}-1280.webp 1280w`}
-            sizes="(max-width: 680px) calc(100vw - 28px), (max-width: 980px) calc(100vw - 48px), 760px"
-          />
-          <img
-            src={`${assetStem}-1280.webp`}
-            alt="Атлет выполняет контролируемую классическую становую тягу со штангой"
-            width={1280}
-            height={1171}
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            className={loaded ? 'is-loaded' : ''}
-            onLoad={() => setLoadedStem(assetStem)}
-            onError={() => setFailedStem(assetStem)}
-          />
-        </picture>
-      )}
-    </span>
-  );
-}
-
 export default function LandingPage() {
   const appUrl = appUrlForHostname(window.location.hostname);
   const loginUrl = loginUrlForHostname(window.location.hostname);
@@ -329,20 +292,17 @@ export default function LandingPage() {
     >
       <main id="landing-content" tabIndex={-1}>
         <section className="landing-hero" aria-labelledby="landing-title">
-          <EnergyFlow className="landing-energy-path" />
           <div className="landing-hero__copy">
-            <p className="landing-kicker">Один связный цикл на каждый день</p>
+            <p className="landing-kicker">Тренировки. Питание. Ваш прогресс.</p>
             <h1 id="landing-title">
-              Знайте, что делать <span>сегодня.</span>
+              <span>Движение.</span> <span>Запись.</span> <span>Прогресс.</span>
             </h1>
             <p className="landing-hero__lead">
-              YFC связывает план на сегодня, выполнение, питание и замеры с честной динамикой —
-              чтобы следующий шаг был понятен. Занимайтесь самостоятельно или подключите тренера
-              позже.
+              Тренировки и питание — в фактах. Прогресс — по вашим записям.
             </p>
             <div className="landing-hero__actions">
               <a className="landing-button" href={appUrl} onClick={trackAppSelection}>
-                Открыть приложение <Icon name="arrow-right" size={20} />
+                Начать <Icon name="arrow-right" size={20} />
               </a>
               <a
                 className="landing-button landing-button--secondary"
@@ -369,36 +329,10 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div
-            className="landing-hero-scene"
-            role="group"
-            aria-label="Силовая тренировка и актуальный интерфейс YFC"
-          >
-            <figure className="landing-athlete-frame">
-              <AthleteVisual />
-            </figure>
-            <figure className="landing-hero-device">
-              <span className="landing-hero-device__label">
-                Актуальный интерфейс · подготовленные данные
-              </span>
-              <ProductScreenshot
-                src={`/assets/product/landing-workout-mobile-${colorScheme}.png`}
-                alt="Актуальный экран Сегодня и текущей силовой тренировки в Mobile Web"
-                width={390}
-                height={844}
-                loading="eager"
-                fetchPriority="high"
-                fallback="Экран Сегодня временно недоступен. Откройте демо, чтобы посмотреть продукт."
-              />
-              <figcaption>
-                <strong>Реальный интерфейс</strong>
-                Подготовленные данные без информации реальных пользователей
-              </figcaption>
-            </figure>
-          </div>
+          <StrengthScene />
         </section>
 
-        <section id="product" className="landing-core" aria-labelledby="product-title">
+        <LandingChapter id="product" className="landing-core" aria-labelledby="product-title">
           <div className="landing-core__intro">
             <header>
               <p className="landing-kicker">Продукт в действии</p>
@@ -422,7 +356,7 @@ export default function LandingPage() {
             <div className="landing-core__proof" aria-label="Актуальные Web и Mobile Web экраны">
               <figure className="landing-core__desktop">
                 <ProductScreenshot
-                  src={`/assets/product/landing-today-desktop-${colorScheme}.png`}
+                  src={`/assets/product/landing-today-desktop-${colorScheme}.webp`}
                   alt="Актуальный экран Сегодня в desktop Web"
                   width={1440}
                   height={900}
@@ -432,7 +366,7 @@ export default function LandingPage() {
               </figure>
               <figure className="landing-core__mobile">
                 <ProductScreenshot
-                  src={`/assets/product/landing-today-mobile-${colorScheme}.png`}
+                  src={`/assets/product/landing-today-mobile-${colorScheme}.webp`}
                   alt="Актуальный экран Сегодня в Mobile Web"
                   width={390}
                   height={844}
@@ -462,7 +396,7 @@ export default function LandingPage() {
               </article>
             ))}
           </div>
-        </section>
+        </LandingChapter>
 
         {publishedArticles.data && publishedArticles.data.length > 0 && (
           <section className="landing-articles" aria-labelledby="landing-articles-title">
@@ -491,7 +425,7 @@ export default function LandingPage() {
           </section>
         )}
 
-        <section className="landing-trainer" aria-labelledby="trainer-title">
+        <LandingChapter className="landing-trainer" aria-labelledby="trainer-title">
           <div className="landing-trainer__copy">
             <p className="landing-kicker">04 · Работа с тренером</p>
             <h2 id="trainer-title">У каждого клиента — видимый контекст.</h2>
@@ -506,7 +440,7 @@ export default function LandingPage() {
           </div>
           <figure className="landing-trainer__proof">
             <ProductScreenshot
-              src={`/assets/product/landing-trainer-desktop-${colorScheme}.png`}
+              src={`/assets/product/landing-trainer-desktop-${colorScheme}.webp`}
               alt="Актуальный кабинет тренера с подготовленными данными клиента"
               width={1280}
               height={972}
@@ -514,9 +448,9 @@ export default function LandingPage() {
               fallback="Экран кабинета тренера временно недоступен."
             />
           </figure>
-        </section>
+        </LandingChapter>
 
-        <section id="demo" className="landing-start" aria-labelledby="start-title">
+        <LandingChapter id="demo" className="landing-start" aria-labelledby="start-title">
           <header>
             <p className="landing-kicker">Как это работает</p>
             <h2 id="start-title">От настройки — к повторяемому ритму.</h2>
@@ -560,9 +494,9 @@ export default function LandingPage() {
               ))}
             </nav>
           </div>
-        </section>
+        </LandingChapter>
 
-        <section id="faq" className="landing-assurance" aria-labelledby="faq-title">
+        <LandingChapter id="faq" className="landing-assurance" aria-labelledby="faq-title">
           <div className="landing-assurance__platform">
             <div className="landing-continuity__copy">
               <p className="landing-kicker">Один продукт на двух поверхностях</p>
@@ -667,7 +601,7 @@ export default function LandingPage() {
               </details>
             </div>
           </div>
-        </section>
+        </LandingChapter>
 
         <section id="contact" className="landing-contact">
           <div>

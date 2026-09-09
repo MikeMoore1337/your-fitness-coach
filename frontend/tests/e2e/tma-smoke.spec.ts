@@ -905,8 +905,8 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
         }),
     )
     .toEqual({
-      fill: 'rgb(22, 25, 22)',
-      stroke: 'rgb(168, 232, 58)',
+      fill: 'rgb(25, 25, 25)',
+      stroke: 'rgb(181, 239, 50)',
       theme: 'dark',
     });
   await tmaReport.evaluate((element) => element.scrollIntoView({ block: 'start' }));
@@ -1302,11 +1302,11 @@ test('workout adaptation keeps preview, cancel, apply and conflict recovery in M
     'border-radius',
     '20px',
   );
-  await expect(apply).toHaveCSS('background-color', 'rgb(158, 224, 43)');
+  await expect(apply).toHaveCSS('background-color', 'rgb(181, 239, 50)');
   await expect(apply).toHaveCSS('border-radius', '12px');
   await expect(mobilePage.getByRole('button', { name: '20 мин' })).toHaveCSS(
     'border-top-color',
-    'rgb(158, 224, 43)',
+    'rgb(181, 239, 50)',
   );
   await mobilePage.locator('.adaptation-preview').scrollIntoViewIfNeeded();
   await mobilePage.screenshot({

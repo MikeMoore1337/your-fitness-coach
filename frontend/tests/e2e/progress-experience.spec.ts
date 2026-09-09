@@ -1347,7 +1347,7 @@ test('notification deep-link opens exact workout feedback and preserves back nav
   await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.workout-feedback').first()).toHaveCSS('color', 'rgb(238, 240, 234)');
+  await expect(page.locator('.workout-feedback').first()).toHaveCSS('color', 'rgb(245, 245, 245)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 
   if (captureFeedbackAudit) {

@@ -159,7 +159,7 @@ test('landing emits a privacy-safe acquisition event without changing the deskto
   await expect(
     page.getByRole('heading', {
       level: 1,
-      name: 'Знайте, что делать сегодня.',
+      name: 'Движение. Запись. Прогресс.',
     }),
   ).toBeVisible();
   await page.screenshot({

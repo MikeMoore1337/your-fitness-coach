@@ -373,11 +373,11 @@
 }
 
 .auth-public-shell--design-v2-1 .login-continuation-brand {
-  color: #eef0ea;
+  color: #f5f5f5;
 }
 
 .auth-public-shell--design-v2-1 .login-surface-note {
-  color: #afb5ad;
+  color: #b8b8b8;
   font-size: 12px;
 }
 
@@ -492,8 +492,8 @@
   .auth-public-shell--design-v2.auth-public-shell--design-v2-1 {
     background: linear-gradient(
       to right,
-      #101310 0,
-      #101310 50%,
+      #111111 0,
+      #111111 50%,
       var(--v2-canvas) 50%,
       var(--v2-canvas) 100%
     );
@@ -518,8 +518,8 @@
     flex-direction: column;
     min-width: 0;
     padding: 32px clamp(32px, 4.5vw, 64px);
-    background: #101310;
-    color: #eef0ea;
+    background: #111111;
+    color: #f5f5f5;
   }
 
   .auth-public-shell--design-v2-1 .login-continuation {
@@ -529,7 +529,7 @@
   .auth-public-shell--design-v2.auth-public-shell--design-v2-1 .login-intro h1 {
     max-width: none;
     margin: 0;
-    color: #eef0ea;
+    color: #f5f5f5;
     font-size: 35px;
     font-weight: 700;
     letter-spacing: -0.055em;
@@ -540,7 +540,7 @@
   .auth-public-shell--design-v2-1 .login-continuation > p:last-child {
     max-width: 520px;
     margin: 10px 0 0;
-    color: #afb5ad;
+    color: #b8b8b8;
     font-size: 14px;
     line-height: 1.5;
   }

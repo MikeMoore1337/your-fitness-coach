@@ -2,14 +2,12 @@
   --landing-content: 1320px;
   --landing-gutter: clamp(24px, 4.4vw, 64px);
   --landing-surface: rgba(251, 252, 247, 0.86);
-  --landing-surface-solid: #f8f9f4;
+  --landing-surface-solid: #fafafa;
   --landing-raised: rgba(255, 255, 255, 0.95);
   --landing-line: rgba(23, 32, 24, 0.14);
   --landing-soft-shadow: 0 20px 60px rgba(23, 32, 24, 0.08);
   --landing-device-shadow: 0 34px 70px rgba(11, 16, 12, 0.28);
-  background:
-    radial-gradient(circle at 75% 6%, rgba(182, 242, 56, 0.11), transparent 25rem),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.68), transparent 40rem), var(--landing-paper);
+  background: var(--landing-paper);
 }
 
 .landing-articles {
@@ -31,6 +29,7 @@
   font-size: clamp(2.2rem, 4vw, 4.2rem);
   letter-spacing: -0.06em;
   line-height: 0.98;
+  font-family: var(--font-display);
 }
 
 .landing-articles__intro > p:not(.landing-kicker) {
@@ -93,14 +92,12 @@
 
 .public-shell--dark.landing-page {
   --landing-surface: rgba(18, 24, 20, 0.88);
-  --landing-surface-solid: #121814;
+  --landing-surface-solid: #191919;
   --landing-raised: rgba(22, 29, 24, 0.97);
   --landing-line: rgba(238, 244, 238, 0.13);
   --landing-soft-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
   --landing-device-shadow: 0 38px 80px rgba(0, 0, 0, 0.64);
-  background:
-    radial-gradient(circle at 78% 5%, rgba(182, 242, 56, 0.09), transparent 27rem),
-    var(--landing-paper);
+  background: var(--landing-paper);
 }
 
 .landing-page section[id],
@@ -108,7 +105,6 @@
   scroll-margin-top: 88px;
 }
 
-.landing-hero,
 .landing-core,
 .landing-trainer,
 .landing-start,
@@ -125,6 +121,7 @@
 
 .landing-page :is(h1, h2) {
   text-wrap: balance;
+  font-family: var(--font-display);
 }
 
 .landing-page :is(p, h3, a) {
@@ -261,7 +258,7 @@
 .landing-button--compact {
   min-height: 44px;
   padding-inline: 18px;
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: none;
 }
 
@@ -271,7 +268,7 @@
   height: 44px;
   padding: 0;
   border: 1px solid var(--landing-border);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--landing-card);
   color: var(--landing-ink);
   cursor: pointer;
@@ -282,8 +279,7 @@
   margin: auto;
 }
 
-.landing-product-image,
-.landing-athlete-image {
+.landing-product-image {
   position: relative;
   display: block;
   width: 100%;
@@ -292,8 +288,7 @@
   background: var(--landing-surface-solid);
 }
 
-.landing-product-image__fallback,
-.landing-athlete-image__fallback {
+.landing-product-image__fallback {
   position: absolute;
   z-index: 0;
   inset: 0;
@@ -309,14 +304,12 @@
     visibility var(--motion-state) var(--motion-ease);
 }
 
-.landing-product-image.is-loaded > .landing-product-image__fallback,
-.landing-athlete-image.is-loaded > .landing-athlete-image__fallback {
+.landing-product-image.is-loaded > .landing-product-image__fallback {
   visibility: hidden;
   opacity: 0;
 }
 
-.landing-product-image img,
-.landing-athlete-image img {
+.landing-product-image img {
   position: relative;
   z-index: 1;
   display: block;
@@ -326,417 +319,11 @@
   transition: opacity 320ms ease;
 }
 
-.landing-product-image img.is-loaded,
-.landing-athlete-image img.is-loaded {
+.landing-product-image img.is-loaded {
   opacity: 1;
 }
 
-.landing-athlete-image picture {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
 /* Hero */
-
-.landing-hero {
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  min-height: 660px;
-  grid-template-columns: minmax(360px, 0.76fr) minmax(0, 1.34fr);
-  align-items: center;
-  gap: clamp(12px, 2vw, 36px);
-  padding-block: 38px 28px;
-}
-
-.landing-hero__copy {
-  position: relative;
-  z-index: 4;
-  max-width: 570px;
-  padding-left: clamp(0px, 1vw, 16px);
-}
-
-.landing-hero h1 {
-  max-width: 9.6ch;
-  margin-bottom: 22px;
-  font-size: clamp(3.55rem, 5.15vw, 4.8rem);
-  font-weight: 800;
-  letter-spacing: -0.055em;
-  line-height: 0.94;
-}
-
-.landing-hero h1 span {
-  color: #86b61f;
-}
-
-.public-shell--dark .landing-hero h1 span {
-  color: var(--brand-lime);
-}
-
-.landing-hero__lead {
-  max-width: 53ch;
-  margin-bottom: 26px;
-  color: var(--landing-muted);
-  font-size: clamp(0.98rem, 1.25vw, 1.08rem);
-  line-height: 1.62;
-}
-
-.landing-hero__actions {
-  display: grid;
-  width: min(100%, 460px);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.landing-hero__actions .landing-button {
-  width: 100%;
-}
-
-.landing-hero__platform {
-  display: grid;
-  width: fit-content;
-  gap: 2px;
-}
-
-.landing-hero__platform-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 0;
-  color: var(--landing-muted);
-  font-size: 0.76rem;
-  line-height: 1.45;
-}
-
-.landing-hero__telegram-link {
-  display: inline-flex;
-  width: fit-content;
-  min-height: 44px;
-  align-items: center;
-  gap: 6px;
-  color: #52740f;
-  font-size: 0.8125rem;
-  font-weight: 800;
-  text-decoration: none;
-  transition:
-    color var(--motion-state) var(--motion-ease),
-    transform var(--motion-state) var(--motion-ease);
-}
-
-.public-shell--dark .landing-hero__telegram-link {
-  color: var(--brand-lime);
-}
-
-.landing-hero__telegram-link:hover {
-  color: var(--landing-ink);
-  transform: translateX(2px);
-}
-
-.landing-hero-scene {
-  position: relative;
-  min-width: 0;
-  height: 610px;
-}
-
-.landing-hero-scene::before {
-  position: absolute;
-  inset: 8% 4% 11% 12%;
-  border-radius: 50%;
-  background: radial-gradient(
-    ellipse at 62% 48%,
-    rgba(23, 32, 24, 0.09),
-    rgba(182, 242, 56, 0.035) 44%,
-    transparent 72%
-  );
-  content: '';
-  pointer-events: none;
-}
-
-.public-shell--dark .landing-hero-scene::before {
-  background: radial-gradient(
-    ellipse at 62% 48%,
-    rgba(182, 242, 56, 0.085),
-    rgba(255, 255, 255, 0.025) 44%,
-    transparent 72%
-  );
-}
-
-.landing-athlete-frame {
-  position: absolute;
-  z-index: 1;
-  inset: -12px 38px -6px -18px;
-  overflow: visible;
-  background: transparent;
-  transform: translateY(-44px);
-}
-
-.landing-athlete-frame .landing-athlete-image {
-  overflow: visible;
-  background: transparent;
-}
-
-.landing-athlete-frame img {
-  object-fit: contain;
-  object-position: center bottom;
-  filter: saturate(0.82) brightness(1.01) contrast(0.98)
-    drop-shadow(0 24px 30px rgba(23, 32, 24, 0.2));
-}
-
-.public-shell--dark .landing-athlete-frame,
-.public-shell--dark .landing-athlete-frame .landing-athlete-image {
-  background: transparent;
-}
-
-.public-shell--dark .landing-athlete-frame img {
-  filter: saturate(0.76) brightness(0.9) contrast(1.08) drop-shadow(0 26px 34px rgba(0, 0, 0, 0.52));
-}
-
-.landing-energy-path {
-  position: absolute;
-  z-index: 0;
-  inset: 0 -24px;
-  pointer-events: none;
-  transform: translateY(-16px);
-}
-
-.energy-flow svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.energy-flow__scene--mobile {
-  display: none;
-}
-
-.energy-flow__stop--start,
-.energy-flow__stop--end {
-  stop-color: #19330f;
-  stop-opacity: 0;
-}
-
-.energy-flow__stop--deep {
-  stop-color: #315c17;
-  stop-opacity: 0.28;
-}
-
-.energy-flow__stop--muted {
-  stop-color: #6f9f1c;
-  stop-opacity: 0.64;
-}
-
-.energy-flow__stop--bright {
-  stop-color: #a9e524;
-  stop-opacity: 0.94;
-}
-
-.energy-flow__stop--tail {
-  stop-color: #75a41b;
-  stop-opacity: 0.38;
-}
-
-.energy-flow__ambient,
-.energy-flow__glow,
-.energy-flow__filament {
-  vector-effect: non-scaling-stroke;
-  stroke-linecap: round;
-}
-
-.energy-flow__ambient {
-  stroke-width: 30;
-  opacity: 0.055;
-}
-
-.energy-flow__glow {
-  stroke-width: 6;
-  opacity: 0.14;
-}
-
-.energy-flow__glow--b {
-  stroke-width: 5;
-  opacity: 0.075;
-}
-
-.energy-flow__filament {
-  --energy-delay: 110ms;
-
-  stroke-width: 0.9;
-  opacity: 0.42;
-  vector-effect: non-scaling-stroke;
-  animation: landing-path-reveal 1200ms var(--energy-delay) both cubic-bezier(0.2, 0.75, 0.2, 1);
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
-}
-
-.energy-flow__filament--primary-a {
-  --energy-delay: 80ms;
-
-  stroke-width: 2.3;
-  opacity: 0.92;
-}
-
-.energy-flow__filament--primary-b {
-  --energy-delay: 150ms;
-
-  stroke-width: 1.75;
-  opacity: 0.74;
-}
-
-.energy-flow__filament--support-a {
-  --energy-delay: 190ms;
-
-  stroke-width: 1.2;
-  opacity: 0.52;
-}
-
-.energy-flow__filament--support-b {
-  --energy-delay: 230ms;
-
-  stroke-width: 0.72;
-  opacity: 0.34;
-}
-
-.energy-flow__filament--support-c {
-  --energy-delay: 270ms;
-
-  stroke-width: 1.35;
-  opacity: 0.46;
-}
-
-.energy-flow__filament--support-d {
-  --energy-delay: 315ms;
-
-  stroke-width: 0.62;
-  opacity: 0.3;
-}
-
-.energy-flow__filament--support-e {
-  --energy-delay: 350ms;
-
-  stroke-width: 1.05;
-  opacity: 0.42;
-}
-
-.energy-flow__filament--support-f {
-  --energy-delay: 395ms;
-
-  stroke-width: 0.56;
-  opacity: 0.24;
-}
-
-.energy-flow__filament--support-g {
-  --energy-delay: 430ms;
-
-  stroke-width: 0.82;
-  opacity: 0.34;
-}
-
-.energy-flow__filament--support-h {
-  --energy-delay: 470ms;
-
-  stroke-width: 1.15;
-  opacity: 0.32;
-}
-
-.energy-flow__filament--support-i {
-  --energy-delay: 510ms;
-
-  stroke-width: 0.68;
-  opacity: 0.25;
-}
-
-.energy-flow__filament--support-j {
-  --energy-delay: 550ms;
-
-  stroke-width: 0.95;
-  opacity: 0.3;
-}
-
-.public-shell--dark .energy-flow__stop--deep {
-  stop-color: #294716;
-  stop-opacity: 0.32;
-}
-
-.public-shell--dark .energy-flow__stop--muted {
-  stop-color: #79a923;
-  stop-opacity: 0.72;
-}
-
-.public-shell--dark .energy-flow__stop--bright {
-  stop-color: var(--brand-lime);
-  stop-opacity: 1;
-}
-
-.public-shell--dark .energy-flow__stop--tail {
-  stop-color: #89bd26;
-  stop-opacity: 0.44;
-}
-
-.public-shell--dark .energy-flow__ambient {
-  opacity: 0.075;
-}
-
-.public-shell--dark .energy-flow__glow {
-  opacity: 0.18;
-}
-
-.public-shell--dark .energy-flow__glow--b {
-  opacity: 0.1;
-}
-
-.landing-hero-device {
-  position: absolute;
-  z-index: 4;
-  top: 32px;
-  right: 16px;
-  width: clamp(180px, 16vw, 222px);
-  margin: 0;
-  padding: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  border-radius: 31px;
-  background: #0d120f;
-  box-shadow: var(--landing-device-shadow);
-  color: #f5f7f3;
-  transform: rotate(2.8deg);
-  animation: landing-device-settle 700ms 90ms both cubic-bezier(0.2, 0.75, 0.2, 1);
-}
-
-.landing-hero-device__label {
-  position: absolute;
-  overflow: hidden;
-  width: 1px;
-  height: 1px;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.landing-hero-device .landing-product-image {
-  aspect-ratio: 390 / 844;
-  height: auto;
-  border-radius: 28px;
-  background: #f2f4ed;
-}
-
-.landing-hero-device img {
-  object-fit: cover;
-  object-position: top;
-}
-
-.landing-hero-device figcaption {
-  position: absolute;
-  overflow: hidden;
-  width: 1px;
-  height: 1px;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.landing-hero-device figcaption strong {
-  font: inherit;
-}
 
 /* Core product */
 
@@ -764,6 +351,7 @@
   font-weight: 750;
   letter-spacing: -0.048em;
   line-height: 0.98;
+  font-family: var(--font-display);
 }
 
 .landing-core__intro header > p:not(.landing-kicker) {
@@ -815,7 +403,7 @@
   padding: 3px;
   border: 1px solid rgba(255, 255, 255, 0.26);
   border-radius: 20px;
-  background: #111713;
+  background: #191919;
   box-shadow: 0 22px 46px rgba(0, 0, 0, 0.3);
   transform: rotate(1.8deg);
 }
@@ -989,23 +577,9 @@
   overflow: hidden;
   padding: clamp(32px, 4vw, 50px);
   border: 1px solid rgba(182, 242, 56, 0.24);
-  border-radius: 26px;
-  background: linear-gradient(118deg, rgba(182, 242, 56, 0.07), transparent 52%), #141a16;
-  color: #f2f5ef;
-}
-
-.landing-trainer::after {
-  position: absolute;
-  right: -8%;
-  bottom: 8%;
-  width: 62%;
-  height: 36%;
-  border-top: 2px solid var(--brand-lime);
-  border-radius: 50%;
-  content: '';
-  opacity: 0.42;
-  transform: rotate(-7deg);
-  pointer-events: none;
+  border-radius: 12px;
+  background: #191919;
+  color: #f5f5f5;
 }
 
 .landing-trainer__copy,
@@ -1016,14 +590,15 @@
 
 .landing-trainer h2 {
   max-width: 13ch;
-  color: #f2f5ef;
+  color: #f5f5f5;
   font-size: clamp(2.25rem, 3.2vw, 3rem);
+  font-family: var(--font-display);
 }
 
 .landing-trainer__copy > p:not(.landing-kicker) {
   max-width: 58ch;
   margin-bottom: 12px;
-  color: #aeb9b0;
+  color: #b8b8b8;
   font-size: 0.9375rem;
   line-height: 1.54;
 }
@@ -1036,9 +611,9 @@
   height: 278px;
   margin: 0;
   overflow: hidden;
-  border: 2px solid #303a33;
+  border: 2px solid #404040;
   border-radius: 16px;
-  background: #111713;
+  background: #191919;
   box-shadow: 0 28px 60px rgba(0, 0, 0, 0.38);
   transform: perspective(900px) rotateY(-1.5deg);
 }
@@ -1065,6 +640,7 @@
 .landing-start > header h2 {
   max-width: 700px;
   margin-bottom: 0;
+  font-family: var(--font-display);
 }
 
 .landing-start__steps {
@@ -1083,7 +659,7 @@
   right: 11%;
   left: 11%;
   height: 1px;
-  background: linear-gradient(90deg, var(--landing-line), var(--brand-lime), var(--landing-line));
+  background: var(--landing-line);
   content: '';
 }
 
@@ -1232,6 +808,7 @@
 .landing-assurance__platform h2 {
   margin-bottom: 12px;
   font-size: clamp(2rem, 3.2vw, 3rem);
+  font-family: var(--font-display);
 }
 
 .landing-continuity__copy > p:not(.landing-kicker) {
@@ -1292,6 +869,7 @@
 
 .landing-assurance > header h2 {
   margin-bottom: 0;
+  font-family: var(--font-display);
 }
 
 .landing-assurance__grid {
@@ -1428,25 +1006,9 @@
   overflow: hidden;
   padding: clamp(30px, 4vw, 52px);
   border: 1px solid rgba(182, 242, 56, 0.24);
-  border-radius: 24px;
-  background:
-    radial-gradient(circle at 83% 28%, rgba(182, 242, 56, 0.15), transparent 26%),
-    linear-gradient(108deg, #0f1411 0 62%, #172018 100%);
-  color: #f1f5ef;
-}
-
-.landing-contact::after {
-  position: absolute;
-  right: -8%;
-  bottom: 12%;
-  width: 58%;
-  height: 40%;
-  border-top: 2px solid var(--brand-lime);
-  border-radius: 50%;
-  content: '';
-  opacity: 0.5;
-  transform: rotate(-8deg);
-  pointer-events: none;
+  border-radius: 12px;
+  background: #191919;
+  color: #f5f5f5;
 }
 
 .landing-contact > div {
@@ -1457,14 +1019,15 @@
 .landing-contact h2 {
   max-width: 15ch;
   margin-bottom: 8px;
-  color: #f1f5ef;
+  color: #f5f5f5;
   font-size: clamp(2rem, 3.2vw, 3rem);
+  font-family: var(--font-display);
 }
 
 .landing-contact > div > p:not(.landing-kicker) {
   max-width: 54ch;
   margin-bottom: 0;
-  color: #b6c0b8;
+  color: #b8b8b8;
   font-size: 0.9375rem;
   line-height: 1.52;
 }
@@ -1479,7 +1042,7 @@
 .landing-contact .landing-button--secondary {
   border-color: rgba(255, 255, 255, 0.32);
   background: rgba(16, 21, 18, 0.72);
-  color: #f1f5ef !important;
+  color: #f5f5f5 !important;
   backdrop-filter: blur(8px);
 }
 
@@ -1585,28 +1148,6 @@
     --landing-gutter: clamp(24px, 3.2vw, 38px);
   }
 
-  .landing-hero {
-    min-height: 620px;
-    grid-template-columns: minmax(330px, 0.78fr) minmax(0, 1.22fr);
-  }
-
-  .landing-hero h1 {
-    font-size: clamp(3.25rem, 5.35vw, 4rem);
-  }
-
-  .landing-hero-scene {
-    height: 560px;
-  }
-
-  .landing-athlete-frame {
-    right: 24px;
-  }
-
-  .landing-hero-device {
-    right: 8px;
-    width: clamp(174px, 18vw, 204px);
-  }
-
   .landing-core__intro {
     gap: clamp(32px, 4vw, 58px);
   }
@@ -1659,28 +1200,6 @@
 
   .landing-nav a:hover {
     background: var(--landing-secondary);
-  }
-
-  .landing-hero {
-    grid-template-columns: minmax(300px, 0.82fr) minmax(0, 1.18fr);
-  }
-
-  .landing-hero h1 {
-    font-size: clamp(3rem, 6vw, 3.55rem);
-  }
-
-  .landing-hero-scene {
-    height: 520px;
-  }
-
-  .landing-athlete-frame {
-    inset: -4px 4px 0 -20px;
-  }
-
-  .landing-hero-device {
-    top: 45px;
-    right: 8px;
-    width: 170px;
   }
 
   .landing-core__intro {
@@ -1755,45 +1274,6 @@
 }
 
 @media (max-width: 860px) {
-  .landing-hero {
-    grid-template-columns: 1fr;
-    padding-block: 48px 56px;
-  }
-
-  .landing-hero__copy {
-    max-width: 660px;
-    padding-left: 0;
-  }
-
-  .landing-hero h1 {
-    max-width: 10.5ch;
-    font-size: clamp(3.45rem, 9vw, 4.3rem);
-  }
-
-  .landing-hero-scene {
-    height: 550px;
-  }
-
-  .landing-energy-path {
-    top: 120px;
-    right: -24px;
-    bottom: auto;
-    left: -24px;
-    height: 420px;
-    transform: none;
-  }
-
-  .landing-athlete-frame {
-    inset: 0 -8px -4px -18px;
-    transform: translateY(-72px);
-  }
-
-  .landing-hero-device {
-    top: 28px;
-    right: 18px;
-    width: 188px;
-  }
-
   .landing-core__intro,
   .landing-trainer,
   .landing-start,
@@ -1924,126 +1404,6 @@
     font-size: 0.6rem;
   }
 
-  .landing-hero {
-    padding-block: 32px 36px;
-  }
-
-  .landing-hero h1 {
-    max-width: 9.8ch;
-    margin-bottom: 18px;
-    font-size: clamp(2.85rem, 13vw, 3.55rem);
-  }
-
-  .landing-hero__lead {
-    margin-bottom: 22px;
-    font-size: 0.92rem;
-    line-height: 1.55;
-  }
-
-  .landing-hero__actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .landing-hero__actions .landing-button {
-    width: 100%;
-    min-height: 50px;
-    padding-inline: 14px;
-    font-size: 0.72rem;
-  }
-
-  .landing-hero__platform-note {
-    align-items: flex-start;
-    font-size: 0.68rem;
-  }
-
-  .landing-hero-scene {
-    height: 410px;
-  }
-
-  .landing-athlete-frame {
-    inset: 0 -62px auto -52px;
-    height: 470px;
-    transform: translateY(-72px);
-  }
-
-  .landing-athlete-frame img {
-    object-position: center bottom;
-  }
-
-  .landing-energy-path {
-    top: 270px;
-    right: -20px;
-    bottom: auto;
-    left: -20px;
-    height: 620px;
-  }
-
-  .energy-flow__scene--desktop {
-    display: none;
-  }
-
-  .energy-flow__scene--mobile {
-    display: inline;
-  }
-
-  .energy-flow__ambient {
-    stroke-width: 20;
-    opacity: 0.024;
-  }
-
-  .energy-flow__glow {
-    stroke-width: 4.5;
-    opacity: 0.065;
-  }
-
-  .energy-flow__glow--b {
-    display: none;
-  }
-
-  .energy-flow__filament--primary-a {
-    stroke-width: 1.45;
-  }
-
-  .energy-flow__filament--primary-b {
-    stroke-width: 1.15;
-  }
-
-  .energy-flow__filament--support-a,
-  .energy-flow__filament--support-c {
-    stroke-width: 0.85;
-  }
-
-  .energy-flow__filament--support-b,
-  .energy-flow__filament--support-d,
-  .energy-flow__filament--support-f {
-    stroke-width: 0.5;
-  }
-
-  .energy-flow__filament--support-e {
-    stroke-width: 0.7;
-  }
-
-  .public-shell--dark .energy-flow__ambient {
-    opacity: 0.034;
-  }
-
-  .public-shell--dark .energy-flow__glow {
-    opacity: 0.08;
-  }
-
-  .landing-hero-device {
-    top: 25px;
-    right: -2px;
-    width: clamp(132px, 37vw, 150px);
-    padding: 3px;
-    border-radius: 26px;
-  }
-
-  .landing-hero-device .landing-product-image {
-    border-radius: 22px;
-  }
-
   .landing-core {
     padding-block: 30px;
   }
@@ -2056,6 +1416,7 @@
   .landing-contact h2 {
     margin-bottom: 13px;
     font-size: clamp(2.15rem, 10vw, 2.75rem);
+    font-family: var(--font-display);
   }
 
   .landing-core__intro header > p:not(.landing-kicker) {
@@ -2146,7 +1507,7 @@
   .landing-trainer {
     gap: 22px;
     padding: 26px 22px 20px;
-    border-radius: 22px;
+    border-radius: 12px;
   }
 
   .landing-trainer__copy > p:not(.landing-kicker) {
@@ -2188,7 +1549,7 @@
     left: 25px;
     width: 1px;
     height: auto;
-    background: linear-gradient(180deg, var(--brand-lime), var(--landing-line));
+    background: var(--landing-line);
   }
 
   .landing-start__steps li {
@@ -2287,7 +1648,7 @@
     grid-template-columns: 1fr;
     gap: 24px;
     padding: 26px 22px;
-    border-radius: 22px;
+    border-radius: 12px;
   }
 
   .landing-contact__actions {
@@ -2337,27 +1698,6 @@
 
   .landing-button--compact {
     padding-inline: 11px;
-  }
-
-  .landing-hero__actions {
-    grid-template-columns: 1fr;
-  }
-
-  .landing-hero {
-    padding-block: 20px 30px;
-  }
-
-  .landing-hero-scene {
-    height: 360px;
-  }
-
-  .landing-athlete-frame {
-    height: 445px;
-  }
-
-  .landing-hero-device {
-    right: -6px;
-    width: 132px;
   }
 
   .landing-core__proof {
@@ -2441,16 +1781,5 @@
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-  }
-
-  .landing-energy-path path {
-    animation: none !important;
-    stroke-dashoffset: 0;
-  }
-
-  .landing-hero-device {
-    animation: none !important;
-    opacity: 1;
-    transform: rotate(2.8deg);
   }
 }

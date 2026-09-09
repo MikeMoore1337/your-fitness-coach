@@ -624,7 +624,7 @@ test('Web cabinet preview uses production shell across the required viewport mat
     await expect(primary).toHaveCSS('border-radius', '12px');
     await expect(primary).toHaveCSS(
       'background-color',
-      viewport.dark ? 'rgb(168, 232, 58)' : 'rgb(158, 224, 43)',
+      viewport.dark ? 'rgb(181, 239, 50)' : 'rgb(181, 239, 50)',
     );
     if (viewport.touch) {
       await expectTouchTargets(page.locator('#appBottomNav .app-bottom-nav__primary > *'));

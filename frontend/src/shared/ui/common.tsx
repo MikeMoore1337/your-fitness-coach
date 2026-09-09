@@ -4,7 +4,6 @@ import { Icon, type IconName } from './Icon';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger';
-type SemanticArtworkVariant = 'current-action' | 'data-insight' | 'workout-completion';
 export type SemanticCardFamily = 'training' | 'nutrition' | 'progress' | 'wellbeing' | 'neutral';
 export type SemanticCardVariant = 'summary' | 'action' | 'section';
 
@@ -89,16 +88,6 @@ export function Surface({
     <section {...props} className={`ui-surface${variants} ${className}`.trim()}>
       {children}
     </section>
-  );
-}
-
-export function SemanticArtwork({ variant }: { variant: SemanticArtworkVariant }) {
-  return (
-    <span aria-hidden="true" className={`ui-semantic-artwork ui-semantic-artwork--${variant}`}>
-      <i />
-      <i />
-      <i />
-    </span>
   );
 }
 

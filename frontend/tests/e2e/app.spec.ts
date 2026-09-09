@@ -173,8 +173,8 @@ test('вторичный hero CTA сохраняет контрастный те
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
     await page.reload();
 
-    const expectedBackground = scheme === 'light' ? 'rgb(236, 237, 233)' : 'rgb(30, 34, 30)';
-    const expectedText = scheme === 'light' ? 'rgb(22, 26, 23)' : 'rgb(238, 240, 234)';
+    const expectedBackground = scheme === 'light' ? 'rgb(240, 240, 240)' : 'rgb(34, 34, 34)';
+    const expectedText = scheme === 'light' ? 'rgb(21, 21, 21)' : 'rgb(245, 245, 245)';
     for (const link of [
       page.locator('.landing-hero__actions').getByRole('link', { name: /Попробовать демо/ }),
     ]) {
@@ -1240,19 +1240,19 @@ test('цветовая система сохраняет иерархию в с�
 
   const authPanel = page.locator('.login-card');
   await expect(page.getByRole('heading', { name: 'Вернитесь к своему плану.' })).toBeVisible();
-  await expect(authPanel).toHaveCSS('background-color', 'rgb(244, 245, 242)');
+  await expect(authPanel).toHaveCSS('background-color', 'rgb(250, 250, 250)');
   await expect(authPanel).toHaveCSS('border-left-color', 'rgb(201, 205, 200)');
 
   const clientButton = page.getByRole('button', { name: 'Клиент' });
   await expect(clientButton).toHaveCSS('border-radius', '12px');
-  await expect(clientButton).toHaveCSS('background-color', 'rgb(236, 237, 233)');
-  await expect(clientButton).toHaveCSS('color', 'rgb(22, 26, 23)');
+  await expect(clientButton).toHaveCSS('background-color', 'rgb(240, 240, 240)');
+  await expect(clientButton).toHaveCSS('color', 'rgb(21, 21, 21)');
 
   await page.emulateMedia({ colorScheme: 'dark' });
-  await expect(authPanel).toHaveCSS('background-color', 'rgb(16, 19, 16)');
+  await expect(authPanel).toHaveCSS('background-color', 'rgb(17, 17, 17)');
   await expect(authPanel).toHaveCSS('border-left-color', 'rgb(58, 65, 58)');
-  await expect(clientButton).toHaveCSS('background-color', 'rgb(30, 34, 30)');
-  await expect(clientButton).toHaveCSS('color', 'rgb(238, 240, 234)');
+  await expect(clientButton).toHaveCSS('background-color', 'rgb(34, 34, 34)');
+  await expect(clientButton).toHaveCSS('color', 'rgb(245, 245, 245)');
 
   await clientButton.click();
   const selectedDestination = page.getByRole('link', { name: 'Сегодня', exact: true });
@@ -1262,7 +1262,7 @@ test('цветовая система сохраняет иерархию в с�
     .locator('.app-bottom-nav__icon');
   await expect(selectedDestination).toHaveAttribute('aria-current', 'page');
   await expect(selectedDestination).toHaveCSS('border-radius', '8px');
-  await expect(selectedDestination).toHaveCSS('background-color', 'rgb(30, 34, 30)');
+  await expect(selectedDestination).toHaveCSS('background-color', 'rgb(34, 34, 34)');
   await expect(selectedDestinationIcon).toBeVisible();
   await expect(nutritionDestinationIcon).toBeVisible();
   await expect(nutritionDestinationIcon.locator('svg')).toBeVisible();
@@ -1424,12 +1424,12 @@ test('primary CTA лендинга и Войти остаются lime в обе
 
   await expect(primary).toHaveCSS('background-color', 'rgb(182, 242, 56)');
   await expect(primary).toHaveCSS('color', 'rgb(23, 32, 24)');
-  await expect(login).toHaveCSS('background-color', 'rgb(158, 224, 43)');
+  await expect(login).toHaveCSS('background-color', 'rgb(181, 239, 50)');
   await expect(login).toHaveCSS('color', 'rgb(16, 32, 21)');
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await expect(primary).toHaveCSS('background-color', 'rgb(182, 242, 56)');
   await expect(primary).toHaveCSS('color', 'rgb(23, 32, 24)');
-  await expect(login).toHaveCSS('background-color', 'rgb(168, 232, 58)');
+  await expect(login).toHaveCSS('background-color', 'rgb(181, 239, 50)');
   await expect(login).toHaveCSS('color', 'rgb(16, 32, 21)');
 });
 

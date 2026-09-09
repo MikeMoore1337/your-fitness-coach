@@ -96,7 +96,7 @@ test('Landing and login keep public/auth initial work bounded in mobile lab', as
     await expect(
       page.getByRole('heading', {
         level: 1,
-        name: route === '/' ? 'Знайте, что делать сегодня.' : 'Войти и продолжить',
+        name: route === '/' ? 'Движение. Запись. Прогресс.' : 'Войти и продолжить',
       }),
     ).toBeVisible();
     await settle(page);
@@ -190,6 +190,6 @@ test('Client navigation preserves metadata owned by a lazy public route', async 
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    'http://127.0.0.1:4173/training',
+    new URL('/training', page.url()).href,
   );
 });

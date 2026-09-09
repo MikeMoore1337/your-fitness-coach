@@ -154,7 +154,7 @@ describe('WorkoutCompletionSummary', () => {
     expect(completion).toHaveAttribute('data-motion-phase', expect.stringMatching(/pending|enter/));
     expect(
       completion?.querySelector('.ui-semantic-artwork--workout-completion'),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(screen.getByText('1 ч 15 мин')).toBeInTheDocument();
     expect(screen.getByText(/1 подход/)).toBeInTheDocument();
     expect(screen.getByText(/Следующая тренировка .* Верх тела/)).toBeInTheDocument();

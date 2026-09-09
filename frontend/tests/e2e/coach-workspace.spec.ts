@@ -472,18 +472,20 @@ test('dashboard даёт обзор и фильтрует клиентов бе�
     });
   }
   if (captureLandingProductProofs) {
-    await page.screenshot({ path: 'public/assets/product/landing-trainer-desktop-light.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-trainer-desktop-light.png',
+    });
   }
 
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await expect(page.getByRole('tab', { name: 'Клиенты' })).toHaveCSS(
     'background-color',
-    'rgb(22, 25, 22)',
+    'rgb(25, 25, 25)',
   );
-  await expect(page.getByLabel('Найти клиента')).toHaveCSS('background-color', 'rgb(22, 25, 22)');
+  await expect(page.getByLabel('Найти клиента')).toHaveCSS('background-color', 'rgb(25, 25, 25)');
   await expect(page.getByRole('button', { name: 'Пригласить клиента', exact: true })).toHaveCSS(
     'background-color',
-    'rgb(168, 232, 58)',
+    'rgb(181, 239, 50)',
   );
   if (captureAudit) {
     await page.screenshot({
@@ -492,7 +494,9 @@ test('dashboard даёт обзор и фильтрует клиентов бе�
     });
   }
   if (captureLandingProductProofs) {
-    await page.screenshot({ path: 'public/assets/product/landing-trainer-desktop-dark.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-trainer-desktop-dark.png',
+    });
     return;
   }
   await page.getByRole('button', { name: 'Включить светлую тему' }).click();
@@ -656,7 +660,7 @@ test('mobile использует список и отдельный конте�
   await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await page.keyboard.press('Escape');
-  await expect(dayInput).toHaveCSS('background-color', 'rgb(22, 25, 22)');
+  await expect(dayInput).toHaveCSS('background-color', 'rgb(25, 25, 25)');
   await expect(dayControls.getByRole('button', { name: 'Переместить день 1 выше' })).toHaveCSS(
     'background-color',
     'rgba(0, 0, 0, 0)',
@@ -759,7 +763,7 @@ test('trainer leaves contextual workout and exercise feedback without messenger 
   await expect(feedback.getByText('Колени держите по направлению носков.')).toBeVisible();
   await expect(feedback.getByRole('textbox', { name: 'Комментарий' })).toHaveCSS(
     'background-color',
-    'rgb(22, 25, 22)',
+    'rgb(25, 25, 25)',
   );
   const mobileContextField = await feedback
     .getByRole('combobox', { name: 'Контекст комментария' })

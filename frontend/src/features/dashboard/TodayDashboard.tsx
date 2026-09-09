@@ -29,7 +29,7 @@ import {
 } from '../workouts/activeWorkoutQueue';
 import { WorkoutAdaptation } from '../workouts/WorkoutAdaptation';
 import { TodayWorkout } from '../workouts/TodayWorkout';
-import { Badge, Button, SemanticArtwork, SemanticCard, Skeleton } from '../../shared/ui/common';
+import { Badge, Button, SemanticCard, Skeleton } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { CardioQuickLog } from '../cardio/CardioLogging';
@@ -916,7 +916,6 @@ export function TodayDashboard({
           aria-labelledby="today-workout-title"
         >
           <span className="today-workout-spotlight__label">Тренировка</span>
-          <SemanticArtwork variant="current-action" />
           {selectedDate !== today ? (
             week.isLoading ? (
               <div

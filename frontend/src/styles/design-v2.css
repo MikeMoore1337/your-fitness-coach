@@ -380,6 +380,7 @@ body:has(.app-shell--design-v2) {
   overflow-wrap: anywhere;
   font-size: clamp(28px, 4vw, 44px);
   line-height: 1.04;
+  font-family: var(--font-display);
 }
 
 .progress-report-overview p,
@@ -776,6 +777,7 @@ body:has(.app-shell--design-v2) {
 
   .progress-report-overview h1 {
     font-size: 27pt;
+    font-family: var(--font-display);
   }
 
   .progress-report-overview__adherence strong {
@@ -955,7 +957,7 @@ body:has(.app-shell--design-v2) {
 .nutrition-diary--design-v2 :where(button, a, input, select):focus-visible,
 .active-workout--design-v2 :where(button, a, input, select, summary):focus-visible,
 .auth-public-shell--design-v2 :where(button, a, input, select):focus-visible {
-  outline: 3px solid var(--v2-lime);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 3px;
 }
 
@@ -1056,11 +1058,12 @@ body:has(.app-shell--design-v2) {
 }
 
 .today-dashboard--design-v2 .today-dashboard__header h1 {
-  color: var(--v2-accent-text);
-  font-size: clamp(0.78rem, 1.2vw, 0.9rem);
+  color: var(--v2-text-primary);
+  font-size: clamp(1.1rem, 2vw, 1.4rem);
   font-weight: 800;
-  letter-spacing: 0.025em;
+  letter-spacing: -0.025em;
   line-height: 1.35;
+  font-family: var(--font-display);
 }
 
 /* Shared week context/date-picker used by Today, Nutrition and future weekly surfaces. */
@@ -1337,7 +1340,7 @@ body:has(.app-shell--design-v2) {
 .week-strip__day:focus-visible,
 .week-strip__nav:focus-visible,
 .week-strip__legend-summary:focus-visible {
-  outline: 3px solid var(--v2-lime);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 2px;
 }
 
@@ -1376,14 +1379,14 @@ body:has(.app-shell--design-v2) {
 }
 
 .today-dashboard--design-v2 .today-workout-spotlight {
-  min-height: 260px;
+  min-height: 0;
   grid-template-columns: minmax(0, 1fr);
   align-content: end;
   gap: var(--v2-space-4);
-  padding: var(--v2-space-5);
+  padding: 20px;
   border: 1px solid var(--v2-border);
-  border-radius: var(--v2-region-radius);
-  background: var(--v2-surface-secondary);
+  border-radius: 8px;
+  background: var(--v2-surface);
   box-shadow: none;
 }
 
@@ -1407,8 +1410,8 @@ body:has(.app-shell--design-v2) {
 }
 
 .today-dashboard--design-v2 .today-workout-copy h2 {
-  font-size: clamp(2rem, 3.5vw, 3rem);
-  font-weight: 750;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  font-weight: 800;
   letter-spacing: -0.045em;
 }
 
@@ -1419,7 +1422,7 @@ body:has(.app-shell--design-v2) {
 }
 
 .today-dashboard--design-v2 .today-workout-actions {
-  width: min(100%, 280px);
+  width: 100%;
 }
 
 .today-dashboard--design-v2 .today-workout-actions--quick-start {
@@ -1484,19 +1487,11 @@ body:has(.app-shell--design-v2) {
 }
 
 .today-dashboard--design-v2 .today-summary-card--nutrition {
-  background:
-    linear-gradient(110deg, color-mix(in srgb, var(--v2-lime) 9%, transparent), transparent 54%),
-    var(--v2-surface-secondary);
+  background: var(--v2-surface-secondary);
 }
 
 .today-dashboard--design-v2 .today-summary-card--progress {
-  background:
-    linear-gradient(
-      110deg,
-      color-mix(in srgb, var(--v2-text-primary) 5%, transparent),
-      transparent
-    ),
-    var(--v2-surface-secondary);
+  background: var(--v2-surface-secondary);
 }
 
 .today-dashboard--design-v2 .today-summary-card__row {
@@ -1683,10 +1678,10 @@ body:has(.app-shell--design-v2) {
 /* Nutrition diary core */
 .nutrition-diary--design-v2 {
   gap: var(--v2-space-4);
-  padding: var(--v2-space-5);
-  border: 1px solid var(--v2-border);
-  border-radius: var(--v2-region-radius);
-  background: var(--v2-surface);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -1710,6 +1705,7 @@ body:has(.app-shell--design-v2) {
   font-weight: 750;
   letter-spacing: -0.055em;
   line-height: 0.95;
+  font-family: var(--font-display);
 }
 
 .nutrition-diary--design-v2 .nutrition-diary__intro p {
@@ -2226,16 +2222,16 @@ body:has(.app-shell--design-v2) {
 }
 
 .active-workout--design-v2 {
-  gap: var(--v2-space-4);
-  padding: var(--v2-space-5);
-  border: 1px solid var(--v2-border);
-  border-radius: var(--v2-region-radius);
-  background: var(--v2-surface);
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .active-workout--design-v2 .active-workout-hero {
-  gap: var(--v2-space-4);
-  padding: 0 0 var(--v2-space-4);
+  gap: 8px;
+  padding: 0 0 12px;
   border: 0;
   border-bottom: 1px solid var(--v2-border);
   border-radius: 0;
@@ -2259,7 +2255,8 @@ body:has(.app-shell--design-v2) {
 
 .active-workout--design-v2 .active-workout-sync {
   border-radius: 0;
-  background: var(--v2-surface-secondary);
+  background: transparent;
+  padding: 6px 0;
 }
 
 .active-workout--design-v2 .active-workout-sync__dot {
@@ -2271,11 +2268,11 @@ body:has(.app-shell--design-v2) {
 }
 
 .active-workout--design-v2 .active-workout-exercise {
-  gap: var(--v2-space-4);
-  padding: var(--v2-space-5);
-  border: 1px solid var(--v2-border);
-  border-radius: var(--v2-region-radius);
-  background: var(--v2-surface-secondary);
+  gap: 12px;
+  padding: 16px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .active-workout--design-v2 .active-workout-exercise:first-child {
@@ -2283,8 +2280,8 @@ body:has(.app-shell--design-v2) {
 }
 
 .active-workout--design-v2 .active-workout-exercise.is-current {
-  border-color: var(--v2-lime);
-  background: var(--v2-surface);
+  border-color: var(--v2-border);
+  background: transparent;
   box-shadow: none;
 }
 
@@ -2470,8 +2467,10 @@ body:has(.app-shell--design-v2) {
 }
 
 .active-workout--design-v2 .active-workout-set.is-current .active-workout-input input {
-  font-size: 1.75rem;
+  font-size: clamp(2rem, 7vw, 3rem);
   text-align: left;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .active-workout--design-v2 .active-workout-set__done {
@@ -2632,6 +2631,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   font-weight: 750;
   letter-spacing: -0.055em;
   line-height: 0.95;
+  font-family: var(--font-display);
 }
 
 .auth-public-shell--design-v2 .login-intro > p:not(.login-kicker) {
@@ -3094,14 +3094,18 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .today-dashboard--design-v2 .today-dashboard__header h1 {
-    font-size: clamp(0.76rem, 3.5vw, 0.86rem);
+    font-size: clamp(1.1rem, 2vw, 1.4rem);
+    color: var(--v2-text-primary);
+    letter-spacing: -0.025em;
+    font-family: var(--font-display);
   }
 
   .today-dashboard--design-v2 .today-workout-spotlight {
     min-height: 0;
     gap: var(--v2-space-3);
-    padding: 20px var(--v2-space-4) 14px;
-    border-radius: var(--v2-region-radius);
+    padding: 20px;
+    border-radius: 8px;
+    background: var(--v2-surface);
   }
 
   .today-dashboard--design-v2 .today-workout-spotlight__label {
@@ -3116,6 +3120,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .today-dashboard--design-v2 .today-workout-actions {
     gap: var(--v2-space-2);
+    width: 100%;
   }
 
   .today-dashboard--design-v2 .today-workout-actions--quick-start {
@@ -3123,7 +3128,8 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .today-dashboard--design-v2 .today-workout-copy h2 {
-    font-size: clamp(1.75rem, 8vw, 2rem);
+    font-size: clamp(1.8rem, 3vw, 2.5rem);
+    font-weight: 800;
   }
 
   .today-dashboard--design-v2 .today-dashboard__facts,
@@ -3150,7 +3156,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .nutrition-diary--design-v2 {
-    padding: var(--v2-space-4) var(--v2-space-3);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 
   .nutrition-diary--design-v2 .nutrition-diary__intro {
@@ -3161,6 +3170,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .nutrition-diary--design-v2 .nutrition-diary__intro h1 {
     font-size: clamp(2.55rem, 13vw, 3.25rem);
+    font-family: var(--font-display);
   }
 
   .nutrition-diary--design-v2 .nutrition-day-summary {
@@ -3181,8 +3191,11 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .active-workout--design-v2 {
-    gap: var(--v2-space-4);
-    padding: var(--v2-space-4) var(--v2-space-3);
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 
   .today-workout-focus__header {
@@ -3205,7 +3218,8 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .active-workout--design-v2 .active-workout-hero {
-    padding: 0 0 var(--v2-space-4);
+    padding: 0 0 12px;
+    gap: 8px;
   }
 
   .active-workout--design-v2 .active-workout-hero__top,
@@ -3294,7 +3308,11 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .active-workout--design-v2 .active-workout-exercise {
-    padding: var(--v2-space-4) var(--v2-space-3);
+    padding: 16px 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    gap: 12px;
   }
 
   .active-workout--design-v2 .active-workout-exercise__copy h3 {
@@ -3328,6 +3346,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .auth-public-shell--design-v2 .login-intro h1 {
     font-size: clamp(2.65rem, 13vw, 3.6rem);
+    font-family: var(--font-display);
   }
 
   .auth-public-shell--design-v2 .login-card {
@@ -4318,7 +4337,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   --accent-alt-line: var(--v2-border);
   --button-text: var(--v2-surface);
   --link-color: var(--v2-accent-text);
-  --focus-ring: var(--v2-lime);
+  --focus-ring: var(--v2-focus);
   --page-bg: var(--v2-canvas);
   --card-bg: var(--v2-surface);
   --surface: var(--v2-surface);
@@ -4366,7 +4385,7 @@ body:has(.standalone-page--design-v2) {
 .public-shell--design-v2 :where(button, a, input, select, textarea):focus-visible,
 .public-page--design-v2 :where(button, a, input, select, textarea):focus-visible,
 .standalone-page--design-v2 :where(button, a):focus-visible {
-  outline: 3px solid var(--v2-lime);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 3px;
 }
 
@@ -4396,6 +4415,7 @@ body:has(.standalone-page--design-v2) {
   font-size: clamp(2.25rem, 4vw, 3.8rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
+  font-family: var(--font-display);
 }
 
 .app-section--design-v2 .eyebrow,
@@ -4553,6 +4573,7 @@ body:has(.standalone-page--design-v2) {
 /* Profile and account: calm settings hierarchy with rare actions kept out of the main flow. */
 .app-section--profile .hero-card h1 {
   max-width: 12ch;
+  font-family: var(--font-display);
 }
 
 .profile-settings {
@@ -4646,7 +4667,7 @@ body:has(.standalone-page--design-v2) {
 
 .avatar-editor__close:focus-visible,
 .avatar-editor :where(button, input):focus-visible {
-  outline: 3px solid var(--v2-lime);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 3px;
 }
 
@@ -4971,7 +4992,7 @@ body:has(.standalone-page--design-v2) {
 
 .profile-settings-nav a:focus-visible,
 .app-section--profile summary:focus-visible {
-  outline: 3px solid var(--v2-lime);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 3px;
 }
 
@@ -5897,7 +5918,7 @@ button.notification-row__main:hover {
 }
 
 button.notification-row__main:focus-visible {
-  outline: 3px solid var(--v2-lime);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 3px;
 }
 
@@ -6242,6 +6263,7 @@ button.notification-row__main:focus-visible {
   font-size: clamp(2.65rem, 5vw, 4.4rem);
   line-height: 0.96;
   letter-spacing: -0.05em;
+  font-family: var(--font-display);
 }
 
 .app-section--progress .progress-summary {
@@ -7368,8 +7390,8 @@ button.notification-row__main:focus-visible {
 
 .app-section--programs :where(.program-day, .program-exercise-row) {
   border-color: var(--v2-border);
-  border-radius: var(--v2-region-radius);
-  background: var(--v2-surface-secondary);
+  border-radius: 8px;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -7630,6 +7652,7 @@ button.notification-row__main:focus-visible {
   font-size: clamp(2.2rem, 5vw, 3.8rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
+  font-family: var(--font-display);
 }
 
 .onboarding-page--design-v2 .onboarding-goal,
@@ -8317,6 +8340,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .app-section--design-v2 .hero-card h1,
   .app-section--progress .progress-hero h1 {
     font-size: clamp(2.2rem, 12vw, 3.1rem);
+    font-family: var(--font-display);
   }
 
   .app-section--design-v2 .metric-grid {
@@ -8411,6 +8435,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 
   .onboarding-page--design-v2 .onboarding-intro h1 {
     font-size: clamp(2.1rem, 12vw, 3rem);
+    font-family: var(--font-display);
   }
 
   .public-page--design-v2 .public-hero,
@@ -8589,7 +8614,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 }
 
 .coach-workspace--design-v2 :where(button, a, input, select, summary):focus-visible {
-  outline: 3px solid var(--v2-lime);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 3px;
 }
 
@@ -8635,6 +8660,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   font-weight: 750;
   letter-spacing: -0.055em;
   line-height: 0.95;
+  font-family: var(--font-display);
 }
 
 .coach-workspace-header p {
@@ -9421,6 +9447,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .coach-workspace-header h1 {
     font-size: clamp(2.1rem, 10vw, 2.75rem);
     line-height: 0.98;
+    font-family: var(--font-display);
   }
 
   .coach-workspace-header p {
