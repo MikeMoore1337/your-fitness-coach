@@ -437,6 +437,7 @@ def test_old_non_hermes_snapshot_does_not_reject_new_hermes_revision() -> None:
 
         assert claim_due_publications(db) == []
 
+        db.flush()
         db.expire(snapshot)
         assert snapshot.status == "cancelled"
         assert snapshot.last_error_code == "non_hermes_news_pipeline_retired"
