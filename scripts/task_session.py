@@ -2990,14 +2990,14 @@ class TaskController:
         task_id: str,
         *,
         head_sha: str,
-        review_verdict: str,
-        qa_verdict: str,
+        quality_verdict: str,
+        qa_verdict: str = "NOT_REQUIRED",
     ) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
-        if review_verdict not in {"APPROVED", "APPROVED_WITH_NON_BLOCKING_FINDINGS"}:
-            raise TaskSessionError("mark-ready requires an approved independent review verdict")
-        if qa_verdict != "PASS":
-            raise TaskSessionError("mark-ready requires QA verdict PASS")
+        if quality_verdict != "PASS":
+            raise TaskSessionError("mark-ready requires deterministic quality checks PASS")
+        if qa_verdict not in {"PASS", "NOT_REQUIRED"}:
+            raise TaskSessionError("mark-ready QA verdict must be PASS or NOT_REQUIRED")
         lease_path = self.store.task_lease_path(expected)
         lease = self.store.read_json(lease_path)
         if lease is None or lease.get("mode") != "write":
@@ -3075,7 +3075,7 @@ class TaskController:
                     "ready_base_origin_master_sha": base_sha,
                     "ready_for_delivery_at": now,
                     "ready_sequence": sequence,
-                    "review_verdict": review_verdict,
+                    "quality_verdict": quality_verdict,
                     "qa_verdict": qa_verdict,
                     "clean_worktree": True,
                     "task_provenance": {
@@ -3463,7 +3463,7 @@ class TaskController:
                 "ready_base_origin_master_sha",
                 "ready_for_delivery_at",
                 "ready_sequence",
-                "review_verdict",
+                "quality_verdict",
                 "qa_verdict",
                 "task_provenance",
                 "canonical_master_refresh",
@@ -3599,7 +3599,7 @@ class TaskController:
                 "ready_base_origin_master_sha",
                 "ready_for_delivery_at",
                 "ready_sequence",
-                "review_verdict",
+                "quality_verdict",
                 "qa_verdict",
                 "task_provenance",
                 "canonical_master_refresh",
@@ -3650,16 +3650,6 @@ class TaskController:
         self._verify_live_master(deployed_sha)
         pull_request = self._github().pull_request(pr_number)
         commits = self._github().pull_request_commits(pr_number)
-        review_contract = validate_pull_request_review_contract(
-            pull_request,
-            self._github().pull_request_reviews(pr_number),
-            self._github().issue_comments(pr_number),
-            self._github().review_threads(pr_number),
-            expected_head_sha=str(pull_request.get("head", {}).get("sha", "")),
-            known_commit_shas=_commit_shas(commits),
-            require_open=False,
-            require_mergeable=False,
-        )
         checks = self._github().check_runs(str(pull_request["head"]["sha"]))
         files = self._github().pull_request_files(pr_number)
         worktree = Path(str(lease.get("worktree", ""))).resolve()
@@ -3697,7 +3687,6 @@ class TaskController:
             "merge_sha": merge_sha,
             "deployed_sha": deployed_sha,
             "pr_number": pr_number,
-            "review_contract": review_contract,
             "completed_at": utc_now(),
         }
         with self.store.lock():
@@ -3734,7 +3723,6 @@ class TaskController:
             current["lifecycle_state"] = "production-success"
             current["merge_sha"] = merge_sha
             current["deployed_sha"] = deployed_sha
-            current["review_contract"] = review_contract
             current["updated_at"] = now
             StateStore.replace_json(lease_path, current)
             history["closeout_required"] = True
@@ -4027,11 +4015,11 @@ def _parser() -> argparse.ArgumentParser:
     ready.add_argument("task_id")
     ready.add_argument("--head-sha", required=True)
     ready.add_argument(
-        "--review-verdict",
-        choices=("APPROVED", "APPROVED_WITH_NON_BLOCKING_FINDINGS"),
+        "--quality-verdict",
+        choices=("PASS",),
         required=True,
     )
-    ready.add_argument("--qa-verdict", choices=("PASS",), required=True)
+    ready.add_argument("--qa-verdict", choices=("PASS", "NOT_REQUIRED"), default="NOT_REQUIRED")
     acquire_delivery = subparsers.add_parser("acquire-delivery")
     acquire_delivery.add_argument("task_id")
     acquire_delivery.add_argument("--offline", action="store_true")
@@ -4067,11 +4055,6 @@ def _parser() -> argparse.ArgumentParser:
     finish.add_argument("task_id")
     validate_pr = subparsers.add_parser("validate-pr")
     validate_pr.add_argument("--event", type=Path, required=True)
-    validate_pr_review = subparsers.add_parser("validate-pr-review")
-    review_source = validate_pr_review.add_mutually_exclusive_group(required=True)
-    review_source.add_argument("--event", type=Path)
-    review_source.add_argument("--pr", type=int)
-    validate_pr_review.add_argument("--head-sha")
     merge = subparsers.add_parser("verify-master-merge")
     merge.add_argument("--sha", required=True)
     return parser
@@ -4131,7 +4114,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 controller.mark_ready(
                     args.task_id,
                     head_sha=args.head_sha,
-                    review_verdict=args.review_verdict,
+                    quality_verdict=args.quality_verdict,
                     qa_verdict=args.qa_verdict,
                 )
             )
@@ -4189,26 +4172,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "validate-pr":
             _print(validate_pr_event(repository, github, args.event))
-            return 0
-        if args.command == "validate-pr-review":
-            if github is None:
-                raise TaskSessionError("validate-pr-review requires online GitHub access")
-            if args.event is not None:
-                _print(
-                    validate_pr_review_event(github, args.event, expected_head_sha=args.head_sha)
-                )
-            else:
-                pull_request = _pull_request_with_resolved_mergeability(github, args.pr)
-                commits = github.pull_request_commits(args.pr)
-                evidence = validate_pull_request_review_contract(
-                    pull_request,
-                    github.pull_request_reviews(args.pr),
-                    github.issue_comments(args.pr),
-                    github.review_threads(args.pr),
-                    expected_head_sha=args.head_sha,
-                    known_commit_shas=_commit_shas(commits),
-                )
-                _print({"kind": "pull-request-review", "pr_number": args.pr, **evidence})
             return 0
         if args.command == "verify-master-merge":
             _print(verify_master_merge(repository, github, sha=args.sha))

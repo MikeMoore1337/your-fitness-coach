@@ -894,9 +894,7 @@ def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
     controller = task_session.TaskController(git_repository)
     existing = controller.start("226A", owner_launch=True, session_label="existing", offline=True)
     existing_head = _commit_task(Path(existing["lease"]["worktree"]), "226A")
-    controller.mark_ready(
-        "226A", head_sha=existing_head, review_verdict="APPROVED", qa_verdict="PASS"
-    )
+    controller.mark_ready("226A", head_sha=existing_head, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("226A", offline=True)
 
     candidate = controller.start("226B", owner_launch=True, session_label="candidate", offline=True)
@@ -1076,7 +1074,7 @@ def test_active_production_deploy_blocks_only_delivery_acquisition(
     second = controller.start("231", owner_launch=True, session_label="deploy-b")
     second_lease = second["lease"]
     second_head = _commit_task(Path(second_lease["worktree"]), "231")
-    controller.mark_ready("231", head_sha=second_head, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("231", head_sha=second_head, quality_verdict="PASS", qa_verdict="PASS")
 
     waiting = controller.acquire_delivery("231")
 
@@ -1108,9 +1106,7 @@ def test_delivery_lane_is_serial_and_handoff_is_deterministic(
     }
     for task_id in ("232", "233"):
         head_sha = _commit_task(Path(started[task_id]["lease"]["worktree"]), task_id)
-        controller.mark_ready(
-            task_id, head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS"
-        )
+        controller.mark_ready(task_id, head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     first = controller.acquire_delivery("232", offline=True)
     second = controller.acquire_delivery("233", offline=True)
@@ -1148,9 +1144,7 @@ def test_release_delivery_does_not_handoff_during_active_production(
     }
     for task_id in ("233A", "233B"):
         head_sha = _commit_task(Path(started[task_id]["lease"]["worktree"]), task_id)
-        controller.mark_ready(
-            task_id, head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS"
-        )
+        controller.mark_ready(task_id, head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     acquired = controller.acquire_delivery("233A", offline=True)
     assert acquired["acquired"] is True
 
@@ -1177,7 +1171,7 @@ def test_reopen_for_review_clears_delivery_snapshot_and_requires_new_readiness(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "234A", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("234A", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("234A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("234A", offline=True)
     refreshed = controller.refresh_for_delivery("234A", offline=True)
     _write_gate_evidence(
@@ -1199,7 +1193,7 @@ def test_reopen_for_review_clears_delivery_snapshot_and_requires_new_readiness(
 
     new_head = _commit_task(worktree, "234A", filename="review-fix.txt")
     ready = controller.mark_ready(
-        "234A", head_sha=new_head, review_verdict="APPROVED", qa_verdict="PASS"
+        "234A", head_sha=new_head, quality_verdict="PASS", qa_verdict="PASS"
     )
     assert ready["lifecycle_state"] == "ready-for-delivery"
     assert ready["ready_head_sha"] == new_head
@@ -1267,7 +1261,7 @@ def test_busy_delivery_lane_does_not_block_compatible_implementation(
     first = controller.start("240", owner_launch=True, session_label="busy-a", offline=True)
     first_worktree = Path(first["lease"]["worktree"])
     first_head = _commit_task(first_worktree, "240")
-    controller.mark_ready("240", head_sha=first_head, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("240", head_sha=first_head, quality_verdict="PASS", qa_verdict="PASS")
     acquired = controller.acquire_delivery("240", offline=True)
 
     second = controller.start("241", owner_launch=True, session_label="busy-b", offline=True)
@@ -1286,7 +1280,7 @@ def test_refresh_updates_stale_task_base_and_invalidates_old_exact_head_evidence
     )
     old_base, old_head = sha_pair.split(":")
     _write_gate_evidence(controller, "234", branch=branch, head_sha=old_head, base_sha=old_base)
-    controller.mark_ready("234", head_sha=old_head, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("234", head_sha=old_head, quality_verdict="PASS", qa_verdict="PASS")
 
     (root / "master-refresh.txt").write_text("M1\n", encoding="utf-8")
     _git(root, "add", "master-refresh.txt")
@@ -1327,7 +1321,7 @@ def test_refresh_delivery_waits_for_active_production_before_touching_task_branc
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "244", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("244", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("244", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("244", offline=True)
     github = controller.github
     assert isinstance(github, FakeGitHub)
@@ -1352,7 +1346,7 @@ def test_refresh_requires_new_evidence_when_head_and_base_are_unchanged(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "243", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("243", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("243", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     controller.acquire_delivery("243", offline=True)
     refreshed = controller.refresh_for_delivery("243", offline=True)
@@ -1382,7 +1376,7 @@ def test_refresh_refuses_post_ready_commit_until_review_and_qa_repeat(
         repository, "243A", concurrency="independent-write"
     )
     base_sha, head_sha = sha_pair.split(":")
-    controller.mark_ready("243A", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("243A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("243A", offline=True)
     _commit_task(worktree, "243A", filename="post-ready-change.txt")
 
@@ -1791,7 +1785,7 @@ def test_canonical_refresh_waits_for_delivery_owner_without_mutation(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "245", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("245", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("245", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     assert controller.acquire_delivery("245", offline=True)["acquired"] is True
     before_master = git_repository.ref("master")
 
@@ -1913,14 +1907,14 @@ def test_mark_ready_persists_ready_state_without_old_base_pre_push_pass(
         terminal_result="PLAN_ONLY",
     )
     ready = controller.mark_ready(
-        "202", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS"
+        "202", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS"
     )
     assert ready["lifecycle_state"] == "ready-for-delivery"
     assert ready["local_evidence"]["status"] == "pending-final-delivery-gate"
 
     _write_gate_evidence(controller, "202", branch=branch, head_sha=head_sha, base_sha=base_sha)
     ready = controller.mark_ready(
-        "202", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS"
+        "202", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS"
     )
     assert ready["lifecycle_state"] == "ready-for-delivery"
     assert ready["pre_push_ci_pass"]["head_sha"] == head_sha
@@ -1934,7 +1928,7 @@ def test_record_production_success_requires_exact_merged_master_deployment(
     root, _, controller, _, branch, sha_pair = _prepare_started(repository, "203")
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "203", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("203", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("203", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     _prepare_delivery(controller, "203", branch=branch)
 
@@ -1970,7 +1964,7 @@ def test_record_production_success_rejects_sha_mismatch_without_mutation(
     _write_gate_evidence(
         controller, "204", branch=lease["branch"], head_sha=head_sha, base_sha=base_sha
     )
-    controller.mark_ready("204", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("204", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "204", branch=lease["branch"])
     with pytest.raises(task_session.TaskSessionError, match="equal the exact merged master SHA"):
         controller.record_production_success(
@@ -1987,7 +1981,7 @@ def test_record_production_success_rejects_gate_invalidated_during_finalization(
     root, _, controller, _, branch, sha_pair = _prepare_started(repository, "204A")
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "204A", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("204A", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("204A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "204A", branch=branch)
 
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 204A")
@@ -2098,7 +2092,7 @@ def test_finish_preserves_active_delivery_artifacts_until_worker_cleanup(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "207", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("207", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("207", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "207", branch=branch)
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 207")
     merge_sha = _git(root, "rev-parse", "HEAD")
@@ -2152,14 +2146,14 @@ def test_finish_cleans_only_delivered_task_and_preserves_next_delivery_task(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "209", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("209", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("209", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     _write_task(root, "210", "queue-b", concurrency="independent-write")
     second = controller.start("210", owner_launch=True, session_label="queue-b", offline=True)
     second_worktree = Path(second["lease"]["worktree"])
     second_branch = str(second["lease"]["branch"])
     second_head = _commit_task(second_worktree, "210")
-    controller.mark_ready("210", head_sha=second_head, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("210", head_sha=second_head, quality_verdict="PASS", qa_verdict="PASS")
 
     _prepare_delivery(controller, "209", branch=branch)
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 209")
@@ -2195,7 +2189,7 @@ def test_finish_refuses_dirty_worktree_and_preserves_state(repository: tuple[Pat
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "208", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("208", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("208", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "208", branch=branch)
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 208")
     merge_sha = _git(root, "rev-parse", "HEAD")

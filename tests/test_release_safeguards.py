@@ -26,8 +26,8 @@ def test_ci_runs_full_regression_on_task_pr_and_only_provenance_on_master_push()
     assert "branches: [dev" not in ci
     assert "if: github.event_name == 'pull_request'" in ci
     assert "task-provenance:" in ci
-    assert "review-contract:" in ci
-    assert "pull_request_review:" in ci
+    assert "review-contract:" not in ci
+    assert "pull_request_review:" not in ci
     assert "merge-provenance:" in ci
     assert "Validate task provenance or trusted Dependabot identity" in ci
     assert "TASK_PROVENANCE_RESULT: ${{ needs.task-provenance.result }}" in ci
@@ -133,7 +133,7 @@ def test_deploy_bounds_transient_production_ssh_failures() -> None:
     assert 'sleep "$delay"' in deploy
 
 
-def test_delivery_contract_is_master_only_and_approval_gated() -> None:
+def test_delivery_contract_is_master_only_and_deterministic_gate_driven() -> None:
     sources = _sources()
     controller = sources["controller"]
     launcher = sources["launcher"]
@@ -147,8 +147,8 @@ def test_delivery_contract_is_master_only_and_approval_gated() -> None:
     assert "refresh_for_delivery" in controller
     assert "resolve-recovery" in controller
     assert "owner_authorize" in controller
-    assert "validate_pull_request_review_contract" in controller
-    assert "validate-pr-review" in launcher
+    assert "review_contract = validate_pull_request_review_contract" not in controller
+    assert "validate-pr-review" not in launcher
     assert "--continue-queue" in launcher
     assert "enqueue_integration" not in controller
     assert "release_freeze" not in controller

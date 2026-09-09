@@ -352,6 +352,70 @@ def test_posix_worker_bootstrap_persists_worker_group_identity(
     assert state["process_instance"] == _claim_process_instance()
 
 
+def test_posix_worker_bootstrap_publishes_identity_before_unblocking_parent_loss(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.sys, "platform", "linux")
+    process = _FakeSupervisedWorker(exit_after_polls=0)
+    events: list[str] = []
+
+    def fake_pthread_sigmask(how: int, mask: set[int]) -> set[int]:
+        del mask
+        events.append("block" if how == delivery.signal.SIG_BLOCK else "unblock")
+        return set()
+
+    monkeypatch.setattr(delivery.signal, "pthread_sigmask", fake_pthread_sigmask, raising=False)
+    monkeypatch.setattr(delivery.signal, "SIG_BLOCK", 0, raising=False)
+    monkeypatch.setattr(delivery.signal, "SIG_SETMASK", 1, raising=False)
+    monkeypatch.setattr(
+        delivery,
+        "_linux_set_parent_death_signal",
+        lambda parent_pid, death_signal: events.append("pdeath") or True,
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_posix_worker_group_is_alive",
+        lambda process_group_id: events.append("group-check") or False,
+    )
+    monkeypatch.setattr(
+        delivery.os,
+        "getpgid",
+        lambda pid: events.append("getpgid") or 1700,
+        raising=False,
+    )
+
+    def parent_probe(parent_pid: int) -> bool:
+        del parent_pid
+        events.append("parent-probe")
+        return True
+
+    def fake_popen(command: list[str], **kwargs: Any) -> _FakeSupervisedWorker:
+        del command, kwargs
+        events.append("popen")
+        return process
+
+    result = delivery._run_worker_bootstrap(
+        ["codex", "exec"],
+        parent_pid=42,
+        worker_state_path=None,
+        popen=fake_popen,
+        parent_probe=parent_probe,
+        sleeper=lambda seconds: pytest.fail("already exited worker must not sleep"),
+    )
+
+    assert result == 0
+    assert events == [
+        "block",
+        "pdeath",
+        "parent-probe",
+        "popen",
+        "getpgid",
+        "unblock",
+        "group-check",
+    ]
+
+
 def test_linux_worker_parent_death_binding_fails_closed_on_parent_race(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -458,7 +522,11 @@ def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
     assert "final applicable gate" in prompt
     assert "reopen-for-review" in prompt
     assert "Не запускай следующую product task" in prompt
-    assert "validate-pr-review --pr <N> --head-sha <SHA>" in prompt
+    assert "Отдельный LLM code review не является gate" in prompt
+    assert "usage-reset" in prompt
+    assert "exact-head CI GREEN" in prompt
+    assert "aggregate checks GREEN" in prompt
+    assert "validate-pr-review --pr <N> --head-sha <SHA>" not in prompt
     assert "3 review-fix cycles" in prompt
     assert "3 CI-fix cycles" in prompt
 

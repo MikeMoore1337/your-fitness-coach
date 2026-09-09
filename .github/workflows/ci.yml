@@ -3,8 +3,6 @@ name: CI
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize]
-  pull_request_review:
-    types: [submitted, edited, dismissed]
   push:
     branches: [master]
   schedule:
@@ -23,7 +21,6 @@ on:
 
 permissions:
   contents: read
-  issues: read
   pull-requests: read
 
 concurrency:
@@ -90,7 +87,7 @@ jobs:
           if [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ]; then
             test "$TARGET_REF" = refs/heads/master
           fi
-          if [ "$EVENT_NAME" = pull_request ] || [ "$EVENT_NAME" = pull_request_review ]; then
+          if [ "$EVENT_NAME" = pull_request ]; then
             python scripts/ci_contract.py route \
               --event pull_request \
               --base-sha "$BASE_SHA" \
@@ -115,7 +112,7 @@ jobs:
   task-provenance:
     name: Task provenance
     needs: scope-router
-    if: github.event_name == 'pull_request' && needs.scope-router.result == 'success' || github.event_name == 'pull_request_review' && needs.scope-router.result == 'success'
+    if: github.event_name == 'pull_request' && needs.scope-router.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -129,24 +126,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python scripts/task_session.py validate-pr --event "$GITHUB_EVENT_PATH"
-
-  review-contract:
-    name: Review before merge
-    needs: [scope-router, task-provenance]
-    if: github.event_name == 'pull_request' && needs.scope-router.result == 'success' && needs.task-provenance.result == 'success' || github.event_name == 'pull_request_review' && needs.scope-router.result == 'success' && needs.task-provenance.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - name: Require exact-head completed review
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/task_session.py validate-pr-review --event "$GITHUB_EVENT_PATH"
 
   merge-provenance:
     name: Merged master provenance
@@ -1022,10 +1001,10 @@ jobs:
         run: python scripts/allure_report.py finalize --metadata "$REPORT_METADATA" --publication "$PUBLICATION_METADATA"
 
   checks:
-    name: ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && 'checks' || 'branch-checks' }}
+    name: ${{ github.event_name == 'pull_request' && 'checks' || 'branch-checks' }}
     if: always()
     needs:
-      [scope-router, task-provenance, review-contract, merge-provenance, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts, scheduled-report]
+      [scope-router, task-provenance, merge-provenance, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts, scheduled-report]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -1042,7 +1021,6 @@ jobs:
           SKIPPED_GROUPS: ${{ needs.scope-router.outputs.skipped_groups }}
           SCOPE_ROUTER_RESULT: ${{ needs.scope-router.result }}
           TASK_PROVENANCE_RESULT: ${{ needs.task-provenance.result }}
-          REVIEW_CONTRACT_RESULT: ${{ needs.review-contract.result }}
           MERGE_PROVENANCE_RESULT: ${{ needs.merge-provenance.result }}
           QUALITY_RESULT: ${{ needs.quality.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
@@ -1072,7 +1050,6 @@ jobs:
           result_names = (
               "scope-router",
               "task-provenance",
-              "review-contract",
               "merge-provenance",
               "quality",
               "policy",

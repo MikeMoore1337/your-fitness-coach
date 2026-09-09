@@ -91,6 +91,7 @@ QUEUE_CLAIM_IDLE_PHASE = "idle"
 QUEUE_CLAIM_TASK_PHASE = "task_running"
 QUEUE_CLAIM_IDLE_WORKER_STATE = "idle"
 QUEUE_CLAIM_RUNNING_WORKER_STATE = "running"
+_HOST_OS_NAME = os.name
 
 
 class DeliveryError(RuntimeError):
@@ -1344,7 +1345,8 @@ def _worker_prompt(
         "Обычная executable task без поля concurrency в metadata считается independent-write; "
         "exclusive-write указывай только для реально global/coordination-sensitive изменений.\n"
         "Implementation независимых compatible independent-write tasks может идти параллельно в "
-        "отдельных worktree. После review/QA и commit переведи текущую task в READY_FOR_DELIVERY; "
+        "отдельных worktree. После targeted verification, self-review, применимой QA и commit "
+        "переведи текущую task в READY_FOR_DELIVERY; "
         "если delivery lane занята, используй acquire-delivery и WAITING_FOR_DELIVERY. Это ожидание "
         "не terminal blocker и не должно останавливать implementation или commit. READY_FOR_DELIVERY, "
         "WAITING_FOR_DELIVERY, active CI и production deployment не удерживают implementation exclusion; "
@@ -1353,19 +1355,16 @@ def _worker_prompt(
         "refresh-delivery: fetch latest origin/master, безопасно обнови branch, считай старое "
         "PRE_PUSH_CI_PASS недействительным и выполни validate-delivery с final applicable gate на "
         "новом exact HEAD перед PR/CI/merge. После rebase/conflict resolution выполни только "
-        "targeted recheck изменённой поверхности; полный independent review повторяй только при "
+        "targeted recheck изменённой поверхности без отдельного LLM reviewer при "
         "существенном изменении поведения. Merge master и production deploy строго serial.\n"
-        "Не делай commit поверх READY_FOR_DELIVERY: если после readiness нужен review-fix, сначала "
-        "освободи delivery ownership через reopen-for-review, затем повтори review/QA и mark-ready.\n"
-        "До merge обязательно выполни exact-head review gate: "
-        "scripts/task_session.py validate-pr-review --pr <N> --head-sha <SHA>. "
-        "Текущий head должен иметь завершённый GitHub APPROVED или trusted Codex review marker, "
-        "не должно быть unresolved review threads, blocking findings, dirty/non-mergeable PR или "
-        "устаревшей base/head provenance. После изменения head review и CI оцениваются заново; "
-        "старое approval не считается. Для continuous queue максимум 3 review-fix cycles и 3 "
-        "CI-fix cycles на task, scope expansion не допускается; превышение означает HUMAN_REQUIRED.\n"
-        "После trusted Codex review comment при необходимости безопасно rerun failed/current PR CI "
-        "через GitHub, но не подменяй exact-head checks.\n"
+        "Не делай commit поверх READY_FOR_DELIVERY: если после readiness нужен post-readiness fix, "
+        "сначала освободи delivery ownership через reopen-for-review, затем повтори targeted "
+        "checks/применимую QA и mark-ready.\n"
+        "Отдельный LLM code review не является gate: не запускай reviewer, не жди review и не "
+        "расходуй usage-reset ради review. Merge требует exact-head CI GREEN, aggregate checks "
+        "GREEN, mergeable PR, актуальную base/head provenance и разрешение реально применимых "
+        "blocking findings. Для continuous queue максимум 3 review-fix cycles и 3 CI-fix cycles "
+        "на task, scope expansion не допускается; превышение означает HUMAN_REQUIRED.\n"
         "Не запускай следующую product task.\n\n"
         + issue_context
         + f"Controller context:\n{started.get('prompt', '')}"
@@ -1627,6 +1626,42 @@ def _worker_parent_is_alive(parent_pid: int) -> bool:
     return os.getppid() == parent_pid
 
 
+@contextmanager
+def _block_worker_parent_loss_signal() -> Iterator[None]:
+    """Keep parent-loss delivery pending until the worker identity is durable."""
+
+    if os.name == "nt":
+        yield
+        return
+    pthread_sigmask = getattr(signal, "pthread_sigmask", None)
+    sig_block = getattr(signal, "SIG_BLOCK", None)
+    sig_setmask = getattr(signal, "SIG_SETMASK", None)
+    if pthread_sigmask is None or sig_block is None or sig_setmask is None:
+        # Tests may emulate POSIX by changing ``os.name`` inside a Windows Python process.
+        # That host has no pthread signal API; real POSIX runtimes fail closed instead.
+        if _HOST_OS_NAME == "nt":
+            yield
+            return
+        raise DeliveryError(
+            "HUMAN_REQUIRED: POSIX worker cannot protect its bootstrap critical section"
+        )
+    try:
+        previous_mask = pthread_sigmask(sig_block, {signal.SIGTERM})
+    except (OSError, ValueError) as error:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: POSIX worker cannot block its parent-loss signal"
+        ) from error
+    try:
+        yield
+    finally:
+        try:
+            pthread_sigmask(sig_setmask, previous_mask)
+        except (OSError, ValueError) as error:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: POSIX worker cannot restore its parent-loss signal mask"
+            ) from error
+
+
 def _wait_for_windows_worker_release() -> None:
     try:
         release = sys.stdin.buffer.read(1)
@@ -1681,12 +1716,6 @@ def _run_worker_bootstrap(
             signal.signal(signal.SIGTERM, terminate_from_parent_loss)
         except OSError, ValueError:
             os._exit(WORKER_PARENT_LOST_EXIT_CODE)
-        if sys.platform == "linux" and not _linux_set_parent_death_signal(
-            parent_pid, signal.SIGTERM
-        ):
-            terminate_from_parent_loss()
-    if not parent_probe(parent_pid):
-        return WORKER_PARENT_LOST_EXIT_CODE
 
     launch_kwargs: dict[str, Any] = {
         "shell": False,
@@ -1696,16 +1725,25 @@ def _run_worker_bootstrap(
     if os.name != "nt":
         launch_kwargs["start_new_session"] = True
     try:
-        worker_process = popen(list(command), **launch_kwargs)
-        if os.name != "nt":
-            try:
-                process_group_id = os.getpgid(worker_process.pid)
-            except ProcessLookupError:
-                # start_new_session=True makes the worker PID its process-group ID;
-                # retain that identity when the leader exits before getpgid runs.
-                process_group_id = worker_process.pid
-        if worker_state_path is not None:
-            _write_worker_state(worker_state_path, worker_process, process_group_id)
+        with _block_worker_parent_loss_signal():
+            if (
+                sys.platform == "linux"
+                and os.name != "nt"
+                and not _linux_set_parent_death_signal(parent_pid, signal.SIGTERM)
+            ):
+                terminate_from_parent_loss()
+            if not parent_probe(parent_pid):
+                return WORKER_PARENT_LOST_EXIT_CODE
+            worker_process = popen(list(command), **launch_kwargs)
+            if os.name != "nt":
+                try:
+                    process_group_id = os.getpgid(worker_process.pid)
+                except ProcessLookupError:
+                    # start_new_session=True makes the worker PID its process-group ID;
+                    # retain that identity when the leader exits before getpgid runs.
+                    process_group_id = worker_process.pid
+            if worker_state_path is not None:
+                _write_worker_state(worker_state_path, worker_process, process_group_id)
     except OSError as error:
         if process_group_id is not None:
             _kill_posix_worker_group(process_group_id)

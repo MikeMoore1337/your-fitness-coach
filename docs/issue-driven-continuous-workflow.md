@@ -10,7 +10,7 @@ controller state.
 
 ```text
 Owner -> ChatGPT -> GitHub Issue -> Codex -> task worktree -> PR
-      -> exact-head review/CI -> merge -> production -> cleanup/archive
+      -> exact-head CI -> merge -> production -> cleanup/archive
 ```
 
 Один owner launch покрывает обычные commit, push, PR, CI, merge, normal deploy и closeout. Для
@@ -22,18 +22,13 @@ PR`; implementation остаётся в task worktree, а refresh, merge, deploy
 
 - current base/head и task provenance;
 - `checks` на exact PR head;
-- завершённый formal GitHub approval или trusted Codex review comment с exact-head marker;
-- отсутствие unresolved review threads и актуальных blocking findings;
+- отсутствие актуальных `BLOCKER`/`HIGH`/`P1`/`P2` findings из применимой проверки;
 - clean/mergeable PR.
 
-На самом `pull_request_review` event GitHub может временно вернуть `mergeable_state=blocked` или
-`unstable`, поскольку aggregate `checks` ещё ждёт результат самого `review-contract`.
-Event-проверка разрешает эти состояния только вместе с exact-head завершённым review; прямой
-`validate-pr-review` перед merge остаётся строгим и принимает только clean/has_hooks.
-
-Проверка выполняется командой `scripts/task_session.py validate-pr-review`. Review старого head
-не переносится на новый commit. Mapping severity не меняет blocking semantics: `P0 -> BLOCKER`,
-`P1 -> HIGH`, `P2 -> MEDIUM`, `P3 -> LOW`, `NIT -> LOW`.
+Отдельный Codex Code Review постоянно отключён и не является release gate. Отсутствие LLM review,
+лимит review API или connector review не останавливают delivery. Release gate состоит из exact-head
+`checks`, deterministic quality/policy checks, mergeability, актуальной provenance и нулевого
+числа применимых blocking findings.
 
 ## Непрерывная очередь
 
@@ -107,6 +102,6 @@ terminal production verdict и bounded cleanup предыдущей задачи
 ambiguous worktree даёт `cleanup_deferred`; controller не использует `reset --hard`, force delete
 или удаление чужой ветки.
 
-Состояние очереди восстанавливается из GitHub Issue/PR, exact SHA, review threads, workflow runs,
-production evidence и local controller coordination state. Новая БД, daemon, permanent `dev`,
+Состояние очереди восстанавливается из GitHub Issue/PR, exact SHA, workflow runs, production
+evidence и local controller coordination state. Новая БД, daemon, permanent `dev`,
 paid dependency или отдельный orchestrator для этого режима не создаются.

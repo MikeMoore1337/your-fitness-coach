@@ -7,7 +7,7 @@
 Нормальный flow разделён на независимую implementation lane и одну serial delivery lane:
 
 ```text
-Task A/B/C: implementation -> targeted checks -> review -> QA -> commit
+Task A/B/C: implementation -> targeted checks -> self-review -> QA -> commit
             -> READY_FOR_DELIVERY -> WAITING_FOR_DELIVERY (если slot занят)
 
 одна delivery lane:
@@ -83,7 +83,7 @@ Frontend jobs используют стандартный download cache `action
 команды, cache signal — как `CI_CACHE`.
 
 `scripts/task_session.py mark-ready` фиксирует durable `READY_FOR_DELIVERY`: clean task worktree,
-commit provenance, approved review/QA, исходный base SHA, текущий task HEAD и локальное evidence
+commit provenance, deterministic quality/QA, исходный base SHA, текущий task HEAD и локальное evidence
 состояние. Полный `PRE_PUSH_CI_PASS` не требуется на старом base. Перед PR команда
 `refresh-delivery` fetch/rebase-ит branch относительно latest `origin/master`, обновляет lease base
 и инвалидирует старое evidence; `validate-delivery` принимает только новый exact HEAD и новый
@@ -93,16 +93,11 @@ evidence. Если HEAD изменился после `READY_FOR_DELIVERY`, `ref
 `reopen-for-review --reason <...>`, который освобождает delivery lane и удаляет старый readiness
 snapshot.
 
-PR CI дополнительно выполняет `review-contract`. Merge-ready возможен только после formal GitHub
-approval на exact current head или trusted завершённого Codex review comment с exact-head marker,
-при отсутствии unresolved review threads, blocking current-head findings и dirty/non-mergeable PR.
-После нового commit старое review не считается; `pull_request_review` запускает повторную
-проверку. Во время этого event GitHub может вернуть `mergeable_state=blocked`, пока aggregate
-`checks` ожидает сам `review-contract`; event gate допускает только это временное состояние при
-наличии exact-head review, а прямой pre-merge `validate-pr-review` требует clean/has_hooks. Для
-текущего Codex connector, который публикует review summary как Issue comment,
-worker должен вызвать `scripts/task_session.py validate-pr-review` и дождаться нового exact-head
-CI перед merge.
+PR CI не выполняет отдельный LLM review job и не запускается на `pull_request_review` event.
+Merge-ready определяется exact-head `checks`, deterministic quality/policy checks, актуальной
+provenance, mergeability и отсутствием применимых blocking findings. Отсутствие Codex review,
+лимит review API и connector review не являются blocker; отдельного `validate-pr-review` перед
+merge нет.
 
 ## Leases и безопасный closeout
 
@@ -172,7 +167,7 @@ python scripts/task_session.py adopt-current 135 --owner-launch --session-label 
 python scripts/task_session.py status
 python scripts/task_session.py recover 135
 python scripts/task_session.py resolve-recovery 135 --owner-authorize --reason "resume after verified recovery"
-python scripts/task_session.py mark-ready 135 --head-sha <sha> --review-verdict APPROVED --qa-verdict PASS
+python scripts/task_session.py mark-ready 135 --head-sha <sha> --quality-verdict PASS --qa-verdict PASS
 python scripts/task_session.py acquire-delivery 135
 python scripts/task_session.py refresh-delivery 135
 python scripts/task_session.py validate-delivery 135
