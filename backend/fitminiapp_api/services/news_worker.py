@@ -42,7 +42,6 @@ from fitminiapp_api.services.news_review_schedule import (
     NEWS_REVIEW_BATCH_SIZE,
     NewsReviewSlot,
 )
-from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.notifications import safe_delivery_error
 
 logger = logging.getLogger(__name__)

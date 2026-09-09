@@ -90,21 +90,16 @@ def _draft(db, cluster: NewsCluster, *, hermes: bool) -> NewsDraftRevision:
         {
             "headline": "Исследование тренировок: результаты для изученной группы",
             "summary": (
-                "Авторы описали результаты исследования тренировок "
-                "и ограничения их интерпретации."
+                "Авторы описали результаты исследования тренировок и ограничения их интерпретации."
             ),
-            "why_it_matters": (
-                "Материал помогает оценивать применимость результатов на практике."
-            ),
+            "why_it_matters": ("Материал помогает оценивать применимость результатов на практике."),
         }
     )
 
     metadata = {
         "topic": packet.topic,
         "source_published_at": (
-            packet.published_at.isoformat()
-            if packet.published_at is not None
-            else None
+            packet.published_at.isoformat() if packet.published_at is not None else None
         ),
         "source_publisher": packet.publisher or packet.source_name,
         "image_context_headline": packet.title[:180],
@@ -142,11 +137,7 @@ def _draft(db, cluster: NewsCluster, *, hermes: bool) -> NewsDraftRevision:
         db,
         cluster,
         "image_pending",
-        reason_code=(
-            "test_hermes_draft_received"
-            if hermes
-            else "test_retired_local_draft"
-        ),
+        reason_code=("test_hermes_draft_received" if hermes else "test_retired_local_draft"),
     )
     db.flush()
     return draft
@@ -183,9 +174,7 @@ def test_retired_configuration_and_runtime_symbols_are_absent() -> None:
 
     assert "NEWS_LEGACY_SOURCE_FETCH_ENABLED" not in env_example
     assert "NEWS_LLM_PROVIDER" not in env_example
-    assert not (
-        root / "scripts" / "normalize_production_news_legacy_source_fetch.py"
-    ).exists()
+    assert not (root / "scripts" / "normalize_production_news_legacy_source_fetch.py").exists()
 
 
 def test_worker_cycle_has_no_local_fetch_or_candidate_generation(monkeypatch) -> None:
@@ -242,7 +231,6 @@ def test_worker_cycle_has_no_local_fetch_or_candidate_generation(monkeypatch) ->
         "draft_ready",
         "awaiting_review",
         "deferred",
-        "accepted_for_design",
         "publication_approved",
         "publication_scheduled",
         "publication_failed",
@@ -289,9 +277,7 @@ def test_non_hermes_owner_delivery_is_cancelled_unconditionally(
             delivery_round=cluster.delivery_round,
             status=delivery_status,
             next_attempt_at=utcnow(),
-            processing_started_at=(
-                utcnow() if delivery_status == "processing" else None
-            ),
+            processing_started_at=(utcnow() if delivery_status == "processing" else None),
         )
         db.add(delivery)
         db.flush()
@@ -346,21 +332,22 @@ def test_hermes_origin_is_not_quarantined() -> None:
         assert db.get(NewsDraftRevision, draft.id) is not None
 
 
-def test_historical_published_non_hermes_news_remains_readable() -> None:
-    cluster_id = _source_candidate(external_id="historical-published")
+@pytest.mark.parametrize("status", ["published", "accepted_for_design"])
+def test_terminal_non_hermes_news_history_remains_readable(status: str) -> None:
+    cluster_id = _source_candidate(external_id=f"historical-{status}")
 
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
         assert cluster is not None
 
         draft = _draft(db, cluster, hermes=False)
-        cluster.status = "published"
+        cluster.status = status
 
         cancelled, quarantined = quarantine_non_hermes_news_work(db)
 
         assert cancelled == 0
         assert quarantined == 0
-        assert cluster.status == "published"
+        assert cluster.status == status
 
         stored = db.get(NewsDraftRevision, draft.id)
         assert stored is not None

@@ -49,8 +49,6 @@ from fitminiapp_api.services.news_images import (
 )
 from fitminiapp_api.services.news_ingestion import (
     ParsedNewsItem,
-    SafeNewsFetcher,
-    SourceFetchResult,
     ingest_items,
     utcnow,
 )
@@ -67,11 +65,11 @@ from fitminiapp_api.services.news_publication import (
     retry_uncertain_publication,
 )
 from fitminiapp_api.services.news_review_schedule import current_news_review_slot
-from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.news_sources import (
     apply_source_allowlist,
     parse_source_allowlist,
 )
+from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.news_worker import (
     NewsCycleStats,
     deliver_review_queue,
@@ -84,7 +82,6 @@ from fitminiapp_api.services.worker import (
 )
 
 
-
 # Test-only stand-in for the state produced by the signed Hermes intake.
 # The production YFC-local create_draft_revision capability is intentionally retired.
 async def create_draft_revision(db, cluster, *, client=None) -> NewsDraftRevision:
@@ -95,12 +92,9 @@ async def create_draft_revision(db, cluster, *, client=None) -> NewsDraftRevisio
         {
             "headline": "Исследование тренировок: результаты для изученной группы",
             "summary": (
-                "Авторы описали результаты исследования тренировок "
-                "и ограничения их интерпретации."
+                "Авторы описали результаты исследования тренировок и ограничения их интерпретации."
             ),
-            "why_it_matters": (
-                "Материал помогает оценивать применимость результатов на практике."
-            ),
+            "why_it_matters": ("Материал помогает оценивать применимость результатов на практике."),
         }
     )
     revision = cluster.latest_draft_revision + 1
@@ -123,9 +117,7 @@ async def create_draft_revision(db, cluster, *, client=None) -> NewsDraftRevisio
             "conflict_notes": list(cluster.conflict_notes[:10]),
             "supporting_source_count": len(packet.supporting_sources),
             "source_published_at": (
-                packet.published_at.isoformat()
-                if packet.published_at is not None
-                else None
+                packet.published_at.isoformat() if packet.published_at is not None else None
             ),
             "source_publisher": packet.publisher or packet.source_name,
             "image_context_headline": packet.title[:180],

@@ -37,12 +37,10 @@ from fitminiapp_api.services.news_editorial import (
     review_message,
 )
 from fitminiapp_api.services.news_freshness import is_fresh_publication
-from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER
 from fitminiapp_api.services.news_ingestion import (
     ParsedNewsItem,
     SafeNewsFetcher,
     SourceFetchError,
-    SourceFetchResult,
     canonicalize_url,
     ingest_items,
     parse_json_feed,
@@ -50,6 +48,7 @@ from fitminiapp_api.services.news_ingestion import (
     utcnow,
     validate_public_source_url,
 )
+from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER
 from fitminiapp_api.services.news_sources import (
     apply_source_allowlist,
     load_source_allowlist,
@@ -57,7 +56,6 @@ from fitminiapp_api.services.news_sources import (
 )
 from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.seed import seed_demo_data
-
 
 
 # Test-only stand-in for the state produced by the signed Hermes intake.
@@ -70,12 +68,9 @@ async def create_draft_revision(db, cluster, *, client=None) -> NewsDraftRevisio
         {
             "headline": "Исследование тренировок: результаты для изученной группы",
             "summary": (
-                "Авторы описали результаты исследования тренировок "
-                "и ограничения их интерпретации."
+                "Авторы описали результаты исследования тренировок и ограничения их интерпретации."
             ),
-            "why_it_matters": (
-                "Материал помогает оценивать применимость результатов на практике."
-            ),
+            "why_it_matters": ("Материал помогает оценивать применимость результатов на практике."),
         }
     )
     revision = cluster.latest_draft_revision + 1
@@ -98,9 +93,7 @@ async def create_draft_revision(db, cluster, *, client=None) -> NewsDraftRevisio
             "conflict_notes": list(cluster.conflict_notes[:10]),
             "supporting_source_count": len(packet.supporting_sources),
             "source_published_at": (
-                packet.published_at.isoformat()
-                if packet.published_at is not None
-                else None
+                packet.published_at.isoformat() if packet.published_at is not None else None
             ),
             "source_publisher": packet.publisher or packet.source_name,
             "image_context_headline": packet.title[:180],

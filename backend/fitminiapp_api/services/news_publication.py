@@ -690,6 +690,7 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
             row.processing_started_at = None
             if cluster is not None and cluster.status not in {
                 "published",
+                "accepted_for_design",
                 "rejected",
                 "rejected_by_rules",
             }:

@@ -75,7 +75,6 @@ RETIRED_NON_HERMES_ACTIVE_STATUSES = frozenset(
         "draft_ready",
         "awaiting_review",
         "deferred",
-        "accepted_for_design",
         "publication_approved",
         "publication_scheduled",
         "publication_failed",
@@ -726,9 +725,7 @@ def cancel_non_hermes_review_deliveries(db: Session) -> int:
     draft_ids = {row.draft_id for row in rows}
     drafts = {
         draft.id: draft
-        for draft in db.query(NewsDraftRevision)
-        .filter(NewsDraftRevision.id.in_(draft_ids))
-        .all()
+        for draft in db.query(NewsDraftRevision).filter(NewsDraftRevision.id.in_(draft_ids)).all()
     }
 
     cancelled = 0
@@ -779,9 +776,7 @@ def quarantine_non_hermes_news_work(db: Session) -> tuple[int, int]:
 
         db.query(NewsPublicationSnapshot).filter(
             NewsPublicationSnapshot.cluster_id == cluster.id,
-            NewsPublicationSnapshot.status.in_(
-                {"queued", "scheduled", "processing", "failed"}
-            ),
+            NewsPublicationSnapshot.status.in_({"queued", "scheduled", "processing", "failed"}),
         ).update(
             {
                 NewsPublicationSnapshot.status: "cancelled",
