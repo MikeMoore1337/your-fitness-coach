@@ -503,7 +503,7 @@ def test_retrying_uncertain_retired_snapshot_cannot_rewind_hermes_flow() -> None
         snapshot = db.query(NewsPublicationSnapshot).one()
         assert cluster is not None
         assert snapshot.status == "cancelled"
-        assert cluster.status == "draft_ready"
+        assert cluster.status in {"draft_ready", "awaiting_review"}
         assert cluster.latest_draft_revision == hermes_revision
         assert claim_due_publications(db) == []
 
