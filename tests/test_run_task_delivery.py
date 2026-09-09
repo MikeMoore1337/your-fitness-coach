@@ -111,6 +111,16 @@ def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
     assert "3 CI-fix cycles" in prompt
 
 
+def test_issue_authorization_normalizes_connector_bot_login(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery, "_github_slug", lambda: "MikeMoore1337/your-fitness-coach")
+    issue = {"user": {"login": "chatgpt-codex-connector[bot]"}}
+
+    assert delivery._issue_authorized(issue) is True
+    assert "chatgpt-codex-connector" in delivery._trusted_issue_logins(issue)
+
+
 def test_only_live_lane_contention_is_retried() -> None:
     assert delivery._is_transient_start_error("task session error: Coordination state is locked")
     assert not delivery._is_transient_start_error(
@@ -238,6 +248,103 @@ def test_continuous_queue_claim_serializes_the_whole_batch(
             pass
 
     assert not claim_path.exists()
+
+
+def test_continuous_queue_claim_recovers_dead_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+    claim_path.parent.mkdir(parents=True)
+    claim_path.write_text(
+        json.dumps(
+            {
+                "control_issue": 218,
+                "pid": 424242,
+                "started_at": "2026-09-09T08:00:00+00:00",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(delivery, "_queue_owner_is_alive", lambda pid: False)
+
+    with delivery._continuous_queue_claim(218):
+        assert claim_path.is_file()
+        assert "424242" not in claim_path.read_text(encoding="utf-8")
+
+    assert not claim_path.exists()
+
+
+def test_continuous_queue_claim_reclaims_dead_owner_via_atomic_quarantine(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+    claim_path.parent.mkdir(parents=True)
+    claim_path.write_text(
+        json.dumps(
+            {
+                "control_issue": 218,
+                "pid": 424242,
+                "started_at": "2026-09-09T08:00:00+00:00",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    renames: list[tuple[Path, Path]] = []
+    real_rename = delivery.os.rename
+
+    def record_rename(source: str | Path, destination: str | Path) -> None:
+        renames.append((Path(source), Path(destination)))
+        real_rename(source, destination)
+
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(delivery, "_queue_owner_is_alive", lambda pid: False)
+    monkeypatch.setattr(delivery.os, "rename", record_rename)
+
+    with delivery._continuous_queue_claim(218):
+        assert claim_path.is_file()
+
+    assert len(renames) == 1
+    assert renames[0][0] == claim_path
+    assert renames[0][1].name.startswith("continuous-queue.lock.stale-")
+    assert not claim_path.exists()
+    assert not renames[0][1].exists()
+
+
+def test_continuous_queue_claim_keeps_corrupted_claim_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+    claim_path.parent.mkdir(parents=True)
+    claim_path.write_text("partial claim", encoding="utf-8")
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+
+    with (
+        pytest.raises(delivery.DeliveryError, match="claim is corrupted"),
+        delivery._continuous_queue_claim(218),
+    ):
+        pass
+
+    assert claim_path.read_text(encoding="utf-8") == "partial claim"
+
+
+def test_queue_owner_liveness_rejects_ambiguous_os_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_ambiguous_error(pid: int, signal: int) -> None:
+        raise OSError("ambiguous liveness result")
+
+    monkeypatch.setattr(delivery.os, "kill", raise_ambiguous_error)
+
+    with pytest.raises(delivery.DeliveryError, match="cannot verify continuous queue owner PID"):
+        delivery._queue_owner_is_alive(424242)
 
 
 def test_queue_rejects_batch_larger_than_contract(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -593,6 +700,61 @@ def test_continuous_cleanup_failure_posts_central_queue_stop(
     assert queue_stops
     assert queue_stops[0][0] == (218,)
     assert queue_stops[0][1]["task_id"] == "91"
+
+
+def test_continuous_worker_exit_after_finish_posts_central_queue_stop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    started = {
+        "lease": {
+            "branch": "task/91-synthetic-task",
+            "worktree": str(tmp_path / "worktree"),
+        }
+    }
+    history = {"state": "finished"}
+    queue_stops: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    status_updates: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
+    monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 23)
+    monkeypatch.setattr(delivery, "_history", lambda task_id: history)
+    monkeypatch.setattr(
+        delivery,
+        "_post_queue_stop",
+        lambda *args, **kwargs: queue_stops.append((args, kwargs)),
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_post_control_state",
+        lambda *args, **kwargs: status_updates.append((args, kwargs)),
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="Worker exited with code 23"):
+        delivery._deliver_one(
+            "91",
+            session_label="test",
+            poll_seconds=10,
+            max_wait_minutes=1,
+            offline=False,
+            control_issue=218,
+            state_issue=219,
+            issue_contract={"dependencies": []},
+        )
+
+    assert queue_stops == [
+        (
+            (218,),
+            {
+                "task_id": "91",
+                "status_issue": 219,
+                "branch": "task/91-synthetic-task",
+                "blocker": "worker exited with code 23 after controller finish",
+            },
+        )
+    ]
+    assert status_updates[-1][0][1]["state"] == "blocked"
 
 
 def test_control_state_post_rejects_invalid_remote_transition(

@@ -8,6 +8,7 @@ from scripts.issue_workflow import (
     QueueBudget,
     control_state_payload,
     latest_control_state,
+    normalize_github_login,
     parse_control_state_comment,
     parse_queue_budget_report,
     parse_task_contract,
@@ -116,6 +117,18 @@ def test_queue_authorization_requires_explicit_activation_and_honors_owner_stop(
 
     with pytest.raises(IssueWorkflowError, match="control Issue is not open"):
         queue_authorization({"state": "closed", "body": "CONTINUE_QUEUE"}, [])
+
+
+def test_queue_authorization_normalizes_connector_bot_login() -> None:
+    result = queue_authorization(
+        {"state": "open", "body": "The control contract supports CONTINUE_QUEUE."},
+        [{"id": 1, "user": {"login": "chatgpt-codex-connector[bot]"}, "body": "CONTINUE_QUEUE"}],
+        authorized_logins=("chatgpt-codex-connector",),
+    )
+
+    assert normalize_github_login("chatgpt-codex-connector[bot]") == "chatgpt-codex-connector"
+    assert result["active"] is True
+    assert result["authorized_comment_count"] == 1
 
 
 def test_queue_budget_is_bounded_and_excess_becomes_human_required() -> None:

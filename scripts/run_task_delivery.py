@@ -9,6 +9,7 @@ control Issue and queue budgets.
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import re
@@ -21,6 +22,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 try:
     from scripts.artifact_manager import ArtifactError, ArtifactManager
@@ -30,6 +32,7 @@ try:
         IssueWorkflowError,
         control_state_payload,
         latest_control_state,
+        normalize_github_login,
         parse_control_state_comment,
         parse_queue_budget_report,
         parse_task_contract,
@@ -53,6 +56,7 @@ except ModuleNotFoundError:
         IssueWorkflowError,
         control_state_payload,
         latest_control_state,
+        normalize_github_login,
         parse_control_state_comment,
         parse_queue_budget_report,
         parse_task_contract,
@@ -178,14 +182,11 @@ def _github_slug() -> str:
 
 
 def _trusted_issue_logins(issue: Mapping[str, Any]) -> tuple[str, ...]:
-    owner = _github_slug().split("/", maxsplit=1)[0].strip().casefold()
+    owner = normalize_github_login(_github_slug().split("/", maxsplit=1)[0])
     user = issue.get("user")
     author = user.get("login") if isinstance(user, Mapping) else None
-    return tuple(
-        login
-        for login in {owner, str(author).strip().casefold(), "chatgpt-codex-connector"}
-        if login and login != "none"
-    )
+    normalized_author = normalize_github_login(str(author)) if author else ""
+    return tuple(login for login in {owner, normalized_author, "chatgpt-codex-connector"} if login)
 
 
 def _issue_authorized(issue: Mapping[str, Any]) -> bool:
@@ -193,8 +194,8 @@ def _issue_authorized(issue: Mapping[str, Any]) -> bool:
     author = user.get("login") if isinstance(user, Mapping) else None
     if not author:
         return False
-    owner = _github_slug().split("/", maxsplit=1)[0].strip().casefold()
-    return str(author).strip().casefold() in {owner, "chatgpt-codex-connector"}
+    owner = normalize_github_login(_github_slug().split("/", maxsplit=1)[0])
+    return normalize_github_login(str(author)) in {owner, "chatgpt-codex-connector"}
 
 
 def _github_json(endpoint: str) -> Any:
@@ -287,13 +288,13 @@ def _unresolved_queue_stop(
     task_id: str,
     authorized_logins: Sequence[str],
 ) -> dict[str, Any] | None:
-    allowed = {str(login).strip().casefold() for login in authorized_logins}
+    allowed = {normalize_github_login(str(login)) for login in authorized_logins}
     latest_stop: tuple[tuple[str, int], dict[str, Any]] | None = None
     latest_resume: tuple[str, int] | None = None
     for comment in comments:
         author = comment.get("user") or comment.get("author") or {}
         login = author.get("login", "") if isinstance(author, Mapping) else ""
-        if str(login).strip().casefold() not in allowed:
+        if normalize_github_login(str(login)) not in allowed:
             continue
         body = str(comment.get("body", ""))
         order = _comment_order_key(comment)
@@ -389,6 +390,126 @@ def _raise_if_queue_stop(authorization: Mapping[str, Any]) -> None:
     )
 
 
+def _read_queue_claim(claim_path: Path) -> tuple[str, dict[str, Any]] | None:
+    try:
+        content = claim_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot inspect continuous queue claim {claim_path}"
+        ) from error
+    try:
+        claim = json.loads(content)
+    except json.JSONDecodeError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue claim is corrupted; inspect {claim_path}"
+        ) from error
+    if not isinstance(claim, dict):
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue claim is not an object; inspect {claim_path}"
+        )
+    control_issue = claim.get("control_issue")
+    pid = claim.get("pid")
+    started_at = claim.get("started_at")
+    if (
+        isinstance(control_issue, bool)
+        or not isinstance(control_issue, int)
+        or control_issue < 1
+        or isinstance(pid, bool)
+        or not isinstance(pid, int)
+        or pid < 1
+        or not isinstance(started_at, str)
+        or not started_at
+    ):
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue claim has invalid owner metadata; "
+            f"inspect {claim_path}"
+        )
+    try:
+        parsed_started_at = datetime.fromisoformat(started_at)
+    except ValueError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue claim has invalid timestamp; inspect {claim_path}"
+        ) from error
+    if parsed_started_at.tzinfo is None:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue claim timestamp has no timezone; inspect {claim_path}"
+        )
+    return content, claim
+
+
+def _queue_owner_is_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError as error:
+        if error.errno == errno.ESRCH or getattr(error, "winerror", None) == 87:
+            return False
+        if error.errno == errno.EPERM or getattr(error, "winerror", None) == 5:
+            return True
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot verify continuous queue owner PID {pid}"
+        ) from error
+    return True
+
+
+def _recover_stale_queue_claim(claim_path: Path) -> bool:
+    snapshot = _read_queue_claim(claim_path)
+    if snapshot is None:
+        return True
+    content, claim = snapshot
+    pid = int(claim["pid"])
+    if _queue_owner_is_alive(pid):
+        return False
+    quarantine_path = claim_path.with_name(f"{claim_path.name}.stale-{uuid4().hex}")
+    try:
+        os.rename(claim_path, quarantine_path)
+    except FileNotFoundError:
+        return True
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot atomically reclaim stale continuous queue claim {claim_path}"
+        ) from error
+    try:
+        quarantined_content = quarantine_path.read_text(encoding="utf-8")
+    except FileNotFoundError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: stale continuous queue claim disappeared during recovery; "
+            f"inspect {quarantine_path}"
+        ) from error
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot inspect quarantined continuous queue claim {quarantine_path}"
+        ) from error
+    if quarantined_content != content:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue claim changed during atomic stale-owner "
+            f"recovery; inspect {quarantine_path}"
+        )
+    if _queue_owner_is_alive(pid):
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue owner PID {pid} became live during recovery; "
+            f"inspect {quarantine_path}"
+        )
+    try:
+        quarantine_path.unlink()
+    except FileNotFoundError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: quarantined continuous queue claim disappeared during recovery; "
+            f"inspect {quarantine_path}"
+        ) from error
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot remove reclaimed continuous queue claim {quarantine_path}"
+        ) from error
+    _event("STALE_QUEUE_CLAIM_RECOVERED", claim_path=str(claim_path), owner_pid=pid)
+    return True
+
+
 @contextmanager
 def _continuous_queue_claim(control_issue: int) -> Iterator[None]:
     state_root = _git_common_dir() / "codex-task-sessions-v1"
@@ -403,15 +524,22 @@ def _continuous_queue_claim(control_issue: int) -> Iterator[None]:
         ensure_ascii=True,
         sort_keys=True,
     )
-    try:
-        descriptor = os.open(
-            str(claim_path),
-            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
-        )
-    except FileExistsError as error:
-        raise DeliveryError(
-            f"HUMAN_REQUIRED: CONTINUE_QUEUE already has an active owner; inspect {claim_path}"
-        ) from error
+    descriptor: int | None = None
+    for attempt in range(2):
+        try:
+            descriptor = os.open(
+                str(claim_path),
+                os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            )
+            break
+        except FileExistsError as error:
+            if attempt == 0 and _recover_stale_queue_claim(claim_path):
+                continue
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: CONTINUE_QUEUE already has an active owner; inspect {claim_path}"
+            ) from error
+    if descriptor is None:
+        raise DeliveryError(f"HUMAN_REQUIRED: cannot acquire continuous queue claim {claim_path}")
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(claim)
@@ -991,6 +1119,19 @@ def _deliver_one(
     history = _history(task_id)
     budget_report: dict[str, int] | None = None
     if worker_exit != 0:
+        if (
+            issue_contract is not None
+            and control_issue is not None
+            and history is not None
+            and history.get("state") == "finished"
+        ):
+            _post_queue_stop(
+                control_issue,
+                task_id=task_id,
+                status_issue=status_issue,
+                branch=started["lease"]["branch"],
+                blocker=f"worker exited with code {worker_exit} after controller finish",
+            )
         if status_issue is not None:
             _post_control_state(
                 status_issue,

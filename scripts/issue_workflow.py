@@ -345,8 +345,19 @@ def parse_control_state_comment(body: str) -> dict[str, Any] | None:
     )
 
 
+def normalize_github_login(value: str) -> str:
+    """Normalize GitHub user and connector bot logins for allowlist checks."""
+
+    normalized = value.strip().casefold()
+    if normalized.endswith("[bot]"):
+        normalized = normalized[: -len("[bot]")].rstrip()
+    return normalized
+
+
 def _authorized_logins(logins: Sequence[str]) -> frozenset[str]:
-    normalized = frozenset(login.strip().casefold() for login in logins if login.strip())
+    normalized = frozenset(
+        normalized_login for login in logins if (normalized_login := normalize_github_login(login))
+    )
     if not normalized:
         raise IssueWorkflowError(
             "control-state parsing requires an explicit authorized login allowlist"
@@ -358,7 +369,7 @@ def _comment_login(comment: Mapping[str, Any]) -> str:
     author = comment.get("user") or comment.get("author") or {}
     if not isinstance(author, Mapping):
         return ""
-    return str(author.get("login", "")).strip().casefold()
+    return normalize_github_login(str(author.get("login", "")))
 
 
 def control_states(
@@ -415,8 +426,12 @@ def queue_authorization(
     commands: list[tuple[str, int, str]] = []
     for comment in comments:
         author = comment.get("user") or comment.get("author") or {}
-        login = str(author.get("login", "")) if isinstance(author, Mapping) else ""
-        if login.casefold() not in allowed:
+        login = (
+            normalize_github_login(str(author.get("login", "")))
+            if isinstance(author, Mapping)
+            else ""
+        )
+        if login not in allowed:
             continue
         body = str(comment.get("body", ""))
         created_at = str(comment.get("created_at") or comment.get("createdAt") or "")
