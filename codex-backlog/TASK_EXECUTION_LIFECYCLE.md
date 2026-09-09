@@ -10,6 +10,15 @@ authorization на весь normal path этой task. Launcher/controller ав�
 ожидание CI/deploy и безопасную cleanup в новые вопросы владельцу. Отдельный ответ нужен только для
 явно объявленного human/legal/external/destructive/task-specific gate или terminal blocker.
 
+## Постоянное owner decision для Your Fitness Coach
+
+Отдельный Codex Code Review, `chatgpt-codex-connector` review, reviewed-SHA gate и ожидание
+review rate limit не используются и не являются release gate. Для YFC достаточно deterministic
+quality/policy checks, exact-head required `checks`, актуальной PR provenance, mergeability и
+нулевого числа применимых `BLOCKER`/`HIGH`/`P1`/`P2` findings. Это решение имеет приоритет над
+старыми формулировками lifecycle о LLM review; human, legal, external, destructive и явно
+task-specific gates сохраняются.
+
 ## 0. Coordination lanes
 
 Lifecycle разделён на две coordination boundary:
@@ -27,11 +36,17 @@ Lifecycle разделён на две coordination boundary:
   `finish`, после чего lane передаётся следующему FIFO candidate. Busy delivery/CI/production не
   блокирует запуск совместимой implementation task.
 
-`READY_FOR_DELIVERY` фиксирует task ID, branch, HEAD, исходный/current base, review/QA, clean
+`READY_FOR_DELIVERY` фиксирует task ID, branch, HEAD, исходный/current base, quality/QA, clean
 worktree, provenance и состояние локального evidence. Это очередь, а не разрешение merge: перед
 PR владелец delivery должен получить актуальный `origin/master`, обновить branch безопасным
 `rebase`, инвалидировать старое exact-HEAD evidence и пройти новый final gate. Конфликт rebase,
 dirty/interrupted worktree или missing/ambiguous lease сохраняются fail-closed для recovery.
+
+При явном owner decision текущая task может получить ограниченный priority promotion через
+`acquire-delivery --owner-priority-reason <reason>`, если lane свободна. Операция не меняет и не
+удаляет чужие leases, сохраняет пропущенные candidates в FIFO для следующего handoff и записывает
+bounded reason в shared delivery state и task history. Она не обходится при активном delivery или
+production deployment и не заменяет refresh, exact-head gate, PR checks, merge или closeout.
 
 ## 0A. Structured task artifacts
 
@@ -338,7 +353,7 @@ commit, task PR в `master`, required CI и normal release без дополни
 Task является `AUTO_RELEASE_ELIGIBLE`, только если одновременно:
 
 1. созданы tracked releasable changes и один итоговый logical commit;
-2. implementation, применимые review/QA и final verification завершены;
+2. implementation, deterministic checks, применимая QA и final verification завершены;
 3. незакрытых `BLOCKER`, `HIGH` и `MEDIUM` ровно ноль, а исправленные blocking/release-blocking
    findings имеют required targeted recheck evidence;
 4. `codex-backlog/bugs/FINDINGS.md` синхронизирован по действующей policy;
@@ -416,7 +431,7 @@ human/owner gate останавливается перед указанным ga
 - ключевые файлы;
 - migrations/config/dependencies;
 - exact checks и результат;
-- review verdict и blocking findings status;
+- quality verdict и blocking findings status;
 - QA status, если QA была предусмотрена;
 - non-blocking findings/follow-ups без длинного повторного аудита;
 - затронутые `codex-backlog/bugs/FINDINGS.md` IDs и их итоговые statuses;

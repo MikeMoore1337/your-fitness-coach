@@ -16,8 +16,9 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -26,8 +27,10 @@ from typing import Any
 
 try:
     from scripts.artifact_manager import ArtifactError, ArtifactManager
+    from scripts.issue_workflow import DEFAULT_QUEUE_BUDGET, IssueWorkflowError, normalize_severity
 except ModuleNotFoundError:
     from artifact_manager import ArtifactError, ArtifactManager
+    from issue_workflow import DEFAULT_QUEUE_BUDGET, IssueWorkflowError, normalize_severity
 
 TASK_ID_PATTERN = r"[0-9]+[A-Z]?"
 TASK_ID_RE = re.compile(rf"^{TASK_ID_PATTERN}$", re.IGNORECASE)
@@ -40,10 +43,28 @@ TASK_DEPENDENCY_RE = re.compile(r"(?im)^Depends-on:\s*(?P<value>.+)$")
 TASK_FILE_RE = re.compile(rf"^(?P<task_id>{TASK_ID_PATTERN})-(?P<slug>.+)\.md$", re.IGNORECASE)
 TASK_STATE_VERSION = 2
 STATE_DIRECTORY_NAME = "codex-task-sessions-v1"
+ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
 DEPENDABOT_LOGIN = "dependabot[bot]"
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
 UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
+TRUSTED_REVIEW_LOGINS = frozenset({"chatgpt-codex-connector"})
+REVIEWED_COMMIT_RE = re.compile(
+    r"(?im)\b(?:reviewed\s+commit|reviewed\s+head|commit)\b\s*\*{0,2}\s*[:=]\s*\*{0,2}\s*`?([0-9a-f]{7,40})`?"
+)
+REVIEW_COMPLETED_MARKERS = ("codex review", "review status completed")
+REVIEW_MERGEABILITY_TIMEOUT_SECONDS = 30.0
+REVIEW_MERGEABILITY_POLL_SECONDS = 1.0
+REVIEW_APPROVAL_RE = re.compile(
+    r"(?ix)"
+    r"(?:didn['’]t|did\s+not)\s+find\s+any\s+(?:major\s+)?issues"
+    r"|(?:^|[\n:])\s*no\s+blocking\s+(?:findings|issues)\b"
+    r"|(?:^|[\n:])\s*(?:review\s+)?(?:verdict|status)\s*[:=-]\s*(?:pass|approved)\b"
+    r"|(?:^|[\n:])\s*approved(?:\s+for\s+merge)?\b"
+)
+REVIEW_BLOCKING_MARKER_RE = re.compile(
+    r"(?i)(?<![a-z0-9])(?:P[0-2]|BLOCKER|HIGH|MEDIUM)(?![a-z0-9])"
+)
 
 # A task lease, an implementation exclusion, and delivery ownership are separate controller
 # concerns.  Only an exclusive-write lease in an implementation state owns the implementation
@@ -65,6 +86,7 @@ KNOWN_LEASE_STATES = (
 )
 DELIVERY_OWNER_STATES = DELIVERY_STATES | TERMINAL_LEASE_STATES
 DELIVERY_STATE_VERSION = 1
+DELIVERY_PRIORITY_REASON_MAX_LENGTH = 1024
 CANONICAL_REFRESH_RESULTS = frozenset({"ALIGNED", "REFRESHED", "WAITING", "BLOCKED"})
 
 # These paths are intentionally ignored by the repository and are managed by the controller,
@@ -106,6 +128,49 @@ def normalize_task_id(value: str) -> str:
     if not TASK_ID_RE.fullmatch(task_id):
         raise TaskSessionError(f"Invalid task ID: {value!r}")
     return task_id
+
+
+def normalize_delivery_priority_reason(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        raise TaskSessionError("owner-priority requires a non-empty reason")
+    if len(normalized) > DELIVERY_PRIORITY_REASON_MAX_LENGTH:
+        raise TaskSessionError("owner-priority reason exceeds the bounded length")
+    return normalized
+
+
+def _active_delivery_exclude_prefixes(root: Path, task_id: str) -> tuple[str, ...]:
+    raw_path = os.environ.get(ACTIVE_DELIVERY_ARTIFACTS_ENV, "").strip()
+    if not raw_path:
+        return ()
+    expected = normalize_task_id(task_id)
+    active_path = Path(raw_path)
+    if not active_path.is_absolute():
+        raise TaskSessionError(f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must be an absolute path")
+    try:
+        active_path = active_path.resolve()
+        temporary_root = (root / ".artifacts" / "tasks" / expected / "temporary").resolve()
+    except (OSError, RuntimeError) as error:
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} path could not be resolved"
+        ) from error
+    try:
+        relative = active_path.relative_to(temporary_root)
+    except ValueError as error:
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must stay under the exact task temporary root"
+        ) from error
+    if len(relative.parts) < 2 or relative.parts[0] != "delivery":
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must point to temporary/delivery/<run>"
+        )
+    if not active_path.is_dir():
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must point to an existing directory"
+        )
+    return (relative.as_posix(),)
 
 
 def task_id_from_branch(branch: str) -> str:
@@ -478,6 +543,21 @@ def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
     )
 
 
+def _resolved_dependency_ids(
+    raw_dependencies: Sequence[str] | None,
+    fallback: Sequence[str],
+) -> tuple[str, ...]:
+    if raw_dependencies is None:
+        return tuple(fallback)
+    if isinstance(raw_dependencies, (str, bytes)):
+        raise TaskSessionError("Issue dependency contract must be an array of task IDs")
+    try:
+        normalized = [normalize_task_id(item) for item in raw_dependencies]
+    except (TypeError, TaskSessionError) as error:
+        raise TaskSessionError("Issue dependency contract contains an invalid task ID") from error
+    return tuple(dict.fromkeys(normalized))
+
+
 class StateStore:
     def __init__(self, common_dir: Path) -> None:
         self.root = common_dir / STATE_DIRECTORY_NAME
@@ -579,6 +659,33 @@ class StateStore:
             raise TaskSessionError(
                 f"Invalid delivery sequence in coordination state: {self.delivery_path}"
             )
+        priority_override = payload.get("priority_override")
+        if priority_override is not None:
+            if not isinstance(priority_override, dict):
+                raise TaskSessionError(
+                    f"Invalid delivery priority override in coordination state: {self.delivery_path}"
+                )
+            override_task_id = priority_override.get("task_id")
+            skipped_task_ids = priority_override.get("skipped_task_ids")
+            reason = priority_override.get("reason")
+            authorized_at = priority_override.get("authorized_at")
+            if (
+                not isinstance(override_task_id, str)
+                or not TASK_ID_RE.fullmatch(override_task_id)
+                or not isinstance(skipped_task_ids, list)
+                or any(
+                    not isinstance(task_id, str) or not TASK_ID_RE.fullmatch(task_id)
+                    for task_id in skipped_task_ids
+                )
+                or not isinstance(reason, str)
+                or not reason.strip()
+                or len(reason.strip()) > DELIVERY_PRIORITY_REASON_MAX_LENGTH
+                or not isinstance(authorized_at, str)
+                or not authorized_at.strip()
+            ):
+                raise TaskSessionError(
+                    f"Malformed delivery priority override in coordination state: {self.delivery_path}"
+                )
         return payload
 
     def all_leases(self) -> list[dict[str, Any]]:
@@ -634,6 +741,79 @@ class GitHubClient:
                 return files
             page += 1
 
+    def pull_request_reviews(self, number: int) -> list[dict[str, Any]]:
+        reviews: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            batch = list(self.api(f"pulls/{number}/reviews?per_page=100&page={page}"))
+            reviews.extend(batch)
+            if len(batch) < 100:
+                return reviews
+            page += 1
+
+    def issue_comments(self, number: int) -> list[dict[str, Any]]:
+        comments: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            batch = list(self.api(f"issues/{number}/comments?per_page=100&page={page}"))
+            comments.extend(batch)
+            if len(batch) < 100:
+                return comments
+            page += 1
+
+    def review_threads(self, number: int) -> list[dict[str, Any]]:
+        owner, separator, name = self.repo_slug.partition("/")
+        if not separator or not owner or not name:
+            raise TaskSessionError("Cannot query review threads without an owner/repository slug")
+        query = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes { isResolved }
+        pageInfo { hasNextPage }
+      }
+    }
+  }
+}
+""".strip()
+        result = _run(
+            [
+                "gh",
+                "api",
+                "graphql",
+                "-f",
+                f"query={query}",
+                "-F",
+                f"owner={owner}",
+                "-F",
+                f"name={name}",
+                "-F",
+                f"number={number}",
+            ],
+            cwd=self.repository.current_worktree,
+        )
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as error:
+            raise TaskSessionError("GitHub returned invalid review-thread JSON") from error
+        errors = payload.get("errors")
+        if errors:
+            raise TaskSessionError(f"GitHub review-thread query failed: {errors}")
+        pull_request = payload.get("data", {}).get("repository", {}).get("pullRequest")
+        if not isinstance(pull_request, Mapping):
+            raise TaskSessionError("GitHub review-thread query returned no pull request")
+        threads = pull_request.get("reviewThreads", {})
+        if not isinstance(threads, Mapping):
+            raise TaskSessionError("GitHub review-thread query returned an invalid connection")
+        page_info = threads.get("pageInfo", {})
+        if isinstance(page_info, Mapping) and page_info.get("hasNextPage"):
+            raise TaskSessionError("GitHub review-thread inventory exceeds the bounded page size")
+        nodes = threads.get("nodes", [])
+        if not isinstance(nodes, list):
+            raise TaskSessionError("GitHub review-thread query returned invalid nodes")
+        return [dict(item) for item in nodes if isinstance(item, Mapping)]
+
     def check_runs(self, sha: str) -> list[dict[str, Any]]:
         payload = self.api(f"commits/{sha}/check-runs?per_page=100")
         return list(payload.get("check_runs", []))
@@ -670,6 +850,32 @@ class GitHubClient:
         return False
 
 
+def _pull_request_with_resolved_mergeability(
+    github: GitHubClient,
+    number: int,
+    *,
+    timeout_seconds: float = REVIEW_MERGEABILITY_TIMEOUT_SECONDS,
+    poll_seconds: float = REVIEW_MERGEABILITY_POLL_SECONDS,
+    clock: Callable[[], float] | None = None,
+    sleeper: Callable[[float], None] | None = None,
+) -> dict[str, Any]:
+    """Poll GitHub until the PR mergeability calculation is available or times out."""
+
+    if timeout_seconds <= 0 or poll_seconds <= 0:
+        raise TaskSessionError("PR mergeability polling requires positive timeout and interval")
+    clock = time.monotonic if clock is None else clock
+    sleeper = time.sleep if sleeper is None else sleeper
+    deadline = clock() + timeout_seconds
+    pull_request = github.pull_request(number)
+    while pull_request.get("mergeable") is None:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return pull_request
+        sleeper(min(poll_seconds, remaining))
+        pull_request = github.pull_request(number)
+    return pull_request
+
+
 def _successful_exact_check(checks: Sequence[Mapping[str, Any]], name: str, sha: str) -> bool:
     return any(
         item.get("name") == name
@@ -678,6 +884,289 @@ def _successful_exact_check(checks: Sequence[Mapping[str, Any]], name: str, sha:
         and str(item.get("conclusion", "")).upper() in VALID_CHECK_CONCLUSIONS
         for item in checks
     )
+
+
+def reviewed_commit_markers(body: str) -> tuple[str, ...]:
+    """Return bounded commit markers found in a review summary."""
+
+    return tuple(match.group(1).lower() for match in REVIEWED_COMMIT_RE.finditer(body))
+
+
+def _commit_shas(commits: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
+    return tuple(
+        sha
+        for item in commits
+        if (sha := str(item.get("sha") or item.get("oid") or "").strip().lower())
+        and re.fullmatch(r"[0-9a-f]{40}", sha)
+    )
+
+
+def _review_login(item: Mapping[str, Any]) -> str:
+    for key in ("user", "author"):
+        value = item.get(key)
+        if isinstance(value, Mapping) and value.get("login"):
+            # GitHub exposes App/bot accounts with a trailing ``[bot]`` suffix while
+            # the trusted identity is configured by its canonical login.
+            return re.sub(r"\[bot\]$", "", str(value["login"]).strip().casefold())
+    return ""
+
+
+def _marker_matches_head(
+    marker: str,
+    head_sha: str,
+    *,
+    known_commit_shas: Sequence[str] | None = None,
+) -> bool:
+    normalized = marker.strip().lower()
+    normalized_head = head_sha.strip().lower()
+    if len(normalized) == 40:
+        return normalized == normalized_head
+    if len(normalized) < 7 or not normalized_head.startswith(normalized):
+        return False
+    matching_shas = {
+        candidate
+        for raw_candidate in known_commit_shas or ()
+        if (candidate := str(raw_candidate).strip().lower())
+        and re.fullmatch(r"[0-9a-f]{40}", candidate)
+        and candidate.startswith(normalized)
+    }
+    return matching_shas == {normalized_head}
+
+
+def _review_body(item: Mapping[str, Any]) -> str:
+    return str(item.get("body") or item.get("text") or "")
+
+
+def _is_approving_codex_review(body: str) -> bool:
+    """Accept only an explicit no-findings/approval verdict from the connector."""
+
+    return bool(REVIEW_APPROVAL_RE.search(body)) and not bool(
+        REVIEW_BLOCKING_MARKER_RE.search(body)
+    )
+
+
+def _effective_current_head_reviews(
+    reviews: Sequence[Mapping[str, Any]],
+    head_sha: str,
+    *,
+    known_commit_shas: Sequence[str] | None = None,
+) -> list[Mapping[str, Any]]:
+    """Keep the latest state-changing review from each reviewer for this exact head."""
+
+    effective: dict[str, tuple[str, int, Mapping[str, Any]]] = {}
+    state_changers = {"APPROVED", "CHANGES_REQUESTED", "DISMISSED"}
+    for index, review in enumerate(reviews):
+        review_head = str(review.get("commit_id", review.get("commitId", "")))
+        if not _marker_matches_head(review_head, head_sha, known_commit_shas=known_commit_shas):
+            continue
+        state = str(review.get("state", "")).upper()
+        if state not in state_changers:
+            continue
+        reviewer = _review_login(review) or f"review-{review.get('id', index)}"
+        timestamp = str(
+            review.get("submitted_at")
+            or review.get("submittedAt")
+            or review.get("created_at")
+            or review.get("createdAt")
+            or ""
+        )
+        # fmt: off
+        try:
+            review_id = int(review.get("id", index))
+        except (TypeError, ValueError):
+            review_id = index
+        # fmt: on
+        previous = effective.get(reviewer)
+        if previous is None or (timestamp, review_id) >= (previous[0], previous[1]):
+            effective[reviewer] = (timestamp, review_id, review)
+    return [item[2] for item in sorted(effective.values(), key=lambda item: (item[0], item[1]))]
+
+
+def validate_pull_request_review_contract(
+    pull_request: Mapping[str, Any],
+    reviews: Sequence[Mapping[str, Any]],
+    issue_comments: Sequence[Mapping[str, Any]],
+    review_threads: Sequence[Mapping[str, Any]],
+    *,
+    expected_head_sha: str | None = None,
+    known_commit_shas: Sequence[str] | None = None,
+    require_open: bool = True,
+    require_mergeable: bool = True,
+    allow_blocked_mergeable_state: bool = False,
+) -> dict[str, Any]:
+    """Require a completed review for the current PR head.
+
+    GitHub formal approvals are authoritative when their ``commit_id`` is the current head.
+    The Codex connector currently records its completed review as a trusted issue comment, so
+    that representation is accepted only with an exact-head marker.  Abbreviated markers are
+    accepted only when they resolve uniquely to the current head among the supplied PR commit
+    SHAs.  Skipped bot comments, old-head reviews, unresolved threads and non-mergeable PRs never
+    satisfy this gate.
+    """
+
+    head = pull_request.get("head", {})
+    head_sha = str(head.get("sha", "")).lower()
+    if not head_sha:
+        raise TaskSessionError("PR review gate requires a current head SHA")
+    if expected_head_sha and head_sha != expected_head_sha.lower():
+        raise TaskSessionError(
+            f"PR review gate received stale head {head_sha}; expected {expected_head_sha}"
+        )
+    state = str(pull_request.get("state", "")).lower()
+    if require_open and state != "open":
+        raise TaskSessionError(f"PR review gate requires an open PR, found {state}")
+    if require_open and pull_request.get("draft") is True:
+        raise TaskSessionError("PR review gate refuses a draft PR")
+    if require_mergeable:
+        if pull_request.get("mergeable") is not True:
+            raise TaskSessionError("PR review gate requires an explicitly mergeable PR")
+        mergeable_state = str(pull_request.get("mergeable_state", "")).lower()
+        allowed_mergeable_states = {"clean", "has_hooks"}
+        if allow_blocked_mergeable_state:
+            # The review-event run is itself one of the required checks. GitHub can therefore
+            # report ``blocked`` or ``unstable`` until the aggregate check containing this gate
+            # succeeds. ``mergeable=True`` above still makes an actual merge conflict fail closed.
+            allowed_mergeable_states.update({"blocked", "unstable"})
+        if mergeable_state not in allowed_mergeable_states:
+            raise TaskSessionError(
+                "PR review gate requires a clean mergeable PR, found "
+                f"{mergeable_state or '<missing>'}"
+            )
+
+    unresolved_threads = [
+        index
+        for index, thread in enumerate(review_threads, start=1)
+        if thread.get("isResolved") is not True
+    ]
+    if unresolved_threads:
+        raise TaskSessionError(
+            "PR review gate refuses unresolved review threads: "
+            + ", ".join(str(item) for item in unresolved_threads)
+        )
+
+    effective_reviews = _effective_current_head_reviews(
+        reviews, head_sha, known_commit_shas=known_commit_shas
+    )
+    exact_approvals = [
+        item for item in effective_reviews if str(item.get("state", "")).upper() == "APPROVED"
+    ]
+    current_changes = [
+        item
+        for item in effective_reviews
+        if str(item.get("state", "")).upper() == "CHANGES_REQUESTED"
+    ]
+    if current_changes:
+        findings = []
+        for item in current_changes:
+            body = _review_body(item)
+            severities = []
+            for raw in re.findall(r"(?i)\b(?:P[0-3]|BLOCKER|HIGH|MEDIUM|LOW|NIT)\b", body):
+                try:
+                    severities.append(normalize_severity(raw))
+                except IssueWorkflowError:
+                    continue
+            findings.append(
+                {
+                    "review_id": item.get("id"),
+                    "severity": severities or ["HIGH"],
+                    "body_present": bool(body.strip()),
+                }
+            )
+        raise TaskSessionError(
+            "PR review gate found blocking current-head review findings: "
+            + json.dumps(findings, ensure_ascii=False, sort_keys=True)
+        )
+
+    exact_codex_comments: list[Mapping[str, Any]] = []
+    current_head_codex_comments: list[tuple[str, int, Mapping[str, Any]]] = []
+    stale_codex_markers: list[str] = []
+    rejected_codex_markers: list[str] = []
+    for comment in issue_comments:
+        if _review_login(comment) not in TRUSTED_REVIEW_LOGINS:
+            continue
+        body = _review_body(comment)
+        lowered = body.casefold()
+        if "review skipped" in lowered or "rate limit exceeded" in lowered:
+            continue
+        markers = reviewed_commit_markers(body)
+        if not markers:
+            continue
+        exact_head = any(
+            _marker_matches_head(marker, head_sha, known_commit_shas=known_commit_shas)
+            for marker in markers
+        )
+        completed = any(marker in lowered for marker in REVIEW_COMPLETED_MARKERS)
+        if exact_head and completed:
+            timestamp = str(
+                comment.get("updated_at")
+                or comment.get("updatedAt")
+                or comment.get("created_at")
+                or comment.get("createdAt")
+                or ""
+            )
+            # fmt: off
+            try:
+                comment_id = int(comment.get("id", 0))
+            except (TypeError, ValueError):
+                comment_id = 0
+            # fmt: on
+            current_head_codex_comments.append((timestamp, comment_id, comment))
+        else:
+            stale_codex_markers.extend(markers)
+
+    if current_head_codex_comments:
+        _, _, latest_codex_comment = max(
+            current_head_codex_comments, key=lambda item: (item[0], item[1])
+        )
+        latest_codex_body = _review_body(latest_codex_comment)
+        if _is_approving_codex_review(latest_codex_body):
+            exact_codex_comments.append(latest_codex_comment)
+        elif REVIEW_BLOCKING_MARKER_RE.search(latest_codex_body):
+            rejected_codex_markers.extend(reviewed_commit_markers(latest_codex_body))
+
+    if rejected_codex_markers:
+        raise TaskSessionError(
+            "PR review gate found blocking exact-head Codex verdict without an explicit "
+            "approving verdict: " + ", ".join(sorted(set(rejected_codex_markers)))
+        )
+
+    if not exact_approvals and not exact_codex_comments:
+        details = (
+            f"; stale review markers: {', '.join(stale_codex_markers)}"
+            if stale_codex_markers
+            else ""
+        )
+        if rejected_codex_markers:
+            details += (
+                "; exact-head Codex review has no explicit approving verdict or contains "
+                "blocking findings"
+            )
+        raise TaskSessionError(
+            f"PR review gate has no completed approval for exact current head {head_sha}{details}"
+        )
+
+    sources: list[str] = []
+    if exact_approvals:
+        sources.append("github-formal-approval")
+    if exact_codex_comments:
+        sources.append("codex-completed-review-comment")
+    return {
+        "status": "PASS",
+        "head_sha": head_sha,
+        "reviewed_head_sha": head_sha,
+        "sources": sources,
+        "formal_approval_count": len(exact_approvals),
+        "codex_review_comment_count": len(exact_codex_comments),
+        "unresolved_thread_count": 0,
+        "blocking_finding_count": 0,
+        "severity_mapping": {
+            "P0": "BLOCKER",
+            "P1": "HIGH",
+            "P2": "MEDIUM",
+            "P3": "LOW",
+            "NIT": "LOW",
+        },
+    }
 
 
 def validate_task_pull_request(
@@ -819,6 +1308,45 @@ def validate_pr_event(
         files, expected_count=int(pull_request.get("changed_files", len(files)))
     )
     return {"kind": "task-pr", "task_id": task_id, "head_sha": pull_request["head"]["sha"]}
+
+
+def validate_pr_review_event(
+    github: GitHubClient,
+    event_path: Path,
+    *,
+    pr_number: int | None = None,
+    expected_head_sha: str | None = None,
+) -> dict[str, Any]:
+    event = json.loads(event_path.read_text(encoding="utf-8"))
+    event_pull_request = event.get("pull_request")
+    if not isinstance(event_pull_request, Mapping) and pr_number is None:
+        raise TaskSessionError("Review gate event does not contain a pull request")
+    number = pr_number or int(event_pull_request["number"])
+    event_head_sha = (
+        str(event_pull_request.get("head", {}).get("sha", ""))
+        if isinstance(event_pull_request, Mapping)
+        else ""
+    )
+    pull_request = _pull_request_with_resolved_mergeability(github, number)
+    live_head_sha = str(pull_request.get("head", {}).get("sha", ""))
+    if event_head_sha and event_head_sha != live_head_sha:
+        raise TaskSessionError(
+            f"Review gate event is stale: event head {event_head_sha} != live head {live_head_sha}"
+        )
+    if expected_head_sha and live_head_sha != expected_head_sha:
+        raise TaskSessionError(
+            f"Review gate head {live_head_sha} != expected current head {expected_head_sha}"
+        )
+    evidence = validate_pull_request_review_contract(
+        pull_request,
+        github.pull_request_reviews(number),
+        github.issue_comments(number),
+        github.review_threads(number),
+        expected_head_sha=live_head_sha,
+        known_commit_shas=_commit_shas(github.pull_request_commits(number)),
+        allow_blocked_mergeable_state=True,
+    )
+    return {"kind": "pull-request-review", "pr_number": number, **evidence}
 
 
 def verify_master_merge(
@@ -1763,13 +2291,35 @@ class TaskController:
 
         return sorted(candidates, key=queue_key)
 
-    def _promote_next_delivery_locked(self, delivery: dict[str, Any]) -> dict[str, Any] | None:
+    def _promote_next_delivery_locked(
+        self,
+        delivery: dict[str, Any],
+        *,
+        requested_task_id: str | None = None,
+        priority_override: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         if delivery.get("owner") is not None:
             return dict(delivery["owner"])
+        delivery.pop("priority_override", None)
         candidates = self._delivery_candidates(self.store.all_leases())
         if not candidates:
             return None
-        candidate = candidates[0]
+        if requested_task_id is None:
+            candidate = candidates[0]
+        else:
+            expected = normalize_task_id(requested_task_id)
+            candidate = next(
+                (
+                    item
+                    for item in candidates
+                    if normalize_task_id(str(item["task_id"])) == expected
+                ),
+                None,
+            )
+            if candidate is None:
+                raise TaskSessionError(
+                    f"Requested delivery priority task {expected} is not a queue candidate"
+                )
         task_id = normalize_task_id(str(candidate["task_id"]))
         lease_path = self.store.task_lease_path(task_id)
         lease = self.store.read_json(lease_path)
@@ -1790,6 +2340,8 @@ class TaskController:
             }
         )
         delivery["owner"] = owner
+        if priority_override is not None:
+            delivery["priority_override"] = dict(priority_override)
         delivery["updated_at"] = now
         StateStore.replace_json(lease_path, lease)
         StateStore.replace_json(self.store.delivery_path, delivery)
@@ -2097,7 +2649,9 @@ class TaskController:
         session_label: str,
         mode: str = "write",
         slug: str | None = None,
+        dependency_ids: Sequence[str] | None = None,
         offline: bool = False,
+        queue_mode: bool = False,
     ) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
         if not owner_launch:
@@ -2139,7 +2693,8 @@ class TaskController:
             raise TaskSessionError(
                 f"Task {expected} blocked: {gate_name} is missing: {concrete_requirement}"
             )
-        missing = sorted(set(document.dependencies) - self._completed_dependency_ids())
+        resolved_dependencies = _resolved_dependency_ids(dependency_ids, document.dependencies)
+        missing = sorted(set(resolved_dependencies) - self._completed_dependency_ids())
         if missing:
             raise TaskSessionError(
                 f"Task {expected} has incomplete dependencies: {', '.join(missing)}"
@@ -2189,9 +2744,19 @@ class TaskController:
                 "session_label": session_label,
                 "concurrency_class": document.concurrency_class,
                 "integration_policy": "task-pr-to-master",
+                "dependency_ids": list(resolved_dependencies),
+                "dependency_source": "github-issue" if dependency_ids is not None else "task-spec",
                 "owner_launch": True,
                 "canonical_master_refresh": canonical_refresh,
             }
+            if queue_mode:
+                lease["queue_mode"] = True
+                lease["queue_budget"] = {
+                    "review_fix_cycles": 0,
+                    "ci_fix_cycles": 0,
+                    "scope_expansions": 0,
+                    "events": [],
+                }
             self.store.create_json(lease_path, lease)
         try:
             self.repository.create_task_worktree(branch, target, base_sha)
@@ -2209,6 +2774,8 @@ class TaskController:
             "prompt": (
                 f"Worktree: {target.resolve()}\nBranch: {branch}\n"
                 f"Base origin/master: {base_sha}\nTask: {expected} ({document.path})\n"
+                f"Dependencies ({'Issue' if dependency_ids is not None else 'task spec'} source): "
+                f"{', '.join(resolved_dependencies) or 'none'}\n"
                 f"Canonical master checkpoint: {canonical_refresh['result']}\n"
                 "Concurrency: missing task concurrency metadata defaults to independent-write; "
                 "exclusive-write is reserved for global/coordination-sensitive scope. Only an "
@@ -2223,6 +2790,74 @@ class TaskController:
                 f"Recovery: python scripts/task_session.py recover {expected}\n"
             ),
         }
+
+    def record_queue_cycle(
+        self,
+        task_id: str,
+        *,
+        kind: str,
+        reason: str,
+    ) -> dict[str, Any]:
+        """Record one bounded continuous-queue fix cycle in durable controller state."""
+
+        expected = normalize_task_id(task_id)
+        normalized_kind = kind.strip().lower()
+        if normalized_kind not in {"review", "ci"}:
+            raise TaskSessionError("queue cycle kind must be review or ci")
+        if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 4096:
+            raise TaskSessionError("queue cycle reason must be a bounded non-empty string")
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            lease = self.store.read_json(lease_path)
+            if not isinstance(lease, dict) or lease.get("task_id") != expected:
+                raise TaskSessionError(f"No active queue lease exists for Task {expected}")
+            if lease.get("queue_mode") is not True:
+                raise TaskSessionError(f"Task {expected} is not running in continuous queue mode")
+            if self._lease_state(lease) in TERMINAL_LEASE_STATES:
+                raise TaskSessionError(f"Task {expected} is already terminal")
+            raw_budget = lease.get("queue_budget")
+            if not isinstance(raw_budget, dict):
+                raise TaskSessionError(f"Task {expected} queue budget state is missing")
+            review_cycles = raw_budget.get("review_fix_cycles", 0)
+            ci_cycles = raw_budget.get("ci_fix_cycles", 0)
+            scope_expansions = raw_budget.get("scope_expansions", 0)
+            if any(
+                isinstance(value, bool) or not isinstance(value, int)
+                for value in (review_cycles, ci_cycles, scope_expansions)
+            ):
+                raise TaskSessionError(f"Task {expected} queue budget state is malformed")
+            if normalized_kind == "review":
+                review_cycles += 1
+            else:
+                ci_cycles += 1
+            try:
+                DEFAULT_QUEUE_BUDGET.check_counters(
+                    tasks_started=1,
+                    review_fix_cycles=review_cycles,
+                    ci_fix_cycles=ci_cycles,
+                    scope_expansions=scope_expansions,
+                )
+            except IssueWorkflowError as error:
+                raise TaskSessionError(str(error)) from error
+            raw_events = raw_budget.get("events", [])
+            if not isinstance(raw_events, list) or len(raw_events) >= 6:
+                raise TaskSessionError(f"Task {expected} queue cycle ledger is malformed or full")
+            event = {
+                "kind": normalized_kind,
+                "reason": reason.strip(),
+                "recorded_at": utc_now(),
+                "sequence": len(raw_events) + 1,
+            }
+            budget = {
+                "review_fix_cycles": review_cycles,
+                "ci_fix_cycles": ci_cycles,
+                "scope_expansions": scope_expansions,
+                "events": [*raw_events, event],
+            }
+            lease["queue_budget"] = budget
+            lease["updated_at"] = utc_now()
+            StateStore.replace_json(lease_path, lease)
+        return {"task_id": expected, "queue_budget": budget}
 
     def adopt_current(
         self,
@@ -2418,14 +3053,14 @@ class TaskController:
         task_id: str,
         *,
         head_sha: str,
-        review_verdict: str,
-        qa_verdict: str,
+        quality_verdict: str,
+        qa_verdict: str = "NOT_REQUIRED",
     ) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
-        if review_verdict not in {"APPROVED", "APPROVED_WITH_NON_BLOCKING_FINDINGS"}:
-            raise TaskSessionError("mark-ready requires an approved independent review verdict")
-        if qa_verdict != "PASS":
-            raise TaskSessionError("mark-ready requires QA verdict PASS")
+        if quality_verdict != "PASS":
+            raise TaskSessionError("mark-ready requires deterministic quality checks PASS")
+        if qa_verdict not in {"PASS", "NOT_REQUIRED"}:
+            raise TaskSessionError("mark-ready QA verdict must be PASS or NOT_REQUIRED")
         lease_path = self.store.task_lease_path(expected)
         lease = self.store.read_json(lease_path)
         if lease is None or lease.get("mode") != "write":
@@ -2447,10 +3082,13 @@ class TaskController:
         if not self.repository.is_ancestor(base_sha, head_sha):
             raise TaskSessionError("Task HEAD does not descend from leased origin/master base")
         document = find_task_document(self._canonical_root(), expected)
+        dependency_ids = _resolved_dependency_ids(
+            lease.get("dependency_ids"), document.dependencies
+        )
         validate_task_commit_messages(
             expected,
             self.repository.commits(f"{base_sha}..{head_sha}"),
-            dependency_ids=document.dependencies,
+            dependency_ids=dependency_ids,
         )
         gate: dict[str, Any] | None = None
         gate_issue: str | None = None
@@ -2500,7 +3138,7 @@ class TaskController:
                     "ready_base_origin_master_sha": base_sha,
                     "ready_for_delivery_at": now,
                     "ready_sequence": sequence,
-                    "review_verdict": review_verdict,
+                    "quality_verdict": quality_verdict,
                     "qa_verdict": qa_verdict,
                     "clean_worktree": True,
                     "task_provenance": {
@@ -2517,8 +3155,15 @@ class TaskController:
             StateStore.replace_json(lease_path, current)
         return current
 
-    def acquire_delivery(self, task_id: str, *, offline: bool = False) -> dict[str, Any]:
+    def acquire_delivery(
+        self,
+        task_id: str,
+        *,
+        offline: bool = False,
+        owner_priority_reason: str | None = None,
+    ) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
+        priority_reason = normalize_delivery_priority_reason(owner_priority_reason)
         lease_path = self.store.task_lease_path(expected)
         with self.store.lock():
             lease = self.store.read_json(lease_path)
@@ -2567,7 +3212,7 @@ class TaskController:
                 }
             if not candidate_ids:
                 raise TaskSessionError("Delivery queue is empty while acquiring a task")
-            if candidate_ids[0] != expected:
+            if candidate_ids[0] != expected and priority_reason is None:
                 lease["lifecycle_state"] = "waiting-for-delivery"
                 lease["delivery_waiting_since"] = lease.get("delivery_waiting_since") or utc_now()
                 lease["updated_at"] = utc_now()
@@ -2580,7 +3225,19 @@ class TaskController:
                     "queue_position": candidate_ids.index(expected) + 1,
                     "queue_head": candidate_ids[0],
                 }
-            promoted = self._promote_next_delivery_locked(delivery)
+            priority_override: dict[str, Any] | None = None
+            if candidate_ids[0] != expected:
+                priority_override = {
+                    "task_id": expected,
+                    "skipped_task_ids": candidate_ids[: candidate_ids.index(expected)],
+                    "reason": priority_reason,
+                    "authorized_at": utc_now(),
+                }
+            promoted = self._promote_next_delivery_locked(
+                delivery,
+                requested_task_id=expected if priority_override is not None else None,
+                priority_override=priority_override,
+            )
             if promoted is None or str(promoted.get("task_id", "")).upper() != expected:
                 raise TaskSessionError("Delivery lane promotion did not select the requested task")
             current = self.store.read_json(lease_path)
@@ -2588,11 +3245,15 @@ class TaskController:
                 raise TaskSessionError(
                     f"Task {expected} lease disappeared after delivery acquisition"
                 )
+            if priority_override is not None:
+                current["delivery_priority_override"] = priority_override
+                StateStore.replace_json(lease_path, current)
             return {
                 "acquired": True,
                 "task_id": expected,
                 "lifecycle_state": self._lease_state(current),
                 "delivery": delivery,
+                "priority_override": priority_override,
             }
 
     def _mark_delivery_refresh_failure(self, task_id: str, reason: str) -> None:
@@ -2766,10 +3427,13 @@ class TaskController:
                 f"Task {expected} delivery HEAD changed after refresh: {head_sha}"
             )
         document = find_task_document(self._canonical_root(), expected)
+        dependency_ids = _resolved_dependency_ids(
+            lease.get("dependency_ids"), document.dependencies
+        )
         validate_task_commit_messages(
             expected,
             self.repository.commits(f"{base_sha}..{head_sha}"),
-            dependency_ids=document.dependencies,
+            dependency_ids=dependency_ids,
         )
         with self.store.lock():
             lease_path = self.store.task_lease_path(expected)
@@ -2885,10 +3549,11 @@ class TaskController:
                 "ready_base_origin_master_sha",
                 "ready_for_delivery_at",
                 "ready_sequence",
-                "review_verdict",
+                "quality_verdict",
                 "qa_verdict",
                 "task_provenance",
                 "canonical_master_refresh",
+                "delivery_priority_override",
             ):
                 current.pop(key, None)
             current.update(
@@ -2906,6 +3571,7 @@ class TaskController:
                 }
             )
             delivery["owner"] = None
+            delivery.pop("priority_override", None)
             delivery["updated_at"] = now
             StateStore.replace_json(lease_path, current)
             StateStore.replace_json(self.store.delivery_path, delivery)
@@ -3021,7 +3687,7 @@ class TaskController:
                 "ready_base_origin_master_sha",
                 "ready_for_delivery_at",
                 "ready_sequence",
-                "review_verdict",
+                "quality_verdict",
                 "qa_verdict",
                 "task_provenance",
                 "canonical_master_refresh",
@@ -3134,6 +3800,10 @@ class TaskController:
                 raise TaskSessionError(
                     "Delivery gate evidence changed before production completion"
                 )
+            if "queue_budget" in current:
+                history["queue_budget"] = current["queue_budget"]
+            if "delivery_priority_override" in current:
+                history["delivery_priority_override"] = current["delivery_priority_override"]
             history_path = self.store.history / f"task-{expected}.json"
             if history_path.exists():
                 raise TaskSessionError(
@@ -3317,9 +3987,14 @@ class TaskController:
             raise TaskSessionError("finish cleanup refuses task branch with unique commits")
         artifact_cleanup: dict[str, Any] = {"status": "noop", "removed_count": 0}
         try:
+            preserved_prefixes = _active_delivery_exclude_prefixes(root, expected)
             artifact_cleanup = ArtifactManager(
                 root / ".artifacts", repo_root=root, controller_state_dir=self.store.root
-            ).cleanup_task(expected, terminal_state="finished")
+            ).cleanup_task(
+                expected,
+                terminal_state="finished",
+                exclude_prefixes=preserved_prefixes,
+            )
         except ArtifactError as error:
             raise TaskSessionError(f"finish artifact cleanup failed closed: {error}") from error
         if artifact_cleanup.get("status") not in {"completed", "noop"} or artifact_cleanup.get(
@@ -3355,6 +4030,7 @@ class TaskController:
             StateStore.replace_json(history_path, history)
             lease_path.unlink()
             latest_delivery["owner"] = None
+            latest_delivery.pop("priority_override", None)
             latest_delivery["updated_at"] = utc_now()
             StateStore.replace_json(self.store.delivery_path, latest_delivery)
             next_owner = self._promote_next_delivery_locked(latest_delivery)
@@ -3414,7 +4090,9 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument("--session-label", required=True)
     start.add_argument("--mode", choices=("write",), default="write")
     start.add_argument("--slug")
+    start.add_argument("--dependency-id", action="append")
     start.add_argument("--offline", action="store_true")
+    start.add_argument("--queue-mode", action="store_true")
     adopt = subparsers.add_parser("adopt-current")
     adopt.add_argument("task_id")
     adopt.add_argument("--owner-launch", action="store_true")
@@ -3428,14 +4106,15 @@ def _parser() -> argparse.ArgumentParser:
     ready.add_argument("task_id")
     ready.add_argument("--head-sha", required=True)
     ready.add_argument(
-        "--review-verdict",
-        choices=("APPROVED", "APPROVED_WITH_NON_BLOCKING_FINDINGS"),
+        "--quality-verdict",
+        choices=("PASS",),
         required=True,
     )
-    ready.add_argument("--qa-verdict", choices=("PASS",), required=True)
+    ready.add_argument("--qa-verdict", choices=("PASS", "NOT_REQUIRED"), default="NOT_REQUIRED")
     acquire_delivery = subparsers.add_parser("acquire-delivery")
     acquire_delivery.add_argument("task_id")
     acquire_delivery.add_argument("--offline", action="store_true")
+    acquire_delivery.add_argument("--owner-priority-reason")
     refresh_delivery = subparsers.add_parser("refresh-delivery")
     refresh_delivery.add_argument("task_id")
     refresh_delivery.add_argument("--offline", action="store_true")
@@ -3453,6 +4132,10 @@ def _parser() -> argparse.ArgumentParser:
     resolve_recovery.add_argument("task_id")
     resolve_recovery.add_argument("--reason", required=True)
     resolve_recovery.add_argument("--owner-authorize", action="store_true")
+    queue_cycle = subparsers.add_parser("record-queue-cycle")
+    queue_cycle.add_argument("task_id")
+    queue_cycle.add_argument("--kind", choices=("review", "ci"), required=True)
+    queue_cycle.add_argument("--reason", required=True)
     production = subparsers.add_parser("complete-production")
     production.add_argument("task_id")
     production.add_argument("--pr", type=int, required=True)
@@ -3498,7 +4181,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     session_label=args.session_label,
                     mode=args.mode,
                     slug=args.slug,
+                    dependency_ids=args.dependency_id,
                     offline=args.offline,
+                    queue_mode=args.queue_mode,
                 )
             )
             return 0
@@ -3521,13 +4206,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 controller.mark_ready(
                     args.task_id,
                     head_sha=args.head_sha,
-                    review_verdict=args.review_verdict,
+                    quality_verdict=args.quality_verdict,
                     qa_verdict=args.qa_verdict,
                 )
             )
             return 0
         if args.command == "acquire-delivery":
-            _print(controller.acquire_delivery(args.task_id, offline=args.offline))
+            _print(
+                controller.acquire_delivery(
+                    args.task_id,
+                    offline=args.offline,
+                    owner_priority_reason=args.owner_priority_reason,
+                )
+            )
             return 0
         if args.command == "refresh-delivery":
             _print(controller.refresh_for_delivery(args.task_id, offline=args.offline))
@@ -3549,6 +4240,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                     args.task_id,
                     reason=args.reason,
                     owner_authorize=args.owner_authorize,
+                )
+            )
+            return 0
+        if args.command == "record-queue-cycle":
+            _print(
+                controller.record_queue_cycle(
+                    args.task_id,
+                    kind=args.kind,
+                    reason=args.reason,
                 )
             )
             return 0

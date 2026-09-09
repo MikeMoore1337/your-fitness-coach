@@ -95,6 +95,9 @@ class FakeGitHub:
         self.pulls: dict[int, dict[str, Any]] = {}
         self.commits: dict[int, list[dict[str, Any]]] = {}
         self.files: dict[int, list[dict[str, Any]]] = {}
+        self.reviews: dict[int, list[dict[str, Any]]] = {}
+        self.comments: dict[int, list[dict[str, Any]]] = {}
+        self.threads: dict[int, list[dict[str, Any]]] = {}
         self.checks: dict[str, list[dict[str, Any]]] = {}
         self.open_prs: list[dict[str, Any]] = []
         self.active_runs: list[dict[str, Any]] = []
@@ -118,6 +121,18 @@ class FakeGitHub:
 
     def pull_request_files(self, number: int) -> list[dict[str, Any]]:
         return self.files.get(number, [{"filename": "README.md"}])
+
+    def pull_request_reviews(self, number: int) -> list[dict[str, Any]]:
+        if number in self.reviews:
+            return self.reviews[number]
+        head_sha = str(self.pulls[number].get("head", {}).get("sha", ""))
+        return [{"state": "APPROVED", "commit_id": head_sha, "user": {"login": "pytest"}}]
+
+    def issue_comments(self, number: int) -> list[dict[str, Any]]:
+        return self.comments.get(number, [])
+
+    def review_threads(self, number: int) -> list[dict[str, Any]]:
+        return self.threads.get(number, [])
 
     def check_runs(self, sha: str) -> list[dict[str, Any]]:
         return self.checks.get(sha, [])
@@ -175,14 +190,24 @@ def _success_check(sha: str) -> dict[str, Any]:
 
 
 def _prepare_started(
-    repository: tuple[Path, Any], task_id: str = "301", *, concurrency: str = "independent-write"
+    repository: tuple[Path, Any],
+    task_id: str = "301",
+    *,
+    concurrency: str = "independent-write",
+    queue_mode: bool = False,
 ) -> tuple[Path, Any, Any, Path, str, str]:
     root, git_repository = repository
     _write_task(root, task_id, "synthetic-task", concurrency=concurrency)
     controller = task_session.TaskController(
         git_repository, github=FakeGitHub(git_repository.ref("origin/master"))
     )
-    started = controller.start(task_id, owner_launch=True, session_label="pytest", offline=True)
+    started = controller.start(
+        task_id,
+        owner_launch=True,
+        session_label="pytest",
+        offline=True,
+        queue_mode=queue_mode,
+    )
     worktree = Path(started["lease"]["worktree"])
     branch = str(started["lease"]["branch"])
     base_sha = str(started["lease"]["base_origin_master_sha"])
@@ -191,6 +216,26 @@ def _prepare_started(
     _git(worktree, "commit", "-m", f"feat: [Task {task_id}] synthetic change")
     head_sha = _git(worktree, "rev-parse", "HEAD")
     return root, git_repository, controller, worktree, branch, base_sha + ":" + head_sha
+
+
+def test_record_queue_cycle_is_durable_and_bounded(repository: tuple[Path, Any]) -> None:
+    _, _, controller, _, _, _ = _prepare_started(repository, "250", queue_mode=True)
+
+    for index in range(3):
+        budget = controller.record_queue_cycle(
+            "250", kind="review", reason=f"bounded review fix {index + 1}"
+        )
+
+    assert budget["task_id"] == "250"
+    assert budget["queue_budget"]["review_fix_cycles"] == 3
+    assert budget["queue_budget"]["ci_fix_cycles"] == 0
+    assert budget["queue_budget"]["scope_expansions"] == 0
+    with pytest.raises(task_session.TaskSessionError, match="HUMAN_REQUIRED"):
+        controller.record_queue_cycle("250", kind="review", reason="fourth review fix")
+
+    lease = next(item for item in controller.status()["leases"] if item["task_id"] == "250")
+    assert lease["queue_budget"]["review_fix_cycles"] == 3
+    assert len(lease["queue_budget"]["events"]) == 3
 
 
 def _write_gate_evidence(
@@ -422,6 +467,286 @@ def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(
         task_session.validate_pr_event(object(), github, event_path)  # type: ignore[arg-type]
 
 
+def _review_pr(head_sha: str) -> dict[str, Any]:
+    pull_request = _task_pr(219, "219", "a" * 40, head_sha)
+    pull_request.update({"state": "open", "mergeable": True, "mergeable_state": "clean"})
+    return pull_request
+
+
+def test_review_contract_rejects_pending_review_for_current_head() -> None:
+    with pytest.raises(task_session.TaskSessionError, match="no completed approval"):
+        task_session.validate_pull_request_review_contract(_review_pr("b" * 40), [], [], [])
+
+
+def test_review_contract_rejects_old_codex_review_marker() -> None:
+    pull_request = _review_pr("b" * 40)
+    comments = [
+        {
+            "user": {"login": "chatgpt-codex-connector"},
+            "body": "Codex Review: **Reviewed commit:** `aaaaaaa`",
+        }
+    ]
+    with pytest.raises(task_session.TaskSessionError, match="stale review markers"):
+        task_session.validate_pull_request_review_contract(pull_request, [], comments, [])
+
+
+def test_review_contract_rejects_current_blocking_finding() -> None:
+    head_sha = "b" * 40
+    reviews = [
+        {
+            "id": 1,
+            "state": "CHANGES_REQUESTED",
+            "commit_id": head_sha,
+            "body": "P1 functional defect",
+        }
+    ]
+    with pytest.raises(task_session.TaskSessionError, match="blocking current-head"):
+        task_session.validate_pull_request_review_contract(_review_pr(head_sha), reviews, [], [])
+
+
+def test_review_contract_uses_latest_state_changing_review_for_each_reviewer() -> None:
+    head_sha = "b" * 40
+    reviews = [
+        {
+            "id": 1,
+            "state": "CHANGES_REQUESTED",
+            "commit_id": head_sha,
+            "submitted_at": "2026-09-09T01:00:00Z",
+            "user": {"login": "reviewer"},
+            "body": "P1 old finding",
+        },
+        {
+            "id": 2,
+            "state": "APPROVED",
+            "commit_id": head_sha,
+            "submitted_at": "2026-09-09T02:00:00Z",
+            "user": {"login": "reviewer"},
+        },
+    ]
+
+    result = task_session.validate_pull_request_review_contract(
+        _review_pr(head_sha), reviews, [], []
+    )
+
+    assert result["status"] == "PASS"
+    assert result["formal_approval_count"] == 1
+
+
+def test_review_contract_rejects_unresolved_thread_even_with_exact_approval() -> None:
+    head_sha = "b" * 40
+    reviews = [{"state": "APPROVED", "commit_id": head_sha, "user": {"login": "owner"}}]
+    with pytest.raises(task_session.TaskSessionError, match="unresolved review threads"):
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha), reviews, [], [{"isResolved": False}]
+        )
+
+
+def test_review_contract_accepts_exact_codex_comment_and_resolved_threads() -> None:
+    head_sha = "b" * 40
+    comments = [
+        {
+            "id": 12,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                "Codex Review: Didn't find any major issues. "
+                f"**Reviewed commit:** `{head_sha[:10]}`"
+            ),
+        },
+        {
+            "id": 13,
+            "user": {"login": "codereviewbot-ai"},
+            "body": "Review skipped: Repository Owner rate limit exceeded",
+        },
+    ]
+    result = task_session.validate_pull_request_review_contract(
+        _review_pr(head_sha),
+        [],
+        comments,
+        [{"isResolved": True}],
+        known_commit_shas=(head_sha,),
+    )
+    assert result["status"] == "PASS"
+    assert result["sources"] == ["codex-completed-review-comment"]
+    assert result["head_sha"] == head_sha
+
+
+def test_review_contract_rejects_ambiguous_abbreviated_codex_marker() -> None:
+    head_sha = "abcdef0" + "1" * 33
+    other_sha = "abcdef0" + "2" * 33
+    comments = [
+        {
+            "id": 14,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                f"Codex Review: Didn't find any major issues. **Reviewed commit:** `{head_sha[:7]}`"
+            ),
+        }
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="stale review markers"):
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha),
+            [],
+            comments,
+            [],
+            known_commit_shas=(head_sha, other_sha),
+        )
+
+
+def test_review_contract_rejects_exact_codex_summary_without_approval() -> None:
+    head_sha = "b" * 40
+    comments = [
+        {
+            "id": 15,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                "Codex Review Summary: Completed. **Reviewed commit:** "
+                f"`{head_sha[:10]}`\n\nP1 blocking finding"
+            ),
+        }
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit approving verdict"):
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha), [], comments, [], known_commit_shas=(head_sha,)
+        )
+
+
+def test_review_contract_uses_latest_exact_head_codex_verdict() -> None:
+    head_sha = "b" * 40
+    comments = [
+        {
+            "id": 16,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "created_at": "2026-09-09T05:00:00Z",
+            "updated_at": "2026-09-09T05:00:00Z",
+            "body": (
+                "Codex Review: Didn't find any major issues. "
+                f"**Reviewed commit:** `{head_sha[:10]}`"
+            ),
+        },
+        {
+            "id": 17,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "created_at": "2026-09-09T06:00:00Z",
+            "updated_at": "2026-09-09T06:00:00Z",
+            "body": (
+                "Codex Review Summary: Completed. **Reviewed commit:** "
+                f"`{head_sha[:10]}`\n\nP1 blocking finding"
+            ),
+        },
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit approving verdict"):
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha), [], comments, [], known_commit_shas=(head_sha,)
+        )
+
+
+def test_review_contract_negative_codex_verdict_vetoes_formal_approval() -> None:
+    head_sha = "b" * 40
+    reviews = [
+        {
+            "id": 18,
+            "state": "APPROVED",
+            "commit_id": head_sha,
+            "user": {"login": "owner"},
+        }
+    ]
+    comments = [
+        {
+            "id": 19,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "created_at": "2026-09-09T07:00:00Z",
+            "body": (
+                "Codex Review Summary: Completed. P1 blocking finding. "
+                f"**Reviewed commit:** `{head_sha[:10]}`"
+            ),
+        }
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="blocking exact-head Codex verdict"):
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha), reviews, comments, [], known_commit_shas=(head_sha,)
+        )
+
+
+@pytest.mark.parametrize("mergeable_state", ["blocked", "unstable"])
+def test_review_event_accepts_exact_review_before_aggregate_check_is_green(
+    mergeable_state: str,
+) -> None:
+    head_sha = "b" * 40
+    pull_request = _review_pr(head_sha)
+    pull_request["mergeable_state"] = mergeable_state
+    comments = [
+        {
+            "id": 14,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                "Codex Review: Didn't find any major issues. review status completed; "
+                f"**Reviewed commit:** `{head_sha[:10]}`"
+            ),
+        }
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="clean mergeable"):
+        task_session.validate_pull_request_review_contract(pull_request, [], comments, [])
+
+    result = task_session.validate_pull_request_review_contract(
+        pull_request,
+        [],
+        comments,
+        [],
+        known_commit_shas=(head_sha,),
+        allow_blocked_mergeable_state=True,
+    )
+    assert result["status"] == "PASS"
+    assert result["head_sha"] == head_sha
+
+
+def test_review_event_polls_transient_mergeability_before_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _review_pr(head_sha)
+    github = FakeGitHub(base_sha)
+    github.pulls[219] = pull_request
+    github.commits[219] = []
+    responses = [
+        {**pull_request, "mergeable": None, "mergeable_state": None},
+        {**pull_request, "mergeable": None, "mergeable_state": None},
+        pull_request,
+    ]
+    fetches: list[int] = []
+
+    def fetch(number: int) -> dict[str, Any]:
+        fetches.append(number)
+        return responses.pop(0)
+
+    monkeypatch.setattr(github, "pull_request", fetch)
+    current_time = [0.0]
+    waits: list[float] = []
+
+    def monotonic() -> float:
+        return current_time[0]
+
+    def sleep(seconds: float) -> None:
+        waits.append(seconds)
+        current_time[0] += seconds
+
+    monkeypatch.setattr(task_session.time, "monotonic", monotonic)
+    monkeypatch.setattr(task_session.time, "sleep", sleep)
+    event_path = tmp_path / "review-event.json"
+    event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
+
+    result = task_session.validate_pr_review_event(github, event_path)  # type: ignore[arg-type]
+
+    assert result["status"] == "PASS"
+    assert fetches == [219, 219, 219]
+    assert waits == [1.0, 1.0]
+
+
 def test_master_ruleset_requires_pr_current_base_and_aggregate_check() -> None:
     weak = [
         {
@@ -475,6 +800,28 @@ def test_start_uses_exact_origin_master_and_records_no_dev_lane(
     assert "base_origin_dev_sha" not in lease
     assert "PR master" in started["prompt"]
     assert "refresh-delivery task branch" in started["prompt"]
+
+
+def test_issue_dependency_override_is_recorded_as_source_of_truth(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "202", "issue-dependencies", dependencies="999")
+    controller = task_session.TaskController(
+        git_repository, github=FakeGitHub(git_repository.ref("origin/master"))
+    )
+
+    started = controller.start(
+        "202",
+        owner_launch=True,
+        session_label="issue-contract",
+        dependency_ids=(),
+        offline=True,
+    )
+
+    assert started["lease"]["dependency_ids"] == []
+    assert started["lease"]["dependency_source"] == "github-issue"
+    assert "Dependencies (Issue source): none" in started["prompt"]
 
 
 def test_two_independent_write_tasks_get_distinct_leases_and_worktrees(
@@ -547,9 +894,7 @@ def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
     controller = task_session.TaskController(git_repository)
     existing = controller.start("226A", owner_launch=True, session_label="existing", offline=True)
     existing_head = _commit_task(Path(existing["lease"]["worktree"]), "226A")
-    controller.mark_ready(
-        "226A", head_sha=existing_head, review_verdict="APPROVED", qa_verdict="PASS"
-    )
+    controller.mark_ready("226A", head_sha=existing_head, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("226A", offline=True)
 
     candidate = controller.start("226B", owner_launch=True, session_label="candidate", offline=True)
@@ -729,7 +1074,7 @@ def test_active_production_deploy_blocks_only_delivery_acquisition(
     second = controller.start("231", owner_launch=True, session_label="deploy-b")
     second_lease = second["lease"]
     second_head = _commit_task(Path(second_lease["worktree"]), "231")
-    controller.mark_ready("231", head_sha=second_head, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("231", head_sha=second_head, quality_verdict="PASS", qa_verdict="PASS")
 
     waiting = controller.acquire_delivery("231")
 
@@ -761,9 +1106,7 @@ def test_delivery_lane_is_serial_and_handoff_is_deterministic(
     }
     for task_id in ("232", "233"):
         head_sha = _commit_task(Path(started[task_id]["lease"]["worktree"]), task_id)
-        controller.mark_ready(
-            task_id, head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS"
-        )
+        controller.mark_ready(task_id, head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     first = controller.acquire_delivery("232", offline=True)
     second = controller.acquire_delivery("233", offline=True)
@@ -785,6 +1128,63 @@ def test_delivery_lane_is_serial_and_handoff_is_deterministic(
     ] == ("delivering")
 
 
+def test_owner_priority_promotes_current_task_and_preserves_fifo_handoff(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    for task_id in ("246", "247", "248"):
+        _write_task(root, task_id, f"priority-{task_id}", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    started = {
+        task_id: controller.start(
+            task_id, owner_launch=True, session_label=f"priority-{task_id}", offline=True
+        )
+        for task_id in ("246", "247", "248")
+    }
+    for task_id in ("246", "247", "248"):
+        head_sha = _commit_task(Path(started[task_id]["lease"]["worktree"]), task_id)
+        controller.mark_ready(task_id, head_sha=head_sha, quality_verdict="PASS")
+
+    acquired = controller.acquire_delivery(
+        "247", offline=True, owner_priority_reason="Owner requested current task first"
+    )
+
+    assert acquired["acquired"] is True
+    priority_override = acquired["priority_override"]
+    assert priority_override["task_id"] == "247"
+    assert priority_override["skipped_task_ids"] == ["246"]
+    assert priority_override["reason"] == "Owner requested current task first"
+    assert priority_override["authorized_at"]
+    assert controller.store.delivery_state()["owner"]["task_id"] == "247"
+    assert controller.store.delivery_state()["priority_override"]["skipped_task_ids"] == ["246"]
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("246"))["lifecycle_state"]
+        == "ready-for-delivery"
+    )
+
+    released = controller.release_delivery(
+        "247", reason="synthetic priority delivery interruption", offline=True
+    )
+
+    assert released["lifecycle_state"] == "recovery-required"
+    assert controller.store.delivery_state()["owner"]["task_id"] == "246"
+    assert "priority_override" not in controller.store.delivery_state()
+
+
+def test_owner_priority_requires_a_bounded_reason(repository: tuple[Path, Any]) -> None:
+    root, git_repository = repository
+    _write_task(root, "249", "priority-reason", concurrency="independent-write")
+    controller = task_session.TaskController(git_repository)
+    started = controller.start(
+        "249", owner_launch=True, session_label="priority-reason", offline=True
+    )
+    head_sha = _commit_task(Path(started["lease"]["worktree"]), "249")
+    controller.mark_ready("249", head_sha=head_sha, quality_verdict="PASS")
+
+    with pytest.raises(task_session.TaskSessionError, match="non-empty reason"):
+        controller.acquire_delivery("249", offline=True, owner_priority_reason=" ")
+
+
 def test_release_delivery_does_not_handoff_during_active_production(
     repository: tuple[Path, Any],
 ) -> None:
@@ -801,9 +1201,7 @@ def test_release_delivery_does_not_handoff_during_active_production(
     }
     for task_id in ("233A", "233B"):
         head_sha = _commit_task(Path(started[task_id]["lease"]["worktree"]), task_id)
-        controller.mark_ready(
-            task_id, head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS"
-        )
+        controller.mark_ready(task_id, head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     acquired = controller.acquire_delivery("233A", offline=True)
     assert acquired["acquired"] is True
 
@@ -830,7 +1228,7 @@ def test_reopen_for_review_clears_delivery_snapshot_and_requires_new_readiness(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "234A", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("234A", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("234A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("234A", offline=True)
     refreshed = controller.refresh_for_delivery("234A", offline=True)
     _write_gate_evidence(
@@ -852,7 +1250,7 @@ def test_reopen_for_review_clears_delivery_snapshot_and_requires_new_readiness(
 
     new_head = _commit_task(worktree, "234A", filename="review-fix.txt")
     ready = controller.mark_ready(
-        "234A", head_sha=new_head, review_verdict="APPROVED", qa_verdict="PASS"
+        "234A", head_sha=new_head, quality_verdict="PASS", qa_verdict="PASS"
     )
     assert ready["lifecycle_state"] == "ready-for-delivery"
     assert ready["ready_head_sha"] == new_head
@@ -920,7 +1318,7 @@ def test_busy_delivery_lane_does_not_block_compatible_implementation(
     first = controller.start("240", owner_launch=True, session_label="busy-a", offline=True)
     first_worktree = Path(first["lease"]["worktree"])
     first_head = _commit_task(first_worktree, "240")
-    controller.mark_ready("240", head_sha=first_head, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("240", head_sha=first_head, quality_verdict="PASS", qa_verdict="PASS")
     acquired = controller.acquire_delivery("240", offline=True)
 
     second = controller.start("241", owner_launch=True, session_label="busy-b", offline=True)
@@ -939,7 +1337,7 @@ def test_refresh_updates_stale_task_base_and_invalidates_old_exact_head_evidence
     )
     old_base, old_head = sha_pair.split(":")
     _write_gate_evidence(controller, "234", branch=branch, head_sha=old_head, base_sha=old_base)
-    controller.mark_ready("234", head_sha=old_head, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("234", head_sha=old_head, quality_verdict="PASS", qa_verdict="PASS")
 
     (root / "master-refresh.txt").write_text("M1\n", encoding="utf-8")
     _git(root, "add", "master-refresh.txt")
@@ -980,7 +1378,7 @@ def test_refresh_delivery_waits_for_active_production_before_touching_task_branc
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "244", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("244", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("244", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("244", offline=True)
     github = controller.github
     assert isinstance(github, FakeGitHub)
@@ -1005,7 +1403,7 @@ def test_refresh_requires_new_evidence_when_head_and_base_are_unchanged(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "243", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("243", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("243", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     controller.acquire_delivery("243", offline=True)
     refreshed = controller.refresh_for_delivery("243", offline=True)
@@ -1035,7 +1433,7 @@ def test_refresh_refuses_post_ready_commit_until_review_and_qa_repeat(
         repository, "243A", concurrency="independent-write"
     )
     base_sha, head_sha = sha_pair.split(":")
-    controller.mark_ready("243A", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("243A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("243A", offline=True)
     _commit_task(worktree, "243A", filename="post-ready-change.txt")
 
@@ -1444,7 +1842,7 @@ def test_canonical_refresh_waits_for_delivery_owner_without_mutation(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "245", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("245", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("245", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     assert controller.acquire_delivery("245", offline=True)["acquired"] is True
     before_master = git_repository.ref("master")
 
@@ -1566,14 +1964,14 @@ def test_mark_ready_persists_ready_state_without_old_base_pre_push_pass(
         terminal_result="PLAN_ONLY",
     )
     ready = controller.mark_ready(
-        "202", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS"
+        "202", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS"
     )
     assert ready["lifecycle_state"] == "ready-for-delivery"
     assert ready["local_evidence"]["status"] == "pending-final-delivery-gate"
 
     _write_gate_evidence(controller, "202", branch=branch, head_sha=head_sha, base_sha=base_sha)
     ready = controller.mark_ready(
-        "202", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS"
+        "202", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS"
     )
     assert ready["lifecycle_state"] == "ready-for-delivery"
     assert ready["pre_push_ci_pass"]["head_sha"] == head_sha
@@ -1587,7 +1985,7 @@ def test_record_production_success_requires_exact_merged_master_deployment(
     root, _, controller, _, branch, sha_pair = _prepare_started(repository, "203")
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "203", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("203", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("203", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     _prepare_delivery(controller, "203", branch=branch)
 
@@ -1623,7 +2021,7 @@ def test_record_production_success_rejects_sha_mismatch_without_mutation(
     _write_gate_evidence(
         controller, "204", branch=lease["branch"], head_sha=head_sha, base_sha=base_sha
     )
-    controller.mark_ready("204", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("204", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "204", branch=lease["branch"])
     with pytest.raises(task_session.TaskSessionError, match="equal the exact merged master SHA"):
         controller.record_production_success(
@@ -1640,7 +2038,7 @@ def test_record_production_success_rejects_gate_invalidated_during_finalization(
     root, _, controller, _, branch, sha_pair = _prepare_started(repository, "204A")
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "204A", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("204A", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("204A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "204A", branch=branch)
 
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 204A")
@@ -1743,13 +2141,15 @@ def test_recover_is_read_only_and_preserves_dirty_unique_task_state(
     assert (worktree / "dirty.txt").exists()
 
 
-def test_finish_cleans_exact_production_success_state(repository: tuple[Path, Any]) -> None:
+def test_finish_preserves_active_delivery_artifacts_until_worker_cleanup(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
     root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
         repository, "207"
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "207", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("207", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("207", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "207", branch=branch)
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 207")
     merge_sha = _git(root, "rev-parse", "HEAD")
@@ -1765,10 +2165,26 @@ def test_finish_cleans_exact_production_success_state(repository: tuple[Path, An
     controller.record_production_success(
         "207", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
     )
+    from scripts.artifact_manager import ArtifactManager
+
+    active_delivery = ArtifactManager(
+        root / ".artifacts", repo_root=root, controller_state_dir=controller.store.root
+    ).allocate_directory(
+        "207",
+        "temporary",
+        Path("temporary") / "delivery" / "active-worker",
+        purpose="active continuous delivery worker output",
+        command="scripts/run_task_delivery.py",
+        owner="run_task_delivery",
+    )
+    (active_delivery / "events.jsonl").write_text("worker output\n", encoding="utf-8")
+    monkeypatch.setenv(task_session.ACTIVE_DELIVERY_ARTIFACTS_ENV, str(active_delivery))
 
     result = controller.finish("207")
 
     assert result["cleanup_performed"] is True
+    assert active_delivery.is_dir()
+    assert (active_delivery / "events.jsonl").is_file()
     assert result["deleted_local_branch"] == branch
     assert not worktree.exists()
     assert not git_repository.ref_exists(branch)
@@ -1787,14 +2203,14 @@ def test_finish_cleans_only_delivered_task_and_preserves_next_delivery_task(
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "209", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("209", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("209", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     _write_task(root, "210", "queue-b", concurrency="independent-write")
     second = controller.start("210", owner_launch=True, session_label="queue-b", offline=True)
     second_worktree = Path(second["lease"]["worktree"])
     second_branch = str(second["lease"]["branch"])
     second_head = _commit_task(second_worktree, "210")
-    controller.mark_ready("210", head_sha=second_head, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("210", head_sha=second_head, quality_verdict="PASS", qa_verdict="PASS")
 
     _prepare_delivery(controller, "209", branch=branch)
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 209")
@@ -1830,7 +2246,7 @@ def test_finish_refuses_dirty_worktree_and_preserves_state(repository: tuple[Pat
     )
     base_sha, head_sha = sha_pair.split(":")
     _write_gate_evidence(controller, "208", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    controller.mark_ready("208", head_sha=head_sha, review_verdict="APPROVED", qa_verdict="PASS")
+    controller.mark_ready("208", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "208", branch=branch)
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 208")
     merge_sha = _git(root, "rev-parse", "HEAD")

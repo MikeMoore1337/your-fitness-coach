@@ -168,7 +168,8 @@ When a task file is explicitly provided:
 6. open the task's core `Рекомендуемые skills`; open `Условные skills` only on their actual trigger;
 7. execute only the `Основная роль` plus the exact `Дополнительные роли lifecycle` declared by the task;
 8. execute only the current task;
-9. do not start the next task automatically.
+9. do not start the next task automatically unless the owner explicitly activates the bounded
+   `CONTINUE_QUEUE` control-Issue mode.
 
 The phrase `полный task lifecycle` always means the `TASK_EXECUTION_LIFECYCLE.md` belonging to
 the current task's backlog. That file is the canonical implementation/review/QA/finalization
@@ -200,7 +201,10 @@ generic owner prompts.
 `LEGAL_COUNSEL_REQUIRED`, `EXTERNAL_AUTHORIZATION`, `DESTRUCTIVE_ACTION` или terminal blocker,
 controller/lifecycle после terminal success автоматически продолжает применимые review, QA,
 commit, task PR в `master`, required CI и normal release без дополнительного owner prompt.
-Тишина владельца не является gate. Следующая product task автоматически не запускается.
+Тишина владельца не является gate. Следующая product task автоматически не запускается в
+разовом режиме. Отдельная явная `CONTINUE_QUEUE` activation может запускать только существующие
+Issue-backed GREEN tasks в пределах bounded batch и сохраняет все human/external/legal/billing/
+credentials/destructive gates.
 
 Do not read completed tasks or historical changelogs unless the current task explicitly requires
 them. Legacy `masters/` and `references/` were removed and are not sources of truth.
@@ -454,7 +458,8 @@ Before declaring tracked backlog implementation complete:
 - after a successful normal production deploy, finish the controller lease, automatically clean
   only the exact safe task worktree/local branch, archive the task and validate backlog manifests
   without another generic owner confirmation;
-- do not start the next task.
+- do not start the next task from a one-task launch; only an explicit `CONTINUE_QUEUE` batch may
+  select the next existing Issue-backed GREEN task.
 
 For backlog tasks, follow the current `TASK_EXECUTION_LIFECYCLE.md` final-report contract.
 

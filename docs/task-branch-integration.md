@@ -7,7 +7,7 @@
 Нормальный flow разделён на независимую implementation lane и одну serial delivery lane:
 
 ```text
-Task A/B/C: implementation -> targeted checks -> review -> QA -> commit
+Task A/B/C: implementation -> targeted checks -> self-review -> QA -> commit
             -> READY_FOR_DELIVERY -> WAITING_FOR_DELIVERY (если slot занят)
 
 одна delivery lane:
@@ -83,7 +83,7 @@ Frontend jobs используют стандартный download cache `action
 команды, cache signal — как `CI_CACHE`.
 
 `scripts/task_session.py mark-ready` фиксирует durable `READY_FOR_DELIVERY`: clean task worktree,
-commit provenance, approved review/QA, исходный base SHA, текущий task HEAD и локальное evidence
+commit provenance, deterministic quality/QA, исходный base SHA, текущий task HEAD и локальное evidence
 состояние. Полный `PRE_PUSH_CI_PASS` не требуется на старом base. Перед PR команда
 `refresh-delivery` fetch/rebase-ит branch относительно latest `origin/master`, обновляет lease base
 и инвалидирует старое evidence; `validate-delivery` принимает только новый exact HEAD и новый
@@ -92,6 +92,12 @@ evidence. Если HEAD изменился после `READY_FOR_DELIVERY`, `ref
 повторных review/QA; для owner-safe возврата в эту стадию используется
 `reopen-for-review --reason <...>`, который освобождает delivery lane и удаляет старый readiness
 snapshot.
+
+PR CI не выполняет отдельный LLM review job и не запускается на `pull_request_review` event.
+Merge-ready определяется exact-head `checks`, deterministic quality/policy checks, актуальной
+provenance, mergeability и отсутствием применимых blocking findings. Отсутствие Codex review,
+лимит review API и connector review не являются blocker; отдельного `validate-pr-review` перед
+merge нет.
 
 ## Leases и безопасный closeout
 
@@ -146,7 +152,9 @@ base ancestry и отсутствие delivery owner, затем атомарн�
 до запуска worker: waiting после `READY_FOR_DELIVERY` — нормальное состояние, а не terminal blocker.
 Останавливает только точный implementation/recovery blocker либо явно объявленный
 human/legal/external/destructive/task-specific gate. Следующая product task автоматически не
-запускается.
+запускается в разовом режиме. Явный `CONTINUE_QUEUE` через control Issue включает только bounded
+batch существующих Issue-backed GREEN tasks; лимиты и точные правила описаны в
+[`docs/issue-driven-continuous-workflow.md`](issue-driven-continuous-workflow.md).
 
 Низкоуровневые команды:
 
@@ -159,7 +167,7 @@ python scripts/task_session.py adopt-current 135 --owner-launch --session-label 
 python scripts/task_session.py status
 python scripts/task_session.py recover 135
 python scripts/task_session.py resolve-recovery 135 --owner-authorize --reason "resume after verified recovery"
-python scripts/task_session.py mark-ready 135 --head-sha <sha> --review-verdict APPROVED --qa-verdict PASS
+python scripts/task_session.py mark-ready 135 --head-sha <sha> --quality-verdict PASS --qa-verdict PASS
 python scripts/task_session.py acquire-delivery 135
 python scripts/task_session.py refresh-delivery 135
 python scripts/task_session.py validate-delivery 135
