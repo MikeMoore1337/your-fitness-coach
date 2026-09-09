@@ -355,7 +355,9 @@ def control_states(comments: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]
         raw_id = comment.get("id", 0)
         try:
             comment_id = int(raw_id)
-        except TypeError, ValueError:
+        except TypeError:
+            comment_id = 0
+        except ValueError:
             comment_id = 0
         parsed.append((created_at, comment_id, payload))
     parsed.sort(key=lambda item: (item[0], item[1]))
