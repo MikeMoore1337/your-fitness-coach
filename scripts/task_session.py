@@ -42,6 +42,7 @@ TASK_DEPENDENCY_RE = re.compile(r"(?im)^Depends-on:\s*(?P<value>.+)$")
 TASK_FILE_RE = re.compile(rf"^(?P<task_id>{TASK_ID_PATTERN})-(?P<slug>.+)\.md$", re.IGNORECASE)
 TASK_STATE_VERSION = 2
 STATE_DIRECTORY_NAME = "codex-task-sessions-v1"
+ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
 DEPENDABOT_LOGIN = "dependabot[bot]"
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
@@ -123,6 +124,38 @@ def normalize_task_id(value: str) -> str:
     if not TASK_ID_RE.fullmatch(task_id):
         raise TaskSessionError(f"Invalid task ID: {value!r}")
     return task_id
+
+
+def _active_delivery_exclude_prefixes(root: Path, task_id: str) -> tuple[str, ...]:
+    raw_path = os.environ.get(ACTIVE_DELIVERY_ARTIFACTS_ENV, "").strip()
+    if not raw_path:
+        return ()
+    expected = normalize_task_id(task_id)
+    active_path = Path(raw_path)
+    if not active_path.is_absolute():
+        raise TaskSessionError(f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must be an absolute path")
+    try:
+        active_path = active_path.resolve()
+        temporary_root = (root / ".artifacts" / "tasks" / expected / "temporary").resolve()
+    except (OSError, RuntimeError) as error:
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} path could not be resolved"
+        ) from error
+    try:
+        relative = active_path.relative_to(temporary_root)
+    except ValueError as error:
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must stay under the exact task temporary root"
+        ) from error
+    if len(relative.parts) < 2 or relative.parts[0] != "delivery":
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must point to temporary/delivery/<run>"
+        )
+    if not active_path.is_dir():
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must point to an existing directory"
+        )
+    return (relative.as_posix(),)
 
 
 def task_id_from_branch(branch: str) -> str:
@@ -980,12 +1013,17 @@ def validate_pull_request_review_contract(
         _, _, latest_codex_comment = max(
             current_head_codex_comments, key=lambda item: (item[0], item[1])
         )
-        if _is_approving_codex_review(_review_body(latest_codex_comment)):
+        latest_codex_body = _review_body(latest_codex_comment)
+        if _is_approving_codex_review(latest_codex_body):
             exact_codex_comments.append(latest_codex_comment)
-        else:
-            rejected_codex_markers.extend(
-                reviewed_commit_markers(_review_body(latest_codex_comment))
-            )
+        elif REVIEW_BLOCKING_MARKER_RE.search(latest_codex_body):
+            rejected_codex_markers.extend(reviewed_commit_markers(latest_codex_body))
+
+    if rejected_codex_markers:
+        raise TaskSessionError(
+            "PR review gate found blocking exact-head Codex verdict without an explicit "
+            "approving verdict: " + ", ".join(sorted(set(rejected_codex_markers)))
+        )
 
     if not exact_approvals and not exact_codex_comments:
         details = (
@@ -3803,9 +3841,14 @@ class TaskController:
             raise TaskSessionError("finish cleanup refuses task branch with unique commits")
         artifact_cleanup: dict[str, Any] = {"status": "noop", "removed_count": 0}
         try:
+            preserved_prefixes = _active_delivery_exclude_prefixes(root, expected)
             artifact_cleanup = ArtifactManager(
                 root / ".artifacts", repo_root=root, controller_state_dir=self.store.root
-            ).cleanup_task(expected, terminal_state="finished")
+            ).cleanup_task(
+                expected,
+                terminal_state="finished",
+                exclude_prefixes=preserved_prefixes,
+            )
         except ArtifactError as error:
             raise TaskSessionError(f"finish artifact cleanup failed closed: {error}") from error
         if artifact_cleanup.get("status") not in {"completed", "noop"} or artifact_cleanup.get(

@@ -612,6 +612,34 @@ def test_review_contract_uses_latest_exact_head_codex_verdict() -> None:
         task_session.validate_pull_request_review_contract(_review_pr(head_sha), [], comments, [])
 
 
+def test_review_contract_negative_codex_verdict_vetoes_formal_approval() -> None:
+    head_sha = "b" * 40
+    reviews = [
+        {
+            "id": 18,
+            "state": "APPROVED",
+            "commit_id": head_sha,
+            "user": {"login": "owner"},
+        }
+    ]
+    comments = [
+        {
+            "id": 19,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "created_at": "2026-09-09T07:00:00Z",
+            "body": (
+                "Codex Review Summary: Completed. P1 blocking finding. "
+                f"**Reviewed commit:** `{head_sha[:10]}`"
+            ),
+        }
+    ]
+
+    with pytest.raises(task_session.TaskSessionError, match="blocking exact-head Codex verdict"):
+        task_session.validate_pull_request_review_contract(
+            _review_pr(head_sha), reviews, comments, []
+        )
+
+
 @pytest.mark.parametrize("mergeable_state", ["blocked", "unstable"])
 def test_review_event_accepts_exact_review_before_aggregate_check_is_green(
     mergeable_state: str,
@@ -1987,7 +2015,9 @@ def test_recover_is_read_only_and_preserves_dirty_unique_task_state(
     assert (worktree / "dirty.txt").exists()
 
 
-def test_finish_cleans_exact_production_success_state(repository: tuple[Path, Any]) -> None:
+def test_finish_preserves_active_delivery_artifacts_until_worker_cleanup(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
     root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
         repository, "207"
     )
@@ -2009,10 +2039,26 @@ def test_finish_cleans_exact_production_success_state(repository: tuple[Path, An
     controller.record_production_success(
         "207", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
     )
+    from scripts.artifact_manager import ArtifactManager
+
+    active_delivery = ArtifactManager(
+        root / ".artifacts", repo_root=root, controller_state_dir=controller.store.root
+    ).allocate_directory(
+        "207",
+        "temporary",
+        Path("temporary") / "delivery" / "active-worker",
+        purpose="active continuous delivery worker output",
+        command="scripts/run_task_delivery.py",
+        owner="run_task_delivery",
+    )
+    (active_delivery / "events.jsonl").write_text("worker output\n", encoding="utf-8")
+    monkeypatch.setenv(task_session.ACTIVE_DELIVERY_ARTIFACTS_ENV, str(active_delivery))
 
     result = controller.finish("207")
 
     assert result["cleanup_performed"] is True
+    assert active_delivery.is_dir()
+    assert (active_delivery / "events.jsonl").is_file()
     assert result["deleted_local_branch"] == branch
     assert not worktree.exists()
     assert not git_repository.ref_exists(branch)

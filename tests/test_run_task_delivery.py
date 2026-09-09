@@ -43,6 +43,37 @@ def test_run_scopes_git_safety_to_exact_directory(
         assert command[3:5] == ["-c", "core.longpaths=true"]
 
 
+def test_worker_launch_passes_active_delivery_artifacts_to_child(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    worktree = tmp_path / "worktree"
+    artifacts = tmp_path / "artifacts"
+    worktree.mkdir()
+    artifacts.mkdir()
+    observed: dict[str, Any] = {}
+
+    monkeypatch.setenv("YFC_ACTIVE_DELIVERY_ARTIFACTS", "C:/untrusted/stale-path")
+    monkeypatch.setattr(delivery.shutil, "which", lambda name: "codex")
+    monkeypatch.setattr(delivery, "_worker_prompt", lambda *args, **kwargs: "prompt")
+
+    def fake_run(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["args"] = args
+        observed["kwargs"] = kwargs
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(delivery.subprocess, "run", fake_run)
+
+    assert (
+        delivery._launch_worker(
+            "150",
+            {"lease": {"worktree": str(worktree)}},
+            artifacts,
+        )
+        == 0
+    )
+    assert observed["kwargs"]["env"]["YFC_ACTIVE_DELIVERY_ARTIFACTS"] == str(artifacts.resolve())
+
+
 def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
     started = {
         "lease": {
@@ -191,6 +222,24 @@ def test_queue_parser_requires_control_issue_and_bounds_batch() -> None:
     assert args.max_tasks == 4
 
 
+def test_continuous_queue_claim_serializes_the_whole_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+
+    with delivery._continuous_queue_claim(218):
+        assert claim_path.is_file()
+        with (
+            pytest.raises(delivery.DeliveryError, match="already has an active owner"),
+            delivery._continuous_queue_claim(218),
+        ):
+            pass
+
+    assert not claim_path.exists()
+
+
 def test_queue_rejects_batch_larger_than_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: ({"state": "open"}, []))
     with pytest.raises(delivery.DeliveryError, match="between 1 and 4"):
@@ -247,6 +296,62 @@ def test_queue_honors_durable_queue_stop_before_candidate_scan(
             poll_seconds=10,
             max_wait_minutes=1,
         )
+
+
+def test_queue_stop_requires_authenticated_continue_to_resolve(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stop = delivery.control_state_payload(
+        task_id="150",
+        state="human_required",
+        issue_number=219,
+        terminal_verdict="queue_stop",
+        blocker="Task 91: cleanup failed",
+    )
+    resumed = delivery.control_state_payload(
+        task_id="150",
+        state="in_progress",
+        issue_number=218,
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue: (
+            {
+                "state": "open",
+                "body": "The control contract supports CONTINUE_QUEUE.",
+                "user": {"login": "owner"},
+                "title": "[Task 150] queue control",
+            },
+            [
+                {
+                    "id": 1,
+                    "created_at": "2026-09-09T06:00:00Z",
+                    "user": {"login": "owner"},
+                    "body": delivery.render_control_state_comment(stop),
+                },
+                {
+                    "id": 2,
+                    "created_at": "2026-09-09T07:00:00Z",
+                    "user": {"login": "owner"},
+                    "body": "CONTINUE_QUEUE",
+                },
+                {
+                    "id": 3,
+                    "created_at": "2026-09-09T07:01:00Z",
+                    "user": {"login": "owner"},
+                    "body": delivery.render_control_state_comment(resumed),
+                },
+            ],
+        ),
+    )
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+
+    _, _, authorization = delivery._queue_authorization_snapshot(218)
+
+    assert authorization["active"] is True
+    assert "queue_stop" not in authorization
 
 
 def test_post_queue_stop_projects_failure_to_central_control_issue(
@@ -423,6 +528,71 @@ def test_durable_controller_budget_is_required_and_consistent() -> None:
     history["queue_budget"]["events"] = [{"kind": "review"}]
     with pytest.raises(delivery.DeliveryError, match="ledger is inconsistent"):
         delivery._queue_budget_from_controller_history(history)
+
+
+def test_continuous_cleanup_failure_posts_central_queue_stop(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    (artifacts / "final.md").write_text(
+        delivery.render_queue_budget_report(
+            review_fix_cycles=0, ci_fix_cycles=0, scope_expansions=0
+        ),
+        encoding="utf-8",
+    )
+    started = {
+        "lease": {
+            "branch": "task/91-synthetic-task",
+            "worktree": str(tmp_path / "worktree"),
+        }
+    }
+    history = {
+        "state": "finished",
+        "pr_number": 223,
+        "deployed_sha": "a" * 40,
+        "queue_budget": {
+            "review_fix_cycles": 0,
+            "ci_fix_cycles": 0,
+            "scope_expansions": 0,
+            "events": [],
+        },
+    }
+    queue_stops: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
+    monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
+    monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(delivery, "_history", lambda task_id: history)
+    monkeypatch.setattr(delivery, "_verify_closeout", lambda started: None)
+    monkeypatch.setattr(
+        delivery,
+        "_cleanup_delivery_artifacts",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            delivery.DeliveryError("cleanup could not remove delivery artifacts")
+        ),
+    )
+    monkeypatch.setattr(delivery, "_post_control_state", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        delivery,
+        "_post_queue_stop",
+        lambda *args, **kwargs: queue_stops.append((args, kwargs)),
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="cleanup could not"):
+        delivery._deliver_one(
+            "91",
+            session_label="test",
+            poll_seconds=10,
+            max_wait_minutes=1,
+            offline=False,
+            control_issue=218,
+            state_issue=219,
+            issue_contract={"dependencies": []},
+        )
+
+    assert queue_stops
+    assert queue_stops[0][0] == (218,)
+    assert queue_stops[0][1]["task_id"] == "91"
 
 
 def test_control_state_post_rejects_invalid_remote_transition(

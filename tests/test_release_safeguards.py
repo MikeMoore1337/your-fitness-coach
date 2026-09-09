@@ -44,6 +44,19 @@ def test_ci_runs_full_regression_on_task_pr_and_only_provenance_on_master_push()
     assert "dev-release" not in ci
 
 
+def test_python_script_ci_jobs_pin_supported_python_runtime() -> None:
+    workflow = yaml.safe_load(_sources()["ci"])
+    jobs = workflow["jobs"]
+
+    for job_name in ("task-provenance", "merge-provenance", "containers"):
+        setup_python = next(
+            step
+            for step in jobs[job_name]["steps"]
+            if step.get("uses") == "actions/setup-python@v5"
+        )
+        assert setup_python["with"]["python-version"] == "3.14"
+
+
 def test_dependabot_allows_only_patch_minor_version_updates() -> None:
     sources = _sources()
     config = yaml.safe_load(sources["dependabot"])

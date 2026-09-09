@@ -16,7 +16,8 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -24,10 +25,10 @@ from typing import Any
 try:
     from scripts.artifact_manager import ArtifactError, ArtifactManager
     from scripts.issue_workflow import (
+        CONTINUE_QUEUE_TOKEN,
         DEFAULT_QUEUE_BUDGET,
         IssueWorkflowError,
         control_state_payload,
-        control_states,
         latest_control_state,
         parse_control_state_comment,
         parse_queue_budget_report,
@@ -38,14 +39,19 @@ try:
         task_risk_lane,
         validate_control_transition,
     )
-    from scripts.task_session import GitRepository, TaskController, find_task_document
+    from scripts.task_session import (
+        ACTIVE_DELIVERY_ARTIFACTS_ENV,
+        GitRepository,
+        TaskController,
+        find_task_document,
+    )
 except ModuleNotFoundError:
     from artifact_manager import ArtifactError, ArtifactManager
     from issue_workflow import (
+        CONTINUE_QUEUE_TOKEN,
         DEFAULT_QUEUE_BUDGET,
         IssueWorkflowError,
         control_state_payload,
-        control_states,
         latest_control_state,
         parse_control_state_comment,
         parse_queue_budget_report,
@@ -56,7 +62,12 @@ except ModuleNotFoundError:
         task_risk_lane,
         validate_control_transition,
     )
-    from task_session import GitRepository, TaskController, find_task_document
+    from task_session import (
+        ACTIVE_DELIVERY_ARTIFACTS_ENV,
+        GitRepository,
+        TaskController,
+        find_task_document,
+    )
 
 SCRIPT_PATH = Path(__file__).resolve()
 REPOSITORY_ROOT = SCRIPT_PATH.parents[1]
@@ -259,6 +270,53 @@ def _post_control_state(issue_number: int, payload: Mapping[str, Any]) -> dict[s
     }
 
 
+def _comment_order_key(comment: Mapping[str, Any]) -> tuple[str, int]:
+    timestamp = str(comment.get("created_at") or comment.get("createdAt") or "")
+    try:
+        comment_id = int(comment.get("id", 0))
+    except TypeError:
+        comment_id = 0
+    except ValueError:
+        comment_id = 0
+    return timestamp, comment_id
+
+
+def _unresolved_queue_stop(
+    comments: Sequence[Mapping[str, Any]],
+    *,
+    task_id: str,
+    authorized_logins: Sequence[str],
+) -> dict[str, Any] | None:
+    allowed = {str(login).strip().casefold() for login in authorized_logins}
+    latest_stop: tuple[tuple[str, int], dict[str, Any]] | None = None
+    latest_resume: tuple[str, int] | None = None
+    for comment in comments:
+        author = comment.get("user") or comment.get("author") or {}
+        login = author.get("login", "") if isinstance(author, Mapping) else ""
+        if str(login).strip().casefold() not in allowed:
+            continue
+        body = str(comment.get("body", ""))
+        order = _comment_order_key(comment)
+        payload = parse_control_state_comment(body)
+        if (
+            payload is not None
+            and str(payload.get("task_id", "")).upper() == task_id.upper()
+            and payload.get("state") == "human_required"
+            and payload.get("terminal_verdict") == "queue_stop"
+            and (latest_stop is None or order > latest_stop[0])
+        ):
+            latest_stop = (order, payload)
+        if re.search(rf"(?im)^\s*{re.escape(CONTINUE_QUEUE_TOKEN)}\s*$", body) and (
+            latest_resume is None or order > latest_resume
+        ):
+            latest_resume = order
+    if latest_stop is None:
+        return None
+    if latest_resume is not None and latest_resume > latest_stop[0]:
+        return None
+    return latest_stop[1]
+
+
 def _queue_authorization_snapshot(
     issue_number: int,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
@@ -278,17 +336,15 @@ def _queue_authorization_snapshot(
         )
     except IssueWorkflowError as error:
         raise DeliveryError(str(error)) from error
-    try:
-        states = control_states(comments, authorized_logins=allowed_logins)
-    except IssueWorkflowError as error:
-        raise DeliveryError(str(error)) from error
-    queue_stops = [
-        state
-        for state in states
-        if state.get("state") == "human_required" and state.get("terminal_verdict") == "queue_stop"
-    ]
-    if queue_stops:
-        authorization = {**authorization, "queue_stop": queue_stops[-1]}
+    match = CONTROL_ISSUE_RE.match(str(issue.get("title", "")))
+    if match is not None:
+        queue_stop = _unresolved_queue_stop(
+            comments,
+            task_id=match.group("task_id"),
+            authorized_logins=allowed_logins,
+        )
+        if queue_stop is not None:
+            authorization = {**authorization, "queue_stop": queue_stop}
     return issue, comments, authorization
 
 
@@ -331,6 +387,47 @@ def _raise_if_queue_stop(authorization: Mapping[str, Any]) -> None:
     raise DeliveryError(
         f"HUMAN_REQUIRED: CONTINUE_QUEUE is durably stopped by Task {task_id}: {blocker}"
     )
+
+
+@contextmanager
+def _continuous_queue_claim(control_issue: int) -> Iterator[None]:
+    state_root = _git_common_dir() / "codex-task-sessions-v1"
+    state_root.mkdir(parents=True, exist_ok=True)
+    claim_path = state_root / "continuous-queue.lock"
+    claim = json.dumps(
+        {
+            "control_issue": control_issue,
+            "pid": os.getpid(),
+            "started_at": datetime.now(UTC).isoformat(timespec="microseconds"),
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+    )
+    try:
+        descriptor = os.open(
+            str(claim_path),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+        )
+    except FileExistsError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: CONTINUE_QUEUE already has an active owner; inspect {claim_path}"
+        ) from error
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(claim)
+            handle.write("\n")
+        yield
+    finally:
+        try:
+            if not claim_path.is_file() or claim_path.read_text(encoding="utf-8") != claim + "\n":
+                raise DeliveryError("HUMAN_REQUIRED: continuous queue claim changed before release")
+            claim_path.unlink()
+        except FileNotFoundError as error:
+            raise DeliveryError("HUMAN_REQUIRED: continuous queue claim disappeared") from error
+        except OSError as error:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: cannot release continuous queue claim {claim_path}"
+            ) from error
 
 
 def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
@@ -757,6 +854,8 @@ def _launch_worker(
     worktree = Path(str(started["lease"]["worktree"]))
     result_path = artifacts / "final.md"
     log_path = artifacts / "events.jsonl"
+    worker_env = os.environ.copy()
+    worker_env[ACTIVE_DELIVERY_ARTIFACTS_ENV] = str(artifacts.resolve())
     with log_path.open("wb") as log:
         completed = subprocess.run(
             [
@@ -779,6 +878,7 @@ def _launch_worker(
             stdout=log,
             stderr=subprocess.STDOUT,
             check=False,
+            env=worker_env,
         )
     return completed.returncode
 
@@ -956,6 +1056,14 @@ def _deliver_one(
         _verify_closeout(started)
         delivery_cleanup = _cleanup_delivery_artifacts(task_id, artifacts)
     except DeliveryError as error:
+        if control_issue is not None:
+            _post_queue_stop(
+                control_issue,
+                task_id=task_id,
+                status_issue=status_issue,
+                branch=started["lease"]["branch"],
+                blocker=str(error),
+            )
         if status_issue is not None:
             _post_control_state(
                 status_issue,
@@ -1007,6 +1115,22 @@ def _run_continuous_queue(
 ) -> int:
     if max_tasks < 1 or max_tasks > DEFAULT_QUEUE_BUDGET.max_tasks_per_batch:
         raise DeliveryError("max-tasks must be between 1 and 4")
+    with _continuous_queue_claim(control_issue):
+        return _run_continuous_queue_locked(
+            control_issue=control_issue,
+            max_tasks=max_tasks,
+            poll_seconds=poll_seconds,
+            max_wait_minutes=max_wait_minutes,
+        )
+
+
+def _run_continuous_queue_locked(
+    *,
+    control_issue: int,
+    max_tasks: int,
+    poll_seconds: int,
+    max_wait_minutes: int,
+) -> int:
     _, _, authorization = _queue_authorization_snapshot(control_issue)
     _raise_if_queue_stop(authorization)
     if not authorization["active"]:

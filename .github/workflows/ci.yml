@@ -122,6 +122,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
       - name: Validate task provenance or trusted Dependabot identity
         env:
           GH_TOKEN: ${{ github.token }}
@@ -155,6 +158,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
       - name: Verify exact merged task PR
         env:
           GH_TOKEN: ${{ github.token }}
@@ -812,6 +818,9 @@ jobs:
             no_cache: true
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
       - name: Run shared container contract group
         run: python scripts/ci_contract.py run-group container-contract
       - uses: docker/setup-buildx-action@v4
