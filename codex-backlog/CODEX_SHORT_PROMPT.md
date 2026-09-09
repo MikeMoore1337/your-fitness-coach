@@ -25,3 +25,10 @@
 Все предыдущие tasks считаются выполненными.
 Не переходи к следующей task.
 ```
+
+
+Codex Code Review отключён постоянно: не создавать отдельного reviewer и не ждать LLM verdict.
+Self-review выполняется один раз implementer в текущей сессии. Release требует targeted tests,
+применимых static analysis/integration/e2e, exact-head CI и aggregate `checks` GREEN,
+отсутствия unresolved BLOCKER/HIGH, mergeable PR и resolution существующих threads.
+Явные task-specific human/external/security/legal/destructive gates сохраняются.

@@ -10,7 +10,7 @@ authorization на весь normal path этой task. Launcher/controller ав�
 ожидание CI/deploy и безопасную cleanup в новые вопросы владельцу. Отдельный ответ нужен только для
 явно объявленного human/legal/external/destructive/task-specific gate или terminal blocker.
 
-## Постоянное owner decision для Your Fitness Coach
+## Постоянная политика quality gates
 
 Отдельный Codex Code Review, `chatgpt-codex-connector` review, reviewed-SHA gate и ожидание
 review rate limit не используются и не являются release gate. Для YFC достаточно deterministic
@@ -19,15 +19,37 @@ quality/policy checks, exact-head required `checks`, актуальной PR pro
 старыми формулировками lifecycle о LLM review; human, legal, external, destructive и явно
 task-specific gates сохраняются.
 
+Codex Code Review отключён и не используется как release gate, поскольку расходует Codex usage.
+Качество подтверждают детерминированные CI/tests/static-analysis checks и явно требуемые
+для конкретной task human/external gates. Отдельный LLM review verdict не требуется.
+Автоматические GitHub reviews, вызов `@codex review`, ожидание connector/fresh reviewed SHA,
+review rate-limit waits, usage-reset credit ради review и waiver отсутствующего review запрещены.
+Отдельную Codex review-задачу, роль или subagent для перечитывания diff не создавать.
+Implementer выполняет один ограниченный self-review в текущей рабочей сессии перед commit;
+после исправления дефекта повторяет только affected checks. Нового full self-audit не требуется.
+
+Normal path: implementation → targeted verification → self-review → commit/push → exact-head CI
+→ PR → required GitHub checks → merge → deploy → production smoke/closeout.
+Для PR-triggered CI PR открывается перед ожиданием его required checks.
+Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
+required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
+Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
+PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
+нужно фактически исправить и resolved. Создавать новый Codex review для этого запрещено.
+PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
+Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
+они не должны заменять отдельный LLM review под другим названием.
+Следующую product task автоматически не запускать.
+
 ## 0. Coordination lanes
 
 Lifecycle разделён на две coordination boundary:
 
 - `implementation lane`: отдельные task leases и worktrees. Обычная task без `concurrency`
   metadata считается `independent-write`. Такие task могут одновременно находиться в
-  `implementation`, `review`, `qa`, `ready-for-delivery` и `waiting-for-delivery`. Только
+  `implementation`, `qa`, legacy `review` rework, `ready-for-delivery` и `waiting-for-delivery`. Только
   `exclusive-write` task удерживает implementation exclusion и только в `starting`,
-  `implementation`, `review` или `qa`; queued, delivery, CI и production states этот exclusion
+  `implementation`, legacy `review` rework или `qa`; queued, delivery, CI и production states этот exclusion
   не удерживают. Dirty, interrupted, corrupt, missing, duplicate, recovery и ambiguous state
   остаются fail-closed.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
@@ -82,7 +104,7 @@ deletes `REVIEW` data or follows a symlink/junction/reparse point.
 4. Прочитать файл `Основная роль` из `.agents/roles/`.
 5. Открыть только `Рекомендуемые skills` текущей task.
 6. `Условные skills` не открывать заранее. Подключать их только после проверки кода, если фактическая реализация действительно затронула указанный trigger.
-7. Выполнять только `Дополнительные роли lifecycle`, явно указанные в task. Не строить автоматически цепочку `researcher -> reviewer -> QA` только потому, что такие роли существуют.
+7. Выполнять только `Дополнительные роли lifecycle`, явно указанные в task. Не строить автоматически multi-agent quality chain только потому, что такие роли существуют.
 8. Проверить текущую ветку/worktree, существующий код, tests, migrations и релевантные docs.
 
 Если task является resume незавершённой работы, сначала сохранить и классифицировать существующий незакоммиченный diff. Не reset/revert чужие или неидентифицированные изменения.
@@ -94,14 +116,14 @@ deletes `REVIEW` data or follows a symlink/junction/reparse point.
 Для обычной task:
 
 - один primary writer;
-- один full independent review максимум, если он указан task;
+- один self-review primary writer в текущей сессии; отдельный reviewer не запускается;
 - один QA pass максимум, если он указан task;
 - researcher только при реальной неизвестности или если это основная/явно дополнительная роль;
-- новые роли после review не подключаются ради `medium/low` finding;
+- новые роли после self-review не подключаются ради `medium/low` finding;
 - не перечитывать неизменившиеся skills/roles после каждого прохода;
 - subagent получает task, релевантный diff/files, результаты checks и конкретный вопрос, а не весь backlog и рабочий журнал.
 
-Для review/QA обычной feature-task использовать базовый skill роли и не более 1-2 дополнительных профильных skills за pass. Исключение - audit/release task, где task явно делит работу на независимые streams. В таком случае skills загружаются последовательно по stream, а не все сразу.
+Для применимой QA обычной feature-task использовать базовый skill роли и не более 1-2 дополнительных профильных skills за pass. Исключение - audit/release task, где task явно делит работу на независимые streams. В таком случае skills загружаются последовательно по stream, а не все сразу.
 
 ## 2. Предварительное исследование
 
@@ -149,12 +171,6 @@ Researcher возвращает компактные факты, файлы, з�
 - не создавать agent на каждый skill;
 - собирать краткие результаты, а не весь журнал subagents.
 
-### `independent-reviewer`
-
-- выполнять независимую проверку, а не новую реализацию;
-- production-код не менять;
-- owner decision не подменять.
-
 ### `qa-verifier`
 
 - проверять фактическое поведение и риски;
@@ -181,30 +197,12 @@ Researcher возвращает компактные факты, файлы, з�
 
 Full repository suite, полный visual audit и полный security audit по умолчанию не нужны.
 
-Для dedicated `audit + remediation` task, где полный audit прямо является scope, primary pass сначала формирует и **замораживает один finding set** до массовых fixes. После этого remediation, independent review и QA работают от этого набора и regressions текущего diff; они не запускают второй product-wide audit ради новых non-blocking наблюдений.
+Для dedicated `audit + remediation` task, где полный audit прямо является scope, primary pass сначала формирует и **замораживает один finding set** до массовых fixes. После этого remediation, self-review и QA работают от этого набора и regressions текущего diff; они не запускают второй product-wide audit ради новых non-blocking наблюдений.
 
-## 5. Independent review - только если он указан
+## 5. Детерминированная проверка
 
-Отдельный `independent-reviewer` выполняется только если:
-
-- он указан в `Дополнительные роли lifecycle`; или
-- он является `Основная роль` текущей task.
-
-Первый review является единственным **full review pass**. Reviewer проверяет:
-
-- acceptance criteria текущей task;
-- regressions, внесённые текущим diff;
-- correctness/data integrity/security/privacy только по реально затронутой поверхности;
-- необходимые critical tests;
-- существенный UX/a11y/performance regression только там, где текущий diff мог его создать.
-
-Reviewer не должен:
-
-- проводить новый полный аудит продукта;
-- расширять task соседним техническим долгом;
-- требовать исправить pre-existing проблему, не вызванную текущим diff;
-- добавлять новый product requirement;
-- подключать новые write-роли ради non-blocking finding.
+Использовать результаты targeted tests, static analysis и применимой QA.
+Self-review из раздела 4 не является отдельной ролью или LLM verdict gate.
 
 ### Severity и blocking policy
 
@@ -216,19 +214,13 @@ Reviewer не должен:
 - `LOW`/`NIT` - polish/maintainability/style без существенного production impact. Не блокирует task.
 - `OUT_OF_SCOPE` - реальная соседняя проблема или улучшение вне текущей task. Не блокирует task.
 
-Запрещён результат вида `MEDIUM, но коммитить нельзя`. Если finding действительно делает результат неприемлемым, reviewer обязан классифицировать его как `HIGH`/`BLOCKER` и воспроизводимо объяснить почему.
+Запрещён результат вида `MEDIUM, но коммитить нельзя`. Если finding действительно делает результат неприемлемым, primary agent обязан классифицировать его как `HIGH`/`BLOCKER` и воспроизводимо объяснить почему.
 
 `MEDIUM` не блокирует локальное завершение lifecycle и logical commit, но незакрытый `MEDIUM`
 блокирует `AUTO_RELEASE_ELIGIBLE`: PR/merge/deploy откладываются до verified closure или отдельного
 owner-controlled решения, которое прямо изменяет release scope. Severity нельзя понижать ради release.
 
-Первый review возвращает закрытый набор findings с ID и verdict:
-
-- `APPROVED`;
-- `APPROVED_WITH_NON_BLOCKING_FINDINGS`;
-- `BLOCKED`.
-
-## 6. Исправление review findings и повторный review
+## 6. Исправление обнаруженных дефектов и targeted recheck
 
 Автоматически исправляются `BLOCKER/HIGH` и все release-blocking `MEDIUM` текущего scope.
 
@@ -243,10 +235,10 @@ owner-controlled решения, которое прямо изменяет rele
 `AUTO_RELEASE_BLOCKED` до отдельного owner-controlled решения и verified closure. Severity нельзя
 понижать или замалчивать ради release.
 
-`LOW/NIT/OUT_OF_SCOPE` после review автоматически не исправлять.
+`LOW/NIT/OUT_OF_SCOPE` после self-review автоматически не исправлять.
 
 Каждый `MEDIUM/LOW`, включая локально исправленный в текущей task, primary agent добавляет или
-обновляет в `codex-backlog/bugs/FINDINGS.md` до commit. Reviewer передаёт ID, severity,
+обновляет в `codex-backlog/bugs/FINDINGS.md` до commit. Primary agent фиксирует ID, severity,
 scenario/impact, source, minimal fix и verification; финальный ответ и `.artifacts/` не являются
 заменой реестра.
 
@@ -256,7 +248,7 @@ scenario/impact, source, minimal fix и verification; финальный отв�
 `codex-backlog/bugs/README.md`. Такой bug-task не входит в основную последовательность product
 tasks и не запускается без отдельного выбора владельца.
 
-После исправления `BLOCKER/HIGH` выполнить **targeted recheck**, а не новый full review:
+После исправления `BLOCKER/HIGH` выполнить **targeted recheck**, а не новый full audit:
 
 - проверить только ранее зафиксированные blocking finding IDs;
 - проверить regressions, которые могли быть внесены этими fixes;
@@ -264,11 +256,10 @@ tasks и не запускается без отдельного выбора в
 
 Новый `BLOCKER/HIGH` на recheck допустим только если он непосредственно создан fix или является очевидным критическим defect текущего diff, пропущенным в первом pass. Он должен быть явно обоснован.
 
-### Ограничение циклов review
+### Ограничение повторов
 
-- обычная task: максимум 2 review passes - full review + targeted recheck;
-- high-risk/audit/release task: третий targeted pass допустим только если fix после второго pass сам создал новый `BLOCKER/HIGH`;
-- после лимита не запускать очередной review автоматически. Вернуть точный blocker/status владельцу.
+Один self-review до commit и targeted recheck затронутых fixes. Не запускать новый полный
+аудит или отдельного reviewer. При сохраняющемся blocker вернуть точное evidence.
 
 ## 7. QA verification - только если она указана
 
@@ -295,11 +286,11 @@ feature cycle.
 
 Нормальный лимит - один QA pass + один targeted recheck при blocking defect.
 
-## 8. Запрет review-driven scope creep
+## 8. Запрет quality-driven scope creep
 
-Review/QA не могут сами по себе быть основанием для нового крупного scope.
+Self-review/QA не могут сами по себе быть основанием для нового крупного scope.
 
-Без прямого требования task или `BLOCKER/HIGH`, доказывающего нарушение текущего contract, после review запрещено добавлять:
+Без прямого требования task или `BLOCKER/HIGH`, доказывающего нарушение текущего contract, после self-review запрещено добавлять:
 
 - migrations/columns/indexes/constraints;
 - новый API/public contract;
@@ -317,7 +308,7 @@ Review/QA не могут сами по себе быть основанием �
 
 1. Запустить финальный минимальный набор affected checks.
 2. Проверить итоговый `git diff`.
-3. Убедиться, что нет случайных files/secrets/generated artifacts и review-driven scope creep.
+3. Убедиться, что нет случайных files/secrets/generated artifacts и quality-driven scope creep.
 4. Проверить migrations/config/dependencies только если они реально изменились.
 5. Убедиться, что все `BLOCKER/HIGH` закрыты либо task остановлена с точным blocker.
 6. `MEDIUM/LOW/OUT_OF_SCOPE` перечислить кратко как non-blocking для commit; при этом каждый
@@ -326,12 +317,12 @@ Review/QA не могут сами по себе быть основанием �
    `codex-backlog/bugs/FINDINGS.md`; закрытые записи не удалять, а обновлять status/verification.
 8. Создать один логический commit в lease-bound `task/<ID>-<slug>` branch/worktree при tracked
    changes, если task не задаёт другой stage strategy.
-   Новый registry entry считается tracked change даже для read-only audit/review task.
+   Новый registry entry считается tracked change даже для read-only audit task.
 9. Получить delivery ownership, проверить `[Task <ID>]` provenance, fetch-нуть текущий
    `origin/master`, безопасно обновить task branch, инвалидировать старое evidence и выполнить
    local `PRE_PUSH_CI_PASS` для нового exact HEAD. Только после этого открыть task PR в `master` и
    дождаться exact-head `checks` на current base; direct push в `master` запрещён. До ownership
-   task может закончить review/QA/commit и ждать в `READY_FOR_DELIVERY` или
+   task может закончить verification/QA/commit и ждать в `READY_FOR_DELIVERY` или
    `WAITING_FOR_DELIVERY`.
 10. Классифицировать уже интегрированную task как `AUTO_RELEASE_ELIGIBLE` либо
     `AUTO_RELEASE_BLOCKED` по разделу 9A.
@@ -344,7 +335,7 @@ Review/QA не могут сами по себе быть основанием �
 
 Если текущая task не объявляет `OWNER_CHECKPOINT`, `HUMAN_EVIDENCE`, `MANUAL_VISUAL_APPROVAL`,
 `LEGAL_COUNSEL_REQUIRED`, `EXTERNAL_AUTHORIZATION`, `DESTRUCTIVE_ACTION` или terminal blocker,
-controller/lifecycle после terminal success автоматически продолжает применимые review, QA,
+controller/lifecycle после terminal success автоматически продолжает self-review, применимую QA,
 commit, task PR в `master`, required CI и normal release без дополнительного owner prompt.
 Тишина владельца не является gate. Следующая product task автоматически не запускается.
 
@@ -353,7 +344,7 @@ commit, task PR в `master`, required CI и normal release без дополни
 Task является `AUTO_RELEASE_ELIGIBLE`, только если одновременно:
 
 1. созданы tracked releasable changes и один итоговый logical commit;
-2. implementation, deterministic checks, применимая QA и final verification завершены;
+2. implementation, deterministic checks, self-review и применимая QA и final verification завершены;
 3. незакрытых `BLOCKER`, `HIGH` и `MEDIUM` ровно ноль, а исправленные blocking/release-blocking
    findings имеют required targeted recheck evidence;
 4. `codex-backlog/bugs/FINDINGS.md` синхронизирован по действующей policy;
@@ -396,7 +387,7 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 Canonical sequencing для нового release candidate:
 
 ```text
-implementation/review/QA -> logical commit -> READY_FOR_DELIVERY
+implementation/self-review/QA -> logical commit -> READY_FOR_DELIVERY
   -> acquire single delivery lane
   -> fetch/rebase current origin/master -> invalidate old evidence
   -> local PRE_PUSH_CI_PASS on refreshed exact HEAD
@@ -431,7 +422,7 @@ human/owner gate останавливается перед указанным ga
 - ключевые файлы;
 - migrations/config/dependencies;
 - exact checks и результат;
-- quality verdict и blocking findings status;
+- результаты deterministic checks и blocking findings status;
 - QA status, если QA была предусмотрена;
 - non-blocking findings/follow-ups без длинного повторного аудита;
 - затронутые `codex-backlog/bugs/FINDINGS.md` IDs и их итоговые statuses;
@@ -439,7 +430,7 @@ human/owner gate останавливается перед указанным ga
 - owner/manual actions;
 - commit hash или `no commit`.
 
-Нельзя утверждать independent review, QA, real-user, real Telegram, provider или production validation, если этого фактически не было.
+Нельзя утверждать self-review, QA, real-user, real Telegram, provider или production validation, если этого фактически не было.
 
 ## 11. Stop conditions
 
@@ -451,6 +442,6 @@ human/owner gate останавливается перед указанным ga
 - требования противоречат source of truth;
 - остаётся `BLOCKER/HIGH`, который нельзя безопасно исправить в scope;
 - fixing blocker требует нового крупного scope, не разрешённого task;
-- достигнут лимит review/QA recheck и blocking defect остаётся.
+- достигнут лимит verification/QA recheck и blocking defect остаётся.
 
 Вернуть точный blocker и уже выполненную часть lifecycle.

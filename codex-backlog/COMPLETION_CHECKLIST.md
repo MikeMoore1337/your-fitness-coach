@@ -12,13 +12,15 @@
 - [ ] For tasks `49B1-49G`, followed applicable `DESIGN_ALTERNATIVES_EXPLORATION_CONTRACT.md`.
 - [ ] For client-facing UI, preserved `GLOBAL_RULES.md` UI consistency contract and did not create a local duplicate primitive/system.
 - [ ] For client-facing scope, followed applicable mobile/TMA contract/matrix.
-- [ ] Ran targeted checks and recorded exact commands.
+- [ ] Выполнены targeted checks; записаны точные команды и результаты.
+- [ ] Self-review выполнен primary writer в текущей сессии, отдельный Codex reviewer не запускался.
+- [ ] Перед merge exact-head CI и aggregate `checks` GREEN; PR mergeable, существующие threads resolved.
 - [ ] Only `BLOCKER/HIGH` blocked completion.
 - [ ] `MEDIUM/LOW/NIT/OUT_OF_SCOPE` did not create new schema/API/platform/product scope.
 - [ ] Added or updated every `MEDIUM/LOW` in `codex-backlog/bugs/FINDINGS.md`, including findings
       fixed in the same task, and recorded their IDs/statuses in the final report.
-- [ ] If blocking findings were fixed, repeat review/QA was targeted rather than a new full audit.
-- [ ] Stayed within lifecycle review/QA pass limits.
+- [ ] If blocking findings were fixed, repeat verification/QA was targeted rather than a new full audit.
+- [ ] Stayed within lifecycle verification/QA limits.
 - [ ] Checked final `git diff`, migrations/config/dependencies/generated artifacts.
 - [ ] Did not claim real Telegram/device coverage without actual verification.
 - [ ] Created one logical commit when applicable.
@@ -31,7 +33,7 @@
 - [ ] Closed all in-scope `MUST_FIX` findings without importing Direction A/B/C.
 - [ ] Preserved business logic/API/schema/auth contracts.
 - [ ] Verified mobile-first baseline plus representative desktop/light/dark states.
-- [ ] Independent review/QA verified the frozen set and regressions instead of starting a second product-wide audit.
+- [ ] Self-review/QA verified the frozen set and regressions instead of starting a second product-wide audit.
 
 
 ## Release gates

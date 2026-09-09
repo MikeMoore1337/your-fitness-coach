@@ -8,7 +8,7 @@ Skills задают профессиональный способ выполне
 2. `Условные skills` открываются только при фактическом trigger.
 3. Skill не расширяет scope.
 4. Для обычной implementation task держи примерно 2-5 core skills.
-5. Review/QA: base skill роли + обычно не более 1-2 профильных skills.
+5. QA: base skill роли + обычно не более 1-2 профильных skills.
 6. Не создавать отдельного агента на каждый skill.
 7. Большой end-to-end scope координирует role `orchestrator`, а не специальный meta-skill.
 8. `commercial-product-builder` удалён в v6 как дублирующий orchestration/lifecycle.

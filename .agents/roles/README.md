@@ -2,15 +2,14 @@
 
 Role определяет ответственность прохода. Skill определяет профильные знания. Task определяет scope.
 
-Доступно семь ролей:
+Доступно шесть ролей:
 
 1. `orchestrator`
 2. `researcher`
 3. `product-lawyer`
 4. `implementer`
-5. `independent-reviewer`
-6. `qa-verifier`
-7. `integration-release`
+5. `qa-verifier`
+6. `integration-release`
 
 Lifecycle/severity/recheck/commit policy не дублируется здесь. Для backlog task canonical source - `codex-backlog/TASK_EXECUTION_LIFECYCLE.md`.
 

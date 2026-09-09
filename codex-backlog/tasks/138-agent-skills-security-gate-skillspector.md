@@ -4,7 +4,7 @@
 - **Приоритет:** P0 / agent security and delivery governance
 - **Тип:** implementation / external static-semantic security scanner integration + delivery gate
 - **Основная роль:** `implementer`
-- **Дополнительные роли lifecycle:** `independent-reviewer`, `qa-verifier`
+- **Дополнительные роли lifecycle:** `qa-verifier`
 - **Рекомендуемые skills:** `$security-engineer`, `$platform-engineer`, `$python-engineer`, `$qa-engineer`, `$technical-writer`
 - **Условные skills:** `$llm-engineer` только если реализация изменяет provider/routing/prompt semantics за пределами documented SkillSpector CLI contract; `$privacy-engineer` только если фактический diff вводит новую передачу содержимого skills/telemetry или иной privacy/data-egress boundary
 - **Зависимости:** hard dependencies нет; реализация начинается от текущего delivery/pre-push

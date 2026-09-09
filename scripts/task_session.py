@@ -2781,7 +2781,7 @@ class TaskController:
                 "exclusive-write is reserved for global/coordination-sensitive scope. Only an "
                 "exclusive lease in starting/implementation/review/qa (or unresolved recovery) "
                 "holds implementation exclusion; readiness, waiting, CI and production do not.\n"
-                "Normal path: targeted checks/review/QA/commit -> READY_FOR_DELIVERY -> acquire delivery\n"
+                "Normal path: targeted checks/self-review/QA/commit -> READY_FOR_DELIVERY -> acquire delivery\n"
                 "-> refresh-delivery task branch -> local PRE_PUSH_CI_PASS -> PR master -> production.\n"
                 "Implementation may run in parallel with compatible tasks. Do not start another task\n"
                 "from this worker. READY_FOR_DELIVERY may wait for the single delivery lane; before\n"
@@ -3085,9 +3085,16 @@ class TaskController:
         dependency_ids = _resolved_dependency_ids(
             lease.get("dependency_ids"), document.dependencies
         )
+        validation_base_sha = base_sha
+        current_origin_master = self.repository.ref("origin/master")
+        if self.repository.is_ancestor(current_origin_master, head_sha):
+            # A delivery refresh may have completed a rebase before recovery was
+            # acknowledged. Validate only commits unique to the task when the
+            # current protected-base ref is already an ancestor of its HEAD.
+            validation_base_sha = current_origin_master
         validate_task_commit_messages(
             expected,
-            self.repository.commits(f"{base_sha}..{head_sha}"),
+            self.repository.commits(f"{validation_base_sha}..{head_sha}"),
             dependency_ids=dependency_ids,
         )
         gate: dict[str, Any] | None = None
@@ -3096,7 +3103,7 @@ class TaskController:
             gate = self._current_gate_evidence(expected, lease, head_sha)
         except TaskSessionError as error:
             # PRE_PUSH_CI_PASS is a final delivery gate.  Implementation can reach the
-            # durable queue with targeted checks and review/QA evidence only.
+            # durable queue with targeted checks and applicable QA evidence only.
             gate_issue = str(error)
         with self.store.lock():
             current = self.store.read_json(lease_path)
@@ -3131,6 +3138,7 @@ class TaskController:
             }
             if gate_issue:
                 local_evidence["invalidated_reason"] = gate_issue
+            current.pop("review_verdict", None)
             current.update(
                 {
                     "lifecycle_state": "ready-for-delivery",
@@ -3333,7 +3341,7 @@ class TaskController:
                 ready_head = str(current.get("ready_head_sha", ""))
                 if not ready_head or head_before != ready_head:
                     raise TaskSessionError(
-                        "Task branch HEAD changed after PR readiness; rerun review and QA "
+                        "Task branch HEAD changed after PR readiness; rerun targeted checks and applicable QA "
                         "before delivery refresh"
                     )
                 current.update({"lifecycle_state": "delivery-refreshing", "updated_at": utc_now()})

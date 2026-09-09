@@ -1,3 +1,27 @@
+## Постоянная политика quality gates
+
+Codex Code Review отключён и не используется как release gate, поскольку расходует Codex usage.
+Качество подтверждают детерминированные CI/tests/static-analysis checks и явно требуемые
+для конкретной task human/external gates. Отдельный LLM review verdict не требуется.
+Автоматические GitHub reviews, вызов `@codex review`, ожидание connector/fresh reviewed SHA,
+review rate-limit waits, usage-reset credit ради review и waiver отсутствующего review запрещены.
+Отдельную Codex review-задачу, роль или subagent для перечитывания diff не создавать.
+Implementer выполняет один ограниченный self-review в текущей рабочей сессии перед commit;
+после исправления дефекта повторяет только affected checks. Нового full self-audit не требуется.
+
+Normal path: implementation → targeted verification → self-review → commit/push → exact-head CI
+→ PR → required GitHub checks → merge → deploy → production smoke/closeout.
+Для PR-triggered CI PR открывается перед ожиданием его required checks.
+Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
+required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
+Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
+PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
+нужно фактически исправить и resolved. Создавать новый Codex review для этого запрещено.
+PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
+Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
+они не должны заменять отдельный LLM review под другим названием.
+Следующую product task автоматически не запускать.
+
 # GLOBAL_RULES - правила выполнения release backlog v17 resource-aware
 
 Этот файл действует для завершённых и архивированных release tasks `75-80`, включая буквенные
@@ -34,7 +58,7 @@ cleanup targets.
 
 Перед каждой task обязательно прочитать и выполнить `codex-backlog/TASK_EXECUTION_LIFECYCLE.md`.
 
-Фраза владельца `полный task lifecycle` ссылается именно на этот контракт. Он выполняет только основную роль, core/conditional skills и дополнительные lifecycle-роли, которые явно применимы к текущей task, с конечными review/QA циклами и одним логическим commit.
+Фраза владельца `полный task lifecycle` ссылается именно на этот контракт. Он выполняет только основную роль, core/conditional skills и дополнительные lifecycle-роли, которые явно применимы к текущей task, с конечными verification/QA шагами и одним логическим commit.
 
 Lifecycle не расширяет scope task и не отменяет явно объявленные owner checkpoints, Trigger/evidence
 gates, conditional/skip conditions, security/privacy rules или запрет внешних production actions
@@ -57,8 +81,8 @@ gate, evidence и точки остановки в task-файле.
 3. использовать их как профильные рабочие контракты;
 4. открыть conditional skill только если inspection/diff подтверждает его trigger;
 5. не расширять scope только потому, что skill описывает более широкую практику;
-6. для code/diff `independent-reviewer` использовать `$code-reviewer`, для `qa-verifier` - `$qa-engineer`; не требовать дублировать base skill в каждой task; non-code design/decision gate не загружает `$code-reviewer` автоматически;
-7. для обычного review/QA ограничиваться применимым base skill роли и максимум 1-2 профильными skills текущего риска.
+6. self-review выполняет primary writer в текущей сессии; для применимой QA использовать `$qa-engineer`;
+7. для обычной QA ограничиваться применимым base skill роли и максимум 1-2 профильными skills текущего риска.
 
 Маршрутизация по фактическому scope:
 
@@ -93,7 +117,7 @@ gate, evidence и точки остановки в task-файле.
 - `master` является единственной защищённой release-веткой. Task branch/worktree создаются от
   чистого, проверенного exact `origin/master` SHA; feature implementation непосредственно в
   canonical controller worktree запрещена.
-- Внутри текущей task после terminal success автоматически выполняются применимые review, QA,
+- Внутри текущей task после terminal success автоматически выполняются self-review, применимую QA,
   commit, PR в `master`, CI и normal release шаги, если task явно не объявляет checkpoint или
   blocker. Следующая product task автоматически не запускается.
 - Явный выбор task владельцем или `scripts/run_task_delivery.py <ID>` является одним standing
@@ -113,13 +137,13 @@ gate, evidence и точки остановки в task-файле.
   bootstrap, infrastructure recovery и SHA вне текущего merged `master` остаются exceptional
   actions с отдельным owner approval, backup и preflight.
 - Для `AUTO_RELEASE_ELIGIBLE` task нормальный release path выполняется без дополнительного вопроса
-  владельцу: `implementation/review/QA -> logical commit -> READY_FOR_DELIVERY -> acquire
+  владельцу: `implementation/self-review/QA -> logical commit -> READY_FOR_DELIVERY -> acquire
   delivery -> fetch/refresh latest origin/master -> local PRE_PUSH_CI_PASS на новом exact HEAD ->
   task PR master -> exact-head checks -> merge master -> post-merge provenance/image publish ->
   immutable bundle deploy -> production smoke -> controller finish/clean task worktree and merged
   local branch -> archive task -> rebuild/check backlog manifests -> terminal report`. Direct push в
   `master` запрещён.
-- Implementation/review/QA нескольких совместимых `independent-write` task могут быть
+- Implementation/self-review/QA нескольких совместимых `independent-write` task могут быть
   параллельными. Master integration и production delivery остаются **strictly serial**: только
   delivery owner может refresh/rebase, открыть/обновить PR, merge или deploy. Если current base
   изменился, ожидающий candidate обновляется перед final gate; busy delivery/production только
@@ -134,7 +158,7 @@ gate, evidence и точки остановки в task-файле.
 
 Если текущая task не объявляет `OWNER_CHECKPOINT`, `HUMAN_EVIDENCE`, `MANUAL_VISUAL_APPROVAL`,
 `LEGAL_COUNSEL_REQUIRED`, `EXTERNAL_AUTHORIZATION`, `DESTRUCTIVE_ACTION` или terminal blocker,
-controller/lifecycle после terminal success автоматически продолжает применимые review, QA,
+controller/lifecycle после terminal success автоматически продолжает self-review, применимую QA,
 commit, task PR в `master`, required CI и normal release без дополнительного owner prompt.
 Тишина владельца не является gate. Следующая product task автоматически не запускается.
 
@@ -196,14 +220,14 @@ Direct push в `master` запрещён. Legacy `dev` refs не являютс�
 
 ### Роли lifecycle
 
-`Основная роль` и `Дополнительные роли lifecycle` в task являются точным маршрутом. Не строить автоматическую цепочку `researcher -> reviewer -> QA` и не создавать отдельного агента на каждый skill.
+`Основная роль` и `Дополнительные роли lifecycle` в task являются точным маршрутом. Не строить автоматическую multi-agent review chain и не создавать отдельного агента на каждый skill.
 
 Для dedicated legal-risk audit основной ролью может быть read-only `product-lawyer` с обязательным
 `$ru-legal-risk`. В обычной implementation task legal surface не меняет основную роль автоматически.
 
-Если следующая task сама является dedicated review/approval gate, не дублировать полный аналогичный review в предыдущей task без явного требования. Примеры: `49B1 -> 49C`, `49E -> 49F`, `75A -> 75B`, `78 -> 79`.
+Если следующая task сама является dedicated approval/audit gate, не дублировать полный аналогичный audit в предыдущей task без явного требования. Примеры: `49B1 -> 49C`, `49E -> 49F`, `75A -> 75B`, `78 -> 79`.
 
-### Blocking policy review/QA
+### Blocking policy for quality/QA findings
 
 - Только `BLOCKER/HIGH` блокируют завершение.
 - Незакрытый `MEDIUM` не блокирует локальный lifecycle/commit, но блокирует автоматический release:
@@ -213,15 +237,15 @@ Direct push в `master` запрещён. Legacy `dev` refs не являютс�
   product/legal risk scale, не lifecycle severity. Canonical legal risks хранятся в
   `docs/private/legal/LEGAL_RISK_REGISTER.md` после owner checkpoint; только technical/audit-deliverable
   findings с lifecycle severity `MEDIUM/LOW` синхронизируются в `bugs/FINDINGS.md`.
-- Каждый `MEDIUM/LOW` из review, QA или audit до commit и финализации обязательно добавляется или
+- Каждый `MEDIUM/LOW` из quality verification, QA или audit до commit и финализации обязательно добавляется или
   обновляется в `codex-backlog/bugs/FINDINGS.md`, даже если исправлен в той же task. Финальный
   ответ или ignored `.artifacts/` не заменяют tracked-реестр.
 - Если finding исправлен и проверен в текущей task, отдельный bug-task не создаётся. Неисправленный
   finding становится task в `codex-backlog/bugs/pending/` только после triage и явного решения
   владельца по правилам `codex-backlog/bugs/README.md`; он не меняет очередь product tasks.
 - Результат `MEDIUM, но коммитить нельзя` запрещён: если task действительно неприемлема, finding должен быть `HIGH/BLOCKER` с воспроизводимым обоснованием.
-- Первый independent review - единственный полный review pass. После blocking fix выполняется только targeted recheck закрытого набора finding IDs.
-- Обычная task: максимум full review + один targeted recheck; QA - один pass + один targeted recheck при blocking defect. Дополнительные циклы только в исключениях lifecycle.
+- Primary writer выполняет один self-review в текущей сессии. После blocking fix выполняется только targeted recheck закрытого набора finding IDs.
+- Обычная task: self-review + targeted recheck изменённых сценариев; QA - один pass + один targeted recheck при blocking defect. Дополнительные циклы только в исключениях lifecycle.
 - Non-blocking finding, требующий migration/schema/API/platform architecture/new dependency/new role/new skill, всегда уходит в follow-up/owner decision.
 
 ## Active design source и alternatives gate

@@ -1,13 +1,12 @@
 {
   "package": "your-fitness-coach-agents",
-  "version": "6",
+  "version": "7",
   "root": ".agents",
-  "skill_count": 33,
+  "skill_count": 32,
   "skills": [
     "accessibility-engineer",
     "backend-engineer",
     "billing-engineer",
-    "code-reviewer",
     "data-engineer",
     "document-import-engineer",
     "evidence-content-editor",
@@ -43,7 +42,6 @@
     "researcher",
     "product-lawyer",
     "implementer",
-    "independent-reviewer",
     "qa-verifier",
     "integration-release"
   ],
@@ -62,7 +60,7 @@
     "wow_is_first_class_quality": true
   },
   "routing_model": "focused-core-plus-conditional-skills; task-declared-lifecycle-roles",
-  "role_count": 7,
+  "role_count": 6,
   "notes": [
     "commercial-product-builder removed because orchestration belongs to role orchestrator",
     "mobile-engineer narrowed to smartphone runtime/lifecycle",

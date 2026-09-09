@@ -93,6 +93,30 @@ consistency rule, not an immutable design law: an explicit owner-approved redesi
 the component/pattern together with the active design system. In ordinary tasks keep adjacent content
 in normal layout flow and verify relevant desktop/mobile geometry.
 
+## Постоянная политика quality gates
+
+Codex Code Review отключён и не используется как release gate, поскольку расходует Codex usage.
+Качество подтверждают детерминированные CI/tests/static-analysis checks и явно требуемые
+для конкретной task human/external gates. Отдельный LLM review verdict не требуется.
+Автоматические GitHub reviews, вызов `@codex review`, ожидание connector/fresh reviewed SHA,
+review rate-limit waits, usage-reset credit ради review и waiver отсутствующего review запрещены.
+Отдельную Codex review-задачу, роль или subagent для перечитывания diff не создавать.
+Implementer выполняет один ограниченный self-review в текущей рабочей сессии перед commit;
+после исправления дефекта повторяет только affected checks. Нового full self-audit не требуется.
+
+Normal path: implementation → targeted verification → self-review → commit/push → exact-head CI
+→ PR → required GitHub checks → merge → deploy → production smoke/closeout.
+Для PR-triggered CI PR открывается перед ожиданием его required checks.
+Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
+required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
+Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
+PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
+нужно фактически исправить и resolved. Создавать новый Codex review для этого запрещено.
+PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
+Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
+они не должны заменять отдельный LLM review под другим названием.
+Следующую product task автоматически не запускать.
+
 # Skills
 
 Repository skills live under `.agents/skills/`.
@@ -101,9 +125,7 @@ Repository skills live under `.agents/skills/`.
   only these initially.
 - `Условные skills` are not preload instructions. Open one only after inspection proves its
   documented trigger is actually present in the current implementation/fix.
-- For code/diff review, reviewer may use `$code-reviewer`; QA uses `$qa-engineer`. These base
-  skills need not be repeated in task metadata. A non-code design/decision review does not load
-  `$code-reviewer` automatically. Add at most 1-2 task-specific review skills for a normal pass.
+- Implementer performs self-review in the current session; applicable QA uses `$qa-engineer`.
 - Do not load every skill merely because the product surface could theoretically involve it.
   In particular, visible-in-TMA UI does not by itself require `$telegram-engineer`; ordinary UI
   does not by itself require a separate `$accessibility-engineer` pass.
@@ -125,12 +147,12 @@ Reusable role contracts live under `.agents/roles/`.
 
 - Role defines responsibility; skill defines domain workflow; task defines result and scope.
 - For a backlog task, `Основная роль` and `Дополнительные роли lifecycle` are authoritative.
-- Read only the assigned primary role initially. Do not synthesize the old automatic chain
-  `researcher -> implementer -> independent-reviewer -> qa-verifier`.
+- Read only the assigned primary role initially. Do not synthesize an automatic multi-agent
+  review chain; use implementer self-review and conditional QA instead.
 - Add a role only when the task explicitly lists it, it is the primary role, or the lifecycle
   allows a narrowly triggered conditional role.
-- Keep one primary production writer for a normal task. A reviewer/QA pass is read-only; any
-  subsequent fix returns to the primary writer.
+- Keep one primary production writer for a normal task. A QA pass is read-only; any subsequent
+  fix returns to the primary writer.
 - Do not create an agent per skill or re-read unchanged role/skill files after every pass.
 - Use `.agents/references/ROLE_ROUTING_GUIDE.md` only when routing/delegation is actually needed.
 - Do not let multiple write-agents edit the same working tree or core contract concurrently.
@@ -172,7 +194,7 @@ When a task file is explicitly provided:
    `CONTINUE_QUEUE` control-Issue mode.
 
 The phrase `полный task lifecycle` always means the `TASK_EXECUTION_LIFECYCLE.md` belonging to
-the current task's backlog. That file is the canonical implementation/review/QA/finalization
+the current task's backlog. That file is the canonical implementation/self-review/QA/finalization
 workflow. Do not duplicate it with an improvised workflow.
 
 The phrase `Все предыдущие tasks считаются выполненными` is only a sequencing assumption. It
@@ -181,7 +203,7 @@ external actions, provide secrets/tokens, override conditional/skip rules, or pr
 Telegram, provider or production validation.
 
 For standardized backlog tasks, normally create one logical commit only after applicable
-review, QA and final verification. Do not create intermediate lifecycle commits unless the
+self-review, applicable QA and final verification. Do not create intermediate lifecycle commits unless the
 current task/backlog explicitly requires them. A read-only/no-code outcome does not require a
 manufactured commit.
 
@@ -189,7 +211,7 @@ After that commit, apply the canonical release eligibility contract from
 `codex-backlog/TASK_EXECUTION_LIFECYCLE.md`. If the current task has no explicitly declared owner
 checkpoint, human/device evidence gate, manual visual approval, legal-counsel gate,
 destructive/external authorization or terminal blocker, continue automatically through applicable
-review, QA, commit, PR, merge, CI and normal release stages without waiting for another owner
+  self-review, applicable QA, commit, PR, merge, CI and normal release stages without waiting for another owner
 prompt. Stop only at the declared gate and report its exact evidence/decision requirement.
 
 An explicit owner selection of a task, or `scripts/run_task_delivery.py <ID>`, is one standing
@@ -199,7 +221,7 @@ generic owner prompts.
 
 Если текущая task не объявляет `OWNER_CHECKPOINT`, `HUMAN_EVIDENCE`, `MANUAL_VISUAL_APPROVAL`,
 `LEGAL_COUNSEL_REQUIRED`, `EXTERNAL_AUTHORIZATION`, `DESTRUCTIVE_ACTION` или terminal blocker,
-controller/lifecycle после terminal success автоматически продолжает применимые review, QA,
+controller/lifecycle после terminal success автоматически продолжает self-review, применимую QA,
 commit, task PR в `master`, required CI и normal release без дополнительного owner prompt.
 Тишина владельца не является gate. Следующая product task автоматически не запускается в
 разовом режиме. Отдельная явная `CONTINUE_QUEUE` activation может запускать только существующие
@@ -209,7 +231,7 @@ credentials/destructive gates.
 Do not read completed tasks or historical changelogs unless the current task explicitly requires
 them. Legacy `masters/` and `references/` were removed and are not sources of truth.
 
-# Resource-aware review and stop policy
+# Resource-aware quality finding and stop policy
 
 For backlog tasks, severity determines whether work continues:
 
@@ -223,16 +245,16 @@ For backlog tasks, severity determines whether work continues:
   unresolved finding becomes a file under `codex-backlog/bugs/pending/` only after triage and an
   explicit owner decision; bug tasks do not enter or advance the main product-task sequence.
 - Keep resolved entries in that registry and update their status/verification instead of deleting
-  them. The primary agent owns registry synchronization; read-only reviewer/QA roles return the
+  them. The primary agent owns registry synchronization; read-only QA roles return the
   required registry-ready details.
 - A finding cannot be labelled `MEDIUM` and still be used to prevent commit. If it truly makes
-  the task unacceptable, the reviewer must reclassify it as `HIGH/BLOCKER` with reproducible
+  the task unacceptable, the primary agent must classify it as `HIGH/BLOCKER` with reproducible
   evidence tied to the task or regression introduced by the current diff.
-- The first independent review is the only full review pass. After `BLOCKER/HIGH` fixes, perform
+- The implementer performs one bounded self-review in the current session. After `BLOCKER/HIGH` fixes, perform
   only the targeted recheck defined by the backlog lifecycle - do not restart a fresh audit.
-- Normal tasks have a finite review/QA budget. Respect `TASK_EXECUTION_LIFECYCLE.md` limits and
+- Normal tasks have a finite verification/QA budget. Respect `TASK_EXECUTION_LIFECYCLE.md` limits and
   stop with an exact blocker instead of looping.
-- A dedicated later review/audit task is a reason not to duplicate the same full review in the
+- A dedicated later audit task is a reason not to duplicate the same full audit in the
   preceding implementation task unless that task explicitly requires it.
 
 Prefer targeted checks, relevant files, compact subagent context and closed finding sets. More
@@ -401,7 +423,7 @@ wait timer. Manual workflow dispatch is not part of the normal release path.
 For an `AUTO_RELEASE_ELIGIBLE` task, no additional owner prompt is required for task branch push,
 task PR serial integration, release PR creation, checked exact-head merge or the resulting automatic
 production deployment. Eligibility requires a
-tracked logical commit, completed implementation/review/QA/final verification, zero unresolved
+tracked logical commit, completed implementation/self-review/QA/final verification, zero unresolved
 `BLOCKER`, `HIGH` and `MEDIUM`, synchronized findings, current `master` ancestry, a clean scoped
 worktree and no mandatory owner/human/visual gate. The agent must monitor required check `checks`,
 post-merge CI and deployment to terminal success. PR-triggered CI runs the full regression profile;
@@ -449,7 +471,7 @@ Before declaring tracked backlog implementation complete:
 - confirm no accidental files exist outside `.artifacts/`;
 - confirm no secrets or debug artifacts were introduced;
 - confirm migrations, generated files, dependencies and configuration changes are intentional;
-- confirm all blocking `BLOCKER/HIGH` review/QA findings are resolved or explicitly blocked;
+- confirm all blocking `BLOCKER/HIGH` quality/QA findings are resolved or explicitly blocked;
 - keep `MEDIUM/LOW/NIT/OUT_OF_SCOPE` as concise non-blocking follow-ups for commit rather than
   reopening scope, while requiring zero unresolved `MEDIUM` before release;
 - confirm every new or changed `MEDIUM/LOW` is synchronized in
@@ -471,7 +493,7 @@ For other substantial work, report concisely:
 - remaining risks or limitations;
 - commit hash or explicit `no commit`.
 
-Never list hypothetical checks as completed or claim independent review, QA, real-user,
+Never list hypothetical checks as completed or claim self-review, QA, real-user,
 Telegram, provider or production validation if it did not actually happen.
 
 # Workflow
