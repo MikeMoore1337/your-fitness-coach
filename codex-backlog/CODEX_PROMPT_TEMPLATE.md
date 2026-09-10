@@ -22,7 +22,7 @@ dependencies/concurrency и recovery command. Не меняй другой workt
 Каждый MEDIUM/LOW до commit добавь или обнови в `codex-backlog/bugs/FINDINGS.md`.
 Обычная task без `concurrency` metadata считается `independent-write`; `exclusive-write` допустим
 только для global/coordination-sensitive изменений. Task PR открывай только в `master`, сохраняя
-`[Task <ID>]`; implementation/review/QA совместимых task могут идти параллельно, а delivery owner
+`[Task <ID>]`; implementation/self-review/QA совместимых task могут идти параллельно, а delivery owner
 единолично сериализует refresh, final gate, PR, CI, merge и production. READY/waiting/CI/production
 не удерживают implementation exclusion. Не deploy production вне task release contract. Не
 переходи к следующей task.
@@ -37,3 +37,10 @@ dependencies/concurrency и recovery command. Не меняй другой workt
 ```
 
 После успешного завершения `58` следующая task — `59`. Не переходить к ней в той же сессии.
+
+
+Codex Code Review отключён постоянно: не создавать отдельного reviewer и не ждать LLM verdict.
+Self-review выполняется один раз implementer в текущей сессии. Release требует targeted tests,
+применимых static analysis/integration/e2e, exact-head CI и aggregate `checks` GREEN,
+отсутствия unresolved BLOCKER/HIGH, mergeable PR и resolution существующих threads.
+Явные task-specific human/external/security/legal/destructive gates сохраняются.

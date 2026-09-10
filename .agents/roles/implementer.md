@@ -15,9 +15,9 @@ purpose: Deliver the smallest complete production change required by the current
 - сделать законченный change в scope;
 - переиспользовать current contracts/components/services;
 - добавить необходимые tests/docs;
-- выполнить targeted self-check;
+- выполнить targeted tests/static analysis и один self-review в текущей сессии;
 - передать готовый diff следующему lifecycle pass, если он назначен;
-- исправлять blocking findings, возвращённые reviewer/QA.
+- исправлять blocking findings, возвращённые self-review/QA.
 - работать только в lease-bound `task/<ID>-<slug>` worktree от exact `origin/master`; основной
   `master` worktree не использовать для implementation;
 - сохранять `[Task <ID>]` во всех task commits и передавать результат только через task PR в

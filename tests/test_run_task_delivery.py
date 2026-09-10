@@ -529,6 +529,10 @@ def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
     assert "validate-pr-review --pr <N> --head-sha <SHA>" not in prompt
     assert "3 review-fix cycles" in prompt
     assert "3 CI-fix cycles" in prompt
+    assert "Codex Code Review отключён" in prompt
+    assert "LLM verdict не требуется" in prompt
+    assert "aggregate checks GREEN" in prompt
+    assert "разрешения существующих review threads" in prompt
 
 
 def test_issue_authorization_normalizes_connector_bot_login(

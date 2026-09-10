@@ -1365,6 +1365,10 @@ def _worker_prompt(
         "GREEN, mergeable PR, актуальную base/head provenance и разрешение реально применимых "
         "blocking findings. Для continuous queue максимум 3 review-fix cycles и 3 CI-fix cycles "
         "на task, scope expansion не допускается; превышение означает HUMAN_REQUIRED.\n"
+        "Codex Code Review отключён: не запускай отдельного reviewer, connector, ожидание review "
+        "или usage reset ради review. Self-review выполняй один раз в текущей сессии. "
+        "Merge требует exact-head CI GREEN, aggregate checks GREEN, mergeable PR и фактического "
+        "разрешения существующих review threads; LLM verdict не требуется.\n"
         "Не запускай следующую product task.\n\n"
         + issue_context
         + f"Controller context:\n{started.get('prompt', '')}"

@@ -2270,3 +2270,86 @@ def test_finish_refuses_dirty_worktree_and_preserves_state(repository: tuple[Pat
     assert worktree.exists()
     assert git_repository.ref_exists(branch)
     assert controller.store.task_lease_path("208").exists()
+
+
+@pytest.mark.parametrize("quality", ["FAIL", "APPROVED", "", "UNKNOWN"])
+def test_readiness_rejects_nonpassing_deterministic_checks(quality: str) -> None:
+    controller = task_session.TaskController(task_session.GitRepository(Path.cwd()))
+    with pytest.raises(task_session.TaskSessionError, match="deterministic quality checks PASS"):
+        controller.mark_ready("152", head_sha="unused", quality_verdict=quality, qa_verdict="PASS")
+
+
+def test_readiness_cli_defaults_to_no_qa_when_task_does_not_declare_it() -> None:
+    args = task_session._parser().parse_args(
+        [
+            "mark-ready",
+            "152",
+            "--head-sha",
+            "exact-sha",
+            "--quality-verdict",
+            "PASS",
+        ]
+    )
+    assert args.quality_verdict == "PASS"
+    assert args.qa_verdict == "NOT_REQUIRED"
+    assert not hasattr(args, "review_verdict")
+
+
+def test_readiness_without_reviewer_preserves_exact_head_gate(repository: tuple[Path, Any]) -> None:
+    root, git_repository = repository
+    _write_task(root, "252", "quality-only")
+    controller = task_session.TaskController(git_repository)
+    started = controller.start("252", owner_launch=True, session_label="quality", offline=True)
+    head = _commit_task(Path(started["lease"]["worktree"]), "252")
+    with pytest.raises(task_session.TaskSessionError, match="declared ready SHA"):
+        controller.mark_ready("252", head_sha="stale", quality_verdict="PASS", qa_verdict="PASS")
+    ready = controller.mark_ready("252", head_sha=head, quality_verdict="PASS", qa_verdict="PASS")
+    assert ready["quality_verdict"] == "PASS"
+    assert "review_verdict" not in ready
+    assert ready["local_evidence"]["status"] == "pending-final-delivery-gate"
+
+
+def test_readiness_after_rebase_validates_only_task_commits(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "254", "rebased-quality-only")
+    controller = task_session.TaskController(git_repository)
+    started = controller.start("254", owner_launch=True, session_label="rebased", offline=True)
+    worktree = Path(started["lease"]["worktree"])
+    _commit_task(worktree, "254")
+
+    remote_worktree = root.parent / f"remote-master-{uuid.uuid4().hex[:8]}"
+    old_master = _git(root, "rev-parse", "master")
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), old_master)
+    try:
+        (remote_worktree / "task-150-base.txt").write_text("inherited\n", encoding="utf-8")
+        _git(remote_worktree, "add", "task-150-base.txt")
+        _git(remote_worktree, "commit", "-m", "[Task 150] inherited base change")
+        current_base = _git(remote_worktree, "rev-parse", "HEAD")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    _git(root, "fetch", "origin", "master")
+    assert current_base == _git(root, "rev-parse", "origin/master")
+    _git(worktree, "rebase", "origin/master")
+    head = _git(worktree, "rev-parse", "HEAD")
+
+    ready = controller.mark_ready("254", head_sha=head, quality_verdict="PASS")
+
+    assert ready["base_origin_master_sha"] != current_base
+    assert ready["ready_head_sha"] == head
+
+
+def test_readiness_allows_task_without_qa_role(repository: tuple[Path, Any]) -> None:
+    root, git_repository = repository
+    _write_task(root, "253", "quality-only-no-qa")
+    controller = task_session.TaskController(git_repository)
+    started = controller.start("253", owner_launch=True, session_label="quality-only", offline=True)
+    worktree = Path(started["lease"]["worktree"])
+    head = _commit_task(worktree, "253")
+
+    ready = controller.mark_ready("253", head_sha=head, quality_verdict="PASS")
+
+    assert ready["quality_verdict"] == "PASS"
+    assert ready["qa_verdict"] == "NOT_REQUIRED"

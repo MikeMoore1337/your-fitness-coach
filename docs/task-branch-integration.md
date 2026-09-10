@@ -1,5 +1,30 @@
 # Task-ветки, worktree и прямой PR-flow в `master`
 
+## Постоянная политика quality gates
+
+Codex Code Review отключён и не используется как release gate, поскольку расходует Codex usage.
+Качество подтверждают детерминированные CI/tests/static-analysis checks и явно требуемые
+для конкретной task human/external gates. Отдельный LLM review verdict не требуется.
+Автоматические GitHub reviews, вызов `@codex review`, ожидание connector/fresh reviewed SHA,
+review rate-limit waits, usage-reset credit ради review и waiver отсутствующего review запрещены.
+Отдельную Codex review-задачу, роль или subagent для перечитывания diff не создавать.
+Implementer выполняет один ограниченный self-review в текущей рабочей сессии перед commit;
+после исправления дефекта повторяет только affected checks. Нового full self-audit не требуется.
+
+Normal path: implementation → targeted verification → self-review → commit/push → exact-head CI
+→ PR → required GitHub checks → merge → deploy → production smoke/closeout.
+Для PR-triggered CI PR открывается перед ожиданием его required checks.
+Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
+required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
+Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
+PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
+нужно фактически исправить и resolved. Создавать новый Codex review для этого запрещено.
+PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
+Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
+они не должны заменять отдельный LLM review под другим названием.
+Следующую product task автоматически не запускать.
+
+
 Статус ADR: **принято и действует в repository contract и live GitHub enforcement**.
 
 ## Контракт
@@ -7,7 +32,7 @@
 Нормальный flow разделён на независимую implementation lane и одну serial delivery lane:
 
 ```text
-Task A/B/C: implementation -> targeted checks -> self-review -> QA -> commit
+Task A/B/C: implementation -> targeted checks -> self-review -> применимая QA -> commit
             -> READY_FOR_DELIVERY -> WAITING_FOR_DELIVERY (если slot занят)
 
 одна delivery lane:
@@ -83,13 +108,13 @@ Frontend jobs используют стандартный download cache `action
 команды, cache signal — как `CI_CACHE`.
 
 `scripts/task_session.py mark-ready` фиксирует durable `READY_FOR_DELIVERY`: clean task worktree,
-commit provenance, deterministic quality/QA, исходный base SHA, текущий task HEAD и локальное evidence
+commit provenance, PASS targeted checks/применимой QA, исходный base SHA, текущий task HEAD и локальное evidence
 состояние. Полный `PRE_PUSH_CI_PASS` не требуется на старом base. Перед PR команда
 `refresh-delivery` fetch/rebase-ит branch относительно latest `origin/master`, обновляет lease base
 и инвалидирует старое evidence; `validate-delivery` принимает только новый exact HEAD и новый
 `PRE_PUSH_CI_PASS`. Любой amend/rebase/commit или tracked modification после gate требует нового
 evidence. Если HEAD изменился после `READY_FOR_DELIVERY`, `refresh-delivery` останавливается до
-повторных review/QA; для owner-safe возврата в эту стадию используется
+targeted checks/применимой QA; для owner-safe возврата в эту стадию используется
 `reopen-for-review --reason <...>`, который освобождает delivery lane и удаляет старый readiness
 snapshot.
 
@@ -147,7 +172,7 @@ base ancestry и отсутствие delivery owner, затем атомарн�
 ```
 
 Явный выбор task владельцем или эта команда являются standing authorization для normal delivery
-этой task: отдельный worktree, implementation/review/QA, commit, очередь delivery, refresh, task PR
+этой task: отдельный worktree, implementation/self-review/QA, commit, очередь delivery, refresh, task PR
 в `master`, CI, immutable bundle deploy и safe closeout. Launcher не ждёт свободную delivery lane
 до запуска worker: waiting после `READY_FOR_DELIVERY` — нормальное состояние, а не terminal blocker.
 Останавливает только точный implementation/recovery blocker либо явно объявленный
@@ -228,3 +253,14 @@ handoff и host lock остаются в deployment evidence под persistent `
 Любая exceptional операция — history rewrite, direct/force push, manual production command,
 bootstrap, infrastructure recovery или deployment SHA вне current merged `master` — требует
 отдельного owner authorization, backup и operator preflight.
+
+`--quality-verdict PASS` подтверждает выполненные targeted tests и применимый static analysis,
+а не мнение LLM reviewer. `--qa-verdict PASS` подтверждает фактические проверки поведения;
+`--qa-verdict NOT_REQUIRED` используется, когда task не объявляет QA-проверку;
+отдельная QA-роль запускается только по task. Readiness не заменяет final exact-head CI gate.
+Legacy имя recovery-команды `reopen-for-review` означает возврат к исправлению и повторной
+проверке изменённых сценариев; отдельного reviewer оно не запускает.
+
+Automatic Codex GitHub review настраивается вне репозитория в Codex Cloud settings.
+Для этого репозитория владелец должен выключить automatic code review, если оно включено.
+GitHub ruleset уже допускает ноль approving reviews; его deterministic protections сохраняются.

@@ -12,7 +12,7 @@ revision попадает в `master` только через checked merged tas
 push, force-push и удаление ветки и не разрешать bypass обычного release path.
 
 Task получает normal automatic release только при `AUTO_RELEASE_ELIGIBLE`: есть tracked logical
-commit, lifecycle/review/QA/final verification завершены, незакрытых `BLOCKER/HIGH/MEDIUM` нет,
+commit, lifecycle/self-review/applicable QA/final verification завершены, незакрытых `BLOCKER/HIGH/MEDIUM` нет,
 findings синхронизированы и отсутствует обязательный owner/human/manual visual gate. Тогда task
 branch после получения delivery ownership и refresh относительно current `origin/master` проходит
 shared local `PRE_PUSH_CI_PASS` для refreshed exact HEAD, затем exact-head checked task PR в
@@ -23,7 +23,7 @@ immutable commit bundle, image refs и migration manifest; host не испол�
 Failure/rollback/manual intervention required блокирует следующую backlog task.
 
 Task PR идут только из `task/<ID>-<slug>`. Совместимые `independent-write` task могут параллельно
-дойти до approved review/QA, logical commit и `READY_FOR_DELIVERY`; занятая delivery lane или
+дойти до completed self-review/applicable QA, logical commit и `READY_FOR_DELIVERY`; занятая delivery lane или
 active production deploy блокируют только delivery acquisition. Перед PR delivery owner fetch-ит
 latest `origin/master`, безопасно rebase-ит task branch, инвалидирует старое evidence и запускает
 новый exact `PRE_PUSH_CI_PASS` на refreshed HEAD. Repository `delete_branch_on_merge` не заменяет
