@@ -26,6 +26,7 @@ from fitminiapp_api.services.notifications import (
     safe_delivery_error,
 )
 from fitminiapp_api.services.worker import (
+    TelegramPublicationError,
     TelegramRateLimiter,
     _log_delivery_failure,
     send_telegram_message,
@@ -316,6 +317,7 @@ def test_worker_rate_limits_send_starts_after_waiting_for_delivery_slot(monkeypa
             NotificationDeliveryError("telegram_chat_unavailable", terminal_status="cancelled"),
             "telegram_chat_unavailable",
         ),
+        (TelegramPublicationError("telegram_network_error"), "telegram_network_error"),
         (RuntimeError("secret unexpected details"), "unexpected:RuntimeError"),
     ],
 )

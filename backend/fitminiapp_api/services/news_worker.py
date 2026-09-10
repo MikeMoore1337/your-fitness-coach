@@ -43,6 +43,10 @@ from fitminiapp_api.services.news_review_schedule import (
     NewsReviewSlot,
 )
 from fitminiapp_api.services.notifications import safe_delivery_error
+from fitminiapp_api.services.telegram_transport import (
+    TelegramPublicationError,
+    telegram_transport_options,
+)
 
 logger = logging.getLogger(__name__)
 MAX_GENERATIONS_PER_CYCLE = 10
@@ -416,8 +420,6 @@ async def publish_due_snapshots(
     send_publication: Callable[..., Awaitable[PublicationResult]],
     send_message: Callable[..., Awaitable[int | None]],
 ) -> int:
-    from fitminiapp_api.services.worker import TelegramPublicationError
-
     with get_session_context() as db:
         snapshot_ids = claim_due_publications(db)
     published = 0
@@ -541,7 +543,11 @@ async def run_news_pipeline_once(
         quarantine_non_hermes_news_work(db)
 
     timeout = httpx.Timeout(settings.news_source_timeout_seconds)
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+    async with httpx.AsyncClient(
+        timeout=timeout,
+        follow_redirects=False,
+        **telegram_transport_options(),
+    ) as client:
         published = (
             await publish_due_snapshots(client, send_publication, send_message)
             if publication_ready

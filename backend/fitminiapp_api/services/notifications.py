@@ -35,6 +35,7 @@ from fitminiapp_api.models.user import (
     User,
     UserProfile,
 )
+from fitminiapp_api.services.telegram_transport import TelegramPublicationError
 
 MAX_DELIVERY_ATTEMPTS = 5
 PROCESSING_TIMEOUT = timedelta(minutes=5)
@@ -293,6 +294,8 @@ def utcnow() -> datetime:
 def safe_delivery_error(error: Exception) -> str:
     """Return a bounded diagnostic code without serializing request URLs or secrets."""
     if isinstance(error, NotificationDeliveryError):
+        return error.code
+    if isinstance(error, TelegramPublicationError):
         return error.code
     if isinstance(error, httpx.HTTPStatusError):
         return f"http_status:{error.response.status_code}"

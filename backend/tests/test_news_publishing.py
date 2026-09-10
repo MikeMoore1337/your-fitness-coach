@@ -25,7 +25,7 @@ from fitminiapp_api.models.news import (
     NewsReviewDelivery,
     NewsSource,
 )
-from fitminiapp_api.services import news_images, news_publication
+from fitminiapp_api.services import news_images, news_publication, news_worker
 from fitminiapp_api.services.news_content import (
     EditorialContent,
     parse_editorial_content,
@@ -1255,7 +1255,7 @@ def test_private_preview_matches_exact_artifact_and_retry_does_not_duplicate_it(
             }
         )
         if len(control_calls) == 1:
-            raise RuntimeError("simulated control-card failure")
+            raise TelegramPublicationError("telegram_network_error")
         return 202
 
     stats = NewsCycleStats()
@@ -1276,6 +1276,7 @@ def test_private_preview_matches_exact_artifact_and_retry_does_not_duplicate_it(
         delivery = db.query(NewsReviewDelivery).one()
         assert delivery.status == "queued"
         assert delivery.telegram_message_id == 101
+        assert delivery.last_error_code == "telegram_network_error"
         delivery.next_attempt_at = utcnow() - timedelta(seconds=1)
 
     assert asyncio.run(deliver()) == 1
@@ -1304,6 +1305,58 @@ def test_private_preview_matches_exact_artifact_and_retry_does_not_duplicate_it(
         assert event.details["artifact_hash"] == expected_hash
         assert event.details["preview_message_id"] == 101
         assert event.details["control_message_id"] == 202
+
+
+@pytest.mark.parametrize(
+    ("proxy_url", "expected_proxy"),
+    [
+        ("socks5://bot-proxy.test:1081", "socks5://bot-proxy.test:1081"),
+        ("", None),
+    ],
+)
+def test_news_pipeline_uses_explicit_telegram_transport(
+    monkeypatch,
+    proxy_url: str,
+    expected_proxy: str | None,
+) -> None:
+    captured: dict[str, object] = {}
+
+    class RecordingAsyncClient:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+
+        async def __aenter__(self) -> RecordingAsyncClient:
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    async def no_images(_client: httpx.AsyncClient) -> int:
+        return 0
+
+    monkeypatch.setattr(settings, "telegram_bot_proxy_url", proxy_url)
+    monkeypatch.setattr(news_worker.httpx, "AsyncClient", RecordingAsyncClient)
+    monkeypatch.setattr(news_worker, "prune_news_editorial", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(news_worker, "quarantine_non_hermes_news_work", lambda *_args: None)
+    monkeypatch.setattr(news_worker, "generate_pending_images", no_images)
+    monkeypatch.setattr(news_worker, "enqueue_review_deliveries", lambda *_args: 0)
+
+    async def unused_sender(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("sender should not run in transport construction test")
+
+    asyncio.run(
+        run_news_pipeline_once(
+            send_message=unused_sender,
+            send_preview=unused_sender,
+            send_publication=unused_sender,
+            publication_ready=False,
+            review_delivery_due=False,
+        )
+    )
+
+    assert captured["trust_env"] is False
+    assert captured["follow_redirects"] is False
+    assert captured.get("proxy") == expected_proxy
 
 
 def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatch) -> None:
