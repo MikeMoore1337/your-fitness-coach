@@ -6,7 +6,7 @@ export default defineConfig({
   testIgnore: ['**/mobile-ui-regression.spec.ts'],
   outputDir: '../.artifacts/runtime/tests/playwright',
   fullyParallel: true,
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   reporter: getPlaywrightReporters(),
   use: {
     baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',

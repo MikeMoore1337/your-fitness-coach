@@ -23,7 +23,7 @@ dependencies/concurrency и recovery command. Не меняй другой workt
 Обычная task без `concurrency` metadata считается `independent-write`; `exclusive-write` допустим
 только для global/coordination-sensitive изменений. Task PR открывай только в `master`, сохраняя
 `[Task <ID>]`; implementation/self-review/QA совместимых task могут идти параллельно, а delivery owner
-единолично сериализует refresh, final gate, PR, CI, merge и production. READY/waiting/CI/production
+единолично сериализует refresh, current-base/provenance check, PR, CI, merge и production. READY/waiting/CI/production
 не удерживают implementation exclusion. Не deploy production вне task release contract. Не
 переходи к следующей task.
 ```

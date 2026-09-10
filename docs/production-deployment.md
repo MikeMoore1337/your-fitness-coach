@@ -14,9 +14,8 @@ push, force-push и удаление ветки и не разрешать bypas
 Task получает normal automatic release только при `AUTO_RELEASE_ELIGIBLE`: есть tracked logical
 commit, lifecycle/self-review/applicable QA/final verification завершены, незакрытых `BLOCKER/HIGH/MEDIUM` нет,
 findings синхронизированы и отсутствует обязательный owner/human/manual visual gate. Тогда task
-branch после получения delivery ownership и refresh относительно current `origin/master` проходит
-shared local `PRE_PUSH_CI_PASS` для refreshed exact HEAD, затем exact-head checked task PR в
-`master`. PR-triggered CI выполняет полный regression profile;
+branch после relevant fast checks и commit/push открывает exact-head checked task PR в `master`.
+GitHub PR CI является authoritative release check и выполняет полный применимый regression profile;
 после merge push-CI выполняет только merge provenance и immutable image publication, потому что
 тот же tree уже прошёл полный PR suite. Затем `.github/workflows/deploy.yml` передаёт на host
 immutable commit bundle, image refs и migration manifest; host не использует Git checkout.
@@ -25,18 +24,19 @@ Failure/rollback/manual intervention required блокирует следующ�
 Task PR идут только из `task/<ID>-<slug>`. Совместимые `independent-write` task могут параллельно
 дойти до completed self-review/applicable QA, logical commit и `READY_FOR_DELIVERY`; занятая delivery lane или
 active production deploy блокируют только delivery acquisition. Перед PR delivery owner fetch-ит
-latest `origin/master`, безопасно rebase-ит task branch, инвалидирует старое evidence и запускает
-новый exact `PRE_PUSH_CI_PASS` на refreshed HEAD. Repository `delete_branch_on_merge` не заменяет
+latest `origin/master`, безопасно rebase-ит task branch и фиксирует минимальный delivery anchor;
+GitHub `checks` на exact PR head заменяет отдельный локальный release gate. Repository `delete_branch_on_merge` не заменяет
 owner-safe cleanup worktree/branch. Если `master` изменился до push или merge, candidate обязан
-повторить refresh и current-base gate.
+повторить refresh и relevant local checks перед push; GitHub повторно проверяет exact current head.
 
 Изменение Ruleset, variables или secrets остаётся exceptional owner-authorized action.
 Подробный ADR/runbook: `docs/task-branch-integration.md`.
 
 После merge участие человека заканчивается:
 
-1. `push` merge result в `master` запускает полный PR-equivalent CI для точного SHA и публикует
-   проверенные backend/bot images с immutable SHA tag;
+1. `push` merge result в `master` запускает минимальный post-merge CI для точного SHA и публикует
+   проверенные backend/bot images с immutable SHA tag; полный применимый regression profile уже
+   был выполнен PR CI на том же exact tree;
 2. успешный CI запускает `.github/workflows/deploy.yml` через `workflow_run`;
 3. отдельный job без production secrets через GitHub API проверяет, что SHA является результатом
    ровно одного merged task PR в `master`;

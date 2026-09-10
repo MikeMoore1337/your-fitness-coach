@@ -292,6 +292,24 @@ async function mockActiveWorkout(page: Page, mixed = false) {
   };
 }
 
+function waitForCompletedSetPatch(page: Page, setId: number) {
+  return page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    if (
+      response.request().method() !== 'PATCH' ||
+      !url.pathname.endsWith(`/workouts/sets/${setId}`) ||
+      !response.ok()
+    ) {
+      return false;
+    }
+    try {
+      return response.request().postDataJSON()?.is_completed === true;
+    } catch {
+      return false;
+    }
+  });
+}
+
 test('active workout keeps one obvious next action through logging, timer and finish', async ({
   page,
 }) => {
@@ -339,7 +357,10 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(firstSet).toHaveAttribute('aria-current', 'step');
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
-  await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).dblclick();
+  await Promise.all([
+    waitForCompletedSetPatch(page, 201),
+    firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).dblclick(),
+  ]);
 
   const secondSet = page.locator('[data-workout-set-id="202"]');
   await expect(secondSet).toHaveAttribute('aria-current', 'step');
@@ -353,13 +374,19 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await secondSet.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
   await secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }).fill('35');
   await secondSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 2' }).fill('9');
-  await secondSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }).click();
+  await Promise.all([
+    waitForCompletedSetPatch(page, 202),
+    secondSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }).click(),
+  ]);
 
   const thirdSet = page.locator('[data-workout-set-id="203"]');
   await expect(thirdSet).toHaveAttribute('aria-current', 'step');
   await thirdSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 3' }).fill('32.5');
   await thirdSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 3' }).fill('10');
-  await thirdSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 3' }).click();
+  await Promise.all([
+    waitForCompletedSetPatch(page, 203),
+    thirdSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 3' }).click(),
+  ]);
 
   await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
   await expect(page.getByText('Синхронизировано')).toBeVisible();

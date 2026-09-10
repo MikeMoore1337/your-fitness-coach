@@ -39,6 +39,15 @@ const TASK_74_CAPTURE_PHASE = (
 ).process?.env?.YFC_CAPTURE_TASK_74_PHASE;
 const TASK_74_SCREENSHOT_DIR = '../.artifacts/screenshots/task-74';
 
+async function waitForVisualStability(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+  });
+}
+
 async function expectLimeStartBoundary(locator: Locator) {
   const colors = await locator.evaluate((element) => {
     const sample = document.createElement('span');
@@ -685,6 +694,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     const page = await browser.newPage({
       viewport: current.viewport,
       hasTouch: current.telegram,
+      reducedMotion: 'reduce',
     });
     if (current.telegram) {
       await installTelegramHarness(page, { colorScheme: current.theme });
@@ -699,6 +709,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     const program = page.locator('.program-active');
     const history = program.locator('.program-history');
     await expect(history.getByText('Текущий тренировочный блок')).toBeVisible();
+    await waitForVisualStability(page);
     if (current.screenshot) {
       await history
         .locator('.program-current-block')
@@ -718,21 +729,19 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     }
     if (current.viewport.width < 900) {
       const lastCurrentAction = history.getByRole('button', { name: 'В архив' });
-      await lastCurrentAction.evaluate((element) => {
-        const dock = document.querySelector<HTMLElement>('#appBottomNav');
-        if (!dock) return;
-        const actionBox = element.getBoundingClientRect();
-        const dockBox = dock.getBoundingClientRect();
-        const overlap = actionBox.bottom - dockBox.top;
-        if (overlap >= 0) window.scrollBy(0, overlap + 16);
-      });
       await expect
         .poll(async () => {
           const [actionBox, dockBox] = await Promise.all([
             lastCurrentAction.boundingBox(),
             page.locator('#appBottomNav').boundingBox(),
           ]);
-          return Boolean(actionBox && dockBox && actionBox.y + actionBox.height <= dockBox.y);
+          if (!actionBox || !dockBox) return false;
+          const overlap = actionBox.y + actionBox.height - dockBox.y;
+          if (overlap >= 0) {
+            await page.evaluate((distance) => window.scrollBy(0, distance), overlap + 16);
+            return false;
+          }
+          return true;
         })
         .toBe(true);
       await expect(lastCurrentAction).toBeInViewport();
@@ -741,6 +750,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
     await history.getByText('Все этапы и изменения').click();
     await history.locator('#program-revision-77-4 > summary').click();
     await expect(history.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
+    await waitForVisualStability(page);
     if (current.screenshot) {
       await history
         .locator('.program-current-block')

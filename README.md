@@ -168,6 +168,20 @@ git diff -- frontend/openapi.json frontend/src/shared/api/schema.d.ts
 
 ## Проверки
 
+Единая подготовка и быстрый route-aware набор локальных checks:
+
+```bash
+.venv/bin/python scripts/local_checks.py
+```
+
+В Windows PowerShell используйте `.\.venv\Scripts\python.exe scripts\local_checks.py`. Команда
+сама определяет Git worktree, активный Python, `PATH`/`PYTHONPATH`, безопасные test `APP_*` и
+изолированную SQLite-базу в отдельном каталоге запуска под `.artifacts/runtime`, который удаляется
+после завершения; переданный `TEST_DATABASE_URL` используется как изолированный test database URL.
+По умолчанию выполняется только relevant fast route. Полный
+GitHub route можно добровольно проверить через `--full`; его результат не создаёт release evidence
+и не заменяет required GitHub `checks`.
+
 Выбирайте targeted набор по изменённому риску. Скрипт Python складывает pytest cache и temp files в
 `.artifacts/runtime/{cache,tmp,tests}/` согласно [lifecycle документации](docs/artifacts-lifecycle.md):
 

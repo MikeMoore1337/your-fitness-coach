@@ -2,7 +2,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from scripts import ci_contract, pre_push_gate
+from scripts import ci_contract, local_checks
 
 
 def test_ci_contract_is_valid_and_profiles_are_non_empty() -> None:
@@ -118,6 +118,25 @@ def test_python_shard_collects_and_runs_only_its_node_ids(monkeypatch, tmp_path:
         "backend/tests/test_b.py::test_b",
         "bot/tests/test_f.py::test_f",
     ]
+
+
+def test_local_sqlite_python_checks_use_one_windows_worker(monkeypatch) -> None:
+    command = ci_contract.COMMAND_GROUPS["python-tests"].commands[1]
+    monkeypatch.setattr(ci_contract.os, "name", "nt")
+
+    local = ci_contract._local_command(
+        command,
+        group="python-tests",
+        env={"TEST_DATABASE_URL": "sqlite:///test.db"},
+    )
+    ci = ci_contract._local_command(
+        command,
+        group="python-tests",
+        env={"TEST_DATABASE_URL": "postgresql://test"},
+    )
+
+    assert local.argv[local.argv.index("-n") + 1] == "1"
+    assert ci == command
 
 
 def test_windows_node_commands_use_cmd_wrappers(monkeypatch) -> None:
@@ -501,8 +520,8 @@ def test_transient_dependency_failure_retries_with_bounded_backoff(
         name="audit",
         argv=("audit",),
         retry_on_transient=True,
-        retry_max_attempts=3,
-        retry_delays_seconds=(2, 10),
+        retry_max_attempts=2,
+        retry_delays_seconds=(2,),
     )
 
     def fake_run(argv, **kwargs):
@@ -516,8 +535,8 @@ def test_transient_dependency_failure_retries_with_bounded_backoff(
     with pytest.raises(ci_contract.CIContractError, match="BLOCKED_INFRASTRUCTURE"):
         ci_contract._run_command(command, argv=command.argv, cwd=tmp_path, env={}, group="audit")
 
-    assert calls == 3
-    assert sleeps == [2, 10]
+    assert calls == 2
+    assert sleeps == [2]
 
 
 def test_dependency_vulnerability_failure_is_not_retried(monkeypatch, tmp_path: Path) -> None:
@@ -526,8 +545,8 @@ def test_dependency_vulnerability_failure_is_not_retried(monkeypatch, tmp_path: 
         name="audit",
         argv=("audit",),
         retry_on_transient=True,
-        retry_max_attempts=3,
-        retry_delays_seconds=(2, 10),
+        retry_max_attempts=2,
+        retry_delays_seconds=(2,),
     )
 
     def fake_run(argv, **kwargs):
@@ -560,14 +579,13 @@ def test_workflow_routes_scope_cancels_only_pull_request_runs() -> None:
     assert "cancel-in-progress: false" in deploy
 
 
-def test_local_gate_and_ci_router_share_the_same_decision() -> None:
-    fixtures = [
-        ["frontend/src/App.tsx"],
-        ["backend/fitminiapp_api/schemas/example.py"],
-        [".github/workflows/ci.yml"],
-        ["docs/release-flow.md"],
-        ["unknown/input.bin"],
-    ]
-
-    for paths in fixtures:
-        assert pre_push_gate.classify_scope(paths) == ci_contract.classify_scope(paths)
+def test_optional_local_checks_use_ci_groups_without_release_evidence() -> None:
+    for groups in local_checks.FAST_GROUPS_BY_PROFILE.values():
+        assert set(groups) <= set(ci_contract.COMMAND_GROUPS)
+    assert "frontend-e2e" not in local_checks.FAST_GROUPS_BY_PROFILE["frontend"]
+    assert "migrated-stack" not in local_checks.FAST_GROUPS_BY_PROFILE["frontend"]
+    source = Path(__file__).parents[1] / "scripts" / "local_checks.py"
+    source_text = source.read_text(encoding="utf-8")
+    assert "task_session" not in source_text
+    assert "pre_push" not in source_text
+    assert ".artifacts/tasks" not in source_text

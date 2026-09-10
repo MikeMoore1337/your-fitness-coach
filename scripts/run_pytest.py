@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -43,6 +44,16 @@ def _run(
     return subprocess.call(cmd, cwd=root, env=env)
 
 
+def _temporary_process_directory():
+    process_parent = os.environ.get("YFC_PROCESS_TMP")
+    if not process_parent:
+        return tempfile.TemporaryDirectory(prefix="yfc-")
+    parent = Path(process_parent)
+    if not parent.is_dir():
+        raise ValueError(f"YFC_PROCESS_TMP is not an existing directory: {parent}")
+    return tempfile.TemporaryDirectory(prefix="yfc-", dir=parent)
+
+
 def main() -> int:
     root = Path(__file__).resolve().parent.parent
 
@@ -52,19 +63,26 @@ def main() -> int:
     # Windows a per-run tree still avoids stale ACLs and file-vs-directory
     # collisions, but its parent is now the classified runtime/tmp area.
     if os.name == "nt":
-        import tempfile
-
         temporary_parent = runtime / "tmp"
         temporary_parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(
-            prefix="fitminiapp-pytest-", dir=temporary_parent
-        ) as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="p-", dir=temporary_parent) as temp_dir:
             temp_root = Path(temp_dir)
+            if len(str(root)) >= 80:
+                # Keep pytest cache/basetemp in the repository artifact tree, but use an
+                # ephemeral OS temp directory for Python-created repositories. This avoids
+                # Windows MAX_PATH failures when task-session tests create nested worktrees.
+                with _temporary_process_directory() as process_dir:
+                    return _run(
+                        root,
+                        pytest_cache=temp_root / "cache",
+                        pytest_tmp=temp_root / "basetemp",
+                        process_tmp=Path(process_dir),
+                    )
             return _run(
                 root,
                 pytest_cache=temp_root / "cache",
                 pytest_tmp=temp_root / "basetemp",
-                process_tmp=temp_root / "python",
+                process_tmp=temp_root,
             )
 
     return _run(
