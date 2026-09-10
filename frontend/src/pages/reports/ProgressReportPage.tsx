@@ -23,6 +23,8 @@ import {
   LoadingState,
   SegmentedControl,
 } from '../../shared/ui/common';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 
 const periodOptions = [
   { value: 'days_7', label: '7 дней' },

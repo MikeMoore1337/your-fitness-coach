@@ -4,6 +4,8 @@ import { useWebTheme } from '../useWebTheme';
 import { AppThemeToggle } from './AppThemeToggle';
 import { BrandLockup } from './BrandLogo';
 import './public-shell.css';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 
 type PublicShellProps = {
   children: ReactNode;

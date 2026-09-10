@@ -15,15 +15,12 @@ import {
   isPublicKnowledgePath,
   publicKnowledgePathFromLegacyRoute,
 } from './shared/navigation/knowledgeRoutes';
-import { isPublishedKnowledgePath } from './content/publicContent';
 import { applyRouteMetadata } from './shared/seo/metadata';
 import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
 import './styles/legacy.css';
-import './styles/react.css';
 import './styles/fonts.css';
 import './styles/design-system.css';
-import './styles/design-v2.css';
 
 const publicContentRoots = new Set([
   '/training',
@@ -52,7 +49,7 @@ const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
 const DemoPage = lazy(() => import('./pages/demo/DemoPage'));
 const PublicContentPage = lazy(() => import('./pages/public/PublicContentPage'));
 const ArticlesPage = lazy(() => import('./pages/public/ArticlesPage'));
-const KnowledgeHandoffPage = lazy(() => import('./pages/public/KnowledgeHandoffPage'));
+const PublicKnowledgeRoute = lazy(() => import('./pages/public/PublicKnowledgeRoute'));
 const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
@@ -90,8 +87,6 @@ function AuthenticatedRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { path } = useNavigation();
-  const isMiniApp =
-    Boolean(window.Telegram?.WebApp?.initData?.trim()) || isTelegramLaunch(window.location);
   const legacyKnowledgePath = publicKnowledgePathFromLegacyRoute(path);
   useEffect(() => {
     if (path !== '/' && !isPublicContentRoute(path) && !isArticleRoute(path)) {
@@ -104,11 +99,11 @@ function AppRoutes() {
     if (isTelegramLaunch(window.location)) return <Redirect to="/app" />;
     return <DemoPage />;
   }
-  if (legacyKnowledgePath && isPublishedKnowledgePath(legacyKnowledgePath)) {
-    return <KnowledgeHandoffPage articlePath={legacyKnowledgePath} />;
+  if (legacyKnowledgePath) {
+    return <PublicKnowledgeRoute articlePath={legacyKnowledgePath} legacyRoute />;
   }
-  if (isMiniApp && isPublicKnowledgePath(path) && isPublishedKnowledgePath(path)) {
-    return <KnowledgeHandoffPage articlePath={path} />;
+  if (isPublicKnowledgePath(path)) {
+    return <PublicKnowledgeRoute articlePath={path} />;
   }
   if (isPublicContentRoute(path)) {
     return <PublicContentPage />;

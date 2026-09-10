@@ -1,5 +1,7 @@
 import { AppLink } from '../shared/navigation/router';
 import { Card } from '../shared/ui/common';
+import '../styles/react.css';
+import '../styles/design-v2.css';
 
 export default function NotFoundPage() {
   return (

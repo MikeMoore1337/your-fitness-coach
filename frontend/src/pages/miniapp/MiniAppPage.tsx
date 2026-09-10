@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppShell, type AppSection } from '../../app/AppShell';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 import { useAuth } from '../../app/AuthProvider';
 import {
   authRecoveryMessage,

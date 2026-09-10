@@ -22,6 +22,8 @@ import '../../shared/ui/public-shell.css';
 import '../landing/landing.css';
 import './public-content.css';
 import NotFoundPage from '../NotFoundPage';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 
 export function PublicHeader({ theme }: { theme: 'light' | 'dark' }) {
   const [menuOpen, setMenuOpen] = useState(false);
