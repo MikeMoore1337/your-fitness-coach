@@ -888,6 +888,7 @@ def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
         ("delivery-refreshing", "exclusive-write", "independent-write", False),
         ("delivery-gate", "exclusive-write", "exclusive-write", False),
         ("production-success", "exclusive-write", "independent-write", False),
+        ("superseded", "exclusive-write", "exclusive-write", False),
     ],
 )
 def test_implementation_exclusion_is_state_aware(
@@ -1258,6 +1259,57 @@ def test_resolve_recovery_refuses_dirty_anchor(repository: tuple[Path, Any]) -> 
 
     with pytest.raises(task_session.TaskSessionError, match="dirty worktree"):
         controller.resolve_recovery("234C", reason="inspect", owner_authorize=True)
+
+
+def test_supersede_releases_exclusion_and_preserves_clean_anchor(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "234D", concurrency="exclusive-write"
+    )
+    _, head_sha = sha_pair.split(":")
+
+    with pytest.raises(task_session.TaskSessionError, match="owner authorization"):
+        controller.supersede("234D", reason="owner decision", owner_authorize=False)
+
+    superseded = controller.supersede("234D", reason="Task 229 is canonical", owner_authorize=True)
+
+    assert superseded["lifecycle_state"] == "superseded"
+    assert superseded["superseded_from_state"] == "implementation"
+    assert superseded["superseded_reason"] == "Task 229 is canonical"
+    assert worktree.exists()
+    assert not _git(worktree, "status", "--short")
+    assert git_repository.ref(branch) == head_sha
+    assert controller.store.delivery_state()["owner"] is None
+
+    snapshot = next(item for item in controller.status()["leases"] if item["task_id"] == "234D")
+    assert snapshot["ownership"] == {
+        "task_session_active": False,
+        "implementation_exclusion_active": False,
+        "delivery_critical_section_active": False,
+    }
+    recovered = controller.recover("234D")
+    assert recovered["classification"] == "SUPERSEDED"
+    assert recovered["issues"] == []
+    assert recovered["mutation_performed"] is False
+
+    _write_task(root, "234E", "after-supersede", concurrency="exclusive-write")
+    started = controller.start("234E", owner_launch=True, session_label="after", offline=True)
+    assert started["lease"]["lifecycle_state"] == "implementation"
+
+
+def test_supersede_refuses_dirty_anchor_without_mutation(repository: tuple[Path, Any]) -> None:
+    _, _, controller, worktree, _, _ = _prepare_started(
+        repository, "234F", concurrency="exclusive-write"
+    )
+    (worktree / "uncommitted.txt").write_text("preserve\n", encoding="utf-8")
+
+    with pytest.raises(task_session.TaskSessionError, match="dirty worktree"):
+        controller.supersede("234F", reason="owner decision", owner_authorize=True)
+
+    lease = controller.store.read_json(controller.store.task_lease_path("234F"))
+    assert isinstance(lease, dict)
+    assert lease["lifecycle_state"] == "implementation"
 
 
 def test_busy_delivery_lane_does_not_block_compatible_implementation(

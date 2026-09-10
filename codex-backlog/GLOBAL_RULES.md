@@ -113,7 +113,10 @@ gate, evidence и точки остановки в task-файле.
   `starting/implementation/review/qa`; после durable readiness task lease сохраняется, но
   implementation exclusion освобождается. Обычная task без `concurrency` metadata считается
   `independent-write`; `exclusive-write` используется только для действительно global или
-  coordination-sensitive изменений. Delivery lane хранится отдельным минимальным mutex/queue.
+  coordination-sensitive изменений. Owner-authorized `supersede` является отдельным non-release
+  terminal переходом: он сохраняет clean branch/worktree lease как audit/recovery anchor, снимает
+  implementation exclusion, не получает delivery ownership и не считается `production-success`.
+  Delivery lane хранится отдельным минимальным mutex/queue.
 - `master` является единственной защищённой release-веткой. Task branch/worktree создаются от
   чистого, проверенного exact `origin/master` SHA; feature implementation непосредственно в
   canonical controller worktree запрещена.
