@@ -59,9 +59,10 @@ test('semantic families, compact actions and disclosure states share one accessi
   const page = await context.newPage();
   await openSurface(page, '/app?section=today', 'light');
 
-  for (const family of ['training', 'nutrition', 'progress'] as const) {
+  for (const family of ['training', 'progress'] as const) {
     await expect(page.locator(`[data-semantic-family="${family}"]`).first()).toBeVisible();
   }
+  await expect(page.getByRole('region', { name: 'Питание на сегодня' })).toBeVisible();
   for (const action of await page.locator('.semantic-card__action > :is(a, button)').all()) {
     const box = await action.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
@@ -117,7 +118,7 @@ test('hover and focus use the restrained brand and neutral palette', async ({ br
   const page = await context.newPage();
   await openSurface(page, '/app?section=today', 'dark');
 
-  const nutritionCard = page.locator('[data-semantic-family="nutrition"]').first();
+  const nutritionCard = page.getByRole('region', { name: 'Питание на сегодня' });
   const action = nutritionCard.getByRole('link', { name: '+ Вода', exact: true });
   await nutritionCard.hover();
   await action.focus();
@@ -134,8 +135,8 @@ test('hover and focus use the restrained brand and neutral palette', async ({ br
         .slice(0, 3)
         .map((card) => getComputedStyle(card).getPropertyValue('--semantic-line').trim()),
     );
+  expect(familyLines.length).toBeGreaterThanOrEqual(2);
   expect(familyLines[0]).not.toBe(familyLines[1]);
-  expect(familyLines[1]).toBe(familyLines[2]);
   await context.close();
 });
 

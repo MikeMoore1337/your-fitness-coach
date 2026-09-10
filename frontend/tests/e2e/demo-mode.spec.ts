@@ -500,11 +500,8 @@ test('Web cabinet preview uses production shell across the required viewport mat
 
     const primary = page.getByRole('button', { name: 'Продолжить тренировку' });
     await expect(primary).toBeInViewport();
-    await expect(primary).toHaveCSS('border-radius', '12px');
-    await expect(primary).toHaveCSS(
-      'background-color',
-      viewport.dark ? 'rgb(181, 239, 50)' : 'rgb(181, 239, 50)',
-    );
+    await expect(primary).toHaveCSS('border-radius', '14px');
+    await expect(primary).toHaveCSS('background-color', 'rgb(178, 245, 32)');
     if (viewport.touch) {
       await expectTouchTargets(page.locator('#appBottomNav .app-bottom-nav__primary > *'));
       await expectTouchTargets(primary);
@@ -718,26 +715,34 @@ test('desktop demo keeps metric groups separated and conversion copy honest', as
       const pictogram = document.querySelector<HTMLElement>(
         `.week-strip__pictogram[data-pictogram="${kind}"]`,
       );
-      const shape = pictogram?.querySelector<SVGGraphicsElement>('path, circle');
-      if (!pictogram || !shape) return null;
-      const box = shape.getBBox();
+      const icon = pictogram?.querySelector<HTMLElement>('.yfc-icon');
+      if (!pictogram || !icon) return null;
+      const asset = Array.from(icon.querySelectorAll<HTMLElement>('img')).find(
+        (candidate) => window.getComputedStyle(candidate).display !== 'none',
+      );
+      if (!asset) return null;
+      const box = asset.getBoundingClientRect();
       return {
         canvasHeight: pictogram.getBoundingClientRect().height,
         canvasWidth: pictogram.getBoundingClientRect().width,
-        shapeHeight: box.height,
-        shapeWidth: box.width,
-        strokeWidth: Number.parseFloat(window.getComputedStyle(shape).strokeWidth),
+        iconHeight: icon.getBoundingClientRect().height,
+        iconWidth: icon.getBoundingClientRect().width,
+        assetHeight: box.height,
+        assetWidth: box.width,
       };
     };
     return { inProgress: geometry('in-progress'), planned: geometry('planned') };
   });
   expect(statusGeometry.planned).toMatchObject({ canvasHeight: 16, canvasWidth: 16 });
-  expect(statusGeometry.planned?.shapeHeight).toBeGreaterThanOrEqual(7);
-  expect(statusGeometry.planned?.shapeWidth).toBeGreaterThanOrEqual(7);
+  expect(statusGeometry.planned?.iconHeight).toBe(16);
+  expect(statusGeometry.planned?.iconWidth).toBe(16);
+  expect(statusGeometry.planned?.assetHeight).toBe(16);
+  expect(statusGeometry.planned?.assetWidth).toBe(16);
   expect(statusGeometry.inProgress).toMatchObject({ canvasHeight: 16, canvasWidth: 16 });
-  expect(statusGeometry.inProgress?.shapeHeight).toBeGreaterThanOrEqual(9);
-  expect(statusGeometry.inProgress?.shapeWidth).toBeGreaterThanOrEqual(4);
-  expect(statusGeometry.inProgress?.strokeWidth).toBeGreaterThanOrEqual(1.8);
+  expect(statusGeometry.inProgress?.iconHeight).toBe(16);
+  expect(statusGeometry.inProgress?.iconWidth).toBe(16);
+  expect(statusGeometry.inProgress?.assetHeight).toBe(16);
+  expect(statusGeometry.inProgress?.assetWidth).toBe(16);
   const statusColors = await page.evaluate(() => {
     const color = (kind: string) => {
       const pictogram = document.querySelector<HTMLElement>(

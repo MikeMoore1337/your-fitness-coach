@@ -79,7 +79,7 @@ test('current action and floating dock preserve the shared navigation contract',
     await expect(page.locator('.ui-semantic-artwork')).toHaveCount(0);
     await expect(page.locator('.today-workout-spotlight')).toHaveCSS('background-image', 'none');
     await expect(dock).toHaveCSS('position', 'fixed');
-    await expect(dock).toHaveCSS('border-radius', '12px');
+    await expect(dock).toHaveCSS('border-radius', '24px');
     await expectNoOverlap(action, dock);
     await expectNoHorizontalOverflow(page);
 

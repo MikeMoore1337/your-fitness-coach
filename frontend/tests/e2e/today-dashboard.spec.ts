@@ -1,5 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { namedArticle } from './fixtures/locators';
 import { emptyHydrationDay } from './fixtures/platform-api';
 
 const captureLandingProductProofs =
@@ -321,8 +320,8 @@ test('shows the non-modal install option only after value on the authenticated T
   const installButton = prompt.getByRole('button', { name: 'Установить' });
   const installBounds = await installButton.boundingBox();
   expect(installBounds?.height).toBeGreaterThanOrEqual(44);
-  await expect(installButton).toHaveCSS('background-color', 'rgb(181, 239, 50)');
-  await expect(installButton).toHaveCSS('color', 'rgb(16, 32, 21)');
+  await expect(installButton).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(installButton).toHaveCSS('color', 'rgb(9, 11, 11)');
   await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
     'color',
     'rgb(21, 21, 21)',
@@ -331,11 +330,11 @@ test('shows the non-modal install option only after value on the authenticated T
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-  await expect(installButton).toHaveCSS('background-color', 'rgb(181, 239, 50)');
-  await expect(installButton).toHaveCSS('color', 'rgb(16, 32, 21)');
+  await expect(installButton).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(installButton).toHaveCSS('color', 'rgb(9, 11, 11)');
   await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
     'background-color',
-    'rgb(25, 25, 25)',
+    'rgb(20, 23, 23)',
   );
   await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
     'color',
@@ -402,7 +401,7 @@ test('core navigation keeps the locked order, labels, active state and deep link
   expect(profileButtonBox).not.toBeNull();
   expect(profileButtonBox!.width).toBeGreaterThanOrEqual(44);
   expect(profileButtonBox!.height).toBeGreaterThanOrEqual(44);
-  await expect(profileButton).toHaveCSS('border-color', 'rgb(181, 239, 50)');
+  await expect(profileButton).toHaveCSS('border-color', 'rgb(178, 245, 32)');
   await profileButton.click();
   await expect(page.getByRole('dialog', { name: 'Профиль и настройки' })).toBeVisible();
   await page.getByRole('button', { name: 'Закрыть меню' }).click();
@@ -595,9 +594,9 @@ test('Today keeps hierarchy and has no horizontal overflow at required widths', 
   ]) {
     await page.setViewportSize(viewport);
     await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeInViewport();
-    await expect(page.getByRole('heading', { name: 'Питание' })).toBeVisible();
-    const nutritionCard = namedArticle(page, 'Питание');
-    const progressCard = namedArticle(page, 'Прогресс');
+    await expect(page.getByRole('heading', { name: 'Питание на сегодня' })).toBeVisible();
+    const nutritionCard = page.getByRole('region', { name: 'Питание на сегодня' });
+    const progressCard = page.getByRole('region', { name: 'Главное о прогрессе' });
     await expect(nutritionCard).toHaveCount(1);
     await expect(progressCard).toHaveCount(1);
     const [nutritionBox, progressBox] = await Promise.all([

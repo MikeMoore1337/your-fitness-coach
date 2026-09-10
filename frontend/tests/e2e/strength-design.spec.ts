@@ -74,30 +74,30 @@ test.describe('motion demonstration', () => {
     await page.goto('/');
     const scene = page.locator('.strength-scene');
     await expect(page.getByRole('link', { name: 'Начать', exact: true })).toBeInViewport();
-    await expect(scene).toHaveAttribute('data-motion-phase', 'idle');
+    await expect(scene).toHaveAttribute('data-phase', '0');
     for (const chapter of await page.locator('.landing-chapter').all()) {
       await chapter.scrollIntoViewIfNeeded();
       await expect(chapter).toHaveAttribute('data-motion-phase', 'idle');
     }
     await scene.scrollIntoViewIfNeeded();
-    await expect(scene).toHaveAttribute('data-motion-phase', 'idle');
+    await expect(scene).toHaveAttribute('data-phase', '0');
     await page.reload();
-    await expect(scene).toHaveAttribute('data-motion-phase', 'enter');
+    await expect(scene).toHaveAttribute('data-phase', '0');
     await page.locator('footer').scrollIntoViewIfNeeded();
-    await expect(scene).toHaveAttribute('data-motion-phase', 'idle');
+    await expect(scene).toHaveAttribute('data-phase', '2');
     await scene.scrollIntoViewIfNeeded();
-    await expect(scene).toHaveAttribute('data-motion-phase', 'idle');
+    await expect(scene).toHaveAttribute('data-phase', '2');
     await page.reload();
-    await expect(scene).toHaveAttribute('data-motion-phase', 'enter');
+    await expect(scene).toHaveAttribute('data-phase', '0');
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await expect(scene).toHaveAttribute('data-motion-phase', 'idle');
+    await expect(scene).toHaveAttribute('data-phase', '0');
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await expect(scene).toHaveAttribute('data-motion-phase', 'idle');
+    await expect(scene).toHaveAttribute('data-phase', '0');
   });
 });

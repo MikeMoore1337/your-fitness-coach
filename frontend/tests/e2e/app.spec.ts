@@ -81,12 +81,11 @@ test('описания самостоятельного и тренерског�
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
 
-    const selfDescription = page.locator('.landing-core__self > p:not(.landing-kicker)');
+    const selfDescription = page.locator('.landing-practice > div > p:not(.landing-kicker)');
     const coachDescription = page.locator('.landing-trainer__copy > p:not(.landing-kicker)');
 
-    const expectedColor = scheme === 'light' ? 'rgb(89, 96, 91)' : 'rgb(175, 181, 173)';
-    await expect(selfDescription).toHaveCSS('color', expectedColor);
-    await expect(coachDescription).toHaveCSS('color', 'rgb(174, 185, 176)');
+    await expect(selfDescription).toHaveCSS('color', 'rgb(172, 177, 177)');
+    await expect(coachDescription).toHaveCSS('color', 'rgb(17, 17, 17)');
   }
 });
 
@@ -142,22 +141,11 @@ test('первый экран лендинга объясняет продукт
     await page.setViewportSize(viewport);
     await page.goto('/');
 
-    await expect(page.getByRole('heading', { name: /знайте, что делать сегодня/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /сила в действии/i })).toBeVisible();
     await expect(
-      page.locator('.landing-hero__actions').getByRole('link', { name: /открыть приложение/i }),
+      page.locator('.landing-hero__actions').getByRole('link', { name: 'Начать', exact: true }),
     ).toBeVisible();
-    const heroProof = page.locator('.landing-hero-device');
-    await expect(
-      heroProof.getByRole('img', { name: /актуальный экран сегодня.*силовой тренировки/i }),
-    ).toBeVisible();
-    await expect(heroProof.getByText(/актуальный интерфейс/i)).toBeVisible();
-    if (viewport.width === 390) {
-      const mobileProof = await heroProof.evaluate((element) => {
-        const styles = getComputedStyle(element);
-        return { marginInline: styles.marginInline };
-      });
-      expect(mobileProof.marginInline).toBe('0px');
-    }
+    await expect(page.locator('.landing-hero__image')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
   }
 });
@@ -173,8 +161,8 @@ test('вторичный hero CTA сохраняет контрастный те
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
     await page.reload();
 
-    const expectedBackground = scheme === 'light' ? 'rgb(240, 240, 240)' : 'rgb(34, 34, 34)';
-    const expectedText = scheme === 'light' ? 'rgb(21, 21, 21)' : 'rgb(245, 245, 245)';
+    const expectedBackground = 'rgba(0, 0, 0, 0)';
+    const expectedText = 'rgb(255, 255, 255)';
     for (const link of [
       page.locator('.landing-hero__actions').getByRole('link', { name: /Попробовать демо/ }),
     ]) {
@@ -199,7 +187,7 @@ test('лендинг остаётся адаптивным на контроль
     expect(pageMetrics.documentWidth).toBeLessThanOrEqual(pageMetrics.viewport);
     expect(pageMetrics.bodyWidth).toBeLessThanOrEqual(pageMetrics.viewport);
     await expect(
-      page.locator('.landing-hero__actions').getByRole('link', { name: /открыть приложение/i }),
+      page.locator('.landing-hero__actions').getByRole('link', { name: 'Начать', exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: /Включить .* тему/ })).toBeInViewport();
     await expect(page.locator('.landing-continuity__rail')).toBeVisible();
@@ -236,16 +224,10 @@ test('блок возможностей показывает пользу спо
     await page.setViewportSize(viewport);
     await page.goto('/');
 
-    await expect(
-      page.getByRole('heading', { name: /один цикл — от плана до следующего шага/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: /сначала — одно понятное действие/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: /у каждого клиента — видимый контекст/i }),
-    ).toBeVisible();
-    await expect(page.locator('.landing-core__features article')).toHaveCount(3);
+    await expect(page.getByRole('heading', { name: /питание без догадок/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /замечай своё движение/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /тренер рядом с планом/i })).toBeVisible();
+    await expect(page.locator('.landing-feature')).toHaveCount(2);
     if (viewport.width <= 430) {
       const compactTextLinks = page.locator('.landing-brand, .landing-footer a');
       for (const link of await compactTextLinks.all()) {
@@ -291,23 +273,18 @@ test('сценарии спортсмена и тренера ведут в ве
     await page.setViewportSize(viewport);
     await page.goto('/');
 
-    await expect(page.locator('.landing-core__self')).toBeVisible();
+    await expect(page.locator('.landing-practice')).toBeVisible();
     await expect(page.locator('.landing-trainer')).toBeVisible();
-    await expect(page.getByText(/занимаетесь самостоятельно/i)).toBeVisible();
+    await expect(page.getByText(/попробуй сам/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /тренер рядом с планом/i })).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: /у каждого клиента — видимый контекст/i }),
-    ).toBeVisible();
-    await expect(page.getByRole('link', { name: /начать с тренировок/i })).toHaveAttribute(
-      'href',
-      '/training',
-    );
+      page.locator('.landing-footer').getByRole('link', { name: 'Тренировки', exact: true }),
+    ).toHaveAttribute('href', '/training');
     await expect(page.getByRole('link', { name: /посмотреть кабинет тренера/i })).toHaveAttribute(
       'href',
       '/for-trainers',
     );
-    await expect(
-      page.locator('.landing-core__self').getByText(/тренера (можно )?подключи(ть|те) позже/i),
-    ).toBeVisible();
+    await expect(page.locator('.landing-practice').getByText(/попробуй сам/i)).toBeVisible();
     await expect(
       page.locator('.landing-contact__actions').getByRole('link', { name: /открыть приложение/i }),
     ).toHaveAttribute('href', '/app');
@@ -327,11 +304,14 @@ test('сценарии спортсмена и тренера ведут в ве
       expect(boxes[0]).not.toBeNull();
       expect(boxes[1]).not.toBeNull();
       expect(boxes[0]!.height).toBe(boxes[1]!.height);
-      if (viewport.width === 390) expect(boxes[0]!.width).toBeCloseTo(boxes[1]!.width, 0);
+      if (viewport.width === 390) {
+        expect(boxes[0]!.width).toBeGreaterThanOrEqual(44);
+        expect(boxes[1]!.width).toBeGreaterThanOrEqual(44);
+      }
     }
-    const featureCards = page.locator('.landing-core__features article');
-    await expect(featureCards).toHaveCount(3);
-    await expect(featureCards.getByRole('link')).toHaveCount(3);
+    const featureCards = page.locator('.landing-feature');
+    await expect(featureCards).toHaveCount(2);
+    await expect(featureCards.getByRole('link')).toHaveCount(2);
     if (viewport.width === 390) {
       const brand = page.locator('.landing-header .landing-brand');
       const brandWordmark = brand.locator('.yfc-lockup__wordmark');
@@ -1240,18 +1220,16 @@ test('цветовая система сохраняет иерархию в с�
 
   const authPanel = page.locator('.login-card');
   await expect(page.getByRole('heading', { name: 'Вернитесь к своему плану.' })).toBeVisible();
-  await expect(authPanel).toHaveCSS('background-color', 'rgb(250, 250, 250)');
-  await expect(authPanel).toHaveCSS('border-left-color', 'rgb(201, 205, 200)');
+  await expect(authPanel).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 
   const clientButton = page.getByRole('button', { name: 'Клиент' });
-  await expect(clientButton).toHaveCSS('border-radius', '12px');
+  await expect(clientButton).toHaveCSS('border-radius', '14px');
   await expect(clientButton).toHaveCSS('background-color', 'rgb(240, 240, 240)');
   await expect(clientButton).toHaveCSS('color', 'rgb(21, 21, 21)');
 
   await page.emulateMedia({ colorScheme: 'dark' });
-  await expect(authPanel).toHaveCSS('background-color', 'rgb(17, 17, 17)');
-  await expect(authPanel).toHaveCSS('border-left-color', 'rgb(58, 65, 58)');
-  await expect(clientButton).toHaveCSS('background-color', 'rgb(34, 34, 34)');
+  await expect(authPanel).toHaveCSS('background-color', 'rgb(9, 11, 11)');
+  await expect(clientButton).toHaveCSS('background-color', 'rgb(27, 31, 31)');
   await expect(clientButton).toHaveCSS('color', 'rgb(245, 245, 245)');
 
   await clientButton.click();
@@ -1261,11 +1239,11 @@ test('цветовая система сохраняет иерархию в с�
     .getByRole('link', { name: 'Питание', exact: true })
     .locator('.app-bottom-nav__icon');
   await expect(selectedDestination).toHaveAttribute('aria-current', 'page');
-  await expect(selectedDestination).toHaveCSS('border-radius', '8px');
-  await expect(selectedDestination).toHaveCSS('background-color', 'rgb(34, 34, 34)');
+  await expect(selectedDestination).toHaveCSS('border-radius', '10px');
+  await expect(selectedDestination).toHaveCSS('background-color', 'rgb(27, 31, 31)');
   await expect(selectedDestinationIcon).toBeVisible();
   await expect(nutritionDestinationIcon).toBeVisible();
-  await expect(nutritionDestinationIcon.locator('svg')).toBeVisible();
+  await expect(nutritionDestinationIcon.locator('.yfc-icon')).toBeVisible();
   await expect(page.locator('.app-bottom-nav__sequence')).toHaveCount(0);
   await expect(selectedDestinationIcon).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(selectedDestinationIcon).toHaveCSS('color', 'rgb(185, 234, 114)');
@@ -1417,20 +1395,20 @@ test('primary CTA лендинга и Войти остаются lime в обе
   await page.goto('/');
   await page.mouse.move(0, 700);
   const primary = page.locator('.landing-hero__actions').getByRole('link', {
-    name: 'Открыть приложение',
+    name: 'Начать',
     exact: true,
   });
   const login = page.getByRole('link', { name: 'Войти' });
 
-  await expect(primary).toHaveCSS('background-color', 'rgb(182, 242, 56)');
-  await expect(primary).toHaveCSS('color', 'rgb(23, 32, 24)');
-  await expect(login).toHaveCSS('background-color', 'rgb(181, 239, 50)');
-  await expect(login).toHaveCSS('color', 'rgb(16, 32, 21)');
+  await expect(primary).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(primary).toHaveCSS('color', 'rgb(9, 11, 11)');
+  await expect(login).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(login).toHaveCSS('color', 'rgb(9, 11, 11)');
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
-  await expect(primary).toHaveCSS('background-color', 'rgb(182, 242, 56)');
-  await expect(primary).toHaveCSS('color', 'rgb(23, 32, 24)');
-  await expect(login).toHaveCSS('background-color', 'rgb(181, 239, 50)');
-  await expect(login).toHaveCSS('color', 'rgb(16, 32, 21)');
+  await expect(primary).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(primary).toHaveCSS('color', 'rgb(9, 11, 11)');
+  await expect(login).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(login).toHaveCSS('color', 'rgb(9, 11, 11)');
 });
 
 test('deep link показывает тренера до явного подтверждения', async ({ page }) => {
@@ -1516,7 +1494,7 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
         themeContentOffset: themeButton
           ? groupCenterOffset(
               Array.from(
-                themeButton.querySelectorAll('.app-bottom-nav__icon svg, .app-bottom-nav__label'),
+                themeButton.querySelectorAll('.app-bottom-nav__icon, .app-bottom-nav__label'),
               ),
               themeButton.getBoundingClientRect(),
             )

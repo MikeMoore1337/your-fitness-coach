@@ -96,7 +96,7 @@ test('Landing and login keep public/auth initial work bounded in mobile lab', as
     await expect(
       page.getByRole('heading', {
         level: 1,
-        name: route === '/' ? 'Движение. Запись. Прогресс.' : 'Войти и продолжить',
+        name: route === '/' ? 'СИЛА В ДЕЙСТВИИ.' : 'Войти и продолжить',
       }),
     ).toBeVisible();
     await settle(page);
@@ -178,7 +178,10 @@ test('Telegram knowledge launch keeps the handoff when the SDK is unavailable', 
 test('Client navigation preserves metadata owned by a lazy public route', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('link', { name: 'Начать с тренировок' }).click();
+  await page
+    .locator('.landing-footer')
+    .getByRole('link', { name: 'Тренировки', exact: true })
+    .click();
 
   await expect(page).toHaveURL(/\/training$/);
   await expect(

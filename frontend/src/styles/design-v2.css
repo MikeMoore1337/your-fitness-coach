@@ -7855,6 +7855,12 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   transform: none;
 }
 
+.public-shell.public-shell--design-v2.landing-page .landing-menu-toggle:hover,
+.public-shell.public-shell--design-v2.landing-page .landing-menu-toggle:active,
+.public-shell.public-shell--design-v2.landing-page .landing-menu-toggle:focus {
+  background: transparent;
+}
+
 .public-shell.public-shell--design-v2.landing-page .landing-button--compact {
   border-color: var(--v2-lime);
   background: var(--v2-lime);

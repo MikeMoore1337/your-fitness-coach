@@ -223,7 +223,7 @@ test('keyboard, menu, FAQ and canonical public actions stay operable', async ({ 
       '.landing-footer nav a',
     ];
     const textSelectors = [
-      '.landing-feature p:not(.landing-kicker)',
+      '.landing-feature > div > p:not(.landing-kicker)',
       '.landing-trainer__copy > p:not(.landing-kicker)',
       '.landing-start__steps p',
       '.landing-faq-list details > p',
