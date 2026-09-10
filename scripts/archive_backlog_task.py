@@ -1,4 +1,4 @@
-"""Archive a completed backlog task and keep backlog manifests synchronized."""
+"""Archive a completed or owner-superseded backlog task and sync manifests."""
 
 from __future__ import annotations
 
@@ -231,7 +231,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    archive = subparsers.add_parser("archive", help="archive one completed task")
+    archive = subparsers.add_parser("archive", help="archive one completed or superseded task")
     archive.add_argument("--backlog", required=True, type=Path)
     archive.add_argument("--task", required=True)
 

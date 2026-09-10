@@ -185,6 +185,17 @@ def _task_commit(task_id: str) -> dict[str, Any]:
     return {"commit": {"message": f"feat: [Task {task_id}] synthetic change"}}
 
 
+def _controller_pr(base_sha: str, head_sha: str) -> dict[str, Any]:
+    pull_request = _task_pr(234, "234", base_sha, head_sha)
+    pull_request["title"] = "[Controller] Synthetic maintenance"
+    pull_request["head"]["ref"] = "codex/controller-synthetic-maintenance"
+    return pull_request
+
+
+def _controller_commit() -> dict[str, Any]:
+    return {"commit": {"message": "[Controller] synthetic maintenance"}}
+
+
 def _success_check(sha: str) -> dict[str, Any]:
     return {"name": "checks", "head_sha": sha, "status": "completed", "conclusion": "SUCCESS"}
 
@@ -216,6 +227,34 @@ def _prepare_started(
     _git(worktree, "commit", "-m", f"feat: [Task {task_id}] synthetic change")
     head_sha = _git(worktree, "rev-parse", "HEAD")
     return root, git_repository, controller, worktree, branch, base_sha + ":" + head_sha
+
+
+def test_superseded_archived_task_is_not_a_completed_dependency(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    done = root / "codex-backlog" / "tasks" / "done"
+    done.mkdir(parents=True)
+    (done / "152-superseded.md").write_text("superseded\n", encoding="utf-8")
+    (done / "153-delivered.md").write_text("delivered\n", encoding="utf-8")
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    controller.store.initialize()
+    task_session.StateStore.replace_json(
+        controller.store.task_lease_path("152"),
+        {
+            "task_id": "152",
+            "mode": "write",
+            "lifecycle_state": "superseded",
+        },
+    )
+
+    completed = controller._completed_dependency_ids()
+
+    assert "152" not in completed
+    assert "153" in completed
 
 
 def test_record_queue_cycle_is_durable_and_bounded(repository: tuple[Path, Any]) -> None:
@@ -401,6 +440,51 @@ def test_validate_pr_event_accepts_trusted_dependabot_without_task_branch(
     )
 
     assert result == {"kind": "dependabot-pr", "head_sha": head_sha}
+
+
+def test_validate_pr_event_accepts_controller_maintenance_branch(
+    tmp_path: Path,
+) -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _controller_pr(base_sha, head_sha)
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
+    github = FakeGitHub(base_sha)
+    github.commits[234] = [_controller_commit()]
+    github.files[234] = [{"filename": "scripts/task_session.py"}]
+
+    result = task_session.validate_pr_event(
+        object(),
+        github,
+        event_path,  # type: ignore[arg-type]
+    )
+
+    assert result == {
+        "kind": "controller-pr",
+        "branch": "codex/controller-synthetic-maintenance",
+        "head_sha": head_sha,
+    }
+
+
+def test_controller_pr_rejects_product_paths(
+    tmp_path: Path,
+) -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _controller_pr(base_sha, head_sha)
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
+    github = FakeGitHub(base_sha)
+    github.commits[234] = [_controller_commit()]
+    github.files[234] = [{"filename": "backend/app.py"}]
+
+    with pytest.raises(task_session.TaskSessionError, match="outside the governance allowlist"):
+        task_session.validate_pr_event(  # type: ignore[arg-type]
+            object(),
+            github,
+            event_path,
+        )
 
 
 def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(
@@ -888,6 +972,7 @@ def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
         ("delivery-refreshing", "exclusive-write", "independent-write", False),
         ("delivery-gate", "exclusive-write", "exclusive-write", False),
         ("production-success", "exclusive-write", "independent-write", False),
+        ("superseded", "exclusive-write", "exclusive-write", False),
     ],
 )
 def test_implementation_exclusion_is_state_aware(
@@ -1258,6 +1343,72 @@ def test_resolve_recovery_refuses_dirty_anchor(repository: tuple[Path, Any]) -> 
 
     with pytest.raises(task_session.TaskSessionError, match="dirty worktree"):
         controller.resolve_recovery("234C", reason="inspect", owner_authorize=True)
+
+
+def test_supersede_releases_exclusion_and_preserves_clean_anchor(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "234D", concurrency="exclusive-write"
+    )
+    _, head_sha = sha_pair.split(":")
+
+    with pytest.raises(task_session.TaskSessionError, match="owner authorization"):
+        controller.supersede("234D", reason="owner decision", owner_authorize=False)
+
+    superseded = controller.supersede("234D", reason="Task 229 is canonical", owner_authorize=True)
+
+    assert superseded["lifecycle_state"] == "superseded"
+    assert superseded["superseded_from_state"] == "implementation"
+    assert superseded["superseded_reason"] == "Task 229 is canonical"
+    assert worktree.exists()
+    assert not _git(worktree, "status", "--short")
+    assert git_repository.ref(branch) == head_sha
+    assert controller.store.delivery_state()["owner"] is None
+
+    snapshot = next(item for item in controller.status()["leases"] if item["task_id"] == "234D")
+    assert snapshot["ownership"] == {
+        "task_session_active": False,
+        "implementation_exclusion_active": False,
+        "delivery_critical_section_active": False,
+    }
+    recovered = controller.recover("234D")
+    assert recovered["classification"] == "SUPERSEDED"
+    assert recovered["issues"] == []
+    assert recovered["mutation_performed"] is False
+
+    _write_task(root, "234E", "after-supersede", concurrency="exclusive-write")
+    started = controller.start("234E", owner_launch=True, session_label="after", offline=True)
+    assert started["lease"]["lifecycle_state"] == "implementation"
+
+
+def test_supersede_refuses_dirty_anchor_without_mutation(repository: tuple[Path, Any]) -> None:
+    _, _, controller, worktree, _, _ = _prepare_started(
+        repository, "234F", concurrency="exclusive-write"
+    )
+    (worktree / "uncommitted.txt").write_text("preserve\n", encoding="utf-8")
+
+    with pytest.raises(task_session.TaskSessionError, match="dirty worktree"):
+        controller.supersede("234F", reason="owner decision", owner_authorize=True)
+
+    lease = controller.store.read_json(controller.store.task_lease_path("234F"))
+    assert isinstance(lease, dict)
+    assert lease["lifecycle_state"] == "implementation"
+
+
+def test_supersede_refuses_open_task_pr_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, branch, _ = _prepare_started(repository, "234G")
+    assert isinstance(controller.github, FakeGitHub)
+    controller.github.open_prs = [{"number": 999, "head": {"ref": branch}}]
+
+    with pytest.raises(task_session.TaskSessionError, match="open task PR"):
+        controller.supersede("234G", reason="owner decision", owner_authorize=True)
+
+    lease = controller.store.read_json(controller.store.task_lease_path("234G"))
+    assert isinstance(lease, dict)
+    assert lease["lifecycle_state"] == "implementation"
 
 
 def test_busy_delivery_lane_does_not_block_compatible_implementation(
@@ -2001,6 +2152,21 @@ def test_verify_master_merge_accepts_only_one_task_pr_for_current_master() -> No
     assert result["pull_request"]["number"] == 205
 
 
+def test_verify_master_merge_accepts_one_controller_maintenance_pr() -> None:
+    base_sha = "a" * 40
+    merge_sha = "c" * 40
+    controller_pr = _controller_pr(base_sha, "b" * 40)
+    controller_pr["merged_at"] = "2026-09-11T10:00:00Z"
+    controller_pr["merge_commit_sha"] = merge_sha
+    github = FakeGitHub(merge_sha)
+    github.associated_pulls = [controller_pr]
+
+    result = task_session.verify_master_merge(object(), github, sha=merge_sha)
+
+    assert result["kind"] == "controller-pr-merge"
+    assert result["pull_request"]["number"] == 234
+
+
 def test_verify_master_merge_accepts_trusted_dependabot_pr() -> None:
     base_sha = "a" * 40
     merge_sha = "c" * 40
@@ -2028,7 +2194,9 @@ def test_verify_master_merge_rejects_dependabot_fork_pr() -> None:
     github = FakeGitHub(merge_sha)
     github.associated_pulls = [dependabot_pr]
 
-    with pytest.raises(task_session.TaskSessionError, match="not exactly one merged task PR"):
+    with pytest.raises(
+        task_session.TaskSessionError, match="not exactly one merged task or controller PR"
+    ):
         task_session.verify_master_merge(object(), github, sha=merge_sha)
 
 

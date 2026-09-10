@@ -38,7 +38,19 @@ TASK_BRANCH_RE = re.compile(
     rf"^task/(?P<task_id>{TASK_ID_PATTERN})-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)$",
     re.IGNORECASE,
 )
+CONTROLLER_BRANCH_RE = re.compile(r"^codex/controller-[a-z0-9]+(?:-[a-z0-9]+)*$")
 TASK_COMMIT_RE = re.compile(rf"\[Task (?P<task_id>{TASK_ID_PATTERN})\]", re.IGNORECASE)
+CONTROLLER_COMMIT_RE = re.compile(r"^\[Controller\]\s+\S")
+CONTROLLER_ALLOWED_PATHS = frozenset(
+    {
+        "codex-backlog/GLOBAL_RULES.md",
+        "codex-backlog/TASK_EXECUTION_LIFECYCLE.md",
+        "scripts/archive_backlog_task.py",
+        "scripts/task_session.py",
+        "tests/test_archive_backlog_task.py",
+        "tests/test_task_session.py",
+    }
+)
 TASK_DEPENDENCY_RE = re.compile(r"(?im)^Depends-on:\s*(?P<value>.+)$")
 TASK_FILE_RE = re.compile(rf"^(?P<task_id>{TASK_ID_PATTERN})-(?P<slug>.+)\.md$", re.IGNORECASE)
 TASK_STATE_VERSION = 2
@@ -68,20 +80,23 @@ REVIEW_BLOCKING_MARKER_RE = re.compile(
 
 # A task lease, an implementation exclusion, and delivery ownership are separate controller
 # concerns.  Only an exclusive-write lease in an implementation state owns the implementation
-# exclusion.  A ready, waiting, delivery, or production-success lease remains a task session but
-# does not hold that exclusion; delivery ownership is serialized independently below.
+# exclusion.  A ready, waiting, delivery, production-success, or superseded lease does not hold
+# that exclusion; delivery ownership is serialized independently below. A superseded lease is a
+# non-release terminal record whose clean Git anchor is retained for audit/recovery.
 IMPLEMENTATION_STATES = frozenset({"starting", "implementation", "review", "qa"})
 READY_STATES = frozenset({"ready-for-delivery", "ready-for-pr"})
 WAITING_STATES = frozenset({"waiting-for-delivery"})
 DELIVERY_STATES = frozenset({"delivering", "delivery-refreshing", "delivery-gate"})
 TERMINAL_LEASE_STATES = frozenset({"production-success"})
+SUPERSEDED_LEASE_STATES = frozenset({"superseded"})
+CLOSED_LEASE_STATES = TERMINAL_LEASE_STATES | SUPERSEDED_LEASE_STATES
 RECOVERY_STATES = frozenset({"recovery-required", "start-failed-recovery-required"})
 KNOWN_LEASE_STATES = (
     IMPLEMENTATION_STATES
     | READY_STATES
     | WAITING_STATES
     | DELIVERY_STATES
-    | TERMINAL_LEASE_STATES
+    | CLOSED_LEASE_STATES
     | RECOVERY_STATES
 )
 DELIVERY_OWNER_STATES = DELIVERY_STATES | TERMINAL_LEASE_STATES
@@ -1211,6 +1226,86 @@ def validate_task_pull_request(
     return task_id
 
 
+def validate_controller_pull_request(
+    pull_request: Mapping[str, Any],
+    commits: Sequence[Mapping[str, Any]],
+    checks: Sequence[Mapping[str, Any]],
+    *,
+    expected_base_sha: str,
+    expected_base_branch: str = TARGET_BASE_BRANCH,
+    require_checks: bool = True,
+) -> str:
+    """Validate a controller-only maintenance PR without inventing a product task."""
+
+    base = pull_request.get("base", {})
+    head = pull_request.get("head", {})
+    if base.get("ref") != expected_base_branch:
+        raise TaskSessionError(
+            f"Controller pull request base must be {expected_base_branch}, found {base.get('ref')}"
+        )
+    branch = str(head.get("ref", ""))
+    if CONTROLLER_BRANCH_RE.fullmatch(branch) is None:
+        raise TaskSessionError(
+            f"Controller branch {branch!r} must match codex/controller-<lowercase-kebab-slug>"
+        )
+    if base.get("sha") != expected_base_sha:
+        raise TaskSessionError(
+            f"Controller PR is stale: base {base.get('sha')} != current {expected_base_sha}"
+        )
+    base_repo = base.get("repo", {})
+    head_repo = head.get("repo", {})
+    if (
+        not isinstance(base_repo, Mapping)
+        or not isinstance(head_repo, Mapping)
+        or not base_repo.get("full_name")
+        or head_repo.get("full_name") != base_repo.get("full_name")
+    ):
+        raise TaskSessionError("Controller PR must originate from the same repository")
+    title = str(pull_request.get("title", ""))
+    if not title.startswith("[Controller]"):
+        raise TaskSessionError("Controller PR title must start with [Controller]")
+    messages = [str(item.get("commit", {}).get("message", "")) for item in commits]
+    declared_commit_count = pull_request.get("commits")
+    if declared_commit_count is not None and int(declared_commit_count) != len(commits):
+        raise TaskSessionError(
+            "Controller PR commit inventory is incomplete; split/review the PR instead of truncating provenance"
+        )
+    if not messages:
+        raise TaskSessionError("Controller branch contains no controller commits")
+    invalid = [
+        message.splitlines()[0] if message else "<empty>"
+        for message in messages
+        if not CONTROLLER_COMMIT_RE.match(message)
+    ]
+    if invalid:
+        raise TaskSessionError(
+            "Controller commit messages must start with [Controller]: " + ", ".join(invalid)
+        )
+    head_sha = str(head.get("sha", ""))
+    if not head_sha:
+        raise TaskSessionError("Controller PR head SHA is missing")
+    if require_checks and not _successful_exact_check(checks, "checks", head_sha):
+        raise TaskSessionError(
+            f"Exact-head required check 'checks' is not successful for {head_sha}"
+        )
+    return branch
+
+
+def validate_controller_pull_request_files(
+    files: Sequence[Mapping[str, Any]], *, expected_count: int | None = None
+) -> None:
+    """Keep controller-only provenance from becoming a product-code bypass."""
+
+    validate_task_pull_request_files(files, expected_count=expected_count)
+    changed = {str(item.get("filename", "")).replace("\\", "/") for item in files}
+    disallowed = sorted(changed - CONTROLLER_ALLOWED_PATHS)
+    if disallowed:
+        raise TaskSessionError(
+            "Controller PR contains paths outside the governance allowlist: "
+            + ", ".join(disallowed)
+        )
+
+
 def validate_task_pull_request_files(
     files: Sequence[Mapping[str, Any]], *, expected_count: int | None = None
 ) -> None:
@@ -1296,6 +1391,23 @@ def validate_pr_event(
     number = int(pull_request["number"])
     commits = github.pull_request_commits(number)
     files = github.pull_request_files(number)
+    branch = str(pull_request.get("head", {}).get("ref", ""))
+    if CONTROLLER_BRANCH_RE.fullmatch(branch):
+        validate_controller_pull_request(
+            pull_request,
+            commits,
+            [],
+            expected_base_sha=event_base_sha,
+            require_checks=False,
+        )
+        validate_controller_pull_request_files(
+            files, expected_count=int(pull_request.get("changed_files", len(files)))
+        )
+        return {
+            "kind": "controller-pr",
+            "branch": branch,
+            "head_sha": pull_request["head"]["sha"],
+        }
     task_id = validate_task_pull_request(
         pull_request,
         commits,
@@ -1365,9 +1477,12 @@ def verify_master_merge(
             and base.get("ref") == TARGET_BASE_BRANCH
         ):
             continue
-        is_task_merge = TASK_BRANCH_RE.fullmatch(str(head.get("ref", ""))) and str(
-            pull_request.get("title", "")
-        ).startswith("[Task ")
+        branch = str(head.get("ref", ""))
+        title = str(pull_request.get("title", ""))
+        is_task_merge = TASK_BRANCH_RE.fullmatch(branch) and title.startswith("[Task ")
+        is_controller_merge = CONTROLLER_BRANCH_RE.fullmatch(
+            branch
+        ) is not None and title.startswith("[Controller]")
         base_repo = base.get("repo", {})
         head_repo = head.get("repo", {})
         is_same_repository = (
@@ -1379,6 +1494,8 @@ def verify_master_merge(
         is_dependabot_merge = is_dependabot_pull_request(pull_request) and is_same_repository
         if is_task_merge:
             merge_kind = "task-pr-merge"
+        elif is_controller_merge and is_same_repository:
+            merge_kind = "controller-pr-merge"
         elif is_dependabot_merge:
             merge_kind = "dependabot-pr-merge"
         else:
@@ -1392,7 +1509,8 @@ def verify_master_merge(
         )
     if len(matches) != 1:
         raise TaskSessionError(
-            f"Master revision {sha} is not exactly one merged task PR result: found {len(matches)}"
+            f"Master revision {sha} is not exactly one merged task or controller PR result: "
+            f"found {len(matches)}"
         )
     match = matches[0]
     return {
@@ -1597,6 +1715,8 @@ class TaskController:
                     f"Task {raw_task_id} lease worktree branch does not match {branch}",
                 )
             state = self._lease_state(lease)
+            if state in SUPERSEDED_LEASE_STATES:
+                continue
             if state in RECOVERY_STATES:
                 return ("BLOCKED", f"Task {raw_task_id} requires controller recovery")
             if state in DELIVERY_STATES:
@@ -2143,7 +2263,14 @@ class TaskController:
                 for path in root.glob("*.md"):
                     match = TASK_FILE_RE.fullmatch(path.name)
                     if match:
-                        result.add(match.group("task_id").upper())
+                        task_id = match.group("task_id").upper()
+                        lease = self.store.read_json(self.store.task_lease_path(task_id))
+                        if (
+                            isinstance(lease, dict)
+                            and self._lease_state(lease) in SUPERSEDED_LEASE_STATES
+                        ):
+                            continue
+                        result.add(task_id)
         return result
 
     @staticmethod
@@ -2152,7 +2279,7 @@ class TaskController:
 
     @classmethod
     def _is_active_write_lease(cls, lease: Mapping[str, Any]) -> bool:
-        return lease.get("mode") == "write" and cls._lease_state(lease) not in TERMINAL_LEASE_STATES
+        return lease.get("mode") == "write" and cls._lease_state(lease) not in CLOSED_LEASE_STATES
 
     @classmethod
     def _validated_lease_concurrency_class(cls, lease: Mapping[str, Any]) -> str:
@@ -2189,7 +2316,9 @@ class TaskController:
     def _lease_ownership_snapshot(
         cls, lease: Mapping[str, Any], *, delivery_owner_id: str
     ) -> dict[str, bool]:
-        task_session_active = lease.get("mode") == "write"
+        task_session_active = lease.get("mode") == "write" and (
+            cls._lease_state(lease) not in SUPERSEDED_LEASE_STATES
+        )
         try:
             implementation_exclusion_active = cls._lease_holds_implementation_exclusion(lease)
         except TaskSessionError:
@@ -2518,7 +2647,12 @@ class TaskController:
             except TaskSessionError as error:
                 delivery_blockers.append(f"GitHub state unavailable: {error}")
                 active_runs = open_task_prs = rulesets = "unavailable"
-        active_task_ids = {item.get("task_id") for item in leases if item.get("mode") == "write"}
+        active_task_ids = {
+            item.get("task_id")
+            for item in leases
+            if item.get("mode") == "write"
+            and self._lease_state(item) not in SUPERSEDED_LEASE_STATES
+        }
         if any(item.get("mode") in {"integration", "release"} for item in leases):
             recovery_findings.append(
                 "obsolete integration/release lease requires explicit recovery"
@@ -2816,7 +2950,7 @@ class TaskController:
                 raise TaskSessionError(f"No active queue lease exists for Task {expected}")
             if lease.get("queue_mode") is not True:
                 raise TaskSessionError(f"Task {expected} is not running in continuous queue mode")
-            if self._lease_state(lease) in TERMINAL_LEASE_STATES:
+            if self._lease_state(lease) in CLOSED_LEASE_STATES:
                 raise TaskSessionError(f"Task {expected} is already terminal")
             raw_budget = lease.get("queue_budget")
             if not isinstance(raw_budget, dict):
@@ -3612,6 +3746,202 @@ class TaskController:
             StateStore.replace_json(self.store.delivery_path, current_delivery)
         return current
 
+    def supersede(self, task_id: str, *, reason: str, owner_authorize: bool) -> dict[str, Any]:
+        """Close a task as superseded while retaining its clean Git anchor."""
+
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError("supersede requires explicit owner authorization")
+        normalized_reason = reason.strip()
+        if not normalized_reason or len(normalized_reason) > 4096:
+            raise TaskSessionError("supersede reason must be a bounded non-empty string")
+
+        lease_path = self.store.task_lease_path(expected)
+        lease = self.store.read_json(lease_path)
+        if not isinstance(lease, dict):
+            raise TaskSessionError(f"Task {expected} has no active lease")
+
+        initial_state = self._lease_state(lease)
+        if initial_state in TERMINAL_LEASE_STATES:
+            raise TaskSessionError(
+                f"Task {expected} cannot be superseded from terminal state {initial_state}"
+            )
+        if initial_state not in (
+            IMPLEMENTATION_STATES
+            | READY_STATES
+            | WAITING_STATES
+            | RECOVERY_STATES
+            | SUPERSEDED_LEASE_STATES
+        ):
+            raise TaskSessionError(
+                f"Task {expected} cannot be superseded from {lease.get('lifecycle_state')}"
+            )
+
+        def verify_anchor(current: Mapping[str, Any]) -> tuple[Path, str]:
+            if current.get("mode") != "write":
+                raise TaskSessionError(f"Task {expected} supersede lease is not writable")
+            if str(current.get("task_id", "")).upper() != expected:
+                raise TaskSessionError(f"Task {expected} supersede lease has mismatched task ID")
+            branch = current.get("branch")
+            worktree_value = current.get("worktree")
+            if not isinstance(branch, str) or not isinstance(worktree_value, str):
+                raise TaskSessionError(
+                    f"Task {expected} supersede lease has no valid branch/worktree anchor"
+                )
+            if task_id_from_branch(branch) != expected:
+                raise TaskSessionError(f"Task {expected} supersede lease has an invalid branch")
+            worktree = Path(worktree_value).resolve()
+            matches = [
+                item
+                for item in self.repository.worktrees()
+                if str(item.path.resolve()).casefold() == str(worktree).casefold()
+                or item.branch == branch
+            ]
+            if len(matches) != 1 or matches[0].branch != branch:
+                raise TaskSessionError(
+                    f"Task {expected} supersede requires exactly one matching branch/worktree"
+                )
+            branch_refs = [
+                line.removeprefix("refs/heads/")
+                for line in self.repository.git(
+                    "for-each-ref", "--format=%(refname)", f"refs/heads/{branch}"
+                ).splitlines()
+                if line
+            ]
+            if branch_refs != [branch]:
+                raise TaskSessionError(
+                    f"Task {expected} supersede requires exactly one local task branch"
+                )
+            if self.repository.status(worktree):
+                raise TaskSessionError(f"Task {expected} supersede refuses a dirty worktree")
+            operations = self.repository.operation_issues(worktree)
+            if operations:
+                raise TaskSessionError(
+                    f"Task {expected} supersede refuses interrupted Git operation: {operations}"
+                )
+            head = self.repository.head(cwd=worktree)
+            base_sha = str(current.get("base_origin_master_sha", ""))
+            if not base_sha or not self.repository.is_ancestor(base_sha, head):
+                raise TaskSessionError(
+                    f"Task {expected} supersede worktree does not descend from its leased base"
+                )
+            return worktree, head
+
+        def verified_open_pr_numbers(branch: object) -> list[str]:
+            if not isinstance(branch, str) or not branch:
+                raise TaskSessionError(
+                    f"Task {expected} supersede lease has no valid branch anchor"
+                )
+            try:
+                open_prs = self._github().open_pull_requests()
+            except (TaskSessionError, OSError) as error:
+                raise TaskSessionError(
+                    f"Task {expected} supersede requires a verified open-PR inventory"
+                ) from error
+            matching: list[str] = []
+            for pull_request in open_prs:
+                if not isinstance(pull_request, Mapping):
+                    raise TaskSessionError("GitHub returned an invalid open-PR inventory")
+                head = pull_request.get("head", {})
+                if not isinstance(head, Mapping):
+                    raise TaskSessionError("GitHub returned an open PR without a valid head")
+                if head.get("ref") == branch:
+                    matching.append(str(pull_request.get("number", "<unknown>")))
+            return matching
+
+        delivery = self.store.delivery_state()
+        owner = delivery.get("owner")
+        owner_id = str(owner.get("task_id", "")).upper() if isinstance(owner, dict) else ""
+        if owner_id == expected:
+            raise TaskSessionError(
+                f"Task {expected} cannot be superseded while owning the delivery lane"
+            )
+        matching_pr_numbers = verified_open_pr_numbers(lease.get("branch"))
+        if matching_pr_numbers:
+            raise TaskSessionError(
+                f"Task {expected} supersede refuses open task PR(s): "
+                + ", ".join(sorted(matching_pr_numbers))
+            )
+        verify_anchor(lease)
+
+        with self.store.lock():
+            current = self.store.read_json(lease_path)
+            current_delivery = self.store.delivery_state()
+            if not isinstance(current, dict):
+                raise TaskSessionError(f"Task {expected} lease disappeared during supersede")
+            if current.get("updated_at") != lease.get("updated_at"):
+                raise TaskSessionError("Task supersede lease changed during transition")
+            if current_delivery.get("owner") != delivery.get("owner"):
+                raise TaskSessionError("Delivery ownership changed during task supersede")
+            current_owner = current_delivery.get("owner")
+            current_owner_id = (
+                str(current_owner.get("task_id", "")).upper()
+                if isinstance(current_owner, dict)
+                else ""
+            )
+            if current_owner_id == expected:
+                raise TaskSessionError(
+                    f"Task {expected} cannot be superseded while owning the delivery lane"
+                )
+            current_state = self._lease_state(current)
+            if current_state in TERMINAL_LEASE_STATES:
+                raise TaskSessionError(
+                    f"Task {expected} cannot be superseded from terminal state {current_state}"
+                )
+            if current_state in SUPERSEDED_LEASE_STATES:
+                verify_anchor(current)
+                return current
+            if current_state not in (
+                IMPLEMENTATION_STATES | READY_STATES | WAITING_STATES | RECOVERY_STATES
+            ):
+                raise TaskSessionError(
+                    f"Task {expected} cannot be superseded from {current.get('lifecycle_state')}"
+                )
+            verify_anchor(current)
+            matching_pr_numbers = verified_open_pr_numbers(current.get("branch"))
+            if matching_pr_numbers:
+                raise TaskSessionError(
+                    f"Task {expected} supersede refuses open task PR(s): "
+                    + ", ".join(sorted(matching_pr_numbers))
+                )
+            self._validated_lease_concurrency_class(current)
+            previous_state = current_state
+            now = utc_now()
+            for key in (
+                "delivery_owner",
+                "delivery_acquired_at",
+                "delivery_base_origin_master_sha",
+                "delivery_head_sha",
+                "delivery_anchor",
+                "delivery_released_at",
+                "delivery_failed_at",
+                "delivery_handoff_blocker",
+                "delivery_next_owner",
+                "delivery_waiting_since",
+                "ready_head_sha",
+                "ready_base_origin_master_sha",
+                "ready_for_delivery_at",
+                "ready_sequence",
+                "quality_verdict",
+                "qa_verdict",
+                "task_provenance",
+                "canonical_master_refresh",
+                "delivery_priority_override",
+            ):
+                current.pop(key, None)
+            current.update(
+                {
+                    "lifecycle_state": "superseded",
+                    "superseded_from_state": previous_state,
+                    "superseded_at": now,
+                    "superseded_reason": normalized_reason,
+                    "owner_authorized": True,
+                    "updated_at": now,
+                }
+            )
+            StateStore.replace_json(lease_path, current)
+        return current
+
     def record_production_success(
         self,
         task_id: str,
@@ -3790,6 +4120,8 @@ class TaskController:
             classification = "READY_FOR_DELIVERY"
         elif state in WAITING_STATES:
             classification = "WAITING_FOR_DELIVERY"
+        elif state in SUPERSEDED_LEASE_STATES:
+            classification = "SUPERSEDED"
         elif state in TERMINAL_LEASE_STATES:
             classification = "TERMINAL_SUCCESS"
         elif state in DELIVERY_STATES:
@@ -3967,11 +4299,26 @@ def archive_guard(backlog_root: Path, task_id: str) -> None:
     store = StateStore(common_dir)
     if not (store.root / "contract.json").exists():
         return
-    history = store.read_json(store.history / f"task-{normalize_task_id(task_id)}.json")
-    if history is None or history.get("state") != "finished":
-        raise TaskSessionError(
-            f"Task {task_id} cannot be archived before controller finish and terminal production success"
-        )
+    expected = normalize_task_id(task_id)
+    history = store.read_json(store.history / f"task-{expected}.json")
+    if isinstance(history, dict) and history.get("state") == "finished":
+        return
+    lease = store.read_json(store.task_lease_path(expected))
+    if (
+        isinstance(lease, dict)
+        and lease.get("task_id") == expected
+        and lease.get("mode") == "write"
+        and lease.get("owner_authorized") is True
+        and lease.get("lifecycle_state") in SUPERSEDED_LEASE_STATES
+    ):
+        reason = lease.get("superseded_reason")
+        timestamp = lease.get("superseded_at")
+        if isinstance(reason, str) and reason.strip() and isinstance(timestamp, str) and timestamp:
+            return
+    raise TaskSessionError(
+        f"Task {task_id} cannot be archived before controller finish/terminal production success "
+        "or owner-authorized supersede"
+    )
 
 
 def _print(payload: Mapping[str, Any]) -> None:
@@ -4035,6 +4382,10 @@ def _parser() -> argparse.ArgumentParser:
     resolve_recovery.add_argument("task_id")
     resolve_recovery.add_argument("--reason", required=True)
     resolve_recovery.add_argument("--owner-authorize", action="store_true")
+    supersede = subparsers.add_parser("supersede")
+    supersede.add_argument("task_id")
+    supersede.add_argument("--reason", required=True)
+    supersede.add_argument("--owner-authorize", action="store_true")
     queue_cycle = subparsers.add_parser("record-queue-cycle")
     queue_cycle.add_argument("task_id")
     queue_cycle.add_argument("--kind", choices=("review", "ci"), required=True)
@@ -4140,6 +4491,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "resolve-recovery":
             _print(
                 controller.resolve_recovery(
+                    args.task_id,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            )
+            return 0
+        if args.command == "supersede":
+            _print(
+                controller.supersede(
                     args.task_id,
                     reason=args.reason,
                     owner_authorize=args.owner_authorize,

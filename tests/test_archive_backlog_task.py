@@ -101,3 +101,30 @@ def test_archive_task_requires_finished_controller_history_when_contract_is_acti
     destination = archive_backlog_task.archive_task(backlog, "03-notifications.md")
 
     assert destination.is_file()
+
+
+def test_archive_task_accepts_owner_authorized_superseded_lease(tmp_path: Path) -> None:
+    parent, backlog = _nested_backlog(tmp_path)
+    state_root = parent.parent / ".git" / "codex-task-sessions-v1"
+    leases = state_root / "leases"
+    leases.mkdir(parents=True)
+    (state_root / "contract.json").write_text('{"version": 2}\n', encoding="utf-8")
+    (leases / "task-03.json").write_text(
+        json.dumps(
+            {
+                "task_id": "03",
+                "mode": "write",
+                "lifecycle_state": "superseded",
+                "owner_authorized": True,
+                "superseded_at": "2026-09-10T10:00:00Z",
+                "superseded_reason": "owner selected a canonical replacement",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    destination = archive_backlog_task.archive_task(backlog, "03-notifications.md")
+
+    assert destination.is_file()
+    assert archive_backlog_task.validate_manifests(backlog) == []
