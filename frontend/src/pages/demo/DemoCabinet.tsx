@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell, type DemoAppShellConfig } from '../../app/AppShell';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 import {
   applyDemoAction,
   clearAllDemoSessions,

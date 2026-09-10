@@ -64,7 +64,15 @@ export function useSemanticMotion<T extends HTMLElement>(
       return undefined;
     }
     const observer = new IntersectionObserver(
-      ([entry]) => setInView(Boolean(entry?.isIntersecting)),
+      ([entry]) => {
+        const visible = Boolean(entry?.isIntersecting);
+        setInView(visible);
+        if (!visible && hasEntered.current) {
+          if (restartFrame.current != null) window.cancelAnimationFrame(restartFrame.current);
+          restartFrame.current = null;
+          setMotion((current) => ({ phase: 'idle', revision: current.revision }));
+        }
+      },
       { threshold: 0.08 },
     );
     observer.observe(node);

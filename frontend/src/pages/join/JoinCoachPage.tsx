@@ -1,4 +1,6 @@
 import { AppShell } from '../../app/AppShell';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 import { CoachInvites } from '../../features/profile/CoachInvites';
 
 export default function JoinCoachPage({ token }: { token: string }) {

@@ -33,7 +33,7 @@ test('canonical brand assets render on light and dark public surfaces', async ({
       window.localStorage.removeItem('landing-theme');
     });
     await page.reload();
-    await assertHeaderMark(page, 'light', viewport.name === 'mobile' ? 34 : 42);
+    await assertHeaderMark(page, 'light', 44);
     const wordmark = page.locator('.landing-header .yfc-lockup__wordmark');
     await expect(wordmark).toBeVisible();
     const brandBounds = await page.locator('.public-shell__brand').boundingBox();
@@ -48,8 +48,8 @@ test('canonical brand assets render on light and dark public surfaces', async ({
     }
 
     await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
-    await assertHeaderMark(page, 'dark', viewport.name === 'mobile' ? 34 : 42);
-    await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(238, 240, 234)');
+    await assertHeaderMark(page, 'dark', 44);
+    await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(255, 255, 255)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
 
     if (viewport.name === 'mobile') {

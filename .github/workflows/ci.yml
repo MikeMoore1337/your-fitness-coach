@@ -304,6 +304,18 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 7
+      - name: Upload redesign visual and motion evidence
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: redesign-evidence-${{ github.sha }}-shard-${{ matrix.shard }}
+          path: |
+            .artifacts/runtime/tests/playwright/redesign-visual-*/
+            .artifacts/runtime/tests/playwright/redesign-motion-*/
+            .artifacts/runtime/tests/playwright/active-workout-experience-*/
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 30
       - name: Upload encrypted Allure results
         if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
         uses: ./.github/actions/upload-allure-results

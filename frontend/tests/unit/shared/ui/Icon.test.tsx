@@ -3,13 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { Icon } from '../../../../src/shared/ui/Icon';
 
 describe('Icon', () => {
-  it('uses the canonical 24px currentColor contract at supported optical sizes', () => {
+  it('renders theme-specific raster assets at supported optical sizes', () => {
     const { container } = render(<Icon name="nav-progress" size={20} />);
     const icon = container.querySelector('[data-icon="nav-progress"]');
 
-    expect(icon).toHaveAttribute('viewBox', '0 0 24 24');
-    expect(icon).toHaveAttribute('stroke', 'currentColor');
-    expect(icon).toHaveAttribute('width', '20');
+    expect(icon).toHaveStyle({ width: '20px', height: '20px' });
+    expect(icon?.querySelector('.yfc-icon__light')).toHaveAttribute(
+      'src',
+      '/assets/icons/flat-progress.webp',
+    );
+    expect(icon?.querySelector('.yfc-icon__dark')).toHaveAttribute(
+      'src',
+      '/assets/icons/flat-progress.webp',
+    );
     expect(icon).toHaveAttribute('aria-hidden', 'true');
   });
 
@@ -22,21 +28,23 @@ describe('Icon', () => {
     expect(icon).not.toHaveAttribute('aria-hidden');
   });
 
-  it('keeps the exercise catalogue glyph sparse at compact optical sizes', () => {
+  it('uses the approved dumbbell for the exercise catalogue', () => {
     const { container } = render(<Icon name="nav-exercise-catalog" size={16} />);
     const icon = container.querySelector('[data-icon="nav-exercise-catalog"]');
 
-    expect(icon).toHaveAttribute('width', '16');
-    expect(icon?.querySelectorAll('path')).toHaveLength(1);
-    expect(icon?.querySelectorAll('rect')).toHaveLength(2);
-    expect(icon?.querySelectorAll('line')).toHaveLength(1);
+    expect(icon).toHaveStyle({ width: '16px', height: '16px' });
+    expect(icon?.querySelector('.yfc-icon__dark')).toHaveAttribute(
+      'src',
+      '/assets/icons/flat-dumbbell.webp',
+    );
   });
 
-  it('renders the theme moon without a detached decorative dot', () => {
+  it('keeps action icons decorative inside their named controls', () => {
     const { container } = render(<Icon name="theme-moon" />);
     const icon = container.querySelector('[data-icon="theme-moon"]');
 
-    expect(icon?.querySelectorAll('path')).toHaveLength(1);
-    expect(icon?.querySelector('circle')).not.toBeInTheDocument();
+    expect(icon?.querySelector('svg')).not.toBeInTheDocument();
+    expect(icon?.querySelectorAll('img')).toHaveLength(2);
+    icon?.querySelectorAll('img').forEach((image) => expect(image).toHaveAttribute('alt', ''));
   });
 });

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { namedArticle } from './fixtures/locators';
+import { emptyHydrationDay } from './fixtures/platform-api';
 
 const captureLandingProductProofs =
   (
@@ -248,6 +248,9 @@ async function mockDashboard(page: Page, state: DashboardState = {}) {
           : [],
       });
     }
+    if (path.endsWith('/nutrition/hydration')) {
+      return route.fulfill({ json: emptyHydrationDay(today) });
+    }
     if (path.endsWith('/nutrition/diary')) {
       if (state.failNutrition) return route.abort('failed');
       return route.fulfill({
@@ -317,25 +320,25 @@ test('shows the non-modal install option only after value on the authenticated T
   const installButton = prompt.getByRole('button', { name: 'Установить' });
   const installBounds = await installButton.boundingBox();
   expect(installBounds?.height).toBeGreaterThanOrEqual(44);
-  await expect(installButton).toHaveCSS('background-color', 'rgb(158, 224, 43)');
-  await expect(installButton).toHaveCSS('color', 'rgb(16, 32, 21)');
+  await expect(installButton).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(installButton).toHaveCSS('color', 'rgb(9, 11, 11)');
   await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
     'color',
-    'rgb(22, 26, 23)',
+    'rgb(21, 21, 21)',
   );
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-  await expect(installButton).toHaveCSS('background-color', 'rgb(168, 232, 58)');
-  await expect(installButton).toHaveCSS('color', 'rgb(16, 32, 21)');
+  await expect(installButton).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(installButton).toHaveCSS('color', 'rgb(9, 11, 11)');
   await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
     'background-color',
-    'rgb(22, 25, 22)',
+    'rgb(20, 23, 23)',
   );
   await expect(prompt.getByRole('button', { name: 'Не сейчас' })).toHaveCSS(
     'color',
-    'rgb(238, 240, 234)',
+    'rgb(245, 245, 245)',
   );
   await page.setViewportSize({ width: 390, height: 844 });
 
@@ -398,7 +401,7 @@ test('core navigation keeps the locked order, labels, active state and deep link
   expect(profileButtonBox).not.toBeNull();
   expect(profileButtonBox!.width).toBeGreaterThanOrEqual(44);
   expect(profileButtonBox!.height).toBeGreaterThanOrEqual(44);
-  await expect(profileButton).toHaveCSS('border-color', 'rgb(158, 224, 43)');
+  await expect(profileButton).toHaveCSS('border-color', 'rgb(178, 245, 32)');
   await profileButton.click();
   await expect(page.getByRole('dialog', { name: 'Профиль и настройки' })).toBeVisible();
   await page.getByRole('button', { name: 'Закрыть меню' }).click();
@@ -422,15 +425,23 @@ test('planned workout starts from the primary Today CTA', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: 'Силовая база' })).toBeVisible();
   if (captureLandingProductProofs) {
-    await page.screenshot({ path: 'public/assets/product/landing-today-desktop-light.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-today-desktop-light.png',
+    });
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: 'public/assets/product/landing-today-mobile-light.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-today-mobile-light.png',
+    });
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-    await page.screenshot({ path: 'public/assets/product/landing-today-desktop-dark.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-today-desktop-dark.png',
+    });
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: 'public/assets/product/landing-today-mobile-dark.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-today-mobile-dark.png',
+    });
     return;
   }
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
@@ -524,7 +535,7 @@ test('task 116 owner-checkpoint screenshots', async ({ browser }) => {
     await openDashboard(page);
     await expect(page.getByRole('heading', { name: capture.heading })).toBeVisible();
     await page.screenshot({
-      path: `../.artifacts/screenshots/task-116/${capture.name}`,
+      path: `../.artifacts/runtime/tests/screenshots/task-116/${capture.name}`,
       fullPage: true,
     });
     await context.close();
@@ -583,9 +594,9 @@ test('Today keeps hierarchy and has no horizontal overflow at required widths', 
   ]) {
     await page.setViewportSize(viewport);
     await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeInViewport();
-    await expect(page.getByRole('heading', { name: 'Питание' })).toBeVisible();
-    const nutritionCard = namedArticle(page, 'Питание');
-    const progressCard = namedArticle(page, 'Прогресс');
+    await expect(page.getByRole('heading', { name: 'Питание на сегодня' })).toBeVisible();
+    const nutritionCard = page.getByRole('region', { name: 'Питание на сегодня' });
+    const progressCard = page.getByRole('region', { name: 'Главное о прогрессе' });
     await expect(nutritionCard).toHaveCount(1);
     await expect(progressCard).toHaveCount(1);
     const [nutritionBox, progressBox] = await Promise.all([

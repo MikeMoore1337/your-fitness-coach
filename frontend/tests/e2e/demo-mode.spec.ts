@@ -1,3 +1,4 @@
+import { demoFixture } from './fixtures/demo-session';
 import type { Browser, Page } from '@playwright/test';
 import type { DemoScenario, DemoSessionSnapshot } from '../../src/features/demo/demoApi';
 import {
@@ -29,128 +30,6 @@ const TASK_74_SCREENSHOT_DIR = '../.artifacts/screenshots/task-74';
 const TASK_74A_DEMO_VIDEO =
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
     ?.YFC_CAPTURE_TASK_74A_DEMO === '1';
-
-function cabinetFixture(scenario: DemoScenario): DemoSessionSnapshot['cabinet'] {
-  return {
-    today: {
-      title: scenario === 'trainer' ? 'Результат клиента готов к разбору' : 'План на сегодня',
-      summary: 'Подготовленный связный контекст',
-      status_label: 'Нужно действие',
-      completed_days: 3,
-      planned_days: 5,
-    },
-    nutrition: {
-      calories: 1160,
-      calorie_target: 2150,
-      protein_g: 82,
-      protein_target_g: 145,
-      meals_logged: 2,
-      item_added: false,
-      recent_item: {
-        name: 'Овсяная каша с бананом и греческим йогуртом',
-        serving: '320 г · недавний продукт',
-        calories: 428,
-        protein_g: 24,
-      },
-    },
-    progress: {
-      workouts_completed: 11,
-      latest_volume_kg: 6220,
-      volume_change_percent: 4.2,
-      nutrition_days_logged: 5,
-      nutrition_completion_percent: 54,
-      summary: 'Итог использует только подтверждённые записи.',
-    },
-    trainer: null,
-    meaningful_action_completed: false,
-    conversion_title:
-      scenario === 'nutrition'
-        ? 'Настройте дневник питания под себя'
-        : scenario === 'trainer'
-          ? 'Начните работать с реальными клиентами'
-          : 'Ведите настоящую историю тренировок',
-  };
-}
-
-function demoFixture(scenario: DemoScenario): DemoSessionSnapshot {
-  const base = {
-    capability: 'demo' as const,
-    scenario,
-    fixture_version: 'demo-curated-v1' as const,
-    revision: 1,
-    expires_at: '2026-08-24T12:30:00Z',
-    cabinet: cabinetFixture(scenario),
-  };
-  if (scenario === 'nutrition') {
-    return {
-      ...base,
-      state: {
-        kind: 'nutrition',
-        screen: 'diary',
-        date_label: 'Сегодня · подготовленный дневник',
-        item_added: false,
-        recent_item: {
-          name: 'Овсяная каша с бананом и греческим йогуртом',
-          serving: '320 г · недавний продукт',
-          calories: 428,
-          protein_g: 24,
-        },
-        calories: 1160,
-        calorie_target: 2150,
-        protein_g: 82,
-        protein_target_g: 145,
-        meals_logged: 2,
-      },
-    };
-  }
-  if (scenario === 'trainer') {
-    const trainerState = {
-      kind: 'trainer' as const,
-      screen: 'client' as const,
-      client_name: 'Алексей Воронов — подготовленный демо-клиент',
-      context_label: 'Последняя тренировка · сегодня, 18:40',
-      workout_title: 'Ноги и корпус · неделя 4',
-      facts: [
-        { label: 'Выполнено', value: '6 из 6 упражнений' },
-        { label: 'Объём', value: '6 840 кг' },
-        { label: 'Самочувствие', value: '8 из 10' },
-        { label: 'Следующий ориентир', value: '+2,5 кг в приседе' },
-      ],
-      comment: null,
-    };
-    return {
-      ...base,
-      state: trainerState,
-      cabinet: { ...base.cabinet, trainer: trainerState },
-    };
-  }
-  return {
-    ...base,
-    state: {
-      kind: 'self_training',
-      screen: 'today',
-      workout_title: 'Верх тела · уверенный старт',
-      workout_subtitle: 'Подготовленная тренировка на сегодня',
-      completed_sets: 2,
-      total_sets: 3,
-      exercises: [
-        {
-          name: 'Жим гантелей лёжа с контролируемой паузой',
-          prescription: '3 × 10 · 18 кг · отдых 90 сек.',
-          status: 'current',
-        },
-        {
-          name: 'Тяга верхнего блока нейтральным хватом',
-          prescription: '3 × 12 · 40 кг · отдых 75 сек.',
-          status: 'next',
-        },
-      ],
-      duration_minutes: 0,
-      total_volume_kg: 0,
-      progress_change_percent: 0,
-    },
-  };
-}
 
 function applyMockAction(snapshot: DemoSessionSnapshot, action: string, comment?: string) {
   const next = structuredClone(snapshot);
@@ -621,11 +500,8 @@ test('Web cabinet preview uses production shell across the required viewport mat
 
     const primary = page.getByRole('button', { name: 'Продолжить тренировку' });
     await expect(primary).toBeInViewport();
-    await expect(primary).toHaveCSS('border-radius', '12px');
-    await expect(primary).toHaveCSS(
-      'background-color',
-      viewport.dark ? 'rgb(168, 232, 58)' : 'rgb(158, 224, 43)',
-    );
+    await expect(primary).toHaveCSS('border-radius', '14px');
+    await expect(primary).toHaveCSS('background-color', 'rgb(178, 245, 32)');
     if (viewport.touch) {
       await expectTouchTargets(page.locator('#appBottomNav .app-bottom-nav__primary > *'));
       await expectTouchTargets(primary);
@@ -839,26 +715,34 @@ test('desktop demo keeps metric groups separated and conversion copy honest', as
       const pictogram = document.querySelector<HTMLElement>(
         `.week-strip__pictogram[data-pictogram="${kind}"]`,
       );
-      const shape = pictogram?.querySelector<SVGGraphicsElement>('path, circle');
-      if (!pictogram || !shape) return null;
-      const box = shape.getBBox();
+      const icon = pictogram?.querySelector<HTMLElement>('.yfc-icon');
+      if (!pictogram || !icon) return null;
+      const asset = Array.from(icon.querySelectorAll<HTMLElement>('img')).find(
+        (candidate) => window.getComputedStyle(candidate).display !== 'none',
+      );
+      if (!asset) return null;
+      const box = asset.getBoundingClientRect();
       return {
         canvasHeight: pictogram.getBoundingClientRect().height,
         canvasWidth: pictogram.getBoundingClientRect().width,
-        shapeHeight: box.height,
-        shapeWidth: box.width,
-        strokeWidth: Number.parseFloat(window.getComputedStyle(shape).strokeWidth),
+        iconHeight: icon.getBoundingClientRect().height,
+        iconWidth: icon.getBoundingClientRect().width,
+        assetHeight: box.height,
+        assetWidth: box.width,
       };
     };
     return { inProgress: geometry('in-progress'), planned: geometry('planned') };
   });
   expect(statusGeometry.planned).toMatchObject({ canvasHeight: 16, canvasWidth: 16 });
-  expect(statusGeometry.planned?.shapeHeight).toBeGreaterThanOrEqual(7);
-  expect(statusGeometry.planned?.shapeWidth).toBeGreaterThanOrEqual(7);
+  expect(statusGeometry.planned?.iconHeight).toBe(16);
+  expect(statusGeometry.planned?.iconWidth).toBe(16);
+  expect(statusGeometry.planned?.assetHeight).toBe(16);
+  expect(statusGeometry.planned?.assetWidth).toBe(16);
   expect(statusGeometry.inProgress).toMatchObject({ canvasHeight: 16, canvasWidth: 16 });
-  expect(statusGeometry.inProgress?.shapeHeight).toBeGreaterThanOrEqual(9);
-  expect(statusGeometry.inProgress?.shapeWidth).toBeGreaterThanOrEqual(4);
-  expect(statusGeometry.inProgress?.strokeWidth).toBeGreaterThanOrEqual(1.8);
+  expect(statusGeometry.inProgress?.iconHeight).toBe(16);
+  expect(statusGeometry.inProgress?.iconWidth).toBe(16);
+  expect(statusGeometry.inProgress?.assetHeight).toBe(16);
+  expect(statusGeometry.inProgress?.assetWidth).toBe(16);
   const statusColors = await page.evaluate(() => {
     const color = (kind: string) => {
       const pictogram = document.querySelector<HTMLElement>(

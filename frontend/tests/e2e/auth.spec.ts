@@ -270,8 +270,8 @@ test('Telegram fallback сохраняет контраст, когда browser 
   const fallback = page.getByRole('link', { name: 'Открыть в Telegram' });
   await expect(fallback).toBeVisible();
   await expect(fallback).toHaveCSS('min-height', '48px');
-  await expect(fallback).toHaveCSS('background-color', 'rgb(236, 237, 233)');
-  await expect(fallback).toHaveCSS('color', 'rgb(22, 26, 23)');
+  await expect(fallback).toHaveCSS('background-color', 'rgb(240, 240, 240)');
+  await expect(fallback).toHaveCSS('color', 'rgb(21, 21, 21)');
 });
 
 test('Повторить сохраняет контраст и единый hover с provider-кнопками', async ({ page }) => {
@@ -306,9 +306,9 @@ test('Повторить сохраняет контраст и единый hov
 
     expect(retryStyles).toEqual(providerStyles);
     expect(retryStyles.backgroundColor).toBe(
-      scheme === 'light' ? 'rgb(236, 237, 233)' : 'rgb(30, 34, 30)',
+      scheme === 'light' ? 'rgb(240, 240, 240)' : 'rgb(27, 31, 31)',
     );
-    expect(retryStyles.color).toBe(scheme === 'light' ? 'rgb(22, 26, 23)' : 'rgb(238, 240, 234)');
+    expect(retryStyles.color).toBe(scheme === 'light' ? 'rgb(21, 21, 21)' : 'rgb(245, 245, 245)');
   }
 });
 
@@ -478,7 +478,7 @@ test('Login адаптивен, доступен с клавиатуры и ув
       await expect(page.getByRole('combobox')).toHaveCount(0);
 
       const google = page.getByRole('link', { name: 'Продолжить с Google' });
-      await expect(google).toHaveCSS('border-radius', '12px');
+      await expect(google).toHaveCSS('border-radius', '14px');
       const googleBox = await google.boundingBox();
       expect(googleBox).not.toBeNull();
 

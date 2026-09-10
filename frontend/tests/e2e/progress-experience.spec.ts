@@ -1347,7 +1347,7 @@ test('notification deep-link opens exact workout feedback and preserves back nav
   await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
   await page.keyboard.press('Escape');
-  await expect(page.locator('.workout-feedback').first()).toHaveCSS('color', 'rgb(238, 240, 234)');
+  await expect(page.locator('.workout-feedback').first()).toHaveCSS('color', 'rgb(245, 245, 245)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 
   if (captureFeedbackAudit) {
@@ -1451,7 +1451,7 @@ test('canonical charts and icons remain operable in forced colors and reduced mo
     page
       .getByRole('navigation', { name: 'Основная навигация' })
       .getByRole('link', { name: 'Прогресс' })
-      .locator('svg[data-icon="nav-progress"]'),
+      .locator('[data-icon="nav-progress"]'),
   ).toBeVisible();
   expect(
     await chart
@@ -1487,7 +1487,7 @@ test('exercise catalogue uses the selected folder and dumbbell glyph on desktop 
   const desktopCatalogue = page
     .getByRole('navigation', { name: 'Основная навигация' })
     .getByRole('link', { name: 'Упражнения' });
-  const desktopIcon = desktopCatalogue.locator('svg[data-icon="nav-exercise-catalog"]');
+  const desktopIcon = desktopCatalogue.locator('[data-icon="nav-exercise-catalog"]');
   await expect(desktopIcon).toBeVisible();
   expect((await desktopIcon.boundingBox())?.width).toBeGreaterThanOrEqual(16);
   await desktopCatalogue.screenshot({
@@ -1499,7 +1499,7 @@ test('exercise catalogue uses the selected folder and dumbbell glyph on desktop 
   await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   const morePanel = page.getByRole('dialog');
   const mobileCatalogue = morePanel.getByRole('link', { name: 'Упражнения' });
-  await expect(mobileCatalogue.locator('svg[data-icon="nav-exercise-catalog"]')).toBeVisible();
+  await expect(mobileCatalogue.locator('[data-icon="nav-exercise-catalog"]')).toBeVisible();
   await morePanel.screenshot({
     path: '../.artifacts/screenshots/task-69b/exercise-catalog-mobile-dark.png',
   });
@@ -1508,6 +1508,7 @@ test('exercise catalogue uses the selected folder and dumbbell glyph on desktop 
 
 test('progress bento keeps matching light and dark visual forms for the same data', async ({
   browser,
+  baseURL,
 }) => {
   test.setTimeout(120_000);
   const surfaces = [
@@ -1523,7 +1524,7 @@ test('progress bento keeps matching light and dark visual forms for the same dat
   for (const surface of surfaces) {
     for (const theme of ['light', 'dark'] as const) {
       const context = await browser.newContext({
-        baseURL: 'http://127.0.0.1:4173',
+        baseURL,
         colorScheme: theme,
         viewport: { width: 1440, height: 900 },
       });

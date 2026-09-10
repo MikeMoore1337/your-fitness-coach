@@ -86,7 +86,7 @@
   min-height: 300px;
   padding: 30px;
   border: 1px solid var(--landing-card-border);
-  border-radius: 26px;
+  border-radius: var(--radius-control);
   background: var(--landing-card);
   box-shadow: 0 24px 64px rgba(23, 32, 24, 0.08);
 }
@@ -230,7 +230,7 @@
   margin: 0 auto 48px;
   padding: 24px;
   border: 1px solid var(--landing-card-border);
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   background: var(--landing-card);
 }
 
@@ -347,7 +347,7 @@
   min-width: 0;
   padding: 30px;
   border: 1px solid var(--landing-card-border);
-  border-radius: 24px;
+  border-radius: var(--radius-control);
   background: var(--landing-card);
 }
 
@@ -393,7 +393,7 @@
   margin-top: 52px;
   overflow: hidden;
   border: 1px solid var(--landing-border);
-  border-radius: 24px;
+  border-radius: var(--radius-control);
   background: var(--landing-border);
 }
 
@@ -474,7 +474,7 @@
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--landing-border);
-  border-radius: 22px;
+  border-radius: var(--radius-control);
   background: var(--landing-border);
   list-style: none;
   counter-reset: sources;
@@ -515,7 +515,7 @@
   align-items: end;
   margin: 0 0 clamp(80px, 10vw, 136px);
   padding: clamp(32px, 5vw, 58px);
-  border-radius: 30px;
+  border-radius: var(--radius-control);
   background: var(--landing-dark);
   color: #fff;
 }
@@ -612,7 +612,7 @@
 
   .public-hero__summary {
     padding: 24px;
-    border-radius: 22px;
+    border-radius: var(--radius-control);
   }
 
   .public-hero__summary > strong {
@@ -700,7 +700,7 @@
   .public-related-card {
     min-height: 0;
     padding: 24px;
-    border-radius: 20px;
+    border-radius: var(--radius-control);
   }
 
   .public-related-card small {
@@ -732,7 +732,7 @@
     align-items: stretch;
     margin-bottom: 82px;
     padding: 28px 24px;
-    border-radius: 22px;
+    border-radius: var(--radius-control);
   }
 
   .public-cta .landing-button {
@@ -763,7 +763,7 @@
   margin-top: 78px;
   padding: clamp(26px, 5vw, 42px);
   border: 1px solid var(--landing-card-border);
-  border-radius: 26px;
+  border-radius: var(--radius-control);
   background:
     linear-gradient(135deg, rgba(182, 242, 56, 0.12), transparent 60%), var(--landing-card);
 }
@@ -812,7 +812,7 @@
   min-height: 52px;
   padding: 12px 14px;
   border: 1px solid var(--landing-card-border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--landing-paper);
   color: var(--landing-ink);
   font: inherit;
@@ -940,7 +940,7 @@
   .public-body section.public-calculator {
     margin-top: 56px;
     padding: 24px;
-    border-radius: 22px;
+    border-radius: var(--radius-control);
   }
 
   .public-calculator__fields {

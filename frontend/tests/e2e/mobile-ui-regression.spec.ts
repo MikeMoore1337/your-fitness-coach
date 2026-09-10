@@ -27,6 +27,13 @@ const screenshotOptions = {
   scale: 'css' as const,
 };
 
+const activeWorkoutScreenshotOptions = {
+  ...screenshotOptions,
+  // The dock is covered by dedicated visibility/geometry assertions below. Hiding the fixed
+  // chrome keeps its position from changing the clip of this intentionally tall component.
+  stylePath: 'tests/e2e/fixtures/active-workout-screenshot.css',
+};
+
 type Surface = 'today' | 'nutrition' | 'progress' | 'profile';
 
 async function preparePage(
@@ -184,11 +191,23 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
   await expect(page.locator('#appBottomNav')).toBeVisible();
   await reps.evaluate((element) => (element as HTMLElement).blur());
+  await expectDockWithinViewport(page);
 
-  await expect(page.locator('.active-workout')).toHaveScreenshot(
-    'active-workout-390x844-dark.png',
-    screenshotOptions,
-  );
+  const activeWorkout = page.locator('.active-workout');
+  const activeWorkoutClip = await activeWorkout.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.left,
+      y: rect.top + window.scrollY,
+      width: rect.width,
+      height: rect.height,
+    };
+  });
+  await expect(page).toHaveScreenshot('active-workout-390x844-dark.png', {
+    ...activeWorkoutScreenshotOptions,
+    fullPage: true,
+    clip: activeWorkoutClip,
+  });
 });
 
 test('@critical mocked TMA preserves safe areas, lifecycle and Today geometry', async ({

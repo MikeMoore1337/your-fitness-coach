@@ -8,9 +8,7 @@
   overflow: hidden;
   min-width: 0;
   border-color: color-mix(in srgb, var(--semantic-line) 72%, var(--v2-border));
-  background:
-    linear-gradient(132deg, var(--v2-surface) 0 56%, transparent 84%), var(--semantic-tint);
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--semantic-line) 12%, transparent);
+  background: var(--v2-surface);
   color: var(--v2-text-primary);
   transition:
     border-color var(--motion-state) var(--motion-ease),
@@ -20,37 +18,6 @@
 
 .semantic-card:not(.nutrition-day-summary) {
   position: relative;
-}
-
-.semantic-card::before {
-  position: absolute;
-  inset: -42% -12% auto auto;
-  z-index: -1;
-  width: clamp(150px, 28vw, 280px);
-  aspect-ratio: 1;
-  border: 1px solid color-mix(in srgb, var(--semantic-accent) 42%, transparent);
-  border-radius: 50%;
-  background:
-    linear-gradient(
-      112deg,
-      transparent 38%,
-      color-mix(in srgb, var(--semantic-accent) 22%, transparent) 39% 41%,
-      transparent 42% 55%,
-      color-mix(in srgb, var(--semantic-accent) 12%, transparent) 56% 58%,
-      transparent 59%
-    ),
-    radial-gradient(
-      circle,
-      color-mix(in srgb, var(--semantic-accent) 18%, transparent),
-      transparent 64%
-    );
-  box-shadow:
-    0 0 0 24px color-mix(in srgb, var(--semantic-accent) 6%, transparent),
-    0 0 0 52px color-mix(in srgb, var(--semantic-accent) 3%, transparent);
-  content: '';
-  opacity: 0.88;
-  pointer-events: none;
-  transform: rotate(-8deg);
 }
 
 .semantic-card--training {
@@ -88,11 +55,6 @@
   --semantic-line: var(--semantic-neutral-line);
 }
 
-.semantic-card > :not(.ui-semantic-artwork) {
-  position: relative;
-  z-index: 1;
-}
-
 .semantic-card--compact {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -109,7 +71,7 @@
   width: 44px;
   height: 44px;
   border: 1px solid color-mix(in srgb, var(--semantic-line) 72%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--semantic-tint) 82%, var(--v2-surface));
   color: var(--semantic-ink);
 }
@@ -205,7 +167,7 @@
   .semantic-card--compact:hover,
   .semantic-card.card-disclosure:hover {
     border-color: var(--semantic-line);
-    box-shadow: 0 18px 42px color-mix(in srgb, var(--semantic-line) 16%, transparent);
+    box-shadow: none;
     transform: translateY(-1px);
   }
 

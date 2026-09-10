@@ -905,8 +905,8 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
         }),
     )
     .toEqual({
-      fill: 'rgb(22, 25, 22)',
-      stroke: 'rgb(168, 232, 58)',
+      fill: 'rgb(20, 23, 23)',
+      stroke: 'rgb(178, 245, 32)',
       theme: 'dark',
     });
   await tmaReport.evaluate((element) => element.scrollIntoView({ block: 'start' }));
@@ -1300,13 +1300,13 @@ test('workout adaptation keeps preview, cancel, apply and conflict recovery in M
   const apply = mobilePage.getByRole('button', { name: 'Применить' });
   await expect(mobilePage.locator('.workout-adaptation-dialog__panel')).toHaveCSS(
     'border-radius',
-    '20px',
+    '24px',
   );
-  await expect(apply).toHaveCSS('background-color', 'rgb(158, 224, 43)');
-  await expect(apply).toHaveCSS('border-radius', '12px');
+  await expect(apply).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+  await expect(apply).toHaveCSS('border-radius', '14px');
   await expect(mobilePage.getByRole('button', { name: '20 мин' })).toHaveCSS(
     'border-top-color',
-    'rgb(158, 224, 43)',
+    'rgb(178, 245, 32)',
   );
   await mobilePage.locator('.adaptation-preview').scrollIntoViewIfNeeded();
   await mobilePage.screenshot({
@@ -1986,10 +1986,10 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   expect(
     (firstFeedbackBox?.y ?? 0) - ((legendBox?.y ?? 0) + (legendBox?.height ?? 0)),
   ).toBeGreaterThanOrEqual(11.99);
-  await expect(firstFeedback).toHaveCSS('border-radius', '12px');
+  await expect(firstFeedback).toHaveCSS('border-radius', '14px');
   await expect(tmaPage.getByRole('button', { name: 'Вернуться в Сегодня' })).toHaveCSS(
     'border-radius',
-    '12px',
+    '14px',
   );
 
   const duplicateStatus = await tmaPage.evaluate(async () => {
@@ -2046,7 +2046,7 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   const landingButtons = mobilePage.locator('.landing-button');
   await expect(landingButtons).not.toHaveCount(0);
   for (const button of await landingButtons.all()) {
-    await expect(button).toHaveCSS('border-radius', '12px');
+    await expect(button).toHaveCSS('border-radius', '14px');
   }
 });
 

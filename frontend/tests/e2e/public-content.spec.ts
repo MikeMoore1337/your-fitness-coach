@@ -159,19 +159,22 @@ test('landing emits a privacy-safe acquisition event without changing the deskto
   await expect(
     page.getByRole('heading', {
       level: 1,
-      name: 'Знайте, что делать сегодня.',
+      name: 'СИЛА В ДЕЙСТВИИ.',
     }),
   ).toBeVisible();
   await page.screenshot({
     path: '../.artifacts/screenshots/task-73a/analytics/desktop-1440x900-light-landing.png',
   });
   await page
-    .getByRole('link', { name: 'Открыть приложение' })
-    .first()
+    .locator('.landing-contact')
+    .getByRole('link', { name: 'Открыть приложение', exact: true })
     .evaluate((element) => {
       element.addEventListener('click', (event) => event.preventDefault(), { once: true });
     });
-  await page.getByRole('link', { name: 'Открыть приложение' }).first().click();
+  await page
+    .locator('.landing-contact')
+    .getByRole('link', { name: 'Открыть приложение', exact: true })
+    .click();
 
   const analyticsEvents = await page.evaluate(
     () =>
@@ -334,7 +337,7 @@ test('product and knowledge index heroes stay compact on desktop and mobile', as
       });
       expect(metrics.headingSize).toBeLessThanOrEqual(viewport.maxHeading);
       expect(metrics.headerDisplay).toBe('grid');
-      expect(metrics.headerBackground).toBe('rgba(0, 0, 0, 0)');
+      expect(metrics.headerBackground).toBe('rgb(9, 11, 11)');
       expect(metrics.heroHeight).toBeLessThanOrEqual(viewport.maxHero);
       expect(metrics.paddingTop).toBeLessThanOrEqual(viewport.width === 1440 ? 80 : 44);
       expect(Math.abs(metrics.breadcrumbTopGap - metrics.breadcrumbBottomGap)).toBeLessThanOrEqual(

@@ -5,7 +5,7 @@ import { installPlatformApi } from './fixtures/platform-api';
 const capture =
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
     ?.YFC_CAPTURE_TASK_74A === '1';
-const screenshotRoot = '../.artifacts/screenshots/task-74a';
+const screenshotRoot = '../.artifacts/runtime/tests/screenshots/task-74a';
 
 interface PilotTmaHarness {
   active(value: boolean): void;

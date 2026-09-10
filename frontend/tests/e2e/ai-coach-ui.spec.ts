@@ -8,7 +8,7 @@ import {
   installTelegramHarness,
 } from './fixtures/mobile-tma';
 
-const evidenceDir = resolve(process.cwd(), '../.artifacts/tasks/90A/evidence/ui-evaluation');
+const evidenceDir = resolve(process.cwd(), '../.artifacts/runtime/tests/ai-coach-ui');
 
 async function installAiCoachApi(page: Page): Promise<void> {
   await page.route('**/api/v1/ai-coach/**', async (route: Route) => {
@@ -75,7 +75,7 @@ async function openAiCoachSurface(
   if (tma) await installTelegramHarness(page, { colorScheme: theme });
   await installPlatformApi(page, { browserSession: !tma, measurementHistory: 'many' });
   await installAiCoachApi(page);
-  await page.goto('/app?section=profile#profile-ai-coach');
+  await page.goto(`/app?section=profile${tma ? '&tgWebAppPlatform=android' : ''}#profile-ai-coach`);
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
   await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
   await expect(page.locator('#profile-ai-coach')).toHaveAttribute('open');

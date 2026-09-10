@@ -15,6 +15,8 @@ import { AppThemeToggle } from '../../shared/ui/AppThemeToggle';
 import { StepProgress } from '../../shared/ui/DataViz';
 import { BrandLogo } from '../../shared/ui/BrandLogo';
 import { Button, CheckIcon, ChevronIcon, ErrorState } from '../../shared/ui/common';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 
 const nextActions = [
   {

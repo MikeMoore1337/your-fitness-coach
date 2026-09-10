@@ -92,7 +92,7 @@ describe('ExerciseGuideMedia', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Увеличенное изображение: Фаза усилия' });
     expect(dialog).toBeVisible();
-    expect(dialog.querySelector('img')).toHaveAttribute(
+    expect(dialog.querySelector('img[alt="Пример: конечное положение усилия"]')).toHaveAttribute(
       'src',
       '/static/exercise-guides/human-v1/example/concentric_end-1280w.webp',
     );

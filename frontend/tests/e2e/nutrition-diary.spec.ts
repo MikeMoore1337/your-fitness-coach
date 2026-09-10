@@ -622,7 +622,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   await expect(page.getByRole('heading', { name: 'Мои кружки и бутылки' })).toBeVisible();
   await page.screenshot({
     fullPage: true,
-    path: '../.artifacts/screenshots/task-81A/desktop-light-five-cards.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81A/desktop-light-five-cards.png',
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -658,12 +658,12 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   expect(await saveSex.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
   expect((await saveSex.boundingBox())?.height).toBeLessThanOrEqual(24);
   await page.locator('.nutrition-diary').screenshot({
-    path: '../.artifacts/screenshots/task-81A/mobile-light-ordered-cards-round-2.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81A/mobile-light-ordered-cards-round-2.png',
   });
   const hydration = page.getByRole('region', { name: 'Гидратация' });
   await hydration.scrollIntoViewIfNeeded();
   await hydration.screenshot({
-    path: '../.artifacts/screenshots/task-81A/mobile-light-expanded-profile-and-containers.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81A/mobile-light-expanded-profile-and-containers.png',
   });
 });
 
@@ -676,12 +676,12 @@ test('hydration visual evidence: mobile web compact and quick add', async ({ pag
   await expect(hydration).toBeVisible();
   await expect(page.getByText('850 из 2200 мл')).toBeVisible();
   await hydration.screenshot({
-    path: '../.artifacts/screenshots/task-81/mobile-web-light-compact.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81/mobile-web-light-compact.png',
   });
   await hydration.getByRole('button', { name: /Стакан.*250 мл/ }).click();
   await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
   await hydration.screenshot({
-    path: '../.artifacts/screenshots/task-81/mobile-web-light-quick-add-undo.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81/mobile-web-light-quick-add-undo.png',
   });
 });
 
@@ -713,13 +713,15 @@ test('hydration visual evidence: mocked TMA dark expanded and reduced motion', a
     };
   });
   await mockNutritionApi(page);
-  await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+  await page.goto(
+    '/app?section=nutrition&date=2026-08-19&hydration=quick#tgWebAppPlatform=android',
+  );
   const hydration = page.getByRole('region', { name: 'Гидратация' });
   await expect(hydration.getByRole('heading', { name: 'Личный ориентир' })).toBeVisible();
   await expect(hydration.getByText(/для здоровых взрослых/i)).toBeVisible();
   await hydration.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-81/mock-tma-dark-expanded-reduced-motion.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-81/mock-tma-dark-expanded-reduced-motion.png',
   });
 });
 
@@ -733,7 +735,7 @@ for (const mode of ['light', 'dark'] as const) {
     const hydration = page.getByRole('region', { name: 'Гидратация' });
     await expect(hydration.getByText('Термокружка · 420 мл')).toBeVisible();
     await hydration.screenshot({
-      path: `../.artifacts/screenshots/task-81/desktop-${mode}-expanded.png`,
+      path: `../.artifacts/runtime/tests/screenshots/task-81/desktop-${mode}-expanded.png`,
     });
   });
 }
@@ -755,7 +757,7 @@ for (const state of ['loading', 'error', 'empty'] as const) {
       await expect(hydration.getByText('Гидратация временно недоступна')).toBeVisible();
     if (state === 'empty') await expect(hydration.getByText('0 мл записано')).toBeVisible();
     await hydration.screenshot({
-      path: `../.artifacts/screenshots/task-81/mobile-${state}.png`,
+      path: `../.artifacts/runtime/tests/screenshots/task-81/mobile-${state}.png`,
     });
   });
 }
@@ -812,7 +814,7 @@ for (const current of russianSearchVisualCases) {
       current.viewport.width,
     );
     await page.screenshot({
-      path: `../.artifacts/screenshots/task-114a/russian-food-variants-${current.label}.png`,
+      path: `../.artifacts/runtime/tests/screenshots/task-114a/russian-food-variants-${current.label}.png`,
     });
   });
 }
@@ -836,11 +838,11 @@ test('Russian search shows separate preparation states with their own macros', a
   await expect(page.getByText('87 ккал / 100 г')).toBeVisible();
   await expect(page.getByText('289 ккал / 100 г')).toBeVisible();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/russian-food-preparation-states-mobile-390.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/russian-food-preparation-states-mobile-390.png',
   });
   await page.getByText('Картофель фри из свежего картофеля, жареный').scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/russian-food-preparation-states-lower-mobile-390.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/russian-food-preparation-states-lower-mobile-390.png',
   });
 });
 
@@ -870,7 +872,7 @@ test('Russian preparation states and oil variants apply beyond potatoes', async 
   await expect(friedWithButter).toContainText('196 ккал / 100 г');
   await page.getByText('Яйцо целое жареное с растительным маслом').scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/russian-food-oil-variants-mobile-390.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/russian-food-oil-variants-mobile-390.png',
   });
 });
 
@@ -947,7 +949,7 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
     expect((await action.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   }
   await compactBreakfast.screenshot({
-    path: '../.artifacts/screenshots/task-113A-round-5/nutrition-collapsible-meals-360.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-113A-round-5/nutrition-collapsible-meals-360.png',
   });
 
   await page.getByRole('button', { name: 'Предыдущая неделя' }).click();
@@ -1012,15 +1014,15 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   await page.goto('/app?section=nutrition');
 
   const status = page.getByText('Цель КБЖУ настроена');
-  await expect(status).toHaveCSS('background-color', 'rgb(30, 34, 30)');
+  await expect(status).toHaveCSS('background-color', 'rgb(34, 34, 34)');
   await expect(status).toHaveCSS('border-color', 'rgb(89, 111, 56)');
   await expect(status).toHaveCSS('color', 'rgb(185, 234, 114)');
   await expect(
     page.getByRole('progressbar', { name: /Калории:/ }).locator(':scope > span'),
-  ).toHaveCSS('background-color', 'rgb(168, 232, 58)');
+  ).toHaveCSS('background-color', 'rgb(178, 245, 32)');
   await expect(page.getByRole('link', { name: 'Питание', exact: true })).toHaveCSS(
     'background-color',
-    'rgb(30, 34, 30)',
+    'rgb(27, 31, 31)',
   );
   const lunch = page.getByRole('region', { name: 'Обед' });
   await expect(lunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(
@@ -1030,7 +1032,7 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   expect((await lunch.boundingBox())?.height).toBeLessThanOrEqual(88);
   await lunch.scrollIntoViewIfNeeded();
   await lunch.screenshot({
-    path: '../.artifacts/screenshots/task-113A-round-5/nutrition-collapsible-meals-dark-390x844.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-113A-round-5/nutrition-collapsible-meals-dark-390x844.png',
   });
 });
 
@@ -1053,7 +1055,7 @@ test('Russian search supplements local food with USDA generic result and persist
   await expect(page.getByText('Рис дикий приготовленный, без добавления масла')).toBeVisible();
   await expect(page.getByText(/CC0-1.0/).first()).toBeVisible();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/generic-rice-search-390x844.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/generic-rice-search-390x844.png',
   });
   await page
     .getByText('Рис белый приготовленный, без добавления масла')
@@ -1079,6 +1081,6 @@ test('Russian search supplements local food with USDA generic result and persist
   await expect(reloadedEntry).toBeVisible();
   await reloadedEntry.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-114a/generic-rice-added-390x844.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-114a/generic-rice-added-390x844.png',
   });
 });

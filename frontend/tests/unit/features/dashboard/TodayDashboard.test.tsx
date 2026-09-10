@@ -6,6 +6,7 @@ import type { FoodDiaryDay, ProgressSummary, Workout } from '../../../../src/sha
 import { calendarWeek, dateInputValue } from '../../../../src/shared/dateTime';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 import {
+  formatNutritionDateLabel,
   formatTodayHeading,
   TodayDashboard,
 } from '../../../../src/features/dashboard/TodayDashboard';
@@ -319,6 +320,8 @@ describe('TodayDashboard', () => {
     expect(formatTodayHeading('2030-01-10')).toEqual({
       title: 'Сегодня · четверг, 10 января',
     });
+    expect(formatNutritionDateLabel('2030-01-10', '2030-01-10')).toBe('сегодня');
+    expect(formatNutritionDateLabel('2030-01-09', '2030-01-10')).toMatch(/9 января 2030/);
     expect(calendarWeek('2029-12-31')).toEqual([
       '2029-12-31',
       '2030-01-01',
@@ -456,7 +459,7 @@ describe('TodayDashboard', () => {
     expect(
       await screen.findByRole('heading', { name: 'Сегодня без тренировки' }),
     ).toBeInTheDocument();
-    expect(document.querySelector('.ui-semantic-artwork--current-action')).toBeInTheDocument();
+    expect(document.querySelector('.ui-semantic-artwork--current-action')).not.toBeInTheDocument();
     expect(screen.getByText(/Ближайшая .*Верх тела/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Добавить питание' })).toHaveAttribute(
       'href',

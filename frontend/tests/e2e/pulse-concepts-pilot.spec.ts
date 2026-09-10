@@ -7,8 +7,8 @@ const env = (globalThis as { process?: { env?: Record<string, string | undefined
 const captureVisualImpactFix = env?.YFC_CAPTURE_PULSE_VISUAL_IMPACT === '1';
 const capture = env?.YFC_CAPTURE_TASK_75C === '1' || captureVisualImpactFix;
 const screenshotRoot = captureVisualImpactFix
-  ? '../.artifacts/screenshots/bug-20260828-01-pulse-visual-impact/review'
-  : '../.artifacts/screenshots/task-75c/final';
+  ? '../.artifacts/runtime/tests/screenshots/bug-20260828-01-pulse-visual-impact/review'
+  : '../.artifacts/runtime/tests/screenshots/task-75c/final';
 
 interface PulseLabState {
   cls: number;
@@ -57,7 +57,7 @@ async function completeWorkout(page: Page) {
   return page.locator('.workout-completion');
 }
 
-test('selected current-action artwork and floating dock preserve the shared navigation contract', async ({
+test('current action and floating dock preserve the shared navigation contract', async ({
   page,
 }) => {
   await installPlatformApi(page, {
@@ -76,39 +76,10 @@ test('selected current-action artwork and floating dock preserve the shared navi
     const action = page.getByRole('button', { name: 'Начать тренировку' });
     const dock = page.locator('#appBottomNav');
     await expect(action).toBeVisible();
-    const currentActionArtwork = page.locator('.ui-semantic-artwork--current-action');
-    const currentActionSurface = page.locator('.today-workout-spotlight');
-    await expect(currentActionArtwork).toHaveCount(1);
-    await expect
-      .poll(() =>
-        currentActionArtwork.evaluate((element) =>
-          Number.parseFloat(getComputedStyle(element).opacity),
-        ),
-      )
-      .toBeGreaterThanOrEqual(0.9);
-    const visualImpact = await currentActionSurface.evaluate((element) => {
-      const surface = getComputedStyle(element);
-      const artwork = getComputedStyle(
-        element.querySelector<HTMLElement>('.ui-semantic-artwork--current-action')!,
-      );
-      return {
-        artworkShadow: artwork.boxShadow,
-        artworkWidth: Number.parseFloat(artwork.width),
-        background: surface.backgroundImage,
-        borderLeftWidth: Number.parseFloat(surface.borderLeftWidth),
-        stripeWidth: Number.parseFloat(getComputedStyle(element, '::before').width),
-      };
-    });
-    expect(visualImpact.borderLeftWidth).toBeLessThanOrEqual(2);
-    expect(visualImpact.stripeWidth).toBe(2);
-    expect(visualImpact.artworkWidth).toBeGreaterThanOrEqual(250);
-    expect(visualImpact.artworkShadow).not.toBe('none');
-    expect(visualImpact.background).toContain('radial-gradient');
-    await expect
-      .poll(() => currentActionArtwork.evaluate((element) => element.getAnimations().length))
-      .toBe(0);
+    await expect(page.locator('.ui-semantic-artwork')).toHaveCount(0);
+    await expect(page.locator('.today-workout-spotlight')).toHaveCSS('background-image', 'none');
     await expect(dock).toHaveCSS('position', 'fixed');
-    await expect(dock).toHaveCSS('border-radius', '20px');
+    await expect(dock).toHaveCSS('border-radius', '24px');
     await expectNoOverlap(action, dock);
     await expectNoHorizontalOverflow(page);
 
@@ -194,40 +165,16 @@ test('selected current-action artwork and floating dock preserve the shared navi
   }
 });
 
-test('current-action artwork remains visible on a rest day', async ({ page }) => {
+test('rest-day action stays clear without decorative artwork', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 932 });
   await installPlatformApi(page, { browserSession: true, workoutStatus: 'none' });
   await page.goto('/app?section=today');
 
   await expect(page.getByRole('heading', { name: 'Сегодня без тренировки' })).toBeVisible();
   const surface = page.locator('.today-workout-spotlight');
-  const artwork = surface.locator('.ui-semantic-artwork--current-action');
   await expect(surface).toHaveClass(/today-workout-spotlight--rest-day/);
-  await expect(artwork).toHaveCount(1);
-
-  const visualImpact = await surface.evaluate((element) => {
-    const surfaceStyle = getComputedStyle(element);
-    const artworkStyle = getComputedStyle(
-      element.querySelector<HTMLElement>('.ui-semantic-artwork--current-action')!,
-    );
-    return {
-      artworkOpacity: Number.parseFloat(artworkStyle.opacity),
-      artworkShadow: artworkStyle.boxShadow,
-      artworkWidth: Number.parseFloat(artworkStyle.width),
-      background: surfaceStyle.backgroundImage,
-      stripeWidth: Number.parseFloat(getComputedStyle(element, '::before').width),
-    };
-  });
-
-  expect(visualImpact.artworkOpacity).toBeGreaterThanOrEqual(0.9);
-  expect(visualImpact.stripeWidth).toBe(2);
-  expect(visualImpact.artworkWidth).toBeGreaterThanOrEqual(250);
-  expect(visualImpact.artworkShadow).not.toBe('none');
-  expect(visualImpact.background).toContain('radial-gradient');
-  await expectNoOverlap(
-    page.getByRole('heading', { name: 'Сегодня без тренировки' }),
-    artwork.locator('i').last(),
-  );
+  await expect(surface.locator('.ui-semantic-artwork')).toHaveCount(0);
+  await expect(surface).toHaveCSS('background-image', 'none');
   await expectNoHorizontalOverflow(page);
 
   if (capture) {
@@ -503,33 +450,18 @@ test('full Pulse completion motion exposes facts immediately and settles within 
   expect(lab.longTasks).toEqual([]);
   expect(lab.cls).toBeLessThanOrEqual(0.01);
   expect(p95FrameGap).toBeLessThanOrEqual(34);
-  const completionImpact = await completion.evaluate((element) => {
-    const hero = getComputedStyle(element.querySelector<HTMLElement>('.workout-completion__hero')!);
-    const artwork = getComputedStyle(
-      element.querySelector<HTMLElement>('.ui-semantic-artwork--workout-completion')!,
-    );
-    const check = getComputedStyle(
-      element.querySelector<HTMLElement>('.workout-completion__check')!,
-    );
-    return {
-      artworkOpacity: Number.parseFloat(artwork.opacity),
-      artworkWidth: Number.parseFloat(artwork.width),
-      background: hero.backgroundImage,
-      borderLeftWidth: Number.parseFloat(hero.borderLeftWidth),
-      checkWidth: Number.parseFloat(check.width),
-    };
-  });
-  expect(completionImpact.artworkOpacity).toBeGreaterThanOrEqual(0.9);
-  expect(completionImpact.artworkWidth).toBeGreaterThanOrEqual(320);
-  expect(completionImpact.borderLeftWidth).toBeGreaterThanOrEqual(7);
-  expect(completionImpact.checkWidth).toBeGreaterThanOrEqual(64);
-  expect(completionImpact.background).toContain('radial-gradient');
+  await expect(completion.locator('.ui-semantic-artwork')).toHaveCount(0);
+  await expect(completion.locator('.workout-completion__hero')).toHaveCSS(
+    'background-image',
+    'none',
+  );
+  await expect(completion.locator('.workout-completion__check')).toBeVisible();
   if (capture) {
     await page.screenshot({ path: `${screenshotRoot}/completion-full-390-light-final.png` });
   }
 });
 
-test('reduced motion keeps the completion artwork and final values without travel', async ({
+test('reduced motion keeps completion confirmation and final values without travel', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -541,14 +473,12 @@ test('reduced motion keeps the completion artwork and final values without trave
   await expect(page.getByText(/максимальный вес 40 кг/)).toBeVisible();
   const finalState = await completion.evaluate((element) => ({
     animations: element.getAnimations({ subtree: true }).length,
-    artwork: getComputedStyle(
-      element.querySelector<HTMLElement>('.ui-semantic-artwork--workout-completion')!,
-    ).transform,
+    artworkCount: element.querySelectorAll('.ui-semantic-artwork').length,
     boundary: getComputedStyle(element.querySelector<HTMLElement>('.workout-completion__hero')!)
       .borderLeftColor,
   }));
   expect(finalState.animations).toBe(0);
-  expect(finalState.artwork).toBe('none');
+  expect(finalState.artworkCount).toBe(0);
   expect(finalState.boundary).not.toBe('rgba(0, 0, 0, 0)');
   await expectNoHorizontalOverflow(page);
   if (capture) {

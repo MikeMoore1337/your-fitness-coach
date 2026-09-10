@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+test.use({ video: 'on' });
+
 const captureLandingProductProofs =
   (
     globalThis as typeof globalThis & {
@@ -293,7 +295,7 @@ async function mockActiveWorkout(page: Page, mixed = false) {
 test('active workout keeps one obvious next action through logging, timer and finish', async ({
   page,
 }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 390, height: 844 });
   if (captureLandingProductProofs) {
     await page.addInitScript(() => {
@@ -315,7 +317,9 @@ test('active workout keeps one obvious next action through logging, timer and fi
 
   if (captureLandingProductProofs) {
     await expect(page.getByRole('heading', { name: 'Жим штанги лёжа' })).toBeVisible();
-    await page.screenshot({ path: 'public/assets/product/landing-workout-mobile-light.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-workout-mobile-light.png',
+    });
     await page.evaluate(() => localStorage.setItem('app-theme', 'dark'));
     await page.reload({ waitUntil: 'domcontentloaded' });
     const darkClientEntry = page.getByRole('button', { name: 'Клиент' });
@@ -325,7 +329,9 @@ test('active workout keeps one obvious next action through logging, timer and fi
     await darkWorkoutEntry.click();
     await expect(page.getByRole('heading', { name: 'Жим штанги лёжа' })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-    await page.screenshot({ path: 'public/assets/product/landing-workout-mobile-dark.png' });
+    await page.screenshot({
+      path: '../.artifacts/runtime/tests/product-proofs/landing-workout-mobile-dark.png',
+    });
     return;
   }
 
@@ -362,7 +368,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(completedHeading).toBeVisible();
   await completedHeading.scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-62/mobile-web-390x844-light-workout-completed.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-62/mobile-web-390x844-light-workout-completed.png',
   });
   const analyticsEvents = await page.evaluate(
     () =>
@@ -385,9 +391,9 @@ test('active workout has touch-size controls and no horizontal overflow', async 
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const exercise = page.locator('.active-workout-exercise').first();
-  await expect(exercise).toHaveCSS('border-radius', '16px');
-  await expect(exercise).toHaveCSS('border-top-color', 'rgb(158, 224, 43)');
-  await expect(exercise).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(exercise).toHaveCSS('border-radius', '0px');
+  await expect(exercise).toHaveCSS('border-top-color', 'rgb(208, 208, 208)');
+  await expect(exercise).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const guideButton = page.getByRole('button', { name: 'Техника' });
   await expect(guideButton).toHaveText('Техника');
   await guideButton.click();
@@ -482,7 +488,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await expect(cardio.locator('details')).toHaveAttribute('open', '');
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-119/mobile-web-390x844-dark-mixed-workout.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-119/mobile-web-390x844-dark-mixed-workout.png',
     fullPage: true,
   });
 
@@ -529,7 +535,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
     )
     .toBe(true);
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-119/desktop-web-1280x900-light-mixed-workout.png',
+    path: '../.artifacts/runtime/tests/screenshots/task-119/desktop-web-1280x900-light-mixed-workout.png',
     fullPage: true,
   });
 });
@@ -648,4 +654,36 @@ test('save failure stays compact, keeps controls open and retries explicitly', a
   server.failSetPatch(false);
   await page.getByRole('button', { name: 'Повторить' }).click();
   await expect(page.getByText('Синхронизировано')).toBeVisible();
+});
+
+test('rest timer reconciles its deadline after a simulated hidden-tab return', async ({ page }) => {
+  const start = new Date('2026-09-09T12:00:00Z');
+  await page.clock.setFixedTime(start);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const firstSet = page.locator('[data-workout-set-id="201"]');
+  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
+  await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
+  const timer = page.getByRole('timer').filter({ hasText: 'Отдых' });
+  await expect(timer).toContainText('1:30');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.clock.setFixedTime(new Date(start.getTime() + 65_000));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(timer).toContainText('0:25');
+  await page.clock.setFixedTime(new Date(start.getTime() + 100_000));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await expect(timer).toHaveCount(0);
 });

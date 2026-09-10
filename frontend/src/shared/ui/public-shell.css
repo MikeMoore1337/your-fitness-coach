@@ -1,10 +1,10 @@
 body.public-shell-mode {
   padding: 0;
-  background: #f1f3ec;
+  background: #fafafa;
 }
 
 body.public-shell-mode.public-shell-dark-mode {
-  background: #0d120f;
+  background: #111111;
 }
 
 body.public-shell-mode #root {
@@ -15,27 +15,27 @@ body.public-shell-mode #root {
   --brand-lime: #b6f238;
   --brand-lime-hover: #a7e52d;
   --brand-lime-active: #99d522;
-  --brand-ink: #172018;
-  --brand-deep: #18251d;
+  --brand-ink: #151515;
+  --brand-deep: #191919;
   --landing-ink: var(--brand-ink);
-  --landing-muted: #657067;
-  --landing-paper: #f1f3ec;
-  --landing-card: #fbfcf7;
+  --landing-muted: #606060;
+  --landing-paper: #fafafa;
+  --landing-card: #ffffff;
   --landing-green: var(--brand-lime);
   --landing-dark: var(--brand-deep);
   --landing-primary: var(--brand-deep);
-  --landing-primary-hover: #223229;
+  --landing-primary-hover: #303030;
   --landing-primary-text: #fff;
-  --landing-border: #cdd3c9;
-  --landing-card-border: #d5dbd1;
+  --landing-border: #d0d0d0;
+  --landing-card-border: #dedede;
   --landing-kicker: #4f6725;
-  --landing-heading-muted: #6c796e;
+  --landing-heading-muted: #707070;
   --landing-panel: rgba(251, 252, 247, 0.93);
   --landing-panel-border: rgba(255, 255, 255, 0.78);
   --landing-float: rgba(255, 255, 255, 0.92);
   --landing-float-border: rgba(255, 255, 255, 0.9);
-  --landing-secondary: #dfe6dc;
-  --landing-secondary-text: #4f5c51;
+  --landing-secondary: #eeeeee;
+  --landing-secondary-text: #606060;
   --landing-orbit: rgba(23, 32, 24, 0.14);
   --landing-chart-axis: #dce1d7;
   --landing-chart-grid: #e5e9e1;
@@ -43,28 +43,26 @@ body.public-shell-mode #root {
   --landing-chart-accent: #79a71c;
   min-height: 100dvh;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 85% 5%, rgba(182, 242, 56, 0.2), transparent 26rem),
-    var(--landing-paper);
+  background: var(--landing-paper);
   color: var(--landing-ink);
   font-family: var(--font-sans);
 }
 
 .public-shell--dark {
-  --landing-ink: #f2f6ef;
-  --landing-muted: #aab5ac;
-  --landing-paper: #0d120f;
-  --landing-card: #151c17;
-  --landing-border: #344038;
-  --landing-card-border: #2b372f;
+  --landing-ink: #f5f5f5;
+  --landing-muted: #b8b8b8;
+  --landing-paper: #111111;
+  --landing-card: #191919;
+  --landing-border: #404040;
+  --landing-card-border: #404040;
   --landing-kicker: #a7d84a;
-  --landing-heading-muted: #aab5ac;
+  --landing-heading-muted: #b8b8b8;
   --landing-panel: rgba(21, 28, 23, 0.94);
   --landing-panel-border: rgba(182, 242, 56, 0.18);
   --landing-float: rgba(24, 33, 27, 0.95);
   --landing-float-border: rgba(182, 242, 56, 0.16);
-  --landing-secondary: #202a23;
-  --landing-secondary-text: #c0cac2;
+  --landing-secondary: #222222;
+  --landing-secondary-text: #cccccc;
   --landing-orbit: rgba(182, 242, 56, 0.2);
   --landing-chart-axis: #3a473e;
   --landing-chart-grid: #29342c;
@@ -73,9 +71,7 @@ body.public-shell-mode #root {
   --landing-primary: var(--brand-lime);
   --landing-primary-hover: var(--brand-lime-hover);
   --landing-primary-text: var(--brand-ink);
-  background:
-    radial-gradient(circle at 85% 5%, rgba(182, 242, 56, 0.12), transparent 26rem),
-    var(--landing-paper);
+  background: var(--landing-paper);
 }
 
 .public-shell *,
@@ -94,7 +90,7 @@ body.public-shell-mode #root {
   top: 10px;
   left: 10px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--landing-dark);
   color: #fff !important;
   font-size: 0.85rem;
@@ -108,7 +104,7 @@ body.public-shell-mode #root {
 }
 
 .public-shell :where(a, button):focus-visible {
-  outline: 3px solid var(--landing-green);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 3px;
 }
 
@@ -142,7 +138,7 @@ body.public-shell-mode #root {
   height: var(--landing-header-control-size);
   padding: 0;
   border: 1px solid var(--landing-border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   color: var(--landing-ink);
   cursor: pointer;
   font: inherit;
@@ -176,7 +172,7 @@ body.public-shell-mode #root {
 }
 
 .public-shell .landing-theme-toggle:focus-visible {
-  outline: 3px solid var(--landing-green);
+  outline: 3px solid var(--v2-focus);
   outline-offset: 2px;
 }
 

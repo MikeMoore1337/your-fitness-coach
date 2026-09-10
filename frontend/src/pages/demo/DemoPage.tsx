@@ -71,7 +71,7 @@ function DemoLoginAction({ scenario }: { scenario: DemoScenario }) {
   );
 }
 
-function TrainingScenario({
+export function TrainingScenario({
   busy,
   onAction,
   state,

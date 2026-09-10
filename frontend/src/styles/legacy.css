@@ -31,7 +31,7 @@ html {
     gap: 5px;
     padding: 5px;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     background: var(--nav-bg);
     box-shadow: var(--shadow);
     backdrop-filter: blur(14px);
@@ -44,7 +44,7 @@ html {
     gap: 7px;
     min-width: 0;
     padding: 11px;
-    border-radius: 8px;
+    border-radius: var(--radius-control);
     background: transparent;
     color: var(--muted);
 }
@@ -132,7 +132,7 @@ html {
     gap: 12px;
     padding: 14px;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     background: var(--surface);
     transition:
         border-color var(--motion-state) var(--motion-ease),
@@ -189,7 +189,7 @@ html {
     flex: 0 0 38px;
     width: 38px;
     height: 38px;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     background: linear-gradient(145deg, var(--accent), var(--accent-alt));
     color: var(--button-text);
     font-size: 13px;
@@ -200,7 +200,7 @@ html {
     flex-basis: 48px;
     width: 48px;
     height: 48px;
-    border-radius: 14px;
+    border-radius: var(--radius-control);
     font-size: 15px;
 }
 
@@ -212,7 +212,7 @@ html {
     margin: 16px auto 0;
     padding: 8px;
     background: #fff;
-    border-radius: 12px;
+    border-radius: var(--radius-control);
 }
 
 .status-dot {
@@ -355,7 +355,7 @@ button.ghost-danger:hover {
     gap: 11px;
     padding: 14px;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-control);
     background: var(--surface);
 }
 

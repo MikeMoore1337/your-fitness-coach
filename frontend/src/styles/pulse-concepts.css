@@ -1,89 +1,4 @@
 /* Owner-selected Pulse concepts for the bounded authenticated-app pilot in task 75C. */
-.ui-semantic-artwork {
-  position: absolute;
-  z-index: 0;
-  display: block;
-  overflow: hidden;
-  color: var(--v2-lime);
-  pointer-events: none;
-}
-
-.ui-semantic-artwork i {
-  position: absolute;
-  display: block;
-}
-
-.today-dashboard--design-v2 .today-workout-spotlight:has(.ui-semantic-artwork--current-action) {
-  isolation: isolate;
-  border-color: color-mix(in srgb, var(--v2-lime) 42%, var(--v2-border));
-  border-left-color: color-mix(in srgb, var(--v2-lime) 42%, var(--v2-border));
-  background:
-    radial-gradient(
-      circle at 91% 16%,
-      color-mix(in srgb, var(--v2-lime) 30%, transparent),
-      transparent 34%
-    ),
-    linear-gradient(
-      135deg,
-      var(--v2-surface-secondary) 0 58%,
-      color-mix(in srgb, var(--v2-lime) 12%, var(--v2-surface-secondary)) 100%
-    );
-  box-shadow: 0 14px 42px rgb(16 25 17 / 0.09);
-}
-
-.today-dashboard--design-v2
-  .today-workout-spotlight:has(.ui-semantic-artwork--current-action)::before {
-  width: 2px;
-}
-
-.today-workout-spotlight > .ui-semantic-artwork--current-action {
-  inset: -72px -58px auto auto;
-  width: 260px;
-  height: 260px;
-  border: 1px solid color-mix(in srgb, var(--v2-lime) 82%, transparent);
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 58% 48%,
-    color-mix(in srgb, var(--v2-lime) 30%, transparent),
-    color-mix(in srgb, var(--v2-lime) 8%, transparent) 48%,
-    transparent 70%
-  );
-  box-shadow:
-    0 0 0 34px color-mix(in srgb, var(--v2-lime) 10%, transparent),
-    0 0 0 76px color-mix(in srgb, var(--v2-lime) 5%, transparent);
-  opacity: 0.96;
-  animation: pulse-current-action-arrive var(--motion-data) var(--motion-ease);
-}
-
-.ui-semantic-artwork--current-action i:first-child,
-.ui-semantic-artwork--current-action i:nth-child(2) {
-  top: 114px;
-  right: 46px;
-  width: 94px;
-  height: 2px;
-  background: currentColor;
-  transform: rotate(-31deg);
-  transform-origin: right center;
-}
-
-.ui-semantic-artwork--current-action i:nth-child(2) {
-  top: 130px;
-  width: 74px;
-  opacity: 0.58;
-}
-
-.ui-semantic-artwork--current-action i:last-child {
-  right: 42px;
-  bottom: 44px;
-  width: 98px;
-  height: 8px;
-  transform: skewX(-18deg);
-  background: currentColor;
-}
-
-.today-workout-spotlight--rest-day > .ui-semantic-artwork--current-action i:last-child {
-  bottom: 12px;
-}
 
 .today-pulse-action {
   position: relative;
@@ -106,7 +21,7 @@
 }
 
 .today-pulse-action:not(:disabled) {
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--v2-lime) 22%, transparent);
+  box-shadow: none;
 }
 
 .today-pulse-action:active:not(:disabled)::after {
@@ -122,61 +37,9 @@
   padding: clamp(18px, 2.5vw, 24px);
   border: 2px solid color-mix(in srgb, var(--v2-text-secondary) 58%, var(--v2-border));
   border-left: 7px solid var(--v2-lime);
-  border-radius: 24px;
-  background:
-    radial-gradient(
-      circle at 94% 4%,
-      color-mix(in srgb, var(--v2-lime) 25%, transparent),
-      transparent 34%
-    ),
-    linear-gradient(
-      145deg,
-      var(--v2-surface-secondary) 44%,
-      color-mix(in srgb, var(--v2-lime) 16%, var(--v2-surface-secondary)) 100%
-    ) !important;
-  box-shadow: 7px 7px 0 color-mix(in srgb, var(--v2-text-secondary) 18%, transparent);
-}
-
-.progress-body-metric--data-insight > :not(.ui-semantic-artwork) {
-  position: relative;
-  z-index: 1;
-}
-
-.progress-body-metric--data-insight > .ui-semantic-artwork--data-insight {
-  inset: -84px -64px auto auto;
-  width: 240px;
-  height: 240px;
-  border: 1px solid color-mix(in srgb, var(--v2-lime) 76%, transparent);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 30px color-mix(in srgb, var(--v2-lime) 8%, transparent),
-    0 0 0 64px color-mix(in srgb, var(--v2-lime) 4%, transparent);
-  opacity: 0.86;
-}
-
-.ui-semantic-artwork--data-insight i {
-  right: 26px;
-  width: 118px;
-  height: 2px;
-  background: currentColor;
-  transform: rotate(-26deg);
-  transform-origin: right center;
-}
-
-.ui-semantic-artwork--data-insight i:first-child {
-  top: 118px;
-}
-
-.ui-semantic-artwork--data-insight i:nth-child(2) {
-  top: 134px;
-  width: 92px;
-  opacity: 0.58;
-}
-
-.ui-semantic-artwork--data-insight i:last-child {
-  top: 150px;
-  width: 62px;
-  opacity: 0.34;
+  border-radius: var(--radius-control);
+  background: var(--v2-surface) !important;
+  box-shadow: none;
 }
 
 .progress-body-metric--data-insight .data-viz-chart {
@@ -186,8 +49,8 @@
 
 .progress-body-metric--data-insight .data-viz-chart__plot {
   border-width: 2px;
-  border-radius: 18px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v2-lime) 8%, transparent);
+  border-radius: var(--radius-control);
+  box-shadow: none;
 }
 
 .progress-body-metric--data-insight .data-viz-chart__actual {
@@ -207,71 +70,28 @@
 }
 
 :root:not([data-color-scheme='light']) .progress-body-metric--data-insight {
-  border-color: #5f6b61;
+  border-color: var(--v2-border);
   border-left-color: var(--v2-lime);
-  background:
-    radial-gradient(circle at 94% 4%, rgb(168 232 58 / 0.2), transparent 34%),
-    linear-gradient(145deg, #151a16 42%, #1d2919 100%) !important;
-  box-shadow: 7px 7px 0 rgb(95 107 97 / 0.22);
+  background: var(--v2-surface) !important;
+  box-shadow: none;
 }
 
 :root:not([data-color-scheme='light']) .progress-body-metric--data-insight .data-viz-chart {
-  --data-viz-grid: #465248;
-  --data-viz-surface: #111612;
+  --data-viz-grid: #404040;
+  --data-viz-surface: #191919;
 }
 
 .workout-completion__hero {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  min-height: clamp(190px, 28vw, 280px);
-  padding: clamp(28px, 5vw, 54px);
+  min-height: 0;
+  padding: 24px;
   border-color: color-mix(in srgb, var(--v2-lime) 48%, var(--v2-border));
-  border-left-width: 7px;
-  border-radius: 24px;
-  background:
-    radial-gradient(
-      circle at 90% 12%,
-      color-mix(in srgb, var(--v2-lime) 28%, transparent),
-      transparent 36%
-    ),
-    linear-gradient(
-      142deg,
-      var(--v2-surface) 48%,
-      color-mix(in srgb, var(--v2-lime) 18%, var(--v2-surface)) 100%
-    );
-  box-shadow: 0 18px 46px rgb(16 25 17 / 0.12);
-}
-
-.workout-completion__hero > :not(.ui-semantic-artwork) {
-  position: relative;
-  z-index: 1;
-}
-
-.workout-completion__hero > .ui-semantic-artwork--workout-completion {
-  inset: -96px -68px auto auto;
-  width: 320px;
-  height: 320px;
-  border: 1px solid color-mix(in srgb, var(--v2-lime) 88%, transparent);
-  border-radius: 50%;
-  box-shadow: 0 0 0 32px color-mix(in srgb, var(--v2-lime) 7%, transparent);
-  opacity: 0.92;
-}
-
-.ui-semantic-artwork--workout-completion i {
-  inset: 38px;
-  border: 1px solid color-mix(in srgb, currentColor 72%, transparent);
-  border-radius: 50%;
-}
-
-.ui-semantic-artwork--workout-completion i:nth-child(2) {
-  inset: 82px;
-  opacity: 0.72;
-}
-
-.ui-semantic-artwork--workout-completion i:last-child {
-  inset: 124px;
-  opacity: 0.48;
+  border-left-width: 3px;
+  border-radius: var(--radius-control);
+  background: var(--v2-surface);
+  box-shadow: none;
 }
 
 .workout-completion__hero .workout-completion__check {
@@ -279,9 +99,7 @@
   height: 64px;
   flex-basis: 64px;
   border: 1px solid color-mix(in srgb, var(--v2-on-lime) 24%, transparent);
-  box-shadow:
-    0 0 0 8px color-mix(in srgb, var(--v2-lime) 14%, transparent),
-    0 12px 28px color-mix(in srgb, var(--v2-lime) 22%, transparent);
+  box-shadow: none;
 }
 
 .workout-completion[data-motion-phase='enter'] {
@@ -296,110 +114,38 @@
   animation: pulse-completion-check var(--motion-data-total) var(--motion-ease) both;
 }
 
-.workout-completion[data-motion-phase='enter'] .ui-semantic-artwork--workout-completion {
-  animation: pulse-completion-gather var(--motion-data-total) var(--motion-ease) both;
+@media (max-width: 640px) {
+  .progress-body-metric--data-insight {
+    padding: 18px 16px;
+    border-radius: var(--radius-control);
+  }
+
+  .workout-completion__hero {
+    min-height: 0;
+    padding: 20px 16px;
+  }
 }
 
 @keyframes pulse-completion-surface {
-  0% {
+  from {
     transform: translateY(8px);
   }
-
-  36% {
-    transform: translateY(-2px);
-  }
-
-  100% {
+  to {
     transform: translateY(0);
   }
 }
 
 @keyframes pulse-completion-check {
-  0% {
-    transform: scale(0.84);
+  from {
+    transform: scale(0.82);
   }
-
-  48% {
-    transform: scale(1.08);
-  }
-
-  100% {
+  to {
     transform: scale(1);
-  }
-}
-
-@keyframes pulse-completion-gather {
-  0% {
-    opacity: 0.22;
-    transform: scale(0.68) rotate(-8deg);
-  }
-
-  58% {
-    opacity: 0.78;
-    transform: scale(1.04) rotate(2deg);
-  }
-
-  100% {
-    opacity: 0.68;
-    transform: scale(1) rotate(0);
-  }
-}
-
-@keyframes pulse-current-action-arrive {
-  0% {
-    opacity: 0.24;
-    transform: scale(0.82) rotate(-8deg);
-  }
-
-  62% {
-    opacity: 1;
-    transform: scale(1.03) rotate(2deg);
-  }
-
-  100% {
-    opacity: 0.96;
-    transform: scale(1) rotate(0);
-  }
-}
-
-@media (max-width: 640px) {
-  .today-dashboard--design-v2 .today-workout-spotlight:has(.ui-semantic-artwork--current-action) {
-    min-height: 330px;
-    padding: 22px 18px 18px;
-  }
-
-  .today-workout-spotlight > .ui-semantic-artwork--current-action {
-    inset: -78px -88px auto auto;
-    width: 280px;
-    height: 280px;
-  }
-
-  .progress-body-metric--data-insight {
-    padding: 18px 16px;
-    border-radius: 22px;
-  }
-
-  .workout-completion__hero {
-    min-height: 250px;
-    padding: 28px 18px;
-  }
-
-  .workout-completion__hero > .ui-semantic-artwork--workout-completion {
-    inset: -112px -122px auto auto;
-    width: 340px;
-    height: 340px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .today-pulse-action::after {
     transform: none;
-  }
-
-  .workout-completion__hero,
-  .workout-completion__check,
-  .ui-semantic-artwork {
-    animation: none !important;
-    transform: none !important;
   }
 }

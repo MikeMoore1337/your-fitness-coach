@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppShell } from '../../app/AppShell';
+import '../../styles/react.css';
+import '../../styles/design-v2.css';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../shared/api/client';
 import type {
