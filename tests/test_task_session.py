@@ -185,6 +185,17 @@ def _task_commit(task_id: str) -> dict[str, Any]:
     return {"commit": {"message": f"feat: [Task {task_id}] synthetic change"}}
 
 
+def _controller_pr(base_sha: str, head_sha: str) -> dict[str, Any]:
+    pull_request = _task_pr(234, "234", base_sha, head_sha)
+    pull_request["title"] = "[Controller] Synthetic maintenance"
+    pull_request["head"]["ref"] = "codex/controller-synthetic-maintenance"
+    return pull_request
+
+
+def _controller_commit() -> dict[str, Any]:
+    return {"commit": {"message": "[Controller] synthetic maintenance"}}
+
+
 def _success_check(sha: str) -> dict[str, Any]:
     return {"name": "checks", "head_sha": sha, "status": "completed", "conclusion": "SUCCESS"}
 
@@ -401,6 +412,30 @@ def test_validate_pr_event_accepts_trusted_dependabot_without_task_branch(
     )
 
     assert result == {"kind": "dependabot-pr", "head_sha": head_sha}
+
+
+def test_validate_pr_event_accepts_controller_maintenance_branch(
+    tmp_path: Path,
+) -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _controller_pr(base_sha, head_sha)
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
+    github = FakeGitHub(base_sha)
+    github.commits[234] = [_controller_commit()]
+
+    result = task_session.validate_pr_event(
+        object(),
+        github,
+        event_path,  # type: ignore[arg-type]
+    )
+
+    assert result == {
+        "kind": "controller-pr",
+        "branch": "codex/controller-synthetic-maintenance",
+        "head_sha": head_sha,
+    }
 
 
 def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(
@@ -2053,6 +2088,21 @@ def test_verify_master_merge_accepts_only_one_task_pr_for_current_master() -> No
     assert result["pull_request"]["number"] == 205
 
 
+def test_verify_master_merge_accepts_one_controller_maintenance_pr() -> None:
+    base_sha = "a" * 40
+    merge_sha = "c" * 40
+    controller_pr = _controller_pr(base_sha, "b" * 40)
+    controller_pr["merged_at"] = "2026-09-11T10:00:00Z"
+    controller_pr["merge_commit_sha"] = merge_sha
+    github = FakeGitHub(merge_sha)
+    github.associated_pulls = [controller_pr]
+
+    result = task_session.verify_master_merge(object(), github, sha=merge_sha)
+
+    assert result["kind"] == "controller-pr-merge"
+    assert result["pull_request"]["number"] == 234
+
+
 def test_verify_master_merge_accepts_trusted_dependabot_pr() -> None:
     base_sha = "a" * 40
     merge_sha = "c" * 40
@@ -2080,7 +2130,9 @@ def test_verify_master_merge_rejects_dependabot_fork_pr() -> None:
     github = FakeGitHub(merge_sha)
     github.associated_pulls = [dependabot_pr]
 
-    with pytest.raises(task_session.TaskSessionError, match="not exactly one merged task PR"):
+    with pytest.raises(
+        task_session.TaskSessionError, match="not exactly one merged task or controller PR"
+    ):
         task_session.verify_master_merge(object(), github, sha=merge_sha)
 
 

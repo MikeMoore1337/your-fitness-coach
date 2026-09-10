@@ -38,7 +38,9 @@ TASK_BRANCH_RE = re.compile(
     rf"^task/(?P<task_id>{TASK_ID_PATTERN})-(?P<slug>[a-z0-9]+(?:-[a-z0-9]+)*)$",
     re.IGNORECASE,
 )
+CONTROLLER_BRANCH_RE = re.compile(r"^codex/controller-[a-z0-9]+(?:-[a-z0-9]+)*$")
 TASK_COMMIT_RE = re.compile(rf"\[Task (?P<task_id>{TASK_ID_PATTERN})\]", re.IGNORECASE)
+CONTROLLER_COMMIT_RE = re.compile(r"^\[Controller\]\s+\S")
 TASK_DEPENDENCY_RE = re.compile(r"(?im)^Depends-on:\s*(?P<value>.+)$")
 TASK_FILE_RE = re.compile(rf"^(?P<task_id>{TASK_ID_PATTERN})-(?P<slug>.+)\.md$", re.IGNORECASE)
 TASK_STATE_VERSION = 2
@@ -1214,6 +1216,71 @@ def validate_task_pull_request(
     return task_id
 
 
+def validate_controller_pull_request(
+    pull_request: Mapping[str, Any],
+    commits: Sequence[Mapping[str, Any]],
+    checks: Sequence[Mapping[str, Any]],
+    *,
+    expected_base_sha: str,
+    expected_base_branch: str = TARGET_BASE_BRANCH,
+    require_checks: bool = True,
+) -> str:
+    """Validate a controller-only maintenance PR without inventing a product task."""
+
+    base = pull_request.get("base", {})
+    head = pull_request.get("head", {})
+    if base.get("ref") != expected_base_branch:
+        raise TaskSessionError(
+            f"Controller pull request base must be {expected_base_branch}, found {base.get('ref')}"
+        )
+    branch = str(head.get("ref", ""))
+    if CONTROLLER_BRANCH_RE.fullmatch(branch) is None:
+        raise TaskSessionError(
+            f"Controller branch {branch!r} must match codex/controller-<lowercase-kebab-slug>"
+        )
+    if base.get("sha") != expected_base_sha:
+        raise TaskSessionError(
+            f"Controller PR is stale: base {base.get('sha')} != current {expected_base_sha}"
+        )
+    base_repo = base.get("repo", {})
+    head_repo = head.get("repo", {})
+    if (
+        not isinstance(base_repo, Mapping)
+        or not isinstance(head_repo, Mapping)
+        or not base_repo.get("full_name")
+        or head_repo.get("full_name") != base_repo.get("full_name")
+    ):
+        raise TaskSessionError("Controller PR must originate from the same repository")
+    title = str(pull_request.get("title", ""))
+    if not title.startswith("[Controller]"):
+        raise TaskSessionError("Controller PR title must start with [Controller]")
+    messages = [str(item.get("commit", {}).get("message", "")) for item in commits]
+    declared_commit_count = pull_request.get("commits")
+    if declared_commit_count is not None and int(declared_commit_count) != len(commits):
+        raise TaskSessionError(
+            "Controller PR commit inventory is incomplete; split/review the PR instead of truncating provenance"
+        )
+    if not messages:
+        raise TaskSessionError("Controller branch contains no controller commits")
+    invalid = [
+        message.splitlines()[0] if message else "<empty>"
+        for message in messages
+        if not CONTROLLER_COMMIT_RE.match(message)
+    ]
+    if invalid:
+        raise TaskSessionError(
+            "Controller commit messages must start with [Controller]: " + ", ".join(invalid)
+        )
+    head_sha = str(head.get("sha", ""))
+    if not head_sha:
+        raise TaskSessionError("Controller PR head SHA is missing")
+    if require_checks and not _successful_exact_check(checks, "checks", head_sha):
+        raise TaskSessionError(
+            f"Exact-head required check 'checks' is not successful for {head_sha}"
+        )
+    return branch
+
+
 def validate_task_pull_request_files(
     files: Sequence[Mapping[str, Any]], *, expected_count: int | None = None
 ) -> None:
@@ -1299,6 +1366,23 @@ def validate_pr_event(
     number = int(pull_request["number"])
     commits = github.pull_request_commits(number)
     files = github.pull_request_files(number)
+    branch = str(pull_request.get("head", {}).get("ref", ""))
+    if CONTROLLER_BRANCH_RE.fullmatch(branch):
+        validate_controller_pull_request(
+            pull_request,
+            commits,
+            [],
+            expected_base_sha=event_base_sha,
+            require_checks=False,
+        )
+        validate_task_pull_request_files(
+            files, expected_count=int(pull_request.get("changed_files", len(files)))
+        )
+        return {
+            "kind": "controller-pr",
+            "branch": branch,
+            "head_sha": pull_request["head"]["sha"],
+        }
     task_id = validate_task_pull_request(
         pull_request,
         commits,
@@ -1368,9 +1452,12 @@ def verify_master_merge(
             and base.get("ref") == TARGET_BASE_BRANCH
         ):
             continue
-        is_task_merge = TASK_BRANCH_RE.fullmatch(str(head.get("ref", ""))) and str(
-            pull_request.get("title", "")
-        ).startswith("[Task ")
+        branch = str(head.get("ref", ""))
+        title = str(pull_request.get("title", ""))
+        is_task_merge = TASK_BRANCH_RE.fullmatch(branch) and title.startswith("[Task ")
+        is_controller_merge = CONTROLLER_BRANCH_RE.fullmatch(
+            branch
+        ) is not None and title.startswith("[Controller]")
         base_repo = base.get("repo", {})
         head_repo = head.get("repo", {})
         is_same_repository = (
@@ -1382,6 +1469,8 @@ def verify_master_merge(
         is_dependabot_merge = is_dependabot_pull_request(pull_request) and is_same_repository
         if is_task_merge:
             merge_kind = "task-pr-merge"
+        elif is_controller_merge and is_same_repository:
+            merge_kind = "controller-pr-merge"
         elif is_dependabot_merge:
             merge_kind = "dependabot-pr-merge"
         else:
@@ -1395,7 +1484,8 @@ def verify_master_merge(
         )
     if len(matches) != 1:
         raise TaskSessionError(
-            f"Master revision {sha} is not exactly one merged task PR result: found {len(matches)}"
+            f"Master revision {sha} is not exactly one merged task or controller PR result: "
+            f"found {len(matches)}"
         )
     match = matches[0]
     return {
