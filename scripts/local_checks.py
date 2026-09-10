@@ -100,6 +100,7 @@ def child_environment(
     environment["CI"] = "1"
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     environment["APP_ENV"] = "test"
+    environment["YFC_PROCESS_TMP"] = tempfile.gettempdir()
     for key, value in LOCAL_APP_DEFAULTS.items():
         environment[key] = value
 

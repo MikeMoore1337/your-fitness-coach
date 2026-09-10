@@ -1,9 +1,10 @@
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
-from scripts import ci_contract, local_checks
+from scripts import ci_contract, local_checks, run_pytest
 
 
 def test_child_environment_is_shared_and_uses_the_active_python(tmp_path: Path) -> None:
@@ -25,6 +26,7 @@ def test_child_environment_is_shared_and_uses_the_active_python(tmp_path: Path) 
     assert environment["DATABASE_URL"] == "postgresql://isolated-test"
     assert environment["CI"] == "1"
     assert environment["APP_ENV"] == "test"
+    assert environment["YFC_PROCESS_TMP"] == tempfile.gettempdir()
     assert Path(environment["TMP"]).is_relative_to(tmp_path / ".artifacts")
 
 
@@ -49,6 +51,16 @@ def test_child_environment_uses_a_distinct_runtime_directory_per_invocation(
     assert first["DATABASE_URL"] != second["DATABASE_URL"]
     assert Path(first["TMP"]).parent == Path(second["TMP"]).parent
     assert Path(first["TMP"]).parent.name == "local-checks"
+
+
+def test_pytest_runner_uses_the_preserved_process_temp_parent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("YFC_PROCESS_TMP", str(tmp_path))
+
+    with run_pytest._temporary_process_directory() as process_dir:
+        assert Path(process_dir).parent == tmp_path
+        assert Path(process_dir).name.startswith("yfc-")
 
 
 def test_child_environment_rejects_production_mode(tmp_path: Path) -> None:
