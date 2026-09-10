@@ -218,7 +218,12 @@ function workoutStatusLabel(status: string): string {
   return 'Запланирована';
 }
 
-function NutritionSummary({ date }: { date: string }) {
+export function formatNutritionDateLabel(value: string, today: string): string {
+  if (value === today) return 'сегодня';
+  return formatCalendarDate(value, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function NutritionSummary({ date, today }: { date: string; today: string }) {
   const diary = useQuery({
     queryKey: ['nutrition', 'diary', date],
     queryFn: () => api<FoodDiaryDay>(`/api/v1/nutrition/diary?diary_date=${date}`),
@@ -261,9 +266,12 @@ function NutritionSummary({ date }: { date: string }) {
     : hydration.isLoading
       ? 'вода загружается…'
       : 'вода недоступна';
+  const dateLabel = formatNutritionDateLabel(date, today);
+  const nutritionTitle = date === today ? 'Питание на сегодня' : `Питание за ${dateLabel}`;
+  const caloriesLabel = date === today ? 'Калории за сегодня' : `Калории за ${dateLabel}`;
   return (
-    <section className="today-nutrition" aria-label="Питание на сегодня">
-      <h2>Питание на сегодня</h2>
+    <section className="today-nutrition" aria-label={nutritionTitle}>
+      <h2>{nutritionTitle}</h2>
       <div className="today-nutrition__content">
         <Icon name="nav-nutrition" style={{ width: 72, height: 72 }} />
         <div className="today-nutrition__values">
@@ -278,7 +286,7 @@ function NutritionSummary({ date }: { date: string }) {
             diary.data.targets &&
             Number(diary.data.targets.energy_kcal) > 0 && (
               <progress
-                aria-label="Калории за сегодня"
+                aria-label={caloriesLabel}
                 max={diary.data.targets.energy_kcal}
                 value={diary.data.totals.energy_kcal}
               />
@@ -1030,7 +1038,7 @@ export function TodayDashboard({
           />
         </div>
         <div className="today-dashboard__facts">
-          <NutritionSummary date={selectedDate} />
+          <NutritionSummary date={selectedDate} today={today} />
           <ProgressSummaryPanel summary={progress} />
           <AiCoachEntry entryPoint="today" />
           {user && (

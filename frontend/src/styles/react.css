@@ -7560,6 +7560,8 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 .nutrition-food-result__actions button[aria-pressed='true'] {
   color: var(--accent-strong);
   font-size: 1rem;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
 }
 .nutrition-food-result__main {
   display: grid;
