@@ -70,6 +70,7 @@ from fitminiapp_api.services.telegram_auth import (
     get_or_insert_telegram_user,
     normalize_telegram_username,
 )
+from fitminiapp_api.services.telegram_transport import telegram_transport_options
 from fitminiapp_api.services.weekly_digest import (
     DigestIssueView,
     approve_digest_issue,
@@ -553,7 +554,7 @@ async def manage_published_news_from_bot(
 ) -> BotNewsRevisionActionResponse:
     _check_bot_token(x_bot_token)
     _check_support_admin(payload.admin_telegram_user_id)
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient(timeout=15, **telegram_transport_options()) as client:
         with get_session_context() as db:
             result = await manage_published_post(
                 db,

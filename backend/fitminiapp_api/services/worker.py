@@ -55,6 +55,10 @@ from fitminiapp_api.services.notifications import (
 )
 from fitminiapp_api.services.program_imports import expire_program_imports
 from fitminiapp_api.services.reminder_templates import sync_contextual_reminders
+from fitminiapp_api.services.telegram_transport import (
+    TelegramPublicationError,
+    telegram_transport_options,
+)
 from fitminiapp_api.services.web_push import send_web_push
 from fitminiapp_api.services.weekly_digest import (
     claim_due_digest_deliveries,
@@ -75,22 +79,6 @@ WORKER_HEARTBEAT_PATH = Path("/tmp/fitminiapp-worker-heartbeat")
 class TelegramPublicationResult:
     message_id: int
     message_date: datetime
-
-
-class TelegramPublicationError(RuntimeError):
-    def __init__(
-        self,
-        code: str,
-        *,
-        retry_after: timedelta | None = None,
-        terminal: bool = False,
-        uncertain: bool = False,
-    ) -> None:
-        super().__init__(code)
-        self.code = code
-        self.retry_after = retry_after
-        self.terminal = terminal
-        self.uncertain = uncertain
 
 
 class TelegramRateLimiter:
@@ -168,15 +156,6 @@ def _telegram_delivery_error(response: httpx.Response) -> NotificationDeliveryEr
             terminal_status="failed",
         )
     return NotificationDeliveryError(f"telegram_http_status:{error_code}")
-
-
-def telegram_transport_options() -> dict[str, object]:
-    """Return an explicit Bot API route without inheriting ambient proxy settings."""
-
-    options: dict[str, object] = {"trust_env": False}
-    if settings.bot_api_proxy_url:
-        options["proxy"] = settings.bot_api_proxy_url
-    return options
 
 
 def _log_delivery_failure(
@@ -296,7 +275,7 @@ async def run_weekly_digest_once() -> None:
 
     semaphore = asyncio.Semaphore(settings.weekly_digest_delivery_concurrency)
     rate_limiter = TelegramRateLimiter(TELEGRAM_DELIVERY_RATE_PER_SECOND)
-    async with httpx.AsyncClient(timeout=20) as client:
+    async with httpx.AsyncClient(timeout=20, **telegram_transport_options()) as client:
 
         async def deliver(delivery_id: int) -> tuple[int, Exception | None, int | None]:
             try:
@@ -896,7 +875,10 @@ async def main() -> None:
     logger.info("worker_started")
     heartbeat_task = asyncio.create_task(refresh_worker_heartbeat(stop_requested))
     try:
-        async with httpx.AsyncClient(timeout=15) as preflight_client:
+        async with httpx.AsyncClient(
+            timeout=15,
+            **telegram_transport_options(),
+        ) as preflight_client:
             news_publication_ready = await check_news_channel_rights(preflight_client)
         await run_until_stopped(
             stop_requested,
