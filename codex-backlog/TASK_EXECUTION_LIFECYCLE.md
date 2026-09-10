@@ -55,8 +55,9 @@ Lifecycle разделён на две coordination boundary:
 - Owner-authorized `supersede` — отдельный non-release terminal переход для task, которую владелец
   заменил другой канонической task. Он проверяет clean, однозначные branch/worktree и сохраняет
   lease и Git anchor для audit/recovery, но снимает implementation exclusion и не получает delivery
-  ownership. `superseded` не является `production-success`; такой task нельзя закрывать через
-  `finish` или выпускать в production.
+  ownership. Перед переходом controller проверяет отсутствие открытого PR этой task; archived
+  `superseded` task не считается выполненной dependency. `superseded` не является
+  `production-success`; такой task нельзя закрывать через `finish` или выпускать в production.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
   может выполнить `refresh/rebase` относительно latest `origin/master`, current-base/provenance
   check, PR/CI, merge, production deploy, smoke и terminal closeout. Owner сохраняется до завершения

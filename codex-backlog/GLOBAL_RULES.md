@@ -122,7 +122,8 @@ gate, evidence и точки остановки в task-файле.
   canonical controller worktree запрещена.
 - Controller-only governance fixes, которые не являются product task, проходят отдельный
   controller PR: branch `codex/controller-<lowercase-kebab-slug>`, title и commit messages с
-  префиксом `[Controller]`, exact required checks и тот же protected-master merge provenance.
+  префиксом `[Controller]`, только allowlisted governance-файлы, exact required checks и тот же
+  protected-master merge provenance.
 - Внутри текущей task после terminal success автоматически выполняются self-review, применимую QA,
   commit, PR в `master`, CI и normal release шаги, если task явно не объявляет checkpoint или
   blocker. Следующая product task автоматически не запускается.

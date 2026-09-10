@@ -229,6 +229,34 @@ def _prepare_started(
     return root, git_repository, controller, worktree, branch, base_sha + ":" + head_sha
 
 
+def test_superseded_archived_task_is_not_a_completed_dependency(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    done = root / "codex-backlog" / "tasks" / "done"
+    done.mkdir(parents=True)
+    (done / "152-superseded.md").write_text("superseded\n", encoding="utf-8")
+    (done / "153-delivered.md").write_text("delivered\n", encoding="utf-8")
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    controller.store.initialize()
+    task_session.StateStore.replace_json(
+        controller.store.task_lease_path("152"),
+        {
+            "task_id": "152",
+            "mode": "write",
+            "lifecycle_state": "superseded",
+        },
+    )
+
+    completed = controller._completed_dependency_ids()
+
+    assert "152" not in completed
+    assert "153" in completed
+
+
 def test_record_queue_cycle_is_durable_and_bounded(repository: tuple[Path, Any]) -> None:
     _, _, controller, _, _, _ = _prepare_started(repository, "250", queue_mode=True)
 
@@ -424,6 +452,7 @@ def test_validate_pr_event_accepts_controller_maintenance_branch(
     event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
     github = FakeGitHub(base_sha)
     github.commits[234] = [_controller_commit()]
+    github.files[234] = [{"filename": "scripts/task_session.py"}]
 
     result = task_session.validate_pr_event(
         object(),
@@ -436,6 +465,26 @@ def test_validate_pr_event_accepts_controller_maintenance_branch(
         "branch": "codex/controller-synthetic-maintenance",
         "head_sha": head_sha,
     }
+
+
+def test_controller_pr_rejects_product_paths(
+    tmp_path: Path,
+) -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _controller_pr(base_sha, head_sha)
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
+    github = FakeGitHub(base_sha)
+    github.commits[234] = [_controller_commit()]
+    github.files[234] = [{"filename": "backend/app.py"}]
+
+    with pytest.raises(task_session.TaskSessionError, match="outside the governance allowlist"):
+        task_session.validate_pr_event(  # type: ignore[arg-type]
+            object(),
+            github,
+            event_path,
+        )
 
 
 def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(
@@ -1343,6 +1392,21 @@ def test_supersede_refuses_dirty_anchor_without_mutation(repository: tuple[Path,
         controller.supersede("234F", reason="owner decision", owner_authorize=True)
 
     lease = controller.store.read_json(controller.store.task_lease_path("234F"))
+    assert isinstance(lease, dict)
+    assert lease["lifecycle_state"] == "implementation"
+
+
+def test_supersede_refuses_open_task_pr_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, branch, _ = _prepare_started(repository, "234G")
+    assert isinstance(controller.github, FakeGitHub)
+    controller.github.open_prs = [{"number": 999, "head": {"ref": branch}}]
+
+    with pytest.raises(task_session.TaskSessionError, match="open task PR"):
+        controller.supersede("234G", reason="owner decision", owner_authorize=True)
+
+    lease = controller.store.read_json(controller.store.task_lease_path("234G"))
     assert isinstance(lease, dict)
     assert lease["lifecycle_state"] == "implementation"
 

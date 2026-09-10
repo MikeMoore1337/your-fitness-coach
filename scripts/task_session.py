@@ -41,6 +41,16 @@ TASK_BRANCH_RE = re.compile(
 CONTROLLER_BRANCH_RE = re.compile(r"^codex/controller-[a-z0-9]+(?:-[a-z0-9]+)*$")
 TASK_COMMIT_RE = re.compile(rf"\[Task (?P<task_id>{TASK_ID_PATTERN})\]", re.IGNORECASE)
 CONTROLLER_COMMIT_RE = re.compile(r"^\[Controller\]\s+\S")
+CONTROLLER_ALLOWED_PATHS = frozenset(
+    {
+        "codex-backlog/GLOBAL_RULES.md",
+        "codex-backlog/TASK_EXECUTION_LIFECYCLE.md",
+        "scripts/archive_backlog_task.py",
+        "scripts/task_session.py",
+        "tests/test_archive_backlog_task.py",
+        "tests/test_task_session.py",
+    }
+)
 TASK_DEPENDENCY_RE = re.compile(r"(?im)^Depends-on:\s*(?P<value>.+)$")
 TASK_FILE_RE = re.compile(rf"^(?P<task_id>{TASK_ID_PATTERN})-(?P<slug>.+)\.md$", re.IGNORECASE)
 TASK_STATE_VERSION = 2
@@ -1281,6 +1291,21 @@ def validate_controller_pull_request(
     return branch
 
 
+def validate_controller_pull_request_files(
+    files: Sequence[Mapping[str, Any]], *, expected_count: int | None = None
+) -> None:
+    """Keep controller-only provenance from becoming a product-code bypass."""
+
+    validate_task_pull_request_files(files, expected_count=expected_count)
+    changed = {str(item.get("filename", "")).replace("\\", "/") for item in files}
+    disallowed = sorted(changed - CONTROLLER_ALLOWED_PATHS)
+    if disallowed:
+        raise TaskSessionError(
+            "Controller PR contains paths outside the governance allowlist: "
+            + ", ".join(disallowed)
+        )
+
+
 def validate_task_pull_request_files(
     files: Sequence[Mapping[str, Any]], *, expected_count: int | None = None
 ) -> None:
@@ -1375,7 +1400,7 @@ def validate_pr_event(
             expected_base_sha=event_base_sha,
             require_checks=False,
         )
-        validate_task_pull_request_files(
+        validate_controller_pull_request_files(
             files, expected_count=int(pull_request.get("changed_files", len(files)))
         )
         return {
@@ -2238,7 +2263,14 @@ class TaskController:
                 for path in root.glob("*.md"):
                     match = TASK_FILE_RE.fullmatch(path.name)
                     if match:
-                        result.add(match.group("task_id").upper())
+                        task_id = match.group("task_id").upper()
+                        lease = self.store.read_json(self.store.task_lease_path(task_id))
+                        if (
+                            isinstance(lease, dict)
+                            and self._lease_state(lease) in SUPERSEDED_LEASE_STATES
+                        ):
+                            continue
+                        result.add(task_id)
         return result
 
     @staticmethod
@@ -3795,12 +3827,40 @@ class TaskController:
                 )
             return worktree, head
 
+        def verified_open_pr_numbers(branch: object) -> list[str]:
+            if not isinstance(branch, str) or not branch:
+                raise TaskSessionError(
+                    f"Task {expected} supersede lease has no valid branch anchor"
+                )
+            try:
+                open_prs = self._github().open_pull_requests()
+            except (TaskSessionError, OSError) as error:
+                raise TaskSessionError(
+                    f"Task {expected} supersede requires a verified open-PR inventory"
+                ) from error
+            matching: list[str] = []
+            for pull_request in open_prs:
+                if not isinstance(pull_request, Mapping):
+                    raise TaskSessionError("GitHub returned an invalid open-PR inventory")
+                head = pull_request.get("head", {})
+                if not isinstance(head, Mapping):
+                    raise TaskSessionError("GitHub returned an open PR without a valid head")
+                if head.get("ref") == branch:
+                    matching.append(str(pull_request.get("number", "<unknown>")))
+            return matching
+
         delivery = self.store.delivery_state()
         owner = delivery.get("owner")
         owner_id = str(owner.get("task_id", "")).upper() if isinstance(owner, dict) else ""
         if owner_id == expected:
             raise TaskSessionError(
                 f"Task {expected} cannot be superseded while owning the delivery lane"
+            )
+        matching_pr_numbers = verified_open_pr_numbers(lease.get("branch"))
+        if matching_pr_numbers:
+            raise TaskSessionError(
+                f"Task {expected} supersede refuses open task PR(s): "
+                + ", ".join(sorted(matching_pr_numbers))
             )
         verify_anchor(lease)
 
@@ -3838,6 +3898,12 @@ class TaskController:
                     f"Task {expected} cannot be superseded from {current.get('lifecycle_state')}"
                 )
             verify_anchor(current)
+            matching_pr_numbers = verified_open_pr_numbers(current.get("branch"))
+            if matching_pr_numbers:
+                raise TaskSessionError(
+                    f"Task {expected} supersede refuses open task PR(s): "
+                    + ", ".join(sorted(matching_pr_numbers))
+                )
             self._validated_lease_concurrency_class(current)
             previous_state = current_state
             now = utc_now()
