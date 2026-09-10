@@ -238,46 +238,6 @@ def test_record_queue_cycle_is_durable_and_bounded(repository: tuple[Path, Any])
     assert len(lease["queue_budget"]["events"]) == 3
 
 
-def _write_gate_evidence(
-    controller: Any,
-    task_id: str,
-    *,
-    branch: str,
-    head_sha: str,
-    base_sha: str,
-    terminal_result: str = "PRE_PUSH_CI_PASS",
-) -> Path:
-    from scripts.ci_contract import CONTRACT_VERSION, contract_digest
-    from scripts.pre_push_gate import _evidence_digest
-
-    path = controller._gate_evidence_path(controller._canonical_root(), task_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "evidence_version": 1,
-        "contract_version": CONTRACT_VERSION,
-        "contract_digest": contract_digest(),
-        "task_id": task_id,
-        "branch": branch,
-        "head_sha": head_sha,
-        "base_sha": base_sha,
-        "target_base_branch": "master",
-        "clean_worktree": True,
-        "started_at": "2026-09-03T10:00:00Z",
-        "finished_at": "2026-09-03T10:01:00Z",
-        "gates": [{"group": "quality", "applicable": True, "status": "SUCCESS"}],
-        "terminal_result": terminal_result,
-    }
-    lease = controller.store.read_json(controller.store.task_lease_path(task_id))
-    if isinstance(lease, dict) and lease.get("delivery_generation") is not None:
-        payload["delivery_generation"] = lease["delivery_generation"]
-    payload["evidence_digest"] = _evidence_digest(payload)
-    path.write_text(
-        json.dumps(payload),
-        encoding="utf-8",
-    )
-    return path
-
-
 def _commit_task(worktree: Path, task_id: str, filename: str = "change.txt") -> str:
     (worktree / filename).write_text(f"{task_id}\n", encoding="utf-8")
     _git(worktree, "add", filename)
@@ -305,17 +265,10 @@ def _advance_remote_master(root: Path, count: int, *, fetch: bool = True) -> tup
 
 
 def _prepare_delivery(controller: Any, task_id: str, *, branch: str) -> dict[str, Any]:
+    del branch
     acquired = controller.acquire_delivery(task_id)
     assert acquired["acquired"] is True
-    refreshed = controller.refresh_for_delivery(task_id)
-    refreshed_head = _git(Path(refreshed["worktree"]), "rev-parse", "HEAD")
-    _write_gate_evidence(
-        controller,
-        task_id,
-        branch=branch,
-        head_sha=refreshed_head,
-        base_sha=refreshed["base_origin_master_sha"],
-    )
+    controller.refresh_for_delivery(task_id)
     return controller.validate_delivery(task_id)
 
 
@@ -799,7 +752,8 @@ def test_start_uses_exact_origin_master_and_records_no_dev_lane(
     assert lease["concurrency_class"] == "independent-write"
     assert "base_origin_dev_sha" not in lease
     assert "PR master" in started["prompt"]
-    assert "refresh-delivery task branch" in started["prompt"]
+    assert "GitHub exact-head checks" in started["prompt"]
+    assert "Delivery ownership is coordination bookkeeping" in started["prompt"]
 
 
 def test_issue_dependency_override_is_recorded_as_source_of_truth(
@@ -870,7 +824,7 @@ def test_three_independent_write_tasks_can_run_at_once(
         ("exclusive-write", "exclusive-write"),
     ],
 )
-def test_exclusive_write_is_a_real_implementation_blocker(
+def test_exclusive_write_only_blocks_another_exclusive_writer(
     repository: tuple[Path, Any], existing_class: str, candidate_class: str
 ) -> None:
     root, git_repository = repository
@@ -879,10 +833,16 @@ def test_exclusive_write_is_a_real_implementation_blocker(
     controller = task_session.TaskController(git_repository)
     controller.start("225", owner_launch=True, session_label="existing", offline=True)
 
-    with pytest.raises(
-        task_session.TaskSessionError, match="incompatible implementation write lease"
-    ):
-        controller.start("226", owner_launch=True, session_label="candidate", offline=True)
+    if candidate_class == "independent-write":
+        started = controller.start(
+            "226", owner_launch=True, session_label="candidate", offline=True
+        )
+        assert started["lease"]["lifecycle_state"] == "implementation"
+    else:
+        with pytest.raises(
+            task_session.TaskSessionError, match="incompatible implementation write lease"
+        ):
+            controller.start("226", owner_launch=True, session_label="candidate", offline=True)
 
 
 def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
@@ -912,10 +872,10 @@ def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
 @pytest.mark.parametrize(
     ("existing_state", "existing_class", "candidate_class", "expected_conflict"),
     [
-        ("starting", "exclusive-write", "independent-write", True),
-        ("implementation", "exclusive-write", "independent-write", True),
-        ("review", "exclusive-write", "independent-write", True),
-        ("qa", "exclusive-write", "independent-write", True),
+        ("starting", "exclusive-write", "independent-write", False),
+        ("implementation", "exclusive-write", "independent-write", False),
+        ("review", "exclusive-write", "independent-write", False),
+        ("qa", "exclusive-write", "independent-write", False),
         ("review", "independent-write", "independent-write", False),
         ("qa", "independent-write", "independent-write", False),
         ("implementation", "independent-write", "exclusive-write", True),
@@ -1223,27 +1183,19 @@ def test_release_delivery_does_not_handoff_during_active_production(
 def test_reopen_for_review_clears_delivery_snapshot_and_requires_new_readiness(
     repository: tuple[Path, Any],
 ) -> None:
-    _, _, controller, worktree, branch, sha_pair = _prepare_started(
+    _, _, controller, worktree, _, sha_pair = _prepare_started(
         repository, "234A", concurrency="independent-write"
     )
-    base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "234A", branch=branch, head_sha=head_sha, base_sha=base_sha)
+    _, head_sha = sha_pair.split(":")
     controller.mark_ready("234A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("234A", offline=True)
-    refreshed = controller.refresh_for_delivery("234A", offline=True)
-    _write_gate_evidence(
-        controller,
-        "234A",
-        branch=branch,
-        head_sha=refreshed["delivery_head_sha"],
-        base_sha=refreshed["base_origin_master_sha"],
-    )
+    controller.refresh_for_delivery("234A", offline=True)
     controller.validate_delivery("234A", offline=True)
 
     reopened = controller.reopen_for_review("234A", reason="address review findings")
 
     assert reopened["lifecycle_state"] == "review"
-    assert reopened["pre_push_ci_pass"] is None
+    assert "delivery_anchor" not in reopened
     assert "delivery_head_sha" not in reopened
     assert "ready_head_sha" not in reopened
     assert controller.store.delivery_state()["owner"] is None
@@ -1285,7 +1237,7 @@ def test_resolve_recovery_requires_owner_authorization_and_clean_unique_anchor(
 
     assert resolved["lifecycle_state"] == "review"
     assert resolved["recovery_resolution_reason"] == "resume after inspection"
-    assert resolved["pre_push_ci_pass"] is None
+    assert "delivery_anchor" not in resolved
     assert "delivery_head_sha" not in resolved
     assert "ready_head_sha" not in resolved
     assert worktree.exists()
@@ -1329,14 +1281,13 @@ def test_busy_delivery_lane_does_not_block_compatible_implementation(
     assert third["lease"]["lifecycle_state"] == "implementation"
 
 
-def test_refresh_updates_stale_task_base_and_invalidates_old_exact_head_evidence(
+def test_refresh_updates_stale_task_base_and_rebuilds_exact_delivery_anchor(
     repository: tuple[Path, Any],
 ) -> None:
-    root, git_repository, controller, _, branch, sha_pair = _prepare_started(
+    root, git_repository, controller, _, _, sha_pair = _prepare_started(
         repository, "234", concurrency="independent-write"
     )
     old_base, old_head = sha_pair.split(":")
-    _write_gate_evidence(controller, "234", branch=branch, head_sha=old_head, base_sha=old_base)
     controller.mark_ready("234", head_sha=old_head, quality_verdict="PASS", qa_verdict="PASS")
 
     (root / "master-refresh.txt").write_text("M1\n", encoding="utf-8")
@@ -1353,31 +1304,18 @@ def test_refresh_updates_stale_task_base_and_invalidates_old_exact_head_evidence
 
     assert refreshed["base_origin_master_sha"] != old_base
     assert new_head != old_head
-    assert refreshed["pre_push_ci_pass"] is None
-    assert refreshed["local_evidence"]["status"] == "invalidated-after-master-refresh"
-    with pytest.raises(task_session.TaskSessionError, match="does not match current lease/HEAD"):
-        controller.validate_delivery("234")
-
-    _write_gate_evidence(
-        controller,
-        "234",
-        branch=branch,
-        head_sha=new_head,
-        base_sha=refreshed["base_origin_master_sha"],
-    )
     validated = controller.validate_delivery("234")
     assert validated["lifecycle_state"] == "delivery-gate"
-    assert validated["delivery_gate_pass"]["head_sha"] == new_head
+    assert validated["delivery_anchor"]["head_sha"] == new_head
 
 
 def test_refresh_delivery_waits_for_active_production_before_touching_task_branch(
     repository: tuple[Path, Any],
 ) -> None:
-    _, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+    _, git_repository, controller, worktree, _, sha_pair = _prepare_started(
         repository, "244", concurrency="independent-write"
     )
-    base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "244", branch=branch, head_sha=head_sha, base_sha=base_sha)
+    _, head_sha = sha_pair.split(":")
     controller.mark_ready("244", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     controller.acquire_delivery("244", offline=True)
     github = controller.github
@@ -1395,35 +1333,26 @@ def test_refresh_delivery_waits_for_active_production_before_touching_task_branc
     assert git_repository.head(cwd=worktree) == before_head
 
 
-def test_refresh_requires_new_evidence_when_head_and_base_are_unchanged(
+def test_refresh_is_idempotent_when_head_and_base_are_unchanged(
     repository: tuple[Path, Any],
 ) -> None:
-    _, _, controller, _, branch, sha_pair = _prepare_started(
+    _, _, controller, _, _, sha_pair = _prepare_started(
         repository, "243", concurrency="independent-write"
     )
     base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "243", branch=branch, head_sha=head_sha, base_sha=base_sha)
     controller.mark_ready("243", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     controller.acquire_delivery("243", offline=True)
     refreshed = controller.refresh_for_delivery("243", offline=True)
 
     assert refreshed["delivery_head_sha"] == head_sha
-    with pytest.raises(
-        task_session.TaskSessionError,
-        match="earlier delivery refresh generation",
-    ):
-        controller.validate_delivery("243", offline=True)
-
-    _write_gate_evidence(
-        controller,
-        "243",
-        branch=branch,
-        head_sha=head_sha,
-        base_sha=refreshed["base_origin_master_sha"],
-    )
     validated = controller.validate_delivery("243", offline=True)
-    assert validated["pre_push_ci_pass"]["delivery_generation"] == refreshed["delivery_generation"]
+    assert validated["delivery_anchor"] == {
+        "task_id": "243",
+        "branch": refreshed["branch"],
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+    }
 
 
 def test_refresh_refuses_post_ready_commit_until_review_and_qa_repeat(
@@ -1837,11 +1766,10 @@ def test_canonical_refresh_waits_for_active_production_without_mutation(
 def test_canonical_refresh_waits_for_delivery_owner_without_mutation(
     repository: tuple[Path, Any],
 ) -> None:
-    _, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+    _, git_repository, controller, worktree, _, sha_pair = _prepare_started(
         repository, "245", concurrency="independent-write"
     )
-    base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "245", branch=branch, head_sha=head_sha, base_sha=base_sha)
+    _, head_sha = sha_pair.split(":")
     controller.mark_ready("245", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     assert controller.acquire_delivery("245", offline=True)["acquired"] is True
     before_master = git_repository.ref("master")
@@ -1948,33 +1876,19 @@ def test_owner_selected_launch_requires_only_explicit_launch_unless_concrete_gat
         controller.start("239", owner_launch=True, session_label="gate", offline=True)
 
 
-def test_mark_ready_persists_ready_state_without_old_base_pre_push_pass(
+def test_mark_ready_records_local_verdicts_without_evidence_file(
     repository: tuple[Path, Any],
 ) -> None:
-    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
-        repository, "202"
-    )
-    base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(
-        controller,
-        "202",
-        branch=branch,
-        head_sha=head_sha,
-        base_sha=base_sha,
-        terminal_result="PLAN_ONLY",
-    )
+    root, git_repository, controller, worktree, _, sha_pair = _prepare_started(repository, "202")
+    _, head_sha = sha_pair.split(":")
     ready = controller.mark_ready(
         "202", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS"
     )
     assert ready["lifecycle_state"] == "ready-for-delivery"
-    assert ready["local_evidence"]["status"] == "pending-final-delivery-gate"
-
-    _write_gate_evidence(controller, "202", branch=branch, head_sha=head_sha, base_sha=base_sha)
-    ready = controller.mark_ready(
-        "202", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS"
-    )
-    assert ready["lifecycle_state"] == "ready-for-delivery"
-    assert ready["pre_push_ci_pass"]["head_sha"] == head_sha
+    assert ready["quality_verdict"] == "PASS"
+    assert ready["qa_verdict"] == "PASS"
+    assert "local_evidence" not in ready
+    assert "pre_push_ci_pass" not in ready
     assert root == controller._canonical_root()
     assert git_repository.status(worktree) == []
 
@@ -1984,7 +1898,6 @@ def test_record_production_success_requires_exact_merged_master_deployment(
 ) -> None:
     root, _, controller, _, branch, sha_pair = _prepare_started(repository, "203")
     base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "203", branch=branch, head_sha=head_sha, base_sha=base_sha)
     controller.mark_ready("203", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     _prepare_delivery(controller, "203", branch=branch)
@@ -2016,11 +1929,8 @@ def test_record_production_success_rejects_sha_mismatch_without_mutation(
     repository: tuple[Path, Any],
 ) -> None:
     _, _, controller, _, _, sha_pair = _prepare_started(repository, "204")
-    base_sha, head_sha = sha_pair.split(":")
+    _, head_sha = sha_pair.split(":")
     lease = controller.store.read_json(controller.store.task_lease_path("204"))
-    _write_gate_evidence(
-        controller, "204", branch=lease["branch"], head_sha=head_sha, base_sha=base_sha
-    )
     controller.mark_ready("204", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "204", branch=lease["branch"])
     with pytest.raises(task_session.TaskSessionError, match="equal the exact merged master SHA"):
@@ -2032,12 +1942,11 @@ def test_record_production_success_rejects_sha_mismatch_without_mutation(
     ] == ("delivery-gate")
 
 
-def test_record_production_success_rejects_gate_invalidated_during_finalization(
+def test_record_production_success_rejects_anchor_changed_during_finalization(
     repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root, _, controller, _, branch, sha_pair = _prepare_started(repository, "204A")
     base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "204A", branch=branch, head_sha=head_sha, base_sha=base_sha)
     controller.mark_ready("204A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "204A", branch=branch)
 
@@ -2053,26 +1962,26 @@ def test_record_production_success_rejects_gate_invalidated_during_finalization(
     github.checks[head_sha] = [_success_check(head_sha)]
     github.successful_deployments.add((merge_sha, "production"))
 
-    original_gate = controller._current_gate_evidence
+    original_validation = task_session.validate_task_pull_request
     calls = 0
 
-    def invalidate_after_first_check(*args: Any, **kwargs: Any) -> dict[str, Any]:
+    def invalidate_after_pr_validation(*args: Any, **kwargs: Any) -> str:
         nonlocal calls
-        result = original_gate(*args, **kwargs)
+        result = original_validation(*args, **kwargs)
         calls += 1
         if calls == 1:
             lease_path = controller.store.task_lease_path("204A")
             lease = controller.store.read_json(lease_path)
             assert isinstance(lease, dict)
-            lease["lifecycle_state"] = "delivering"
+            lease["delivery_anchor"] = None
             task_session.StateStore.replace_json(lease_path, lease)
         return result
 
-    monkeypatch.setattr(controller, "_current_gate_evidence", invalidate_after_first_check)
+    monkeypatch.setattr(task_session, "validate_task_pull_request", invalidate_after_pr_validation)
 
     with pytest.raises(
         task_session.TaskSessionError,
-        match="no longer in the validated final delivery-gate state",
+        match="Delivery anchor changed before production completion",
     ):
         controller.record_production_success(
             "204A", pr_number=214, merge_sha=merge_sha, deployed_sha=merge_sha
@@ -2148,7 +2057,6 @@ def test_finish_preserves_active_delivery_artifacts_until_worker_cleanup(
         repository, "207"
     )
     base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "207", branch=branch, head_sha=head_sha, base_sha=base_sha)
     controller.mark_ready("207", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "207", branch=branch)
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 207")
@@ -2202,7 +2110,6 @@ def test_finish_cleans_only_delivered_task_and_preserves_next_delivery_task(
         repository, "209", concurrency="independent-write"
     )
     base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "209", branch=branch, head_sha=head_sha, base_sha=base_sha)
     controller.mark_ready("209", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
 
     _write_task(root, "210", "queue-b", concurrency="independent-write")
@@ -2245,7 +2152,6 @@ def test_finish_refuses_dirty_worktree_and_preserves_state(repository: tuple[Pat
         repository, "208"
     )
     base_sha, head_sha = sha_pair.split(":")
-    _write_gate_evidence(controller, "208", branch=branch, head_sha=head_sha, base_sha=base_sha)
     controller.mark_ready("208", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
     _prepare_delivery(controller, "208", branch=branch)
     _git(root, "merge", "--no-ff", branch, "-m", "Merge task 208")
@@ -2295,7 +2201,9 @@ def test_readiness_cli_defaults_to_no_qa_when_task_does_not_declare_it() -> None
     assert not hasattr(args, "review_verdict")
 
 
-def test_readiness_without_reviewer_preserves_exact_head_gate(repository: tuple[Path, Any]) -> None:
+def test_readiness_without_reviewer_records_only_local_verdicts(
+    repository: tuple[Path, Any],
+) -> None:
     root, git_repository = repository
     _write_task(root, "252", "quality-only")
     controller = task_session.TaskController(git_repository)
@@ -2306,7 +2214,7 @@ def test_readiness_without_reviewer_preserves_exact_head_gate(repository: tuple[
     ready = controller.mark_ready("252", head_sha=head, quality_verdict="PASS", qa_verdict="PASS")
     assert ready["quality_verdict"] == "PASS"
     assert "review_verdict" not in ready
-    assert ready["local_evidence"]["status"] == "pending-final-delivery-gate"
+    assert "local_evidence" not in ready
 
 
 def test_readiness_after_rebase_validates_only_task_commits(

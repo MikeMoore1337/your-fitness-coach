@@ -1,10 +1,22 @@
+import asyncio
 import os
 import re
 import sys
+import warnings
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
+
+if sys.platform == "win32":
+    # The default Proactor loop allocates a TCP socket pair for every TestClient
+    # portal. The selector loop avoids exhausting the Windows ephemeral socket
+    # pool during the parallel local fallback; Linux CI keeps its native loop.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        _selector_policy = getattr(asyncio, "WindowsSelectorEventLoopPolicy", None)
+        if _selector_policy is not None:
+            asyncio.set_event_loop_policy(_selector_policy())
 
 import pytest
 from fastapi.testclient import TestClient
@@ -46,6 +58,18 @@ if _BASE_TEST_DATABASE_URL:
         _TEST_DATABASE_URL = _parsed_test_database_url.set(
             database=_WORKER_DATABASE_NAME
         ).render_as_string(hide_password=False)
+    elif _WORKER_ID != "main" and _parsed_test_database_url.get_backend_name() == "sqlite":
+        database = _parsed_test_database_url.database
+        if database and database != ":memory:":
+            database_path = Path(database)
+            worker_database_path = database_path.with_name(
+                f"{database_path.stem}_{_WORKER_ID}{database_path.suffix}"
+            )
+            _TEST_DATABASE_URL = _parsed_test_database_url.set(
+                database=worker_database_path.as_posix()
+            ).render_as_string(hide_password=False)
+        else:
+            _TEST_DATABASE_URL = _BASE_TEST_DATABASE_URL
     else:
         _TEST_DATABASE_URL = _BASE_TEST_DATABASE_URL
 else:
@@ -74,6 +98,11 @@ from fitminiapp_api.main import app
 from fitminiapp_api.services.seed import seed_demo_data
 
 if engine.dialect.name == "sqlite":
+    # PostgreSQL sequences do not reuse primary keys after a delete. Make the
+    # SQLite fallback follow that lifecycle so update tests cannot collide with
+    # loaded ORM identities when a template is rebuilt.
+    for _table_name in ("program_template_days", "program_template_exercises"):
+        Base.metadata.tables[_table_name].dialect_options["sqlite"]["autoincrement"] = True
 
     @event.listens_for(engine, "connect")
     def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:

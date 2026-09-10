@@ -32,13 +32,11 @@ PR-only master, required checks, non-fast-forward protection, thread resolution 
 Нормальный flow разделён на независимую implementation lane и одну serial delivery lane:
 
 ```text
-Task A/B/C: implementation -> targeted checks -> self-review -> применимая QA -> commit
-            -> READY_FOR_DELIVERY -> WAITING_FOR_DELIVERY (если slot занят)
+Task A/B/C: implementation -> relevant fast checks -> self-review -> применимая QA
+            -> commit/push -> PR master
 
 одна delivery lane:
-  acquire -> fetch latest origin/master -> refresh/rebase task branch
-  -> invalidate old evidence -> final exact-HEAD PRE_PUSH_CI_PASS
-  -> PR master -> exact-head checks -> merge master
+  current-base/provenance check -> exact-head GitHub checks -> merge master
   -> post-merge provenance/image publication
   -> immutable bundle deploy -> smoke/observation
   -> controller finish -> archive/check
@@ -50,10 +48,11 @@ worktree используется для координации и closeout, н�
 refs могут оставаться в repository для recovery/inventory, но не являются частью normal delivery.
 
 Несколько task с `independent-write` могут одновременно иметь отдельные writer leases и worktrees.
-`exclusive-write` блокирует новую task при любой несовместимой активной nonterminal lease, включая
-очередь, delivery и owner-safe recovery. Обычная `independent-write` task в
-`READY_FOR_DELIVERY`, ожидание delivery slot, GitHub CI или active production deploy не блокируют
-начало совместимой implementation. Merge в `master` и production deployment всегда serial.
+`independent-write` не блокируется активной `exclusive-write` task: раздельные worktree позволяют
+обнаружить реальный конфликт файлов при serial delivery. Новая `exclusive-write` task сохраняет
+консервативную блокировку на время активной implementation другой task. Очередь, delivery, GitHub
+CI и active production deploy не блокируют начало совместимой implementation. Merge в `master` и
+production deployment всегда serial.
 
 GitHub Ruleset для `master` обязан быть active и требовать pull request, deletion protection,
 non-fast-forward protection, strict current-base required checks и aggregate check `checks`.
@@ -64,23 +63,16 @@ approval между merge и normal deploy не создаётся.
 
 `scripts/ci_contract.py` — единственный registry команд CI. Он содержит детерминированные профили:
 `frontend`, `backend`, `migration`, `cross-stack`, `workflow-platform`, `documentation`.
-GitHub workflow и
-локальный `scripts/pre_push_gate.py` вызывают одни и те же group IDs; profile выбирается по
-изменённым путям консервативно, а отсутствующий prerequisite даёт `PRE_PUSH_CI_BLOCKED`.
-
-`pre-push` gate выполняет metadata preflight, проверяет lease, task branch, current
-`origin/master`, clean worktree и ancestry, затем записывает evidence в
-`.artifacts/tasks/<ID>/evidence/pre-push/gate.json`. Evidence содержит HEAD, base, branch, task,
-target base, scope/profile, группы, timestamps, contract version/digest, clean-worktree marker и
-самопроверяемый evidence digest. `PRE_PUSH_CI_PASS` действителен только для exact HEAD и exact
-base; изменение кода, CI contract, base или рабочей директории инвалидирует его.
+GitHub workflow вызывает эти group IDs; profile выбирается по изменённым путям консервативно, а
+отсутствующий prerequisite даёт понятный failure. Локальный `scripts/local_checks.py` — только
+добровольный быстрый dispatcher для тех же групп и не создаёт release evidence или controller state.
 
 ## Scope-aware remote CI
 
 GitHub PR CI сначала запускает дешёвый `scope-router`. Он получает exact diff между
 `pull_request.base.sha` и `pull_request.head.sha`, вызывает `scripts/ci_contract.py route` и передаёт
 один decision в остальные jobs. `scripts/ci_contract.py` остаётся единственным registry команд и
-одновременно используется локальным `pre-push` gate, поэтому path classification не дублируется в
+одновременно используется локальным dispatcher, поэтому path classification не дублируется в
 workflow `if:`.
 
 Router выбирает консервативный профиль: documentation-only оставляет quality,
@@ -103,18 +95,18 @@ Frontend jobs используют стандартный download cache `action
 `frontend/package-lock.json`; `node_modules` не является artifact или cache. Dependency audit не
 делает `npm ci`: для frontend выполняется `npm audit --omit=dev --audit-level=high`, а Python audit
 выбирается отдельно. Только подтверждённые transient `429/5xx` и network errors получают максимум
-три попытки с bounded backoff; найденная vulnerability, malformed lockfile или другая
+две попытки (один bounded retry) с bounded backoff; найденная vulnerability, malformed lockfile или другая
 воспроизводимая ошибка остаётся blocking без retry. Timing выводится как `CI_TIMING` для каждой
 команды, cache signal — как `CI_CACHE`.
 
 `scripts/task_session.py mark-ready` фиксирует durable `READY_FOR_DELIVERY`: clean task worktree,
-commit provenance, PASS targeted checks/применимой QA, исходный base SHA, текущий task HEAD и локальное evidence
-состояние. Полный `PRE_PUSH_CI_PASS` не требуется на старом base. Перед PR команда
-`refresh-delivery` fetch/rebase-ит branch относительно latest `origin/master`, обновляет lease base
-и инвалидирует старое evidence; `validate-delivery` принимает только новый exact HEAD и новый
-`PRE_PUSH_CI_PASS`. Любой amend/rebase/commit или tracked modification после gate требует нового
-evidence. Если HEAD изменился после `READY_FOR_DELIVERY`, `refresh-delivery` останавливается до
-targeted checks/применимой QA; для owner-safe возврата в эту стадию используется
+commit provenance, PASS targeted checks/применимой QA, исходный base SHA и текущий task HEAD.
+Это bookkeeping очереди, а не разрешение merge. Перед PR delivery owner проверяет current
+`origin/master`, обновляет task branch только в serial delivery lane и фиксирует минимальный
+`delivery_anchor` для последующей проверки exact merged/deployed SHA. Полный локальный regression
+run остаётся добровольной диагностикой и не решает, может ли PR быть принят GitHub Ruleset.
+Если HEAD изменился после `READY_FOR_DELIVERY`, перед push повторяются только relevant checks;
+для owner-safe возврата в эту стадию используется
 `reopen-for-review --reason <...>`, который освобождает delivery lane и удаляет старый readiness
 snapshot.
 
@@ -221,7 +213,7 @@ state этой операцией не меняются.
 
 Checkpoint автоматически выполняется перед `start`/`adopt-current` и перед
 `refresh-delivery`. `refresh-delivery` по-прежнему refresh/rebase-ит только task branch и
-инвалидирует старое `PRE_PUSH_CI_PASS`; canonical refresh не является delivery evidence.
+обновляет минимальный `delivery_anchor`; canonical refresh не является GitHub CI result.
 Пути `.artifacts/`, локальное environment/editor state, tooling caches и owner-only backlog
 исключены из проверки ожидаемого ignored state, но неожиданный ignored path за этой границей
 остаётся blocker (включая debug/log артефакты).

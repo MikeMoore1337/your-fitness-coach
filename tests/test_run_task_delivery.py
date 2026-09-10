@@ -504,23 +504,16 @@ def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
 
     assert "standing authorization" in prompt
     assert (
-        "task branch -> local PRE_PUSH_CI_PASS -> PR master -> exact master CI -> production"
+        "task branch -> relevant local checks -> commit/push -> PR master -> exact GitHub CI"
         in prompt
     )
+    assert "do not run a full local regression gate" in prompt
+    assert "create local release evidence" in prompt
     assert "BLOCKER/HIGH/MEDIUM" in prompt
     assert "Не запрашивай generic approval" in prompt
-    assert "READY_FOR_DELIVERY" in prompt
-    assert "WAITING_FOR_DELIVERY" in prompt
     assert "без поля concurrency в metadata считается independent-write" in prompt
-    assert (
-        "READY_FOR_DELIVERY, WAITING_FOR_DELIVERY, active CI и production deployment не удерживают implementation exclusion"
-        in prompt
-    )
     assert "refresh-canonical-master" in prompt
-    assert "canonical checkpoint не заменяет refresh task branch" in prompt
-    assert "refresh-delivery" in prompt
-    assert "final applicable gate" in prompt
-    assert "reopen-for-review" in prompt
+    assert "branch-safety check, not a release gate" in prompt
     assert "Не запускай следующую product task" in prompt
     assert "Отдельный LLM code review не является gate" in prompt
     assert "usage-reset" in prompt

@@ -1,15 +1,16 @@
 """Fail-closed task worktree, provenance and trunk-based release controller.
 
 The normal lifecycle is deliberately small: a task branch is based on master,
-passes the local exact-HEAD gate, enters a PR into master, and is closed only
-after the merged master revision is deployed successfully.  Coordination state
-lives in the shared Git common directory and is never committed.
+runs relevant local checks, enters a PR into master, and is closed only after
+the merged master revision is deployed successfully. GitHub CI is the release
+quality source of truth; local checks provide fast feedback and do not create
+release evidence. Coordination state lives in the shared Git common directory
+and is never committed.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -17,7 +18,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
@@ -2248,13 +2248,15 @@ class TaskController:
                     f"Task {str(lease.get('task_id', '')).upper() or '<unknown>'} lease "
                     "requires controller recovery"
                 )
-            existing_holds_exclusion = (
-                state in IMPLEMENTATION_STATES and existing_class == "exclusive-write"
-            )
+            # An independent writer is compatible with an existing exclusive task.  The
+            # exclusive task still owns its own implementation boundary, but it must not
+            # turn that boundary into a repository-wide start lock for unrelated worktrees.
+            # A new exclusive task remains conservative and waits for every active writer;
+            # actual file overlap is discovered at the serialized delivery refresh/rebase.
             candidate_requires_exclusion = candidate_class == "exclusive-write" and (
                 state in IMPLEMENTATION_STATES
             )
-            if existing_holds_exclusion or candidate_requires_exclusion:
+            if candidate_requires_exclusion:
                 conflicts.append(
                     {
                         "task_id": str(lease.get("task_id", "")).upper(),
@@ -2781,11 +2783,12 @@ class TaskController:
                 "exclusive-write is reserved for global/coordination-sensitive scope. Only an "
                 "exclusive lease in starting/implementation/review/qa (or unresolved recovery) "
                 "holds implementation exclusion; readiness, waiting, CI and production do not.\n"
-                "Normal path: targeted checks/self-review/QA/commit -> READY_FOR_DELIVERY -> acquire delivery\n"
-                "-> refresh-delivery task branch -> local PRE_PUSH_CI_PASS -> PR master -> production.\n"
-                "Implementation may run in parallel with compatible tasks. Do not start another task\n"
-                "from this worker. READY_FOR_DELIVERY may wait for the single delivery lane; before\n"
-                "PR/merge refresh onto latest origin/master and rerun the final exact-HEAD gate.\n"
+                "Normal path: targeted checks/self-review/QA/commit -> push task branch -> PR master\n"
+                "-> GitHub exact-head checks -> merge -> exact-SHA production deployment.\n"
+                "Local checks are fast feedback only; they do not create release evidence or decide\n"
+                "whether the PR may merge. Implementation may run in parallel with compatible tasks.\n"
+                "Delivery ownership is coordination bookkeeping for the serialized PR/merge/deploy\n"
+                "lane; before merge it only refreshes the branch anchor and never replaces GitHub CI.\n"
                 "Do not merge or push master directly.\n"
                 f"Recovery: python scripts/task_session.py recover {expected}\n"
             ),
@@ -2969,85 +2972,6 @@ class TaskController:
             self.store.create_json(self.store.task_lease_path(expected), lease)
         return lease
 
-    @staticmethod
-    def _gate_evidence_path(canonical_root: Path, task_id: str) -> Path:
-        return (
-            canonical_root
-            / ".artifacts"
-            / "tasks"
-            / normalize_task_id(task_id)
-            / "evidence"
-            / "pre-push"
-            / "gate.json"
-        )
-
-    def _current_gate_evidence(
-        self, task_id: str, lease: Mapping[str, Any], head_sha: str
-    ) -> dict[str, Any]:
-        path = self._gate_evidence_path(self._canonical_root(), task_id)
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
-            raise TaskSessionError(
-                f"Current PRE_PUSH_CI_PASS evidence is missing or invalid: {path}"
-            ) from error
-        if not isinstance(payload, dict):
-            raise TaskSessionError(f"Invalid pre-push evidence payload: {path}")
-        if payload.get("evidence_version") != 1:
-            raise TaskSessionError("Pre-push evidence version is invalid")
-        if payload.get("terminal_result") != "PRE_PUSH_CI_PASS":
-            raise TaskSessionError("Readiness requires terminal PRE_PUSH_CI_PASS")
-        expected = {
-            "task_id": task_id,
-            "branch": lease.get("branch"),
-            "head_sha": head_sha,
-            "base_sha": lease.get("base_origin_master_sha"),
-            "target_base_branch": TARGET_BASE_BRANCH,
-        }
-        for key, value in expected.items():
-            if payload.get(key) != value:
-                raise TaskSessionError(f"Pre-push evidence {key} does not match current lease/HEAD")
-        delivery_generation = lease.get("delivery_generation")
-        if (
-            delivery_generation is not None
-            and payload.get("delivery_generation") != delivery_generation
-        ):
-            raise TaskSessionError(
-                "Pre-push evidence belongs to an earlier delivery refresh generation"
-            )
-        try:
-            from scripts.ci_contract import CONTRACT_VERSION, contract_digest
-        except ModuleNotFoundError:
-            from ci_contract import CONTRACT_VERSION, contract_digest
-        if payload.get("contract_version") != CONTRACT_VERSION:
-            raise TaskSessionError("Pre-push evidence contract version is stale")
-        if payload.get("contract_digest") != contract_digest():
-            raise TaskSessionError("Pre-push evidence contract digest is stale")
-        if payload.get("clean_worktree") is not True:
-            raise TaskSessionError("Pre-push evidence does not prove a clean worktree")
-        gates = payload.get("gates")
-        if not isinstance(gates, list) or any(
-            not isinstance(gate, dict)
-            or gate.get("applicable") is not True
-            or gate.get("status") != "SUCCESS"
-            for gate in gates
-        ):
-            raise TaskSessionError("Pre-push evidence does not contain successful applicable gates")
-        unsigned_payload = dict(payload)
-        evidence_digest = unsigned_payload.pop("evidence_digest", None)
-        encoded = json.dumps(
-            unsigned_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode()
-        if (
-            not isinstance(evidence_digest, str)
-            or evidence_digest != hashlib.sha256(encoded).hexdigest()
-        ):
-            raise TaskSessionError("Pre-push evidence digest is invalid")
-        worktree = Path(str(lease["worktree"]))
-        if self.repository.status(worktree):
-            raise TaskSessionError("Task worktree is dirty; PRE_PUSH_CI_PASS is stale")
-        return payload
-
     def mark_ready(
         self,
         task_id: str,
@@ -3097,14 +3021,6 @@ class TaskController:
             self.repository.commits(f"{validation_base_sha}..{head_sha}"),
             dependency_ids=dependency_ids,
         )
-        gate: dict[str, Any] | None = None
-        gate_issue: str | None = None
-        try:
-            gate = self._current_gate_evidence(expected, lease, head_sha)
-        except TaskSessionError as error:
-            # PRE_PUSH_CI_PASS is a final delivery gate.  Implementation can reach the
-            # durable queue with targeted checks and applicable QA evidence only.
-            gate_issue = str(error)
         with self.store.lock():
             current = self.store.read_json(lease_path)
             if not isinstance(current, dict):
@@ -3130,14 +3046,6 @@ class TaskController:
             delivery["updated_at"] = utc_now()
             StateStore.replace_json(self.store.delivery_path, delivery)
             now = utc_now()
-            local_evidence = {
-                "status": "valid-for-current-head"
-                if gate is not None
-                else "pending-final-delivery-gate",
-                "pre_push_ci_pass": gate,
-            }
-            if gate_issue:
-                local_evidence["invalidated_reason"] = gate_issue
             current.pop("review_verdict", None)
             current.update(
                 {
@@ -3155,8 +3063,6 @@ class TaskController:
                         "base_sha": base_sha,
                         "head_sha": head_sha,
                     },
-                    "local_evidence": local_evidence,
-                    "pre_push_ci_pass": gate,
                     "updated_at": now,
                 }
             )
@@ -3377,7 +3283,6 @@ class TaskController:
             if self._lease_state(current) not in DELIVERY_STATES:
                 raise TaskSessionError("Task delivery state changed during master refresh")
             now = utc_now()
-            delivery_generation = uuid.uuid4().hex
             current.update(
                 {
                     "base_origin_master_sha": current_base,
@@ -3385,7 +3290,6 @@ class TaskController:
                     "delivery_head_sha": head_after,
                     "ready_head_sha": head_after,
                     "ready_base_origin_master_sha": current_base,
-                    "delivery_generation": delivery_generation,
                     "task_provenance": {
                         "task_id": expected,
                         "branch": current.get("branch"),
@@ -3393,14 +3297,12 @@ class TaskController:
                         "head_sha": head_after,
                         "original_base_sha": current.get("original_base_origin_master_sha"),
                     },
-                    "pre_push_ci_pass": None,
-                    "local_evidence": {
-                        "status": "invalidated-after-master-refresh",
-                        "invalidated_at": now,
-                        "previous_head_sha": head_before,
-                        "previous_base_sha": old_base,
+                    "delivery_anchor": {
+                        "task_id": expected,
+                        "branch": current.get("branch"),
+                        "base_sha": current_base,
+                        "head_sha": head_after,
                     },
-                    "delivery_gate_pass": None,
                     "canonical_master_refresh": canonical_refresh,
                     "lifecycle_state": "delivering",
                     "updated_at": now,
@@ -3454,22 +3356,25 @@ class TaskController:
                 or str(owner.get("task_id", "")).upper() != expected
             ):
                 raise TaskSessionError(
-                    "Task delivery ownership changed during final gate validation"
+                    "Task delivery ownership changed during delivery anchor validation"
                 )
             current_head = self.repository.head(cwd=worktree)
             if current.get("base_origin_master_sha") != base_sha:
-                raise TaskSessionError("Task delivery base changed during final gate validation")
+                raise TaskSessionError(
+                    "Task delivery base changed during delivery anchor validation"
+                )
             if current.get("delivery_head_sha") != current_head or current_head != head_sha:
-                raise TaskSessionError("Task delivery HEAD changed during final gate validation")
-            gate = self._current_gate_evidence(expected, current, current_head)
+                raise TaskSessionError(
+                    "Task delivery HEAD changed during delivery anchor validation"
+                )
             current.update(
                 {
                     "lifecycle_state": "delivery-gate",
-                    "delivery_gate_pass": gate,
-                    "pre_push_ci_pass": gate,
-                    "local_evidence": {
-                        "status": "valid-for-current-head",
-                        "pre_push_ci_pass": gate,
+                    "delivery_anchor": {
+                        "task_id": expected,
+                        "branch": current.get("branch"),
+                        "base_sha": base_sha,
+                        "head_sha": current_head,
                     },
                     "updated_at": utc_now(),
                 }
@@ -3551,8 +3456,7 @@ class TaskController:
                 "delivery_acquired_at",
                 "delivery_base_origin_master_sha",
                 "delivery_head_sha",
-                "delivery_generation",
-                "delivery_gate_pass",
+                "delivery_anchor",
                 "ready_head_sha",
                 "ready_base_origin_master_sha",
                 "ready_for_delivery_at",
@@ -3569,12 +3473,6 @@ class TaskController:
                     "lifecycle_state": "review",
                     "review_reopened_at": now,
                     "review_reopen_reason": reason,
-                    "pre_push_ci_pass": None,
-                    "local_evidence": {
-                        "status": "invalidated-before-review-reopen",
-                        "invalidated_at": now,
-                        "reason": reason,
-                    },
                     "updated_at": now,
                 }
             )
@@ -3685,8 +3583,7 @@ class TaskController:
                 "delivery_acquired_at",
                 "delivery_base_origin_master_sha",
                 "delivery_head_sha",
-                "delivery_generation",
-                "delivery_gate_pass",
+                "delivery_anchor",
                 "delivery_released_at",
                 "delivery_failed_at",
                 "delivery_handoff_blocker",
@@ -3706,12 +3603,6 @@ class TaskController:
                     "lifecycle_state": "review",
                     "recovery_resolved_at": now,
                     "recovery_resolution_reason": reason,
-                    "pre_push_ci_pass": None,
-                    "local_evidence": {
-                        "status": "invalidated-before-recovery-resolution",
-                        "invalidated_at": now,
-                        "reason": reason,
-                    },
                     "updated_at": now,
                 }
             )
@@ -3756,7 +3647,14 @@ class TaskController:
             raise TaskSessionError("Delivery worktree HEAD changed after the final refresh")
         if pull_request.get("base", {}).get("sha") != lease.get("base_origin_master_sha"):
             raise TaskSessionError("Merged PR base does not match the refreshed delivery base")
-        self._current_gate_evidence(expected, lease, head_sha)
+        delivery_anchor = {
+            "task_id": expected,
+            "branch": lease.get("branch"),
+            "base_sha": lease.get("base_origin_master_sha"),
+            "head_sha": head_sha,
+        }
+        if lease.get("delivery_anchor") != delivery_anchor:
+            raise TaskSessionError("Delivery anchor changed before production completion")
         actual = validate_task_pull_request(
             pull_request,
             commits,
@@ -3803,11 +3701,8 @@ class TaskController:
                 "base_origin_master_sha"
             ) != lease.get("base_origin_master_sha"):
                 raise TaskSessionError("Delivery lease changed before production completion")
-            current_gate = self._current_gate_evidence(expected, current, head_sha)
-            if current.get("delivery_gate_pass") != current_gate:
-                raise TaskSessionError(
-                    "Delivery gate evidence changed before production completion"
-                )
+            if current.get("delivery_anchor") != delivery_anchor:
+                raise TaskSessionError("Delivery anchor changed before production completion")
             if "queue_budget" in current:
                 history["queue_budget"] = current["queue_budget"]
             if "delivery_priority_override" in current:

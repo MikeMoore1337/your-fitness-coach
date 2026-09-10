@@ -53,15 +53,16 @@ Lifecycle разделён на две coordination boundary:
   не удерживают. Dirty, interrupted, corrupt, missing, duplicate, recovery и ambiguous state
   остаются fail-closed.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
-  может выполнить `refresh/rebase` относительно latest `origin/master`, final exact-HEAD gate,
-  PR/CI, merge, production deploy, smoke и terminal closeout. Owner сохраняется до завершения
+  может выполнить `refresh/rebase` относительно latest `origin/master`, current-base/provenance
+  check, PR/CI, merge, production deploy, smoke и terminal closeout. Owner сохраняется до завершения
   `finish`, после чего lane передаётся следующему FIFO candidate. Busy delivery/CI/production не
   блокирует запуск совместимой implementation task.
 
 `READY_FOR_DELIVERY` фиксирует task ID, branch, HEAD, исходный/current base, quality/QA, clean
-worktree, provenance и состояние локального evidence. Это очередь, а не разрешение merge: перед
-PR владелец delivery должен получить актуальный `origin/master`, обновить branch безопасным
-`rebase`, инвалидировать старое exact-HEAD evidence и пройти новый final gate. Конфликт rebase,
+worktree и provenance. Это очередь, а не разрешение merge: перед PR владелец delivery должен
+получить актуальный `origin/master`, обновить branch безопасным `rebase` и зафиксировать
+минимальный delivery anchor. Exact-head required checks выполняются authoritative GitHub CI,
+а не локальным release gate. Конфликт rebase,
 dirty/interrupted worktree или missing/ambiguous lease сохраняются fail-closed для recovery.
 
 При явном owner decision текущая task может получить ограниченный priority promotion через
@@ -319,9 +320,9 @@ Self-review/QA не могут сами по себе быть основани�
    changes, если task не задаёт другой stage strategy.
    Новый registry entry считается tracked change даже для read-only audit task.
 9. Получить delivery ownership, проверить `[Task <ID>]` provenance, fetch-нуть текущий
-   `origin/master`, безопасно обновить task branch, инвалидировать старое evidence и выполнить
-   local `PRE_PUSH_CI_PASS` для нового exact HEAD. Только после этого открыть task PR в `master` и
-   дождаться exact-head `checks` на current base; direct push в `master` запрещён. До ownership
+   `origin/master` и безопасно обновить task branch. Зафиксировать минимальный delivery anchor,
+   открыть task PR в `master` и дождаться exact-head `checks` на current base в authoritative
+   GitHub CI; direct push в `master` запрещён. До ownership
    task может закончить verification/QA/commit и ждать в `READY_FOR_DELIVERY` или
    `WAITING_FOR_DELIVERY`.
 10. Классифицировать уже интегрированную task как `AUTO_RELEASE_ELIGIBLE` либо
@@ -361,9 +362,7 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 
 1. Получить delivery lane только для текущего candidate, выполнить `git fetch --prune origin`,
    проверить, что `origin/master` совпадает с live protected `master`, безопасно обновить task
-   branch от exact current base и инвалидировать старое evidence. Затем выполнить shared command
-   profile, записать новый `PRE_PUSH_CI_PASS` с HEAD/base/profile/contract digest и только затем
-   открыть task PR;
+   branch от exact current base и зафиксировать минимальный delivery anchor. Затем открыть task PR;
 2. проверить expected PR head SHA и required check `checks`. PR-triggered CI выполняет полный
    regression profile, а post-merge `master` CI выполняет только provenance, immutable image
    publication и deployment-source checks для того же exact tree;
@@ -387,11 +386,9 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 Canonical sequencing для нового release candidate:
 
 ```text
-implementation/self-review/QA -> logical commit -> READY_FOR_DELIVERY
-  -> acquire single delivery lane
-  -> fetch/rebase current origin/master -> invalidate old evidence
-  -> local PRE_PUSH_CI_PASS on refreshed exact HEAD
-  -> PR master -> exact-head required checks
+implementation/self-review/QA -> logical commit -> PR master
+  -> current-base/provenance delivery check
+  -> exact-head required checks in GitHub CI
   -> merge exact PR head
   -> WAIT post-merge master provenance/image publication: success
   -> immutable bundle deploy exact master SHA

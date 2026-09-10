@@ -133,18 +133,22 @@ def test_deploy_bounds_transient_production_ssh_failures() -> None:
     assert 'sleep "$delay"' in deploy
 
 
-def test_delivery_contract_is_master_only_and_deterministic_gate_driven() -> None:
+def test_delivery_contract_is_master_only_and_github_gate_driven() -> None:
     sources = _sources()
     controller = sources["controller"]
     launcher = sources["launcher"]
 
     assert 'TARGET_BASE_BRANCH = "master"' in controller
     assert "base_origin_master_sha" in controller
-    assert "PRE_PUSH_CI_PASS" in controller
+    assert "delivery_anchor" in controller
+    assert "PRE_PUSH_CI_PASS" not in controller
+    assert "delivery_generation" not in controller
+    assert "local_evidence" not in controller
     assert "production-success" in controller
     assert '"ready-for-delivery"' in controller
     assert "delivery.json" in controller
     assert "refresh_for_delivery" in controller
+    assert "GitHub" in controller or "github" in controller
     assert "resolve-recovery" in controller
     assert "owner_authorize" in controller
     assert "review_contract = validate_pull_request_review_contract" not in controller
@@ -177,7 +181,8 @@ def test_policy_docs_remove_dev_from_normal_delivery_and_keep_human_gates() -> N
     assert "Busy delivery/CI/production" in lifecycle
     assert "Обычная task без `concurrency`" in lifecycle
     assert "implementation exclusion" in lifecycle
-    assert "active `exclusive-write` несовместим" in global_rules
+    assert "independent-write" in global_rules
+    assert "active `exclusive-write` несовместим" not in global_rules
     assert "fast-forward/sync `dev`" not in lifecycle
     assert "serial merge в `dev`" not in global_rules
     assert "явно обязательный owner checkpoint/approve, human/device evidence" in lifecycle

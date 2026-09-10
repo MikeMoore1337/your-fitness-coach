@@ -137,20 +137,22 @@ gate, evidence и точки остановки в task-файле.
   bootstrap, infrastructure recovery и SHA вне текущего merged `master` остаются exceptional
   actions с отдельным owner approval, backup и preflight.
 - Для `AUTO_RELEASE_ELIGIBLE` task нормальный release path выполняется без дополнительного вопроса
-  владельцу: `implementation/self-review/QA -> logical commit -> READY_FOR_DELIVERY -> acquire
-  delivery -> fetch/refresh latest origin/master -> local PRE_PUSH_CI_PASS на новом exact HEAD ->
-  task PR master -> exact-head checks -> merge master -> post-merge provenance/image publish ->
-  immutable bundle deploy -> production smoke -> controller finish/clean task worktree and merged
-  local branch -> archive task -> rebuild/check backlog manifests -> terminal report`. Direct push в
-  `master` запрещён.
+  владельцу: `implementation/self-review/QA -> relevant local checks -> logical commit/push ->
+  task PR master -> current-base/provenance check -> exact-head GitHub checks -> merge master ->
+  post-merge provenance/image publish -> immutable bundle deploy -> production smoke -> controller
+  finish/clean task worktree and merged local branch -> archive task -> rebuild/check backlog
+  manifests -> terminal report`. Полный локальный regression run доброволен и не создаёт release
+  evidence; direct push в `master` запрещён.
 - Implementation/self-review/QA нескольких совместимых `independent-write` task могут быть
   параллельными. Master integration и production delivery остаются **strictly serial**: только
-  delivery owner может refresh/rebase, открыть/обновить PR, merge или deploy. Если current base
-  изменился, ожидающий candidate обновляется перед final gate; busy delivery/production только
-  переводит его в `WAITING_FOR_DELIVERY`, а dirty, interrupted, conflict или ambiguous state
-  останавливаются с точным blocker. READY/waiting/CI/production не блокируют новую совместимую
-  `independent-write` task; active `exclusive-write` несовместим только пока он находится в
-  `starting/implementation/review/qa`.
+  delivery owner может refresh/rebase, проверить provenance, открыть/обновить PR, merge или deploy.
+  Если current base изменился, candidate обновляется перед push; exact-head required checks
+  выполняет GitHub CI. Busy delivery/production только переводит candidate в
+  `WAITING_FOR_DELIVERY`, а dirty, interrupted, conflict или ambiguous state останавливаются с
+  точным blocker. READY/waiting/CI/production не блокируют новую совместимую `independent-write`
+  task; independent task совместима с активной `exclusive-write`, пока serial delivery не выявит
+  реальный конфликт файлов. Новая `exclusive-write` task консервативно ждёт активную implementation
+  task.
 - Task с явно обязательным owner checkpoint/approve, human/device evidence, manual visual approval,
   legal-counsel gate или destructive/external authorization останавливается ровно перед указанным
   gate до фактического прохождения. Task без tracked logical commit не создаёт PR; отсутствие

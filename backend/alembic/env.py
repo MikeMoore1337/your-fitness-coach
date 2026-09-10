@@ -18,7 +18,8 @@ config = context.config
 # character for ConfigParser while preserving the URL returned by Alembic.
 config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Keep application loggers available to tests and migration diagnostics.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 MIGRATION_ADVISORY_LOCK_ID = 626517843

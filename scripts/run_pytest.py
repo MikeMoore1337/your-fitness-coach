@@ -56,15 +56,24 @@ def main() -> int:
 
         temporary_parent = runtime / "tmp"
         temporary_parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(
-            prefix="fitminiapp-pytest-", dir=temporary_parent
-        ) as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="p-", dir=temporary_parent) as temp_dir:
             temp_root = Path(temp_dir)
+            if len(str(root)) >= 80:
+                # Keep pytest cache/basetemp in the repository artifact tree, but use an
+                # ephemeral OS temp directory for Python-created repositories. This avoids
+                # Windows MAX_PATH failures when task-session tests create nested worktrees.
+                with tempfile.TemporaryDirectory(prefix="yfc-") as process_dir:
+                    return _run(
+                        root,
+                        pytest_cache=temp_root / "cache",
+                        pytest_tmp=temp_root / "basetemp",
+                        process_tmp=Path(process_dir),
+                    )
             return _run(
                 root,
                 pytest_cache=temp_root / "cache",
                 pytest_tmp=temp_root / "basetemp",
-                process_tmp=temp_root / "python",
+                process_tmp=temp_root,
             )
 
     return _run(

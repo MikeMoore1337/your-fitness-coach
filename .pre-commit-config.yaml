@@ -40,10 +40,3 @@ repos:
           - mypy==2.3.0
         pass_filenames: false
         files: ^(backend/fitminiapp_api|scripts/run_mypy\.py|pyproject\.toml)
-
-      - id: pre-push-ci-gate
-        name: CI-equivalent pre-push gate
-        entry: python scripts/pre_push_gate.py
-        language: system
-        pass_filenames: false
-        stages: [pre-push]

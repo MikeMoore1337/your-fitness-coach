@@ -1,8 +1,9 @@
-"""Authoritative command groups shared by GitHub CI and the local pre-push gate.
+"""Authoritative command groups used by GitHub CI and optional local checks.
 
 The workflow files deliberately invoke group IDs instead of carrying a second,
-hand-maintained copy of the repository's quality commands.  The same registry is
-also used to calculate the contract digest stored in exact-HEAD gate evidence.
+hand-maintained copy of the repository's quality commands.  The registry is the
+authoritative GitHub CI command contract; its groups may also be run locally for
+fast feedback or voluntary diagnostics, without producing release evidence.
 """
 
 from __future__ import annotations
@@ -220,8 +221,8 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "--audit-level=high",
                 cwd="frontend",
                 retry_on_transient=True,
-                retry_max_attempts=3,
-                retry_delays_seconds=(2, 10),
+                retry_max_attempts=2,
+                retry_delays_seconds=(2,),
             ),
             _cmd(
                 "backend-dependency-audit",
@@ -232,8 +233,8 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "-r",
                 "backend/requirements-runtime.txt",
                 retry_on_transient=True,
-                retry_max_attempts=3,
-                retry_delays_seconds=(2, 10),
+                retry_max_attempts=2,
+                retry_delays_seconds=(2,),
             ),
             _cmd(
                 "bot-dependency-audit",
@@ -244,8 +245,8 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "-r",
                 "bot/requirements.txt",
                 retry_on_transient=True,
-                retry_max_attempts=3,
-                retry_delays_seconds=(2, 10),
+                retry_max_attempts=2,
+                retry_delays_seconds=(2,),
             ),
         ),
         prerequisites=("npm", "uvx"),
@@ -261,8 +262,8 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "--audit-level=high",
                 cwd="frontend",
                 retry_on_transient=True,
-                retry_max_attempts=3,
-                retry_delays_seconds=(2, 10),
+                retry_max_attempts=2,
+                retry_delays_seconds=(2,),
             ),
         ),
         prerequisites=("npm",),
@@ -279,8 +280,8 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "-r",
                 "backend/requirements-runtime.txt",
                 retry_on_transient=True,
-                retry_max_attempts=3,
-                retry_delays_seconds=(2, 10),
+                retry_max_attempts=2,
+                retry_delays_seconds=(2,),
             ),
             _cmd(
                 "bot-dependency-audit",
@@ -291,8 +292,8 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "-r",
                 "bot/requirements.txt",
                 retry_on_transient=True,
-                retry_max_attempts=3,
-                retry_delays_seconds=(2, 10),
+                retry_max_attempts=2,
+                retry_delays_seconds=(2,),
             ),
         ),
         prerequisites=("uvx",),
@@ -307,7 +308,6 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "pytest",
                 "tests/test_release_safeguards.py",
                 "tests/test_task_session.py",
-                "tests/test_pre_push_gate.py",
                 "tests/test_ci_contract.py",
                 "tests/test_ci_timing.py",
                 "tests/test_run_task_delivery.py",
@@ -1300,12 +1300,37 @@ def _sharded_frontend_command(
     )
 
 
+def _local_command(command: CommandSpec, *, group: str, env: Mapping[str, str]) -> CommandSpec:
+    """Adapt only the local SQLite diagnostic to Windows resource limits."""
+
+    if group != "python-tests" or command.name != "python-suite":
+        return command
+    if os.name != "nt" or not env.get("TEST_DATABASE_URL", "").casefold().startswith("sqlite"):
+        return command
+
+    # Four parallel TestClient processes can exhaust Windows' ephemeral socket
+    # pool. Keep one isolated xdist process locally; GitHub PostgreSQL CI keeps
+    # its four-way command and sharding unchanged.
+    argv = list(command.argv)
+    worker_option = argv.index("-n")
+    argv[worker_option + 1] = "1"
+    return CommandSpec(
+        name=command.name,
+        argv=tuple(argv),
+        cwd=command.cwd,
+        retry_on_transient=command.retry_on_transient,
+        retry_max_attempts=command.retry_max_attempts,
+        retry_delays_seconds=command.retry_delays_seconds,
+    )
+
+
 def run_group(
     group: str,
     *,
     root: Path | None = None,
     env: Mapping[str, str] | None = None,
     shard: str | None = None,
+    local: bool = False,
 ) -> None:
     if group not in COMMAND_GROUPS:
         raise CIContractError(f"Unknown CI command group: {group}")
@@ -1336,6 +1361,12 @@ def run_group(
                 effective_command = _sharded_frontend_command(
                     command, shard_index=shard_index, shard_count=shard_count
                 )
+        if local:
+            effective_command = _local_command(
+                effective_command,
+                group=group,
+                env=effective_env,
+            )
         argv = _resolve_argv(effective_command.argv)
         if argv[0] == "git":
             argv = ["git", "-c", f"safe.directory={project_root.as_posix()}", *argv[1:]]
@@ -1372,10 +1403,8 @@ def validate_contract() -> None:
                 raise CIContractError(
                     f"Non-retryable command has a retry limit for {name}/{command.name}"
                 )
-            if command.retry_on_transient and command.retry_max_attempts > 3:
-                raise CIContractError(
-                    f"Retry limit exceeds three attempts for {name}/{command.name}"
-                )
+            if command.retry_on_transient and command.retry_max_attempts > 2:
+                raise CIContractError(f"Retry limit exceeds one retry for {name}/{command.name}")
             if any(delay < 0 for delay in command.retry_delays_seconds):
                 raise CIContractError(f"Negative retry delay for command {name}/{command.name}")
             if any(delay > 60 for delay in command.retry_delays_seconds):
