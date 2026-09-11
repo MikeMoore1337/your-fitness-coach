@@ -82,7 +82,7 @@ idna==3.18
     #   yarl
 itsdangerous==2.2.0
     # via -r backend/requirements.in
-joserfc==1.7.4
+joserfc==1.7.5
     # via authlib
 limits==5.8.0
     # via slowapi
