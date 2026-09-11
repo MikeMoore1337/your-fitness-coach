@@ -214,12 +214,14 @@ class HermesSourcePacket(BaseModel):
     primary_url: str | None = Field(default=None, max_length=2048)
     title: str = Field(..., min_length=1, max_length=500)
     summary: str = Field(default="", max_length=4000)
+    content: str = Field(..., min_length=1, max_length=32_768)
     author: str | None = Field(default=None, max_length=256)
     publisher: str | None = Field(default=None, max_length=160)
     published_at: datetime | None = None
     updated_at: datetime | None = None
     doi: str | None = Field(default=None, max_length=255)
     content_hash: str = Field(..., pattern=r"^[0-9a-f]{64}$")
+    content_sha256: str = Field(..., pattern=r"^[0-9a-f]{64}$")
 
 
 class HermesDraftProposal(BaseModel):
@@ -239,17 +241,29 @@ class HermesGenerationProvenance(BaseModel):
     skill_version: str = Field(..., min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9_.:-]+$")
 
 
+class HermesRevisionContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    revision_id: str = Field(..., min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
+    parent_revision_id: str | None = Field(
+        default=None, min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$"
+    )
+    attempt: int = Field(..., ge=1, le=2)
+    requested_blockers: list[str] = Field(default_factory=list, max_length=8)
+
+
 class HermesEditorialIntakeRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = Field(
-        default="hermes-editorial-intake-v1", pattern=r"^hermes-editorial-intake-v1$"
+        default="hermes-editorial-intake-v2", pattern=r"^hermes-editorial-intake-v2$"
     )
     idempotency_key: str = Field(..., min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
     request_nonce: str = Field(..., min_length=16, max_length=128, pattern=r"^[A-Za-z0-9_.:-]+$")
     source: HermesSourcePacket
     draft: HermesDraftProposal
     provenance: HermesGenerationProvenance
+    revision: HermesRevisionContext
 
 
 class HermesEditorialIntakeResponse(BaseModel):

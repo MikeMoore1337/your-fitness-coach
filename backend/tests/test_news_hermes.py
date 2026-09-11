@@ -32,6 +32,7 @@ def _payload() -> dict:
         "primary_url": None,
         "title": "Исследование связало силовые тренировки с восстановлением",
         "summary": "Авторы изучили силовые тренировки и восстановление у взрослых.",
+        "content": "Публичный источник описывает результаты и ограничения исследования.",
         "author": None,
         "publisher": "Journal One",
         "published_at": published_at.isoformat(),
@@ -44,8 +45,9 @@ def _payload() -> dict:
         canonical_url=source["canonical_url"],
         published_at=published_at,
     )
+    source["content_sha256"] = hashlib.sha256(source["content"].encode()).hexdigest()
     return {
-        "schema_version": "hermes-editorial-intake-v1",
+        "schema_version": "hermes-editorial-intake-v2",
         "idempotency_key": "hermes-test-idempotency-1",
         "request_nonce": "hermes-test-nonce-1",
         "source": source,
@@ -60,6 +62,12 @@ def _payload() -> dict:
             "model": "test-model",
             "prompt_version": "hermes-editorial-v1",
             "skill_version": "yfc-hermes-editorial-v1",
+        },
+        "revision": {
+            "revision_id": "hermes-test-revision-1",
+            "parent_revision_id": None,
+            "attempt": 1,
+            "requested_blockers": [],
         },
     }
 
@@ -222,6 +230,8 @@ def test_hermes_image_pending_downstream_survives_disabled_legacy_fetch(
     )
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
 
     with get_session_context() as db:
@@ -286,7 +296,7 @@ def test_hermes_image_pending_downstream_survives_disabled_legacy_fetch(
         assert delivery.status == "sent"
 
 
-def test_hermes_sensitive_source_reaches_full_owner_card(client, monkeypatch) -> None:
+def test_hermes_sensitive_source_requires_bounded_remediation(client, monkeypatch) -> None:
     monkeypatch.setattr(settings, "hermes_intake_enabled", True)
     monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
     monkeypatch.setattr(
@@ -294,10 +304,6 @@ def test_hermes_sensitive_source_reaches_full_owner_card(client, monkeypatch) ->
         "hermes_intake_shared_secret",
         SecretStr("test-hermes-shared-secret-that-is-long-enough"),
     )
-    monkeypatch.setattr(settings, "news_ingestion_enabled", True)
-    monkeypatch.setattr(settings, "news_image_provider", "disabled")
-    monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
-
     with get_session_context() as db:
         db.add(
             NewsSource(
@@ -336,42 +342,101 @@ def test_hermes_sensitive_source_reaches_full_owner_card(client, monkeypatch) ->
         content=body,
         headers=_signed_headers(body),
     )
-    assert intake.status_code == 200, intake.text
-    assert intake.json()["status"] == "accepted"
-    assert intake.json()["publication_policy"] == "manual_required"
+    assert intake.status_code == 422, intake.text
+    detail = intake.json()["detail"]
+    assert detail["code"] == "remediation_required"
+    assert "medical_prescription_language" in detail["blockers"]
+    with get_session_context() as db:
+        assert db.query(HermesEditorialSubmission).count() == 0
+        assert db.query(NewsDraftRevision).count() == 0
 
-    preview_calls: list[int] = []
-    control_calls: list[int] = []
 
-    async def send_preview(_client, chat_id, *_args, **_kwargs):
-        preview_calls.append(chat_id)
-        return SimpleNamespace(message_id=511, message_date=datetime.now(UTC))
-
-    async def send_control(_client, chat_id, *_args, **_kwargs):
-        control_calls.append(chat_id)
-        return 512
-
-    async def send_publication(*_args, **_kwargs):
-        raise AssertionError("manual-sensitive intake must not publish automatically")
-
-    asyncio.run(
-        run_news_pipeline_once(
-            send_message=send_control,
-            send_preview=send_preview,
-            send_publication=send_publication,
-            publication_ready=True,
+def test_hermes_unsupported_number_without_source_evidence_requests_remediation(
+    client, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
         )
+
+    payload = _payload()
+    payload["idempotency_key"] = "hermes-unsupported-number-no-evidence"
+    payload["request_nonce"] = "hermes-unsupported-number-nonce"
+    payload["draft"]["summary"] = (
+        "Авторы описали результат с изменением на 99 процентов у исследованной группы."
+    )
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+
+    response = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
     )
 
-    assert preview_calls == [7001]
-    assert control_calls == [7001]
+    assert response.status_code == 422, response.text
+    detail = response.json()["detail"]
+    assert detail["code"] == "remediation_required"
+    assert detail["blockers"] == ["unsupported_number"]
     with get_session_context() as db:
-        submission = db.query(HermesEditorialSubmission).one()
-        draft = db.get(NewsDraftRevision, submission.draft_id)
-        cluster = db.get(NewsCluster, submission.cluster_id)
-        delivery = db.query(NewsReviewDelivery).one()
-        assert draft is not None and cluster is not None
-        assert "medical_prescription_language" in draft.warnings
-        assert any(flag.startswith("prohibited_") for flag in cluster.risk_flags)
-        assert cluster.status == "awaiting_review"
-        assert delivery.status == "sent"
+        assert db.query(HermesEditorialSubmission).count() == 0
+        assert db.query(NewsDraftRevision).count() == 0
+
+
+def test_hermes_number_grounded_in_source_content_is_accepted(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="primary_research",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    payload = _payload()
+    payload["idempotency_key"] = "hermes-grounded-number"
+    payload["request_nonce"] = "hermes-grounded-number-nonce"
+    payload["source"]["content"] = (
+        "Публичный источник описывает результаты у 12 взрослых участников и ограничения исследования."
+    )
+    payload["source"]["content_sha256"] = hashlib.sha256(
+        payload["source"]["content"].encode()
+    ).hexdigest()
+    payload["draft"]["summary"] = (
+        "Авторы описали результаты у 12 взрослых участников и ограничения исследования."
+    )
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+
+    response = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "accepted"

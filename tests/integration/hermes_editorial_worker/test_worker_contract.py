@@ -209,7 +209,7 @@ def test_preflight_repairs_unsupported_number_with_same_provider(monkeypatch) ->
 def test_preflight_repairs_photo_caption_with_trusted_source_url(monkeypatch) -> None:
     rejected = {
         "headline": "З" * 180,
-        "summary": "С" * 810,
+        "summary": "С" * 840,
         "why_it_matters": "",
     }
     repaired = {
@@ -273,7 +273,9 @@ def test_unresolved_repair_fails_closed_before_hmac_intake(monkeypatch) -> None:
     assert calls == 2
 
 
-def test_intake_payload_excludes_source_content(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_intake_payload_binds_source_evidence_and_new_revision_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("HERMES_PROVIDER_MODEL", "local-model")
     body = editorial_worker._build_intake_payload(
         valid_job(),
@@ -284,10 +286,108 @@ def test_intake_payload_excludes_source_content(monkeypatch: pytest.MonkeyPatch)
         ),
     )
     document = json.loads(body)
-    assert "content" not in document["source"]
+    assert document["source"]["content"] == valid_job().source.content
     assert document["source"]["content_hash"] == editorial_worker._canonical_source_hash(
         valid_job().source
     )
+    assert (
+        document["source"]["content_sha256"]
+        == editorial_worker.hashlib.sha256(valid_job().source.content.encode("utf-8")).hexdigest()
+    )
+    assert document["revision"]["attempt"] == 1
+    assert document["revision"]["parent_revision_id"] is None
+
+
+def test_yfc_remediation_creates_new_immutable_revision(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HERMES_PROVIDER_MODE", editorial_worker.EXTERNAL_MODE)
+    monkeypatch.setenv("HERMES_SOURCE_ALLOWLIST", "journal-one")
+    monkeypatch.setenv("HERMES_PROVIDER_MODEL", editorial_worker.EXTERNAL_PROVIDER_MODEL)
+    proposal = editorial_worker.DraftProposal(
+        headline="Заголовок исследования",
+        summary="Проверяемый текст без неподтверждённых чисел.",
+        why_it_matters="Материал требует редакторской проверки.",
+    )
+    provider_calls: list[tuple[tuple[str, ...], int]] = []
+
+    def provider(
+        _source,
+        *,
+        repair_warnings=(),
+        previous_proposal=None,
+        attempts_used=0,
+    ):
+        provider_calls.append((tuple(repair_warnings), attempts_used))
+        assert previous_proposal is None or previous_proposal == proposal
+        return editorial_worker.ProviderResult(proposal, attempts=attempts_used + 1)
+
+    bodies: list[dict[str, object]] = []
+
+    def post(_job, body):
+        document = json.loads(body)
+        bodies.append(document)
+        if len(bodies) == 1:
+            raise editorial_worker.IntakeRemediationRequired(
+                ("unsupported_number",),
+                attempt=1,
+                revision_id=document["revision"]["revision_id"],
+            )
+        return editorial_worker.IntakeResponse(
+            status="accepted",
+            submission_id="submission-remediated",
+            cluster_id="cluster-remediated",
+            draft_id="draft-remediated",
+            publication_policy="manual_required",
+            risk_reasons=[],
+            preview_text="preview is owned by YFC",
+        )
+
+    monkeypatch.setattr(editorial_worker, "_provider_request_bounded", provider)
+    monkeypatch.setattr(editorial_worker, "_post_intake", post)
+
+    result = editorial_worker.run_job(valid_job())
+
+    assert result["remediation"]["attempt"] == 2
+    assert result["remediation"]["parent_revision_id"] == bodies[0]["revision"]["revision_id"]
+    assert len(provider_calls) == 2
+    assert provider_calls[1] == (("unsupported_number",), 1)
+    assert bodies[0]["idempotency_key"] != bodies[1]["idempotency_key"]
+    assert bodies[0]["request_nonce"] != bodies[1]["request_nonce"]
+    assert bodies[1]["revision"]["parent_revision_id"] == bodies[0]["revision"]["revision_id"]
+    assert bodies[1]["revision"]["attempt"] == 2
+
+
+def test_yfc_remediation_exhaustion_is_terminal_and_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("HERMES_PROVIDER_MODE", editorial_worker.EXTERNAL_MODE)
+    monkeypatch.setenv("HERMES_SOURCE_ALLOWLIST", "journal-one")
+    monkeypatch.setenv("HERMES_PROVIDER_MODEL", editorial_worker.EXTERNAL_PROVIDER_MODEL)
+    proposal = editorial_worker.DraftProposal(
+        headline="Заголовок исследования",
+        summary="Проверяемый текст без неподтверждённых чисел.",
+        why_it_matters="Материал требует редакторской проверки.",
+    )
+    calls = 0
+
+    def provider(_source, *, repair_warnings=(), previous_proposal=None, attempts_used=0):
+        nonlocal calls
+        calls += 1
+        return editorial_worker.ProviderResult(proposal, attempts=attempts_used + 1)
+
+    def post(_job, body):
+        document = json.loads(body)
+        raise editorial_worker.IntakeRemediationRequired(
+            ("unsupported_number",),
+            attempt=document["revision"]["attempt"],
+            revision_id=document["revision"]["revision_id"],
+        )
+
+    monkeypatch.setattr(editorial_worker, "_provider_request_bounded", provider)
+    monkeypatch.setattr(editorial_worker, "_post_intake", post)
+
+    with pytest.raises(editorial_worker.WorkerError, match="editorial_remediation_exhausted"):
+        editorial_worker.run_job(valid_job())
+    assert calls == 2
 
 
 def test_untrusted_source_and_capability_fields_fail_closed() -> None:
@@ -318,6 +418,14 @@ def test_source_packet_preserves_safe_query_but_rejects_fragment() -> None:
     with pytest.raises(ValidationError):
         editorial_worker.SourcePacket.model_validate(
             valid_job().source.model_dump() | {"canonical_url": "https://example.com/unit#fragment"}
+        )
+
+
+def test_source_packet_bounds_utf8_content_bytes() -> None:
+    with pytest.raises(ValidationError, match="source_content_too_large"):
+        editorial_worker.SourcePacket.model_validate(
+            valid_job().source.model_dump()
+            | {"content": "я" * editorial_worker.MAX_SOURCE_CONTENT_BYTES}
         )
 
 
@@ -539,7 +647,7 @@ def test_local_mock_payload_does_not_use_external_gpt_oss_contract() -> None:
     assert request["temperature"] == 0
 
 
-def test_external_soft_budget_accounts_for_trusted_url_and_caption_overhead() -> None:
+def test_external_soft_budget_accounts_for_visible_caption_overhead() -> None:
     source = valid_job().source
     base_budget = editorial_worker._external_caption_draft_budget(source)
     prompt = editorial_worker._external_gpt_oss_messages(source)[0]["content"]
@@ -551,7 +659,7 @@ def test_external_soft_budget_accounts_for_trusted_url_and_caption_overhead() ->
     source_with_longer_url = source.model_copy(
         update={"primary_url": "https://example.com/" + ("long-path/" * 8)}
     )
-    assert editorial_worker._external_caption_draft_budget(source_with_longer_url) < base_budget
+    assert editorial_worker._external_caption_draft_budget(source_with_longer_url) == base_budget
 
 
 def test_external_mode_rejects_arbitrary_provider_model(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -620,11 +728,14 @@ def test_external_mode_never_requires_or_calls_telegram_preview(
     monkeypatch.delenv("TELEGRAM_PREVIEW_TIMEOUT_SECONDS", raising=False)
     monkeypatch.setattr(
         editorial_worker,
-        "_provider_request",
-        lambda _source: editorial_worker.DraftProposal(
-            headline="Заголовок",
-            summary="Проверяемый текст",
-            why_it_matters="Ограниченный смысл",
+        "_provider_request_bounded",
+        lambda _source: editorial_worker.ProviderResult(
+            editorial_worker.DraftProposal(
+                headline="Заголовок",
+                summary="Проверяемый текст",
+                why_it_matters="Ограниченный смысл",
+            ),
+            attempts=1,
         ),
     )
     monkeypatch.setattr(

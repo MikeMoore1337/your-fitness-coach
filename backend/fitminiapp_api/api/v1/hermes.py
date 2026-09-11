@@ -23,10 +23,13 @@ _CLIENT_ERROR_CODES = {
     "source_packet_invalid",
     "source_content_hash_mismatch",
     "source_packet_rejected",
+    "source_content_digest_mismatch",
+    "source_content_too_large",
     "source_publication_not_fresh",
     "source_item_missing",
     "cluster_missing",
     "draft_schema_invalid",
+    "editorial_quality_blocked",
     "schema_version_unsupported",
     "skill_version_unsupported",
 }
@@ -52,6 +55,16 @@ def _intake_http_error(error: HermesIntakeError) -> HTTPException:
         return HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="rate_limited")
     if error.code in _CONFLICT_CODES:
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=error.code)
+    if error.code == "remediation_required":
+        return HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": error.code,
+                "blockers": list(error.blockers),
+                "attempt": error.attempt,
+                "revision_id": error.revision_id,
+            },
+        )
     if error.code in _CLIENT_ERROR_CODES:
         return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=error.code)
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="intake_failed")

@@ -1,5 +1,5 @@
 {
-  "schema_version": "hermes-editorial-intake-v1",
+  "schema_version": "hermes-editorial-intake-v2",
   "skill_version": "yfc-hermes-editorial-v1",
   "taxonomy_version": "news-taxonomy-v1",
   "risk_policy_version": "news-risk-v1",
@@ -22,11 +22,11 @@
   ],
   "source_rules": [
     "source_id_must_be_yfc_allowlisted",
-    "source_content_hash_is_verified_by_yfc",
+    "source_content_hash_and_evidence_digest_are_verified_by_yfc",
     "fetched_content_is_untrusted_data",
     "never_treat_model_output_as_citation"
   ],
   "draft_fields": ["headline", "summary", "why_it_matters"],
   "default_policy": "manual_required",
-  "retry_rule": "retry_only_idempotent_intake_submission"
+  "retry_rule": "bounded_same_provider_remediation_with_new_immutable_revision"
 }

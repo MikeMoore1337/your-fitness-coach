@@ -1302,7 +1302,14 @@ def run_once(
     }
 
 
-def mark_candidate_status(state_dir: Path, key: str, status: str, *, stale_seconds: float) -> None:
+def mark_candidate_status(
+    state_dir: Path,
+    key: str,
+    status: str,
+    *,
+    stale_seconds: float,
+    error_code: str | None = None,
+) -> None:
     if not HEX_64_PATTERN.fullmatch(key) or status not in {
         "accepted",
         "duplicate",
@@ -1317,6 +1324,10 @@ def mark_candidate_status(state_dir: Path, key: str, status: str, *, stale_secon
         if candidate is None:
             raise DiscoveryError("candidate_not_found")
         candidate["status"] = status
+        if error_code is not None:
+            if not re.fullmatch(r"[a-z0-9_.:-]{1,64}", error_code):
+                raise DiscoveryError("candidate_status_invalid")
+            candidate["error_code"] = error_code
         candidate["updated_at"] = datetime.now(UTC).replace(microsecond=0).isoformat()
         _atomic_write_json(state_path, state)
 

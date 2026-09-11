@@ -3,7 +3,7 @@
 Это минимальный non-root container для одной bounded editorial job. Он принимает
 source metadata/content packet из `/opt/data`, вызывает только OpenAI-compatible
 `chat/completions`, проверяет structured response и отправляет подписанный
-`hermes-editorial-intake-v1` в YFC. `HERMES_PROVIDER_MODE=local_mock` сохраняет
+`hermes-editorial-intake-v2` в YFC. `HERMES_PROVIDER_MODE=local_mock` сохраняет
 текущий local-only HTTP contract (`/v1` и localhost/`host.docker.internal`); после
 `accepted` он отправляет только preview-only payload в allowlisted local preview endpoint.
 
@@ -27,13 +27,13 @@ provider-neutral contract, но external mode сейчас принимает т
 candidate `openai/gpt-oss-120b`.
 
 До HMAC intake worker выполняет детерминированный editorial preflight: числовые токены draft
-должны быть заземлены в разрешённом source packet, а консервативная plain-text photo caption
-вместе с доверенным source URL и меткой `Источник` должна укладываться в лимит 1024 UTF-16
-символа Telegram. Для этих двух blocker worker может один раз запросить исправление у того же
-approved provider в рамках общего лимита попыток. Нерешённый blocker останавливает job
-fail-closed и не вызывает ни YFC intake, ни Telegram preview/autopublish. Успешный preflight
-не является approval публикации: `manual_required`, Gate B/C и единственный publisher остаются
-на стороне YFC.
+должны быть заземлены в разрешённом source packet, а видимый plain-text photo caption с меткой
+`Источник` должна укладываться в лимит 1024 UTF-16 символа Telegram. Если финальная YFC
+проверка находит recoverable blocker, worker запрашивает bounded repair у того же approved
+provider и отправляет новую immutable revision с новым idempotency key/nonce. Общий бюджет —
+максимум две попытки; после исчерпания job получает terminal remediation failure и не
+переигрывается бесконечно. Успешный preflight не является approval публикации:
+`manual_required`, Gate B/C и единственный publisher остаются на стороне YFC.
 
 Worker не содержит source fetching, scheduler, database client, shell/tool dispatch,
 browser, MCP, plugins, Telegram Bot API или publish endpoint. Полный Hermes monolith
