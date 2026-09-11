@@ -87,23 +87,20 @@ const objects: Partial<Record<IconName, string>> = {
   'nav-nutrition': 'nutrition',
   'nav-progress': 'progress',
   'nav-profile': 'profile',
-  'nav-coach': 'profile',
-  'nav-admin': 'profile',
-  'nav-knowledge': 'ai',
-  achievement: 'progress',
+  'nav-coach': 'nav-coach',
+  'nav-admin': 'nav-admin',
+  'nav-knowledge': 'nav-knowledge',
+  achievement: 'achievement',
   'account-security': 'security',
   'ai-coach': 'ai',
   'theme-sun': 'sun',
   'theme-moon': 'moon',
   logout: 'logout',
 };
-/** Растровые объекты и локальные растровые версии прежних авторских служебных пиктограмм. */
+/** Единое авторское растровое flat/squircle-семейство для разделов, действий и статусов. */
 export function Icon({ className = '', label, name, size = 24, ...props }: IconProps) {
-  const object = objects[name];
-  const src = (theme: string) =>
-    object
-      ? '/assets/icons/flat-' + object + '.webp'
-      : '/assets/icons/action-' + name + '-' + theme + '.png';
+  const object = objects[name] ?? name;
+  const src = '/assets/icons/flat-' + object + '.webp';
   return (
     <span
       {...props}
@@ -114,8 +111,8 @@ export function Icon({ className = '', label, name, size = 24, ...props }: IconP
       aria-hidden={label ? undefined : true}
       style={{ width: size, height: size, ...props.style }}
     >
-      <img className="yfc-icon__light" src={src('light')} alt="" width={size} height={size} />
-      <img className="yfc-icon__dark" src={src('dark')} alt="" width={size} height={size} />
+      <img className="yfc-icon__light" src={src} alt="" width={size} height={size} />
+      <img className="yfc-icon__dark" src={src} alt="" width={size} height={size} />
     </span>
   );
 }

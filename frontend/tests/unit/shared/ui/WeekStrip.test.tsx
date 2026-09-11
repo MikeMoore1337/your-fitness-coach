@@ -117,17 +117,17 @@ describe('WeekStrip', () => {
     ).toBeInTheDocument();
     expect(
       container.querySelector(
-        '[data-icon="week-planned"] img[src="/assets/icons/action-week-planned-dark.png"]',
+        '[data-icon="week-planned"] img[src="/assets/icons/flat-week-planned.webp"]',
       ),
     ).toBeInTheDocument();
     expect(
       container.querySelector(
-        '[data-icon="week-in-progress"] img[src="/assets/icons/action-week-in-progress-dark.png"]',
+        '[data-icon="week-in-progress"] img[src="/assets/icons/flat-week-in-progress.webp"]',
       ),
     ).toBeInTheDocument();
     expect(
       container.querySelector(
-        '[data-icon="week-skipped"] img[src="/assets/icons/action-week-skipped-dark.png"]',
+        '[data-icon="week-skipped"] img[src="/assets/icons/flat-week-skipped.webp"]',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Выполнено.*Открыть тренировку/i })).toHaveAttribute(

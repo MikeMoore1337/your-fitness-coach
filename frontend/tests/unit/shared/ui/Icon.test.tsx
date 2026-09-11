@@ -1,8 +1,25 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Icon } from '../../../../src/shared/ui/Icon';
+import type { IconName } from '../../../../src/shared/ui/Icon';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 describe('Icon', () => {
+  it('provides a real flat raster for every supported semantic icon', () => {
+    const source = readFileSync(resolve('src/shared/ui/Icon.tsx'), 'utf8');
+    const names = [
+      ...source.slice(0, source.indexOf('export interface')).matchAll(/\| '([^']+)'/g),
+    ];
+    expect(names.length).toBeGreaterThan(60);
+    for (const [, name] of names) {
+      const { container, unmount } = render(<Icon name={name as IconName} />);
+      const src = container.querySelector('img')?.getAttribute('src');
+      expect(src).toMatch(/^\/assets\/icons\/flat-[a-z-]+\.webp$/);
+      expect(existsSync(resolve('public', src!.slice(1)))).toBe(true);
+      unmount();
+    }
+  });
   it('renders theme-specific raster assets at supported optical sizes', () => {
     const { container } = render(<Icon name="nav-progress" size={20} />);
     const icon = container.querySelector('[data-icon="nav-progress"]');

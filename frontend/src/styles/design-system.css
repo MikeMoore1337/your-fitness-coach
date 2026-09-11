@@ -806,6 +806,7 @@ body {
 }
 .yfc-icon > .yfc-icon__light {
   display: none;
+  filter: brightness(0.35);
 }
 :root[data-color-scheme='light'] .yfc-icon > .yfc-icon__light,
 .public-shell--light .yfc-icon > .yfc-icon__light {
@@ -821,12 +822,12 @@ body {
 .public-shell--dark .yfc-icon > .yfc-icon__light {
   display: none;
 }
-.ui-button--primary .yfc-icon:not(.yfc-icon--object) > .yfc-icon__light,
-.landing-button .yfc-icon:not(.yfc-icon--object) > .yfc-icon__light {
+.ui-button--primary .yfc-icon > .yfc-icon__light,
+.landing-button:not(.landing-button--secondary) .yfc-icon > .yfc-icon__light {
   display: block;
 }
-.ui-button--primary .yfc-icon:not(.yfc-icon--object) > .yfc-icon__dark,
-.landing-button .yfc-icon:not(.yfc-icon--object) > .yfc-icon__dark {
+.ui-button--primary .yfc-icon > .yfc-icon__dark,
+.landing-button:not(.landing-button--secondary) .yfc-icon > .yfc-icon__dark {
   display: none;
 }
 .app-bottom-nav__icon .yfc-icon--object {

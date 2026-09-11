@@ -135,6 +135,7 @@
   background: #e7f5c8;
 }
 .strength-scene__record img {
+  filter: brightness(0.35);
   object-fit: contain;
 }
 .strength-scene__record small {
