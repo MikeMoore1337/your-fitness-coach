@@ -149,7 +149,7 @@ slowapi==0.1.10
     # via -r backend/requirements.in
 socksio==1.0.0
     # via httpx
-sqlalchemy==2.0.51
+sqlalchemy==2.0.52
     # via
     #   -r backend/requirements.in
     #   alembic
