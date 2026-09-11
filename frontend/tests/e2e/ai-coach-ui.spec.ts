@@ -157,11 +157,11 @@ async function openAiCoachSurface(
 
   if (viewport.width <= 640) {
     const securityLink = page.getByRole('link', {
-      name: 'Аккаунт и безопасность Вход, копия данных, аккаунт',
+      name: 'Доступ и безопасность',
       exact: true,
     });
     const aiCoachLink = page.getByRole('link', {
-      name: 'AI Coach Доступность и личный контекст',
+      name: 'AI Coach',
       exact: true,
     });
     const [securityBox, aiCoachBox] = await Promise.all([
