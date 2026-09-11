@@ -142,7 +142,11 @@ test('current action and floating dock preserve the shared navigation contract',
   const desktopNavigation = page.locator('#appBottomNav');
   await expect(desktopNavigation).toHaveCSS('width', '220px');
   await expect(desktopNavigation).toHaveCSS('border-radius', '0px');
-  await page.getByRole('button', { name: 'Добавить фактическое кардио' }).click();
+  await page.getByRole('button', { name: 'Быстро добавить' }).click();
+  await page
+    .getByRole('dialog', { name: 'Что добавить?' })
+    .getByRole('link', { name: /Добавить кардио/ })
+    .click();
   const cardioFieldTops = await page.locator('.cardio-form__core').evaluate((form) => {
     const top = (selector: string) =>
       form.querySelector<HTMLElement>(selector)!.getBoundingClientRect().top;

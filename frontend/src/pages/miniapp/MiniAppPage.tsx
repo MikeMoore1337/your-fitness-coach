@@ -540,56 +540,70 @@ export default function MiniAppPage() {
                   <a
                     className="profile-settings-nav__item"
                     href="#profile-personal"
+                    aria-label="Личные данные"
+                    aria-describedby="profile-nav-personal-description"
                     onClick={() => openProfileSection('profile-personal')}
                   >
                     <Icon name="nav-profile" size={16} />
-                    <span>Личные данные и цели</span>
-                    <small>Имя, параметры, часовой пояс</small>
+                    <span>Личные данные</span>
+                    <small id="profile-nav-personal-description">
+                      Имя, параметры, часовой пояс
+                    </small>
                   </a>
                   <a
                     className="profile-settings-nav__item"
                     href="#profile-fitness"
+                    aria-label="Цели и параметры"
+                    aria-describedby="profile-nav-fitness-description"
                     onClick={() => openProfileSection('profile-personal', 'profile-fitness')}
                   >
                     <Icon name="nav-plan" size={16} />
-                    <span>Тренировочный профиль</span>
-                    <small>Цель, уровень и частота</small>
+                    <span>Цели и параметры</span>
+                    <small id="profile-nav-fitness-description">Цель, уровень и частота</small>
                   </a>
                   <a
                     className="profile-settings-nav__item"
                     href="#profile-trainer"
+                    aria-label="Тренер и приглашения"
+                    aria-describedby="profile-nav-trainer-description"
                     onClick={() => openProfileSection('profile-trainer')}
                   >
                     <Icon name="nav-coach" size={16} />
-                    <span>Тренер</span>
-                    <small>Приглашения и режим тренера</small>
+                    <span>Тренер и приглашения</span>
+                    <small id="profile-nav-trainer-description">Приглашения и режим тренера</small>
                   </a>
                   <a
                     className="profile-settings-nav__item"
                     href="#profile-notifications"
+                    aria-label="Уведомления"
+                    aria-describedby="profile-nav-notifications-description"
                     onClick={() => openProfileSection('profile-notifications')}
                   >
                     <Icon name="nav-today" size={16} />
                     <span>Уведомления</span>
-                    <small>Напоминания и время</small>
+                    <small id="profile-nav-notifications-description">Напоминания и время</small>
                   </a>
                   <a
                     className="profile-settings-nav__item"
                     href="#profile-security"
+                    aria-label="Доступ и безопасность"
+                    aria-describedby="profile-nav-security-description"
                     onClick={() => openProfileSection('profile-security')}
                   >
                     <Icon name="account-security" size={16} />
-                    <span>Аккаунт и безопасность</span>
-                    <small>Вход, копия данных, аккаунт</small>
+                    <span>Доступ и безопасность</span>
+                    <small id="profile-nav-security-description">Вход, копия данных, аккаунт</small>
                   </a>
                   <a
                     className="profile-settings-nav__item"
                     href="#profile-ai-coach"
+                    aria-label="AI Coach"
+                    aria-describedby="profile-nav-ai-description"
                     onClick={() => openProfileSection('profile-ai-coach')}
                   >
                     <Icon name="ai-coach" size={16} />
                     <span>AI Coach</span>
-                    <small>
+                    <small id="profile-nav-ai-description">
                       {aiCoachStatus.isLoading
                         ? 'Проверяем доступность'
                         : aiCoachStatus.data?.ui_enabled

@@ -377,12 +377,7 @@ test('core navigation keeps the locked order, labels, active state and deep link
 
   const destinations = page.locator('#appBottomNav .app-bottom-nav__primary > a');
   await expect(destinations).toHaveCount(4);
-  expect(await destinations.allTextContents()).toEqual([
-    'Сегодня',
-    'Программа',
-    'Питание',
-    'Прогресс',
-  ]);
+  expect(await destinations.allTextContents()).toEqual(['Сегодня', 'План', 'Питание', 'Прогресс']);
   expect(
     await destinations.evaluateAll((links) => links.map((link) => link.getAttribute('href'))),
   ).toEqual([
@@ -406,12 +401,12 @@ test('core navigation keeps the locked order, labels, active state and deep link
   await expect(page.getByRole('dialog', { name: 'Профиль и настройки' })).toBeVisible();
   await page.getByRole('button', { name: 'Закрыть меню' }).click();
 
-  await page.getByRole('link', { name: 'Программа', exact: true }).click();
-  await expect(page.getByRole('link', { name: 'Программа', exact: true })).toHaveAttribute(
+  await page.getByRole('link', { name: 'План', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'План', exact: true })).toHaveAttribute(
     'aria-current',
     'page',
   );
-  await expect(page.getByRole('heading', { name: 'Программа тренировок' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'План' })).toBeVisible();
 });
 
 test('planned workout starts from the primary Today CTA', async ({ page }) => {
@@ -606,8 +601,13 @@ test('Today keeps hierarchy and has no horizontal overflow at required widths', 
     expect(nutritionBox).not.toBeNull();
     expect(progressBox).not.toBeNull();
     const summaryGap = progressBox!.y - (nutritionBox!.y + nutritionBox!.height);
-    expect(summaryGap).toBeGreaterThanOrEqual(11);
-    expect(summaryGap).toBeLessThanOrEqual(13);
+    if (viewport.width >= 900) {
+      expect(Math.abs(progressBox!.y - nutritionBox!.y)).toBeLessThanOrEqual(1);
+      expect(progressBox!.x - (nutritionBox!.x + nutritionBox!.width)).toBeGreaterThanOrEqual(11);
+    } else {
+      expect(summaryGap).toBeGreaterThanOrEqual(11);
+      expect(summaryGap).toBeLessThanOrEqual(13);
+    }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
   }
 });
