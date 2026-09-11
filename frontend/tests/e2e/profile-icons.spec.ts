@@ -16,7 +16,7 @@ for (const width of [390, 1440])
       for (const [selector, asset] of [
         ['[data-icon="account-security"]', 'security'],
         ['[data-icon="ai-coach"]', 'ai'],
-      ]) {
+      ] as const) {
         const icons = page.locator(selector);
         await expect(icons).toHaveCount(2);
         for (const icon of await icons.all()) {
