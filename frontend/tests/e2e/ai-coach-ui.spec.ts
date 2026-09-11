@@ -20,6 +20,35 @@ async function installAiCoachApi(page: Page, personalAvailable = false): Promise
         json: { ui_enabled: true, generic_available: true, personal_available: personalAvailable },
       });
     }
+    if (path.endsWith('/memory') && request.method() === 'GET') {
+      return route.fulfill({
+        json: {
+          status: 'revoked',
+          scope: 'ai_coach_memory_v1',
+          consent_version: 'ai-coach-memory-v1',
+          categories: [
+            'preferred_explanation_style',
+            'ai_interaction_preferences',
+            'stable_non_medical_preferences',
+            'explicit_ai_context',
+          ],
+          category_labels: {
+            preferred_explanation_style: 'Стиль объяснений',
+            ai_interaction_preferences: 'Предпочтения общения',
+            stable_non_medical_preferences: 'Стабильные немедицинские предпочтения',
+            explicit_ai_context: 'Явный контекст для AI Coach',
+          },
+          purpose: 'Внутренняя оценка AI Coach memory',
+          retention_notice: 'Память выключена по умолчанию.',
+          max_items: 20,
+          consent_source: 'test',
+          items: [],
+          granted_at: null,
+          paused_at: null,
+          revoked_at: null,
+        },
+      });
+    }
     if (path.endsWith('/consent')) {
       return route.fulfill({
         json: {
@@ -69,7 +98,7 @@ async function installAiCoachApi(page: Page, personalAvailable = false): Promise
           ],
           limitations: ['Пропущенные дни не считаются нулевыми.'],
           safety_category: 'clear',
-          prompt_version: 'ai-coach-period-report-v1',
+          prompt_version: 'ai-coach-period-report-v2',
           request_id: 'period-request',
           report_version: 'progress-report-v1',
           input_version: 'ai-coach-period-report-input-v1',
@@ -97,7 +126,7 @@ async function installAiCoachApi(page: Page, personalAvailable = false): Promise
           ],
           limitations: ['Это автоматическая проверка без доступа к истории пользователя.'],
           safety_category: 'clear',
-          prompt_version: 'ai-coach-beta-v1',
+          prompt_version: 'ai-coach-beta-v2',
           request_id: 'ui-eval-request',
         },
       });

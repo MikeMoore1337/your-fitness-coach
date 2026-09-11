@@ -107,6 +107,72 @@ class AiCoachConsentResponse(BaseModel):
     revoked_at: datetime | None = None
 
 
+class AiCoachMemoryConsentUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["enabled", "paused", "revoked"]
+
+
+class AiCoachMemoryCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    category: Literal[
+        "preferred_explanation_style",
+        "ai_interaction_preferences",
+        "stable_non_medical_preferences",
+        "explicit_ai_context",
+    ]
+    value: str = Field(..., min_length=1, max_length=240)
+    confirmation: Literal[True]
+
+
+class AiCoachMemoryUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: str = Field(..., min_length=1, max_length=240)
+    confirmation: Literal[True]
+
+
+class AiCoachMemoryItemResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    category: str
+    category_label: str
+    value: str
+    source_kind: Literal["explicit_user", "confirmed_candidate"]
+    confidence: Literal["explicit", "confirmed"]
+    status: Literal["active", "superseded", "conflicted", "deleted"]
+    version: int
+    created_at: datetime
+    updated_at: datetime
+    expires_at: datetime | None = None
+
+
+class AiCoachMemoryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["enabled", "paused", "revoked"]
+    scope: str
+    consent_version: str
+    categories: tuple[str, ...]
+    category_labels: dict[str, str]
+    purpose: str
+    retention_notice: str
+    max_items: int
+    consent_source: str
+    granted_at: datetime | None = None
+    paused_at: datetime | None = None
+    revoked_at: datetime | None = None
+    items: tuple[AiCoachMemoryItemResponse, ...] = ()
+
+
+class AiCoachMemoryClearResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deleted_count: int
+
+
 class AiCoachStatusResponse(BaseModel):
     """Safe server-authoritative state for the internal beta UI."""
 
@@ -121,6 +187,12 @@ __all__ = [
     "AiCoachConsentResponse",
     "AiCoachConsentUpdateRequest",
     "AiCoachGenerateRequest",
+    "AiCoachMemoryClearResponse",
+    "AiCoachMemoryConsentUpdateRequest",
+    "AiCoachMemoryCreateRequest",
+    "AiCoachMemoryItemResponse",
+    "AiCoachMemoryResponse",
+    "AiCoachMemoryUpdateRequest",
     "AiCoachPersonalGenerateRequest",
     "AiCoachResponse",
     "AiCoachStatusResponse",

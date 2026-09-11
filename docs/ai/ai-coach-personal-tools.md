@@ -48,10 +48,13 @@ scope или проверенной provider policy делает прежнее 
 контролируемый `unavailable`.
 
 В provider уходит только текущая ограниченная структурированная сводка для выбранного
-tool и пользовательский вопрос. Промпт, ответ и tool payload не сохраняются в БД;
+tool, пользовательский вопрос и, при отдельном enabled memory consent, небольшой
+continuity context из разрешённых предпочтений. Memory не является evidence и не может
+переопределить canonical tool. Промпт, ответ и tool payload не сохраняются в БД;
 в логах остаются только request metadata, outcome, tool name, latency, token/cost
-metadata и безопасный error code. Экспорт содержит только историю согласия и не
-содержит prompt/answer/context payload. Удаление аккаунта удаляет запись согласия.
+metadata и безопасный error code. Экспорт содержит историю согласия и управляемые
+memory items, но не содержит prompt/answer/context payload. Удаление аккаунта удаляет
+обе записи согласия и memory items.
 
 ## Ограничения безопасности
 
