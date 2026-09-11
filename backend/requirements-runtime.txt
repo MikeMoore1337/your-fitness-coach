@@ -19,7 +19,7 @@ anyio==4.14.2
     #   watchfiles
 argon2-cffi==25.1.0
     # via pwdlib
-argon2-cffi-bindings==25.1.0
+argon2-cffi-bindings==26.1.0
     # via argon2-cffi
 attrs==26.1.0
     # via aiohttp
