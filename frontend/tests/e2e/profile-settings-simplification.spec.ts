@@ -128,7 +128,7 @@ test('profile stays compact while disclosures, icons and shared provider actions
     ['Цели и параметры', 'nav-plan'],
     ['Тренер и приглашения', 'nav-coach'],
     ['Уведомления', 'nav-today'],
-    ['Доступ и безопасность', 'permission-denied'],
+    ['Доступ и безопасность', 'account-security'],
   ] as const;
   const profileNavigation = page.getByRole('navigation', { name: 'Разделы профиля' });
   for (const [name, icon] of iconContract) {
