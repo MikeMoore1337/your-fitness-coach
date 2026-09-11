@@ -18,14 +18,21 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AI_COACH_DATA_CLASS = "generic"
-AI_COACH_PROMPT_VERSION = "ai-coach-beta-v1"
-AI_COACH_PERSONAL_PROMPT_VERSION = "ai-coach-personal-v1"
+AI_COACH_PROMPT_VERSION = "ai-coach-beta-v2"
+AI_COACH_PERSONAL_PROMPT_VERSION = "ai-coach-personal-v2"
 AI_COACH_SCHEMA_VERSION = "ai-coach-answer-v1"
-AI_COACH_PERIOD_REPORT_PROMPT_VERSION = "ai-coach-period-report-v1"
+AI_COACH_PERIOD_REPORT_PROMPT_VERSION = "ai-coach-period-report-v2"
 AI_COACH_PERIOD_REPORT_INPUT_VERSION = "ai-coach-period-report-input-v1"
 AI_COACH_PERIOD_REPORT_OUTPUT_VERSION = "ai-coach-period-report-output-v1"
 _BoundedLimitation = Annotated[str, Field(max_length=240)]
 _BoundedAnchor = Annotated[str, Field(min_length=1, max_length=128)]
+AiCoachMemoryCategory = Literal[
+    "preferred_explanation_style",
+    "ai_interaction_preferences",
+    "stable_non_medical_preferences",
+    "explicit_ai_context",
+]
+AiCoachMemoryOrigin = Literal["explicit_user", "confirmed_candidate"]
 
 
 def _validate_https_url(value: str) -> str:
@@ -81,6 +88,17 @@ class AiCoachOutcome(StrEnum):
     CONSENT_REQUIRED = "consent_required"
 
 
+class AiCoachMemoryContext(BaseModel):
+    """A bounded continuity hint; it is never canonical evidence."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    category: AiCoachMemoryCategory
+    value: str = Field(..., min_length=1, max_length=240)
+    origin: AiCoachMemoryOrigin
+    updated_at: str = Field(..., min_length=1, max_length=32)
+
+
 class ProviderErrorCode(StrEnum):
     DISABLED = "disabled"
     POLICY_BLOCKED = "policy_blocked"
@@ -104,6 +122,7 @@ class AiCoachRequest(BaseModel):
     data_class: AiCoachDataClass
     tool_name: AiCoachPersonalTool | None = None
     locale: Literal["ru"] = "ru"
+    memory_context: tuple[AiCoachMemoryContext, ...] = ()
 
     @field_validator("context_id")
     @classmethod

@@ -45,6 +45,12 @@ from fitminiapp_api.schemas.ai_coach import (
     AiCoachConsentResponse,
     AiCoachConsentUpdateRequest,
     AiCoachGenerateRequest,
+    AiCoachMemoryClearResponse,
+    AiCoachMemoryConsentUpdateRequest,
+    AiCoachMemoryCreateRequest,
+    AiCoachMemoryItemResponse,
+    AiCoachMemoryResponse,
+    AiCoachMemoryUpdateRequest,
     AiCoachPersonalGenerateRequest,
     AiCoachStatusResponse,
 )
@@ -54,6 +60,21 @@ from fitminiapp_api.services.ai_coach_consent import (
     has_active_ai_coach_consent,
     serialize_ai_coach_consent,
     set_ai_coach_consent,
+)
+from fitminiapp_api.services.ai_coach_memory import (
+    AiCoachMemoryValidationError,
+    clear_ai_coach_memories,
+    create_ai_coach_memory,
+    delete_ai_coach_memory,
+    get_ai_coach_memory_consent,
+    get_ai_coach_memory_context,
+    get_owned_ai_coach_memory,
+    has_active_ai_coach_memory_consent,
+    list_ai_coach_memories,
+    serialize_ai_coach_memory,
+    serialize_ai_coach_memory_consent,
+    set_ai_coach_memory_consent,
+    update_ai_coach_memory,
 )
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.period_bounds import PeriodBoundsError, progress_period_for_days
@@ -290,6 +311,178 @@ def update_personal_ai_coach_consent(
     return AiCoachConsentResponse.model_validate(serialize_ai_coach_consent(consent))
 
 
+def _memory_response(db: Session, user_id: int) -> AiCoachMemoryResponse:
+    consent = get_ai_coach_memory_consent(db, user_id)
+    return AiCoachMemoryResponse.model_validate(
+        {
+            **serialize_ai_coach_memory_consent(consent),
+            "items": tuple(
+                serialize_ai_coach_memory(memory) for memory in list_ai_coach_memories(db, user_id)
+            ),
+        }
+    )
+
+
+def _require_active_memory_consent(db: Session, user_id: int) -> None:
+    if not has_active_ai_coach_memory_consent(get_ai_coach_memory_consent(db, user_id)):
+        raise HTTPException(
+            status_code=409,
+            detail="Сначала включите отдельную память AI Coach",
+        )
+
+
+@router.get("/memory", response_model=AiCoachMemoryResponse)
+@limiter.limit("30/hour")
+def get_ai_coach_memory(
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachMemoryResponse:
+    del request
+    return _memory_response(db, current_user.id)
+
+
+@router.put("/memory/consent", response_model=AiCoachMemoryResponse)
+@limiter.limit("20/hour")
+def update_ai_coach_memory_consent(
+    payload: AiCoachMemoryConsentUpdateRequest,
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachMemoryResponse:
+    del request
+    consent = set_ai_coach_memory_consent(
+        db,
+        user_id=current_user.id,
+        status=payload.status,
+    )
+    record_audit_event(
+        db,
+        action=f"ai_coach.memory_consent_{payload.status}",
+        resource_type="ai_coach_memory_consent",
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        details={
+            "scope": consent.scope,
+            "consent_version": consent.consent_version,
+            "status": payload.status,
+        },
+    )
+    db.commit()
+    return _memory_response(db, current_user.id)
+
+
+@router.post("/memory", response_model=AiCoachMemoryItemResponse)
+@limiter.limit("30/hour")
+def create_ai_coach_memory_item(
+    payload: AiCoachMemoryCreateRequest,
+    request: Request,
+    current_user: User = Depends(require_ai_coach_cohort),
+    db: Session = Depends(get_db),
+) -> AiCoachMemoryItemResponse:
+    del request
+    _require_active_memory_consent(db, current_user.id)
+    try:
+        memory = create_ai_coach_memory(
+            db,
+            user_id=current_user.id,
+            category=payload.category,
+            value=payload.value,
+        )
+    except AiCoachMemoryValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    record_audit_event(
+        db,
+        action="ai_coach.memory_created",
+        resource_type="ai_coach_memory",
+        resource_id=str(memory.id),
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        details={"category": memory.category, "source_kind": memory.source_kind},
+    )
+    db.commit()
+    return AiCoachMemoryItemResponse.model_validate(serialize_ai_coach_memory(memory))
+
+
+@router.delete("/memory", response_model=AiCoachMemoryClearResponse)
+@limiter.limit("10/hour")
+def clear_ai_coach_memory(
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachMemoryClearResponse:
+    del request
+    deleted_count = clear_ai_coach_memories(db, user_id=current_user.id)
+    record_audit_event(
+        db,
+        action="ai_coach.memory_cleared",
+        resource_type="ai_coach_memory",
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        details={"deleted_count": deleted_count},
+    )
+    db.commit()
+    return AiCoachMemoryClearResponse(deleted_count=deleted_count)
+
+
+@router.patch("/memory/{memory_id}", response_model=AiCoachMemoryItemResponse)
+@limiter.limit("30/hour")
+def update_ai_coach_memory_item(
+    memory_id: int,
+    payload: AiCoachMemoryUpdateRequest,
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachMemoryItemResponse:
+    del request
+    _require_active_memory_consent(db, current_user.id)
+    memory = get_owned_ai_coach_memory(db, user_id=current_user.id, memory_id=memory_id)
+    if memory is None:
+        raise HTTPException(status_code=404, detail="Элемент AI Coach memory не найден")
+    try:
+        update_ai_coach_memory(db, memory=memory, value=payload.value)
+    except AiCoachMemoryValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    record_audit_event(
+        db,
+        action="ai_coach.memory_updated",
+        resource_type="ai_coach_memory",
+        resource_id=str(memory.id),
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        details={"category": memory.category, "version": memory.version},
+    )
+    db.commit()
+    return AiCoachMemoryItemResponse.model_validate(serialize_ai_coach_memory(memory))
+
+
+@router.delete("/memory/{memory_id}", response_model=AiCoachMemoryClearResponse)
+@limiter.limit("30/hour")
+def delete_ai_coach_memory_item(
+    memory_id: int,
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachMemoryClearResponse:
+    del request
+    memory = get_owned_ai_coach_memory(db, user_id=current_user.id, memory_id=memory_id)
+    if memory is None:
+        raise HTTPException(status_code=404, detail="Элемент AI Coach memory не найден")
+    category = memory.category
+    delete_ai_coach_memory(db, memory=memory)
+    record_audit_event(
+        db,
+        action="ai_coach.memory_deleted",
+        resource_type="ai_coach_memory",
+        resource_id=str(memory_id),
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        details={"category": category},
+    )
+    db.commit()
+    return AiCoachMemoryClearResponse(deleted_count=1)
+
+
 @router.post("/personal/generate", response_model=AiCoachResponse)
 @limiter.limit("10/minute")
 def generate_personal_ai_coach_answer(
@@ -333,6 +526,14 @@ def generate_personal_ai_coach_answer(
             answer=refusal_text(safety),
             prompt_version=response_prompt_version,
         )
+    internal_request = internal_request.model_copy(
+        update={
+            "memory_context": get_ai_coach_memory_context(
+                db,
+                user_id=current_user.id,
+            )
+        }
+    )
     if (
         not settings.ai_coach_enabled
         or settings.ai_coach_kill_switch

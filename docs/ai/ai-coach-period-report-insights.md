@@ -28,7 +28,9 @@ raw diary, названия упражнений, check-in notes, wellbeing и s
 
 `report_revision` — детерминированный SHA-256 минимального bundle без output-version.
 Он возвращается клиенту для диагностики версии snapshot, но содержимое отчёта не
-сохраняется в БД и не становится AI Coach memory.
+сохраняется в БД и не становится AI Coach memory. Отдельная memory Task 92A может
+передаваться только как пользовательский continuity context для стиля объяснения; она
+не меняет канонические факты отчёта.
 
 ## Output и safety
 
@@ -53,8 +55,9 @@ targets или reminders.
 ## Consent, cost и lifecycle
 
 Используется существующее отдельное согласие Task 89 (`personal_readonly_tools_v1`);
-новая категория данных не добавляется. Результат transient/re-generatable, без миграции
-и без long-term memory. Сохраняются только безопасные metadata: outcome, tool, latency,
+новая категория данных отчёта не добавляется. Результат transient/re-generatable, без
+сохранения report payload. Отдельная user-controlled memory описана в
+`docs/ai/ai-coach-memory.md` и не является частью отчёта. Сохраняются только безопасные metadata: outcome, tool, latency,
 bounded token/cost counters, provider policy, prompt/output version и report revision.
 
 Runtime сохраняет персональный kill switch, per-user/global quota, bounded timeout,

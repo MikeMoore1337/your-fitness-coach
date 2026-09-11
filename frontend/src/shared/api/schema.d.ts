@@ -431,6 +431,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-coach/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Memory */
+        get: operations["get_ai_coach_memory_api_v1_ai_coach_memory_get"];
+        put?: never;
+        /** Create Ai Coach Memory Item */
+        post: operations["create_ai_coach_memory_item_api_v1_ai_coach_memory_post"];
+        /** Clear Ai Coach Memory */
+        delete: operations["clear_ai_coach_memory_api_v1_ai_coach_memory_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/memory/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Ai Coach Memory Consent */
+        put: operations["update_ai_coach_memory_consent_api_v1_ai_coach_memory_consent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/memory/{memory_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Ai Coach Memory Item */
+        delete: operations["delete_ai_coach_memory_item_api_v1_ai_coach_memory__memory_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Ai Coach Memory Item */
+        patch: operations["update_ai_coach_memory_item_api_v1_ai_coach_memory__memory_id__patch"];
+        trace?: never;
+    };
     "/api/v1/ai-coach/personal/generate": {
         parameters: {
             query?: never;
@@ -3919,6 +3973,121 @@ export interface components {
          * @enum {string}
          */
         AiCoachJob: "app_help" | "public_knowledge" | "metric_explanation" | "fitness_knowledge" | "nutrition_knowledge" | "progression_explanation";
+        /** AiCoachMemoryClearResponse */
+        AiCoachMemoryClearResponse: {
+            /** Deleted Count */
+            deleted_count: number;
+        };
+        /** AiCoachMemoryConsentUpdateRequest */
+        AiCoachMemoryConsentUpdateRequest: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "enabled" | "paused" | "revoked";
+        };
+        /** AiCoachMemoryCreateRequest */
+        AiCoachMemoryCreateRequest: {
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "preferred_explanation_style" | "ai_interaction_preferences" | "stable_non_medical_preferences" | "explicit_ai_context";
+            /** Value */
+            value: string;
+            /**
+             * Confirmation
+             * @constant
+             */
+            confirmation: true;
+        };
+        /** AiCoachMemoryItemResponse */
+        AiCoachMemoryItemResponse: {
+            /** Id */
+            id: number;
+            /** Category */
+            category: string;
+            /** Category Label */
+            category_label: string;
+            /** Value */
+            value: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "explicit_user" | "confirmed_candidate";
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "explicit" | "confirmed";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "superseded" | "conflicted" | "deleted";
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Expires At */
+            expires_at?: string | null;
+        };
+        /** AiCoachMemoryResponse */
+        AiCoachMemoryResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "enabled" | "paused" | "revoked";
+            /** Scope */
+            scope: string;
+            /** Consent Version */
+            consent_version: string;
+            /** Categories */
+            categories: string[];
+            /** Category Labels */
+            category_labels: {
+                [key: string]: string;
+            };
+            /** Purpose */
+            purpose: string;
+            /** Retention Notice */
+            retention_notice: string;
+            /** Max Items */
+            max_items: number;
+            /** Consent Source */
+            consent_source: string;
+            /** Granted At */
+            granted_at?: string | null;
+            /** Paused At */
+            paused_at?: string | null;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["AiCoachMemoryItemResponse"][];
+        };
+        /** AiCoachMemoryUpdateRequest */
+        AiCoachMemoryUpdateRequest: {
+            /** Value */
+            value: string;
+            /**
+             * Confirmation
+             * @constant
+             */
+            confirmation: true;
+        };
         /**
          * AiCoachOutcome
          * @enum {string}
@@ -10682,6 +10851,178 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiCoachConsentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_coach_memory_api_v1_ai_coach_memory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryResponse"];
+                };
+            };
+        };
+    };
+    create_ai_coach_memory_item_api_v1_ai_coach_memory_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachMemoryCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_ai_coach_memory_api_v1_ai_coach_memory_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryClearResponse"];
+                };
+            };
+        };
+    };
+    update_ai_coach_memory_consent_api_v1_ai_coach_memory_consent_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachMemoryConsentUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ai_coach_memory_item_api_v1_ai_coach_memory__memory_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryClearResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ai_coach_memory_item_api_v1_ai_coach_memory__memory_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                memory_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachMemoryUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachMemoryItemResponse"];
                 };
             };
             /** @description Validation Error */

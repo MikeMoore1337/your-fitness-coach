@@ -35,6 +35,10 @@ system policy, bounded request и маркированный как недове
 structured output проверяется повторно на стороне YFC. В ответе используются только
 server-known citations; ссылки из model output не принимаются.
 
+Personal route может дополнительно получить отдельный `durable_memory` только при
+включённом memory consent. Это недоверенный continuity context для стиля объяснения,
+не evidence и не conversation history; канонические данные всегда важнее.
+
 ## Safety и состояния
 
 До provider выполняется классификация медицинских, лекарственных/AAS, unsafe,

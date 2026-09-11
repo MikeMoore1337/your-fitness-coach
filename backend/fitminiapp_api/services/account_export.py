@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from fitminiapp_api.models.ai_coach import AiCoachConsent
+from fitminiapp_api.models.ai_coach import AiCoachConsent, AiCoachMemory, AiCoachMemoryConsent
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthIdentity, LocalCredential
 from fitminiapp_api.models.cardio import CardioSession
@@ -60,7 +60,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 10
+ACCOUNT_EXPORT_SCHEMA_VERSION = 11
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -119,6 +119,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "weekly_digest_deliveries": "weekly_digest_deliveries",
     "audit_events": "audit_events",
     "ai_coach_consents": "ai_coach_consent",
+    "ai_coach_memory_consents": "ai_coach_memory_consent",
+    "ai_coach_memories": "ai_coach_memories",
 }
 
 ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
@@ -757,6 +759,15 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
     ai_coach_consent = (
         db.query(AiCoachConsent).filter(AiCoachConsent.user_id == user.id).one_or_none()
     )
+    ai_coach_memory_consent = (
+        db.query(AiCoachMemoryConsent).filter(AiCoachMemoryConsent.user_id == user.id).one_or_none()
+    )
+    ai_coach_memories = (
+        db.query(AiCoachMemory)
+        .filter(AiCoachMemory.user_id == user.id)
+        .order_by(AiCoachMemory.created_at.asc(), AiCoachMemory.id.asc())
+        .all()
+    )
     workout_comments = (
         db.query(WorkoutComment)
         .options(joinedload(WorkoutComment.revisions))
@@ -1246,4 +1257,42 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             if ai_coach_consent is not None
             else None
         ),
+        "ai_coach_memory_consent": (
+            _fields(
+                ai_coach_memory_consent,
+                (
+                    "status",
+                    "scope",
+                    "consent_version",
+                    "consent_source",
+                    "granted_at",
+                    "paused_at",
+                    "revoked_at",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            if ai_coach_memory_consent is not None
+            else None
+        ),
+        "ai_coach_memories": [
+            _fields(
+                memory,
+                (
+                    "id",
+                    "category",
+                    "value_text",
+                    "source_kind",
+                    "confidence",
+                    "status",
+                    "source_ref",
+                    "version",
+                    "created_at",
+                    "updated_at",
+                    "last_used_at",
+                    "expires_at",
+                ),
+            )
+            for memory in ai_coach_memories
+        ],
     }

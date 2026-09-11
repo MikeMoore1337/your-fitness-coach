@@ -12,6 +12,7 @@ from pydantic import SecretStr, ValidationError
 
 from fitminiapp_api.ai_coach.contracts import (
     AI_COACH_DATA_CLASS,
+    AI_COACH_PROMPT_VERSION,
     AiCoachDataClass,
     AiCoachJob,
     AiCoachPolicy,
@@ -151,7 +152,7 @@ def test_success_uses_exact_published_context_and_returns_trusted_citations(monk
 
     assert response.outcome == "answer"
     assert response.answer == provider.answer
-    assert response.prompt_version == "ai-coach-beta-v1"
+    assert response.prompt_version == "ai-coach-beta-v2"
     assert response.citations[0].url.startswith("https://")
     assert response.citations[0].source_type == "canonical_yfc"
     assert provider.calls[0][0].data_class.value == "generic"
@@ -440,7 +441,7 @@ def test_authenticated_api_assigns_generic_class_and_preserves_structured_states
     assert provider.calls[0][0].data_class.value == "generic"
     assert "provider" not in response.json()
     assert "model" not in response.json()
-    assert response.json()["prompt_version"] == "ai-coach-beta-v1"
+    assert response.json()["prompt_version"] == "ai-coach-beta-v2"
 
 
 def test_ai_coach_api_requires_authentication(client, monkeypatch) -> None:
@@ -775,7 +776,7 @@ def test_groq_adapter_sends_docs_compatible_strict_request_without_tools(monkeyp
     policy = AiCoachPolicy(
         job=request.job,
         data_class=AiCoachDataClass.GENERIC,
-        prompt_version="ai-coach-beta-v1",
+        prompt_version=AI_COACH_PROMPT_VERSION,
         schema_version="ai-coach-answer-v1",
     )
     result = GroqDirectAdapter().generate(request, policy, _provider_context())
@@ -824,7 +825,7 @@ def test_groq_adapter_normalizes_429_and_honors_bounded_retry_after(monkeypatch)
     policy = AiCoachPolicy(
         job=request.job,
         data_class=AiCoachDataClass.GENERIC,
-        prompt_version="ai-coach-beta-v1",
+        prompt_version=AI_COACH_PROMPT_VERSION,
         schema_version="ai-coach-answer-v1",
     )
 
@@ -882,7 +883,7 @@ def test_groq_adapter_rejects_incomplete_strict_output(monkeypatch) -> None:
     policy = AiCoachPolicy(
         job=request.job,
         data_class=AiCoachDataClass.GENERIC,
-        prompt_version="ai-coach-beta-v1",
+        prompt_version=AI_COACH_PROMPT_VERSION,
         schema_version="ai-coach-answer-v1",
     )
 

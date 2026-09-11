@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
   AiCoachConsentResponse,
+  AiCoachMemoryItemResponse,
+  AiCoachMemoryResponse,
   AiCoachResponse,
   AiCoachStatus,
 } from '../../shared/api/types';
@@ -17,6 +19,7 @@ import {
   type AiCoachMode,
 } from '../../shared/analytics/productEvents';
 import { Badge, Button, Card, LoadingState } from '../../shared/ui/common';
+import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import './ai-coach.css';
 
 export const AI_COACH_UI_EVAL_VERSION = 'ai-coach-ui-beta-v1';
@@ -183,6 +186,7 @@ const SAFE_FAILURE_COPY: Record<AiCoachFailureClass, string> = {
 
 export const aiCoachStatusQueryKey = ['ai-coach', 'status'] as const;
 export const aiCoachConsentQueryKey = ['ai-coach', 'consent'] as const;
+export const aiCoachMemoryQueryKey = ['ai-coach', 'memory'] as const;
 
 export function useAiCoachStatus(enabled = true) {
   return useQuery<AiCoachStatus>({
@@ -473,7 +477,8 @@ function ConsentNotice({
         <Badge tone="warning">Отдельное согласие</Badge>
         <p>
           Передача ограниченной персональной сводки включается отдельно. Сырые записи дневника,
-          заметки тренера и история чата не передаются и не сохраняются как память.
+          заметки тренера и история чата не передаются. Отдельная memory включается только вами и
+          хранит лишь разрешённые предпочтения.
         </p>
         <ul>
           <li>
@@ -486,6 +491,334 @@ function ConsentNotice({
       <Button disabled={pending} type="button" onClick={() => onChange(true)}>
         {pending ? 'Сохраняем…' : 'Разрешить сводку'}
       </Button>
+    </section>
+  );
+}
+
+const MEMORY_CATEGORY_LABELS: Record<string, string> = {
+  preferred_explanation_style: 'Стиль объяснений',
+  ai_interaction_preferences: 'Предпочтения общения',
+  stable_non_medical_preferences: 'Стабильные немедицинские предпочтения',
+  explicit_ai_context: 'Явный контекст для AI Coach',
+};
+
+function MemoryPanel() {
+  const { confirm, toast } = useFeedback();
+  const queryClient = useQueryClient();
+  const [category, setCategory] = useState('preferred_explanation_style');
+  const [value, setValue] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [editing, setEditing] = useState<AiCoachMemoryItemResponse | null>(null);
+  const memory = useQuery<AiCoachMemoryResponse>({
+    queryKey: aiCoachMemoryQueryKey,
+    queryFn: () => api<AiCoachMemoryResponse>('/api/v1/ai-coach/memory'),
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const invalidateMemory = () => queryClient.invalidateQueries({ queryKey: aiCoachMemoryQueryKey });
+  const consentMutation = useMutation({
+    mutationFn: (status: 'enabled' | 'paused' | 'revoked') =>
+      api<AiCoachMemoryResponse>('/api/v1/ai-coach/memory/consent', {
+        method: 'PUT',
+        body: { status },
+      }),
+    onSuccess: (next) => {
+      queryClient.setQueryData(aiCoachMemoryQueryKey, next);
+      toast(
+        next.status === 'enabled'
+          ? 'AI Coach memory включена.'
+          : next.status === 'paused'
+            ? 'AI Coach memory поставлена на паузу.'
+            : 'AI Coach memory отозвана.',
+      );
+    },
+    onError: () => toast('Не удалось изменить настройку AI Coach memory.', 'error'),
+  });
+  const createMutation = useMutation({
+    mutationFn: () =>
+      api<AiCoachMemoryItemResponse>('/api/v1/ai-coach/memory', {
+        method: 'POST',
+        body: { category, value: value.trim(), confirmation: true },
+      }),
+    onSuccess: () => {
+      setValue('');
+      setConfirmed(false);
+      invalidateMemory();
+      toast('Предпочтение сохранено в AI Coach memory.');
+    },
+    onError: () => toast('Это значение нельзя сохранить в AI Coach memory.', 'error'),
+  });
+  const updateMutation = useMutation({
+    mutationFn: () =>
+      api<AiCoachMemoryItemResponse>(`/api/v1/ai-coach/memory/${editing?.id ?? 0}`, {
+        method: 'PATCH',
+        body: { value: value.trim(), confirmation: true },
+      }),
+    onSuccess: () => {
+      setValue('');
+      setConfirmed(false);
+      setEditing(null);
+      invalidateMemory();
+      toast('Предпочтение обновлено.');
+    },
+    onError: () => toast('Не удалось обновить это предпочтение.', 'error'),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (memoryId: number) =>
+      api<{ deleted_count: number }>(`/api/v1/ai-coach/memory/${memoryId}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      invalidateMemory();
+      toast('Предпочтение удалено.');
+    },
+    onError: () => toast('Не удалось удалить предпочтение.', 'error'),
+  });
+  const clearMutation = useMutation({
+    mutationFn: () =>
+      api<{ deleted_count: number }>('/api/v1/ai-coach/memory', { method: 'DELETE' }),
+    onSuccess: () => {
+      setEditing(null);
+      setValue('');
+      setConfirmed(false);
+      invalidateMemory();
+      toast('AI Coach memory очищена.');
+    },
+    onError: () => toast('Не удалось очистить AI Coach memory.', 'error'),
+  });
+
+  if (memory.isLoading) return <LoadingState label="Загружаем настройки AI Coach memory…" />;
+  if (memory.isError || !memory.data) {
+    return (
+      <section className="ai-coach-memory ai-coach-memory--error" role="alert">
+        <strong>Настройки memory недоступны</strong>
+        <p>
+          Попробуйте обновить экран. Публичная помощь и личная сводка остаются отдельными режимами.
+        </p>
+      </section>
+    );
+  }
+
+  const current = memory.data;
+  const items = current.items ?? [];
+  const memoryEnabled = current.status === 'enabled';
+  const pending =
+    consentMutation.isPending ||
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    clearMutation.isPending;
+  const submitMemory = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!memoryEnabled || !value.trim() || !confirmed || pending) return;
+    if (editing) updateMutation.mutate();
+    else createMutation.mutate();
+  };
+  const startEditing = (item: AiCoachMemoryItemResponse) => {
+    setEditing(item);
+    setCategory(item.category);
+    setValue(item.value);
+    setConfirmed(false);
+  };
+  const cancelEditing = () => {
+    setEditing(null);
+    setValue('');
+    setConfirmed(false);
+  };
+  const removeOne = async (item: AiCoachMemoryItemResponse) => {
+    if (
+      await confirm({
+        title: 'Удалить это предпочтение?',
+        message: 'Оно будет сразу исключено из будущих запросов и удалено из memory.',
+        confirmText: 'Удалить',
+      })
+    ) {
+      deleteMutation.mutate(item.id);
+    }
+  };
+  const clearAll = async () => {
+    if (
+      await confirm({
+        title: 'Очистить AI Coach memory?',
+        message: 'Все сохранённые предпочтения будут удалены без возможности восстановления.',
+        confirmText: 'Очистить',
+      })
+    ) {
+      clearMutation.mutate();
+    }
+  };
+  const revoke = async () => {
+    if (
+      await confirm({
+        title: 'Отозвать использование memory?',
+        message:
+          'Записи останутся доступными для просмотра и удаления, но сразу перестанут передаваться AI Coach.',
+        confirmText: 'Отозвать',
+      })
+    ) {
+      consentMutation.mutate('revoked');
+    }
+  };
+
+  return (
+    <section className="ai-coach-memory" data-testid="ai-coach-memory">
+      <div className="ai-coach-memory__header">
+        <div>
+          <div className="ai-coach-memory__title">
+            <Badge tone={current.status === 'enabled' ? 'success' : 'warning'}>
+              {current.status === 'enabled'
+                ? 'Memory включена'
+                : current.status === 'paused'
+                  ? 'Memory на паузе'
+                  : 'Memory выключена'}
+            </Badge>
+            <strong>Отдельная память AI Coach</strong>
+          </div>
+          <p>{current.purpose}</p>
+          <small>{current.retention_notice}</small>
+        </div>
+        <div className="ai-coach-memory__actions">
+          {current.status === 'enabled' && (
+            <Button
+              disabled={pending}
+              type="button"
+              variant="secondary"
+              onClick={() => consentMutation.mutate('paused')}
+            >
+              Поставить на паузу
+            </Button>
+          )}
+          {current.status === 'paused' && (
+            <Button
+              disabled={pending}
+              type="button"
+              onClick={() => consentMutation.mutate('enabled')}
+            >
+              Возобновить memory
+            </Button>
+          )}
+          {current.status === 'revoked' && (
+            <Button
+              disabled={pending}
+              type="button"
+              onClick={() => consentMutation.mutate('enabled')}
+            >
+              Включить memory
+            </Button>
+          )}
+          {current.status !== 'revoked' && (
+            <Button disabled={pending} type="button" variant="secondary" onClick={revoke}>
+              Отозвать
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="ai-coach-memory__notice">
+        <strong>Что разрешено сохранять</strong>
+        <span>
+          Только четыре категории ниже. Канонические данные профиля, цели, питание, вода,
+          тренировки, прогресс, оборудование, медицинские сведения и история диалога всегда имеют
+          приоритет или не сохраняются.
+        </span>
+      </div>
+      <div className="ai-coach-memory__categories">
+        {current.categories.map((item) => (
+          <span key={item}>
+            {current.category_labels[item] ?? MEMORY_CATEGORY_LABELS[item] ?? item}
+          </span>
+        ))}
+      </div>
+
+      <form className="ai-coach-memory__form" onSubmit={submitMemory}>
+        <div className="ai-coach-memory__form-heading">
+          <strong>{editing ? 'Изменить предпочтение' : 'Добавить предпочтение'}</strong>
+          <small>
+            {memoryEnabled
+              ? 'Не более 240 символов, одной строкой.'
+              : 'Включите memory, чтобы добавлять или изменять записи.'}
+          </small>
+        </div>
+        {!editing && (
+          <label>
+            <span>Категория</span>
+            <select
+              disabled={!memoryEnabled || pending}
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+            >
+              {current.categories.map((item) => (
+                <option key={item} value={item}>
+                  {current.category_labels[item] ?? MEMORY_CATEGORY_LABELS[item] ?? item}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label>
+          <span>Текст предпочтения</span>
+          <input
+            disabled={!memoryEnabled || pending}
+            maxLength={240}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder="Например: объясняй коротко и по пунктам"
+          />
+        </label>
+        <label className="ai-coach-memory__confirmation">
+          <input
+            checked={confirmed}
+            disabled={!memoryEnabled || pending}
+            type="checkbox"
+            onChange={(event) => setConfirmed(event.target.checked)}
+          />
+          <span>Подтверждаю, что это только моё немедицинское предпочтение или контекст.</span>
+        </label>
+        <div className="ai-coach-memory__form-actions">
+          <Button disabled={!memoryEnabled || !value.trim() || !confirmed || pending} type="submit">
+            {editing ? 'Сохранить изменение' : 'Сохранить в memory'}
+          </Button>
+          {editing && (
+            <Button disabled={pending} type="button" variant="secondary" onClick={cancelEditing}>
+              Отмена
+            </Button>
+          )}
+        </div>
+      </form>
+
+      {items.length > 0 ? (
+        <div className="ai-coach-memory__list" aria-label="Сохранённые элементы memory">
+          {items.map((item) => (
+            <article className="ai-coach-memory__item" key={item.id}>
+              <div>
+                <Badge tone="neutral">{item.category_label}</Badge>
+                <p>{item.value}</p>
+                <small>Добавлено вами; canonical data остаётся источником истины.</small>
+              </div>
+              <div className="ai-coach-memory__item-actions">
+                <button
+                  disabled={!memoryEnabled || pending}
+                  type="button"
+                  onClick={() => startEditing(item)}
+                >
+                  Изменить
+                </button>
+                <button type="button" onClick={() => removeOne(item)}>
+                  Удалить
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="ai-coach-memory__empty">Пока ничего не сохранено.</p>
+      )}
+      {items.length > 0 && (
+        <Button disabled={pending} type="button" variant="danger" onClick={clearAll}>
+          Очистить всю memory
+        </Button>
+      )}
     </section>
   );
 }
@@ -544,7 +877,7 @@ export function AiCoachSettingsCard({
           <Icon name="ai-coach" size={20} /> AI Coach · внутренняя beta
         </>
       }
-      description="Публичная помощь и отдельные сводки без долгосрочной памяти."
+      description="Публичная помощь, отдельные сводки и необязательная user-controlled memory."
     >
       <AiCoachExperience status={status} entryPoint="profile" />
     </Card>
@@ -804,9 +1137,10 @@ export function AiCoachExperience({
           <span className="eyebrow">Внутренняя проверка</span>
           <h3>Проверяем полезность маленькими шагами</h3>
           <p>
-            Здесь нет долгосрочной памяти и автоматических изменений. Публичный режим работает по
-            опубликованному материалу, а личный — только по одной готовой сводке за выбранный
-            период. Личный запрос запускается вручную в бесплатной beta-квоте.
+            Память выключена по умолчанию и управляется отдельно. Публичный режим работает по
+            опубликованному материалу, а личный — по одной готовой сводке за выбранный период и,
+            только при отдельном включении, по вашим разрешённым предпочтениям. Личный запрос
+            запускается вручную в бесплатной beta-квоте.
           </p>
         </div>
         <Badge tone="warning">Не замена врачу или тренеру</Badge>
@@ -855,6 +1189,7 @@ export function AiCoachExperience({
           unavailable={!status.personal_available}
         />
       )}
+      {mode === 'personal' && <MemoryPanel />}
       {consent.isError && mode === 'personal' && status.personal_available && (
         <p className="ai-coach-inline-error" role="alert">
           Не удалось проверить согласие. Публичная помощь остаётся доступной отдельно.

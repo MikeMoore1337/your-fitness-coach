@@ -153,6 +153,8 @@ export type TrainerClientProgressSummary = ApiSchemas['TrainerClientProgressSumm
 export type TrainerClientProgressList = ApiSchemas['TrainerClientProgressListResponse'];
 export type AiCoachResponse = ApiSchemas['AiCoachResponse'];
 export type AiCoachConsentResponse = ApiSchemas['AiCoachConsentResponse'];
+export type AiCoachMemoryItemResponse = ApiSchemas['AiCoachMemoryItemResponse'];
+export type AiCoachMemoryResponse = ApiSchemas['AiCoachMemoryResponse'];
 export type AiCoachStatus = ApiSchemas['AiCoachStatusResponse'];
 
 export interface PublicConfig {
