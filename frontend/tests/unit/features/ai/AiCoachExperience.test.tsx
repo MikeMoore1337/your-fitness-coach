@@ -26,14 +26,14 @@ const status = {
   personal_available: false,
 } as const;
 
-function renderExperience() {
+function renderExperience(experienceStatus: AiCoachStatus = status) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
       <NavigationProvider>
-        <AiCoachExperience entryPoint="profile" status={status} />
+        <AiCoachExperience entryPoint="profile" status={experienceStatus} />
       </NavigationProvider>
     </QueryClientProvider>,
   );
@@ -148,5 +148,97 @@ describe('AiCoachExperience', () => {
     );
     expect(screen.getByText(/Чужая ссылка/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Чужая ссылка' })).not.toBeInTheDocument();
+  });
+
+  it('sends a bounded custom period and renders grounded insight groups', async () => {
+    apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/consent') {
+        return {
+          status: 'granted',
+          scope: 'personal_readonly_tools_v1',
+          consent_version: 'ai-coach-personal-v1',
+          categories: ['personal_progress', 'training_history', 'nutrition_summary'],
+          purpose: 'test',
+          provider_name: 'groq',
+          provider_policy_revision: 'test',
+          retention_notice: 'test',
+          consent_source: 'test',
+          granted_at: null,
+          revoked_at: null,
+        };
+      }
+      if (path === '/api/v1/ai-coach/personal/generate') {
+        expect(options?.body).toEqual({
+          tool: 'get_period_report_insights',
+          period_days: 30,
+          period: 'custom',
+          date_from: '2026-09-01',
+          date_to: '2026-09-07',
+          message:
+            'Сделай краткий итог моего канонического отчёта за выбранный период: факты, ограничения данных и 1–3 обратимых следующих шага.',
+        });
+        return {
+          outcome: 'answer',
+          answer:
+            'Главное за период\n\n- Выполнено 3 тренировки.\n\nОграничения данных\n\n- Питание заполнено не полностью.\n\nЧто можно сделать дальше\n\n- Заполнить пропуски.\n\nПочему\n\n- Основание в отчёте.',
+          citations: [
+            {
+              title: 'Канонический отчёт',
+              publisher: 'YFC',
+              url: 'https://your-fitness-coach.ru/progress',
+              source_type: 'personal_tool_screen',
+            },
+          ],
+          insights: [
+            {
+              kind: 'fact',
+              text: 'За период выполнено 3 тренировки.',
+              evidence_ids: ['training.completed_workouts'],
+              reason_keys: [],
+            },
+            {
+              kind: 'suggestion',
+              text: 'Заполнить пропуски и повторить запрос.',
+              evidence_ids: ['nutrition.logged_days'],
+              reason_keys: ['nutrition_missing_days'],
+            },
+          ],
+          limitations: ['Пропущенные дни не считаются нулевыми.'],
+          safety_category: 'clear',
+          prompt_version: 'ai-coach-period-report-v1',
+          request_id: 'period-request',
+          report_version: 'progress-report-v1',
+          input_version: 'ai-coach-period-report-input-v1',
+          output_version: 'ai-coach-period-report-output-v1',
+          report_revision: 'revision-test',
+          period_start: '2026-09-01',
+          period_end: '2026-09-07',
+          timezone: 'Europe/Moscow',
+        };
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+    renderExperience({ ...status, personal_available: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Моя сводка' }));
+    await waitFor(() => expect(screen.getByTestId('ai-coach-consent-granted')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Итог периода' }));
+    fireEvent.change(screen.getByLabelText('Период сводки'), {
+      target: { value: 'custom' },
+    });
+    fireEvent.change(screen.getByLabelText('Начало периода'), {
+      target: { value: '2026-09-01' },
+    });
+    fireEvent.change(screen.getByLabelText('Окончание периода'), {
+      target: { value: '2026-09-07' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Получить ответ' }));
+
+    await waitFor(() => expect(screen.getByTestId('ai-coach-period-insights')).toBeInTheDocument());
+    expect(screen.getByText('За период выполнено 3 тренировки.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Основание: пропущенные дни питания отделены от нулевых значений.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Канонический отчёт progress-report-v1/)).toBeInTheDocument();
   });
 });

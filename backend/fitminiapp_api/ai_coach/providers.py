@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 
 from fitminiapp_api.ai_coach.contracts import (
-    AI_COACH_SCHEMA_VERSION,
+    AiCoachPersonalTool,
     AiCoachPolicy,
     AiCoachRequest,
     ContextRef,
@@ -107,9 +107,9 @@ class GroqDirectAdapter:
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": AI_COACH_SCHEMA_VERSION,
+                    "name": policy.schema_version,
                     "strict": True,
-                    "schema": provider_output_json_schema(),
+                    "schema": provider_output_json_schema(request),
                 },
             },
         }
@@ -169,11 +169,10 @@ class GroqDirectAdapter:
             raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
         try:
             decoded = json.loads(content)
-            if not isinstance(decoded, dict) or not {
-                "answer",
-                "citation_ids",
-                "limitations",
-            }.issubset(decoded):
+            required_fields = {"answer", "citation_ids", "limitations"}
+            if request.tool_name == AiCoachPersonalTool.GET_PERIOD_REPORT_INSIGHTS:
+                required_fields.add("insights")
+            if not isinstance(decoded, dict) or not required_fields.issubset(decoded):
                 raise ValueError("provider response does not satisfy the complete output schema")
             structured = ProviderStructuredResponse.model_validate(decoded)
         except (ValueError, TypeError) as exc:

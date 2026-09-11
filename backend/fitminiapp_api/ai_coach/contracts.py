@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 from typing import Annotated, Literal, Protocol
 from urllib.parse import urlparse
@@ -20,7 +21,11 @@ AI_COACH_DATA_CLASS = "generic"
 AI_COACH_PROMPT_VERSION = "ai-coach-beta-v1"
 AI_COACH_PERSONAL_PROMPT_VERSION = "ai-coach-personal-v1"
 AI_COACH_SCHEMA_VERSION = "ai-coach-answer-v1"
+AI_COACH_PERIOD_REPORT_PROMPT_VERSION = "ai-coach-period-report-v1"
+AI_COACH_PERIOD_REPORT_INPUT_VERSION = "ai-coach-period-report-input-v1"
+AI_COACH_PERIOD_REPORT_OUTPUT_VERSION = "ai-coach-period-report-output-v1"
 _BoundedLimitation = Annotated[str, Field(max_length=240)]
+_BoundedAnchor = Annotated[str, Field(min_length=1, max_length=128)]
 
 
 def _validate_https_url(value: str) -> str:
@@ -57,6 +62,13 @@ class AiCoachPersonalTool(StrEnum):
     GET_PROGRESS_SUMMARY = "get_progress_summary"
     GET_RECENT_TRAINING_SUMMARY = "get_recent_training_summary"
     GET_NUTRITION_SUMMARY = "get_nutrition_summary"
+    GET_PERIOD_REPORT_INSIGHTS = "get_period_report_insights"
+
+
+class AiCoachInsightKind(StrEnum):
+    FACT = "fact"
+    INFERENCE = "inference"
+    SUGGESTION = "suggestion"
 
 
 class AiCoachOutcome(StrEnum):
@@ -154,6 +166,24 @@ class ContextRef(BaseModel):
     _require_https = field_validator("canonical_url")(_validate_https_url)
 
 
+class ProviderInsight(BaseModel):
+    """One bounded, evidence-linked claim in a period-report response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: AiCoachInsightKind
+    text: str = Field(..., min_length=1, max_length=400)
+    evidence_ids: tuple[_BoundedAnchor, ...] = Field(..., min_length=1, max_length=4)
+    reason_keys: tuple[_BoundedAnchor, ...] = Field(default=(), max_length=4)
+
+    @field_validator("evidence_ids", "reason_keys")
+    @classmethod
+    def validate_anchor_ids(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not re.fullmatch(r"[A-Za-z0-9_.:/-]+", item) for item in value):
+            raise ValueError("insight anchors contain an invalid reference")
+        return value
+
+
 class ProviderStructuredResponse(BaseModel):
     """The only model output accepted from a provider."""
 
@@ -162,6 +192,7 @@ class ProviderStructuredResponse(BaseModel):
     answer: str = Field(..., min_length=1, max_length=1_600)
     citation_ids: tuple[str, ...] = Field(..., min_length=1, max_length=5)
     limitations: tuple[_BoundedLimitation, ...] = Field(default=(), max_length=4)
+    insights: tuple[ProviderInsight, ...] = Field(default=(), max_length=11)
 
     @field_validator("citation_ids")
     @classmethod
@@ -169,6 +200,38 @@ class ProviderStructuredResponse(BaseModel):
         if any(not re.fullmatch(r"[A-Za-z0-9_.:/-]+", item) for item in value):
             raise ValueError("citation_ids contain an invalid reference")
         return value
+
+
+class AiCoachInsight(BaseModel):
+    """Stable user-facing representation of a grounded claim."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: AiCoachInsightKind
+    text: str = Field(..., min_length=1, max_length=400)
+    evidence_ids: tuple[_BoundedAnchor, ...] = Field(..., min_length=1, max_length=4)
+    reason_keys: tuple[_BoundedAnchor, ...] = Field(default=(), max_length=4)
+
+    @field_validator("evidence_ids", "reason_keys")
+    @classmethod
+    def validate_anchor_ids(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if any(not re.fullmatch(r"[A-Za-z0-9_.:/-]+", item) for item in value):
+            raise ValueError("insight anchors contain an invalid reference")
+        return value
+
+
+class AiCoachResponseMetadata(BaseModel):
+    """Version and period metadata attached only to grounded report responses."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    report_version: str = Field(..., min_length=1, max_length=64)
+    input_version: str = Field(..., min_length=1, max_length=64)
+    output_version: str = Field(..., min_length=1, max_length=64)
+    report_revision: str = Field(..., min_length=1, max_length=128)
+    period_start: date
+    period_end: date
+    timezone: str = Field(..., min_length=1, max_length=64)
 
 
 class ProviderUsage(BaseModel):
@@ -210,10 +273,18 @@ class AiCoachResponse(BaseModel):
     outcome: AiCoachOutcome
     answer: str | None = Field(default=None, max_length=1_600)
     citations: tuple[AiCoachCitation, ...] = Field(default=(), max_length=12)
+    insights: tuple[AiCoachInsight, ...] = Field(default=(), max_length=11)
     limitations: tuple[_BoundedLimitation, ...] = Field(default=(), max_length=6)
     safety_category: str = Field(..., min_length=1, max_length=48)
     prompt_version: str = Field(..., min_length=1, max_length=64)
     request_id: str | None = Field(default=None, max_length=128)
+    report_version: str | None = Field(default=None, max_length=64)
+    input_version: str | None = Field(default=None, max_length=64)
+    output_version: str | None = Field(default=None, max_length=64)
+    report_revision: str | None = Field(default=None, max_length=128)
+    period_start: date | None = None
+    period_end: date | None = None
+    timezone: str | None = Field(default=None, max_length=64)
 
 
 @dataclass(frozen=True)

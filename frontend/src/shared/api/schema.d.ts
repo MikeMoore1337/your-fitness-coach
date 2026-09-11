@@ -3894,6 +3894,27 @@ export interface components {
             message: string;
         };
         /**
+         * AiCoachInsight
+         * @description Stable user-facing representation of a grounded claim.
+         */
+        AiCoachInsight: {
+            kind: components["schemas"]["AiCoachInsightKind"];
+            /** Text */
+            text: string;
+            /** Evidence Ids */
+            evidence_ids: string[];
+            /**
+             * Reason Keys
+             * @default []
+             */
+            reason_keys: string[];
+        };
+        /**
+         * AiCoachInsightKind
+         * @enum {string}
+         */
+        AiCoachInsightKind: "fact" | "inference" | "suggestion";
+        /**
          * AiCoachJob
          * @enum {string}
          */
@@ -3905,7 +3926,7 @@ export interface components {
         AiCoachOutcome: "answer" | "unavailable" | "rate_limited" | "safety_refusal" | "insufficient_data" | "invalid_output" | "consent_required";
         /**
          * AiCoachPersonalGenerateRequest
-         * @description A server-selected read-only tool and one of three bounded periods.
+         * @description A server-selected read-only tool and a bounded report period.
          */
         AiCoachPersonalGenerateRequest: {
             tool: components["schemas"]["AiCoachPersonalTool"];
@@ -3915,6 +3936,12 @@ export interface components {
              * @enum {integer}
              */
             period_days: 7 | 30 | 90;
+            /** Period */
+            period?: ("days_7" | "days_30" | "days_90" | "custom") | null;
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
             /** Message */
             message: string;
         };
@@ -3922,7 +3949,7 @@ export interface components {
          * AiCoachPersonalTool
          * @enum {string}
          */
-        AiCoachPersonalTool: "get_progress_summary" | "get_recent_training_summary" | "get_nutrition_summary";
+        AiCoachPersonalTool: "get_progress_summary" | "get_recent_training_summary" | "get_nutrition_summary" | "get_period_report_insights";
         /**
          * AiCoachResponse
          * @description Stable user-facing response; provider topology is intentionally absent.
@@ -3937,6 +3964,11 @@ export interface components {
              */
             citations: components["schemas"]["AiCoachCitation"][];
             /**
+             * Insights
+             * @default []
+             */
+            insights: components["schemas"]["AiCoachInsight"][];
+            /**
              * Limitations
              * @default []
              */
@@ -3947,6 +3979,20 @@ export interface components {
             prompt_version: string;
             /** Request Id */
             request_id?: string | null;
+            /** Report Version */
+            report_version?: string | null;
+            /** Input Version */
+            input_version?: string | null;
+            /** Output Version */
+            output_version?: string | null;
+            /** Report Revision */
+            report_revision?: string | null;
+            /** Period Start */
+            period_start?: string | null;
+            /** Period End */
+            period_end?: string | null;
+            /** Timezone */
+            timezone?: string | null;
         };
         /**
          * AiCoachStatusResponse

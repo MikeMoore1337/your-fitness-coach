@@ -8,6 +8,7 @@ from enum import StrEnum
 
 from fitminiapp_api.ai_coach.contracts import (
     AiCoachDataClass,
+    AiCoachInsightKind,
     AiCoachRequest,
     ProviderStructuredResponse,
 )
@@ -47,7 +48,8 @@ _PATTERNS: tuple[tuple[SafetyCategory, re.Pattern[str]], ...] = (
         SafetyCategory.PRIVACY_EXFILTRATION,
         re.compile(
             r"(?:чуж(?:ой|ие|ого)|тренерск(?:ие|их)\s+замет|"
-            r"api\s*key|токен|секрет|парол|private\s+data|друг(?:ого|их)\s+пользов)",
+            r"клиент(?:а|ские|ских)?|client\s+data|api\s*key|токен|секрет|парол|"
+            r"private\s+data|друг(?:ого|их)\s+пользов)",
             re.IGNORECASE,
         ),
     ),
@@ -81,10 +83,13 @@ _PATTERNS: tuple[tuple[SafetyCategory, re.Pattern[str]], ...] = (
             r"(?:(?:рассчитай|посчитай|вычисли|оцени|определи|подбери|"
             r"calculate|compute|estimate).{0,64}(?:\bbmr\b|\btdee\b|кбжу|"
             r"health\s+score|readiness|recovery|fatigue|готовност|восстановлен|"
-            r"усталост|здоровь(?:я|е)\s*(?:балл|оцен)|прогресси)|"
+            r"усталост|здоровь(?:я|е)\s*(?:балл|оцен)|прогресси|прогноз|"
+            r"предскажи|forecast)|"
             r"(?:\bbmr\b|\btdee\b|кбжу|health\s+score|readiness|recovery|"
-            r"fatigue|готовност|восстановлен|усталост|прогресси).{0,64}"
-            r"(?:мой|моя|мои|мне|у\s+меня|для\s+меня|по\s+моим|my|me))",
+            r"fatigue|готовност|восстановлен|усталост|прогресси|прогноз|"
+            r"forecast).{0,64}"
+            r"(?:мой|моя|мои|моего|мне|у\s+меня|для\s+меня|по\s+моим|my|me)|"
+            r"(?:прогноз|forecast|предскажи).{0,64}(?:мой|моя|мои|моего|для\s+меня|my|me))",
             re.IGNORECASE,
         ),
     ),
@@ -156,6 +161,28 @@ _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST = re.compile(
     r")",
     re.IGNORECASE,
 )
+_PERIOD_REPORT_UNSAFE_CLAIM_BLOCKLIST = re.compile(
+    r"(?:"
+    r"\b(?:диагноз\w*|диагностир\w*|лечени\w*|травм\w*|перетрен\w*|"
+    r"бессон\w*|депресс\w*|выгорани\w*|гарант\w*|прогноз\w*|forecast\w*|"
+    r"идеальн\w*|состав\s+тела|процент\s+жира|разгрузочн\w*|"
+    r"недел\w*\s+отдых\w*|rest\s+week|перерыв\w*|eating[- ]?back|"
+    r"(?:плох\w*|хорош\w*|чист\w*|вредн\w*|запрещ\w*)\s+ед\w*|"
+    r"cheat\s+meal|доедать|компенсир\w*|медицин\w*|medical)\b|"
+    r"\b(?:из-за|из за|потому\s+что|причин\w*|вызыва\w*|привод\w*\s+к|"
+    r"связан\w*\s+с|корреляц\w*|влиян\w*|caus\w*)\b|"
+    r"\b(?:измен(?:и|ить|ите)|меняй(?:те)?|назнач(?:ь|ить|ьте)|"
+    r"пересчит(?:ай|ать|айте)|увелич(?:ь|ить|ьте)|уменьш(?:ь|ить|ьте)|"
+    r"добав(?:ь|ить|ьте)|созда(?:й|ть|йте)|удал(?:и|ить|ите)|"
+    r"перенес(?:и|ти|ите))\b.{0,80}\b(?:ккал|калори\w*|кбжу|"
+    r"цел\w*|программ\w*|трениров\w*|напомин\w*|нагрузк\w*)\b|"
+    r"\bчерез\s+.{0,32}\b(?:будет|станет|достигнете|получите)\b|"
+    r"\b(?:кардио|cardio).{0,32}\b(?:калори\w*|kcal)\b|"
+    r"\b(?:калори\w*|kcal).{0,32}\b(?:кардио|cardio)\b|"
+    r"\bпульс\w*.{0,32}\b(?:зон\w*|порог\w*|bpm|удар\w*)\b"
+    r")",
+    re.IGNORECASE,
+)
 _URL_PATTERN = re.compile(r"https?://", re.IGNORECASE)
 _CYRILLIC_PATTERN = re.compile(r"[А-Яа-яЁё]")
 
@@ -219,6 +246,9 @@ def validate_provider_output(
     *,
     allowed_ref_ids: frozenset[str],
     data_class: AiCoachDataClass = AiCoachDataClass.GENERIC,
+    period_report: bool = False,
+    allowed_evidence_ids: frozenset[str] = frozenset(),
+    allowed_reason_keys: frozenset[str] = frozenset(),
 ) -> None:
     if not output.answer.strip() or not _CYRILLIC_PATTERN.search(output.answer):
         raise ValueError("answer_language_invalid")
@@ -233,6 +263,8 @@ def validate_provider_output(
         and _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(output.answer)
     ):
         raise ValueError("answer_contains_unsupported_personal_calculation")
+    if period_report and _PERIOD_REPORT_UNSAFE_CLAIM_BLOCKLIST.search(output.answer):
+        raise ValueError("period_report_answer_contains_unsafe_claim")
     if any(_OUTPUT_BLOCKLIST.search(item) for item in output.limitations):
         raise ValueError("limitation_contains_sensitive_content")
     if data_class != AiCoachDataClass.PERSONALIZED and any(
@@ -244,7 +276,46 @@ def validate_provider_output(
         for item in output.limitations
     ):
         raise ValueError("limitation_contains_unsupported_personal_calculation")
+    if period_report and any(
+        _PERIOD_REPORT_UNSAFE_CLAIM_BLOCKLIST.search(item) for item in output.limitations
+    ):
+        raise ValueError("period_report_limitation_contains_unsafe_claim")
     if not output.citation_ids or any(
         ref_id not in allowed_ref_ids for ref_id in output.citation_ids
     ):
         raise ValueError("citation_reference_invalid")
+    if not period_report:
+        if output.insights:
+            raise ValueError("unexpected_insights")
+        return
+
+    required_sections = (
+        "Главное за период",
+        "Ограничения данных",
+        "Что можно сделать дальше",
+        "Почему",
+    )
+    if any(section not in output.answer for section in required_sections):
+        raise ValueError("period_report_sections_missing")
+    if not 2 <= len(output.insights) <= 11:
+        raise ValueError("period_report_insights_count_invalid")
+
+    fact_count = sum(item.kind == AiCoachInsightKind.FACT for item in output.insights)
+    inference_count = sum(item.kind == AiCoachInsightKind.INFERENCE for item in output.insights)
+    suggestion_count = sum(item.kind == AiCoachInsightKind.SUGGESTION for item in output.insights)
+    if not 2 <= fact_count <= 4:
+        raise ValueError("period_report_fact_count_invalid")
+    if inference_count > 4 or not 1 <= suggestion_count <= 3:
+        raise ValueError("period_report_claim_count_invalid")
+
+    for insight in output.insights:
+        if any(anchor not in allowed_evidence_ids for anchor in insight.evidence_ids):
+            raise ValueError("period_report_evidence_anchor_invalid")
+        if any(reason not in allowed_reason_keys for reason in insight.reason_keys):
+            raise ValueError("period_report_reason_key_invalid")
+        if _OUTPUT_BLOCKLIST.search(insight.text) or _URL_PATTERN.search(insight.text):
+            raise ValueError("period_report_insight_contains_untrusted_content")
+        if _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(insight.text):
+            raise ValueError("period_report_insight_contains_unsupported_calculation")
+        if _PERIOD_REPORT_UNSAFE_CLAIM_BLOCKLIST.search(insight.text):
+            raise ValueError("period_report_insight_contains_unsafe_claim")

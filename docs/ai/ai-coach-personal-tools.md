@@ -13,6 +13,7 @@ Task 89 добавляет отдельный, выключенный по ум�
 | `get_progress_summary` | `build_progress_summary` | 7/30/90 дней | Сводка тренировок, кардио, питания, замеров и sufficiency; экран `/progress` |
 | `get_recent_training_summary` | `build_training_analytics` | 7/30/90 дней | Ограниченные агрегаты тренировок и RIR без сессий/заметок; экран `/progress` |
 | `get_nutrition_summary` | `build_nutrition_report` | 7/30/90 дней | Агрегаты питания, история целей и гидратация без дневного raw payload; экран `/nutrition` |
+| `get_period_report_insights` | `build_progress_report` | 7/30/90 дней или bounded custom до 366 дней | Versioned facts/coverage/ограничения и transient AI-итог; underlying report `/progress` |
 
 `explain_recommendation` пока не включён: в текущем контракте нет безопасного
 канонического идентификатора конкретной рекомендации и её версии. Добавлять tool
