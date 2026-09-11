@@ -13,6 +13,12 @@ import {
   accountRoleLabel,
 } from '../shared/account/AccountIdentity';
 import { usePwa } from '../shared/pwa/PwaProvider';
+import {
+  DEFAULT_QUICK_ADD_ACTIONS,
+  QuickAddTrigger,
+  QuickAddSheet,
+  type QuickAddAction,
+} from './QuickAddSheet';
 
 export type AppSection = 'today' | 'progress' | 'programs' | 'catalog' | 'nutrition' | 'profile';
 
@@ -22,7 +28,7 @@ const APP_DESTINATIONS: ReadonlyArray<{
   icon: AppNavigationIconName;
 }> = [
   { section: 'today', label: 'Сегодня', icon: 'today' },
-  { section: 'programs', label: 'Программа', icon: 'plan' },
+  { section: 'programs', label: 'План', icon: 'plan' },
   { section: 'nutrition', label: 'Питание', icon: 'nutrition' },
   { section: 'progress', label: 'Прогресс', icon: 'progress' },
 ];
@@ -38,8 +44,11 @@ export interface DemoAppShellConfig {
   }>;
   displayName: string;
   exitTo: string;
+  accountTo?: string;
+  accountLabel?: string;
   menuTitle?: string;
   moreLinks: ReadonlyArray<{ label: string; to: string }>;
+  quickAddLinks?: ReadonlyArray<QuickAddAction>;
   onReset(): void;
   resetDisabled?: boolean;
 }
@@ -137,6 +146,7 @@ export function AppShell({
   const logout = auth?.logout;
   const { path } = useNavigation();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
   const morePresence = useMotionPresence({
     closingAnimationName: 'app-more-backdrop-out',
     openingAnimationName: 'app-more-panel-in',
@@ -155,8 +165,10 @@ export function AppShell({
   const isMiniApp = Boolean(window.Telegram?.WebApp?.initData);
   const mobileNavigation = useMobileNavigation();
   const shellDestinations = demo?.destinations ?? APP_DESTINATIONS;
+  const quickAddLinks = demo?.quickAddLinks ?? DEFAULT_QUICK_ADD_ACTIONS;
   const brandTo = demo?.brandTo ?? '/app?section=today';
   const shellVisible = Boolean(user || demo);
+  const quickAddVisible = shellVisible && (Boolean(demo) || section !== undefined);
   const morePresent = moreOpen || morePresence.present;
   const moreSurfacePresent = morePresent && (Boolean(demo) || mobileNavigation);
   const accountDestinations = [
@@ -209,6 +221,10 @@ export function AppShell({
     if (trigger) moreTriggerRef.current = trigger;
     setMoreOpen(true);
     morePresence.show();
+  };
+  const openQuickAdd = () => {
+    if (moreOpen) closeMore();
+    setQuickAddOpen(true);
   };
   useTelegramOverlayBackButton(moreSurfacePresent, () => closeMore(true));
 
@@ -294,6 +310,14 @@ export function AppShell({
         </header>
       )}
       {showPwaInstallPrompt && <PwaInstallPrompt />}
+      {quickAddVisible && <QuickAddTrigger onOpen={openQuickAdd} />}
+      {quickAddVisible && (
+        <QuickAddSheet
+          actions={quickAddLinks}
+          onClose={() => setQuickAddOpen(false)}
+          open={quickAddOpen}
+        />
+      )}
       <main id="appContent" className={`container app-shell__content${narrow ? ' narrow' : ''}`}>
         {children}
       </main>
@@ -312,14 +336,30 @@ export function AppShell({
               <BrandLockup markClassName="app-bottom-nav__brand-mark" />
             </AppLink>
 
-            {!demo && (
+            {(!demo || demo.accountTo) && (
               <div className="app-bottom-nav__profile-slot">
                 <AppLink
                   id="appAccountProfileLink"
-                  to="/app?section=profile"
-                  className={`app-desktop-account-entry${path === '/app' && section === 'profile' ? ' is-active' : ''}`}
-                  aria-current={path === '/app' && section === 'profile' ? 'page' : undefined}
-                  aria-label="Профиль и настройки"
+                  to={demo?.accountTo ?? '/app?section=profile'}
+                  className={`app-desktop-account-entry${
+                    (
+                      demo
+                        ? demo.activeSection === 'profile'
+                        : path === '/app' && section === 'profile'
+                    )
+                      ? ' is-active'
+                      : ''
+                  }`}
+                  aria-current={
+                    (
+                      demo
+                        ? demo.activeSection === 'profile'
+                        : path === '/app' && section === 'profile'
+                    )
+                      ? 'page'
+                      : undefined
+                  }
+                  aria-label={demo?.accountLabel ?? 'Профиль и настройки'}
                 >
                   <AccountIdentity
                     avatarClassName="app-desktop-account-entry__avatar"
@@ -497,6 +537,17 @@ export function AppShell({
                 </header>
 
                 <nav className="app-more-panel__nav" aria-label="Дополнительная навигация">
+                  {demo && demo.accountTo && (
+                    <AppLink
+                      className="app-more-panel__item"
+                      to={demo.accountTo}
+                      aria-current={demo.activeSection === 'profile' ? 'page' : undefined}
+                      onClick={() => closeMore()}
+                    >
+                      <AppNavigationIcon name="profile" />
+                      <span>{demo.accountLabel ?? 'Профиль и настройки'}</span>
+                    </AppLink>
+                  )}
                   {demo &&
                     demo.moreLinks.map((item) => (
                       <AppLink

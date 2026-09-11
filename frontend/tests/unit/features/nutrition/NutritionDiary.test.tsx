@@ -109,14 +109,18 @@ const zeroNutrition = {
   fiber_g: null,
 };
 
-function renderDiary() {
+function renderDiary({ initialFoodQuickAdd = false }: { initialFoodQuickAdd?: boolean } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   const view = render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <NutritionDiary initialDate="2026-08-19" timeZone="Europe/Moscow" />
+        <NutritionDiary
+          initialDate="2026-08-19"
+          initialFoodQuickAdd={initialFoodQuickAdd}
+          timeZone="Europe/Moscow"
+        />
       </FeedbackProvider>
     </QueryClientProvider>,
   );
@@ -137,6 +141,23 @@ describe('NutritionDiary', () => {
   afterEach(() => {
     vi.useRealTimers();
     cleanup();
+  });
+
+  it('opens the quick food entry requested by the global action', async () => {
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+      if (path.startsWith('/api/v1/nutrition/foods/recent')) {
+        return Promise.resolve({ items: [food], total: 1, limit: 12, offset: 0 });
+      }
+      if (path.startsWith('/api/v1/nutrition/foods/favorites')) {
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary({ initialFoodQuickAdd: true });
+
+    expect(await screen.findByRole('heading', { name: 'Быстрый ввод' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Быстрый ввод' })).toBeVisible();
   });
 
   it('shows all meals, entry macros, targets and navigates by date', async () => {

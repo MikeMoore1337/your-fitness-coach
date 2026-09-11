@@ -162,6 +162,29 @@ describe('DemoCabinet preview', () => {
     expect(window.location.search).toBe('?cabinet=1&scenario=nutrition&section=progress');
   });
 
+  it('exposes the redesigned Plan and Profile preview states through direct routes', async () => {
+    const user = userEvent.setup();
+    renderPage('/demo?cabinet=1&scenario=self_training&section=plan');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Один активный план, понятная следующая тренировка',
+      }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Сценарии' }));
+    const demoMenu = screen.getByRole('dialog', { name: 'Выберите демо-сценарий' });
+    expect(within(demoMenu).getByRole('link', { name: 'Профиль и настройки' })).toHaveAttribute(
+      'href',
+      '/demo?cabinet=1&scenario=self_training&section=profile',
+    );
+
+    await user.click(within(demoMenu).getByRole('link', { name: 'Профиль и настройки' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Настройки по одной понятной группе' }),
+    ).toBeVisible();
+    expect(window.location.search).toBe('?cabinet=1&scenario=self_training&section=profile');
+  });
+
   it('shows one contextual conversion after the meaningful action and clears demo credentials', async () => {
     mocks.apply.mockResolvedValue(nutritionSnapshot(true));
     const user = userEvent.setup();

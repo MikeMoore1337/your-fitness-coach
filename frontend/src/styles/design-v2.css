@@ -8289,7 +8289,8 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     background: transparent;
   }
 
-  .app-section--progress .progress-schedule > .weekly-review-card {
+  .app-section--progress .progress-schedule > .weekly-review-card,
+  .app-section--progress > .page-stack > .stack > .weekly-review-card {
     padding-inline: var(--v2-space-4);
   }
 }

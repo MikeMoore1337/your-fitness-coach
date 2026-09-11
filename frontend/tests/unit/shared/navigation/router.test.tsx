@@ -84,6 +84,12 @@ describe('NavigationProvider Telegram BackButton', () => {
         `?workout_id=943&program_history=77&program_revision=4&return_to=${encodeURIComponent('https://example.com/steal')}`,
       ),
     ).toBe('/app?section=progress');
+    expect(
+      focusedContextReturn(
+        `?section=programs&workout_id=43&return_to=${encodeURIComponent('/app?section=today')}`,
+      ),
+    ).toBe('/app?section=today');
+    expect(focusedContextReturn('?section=programs&workout_id=43')).toBe('/app?section=programs');
   });
 
   it('возвращает из публичного demo на landing без запуска защищённого TMA auth', async () => {
@@ -119,6 +125,12 @@ describe('NavigationProvider Telegram BackButton', () => {
     expect(demoReturnPathFromLogin('?from=demo&scenario=nutrition&cabinet=1&section=trainer')).toBe(
       '/demo?cabinet=1&scenario=nutrition&section=today',
     );
+    expect(
+      demoReturnPathFromLogin('?from=demo&scenario=self_training&cabinet=1&section=plan'),
+    ).toBe('/demo?cabinet=1&scenario=self_training&section=plan');
+    expect(
+      demoReturnPathFromLogin('?from=demo&scenario=self_training&cabinet=1&section=profile'),
+    ).toBe('/demo?cabinet=1&scenario=self_training&section=profile');
     expect(demoReturnPathFromLogin('?from=demo&scenario=https://evil.example')).toBeNull();
   });
 });

@@ -161,13 +161,11 @@ test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on on
   await weekLink.focus();
   await expect(weekLink).toBeFocused();
   await weekLink.press('Enter');
-  await expect(tmaPage).toHaveURL(/section=progress&workout_id=43/);
-  await expect(
-    tmaPage.locator('#workout-schedule-43').or(tmaPage.locator('#workout-history-43')),
-  ).toBeVisible();
+  await expect(tmaPage).toHaveURL(/section=programs&workout_id=43/);
+  await expect(tmaPage.locator('#workout-schedule-43')).toBeVisible();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=progress');
+  await expect(tmaPage).toHaveURL('/app?section=today');
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(false);
 });
 
@@ -221,20 +219,19 @@ test('an unplanned day keeps the first factual cardio entry compact but availabl
     const url = new URL(response.url());
     return url.pathname.endsWith('/api/v1/workouts/cardio') && url.searchParams.has('date_from');
   });
-  await tmaPage.goto('/app?section=today');
+  await tmaPage.goto('/app?section=today&cardio=1');
   await cardioRequest;
 
   const cardio = tmaPage.locator('.cardio-log--quick');
   await expect(cardio).toHaveClass(/cardio-log--empty/);
   await expect(cardio.getByRole('heading', { name: 'Кардио', exact: true })).toBeVisible();
-  await expect(cardio.getByRole('button', { name: 'Добавить' })).toBeVisible();
-  await expect(cardio.getByLabel('Длительность, мин')).toHaveCount(0);
+  await expect(cardio.getByRole('button', { name: 'Отмена' })).toBeVisible();
+  await expect(cardio.getByLabel('Длительность, мин')).toHaveCount(1);
   await cardio.scrollIntoViewIfNeeded();
   await cardio.screenshot({
     path: '../.artifacts/screenshots/task-113A-round-5/tma-cardio-empty-entry-390x844.png',
   });
 
-  await cardio.getByRole('button', { name: 'Добавить' }).click();
   const duration = cardio.getByLabel('Длительность, мин');
   await duration.focus();
   await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
@@ -256,13 +253,19 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
     browserSession: true,
     cardioState: 'planned',
   });
-  await Promise.all([tmaPage.goto('/app'), mobilePage.goto('/app')]);
+  await Promise.all([
+    tmaPage.goto('/app?section=today&cardio=1'),
+    mobilePage.goto('/app?section=today&cardio=1'),
+  ]);
 
   for (const page of [tmaPage, mobilePage]) {
     const cardio = page.locator('.cardio-log--quick');
     await cardio.scrollIntoViewIfNeeded();
     await expect(cardio.getByRole('heading', { name: 'Кардио', exact: true })).toBeVisible();
     await expect(cardio.getByRole('heading', { name: 'План кардио' })).toBeVisible();
+    await expect(cardio.getByRole('button', { name: 'Отмена' })).toBeVisible();
+    await cardio.getByRole('button', { name: 'Отмена' }).click();
+    await expect(page).toHaveURL('/app?section=today');
     await expect(cardio.getByRole('button', { name: 'Добавить фактическое кардио' })).toBeVisible();
     await expect(cardio.getByRole('button', { name: 'Сохранить кардио' })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
@@ -449,8 +452,8 @@ test('program history keeps current block, readable revisions and workout return
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs'),
-    mobilePage.goto('/app?section=programs'),
+    tmaPage.goto('/app?section=programs&view=manage'),
+    mobilePage.goto('/app?section=programs&view=manage'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -540,7 +543,7 @@ test('program history renders empty, one-block and full lifecycle states honestl
   for (const state of ['empty', 'one', 'many'] as const) {
     const page = await browser.newPage({ viewport: MOBILE_CONTEXTS.baseline });
     await installPlatformApi(page, { browserSession: true, programHistory: state });
-    await page.goto('/app?section=programs');
+    await page.goto('/app?section=programs&view=manage');
     const history = page.locator('.program-history');
 
     if (state === 'empty') {
@@ -580,8 +583,8 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
   await installPlatformApi(tmaPage, { programHistory: 'many' });
   await installPlatformApi(mobilePage, { browserSession: true, programHistory: 'many' });
   await Promise.all([
-    tmaPage.goto('/app?section=programs'),
-    mobilePage.goto('/app?section=programs'),
+    tmaPage.goto('/app?section=programs&view=manage'),
+    mobilePage.goto('/app?section=programs&view=manage'),
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
@@ -705,7 +708,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       browserSession: !current.telegram,
       programHistory: 'many',
     });
-    await page.goto('/app?section=programs');
+    await page.goto('/app?section=programs&view=manage');
     const program = page.locator('.program-active');
     const history = program.locator('.program-history');
     await expect(history.getByText('Текущий тренировочный блок')).toBeVisible();
@@ -1609,21 +1612,7 @@ test('weekly review visual evidence covers compact Mobile Web, dark TMA and desk
       const primaryAction = page.getByRole('button', { name: 'Всё верно, продолжить' });
       await primaryAction.scrollIntoViewIfNeeded();
       await expectNoOverlap(primaryAction, page.locator('#appBottomNav'));
-      const scheduleCard = page.locator('details.card').filter({
-        has: page.getByRole('heading', { name: 'Расписание', exact: true }),
-      });
-      const weekCard = page.locator('details.card').filter({
-        has: page.getByRole('heading', { name: 'Неделя', exact: true }),
-      });
-      const [scheduleBox, weekBox] = await Promise.all([
-        scheduleCard.boundingBox(),
-        weekCard.boundingBox(),
-      ]);
-      expect(scheduleBox).not.toBeNull();
-      expect(weekBox).not.toBeNull();
-      const adjacentGap = weekBox!.y - (scheduleBox!.y + scheduleBox!.height);
-      expect(adjacentGap).toBeGreaterThanOrEqual(8);
-      expect(adjacentGap).toBeLessThanOrEqual(16);
+      await expect(page.getByRole('heading', { name: 'Расписание', exact: true })).toHaveCount(0);
       await page.screenshot({
         path: `../.artifacts/screenshots/task-56/${current.surface}-${current.viewport.width}x${current.viewport.height}-${current.theme}-facts-actions.png`,
       });

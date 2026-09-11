@@ -17,7 +17,14 @@ interface NavigationContextValue {
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
 const DEMO_SCENARIOS = new Set(['self_training', 'nutrition', 'trainer']);
-const DEMO_CABINET_SECTIONS = new Set(['today', 'nutrition', 'progress', 'trainer']);
+const DEMO_CABINET_SECTIONS = new Set([
+  'today',
+  'plan',
+  'nutrition',
+  'progress',
+  'profile',
+  'trainer',
+]);
 
 export function demoReturnPathFromLogin(search: string): string | null {
   const params = new URLSearchParams(search);
@@ -75,6 +82,20 @@ function notificationCenterReturn(value: string | null): string | null {
   }
 }
 
+function todayReturn(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value, window.location.origin);
+    return parsed.origin === window.location.origin &&
+      parsed.pathname === '/app' &&
+      parsed.searchParams.get('section') === 'today'
+      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function progressReportReturn(search: string): string {
   const params = new URLSearchParams(search);
   const handoffId = params.get('handoff_id');
@@ -95,7 +116,8 @@ export function focusedContextReturn(search: string): string | null {
     return (
       notificationCenterReturn(params.get('return_to')) ??
       programHistoryReturn(params.get('return_to')) ??
-      '/app?section=progress'
+      todayReturn(params.get('return_to')) ??
+      (params.get('section') === 'programs' ? '/app?section=programs' : '/app?section=progress')
     );
   }
   if (params.get('weekly_review') === '1') return '/app';

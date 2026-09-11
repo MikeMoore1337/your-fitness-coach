@@ -18,7 +18,7 @@ import {
   detectedTimeZone,
   formatCalendarDate,
 } from '../../shared/dateTime';
-import { AppLink } from '../../shared/navigation/router';
+import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { queryKeys } from '../../shared/queryKeys';
 import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
 import {
@@ -47,7 +47,6 @@ import {
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
 import { isPwaStandalone } from '../../shared/pwa/pwaRuntime';
-import { AiCoachEntry } from '../ai/AiCoachExperience';
 
 export function formatTodayHeading(value: string): { title: string } {
   const weekday = formatCalendarDate(value, { weekday: 'long' });
@@ -687,20 +686,40 @@ function useCalendarDay(timeZone: string): string {
 export function TodayDashboard({
   initialWellbeingDate,
   initialWellbeingOpen = false,
+  initialCardioOpen = false,
 }: {
   initialWellbeingDate?: string;
   initialWellbeingOpen?: boolean;
+  initialCardioOpen?: boolean;
 } = {}) {
   const { user } = useAuth();
   const { toast } = useFeedback();
+  const { navigate, search } = useNavigation();
   const queryClient = useQueryClient();
   const detailsRef = useRef<HTMLDivElement>(null);
   const autoOpenedCompletionRef = useRef<number | null>(null);
+  const previousCardioOpenRef = useRef(initialCardioOpen);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [cardioOpenRequest, setCardioOpenRequest] = useState(0);
+  const [cardioOpenRequest, setCardioOpenRequest] = useState(initialCardioOpen ? 1 : 0);
+  const wellbeingRequested = Boolean(initialWellbeingOpen || initialWellbeingDate);
   const timeZone = user?.profile?.timezone || detectedTimeZone();
   const today = useCalendarDay(timeZone);
   const [selectedDate, setSelectedDate] = useState(today);
+
+  useEffect(() => {
+    if (initialCardioOpen && !previousCardioOpenRef.current) {
+      setCardioOpenRequest((current) => current + 1);
+    }
+    previousCardioOpenRef.current = initialCardioOpen;
+  }, [initialCardioOpen]);
+
+  const dismissCardioRequest = () => {
+    const params = new URLSearchParams(search);
+    if (params.get('cardio') !== '1') return;
+    params.delete('cardio');
+    const nextSearch = params.toString();
+    navigate(`/app${nextSearch ? `?${nextSearch}` : ''}`, true);
+  };
   const calendarContextRef = useRef(`${timeZone}:${today}`);
   const heading =
     selectedDate === today
@@ -963,7 +982,11 @@ export function TodayDashboard({
                   </p>
                   <AppLink
                     className="today-text-link"
-                    to={`/app?section=progress&workout_id=${selectedScheduleItem.id}`}
+                    to={
+                      selectedScheduleItem.status === 'completed'
+                        ? `/app?section=progress&workout_id=${selectedScheduleItem.id}`
+                        : `/app?section=programs&workout_id=${selectedScheduleItem.id}&return_to=${encodeURIComponent('/app?section=today')}`
+                    }
                   >
                     Открыть тренировку
                   </AppLink>
@@ -1040,8 +1063,7 @@ export function TodayDashboard({
         <div className="today-dashboard__facts">
           <NutritionSummary date={selectedDate} today={today} />
           <ProgressSummaryPanel summary={progress} />
-          <AiCoachEntry entryPoint="today" />
-          {user && (
+          {user && wellbeingRequested && (
             <DailyWellbeingCheckIn
               autoFocus={initialWellbeingOpen}
               initialDate={initialWellbeingDate || selectedDate}
@@ -1055,11 +1077,14 @@ export function TodayDashboard({
         </div>
       </div>
 
-      <CardioQuickLog
-        key={`${selectedDate}:${cardioOpenRequest}`}
-        startOpen={cardioOpenRequest > 0}
-        today={selectedDate}
-      />
+      {cardioOpenRequest > 0 && (
+        <CardioQuickLog
+          key={`${selectedDate}:${cardioOpenRequest}`}
+          onDismiss={dismissCardioRequest}
+          startOpen
+          today={selectedDate}
+        />
+      )}
 
       {profileMissing && (
         <aside className="today-profile-nudge">

@@ -557,9 +557,11 @@ function SessionList({ sessions, timeZone }: { sessions: CardioSession[]; timeZo
 }
 
 export function CardioQuickLog({
+  onDismiss,
   startOpen = false,
   today,
 }: {
+  onDismiss?: () => void;
   startOpen?: boolean;
   today: string;
 }) {
@@ -653,8 +655,14 @@ export function CardioQuickLog({
           <CardioSessionForm
             key={today}
             initialDate={today}
-            onCancel={() => setFormOpen(false)}
-            onSaved={() => setFormOpen(false)}
+            onCancel={() => {
+              setFormOpen(false);
+              onDismiss?.();
+            }}
+            onSaved={() => {
+              setFormOpen(false);
+              onDismiss?.();
+            }}
             timeZone={timeZone}
           />
         </div>
