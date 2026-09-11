@@ -12,6 +12,8 @@ export type IconName =
   | 'disclosure-open'
   | 'external-link'
   | 'logout'
+  | 'account-security'
+  | 'ai-coach'
   | 'menu'
   | 'mini-app'
   | 'minus'
@@ -89,6 +91,11 @@ const objects: Partial<Record<IconName, string>> = {
   'nav-admin': 'profile',
   'nav-knowledge': 'ai',
   achievement: 'progress',
+  'account-security': 'security',
+  'ai-coach': 'ai',
+  'theme-sun': 'sun',
+  'theme-moon': 'moon',
+  logout: 'logout',
 };
 /** Растровые объекты и локальные растровые версии прежних авторских служебных пиктограмм. */
 export function Icon({ className = '', label, name, size = 24, ...props }: IconProps) {

@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/ui/Icon';
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
@@ -452,7 +453,11 @@ export function AiCoachSettingsCard({
       defaultOpen={defaultOpen}
       family="neutral"
       id="profile-ai-coach"
-      title="AI Coach · внутренняя beta"
+      title={
+        <>
+          <Icon name="ai-coach" size={20} /> AI Coach · внутренняя beta
+        </>
+      }
       description="Публичная помощь и отдельные сводки без долгосрочной памяти."
     >
       <AiCoachExperience status={status} entryPoint="profile" />
