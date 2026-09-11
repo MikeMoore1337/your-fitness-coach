@@ -495,14 +495,14 @@ export default function MiniAppPage() {
                     href="#profile-security"
                     onClick={() => openProfileSection('profile-security')}
                   >
-                    <Icon name="permission-denied" size={16} /> Доступ и безопасность
+                    <Icon name="account-security" size={16} /> Доступ и безопасность
                   </a>
                   {aiCoachStatus.data?.ui_enabled && (
                     <a
                       href="#profile-ai-coach"
                       onClick={() => openProfileSection('profile-ai-coach')}
                     >
-                      <Icon name="star" size={16} /> AI Coach beta
+                      <Icon name="ai-coach" size={16} /> AI Coach beta
                     </a>
                   )}
                 </nav>
@@ -557,7 +557,7 @@ export default function MiniAppPage() {
                   id="profile-security"
                   title={
                     <>
-                      <Icon name="permission-denied" size={20} /> Доступ и безопасность
+                      <Icon name="account-security" size={20} /> Доступ и безопасность
                     </>
                   }
                   description="Способы входа, копия ваших данных и действия с аккаунтом."
