@@ -11,16 +11,21 @@ from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.ai_coach.contracts import (
+    AI_COACH_PERIOD_REPORT_OUTPUT_VERSION,
+    AI_COACH_PERIOD_REPORT_PROMPT_VERSION,
     AI_COACH_PERSONAL_PROMPT_VERSION,
     AI_COACH_PROMPT_VERSION,
     AI_COACH_SCHEMA_VERSION,
     AiCoachCitation,
     AiCoachDataClass,
+    AiCoachInsight,
     AiCoachJob,
     AiCoachOutcome,
+    AiCoachPersonalTool,
     AiCoachPolicy,
     AiCoachRequest,
     AiCoachResponse,
+    AiCoachResponseMetadata,
     ContextRef,
     LlmPort,
     NormalizedProviderError,
@@ -151,8 +156,11 @@ class _ProviderCallFailure(RuntimeError):
 
 
 def _policy_for(request: AiCoachRequest) -> AiCoachPolicy:
+    is_period_report = request.tool_name == AiCoachPersonalTool.GET_PERIOD_REPORT_INSIGHTS
     prompt_version = (
-        AI_COACH_PERSONAL_PROMPT_VERSION
+        AI_COACH_PERIOD_REPORT_PROMPT_VERSION
+        if is_period_report
+        else AI_COACH_PERSONAL_PROMPT_VERSION
         if request.data_class == AiCoachDataClass.PERSONALIZED
         else AI_COACH_PROMPT_VERSION
     )
@@ -160,16 +168,28 @@ def _policy_for(request: AiCoachRequest) -> AiCoachPolicy:
         job=request.job,
         data_class=request.data_class,
         prompt_version=prompt_version,
-        schema_version=AI_COACH_SCHEMA_VERSION,
+        schema_version=(
+            AI_COACH_PERIOD_REPORT_OUTPUT_VERSION if is_period_report else AI_COACH_SCHEMA_VERSION
+        ),
         locale=request.locale,
     )
 
 
 def _prompt_version_for(request: AiCoachRequest) -> str:
     return (
-        AI_COACH_PERSONAL_PROMPT_VERSION
+        AI_COACH_PERIOD_REPORT_PROMPT_VERSION
+        if request.tool_name == AiCoachPersonalTool.GET_PERIOD_REPORT_INSIGHTS
+        else AI_COACH_PERSONAL_PROMPT_VERSION
         if request.data_class == AiCoachDataClass.PERSONALIZED
         else AI_COACH_PROMPT_VERSION
+    )
+
+
+def _schema_version_for(request: AiCoachRequest) -> str:
+    return (
+        AI_COACH_PERIOD_REPORT_OUTPUT_VERSION
+        if request.tool_name == AiCoachPersonalTool.GET_PERIOD_REPORT_INSIGHTS
+        else AI_COACH_SCHEMA_VERSION
     )
 
 
@@ -224,6 +244,9 @@ class AiCoachService:
         user_key: str,
         request_id: str | None,
         context_refs: tuple[ContextRef, ...] | None = None,
+        response_metadata: AiCoachResponseMetadata | None = None,
+        evidence_ids: frozenset[str] = frozenset(),
+        reason_keys: frozenset[str] = frozenset(),
     ) -> AiCoachResponse:
         started = time.monotonic()
         safety = classify_request(request)
@@ -237,16 +260,22 @@ class AiCoachService:
         try:
             if safety != SafetyCategory.CLEAR:
                 outcome = AiCoachOutcome.SAFETY_REFUSAL
-                return self._safety_response(request, request_id, safety)
+                return self._safety_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
             if request.data_class not in {
                 AiCoachDataClass.GENERIC,
                 AiCoachDataClass.PERSONALIZED,
             }:
                 error_code = ProviderErrorCode.POLICY_BLOCKED.value
-                return self._unavailable_response(request, request_id, safety)
+                return self._unavailable_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
             if not settings.ai_coach_enabled or settings.ai_coach_kill_switch:
                 error_code = ProviderErrorCode.DISABLED.value
-                return self._unavailable_response(request, request_id, safety)
+                return self._unavailable_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
 
             policy = _policy_for(request)
             resolved_context_refs = (
@@ -256,7 +285,9 @@ class AiCoachService:
             )
             if not resolved_context_refs:
                 outcome = AiCoachOutcome.INSUFFICIENT_DATA
-                return self._insufficient_response(request, request_id, safety)
+                return self._insufficient_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
 
             capability = _provider_capability()
             provider_name = capability.provider or None
@@ -264,14 +295,20 @@ class AiCoachService:
             gate_error = self._provider_gate(capability, policy)
             if gate_error is not None:
                 error_code = gate_error.value
-                return self._unavailable_response(request, request_id, safety)
+                return self._unavailable_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
             if self.cooldown.active():
                 error_code = ProviderErrorCode.COOLDOWN_ACTIVE.value
-                return self._unavailable_response(request, request_id, safety)
+                return self._unavailable_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
             if not self.quota.reserve(user_key):
                 outcome = AiCoachOutcome.RATE_LIMITED
                 error_code = "quota_exhausted"
-                return self._rate_limited_response(request, request_id, safety)
+                return self._rate_limited_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
 
             try:
                 result, attempts = self._call_provider(request, policy, resolved_context_refs)
@@ -281,11 +318,17 @@ class AiCoachService:
                 self.cooldown.mark(failure.error)
                 if failure.error.code == ProviderErrorCode.RATE_LIMITED:
                     outcome = AiCoachOutcome.RATE_LIMITED
-                    return self._rate_limited_response(request, request_id, safety)
+                    return self._rate_limited_response(
+                        request, request_id, safety, response_metadata=response_metadata
+                    )
                 if failure.error.code == ProviderErrorCode.INVALID_OUTPUT:
                     outcome = AiCoachOutcome.INVALID_OUTPUT
-                    return self._invalid_output_response(request, request_id, safety)
-                return self._unavailable_response(request, request_id, safety)
+                    return self._invalid_output_response(
+                        request, request_id, safety, response_metadata=response_metadata
+                    )
+                return self._unavailable_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
 
             provider_name = result.provider
             configured_model = result.configured_model
@@ -296,22 +339,39 @@ class AiCoachService:
                     result.response,
                     allowed_ref_ids=frozenset(ref.ref_id for ref in resolved_context_refs),
                     data_class=request.data_class,
+                    period_report=request.tool_name
+                    == AiCoachPersonalTool.GET_PERIOD_REPORT_INSIGHTS,
+                    allowed_evidence_ids=evidence_ids,
+                    allowed_reason_keys=reason_keys,
                 )
             except ValueError:
                 error_code = ProviderErrorCode.INVALID_OUTPUT.value
                 outcome = AiCoachOutcome.INVALID_OUTPUT
-                return self._invalid_output_response(request, request_id, safety)
+                return self._invalid_output_response(
+                    request, request_id, safety, response_metadata=response_metadata
+                )
             self.cooldown.reset()
             outcome = AiCoachOutcome.ANSWER
-            return self._answer_response(request, request_id, safety, result, resolved_context_refs)
+            return self._answer_response(
+                request,
+                request_id,
+                safety,
+                result,
+                resolved_context_refs,
+                response_metadata=response_metadata,
+            )
         except ContextUnsafe:
             safety = SafetyCategory.PROMPT_INJECTION
             error_code = "context_safety_blocked"
             outcome = AiCoachOutcome.SAFETY_REFUSAL
-            return self._safety_response(request, request_id, safety)
+            return self._safety_response(
+                request, request_id, safety, response_metadata=response_metadata
+            )
         except ContextUnavailable:
             error_code = "context_unavailable"
-            return self._unavailable_response(request, request_id, safety)
+            return self._unavailable_response(
+                request, request_id, safety, response_metadata=response_metadata
+            )
         finally:
             logger.info(
                 "ai_coach_generation",
@@ -321,7 +381,7 @@ class AiCoachService:
                     "data_class": request.data_class.value,
                     "tool_name": request.tool_name.value if request.tool_name else None,
                     "prompt_version": _prompt_version_for(request),
-                    "schema_version": AI_COACH_SCHEMA_VERSION,
+                    "schema_version": _schema_version_for(request),
                     "policy_revision": settings.ai_coach_policy_revision,
                     "provider": provider_name,
                     "configured_model": configured_model,
@@ -336,6 +396,12 @@ class AiCoachService:
                     "completion_tokens": usage.completion_tokens if usage is not None else None,
                     "total_tokens": usage.total_tokens if usage is not None else None,
                     "cost_microunits": usage.cost_microunits if usage is not None else None,
+                    "report_version": (
+                        response_metadata.report_version if response_metadata is not None else None
+                    ),
+                    "report_revision": (
+                        response_metadata.report_revision if response_metadata is not None else None
+                    ),
                 },
             )
 
@@ -412,16 +478,36 @@ class AiCoachService:
         *,
         answer: str | None = None,
         citations=(),
+        insights=(),
         limitations=(),
+        response_metadata: AiCoachResponseMetadata | None = None,
     ) -> AiCoachResponse:
         return AiCoachResponse(
             outcome=outcome,
             answer=answer,
             citations=tuple(citations),
+            insights=tuple(insights),
             limitations=tuple(limitations),
             safety_category=safety.value,
             prompt_version=_prompt_version_for(request),
             request_id=request_id,
+            report_version=(
+                response_metadata.report_version if response_metadata is not None else None
+            ),
+            input_version=(
+                response_metadata.input_version if response_metadata is not None else None
+            ),
+            output_version=(
+                response_metadata.output_version if response_metadata is not None else None
+            ),
+            report_revision=(
+                response_metadata.report_revision if response_metadata is not None else None
+            ),
+            period_start=(
+                response_metadata.period_start if response_metadata is not None else None
+            ),
+            period_end=response_metadata.period_end if response_metadata is not None else None,
+            timezone=response_metadata.timezone if response_metadata is not None else None,
         )
 
     def _unavailable_response(
@@ -429,6 +515,8 @@ class AiCoachService:
         request: AiCoachRequest,
         request_id: str | None,
         safety: SafetyCategory,
+        *,
+        response_metadata: AiCoachResponseMetadata | None = None,
     ) -> AiCoachResponse:
         return self._base_response(
             request,
@@ -436,6 +524,7 @@ class AiCoachService:
             safety,
             AiCoachOutcome.UNAVAILABLE,
             limitations=(_UNAVAILABLE_LIMITATION,),
+            response_metadata=response_metadata,
         )
 
     def _insufficient_response(
@@ -443,6 +532,8 @@ class AiCoachService:
         request: AiCoachRequest,
         request_id: str | None,
         safety: SafetyCategory,
+        *,
+        response_metadata: AiCoachResponseMetadata | None = None,
     ) -> AiCoachResponse:
         return self._base_response(
             request,
@@ -450,6 +541,7 @@ class AiCoachService:
             safety,
             AiCoachOutcome.INSUFFICIENT_DATA,
             limitations=(_INSUFFICIENT_LIMITATION,),
+            response_metadata=response_metadata,
         )
 
     def _rate_limited_response(
@@ -457,6 +549,8 @@ class AiCoachService:
         request: AiCoachRequest,
         request_id: str | None,
         safety: SafetyCategory,
+        *,
+        response_metadata: AiCoachResponseMetadata | None = None,
     ) -> AiCoachResponse:
         return self._base_response(
             request,
@@ -464,6 +558,7 @@ class AiCoachService:
             safety,
             AiCoachOutcome.RATE_LIMITED,
             limitations=(_RATE_LIMITED_LIMITATION,),
+            response_metadata=response_metadata,
         )
 
     def _invalid_output_response(
@@ -471,6 +566,8 @@ class AiCoachService:
         request: AiCoachRequest,
         request_id: str | None,
         safety: SafetyCategory,
+        *,
+        response_metadata: AiCoachResponseMetadata | None = None,
     ) -> AiCoachResponse:
         return self._base_response(
             request,
@@ -478,6 +575,7 @@ class AiCoachService:
             safety,
             AiCoachOutcome.INVALID_OUTPUT,
             limitations=(_INVALID_OUTPUT_LIMITATION,),
+            response_metadata=response_metadata,
         )
 
     def _safety_response(
@@ -485,6 +583,8 @@ class AiCoachService:
         request: AiCoachRequest,
         request_id: str | None,
         safety: SafetyCategory,
+        *,
+        response_metadata: AiCoachResponseMetadata | None = None,
     ) -> AiCoachResponse:
         return self._base_response(
             request,
@@ -492,6 +592,7 @@ class AiCoachService:
             safety,
             AiCoachOutcome.SAFETY_REFUSAL,
             answer=refusal_text(safety),
+            response_metadata=response_metadata,
         )
 
     def _answer_response(
@@ -501,6 +602,8 @@ class AiCoachService:
         safety: SafetyCategory,
         result: ProviderResult,
         context_refs: tuple[ContextRef, ...],
+        *,
+        response_metadata: AiCoachResponseMetadata | None = None,
     ) -> AiCoachResponse:
         ref_by_id = {ref.ref_id: ref for ref in context_refs}
         citations = []
@@ -528,7 +631,12 @@ class AiCoachService:
             AiCoachOutcome.ANSWER,
             answer=result.response.answer,
             citations=citations,
+            insights=tuple(
+                AiCoachInsight.model_validate(insight.model_dump())
+                for insight in result.response.insights
+            ),
             limitations=limitations[:6],
+            response_metadata=response_metadata,
         )
 
 

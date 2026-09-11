@@ -148,8 +148,42 @@
   max-width: 16rem;
 }
 
+.ai-coach-period-controls {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
 .ai-coach-period select {
   padding: 0.625rem 0.75rem;
+}
+
+.ai-coach-custom-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--v2-space-3);
+}
+
+.ai-coach-custom-period label {
+  display: grid;
+  gap: var(--v2-space-2);
+  font-weight: 700;
+}
+
+.ai-coach-custom-period input {
+  min-height: var(--touch-target);
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--v2-border-strong);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface);
+  color: var(--v2-text-primary);
+  font: inherit;
+}
+
+.ai-coach-custom-period small {
+  flex-basis: 100%;
+  color: var(--v2-text-secondary);
+  font-size: 0.8125rem;
 }
 
 .ai-coach-form__meta,
@@ -205,6 +239,17 @@
   margin-left: auto;
 }
 
+.ai-coach-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+  justify-content: flex-end;
+}
+
+.ai-coach-state__actions button {
+  margin-left: 0;
+}
+
 .ai-coach-response {
   display: grid;
   gap: var(--v2-space-4);
@@ -227,9 +272,49 @@
 }
 
 .ai-coach-response__limitations,
-.ai-coach-response__sources {
+.ai-coach-response__sources,
+.ai-coach-response__insights,
+.ai-coach-response__report-meta {
   padding-top: var(--v2-space-3);
   border-top: 1px solid var(--v2-border);
+}
+
+.ai-coach-response__insights {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.ai-coach-response__insight-group h4 {
+  margin: 0;
+}
+
+.ai-coach-response__insight-group ul {
+  display: grid;
+  gap: var(--v2-space-2);
+  margin: var(--v2-space-2) 0 0;
+  padding-left: 1.25rem;
+}
+
+.ai-coach-response__insight-group li {
+  padding-left: 0.125rem;
+}
+
+.ai-coach-response__insight-group small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--v2-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.ai-coach-response__insight-group--suggestions {
+  padding: var(--v2-space-3);
+  border-left: 3px solid var(--v2-lime);
+  background: var(--v2-surface-secondary);
+}
+
+.ai-coach-response__report-meta {
+  color: var(--v2-text-secondary);
+  font-size: 0.8125rem;
 }
 
 .ai-coach-response__sources li {
@@ -277,7 +362,8 @@
 .ai-coach-entry a:focus-visible,
 .ai-coach-experience a:focus-visible,
 .ai-coach-form textarea:focus-visible,
-.ai-coach-period select:focus-visible {
+.ai-coach-period select:focus-visible,
+.ai-coach-custom-period input:focus-visible {
   outline: var(--focus-width) solid var(--color-focus);
   outline-offset: var(--focus-offset);
 }

@@ -10,30 +10,74 @@ import {
 
 const evidenceDir = resolve(process.cwd(), '../.artifacts/runtime/tests/ai-coach-ui');
 
-async function installAiCoachApi(page: Page): Promise<void> {
+async function installAiCoachApi(page: Page, personalAvailable = false): Promise<void> {
   await page.route('**/api/v1/ai-coach/**', async (route: Route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
 
     if (path.endsWith('/status')) {
       return route.fulfill({
-        json: { ui_enabled: true, generic_available: true, personal_available: false },
+        json: { ui_enabled: true, generic_available: true, personal_available: personalAvailable },
       });
     }
     if (path.endsWith('/consent')) {
       return route.fulfill({
         json: {
-          status: 'revoked',
+          status: personalAvailable ? 'granted' : 'revoked',
           scope: 'personal_readonly_tools_v1',
           consent_version: 'ai-coach-personal-v1',
-          categories: [],
+          categories: personalAvailable
+            ? ['personal_progress', 'training_history', 'nutrition_summary']
+            : [],
           purpose: 'Внутренняя оценка AI Coach',
           provider_name: 'groq',
           provider_policy_revision: 'test',
           retention_notice: 'Без долгосрочной памяти',
           consent_source: 'test',
-          granted_at: null,
+          granted_at: personalAvailable ? '2026-09-01T00:00:00Z' : null,
           revoked_at: null,
+        },
+      });
+    }
+    if (path.endsWith('/personal/generate') && request.method() === 'POST') {
+      return route.fulfill({
+        json: {
+          outcome: 'answer',
+          answer:
+            'Главное за период\n\n- Выполнено 3 тренировки.\n\nОграничения данных\n\n- Питание заполнено не полностью.\n\nЧто можно сделать дальше\n\n- Заполнить пропуски.\n\nПочему\n\n- Основание в отчёте.',
+          citations: [
+            {
+              title: 'Канонический отчёт',
+              publisher: 'YFC',
+              url: 'https://your-fitness-coach.ru/progress',
+              source_type: 'personal_tool_screen',
+            },
+          ],
+          insights: [
+            {
+              kind: 'fact',
+              text: 'За период выполнено 3 тренировки.',
+              evidence_ids: ['training.completed_workouts'],
+              reason_keys: [],
+            },
+            {
+              kind: 'suggestion',
+              text: 'Заполнить пропуски и повторить запрос.',
+              evidence_ids: ['nutrition.logged_days'],
+              reason_keys: ['nutrition_missing_days'],
+            },
+          ],
+          limitations: ['Пропущенные дни не считаются нулевыми.'],
+          safety_category: 'clear',
+          prompt_version: 'ai-coach-period-report-v1',
+          request_id: 'period-request',
+          report_version: 'progress-report-v1',
+          input_version: 'ai-coach-period-report-input-v1',
+          output_version: 'ai-coach-period-report-output-v1',
+          report_revision: 'revision-test',
+          period_start: '2026-09-01',
+          period_end: '2026-09-07',
+          timezone: 'Europe/Moscow',
         },
       });
     }
@@ -67,6 +111,7 @@ async function openAiCoachSurface(
   theme: 'light' | 'dark',
   viewport: { width: number; height: number },
   tma = false,
+  personalAvailable = false,
 ): Promise<void> {
   await page.setViewportSize(viewport);
   await page.addInitScript((selectedTheme) => {
@@ -74,7 +119,7 @@ async function openAiCoachSurface(
   }, theme);
   if (tma) await installTelegramHarness(page, { colorScheme: theme });
   await installPlatformApi(page, { browserSession: !tma, measurementHistory: 'many' });
-  await installAiCoachApi(page);
+  await installAiCoachApi(page, personalAvailable);
   await page.goto(`/app?section=profile${tma ? '&tgWebAppPlatform=android' : ''}#profile-ai-coach`);
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
   await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
@@ -176,4 +221,48 @@ test('AI Coach internal beta keeps honest states and responsive boundaries', asy
 
     await context.close();
   }
+});
+
+test('AI Coach period report exposes bounded custom dates and grounded sections', async ({
+  browser,
+}) => {
+  mkdirSync(evidenceDir, { recursive: true });
+  const viewport = { width: 390, height: 844 };
+  const context = await browser.newContext({ viewport, hasTouch: true });
+  const page = await context.newPage();
+  await openAiCoachSurface(page, 'light', viewport, false, true);
+
+  const experience = page.getByTestId('ai-coach-experience');
+  await experience.getByRole('button', { name: 'Моя сводка' }).click();
+  await expect(experience.getByTestId('ai-coach-consent-granted')).toBeVisible();
+  await experience.getByRole('button', { name: 'Итог периода' }).click();
+  await experience.getByLabel('Период сводки').selectOption('custom');
+
+  const endInput = experience.getByLabel('Окончание периода');
+  const endValue = await endInput.getAttribute('max');
+  if (!endValue) throw new Error('The custom period end date has no server-safe max');
+  const end = new Date(`${endValue}T00:00:00Z`);
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - 6);
+  await experience.getByLabel('Начало периода').fill(start.toISOString().slice(0, 10));
+  await endInput.fill(endValue);
+  const submitButton = experience.getByRole('button', { name: 'Получить ответ' });
+  await submitButton.scrollIntoViewIfNeeded();
+  await submitButton.click();
+
+  await expect(experience.getByTestId('ai-coach-period-insights')).toContainText(
+    'За период выполнено 3 тренировки',
+  );
+  await expect(experience.getByTestId('ai-coach-period-insights')).toContainText(
+    'Что можно сделать дальше',
+  );
+  await expect(experience).toContainText('Канонический отчёт progress-report-v1');
+  await expectTouchTargets(experience.locator('button'));
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: resolve(evidenceDir, 'mobile-light-period-report-390x844.png'),
+    fullPage: true,
+  });
+
+  await context.close();
 });

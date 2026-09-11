@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import unicodedata
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.ai_coach.contracts import (
     AiCoachJob,
@@ -51,13 +51,30 @@ class AiCoachGenerateRequest(BaseModel):
 
 
 class AiCoachPersonalGenerateRequest(BaseModel):
-    """A server-selected read-only tool and one of three bounded periods."""
+    """A server-selected read-only tool and a bounded report period."""
 
     model_config = ConfigDict(extra="forbid")
 
     tool: AiCoachPersonalTool
     period_days: Literal[7, 30, 90] = 30
+    period: Literal["days_7", "days_30", "days_90", "custom"] | None = None
+    date_from: date | None = None
+    date_to: date | None = None
     message: str = Field(..., min_length=1, max_length=320)
+
+    @model_validator(mode="after")
+    def validate_period(self) -> AiCoachPersonalGenerateRequest:
+        if self.period is None:
+            if self.date_from is not None or self.date_to is not None:
+                raise ValueError("Произвольные даты требуют period=custom")
+            return self
+        if self.period == "custom":
+            if self.date_from is None or self.date_to is None:
+                raise ValueError("Для произвольного периода укажите обе даты")
+            return self
+        if self.date_from is not None or self.date_to is not None:
+            raise ValueError("Даты можно передавать только для period=custom")
+        return self
 
     @field_validator("message")
     @classmethod

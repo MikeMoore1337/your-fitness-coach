@@ -1,5 +1,5 @@
 import { Icon } from '../../shared/ui/Icon';
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -29,7 +29,10 @@ type AiCoachJob =
   | 'nutrition_knowledge'
   | 'progression_explanation';
 type AiCoachPersonalTool =
-  'get_progress_summary' | 'get_recent_training_summary' | 'get_nutrition_summary';
+  | 'get_progress_summary'
+  | 'get_recent_training_summary'
+  | 'get_nutrition_summary'
+  | 'get_period_report_insights';
 type AiCoachOutcome =
   | 'answer'
   | 'unavailable'
@@ -39,6 +42,7 @@ type AiCoachOutcome =
   | 'invalid_output'
   | 'consent_required';
 type AiCoachPeriod = 7 | 30 | 90;
+type AiCoachPeriodSelection = 'days_7' | 'days_30' | 'days_90' | 'custom';
 
 type GenericPrompt = {
   id: string;
@@ -66,6 +70,9 @@ type AiCoachRequest =
       mode: 'personal';
       tool: AiCoachPersonalTool;
       period_days: AiCoachPeriod;
+      period: AiCoachPeriodSelection;
+      date_from?: string;
+      date_to?: string;
       message: string;
     };
 
@@ -97,6 +104,13 @@ const GENERIC_PROMPTS: readonly GenericPrompt[] = [
 
 const PERSONAL_PROMPTS: readonly PersonalPrompt[] = [
   {
+    id: 'period-report',
+    label: 'Итог периода',
+    message:
+      'Сделай краткий итог моего канонического отчёта за выбранный период: факты, ограничения данных и 1–3 обратимых следующих шага.',
+    tool: 'get_period_report_insights',
+  },
+  {
     id: 'progress-summary',
     label: 'Мой прогресс',
     message:
@@ -118,6 +132,16 @@ const PERSONAL_PROMPTS: readonly PersonalPrompt[] = [
 ];
 const DEFAULT_GENERIC_PROMPT = GENERIC_PROMPTS[0]!;
 const DEFAULT_PERSONAL_PROMPT = PERSONAL_PROMPTS[0]!;
+
+const PERIOD_REASON_COPY: Record<string, string> = {
+  nutrition_missing_days: 'пропущенные дни питания отделены от нулевых значений',
+  nutrition_target_changed: 'учтены исторические версии целей питания',
+  hydration_unavailable: 'гидратация не была доступна в источнике отчёта',
+  hydration_no_logged_days: 'за период нет записанных значений гидратации',
+  body_trend_limited: 'тренд замеров тела ограничен качеством наблюдений',
+  body_trend_unavailable: 'для тренда замеров тела недостаточно наблюдений',
+  report_data_insufficient: 'канонический отчёт пометил данные как недостаточные',
+};
 
 const OUTCOME_COPY: Record<AiCoachOutcome, { title: string; text: string }> = {
   answer: {
@@ -262,6 +286,57 @@ export function SafeCoachAnswer({
   return <div className="ai-coach-answer__body">{blocks}</div>;
 }
 
+type AiCoachInsight = AiCoachResponse['insights'][number];
+
+function PeriodReportInsights({ response }: { response: AiCoachResponse }) {
+  const insights = response.insights ?? [];
+  if (!insights.length) return null;
+
+  const facts = insights.filter((insight) => insight.kind === 'fact');
+  const inferences = insights.filter((insight) => insight.kind === 'inference');
+  const suggestions = insights.filter((insight) => insight.kind === 'suggestion');
+  const reasonText = (insight: AiCoachInsight) => {
+    const labels = insight.reason_keys
+      .map((key) => PERIOD_REASON_COPY[key])
+      .filter((label): label is string => Boolean(label));
+    return labels.length ? labels.join('; ') : null;
+  };
+  const claimList = (items: AiCoachInsight[], title: string, className: string) => {
+    if (!items.length) return null;
+    return (
+      <section className={`ai-coach-response__insight-group ${className}`}>
+        <h4>{title}</h4>
+        <ul>
+          {items.map((insight, index) => {
+            const reason = reasonText(insight);
+            return (
+              <li
+                data-evidence-ids={insight.evidence_ids.join(' ')}
+                key={`${insight.kind}-${insight.evidence_ids.join('.')}-${index}`}
+              >
+                <span>{insight.text}</span>
+                {reason && <small>Основание: {reason}.</small>}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    );
+  };
+
+  return (
+    <div className="ai-coach-response__insights" data-testid="ai-coach-period-insights">
+      {claimList(facts, 'Главное за период', 'ai-coach-response__insight-group--facts')}
+      {claimList(inferences, 'Почему', 'ai-coach-response__insight-group--inferences')}
+      {claimList(
+        suggestions,
+        'Что можно сделать дальше',
+        'ai-coach-response__insight-group--suggestions',
+      )}
+    </div>
+  );
+}
+
 function ResponseState({
   mode,
   onFeedback,
@@ -272,7 +347,8 @@ function ResponseState({
   response: AiCoachResponse;
 }) {
   const copy = OUTCOME_COPY[response.outcome];
-  const citations = response.citations.filter((citation) => safeCoachUrl(citation.url));
+  const citations = (response.citations ?? []).filter((citation) => safeCoachUrl(citation.url));
+  const isPeriodReport = response.output_version === 'ai-coach-period-report-output-v1';
   return (
     <section
       aria-live="polite"
@@ -289,9 +365,10 @@ function ResponseState({
       {response.answer && response.outcome !== 'unavailable' && (
         <SafeCoachAnswer answer={response.answer} citations={citations} />
       )}
+      {isPeriodReport && <PeriodReportInsights response={response} />}
       {response.limitations.length > 0 && (
         <div className="ai-coach-response__limitations">
-          <strong>Границы ответа</strong>
+          <strong>{isPeriodReport ? 'Ограничения данных' : 'Границы ответа'}</strong>
           <ul>
             {response.limitations.map((limitation) => (
               <li key={limitation}>{limitation}</li>
@@ -317,6 +394,12 @@ function ResponseState({
             })}
           </ul>
         </div>
+      )}
+      {isPeriodReport && response.report_version && (
+        <small className="ai-coach-response__report-meta">
+          Канонический отчёт {response.report_version}; период {response.period_start} —{' '}
+          {response.period_end} ({response.timezone}).
+        </small>
       )}
       <div className="ai-coach-response__feedback" aria-label="Оценка ответа">
         <span>Ответ был полезен?</span>
@@ -369,6 +452,9 @@ function ConsentNotice({
             расписание не изменяются.
           </p>
           {consent.retention_notice && <small>{consent.retention_notice}</small>}
+          <small>
+            Запрос запускается вручную, работает в бесплатной beta-квоте и не сохраняет текст.
+          </small>
         </div>
         <Button
           disabled={pending}
@@ -393,7 +479,7 @@ function ConsentNotice({
           <li>
             Только готовая сводка прогресса, тренировок или питания без возможности что-либо менять.
           </li>
-          <li>Период выбираете вы: 7, 30 или 90 дней.</li>
+          <li>Период выбираете вы: 7, 30, 90 или до 366 дней для итога отчёта.</li>
           <li>Согласие можно отозвать в любой момент.</li>
         </ul>
       </div>
@@ -478,10 +564,15 @@ export function AiCoachExperience({
   const [mode, setMode] = useState<AiCoachMode>('generic');
   const [genericPromptId, setGenericPromptId] = useState(DEFAULT_GENERIC_PROMPT.id);
   const [personalPromptId, setPersonalPromptId] = useState(DEFAULT_PERSONAL_PROMPT.id);
-  const [periodDays, setPeriodDays] = useState<AiCoachPeriod>(30);
+  const [periodSelection, setPeriodSelection] = useState<AiCoachPeriodSelection>('days_30');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
   const [draft, setDraft] = useState('');
   const [response, setResponse] = useState<AiCoachResponse | null>(null);
   const [failure, setFailure] = useState<AiCoachFailureClass | null>(null);
+  const [lastRequest, setLastRequest] = useState<AiCoachRequest | null>(null);
+  const requestAbortController = useRef<AbortController | null>(null);
+  const cancelRequested = useRef(false);
 
   const consent = useQuery<AiCoachConsentResponse>({
     queryKey: aiCoachConsentQueryKey,
@@ -511,27 +602,56 @@ export function AiCoachExperience({
   const selectedPersonalPrompt =
     PERSONAL_PROMPTS.find((prompt) => prompt.id === personalPromptId) ?? DEFAULT_PERSONAL_PROMPT;
   const personalConsentGranted = consent.data?.status === 'granted';
+  const customPeriodSelected =
+    periodSelection === 'custom' && selectedPersonalPrompt.tool === 'get_period_report_insights';
+  const selectedPeriodDays: AiCoachPeriod =
+    periodSelection === 'days_7' ? 7 : periodSelection === 'days_90' ? 90 : 30;
+  const today = new Date().toISOString().slice(0, 10);
+  const customPeriodTooLong =
+    Boolean(customDateFrom && customDateTo) &&
+    (Date.parse(customDateTo) - Date.parse(customDateFrom)) / 86_400_000 + 1 > 366;
+  const customPeriodInvalid =
+    customPeriodSelected &&
+    (!customDateFrom ||
+      !customDateTo ||
+      customDateFrom > customDateTo ||
+      customDateTo > today ||
+      customPeriodTooLong);
 
   const requestMutation = useMutation({
-    mutationFn: (request: AiCoachRequest) =>
-      request.mode === 'generic'
-        ? api<AiCoachResponse>('/api/v1/ai-coach/generate', {
-            method: 'POST',
-            body: {
-              job: request.job,
-              context_id: request.context_id,
-              message: request.message,
-            },
-          })
-        : api<AiCoachResponse>('/api/v1/ai-coach/personal/generate', {
-            method: 'POST',
-            body: {
-              tool: request.tool,
-              period_days: request.period_days,
-              message: request.message,
-            },
-          }),
+    mutationFn: async (request: AiCoachRequest) => {
+      const controller = new AbortController();
+      requestAbortController.current = controller;
+      try {
+        return request.mode === 'generic'
+          ? await api<AiCoachResponse>('/api/v1/ai-coach/generate', {
+              method: 'POST',
+              body: {
+                job: request.job,
+                context_id: request.context_id,
+                message: request.message,
+              },
+              signal: controller.signal,
+            })
+          : await api<AiCoachResponse>('/api/v1/ai-coach/personal/generate', {
+              method: 'POST',
+              body: {
+                tool: request.tool,
+                period_days: request.period_days,
+                period: request.period,
+                date_from: request.date_from,
+                date_to: request.date_to,
+                message: request.message,
+              },
+              signal: controller.signal,
+            });
+      } finally {
+        if (requestAbortController.current === controller) requestAbortController.current = null;
+      }
+    },
     onMutate: (request) => {
+      cancelRequested.current = false;
+      setLastRequest(request);
       setResponse(null);
       setFailure(null);
       trackProductEvent({
@@ -550,6 +670,10 @@ export function AiCoachExperience({
       });
     },
     onError: (reason, request) => {
+      if (cancelRequested.current) {
+        setFailure(null);
+        return;
+      }
       const failureClass = normalizeFailure(reason);
       setFailure(failureClass);
       trackProductEvent({
@@ -562,9 +686,27 @@ export function AiCoachExperience({
   });
 
   const reset = () => {
+    if (requestMutation.isPending) {
+      cancelRequested.current = true;
+      requestAbortController.current?.abort();
+      requestMutation.reset();
+    }
     setResponse(null);
     setFailure(null);
     setDraft('');
+  };
+
+  const cancelRequest = () => {
+    cancelRequested.current = true;
+    requestAbortController.current?.abort();
+    requestMutation.reset();
+    setResponse(null);
+    setFailure(null);
+  };
+
+  const retryLastRequest = () => {
+    if (!lastRequest || requestMutation.isPending) return;
+    requestMutation.mutate(lastRequest);
   };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -577,6 +719,7 @@ export function AiCoachExperience({
           outcome: 'unavailable',
           answer: null,
           citations: [],
+          insights: [],
           limitations: [
             'Публичная помощь AI Coach сейчас выключена для этого внутреннего окружения.',
           ],
@@ -586,12 +729,13 @@ export function AiCoachExperience({
         });
         return;
       }
-      requestMutation.mutate({
+      const nextRequest: AiCoachRequest = {
         mode,
         job: selectedGenericPrompt.job,
         context_id: selectedGenericPrompt.context_id,
         message,
-      });
+      };
+      requestMutation.mutate(nextRequest);
       return;
     }
     if (!status?.personal_available) {
@@ -599,6 +743,7 @@ export function AiCoachExperience({
         outcome: 'unavailable',
         answer: null,
         citations: [],
+        insights: [],
         limitations: [
           'Персональная сводка сейчас недоступна; публичная помощь остаётся отдельным режимом.',
         ],
@@ -613,6 +758,7 @@ export function AiCoachExperience({
         outcome: 'consent_required',
         answer: null,
         citations: [],
+        insights: [],
         limitations: [],
         safety_category: 'clear',
         prompt_version: AI_COACH_UI_EVAL_VERSION,
@@ -620,12 +766,19 @@ export function AiCoachExperience({
       });
       return;
     }
-    requestMutation.mutate({
+    if (customPeriodInvalid) {
+      setFailure('validation');
+      return;
+    }
+    const nextRequest: AiCoachRequest = {
       mode,
       tool: selectedPersonalPrompt.tool,
-      period_days: periodDays,
+      period_days: selectedPeriodDays,
+      period: periodSelection,
+      ...(customPeriodSelected ? { date_from: customDateFrom, date_to: customDateTo } : {}),
       message,
-    });
+    };
+    requestMutation.mutate(nextRequest);
   };
 
   const sendFeedback = (value: AiCoachHelpfulness) => {
@@ -653,7 +806,7 @@ export function AiCoachExperience({
           <p>
             Здесь нет долгосрочной памяти и автоматических изменений. Публичный режим работает по
             опубликованному материалу, а личный — только по одной готовой сводке за выбранный
-            период.
+            период. Личный запрос запускается вручную в бесплатной beta-квоте.
           </p>
         </div>
         <Badge tone="warning">Не замена врачу или тренеру</Badge>
@@ -662,7 +815,8 @@ export function AiCoachExperience({
       <div className="ai-coach-boundary">
         <strong>Что не передаётся</strong>
         <span>
-          Сырые записи дневника, заметки тренера, идентификаторы аккаунта и история диалога.
+          Сырые записи дневника, заметки тренера, сон, настроение, идентификаторы аккаунта и история
+          диалога.
         </span>
       </div>
 
@@ -718,7 +872,16 @@ export function AiCoachExperience({
               type="button"
               onClick={() => {
                 if (mode === 'generic') setGenericPromptId(prompt.id);
-                else setPersonalPromptId(prompt.id);
+                else {
+                  setPersonalPromptId(prompt.id);
+                  if (
+                    'tool' in prompt &&
+                    prompt.tool !== 'get_period_report_insights' &&
+                    periodSelection === 'custom'
+                  ) {
+                    setPeriodSelection('days_30');
+                  }
+                }
                 setDraft(prompt.message);
                 setResponse(null);
                 setFailure(null);
@@ -731,17 +894,48 @@ export function AiCoachExperience({
       </div>
 
       {mode === 'personal' && (
-        <label className="ai-coach-period">
-          <span>Период сводки</span>
-          <select
-            value={periodDays}
-            onChange={(event) => setPeriodDays(Number(event.target.value) as AiCoachPeriod)}
-          >
-            <option value={7}>7 дней</option>
-            <option value={30}>30 дней</option>
-            <option value={90}>90 дней</option>
-          </select>
-        </label>
+        <div className="ai-coach-period-controls">
+          <label className="ai-coach-period">
+            <span>Период сводки</span>
+            <select
+              value={periodSelection}
+              onChange={(event) => setPeriodSelection(event.target.value as AiCoachPeriodSelection)}
+            >
+              <option value="days_7">7 дней</option>
+              <option value="days_30">30 дней</option>
+              <option value="days_90">90 дней</option>
+              {selectedPersonalPrompt.tool === 'get_period_report_insights' && (
+                <option value="custom">Произвольный период</option>
+              )}
+            </select>
+          </label>
+          {customPeriodSelected && (
+            <div className="ai-coach-custom-period">
+              <label>
+                <span>Начало</span>
+                <input
+                  aria-label="Начало периода"
+                  max={customDateTo || today}
+                  type="date"
+                  value={customDateFrom}
+                  onChange={(event) => setCustomDateFrom(event.target.value)}
+                />
+              </label>
+              <label>
+                <span>Окончание</span>
+                <input
+                  aria-label="Окончание периода"
+                  max={today}
+                  min={customDateFrom || undefined}
+                  type="date"
+                  value={customDateTo}
+                  onChange={(event) => setCustomDateTo(event.target.value)}
+                />
+              </label>
+              <small>Не более 366 дней; будущие даты недоступны.</small>
+            </div>
+          )}
+        </div>
       )}
 
       <form className="ai-coach-form" onSubmit={submit}>
@@ -765,6 +959,11 @@ export function AiCoachExperience({
           <Button type="button" variant="secondary" onClick={reset}>
             Новый вопрос
           </Button>
+          {requestMutation.isPending && (
+            <Button type="button" variant="secondary" onClick={cancelRequest}>
+              Отменить
+            </Button>
+          )}
         </div>
       </form>
 
@@ -789,9 +988,14 @@ export function AiCoachExperience({
         >
           <strong>Ответ не получен</strong>
           <p>{SAFE_FAILURE_COPY[failure]}</p>
-          <button type="button" onClick={() => setFailure(null)}>
-            Понятно
-          </button>
+          <div className="ai-coach-state__actions">
+            <button type="button" onClick={retryLastRequest}>
+              Повторить
+            </button>
+            <button type="button" onClick={() => setFailure(null)}>
+              Понятно
+            </button>
+          </div>
         </section>
       )}
       {requestMutation.isPending && <LoadingState label="Проверяем разрешённый контекст…" />}
