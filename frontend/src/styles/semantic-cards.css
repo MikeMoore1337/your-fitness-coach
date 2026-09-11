@@ -70,9 +70,6 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1px solid color-mix(in srgb, var(--semantic-line) 72%, transparent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--semantic-tint) 82%, var(--v2-surface));
   color: var(--semantic-ink);
 }
 
