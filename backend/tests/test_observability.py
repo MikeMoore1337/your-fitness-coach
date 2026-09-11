@@ -84,6 +84,55 @@ def test_json_formatter_preserves_worker_lifecycle_markers() -> None:
         assert json.loads(formatter.format(record))["message"] == event_name
 
 
+def test_json_formatter_preserves_bounded_ai_coach_metadata_without_content() -> None:
+    record = logging.LogRecord(
+        name="app.ai_coach",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="ai_coach_generation",
+        args=(),
+        exc_info=None,
+    )
+    fields = {
+        "request_id": "request-ai-123",
+        "job": "nutrition_knowledge",
+        "data_class": "generic",
+        "tool_name": "get_period_report_insights",
+        "prompt_version": "ai-coach-period-report-v2",
+        "schema_version": "ai-coach-period-report-output-v1",
+        "policy_revision": "verified-generic-v1",
+        "provider": "groq",
+        "configured_model": "openai/gpt-oss-120b",
+        "actual_model": "openai/gpt-oss-120b",
+        "outcome": "answer",
+        "error_code": "provider_unavailable",
+        "safety_category": "clear",
+        "attempts": 1,
+        "retry_count": 0,
+        "latency_ms": 123,
+        "prompt_tokens": 10,
+        "completion_tokens": 20,
+        "total_tokens": 30,
+        "cost_microunits": 0,
+        "report_version": "progress-report-v1",
+        "report_revision": "report:0123456789abcdef",
+    }
+    for key, value in fields.items():
+        setattr(record, key, value)
+    record.prompt = "private prompt"
+    record.answer = "private answer"
+    record.user_id = 99887766
+
+    payload = json.loads(JsonFormatter(service="api").format(record))
+
+    assert payload["message"] == "ai_coach_generation"
+    assert {key: payload[key] for key in fields} == fields
+    assert "prompt" not in payload
+    assert "answer" not in payload
+    assert "user_id" not in payload
+
+
 def test_news_cycle_summary_preserves_required_bounded_counters() -> None:
     record = logging.LogRecord(
         name="fitminiapp_api.services.news_worker",

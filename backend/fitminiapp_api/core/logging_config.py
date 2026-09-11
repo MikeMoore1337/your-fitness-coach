@@ -9,6 +9,7 @@ from typing import Any
 
 URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
 SAFE_CODE_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,127}\Z")
+SAFE_IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9_.:/-]{1,128}\Z")
 SAFE_REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
 SAFE_METHOD_PATTERN = re.compile(r"[A-Z]{3,10}\Z")
 SAFE_ROUTE_PATTERN = re.compile(r"(?:/[A-Za-z0-9_./{}:-]{0,255}|unmatched)\Z")
@@ -16,6 +17,7 @@ SAFE_EVENT_NAMES = frozenset(
     {
         "application_started",
         "application_stopped",
+        "ai_coach_generation",
         "auth_email_delivery_failed",
         "food_provider_barcode_unavailable",
         "food_provider_search_unavailable",
@@ -53,6 +55,7 @@ SAFE_PROVIDER_NAMES = frozenset(
         "apple",
         "deterministic",
         "google",
+        "groq",
         "open_food_facts",
         "openai_compatible",
         "telegram",
@@ -73,13 +76,23 @@ STRUCTURED_FIELDS = (
     "db_pool_checked_out",
     "db_pool_overflow",
     "body_limit_bytes",
+    "job",
+    "data_class",
+    "tool_name",
+    "prompt_version",
+    "schema_version",
+    "policy_revision",
     "notification_ref",
     "notification_category",
     "delivery_error",
     "provider",
+    "configured_model",
+    "actual_model",
     "reason",
     "pipeline_stage",
     "outcome",
+    "error_code",
+    "safety_category",
     "source_ref",
     "candidate_ref",
     "topic",
@@ -89,7 +102,15 @@ STRUCTURED_FIELDS = (
     "candidate_count",
     "queue_age_seconds",
     "attempt_count",
+    "attempts",
+    "retry_count",
     "latency_ms",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "cost_microunits",
+    "report_version",
+    "report_revision",
     "issue_count",
     "queued",
     "processing",
@@ -119,6 +140,12 @@ INTEGER_FIELDS = {
     "db_pool_checked_out",
     "db_pool_overflow",
     "body_limit_bytes",
+    "attempts",
+    "retry_count",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "cost_microunits",
     "items_count",
     "duplicate_count",
     "candidate_count",
@@ -152,13 +179,24 @@ CODE_FIELDS = {
     "notification_ref",
     "notification_category",
     "delivery_error",
+    "job",
+    "data_class",
+    "tool_name",
+    "prompt_version",
+    "schema_version",
+    "policy_revision",
     "reason",
     "pipeline_stage",
     "outcome",
+    "error_code",
+    "safety_category",
     "source_ref",
     "candidate_ref",
     "topic",
+    "report_version",
+    "report_revision",
 }
+MODEL_FIELDS = {"configured_model", "actual_model"}
 
 
 class JsonFormatter(logging.Formatter):
@@ -214,6 +252,8 @@ class JsonFormatter(logging.Formatter):
             return value if SAFE_ROUTE_PATTERN.fullmatch(value) else None
         if field == "provider":
             return value if value in SAFE_PROVIDER_NAMES else None
+        if field in MODEL_FIELDS:
+            return value if SAFE_IDENTIFIER_PATTERN.fullmatch(value) else None
         if field in CODE_FIELDS:
             return value if SAFE_CODE_PATTERN.fullmatch(value) else None
         return None

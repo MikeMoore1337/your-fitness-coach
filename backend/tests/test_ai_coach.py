@@ -137,10 +137,13 @@ def test_disabled_route_does_not_call_provider(monkeypatch) -> None:
     assert provider.calls == []
 
 
-def test_success_uses_exact_published_context_and_returns_trusted_citations(monkeypatch) -> None:
+def test_success_uses_exact_published_context_and_emits_routing_metadata(
+    monkeypatch, caplog
+) -> None:
     _enable_provider(monkeypatch)
     provider = StubProvider(calls=[])
     monkeypatch.setattr(ai_coach_service, "provider", provider)
+    caplog.set_level(logging.INFO, logger="app.ai_coach")
 
     with get_session_context() as db:
         response = ai_coach_service.generate(
@@ -157,6 +160,18 @@ def test_success_uses_exact_published_context_and_returns_trusted_citations(monk
     assert response.citations[0].source_type == "canonical_yfc"
     assert provider.calls[0][0].data_class.value == "generic"
     assert provider.calls[0][1] == ("knowledge-kbju-reference-v1",)
+    generation_record = next(
+        record for record in caplog.records if record.getMessage() == "ai_coach_generation"
+    )
+    assert generation_record.job == "nutrition_knowledge"
+    assert generation_record.data_class == "generic"
+    assert generation_record.provider == "groq"
+    assert generation_record.configured_model == "openai/gpt-oss-120b"
+    assert generation_record.actual_model == "openai/gpt-oss-120b"
+    assert generation_record.outcome == "answer"
+    assert generation_record.attempts == 1
+    assert generation_record.retry_count == 0
+    assert generation_record.error_code is None
 
 
 @pytest.mark.parametrize(
