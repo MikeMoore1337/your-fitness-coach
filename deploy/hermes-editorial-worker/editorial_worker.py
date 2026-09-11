@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import logging
 import os
 import re
 import sys
@@ -28,7 +29,7 @@ UPSTREAM_VERSION = "0.21.0"
 UPSTREAM_TAG = "v2026.8.31"
 UPSTREAM_COMMIT = "29112bef099274229cadff79cdff7bf7b99c4b77"
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
-INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v1"
+INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v2"
 PROMPT_VERSION = "task143-editorial-worker-v1"
 SKILL_VERSION = "yfc-hermes-editorial-v1"
 LOCAL_MOCK_MODE = "local_mock"
@@ -61,6 +62,7 @@ DRAFT_FIELD_LIMITS = {
 }
 TELEGRAM_PHOTO_CAPTION_LIMIT = 1024
 NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:%|\s?(?:mg|g|kg|мг|г|кг))?")
+BLOCKER_CODE_PATTERN = re.compile(r"^[a-z0-9_.:-]{1,64}$")
 EXTERNAL_GPT_OSS_SOFT_BUDGETS = (
     "Soft editorial budgets (not JSON Schema constraints): headline <= 140 characters; "
     "summary uses the remaining available caption budget; why_it_matters <= 240 characters. "
@@ -77,6 +79,36 @@ class WorkerError(RuntimeError):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
+
+
+class IntakeRemediationRequired(WorkerError):
+    def __init__(
+        self,
+        blockers: tuple[str, ...],
+        *,
+        attempt: int | None,
+        revision_id: str | None,
+    ) -> None:
+        super().__init__("remediation_required")
+        self.blockers = blockers
+        self.attempt = attempt
+        self.revision_id = revision_id
+
+
+class ProviderResult:
+    def __init__(
+        self,
+        proposal: DraftProposal,
+        *,
+        attempts: int,
+        original_blockers: tuple[str, ...] = (),
+    ) -> None:
+        self.proposal = proposal
+        self.attempts = attempts
+        self.original_blockers = original_blockers
+
+
+logger = logging.getLogger(__name__)
 
 
 class SourcePacket(BaseModel):
@@ -105,6 +137,13 @@ class SourcePacket(BaseModel):
             raise ValueError("source_url_must_be_https")
         if parsed.username or parsed.password or parsed.fragment:
             raise ValueError("source_url_must_not_have_credentials_or_fragment")
+        return value
+
+    @field_validator("content")
+    @classmethod
+    def validate_content_bytes(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > MAX_SOURCE_CONTENT_BYTES:
+            raise ValueError("source_content_too_large")
         return value
 
 
@@ -391,19 +430,7 @@ def _trusted_source_url(source: SourcePacket) -> str:
 
 
 def _source_grounding_text(source: SourcePacket) -> str:
-    values = [
-        source.title,
-        source.summary,
-        source.content,
-        source.author,
-        source.publisher,
-        source.doi,
-    ]
-    if source.published_at is not None:
-        values.append(source.published_at.isoformat())
-    if source.updated_at is not None:
-        values.append(source.updated_at.isoformat())
-    return "\n".join(value for value in values if value)
+    return "\n".join((source.title, source.summary, source.content))
 
 
 def _proposal_text(proposal: DraftProposal) -> str:
@@ -411,10 +438,11 @@ def _proposal_text(proposal: DraftProposal) -> str:
 
 
 def _telegram_photo_caption_text(proposal: DraftProposal, source: SourcePacket) -> str:
+    del source
     parts = [proposal.headline, proposal.summary]
     if proposal.why_it_matters:
         parts.append(proposal.why_it_matters)
-    parts.append(f"Источник\n{_trusted_source_url(source)}")
+    parts.append("Источник")
     return "\n\n".join(parts)
 
 
@@ -428,7 +456,8 @@ def _telegram_photo_caption_length(proposal: DraftProposal, source: SourcePacket
 
 
 def _external_caption_draft_budget(source: SourcePacket) -> int:
-    trusted_source_line = f"Источник\n{_trusted_source_url(source)}"
+    del source
+    trusted_source_line = "Источник"
     reserved_separators = 3 * _telegram_character_count("\n\n")
     return max(
         0,
@@ -444,7 +473,8 @@ def _external_gpt_oss_soft_budgets(source: SourcePacket) -> str:
         f"{EXTERNAL_GPT_OSS_SOFT_BUDGETS} Use as much of the available source-grounded "
         "detail as useful, without filler or repetition. Keep the combined UTF-16 length "
         f"of the three draft fields at or below {available_budget} characters so the final "
-        "photo caption leaves room for the trusted source label and URL. This is a soft "
+        "photo caption leaves room for the trusted source label; the trusted link target is "
+        "bound separately. This is a soft "
         "editorial budget, not a JSON Schema constraint; the worker applies hard limits "
         "locally."
     )
@@ -478,7 +508,17 @@ def _repair_request_content(
         )
     if "telegram_photo_caption_too_long" in warnings:
         instructions.append(
-            f"telegram_photo_caption_too_long: shorten the plain-text photo caption, including the trusted source URL and the Источник label, to at most {TELEGRAM_PHOTO_CAPTION_LIMIT} UTF-16 characters while preserving the supported main fact and material limitation. Do not add the URL to any draft field."
+            f"telegram_photo_caption_too_long: shorten the visible plain-text photo caption, including the Источник label, to at most {TELEGRAM_PHOTO_CAPTION_LIMIT} UTF-16 characters while preserving the supported main fact and material limitation. The trusted source link target is bound separately; do not add the URL to any draft field."
+        )
+    other_warnings = tuple(
+        warning
+        for warning in warnings
+        if warning not in {"unsupported_number", "telegram_photo_caption_too_long"}
+    )
+    if other_warnings:
+        instructions.append(
+            "other editorial warnings: remove only the listed deterministic style or claim issues "
+            f"({', '.join(other_warnings)}) while preserving supported facts, uncertainty, and limitations."
         )
     return (
         "REPAIR_REQUEST\n"
@@ -725,7 +765,13 @@ def _provider_request_once(
         raise WorkerError("provider_schema_invalid") from exc
 
 
-def _provider_request(source: SourcePacket) -> DraftProposal:
+def _provider_request_bounded(
+    source: SourcePacket,
+    *,
+    repair_warnings: tuple[str, ...] = (),
+    previous_proposal: DraftProposal | None = None,
+    attempts_used: int = 0,
+) -> ProviderResult:
     mode = _provider_mode()
     base_url = _provider_base_url(mode)
     api_key = _required_env("HERMES_PROVIDER_API_KEY")
@@ -742,9 +788,8 @@ def _provider_request(source: SourcePacket) -> DraftProposal:
         DEFAULT_PROVIDER_RETRY_BACKOFF_SECONDS,
         maximum=2,
     )
-    repair_warnings: tuple[str, ...] = ()
-    previous_proposal: DraftProposal | None = None
-    for attempt in range(max_attempts):
+    original_blockers = list(repair_warnings)
+    for attempt in range(attempts_used, max_attempts):
         try:
             proposal = _provider_request_once(
                 source,
@@ -764,12 +809,21 @@ def _provider_request(source: SourcePacket) -> DraftProposal:
             continue
         warnings = _preflight_warnings(proposal, source)
         if not warnings:
-            return proposal
+            return ProviderResult(
+                proposal,
+                attempts=attempt + 1,
+                original_blockers=tuple(dict.fromkeys(original_blockers)),
+            )
         if attempt + 1 >= max_attempts:
             raise WorkerError("editorial_preflight_repair_failed")
-        repair_warnings = warnings
+        original_blockers.extend(warnings)
+        repair_warnings = tuple(dict.fromkeys(warnings))
         previous_proposal = proposal
     raise WorkerError("provider_unavailable")
+
+
+def _provider_request(source: SourcePacket) -> DraftProposal:
+    return _provider_request_bounded(source).proposal
 
 
 def _json_response(response: httpx.Response, *, limit: int, error_code: str) -> dict[str, Any]:
@@ -785,12 +839,36 @@ def _json_response(response: httpx.Response, *, limit: int, error_code: str) -> 
     return document
 
 
-def _build_intake_payload(job: EditorialJob, proposal: DraftProposal) -> bytes:
+def _revision_value(base: str, attempt: int, *, suffix: str) -> str:
+    value = f"{base}:{suffix}{attempt}"
+    if len(value) <= 128:
+        return value
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _build_intake_payload(
+    job: EditorialJob,
+    proposal: DraftProposal,
+    *,
+    attempt: int = 1,
+    parent_revision_id: str | None = None,
+    requested_blockers: tuple[str, ...] = (),
+) -> bytes:
     source = job.source
+    idempotency_key = (
+        job.idempotency_key
+        if attempt == 1
+        else _revision_value(job.idempotency_key, attempt, suffix="revision-")
+    )
+    request_nonce = (
+        job.request_nonce
+        if attempt == 1
+        else _revision_value(job.request_nonce, attempt, suffix="nonce-")
+    )
     payload = {
         "schema_version": INTAKE_SCHEMA_VERSION,
-        "idempotency_key": job.idempotency_key,
-        "request_nonce": job.request_nonce,
+        "idempotency_key": idempotency_key,
+        "request_nonce": request_nonce,
         "source": {
             "source_id": source.source_id,
             "external_id": source.external_id,
@@ -798,12 +876,14 @@ def _build_intake_payload(job: EditorialJob, proposal: DraftProposal) -> bytes:
             "primary_url": source.primary_url,
             "title": source.title,
             "summary": source.summary,
+            "content": source.content,
             "author": source.author,
             "publisher": source.publisher,
             "published_at": source.published_at.isoformat() if source.published_at else None,
             "updated_at": source.updated_at.isoformat() if source.updated_at else None,
             "doi": source.doi,
             "content_hash": _canonical_source_hash(source),
+            "content_sha256": hashlib.sha256(source.content.encode("utf-8")).hexdigest(),
         },
         "draft": proposal.model_dump(),
         "provenance": {
@@ -811,6 +891,12 @@ def _build_intake_payload(job: EditorialJob, proposal: DraftProposal) -> bytes:
             "model": _provider_model(),
             "prompt_version": PROMPT_VERSION,
             "skill_version": SKILL_VERSION,
+        },
+        "revision": {
+            "revision_id": _revision_value(job.job_id, attempt, suffix="revision-"),
+            "parent_revision_id": parent_revision_id,
+            "attempt": attempt,
+            "requested_blockers": list(dict.fromkeys(requested_blockers))[:8],
         },
     }
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
@@ -823,7 +909,14 @@ def _post_intake(job: EditorialJob, body: bytes) -> IntakeResponse:
     key_id = _required_env("YFC_HERMES_KEY_ID")
     secret = _required_env("YFC_HERMES_SHARED_SECRET")
     timestamp = str(int(time.time()))
-    message = timestamp.encode("ascii") + b"\n" + job.request_nonce.encode("ascii") + b"\n" + body
+    try:
+        request_document = json.loads(body.decode("utf-8"))
+        request_nonce = request_document["request_nonce"]
+        if not isinstance(request_nonce, str):
+            raise TypeError("request_nonce_invalid")
+    except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise WorkerError("intake_request_invalid") from exc
+    message = timestamp.encode("ascii") + b"\n" + request_nonce.encode("ascii") + b"\n" + body
     signature = "sha256=" + hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
     timeout_seconds = _bounded_timeout("YFC_INTAKE_TIMEOUT_SECONDS", "5")
     timeout = httpx.Timeout(timeout_seconds, connect=timeout_seconds)
@@ -837,7 +930,7 @@ def _post_intake(job: EditorialJob, body: bytes) -> IntakeResponse:
                     "Content-Type": "application/json",
                     "X-Hermes-Key-Id": key_id,
                     "X-Hermes-Timestamp": timestamp,
-                    "X-Hermes-Nonce": job.request_nonce,
+                    "X-Hermes-Nonce": request_nonce,
                     "X-Hermes-Signature": signature,
                 },
                 content=body,
@@ -851,6 +944,31 @@ def _post_intake(job: EditorialJob, body: bytes) -> IntakeResponse:
             if status_code >= 500:
                 raise WorkerError("intake_server_error")
             if status_code >= 400:
+                if status_code == 422:
+                    document = _json_response(
+                        response,
+                        limit=MAX_INTAKE_RESPONSE_BYTES,
+                        error_code="intake_response_invalid",
+                    )
+                    detail = document.get("detail")
+                    if isinstance(detail, dict) and detail.get("code") == "remediation_required":
+                        raw_blockers = detail.get("blockers", [])
+                        blockers = tuple(
+                            dict.fromkeys(
+                                value
+                                for value in raw_blockers
+                                if isinstance(value, str) and BLOCKER_CODE_PATTERN.fullmatch(value)
+                            )
+                        )[:8]
+                        if not blockers:
+                            raise WorkerError("intake_response_invalid")
+                        attempt = detail.get("attempt")
+                        revision_id = detail.get("revision_id")
+                        raise IntakeRemediationRequired(
+                            blockers,
+                            attempt=attempt if isinstance(attempt, int) else None,
+                            revision_id=revision_id if isinstance(revision_id, str) else None,
+                        )
                 raise WorkerError("intake_rejected")
             document = _json_response(
                 response, limit=MAX_INTAKE_RESPONSE_BYTES, error_code="intake_response_invalid"
@@ -919,14 +1037,78 @@ def run_job(job: EditorialJob) -> dict[str, Any]:
     if _contains_prompt_injection(job.source):
         raise WorkerError("source_prompt_injection_blocked")
     expected_hash = _canonical_source_hash(job.source)
-    # The packet has no caller-supplied hash field: the worker derives the exact YFC hash.
-    proposal = _provider_request(job.source)
-    preflight_warnings = _preflight_warnings(proposal, job.source)
-    if preflight_warnings:
-        raise WorkerError("editorial_preflight_repair_failed")
+    provider_result = _provider_request_bounded(job.source)
+    proposal = provider_result.proposal
+    provider_attempt = provider_result.attempts
+    original_blockers = provider_result.original_blockers
+    parent_revision_id: str | None = None
+    while True:
+        preflight_warnings = _preflight_warnings(proposal, job.source)
+        if preflight_warnings:
+            raise WorkerError("editorial_preflight_repair_failed")
+        revision_id = _revision_value(job.job_id, provider_attempt, suffix="revision-")
+        body = _build_intake_payload(
+            job,
+            proposal,
+            attempt=provider_attempt,
+            parent_revision_id=parent_revision_id,
+            requested_blockers=original_blockers,
+        )
+        logger.info(
+            "hermes_editorial_intake_attempt",
+            extra={
+                "pipeline_stage": "hermes_intake",
+                "event": "intake_attempt",
+                "revision_id": revision_id,
+                "attempt": provider_attempt,
+                "requested_blockers": list(original_blockers),
+            },
+        )
+        try:
+            intake = _post_intake(job, body)
+        except IntakeRemediationRequired as exc:
+            if provider_attempt >= _bounded_int(
+                "HERMES_PROVIDER_MAX_ATTEMPTS",
+                DEFAULT_PROVIDER_MAX_ATTEMPTS,
+                minimum=1,
+                maximum=2,
+            ):
+                logger.error(
+                    "hermes_editorial_remediation_failed",
+                    extra={
+                        "pipeline_stage": "hermes_intake",
+                        "event": "remediation_failed",
+                        "revision_id": revision_id,
+                        "attempt": provider_attempt,
+                        "blockers": list(exc.blockers),
+                    },
+                )
+                raise WorkerError("editorial_remediation_exhausted") from exc
+            logger.info(
+                "hermes_editorial_remediation_started",
+                extra={
+                    "pipeline_stage": "hermes_intake",
+                    "event": "remediation_started",
+                    "revision_id": revision_id,
+                    "attempt": provider_attempt,
+                    "blockers": list(exc.blockers),
+                },
+            )
+            next_result = _provider_request_bounded(
+                job.source,
+                repair_warnings=exc.blockers,
+                previous_proposal=proposal,
+                attempts_used=provider_attempt,
+            )
+            proposal = next_result.proposal
+            provider_attempt = next_result.attempts
+            original_blockers = tuple(
+                dict.fromkeys((*original_blockers, *exc.blockers, *next_result.original_blockers))
+            )
+            parent_revision_id = revision_id
+            continue
+        break
     photo_caption_length = _telegram_photo_caption_length(proposal, job.source)
-    body = _build_intake_payload(job, proposal)
-    intake = _post_intake(job, body)
     preview: PreviewResponse | None = None
     if intake.status == "accepted" and mode == LOCAL_MOCK_MODE:
         preview = _post_preview(job, intake)
@@ -945,6 +1127,11 @@ def run_job(job: EditorialJob) -> dict[str, Any]:
             "status": "passed",
             "telegram_photo_caption_length": photo_caption_length,
             "telegram_photo_caption_limit": TELEGRAM_PHOTO_CAPTION_LIMIT,
+        },
+        "remediation": {
+            "attempt": provider_attempt,
+            "blockers": list(original_blockers),
+            "parent_revision_id": parent_revision_id,
         },
         "preview": {
             "status": preview.status
@@ -979,7 +1166,7 @@ def _self_check() -> dict[str, Any]:
         "telegram": "preview-only-local-contract; absent in external mode",
         "provider_fallback": "disabled; manual/no-provider only",
         "editorial_preflight": "numeric-grounding-and-photo-caption-before-intake",
-        "editorial_repair": "same-provider; maximum-two-total-attempts; unresolved-fail-closed",
+        "editorial_repair": "same-provider; maximum-two-total-attempts; new-immutable-revision; unresolved-terminal-failure",
         "provider_cost_policy": "free-only candidate; no automatic paid tier",
         "tools_exposed": 0,
         "terminal_execution": "disabled",

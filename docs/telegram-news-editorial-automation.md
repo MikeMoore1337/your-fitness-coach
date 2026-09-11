@@ -24,9 +24,9 @@ NEWS_PUBLICATION_ENABLED=false
 `evidence_metadata["submitted_by"] == "hermes_narrow_intake"`. Активные non-Hermes leftovers
 обрабатываются fail-closed: owner deliveries и исполняемые publication snapshots отменяются,
 а активные legacy clusters переводятся в terminal quarantine. Уже опубликованная история остаётся
-читаемой. Hermes owner-edited revisions сохраняют marker. Действие «Перегенерировать текст»
-повторно ставит принятую immutable Hermes revision в review flow и не создаёт локальный
-candidate/draft.
+читаемой. Hermes owner-edited revisions сохраняют marker. Действие «Перегенерировать текст» не
+переигрывает принятую immutable revision: новый текст может прийти только отдельной Hermes
+revision через bounded remediation contract.
 
 Для editorial intake действует rolling-окно свежести в 60 дней: границы включаются, будущие и
 неизвестные даты отклоняются. Это product/discovery heuristic, а не медицинская норма. Owner-
@@ -36,14 +36,11 @@ candidate/draft.
 Очередь, изображения и другие downstream-этапы продолжают обрабатываться между слотами, но новые
 Telegram review cards вне этих окон не отправляются.
 
-Hermes может передавать владельцу полноценный exact preview и управляющую карточку для тем,
-которые требуют ручного решения: AAS/фармакология/пептиды/БАДы и дозировки. Такие карточки не
-включаются в autopublish: `NEWS_AUTO_PUBLISH_LOW_RISK` остаётся `false`, а существующие
-publication quality gates сохраняют право скрыть кнопку публикации до редактирования текста.
-Это расширяет только ручной editorial recall. Malformed provider response, fallback-заглушка и
-отсутствующее Hermes image по-прежнему остаются hard delivery blockers. Recoverable
-publication-quality warnings `unsupported_number` и `telegram_photo_caption_too_long` могут
-дойти до owner review, но продолжают блокировать publication до исправления.
+Темы, которые требуют ручного решения: AAS/фармакология/пептиды/БАДы и дозировки, могут попасть
+в owner review только после bounded remediation и полного ready-gate. Такие карточки не
+включаются в autopublish: `NEWS_AUTO_PUBLISH_LOW_RISK` остаётся `false`. Malformed provider
+response, fallback-заглушка, recoverable warning, missing artifact/hash/image, disabled publication
+и missing channel rights остаются delivery blockers и владельцу не отправляются.
 
 После production release целевые значения для разделения контуров такие:
 
@@ -96,48 +93,42 @@ X-Hermes-Nonce           # unique replay-protection value
 X-Hermes-Signature       # sha256=<lowercase hex digest>
 ```
 
-The payload is `hermes-editorial-intake-v1`, with one allowlisted source packet, one structured
-draft proposal and provider/model/prompt/skill provenance.  The source content hash is recomputed
-by YFC.  Idempotency key and nonce are unique in `hermes_editorial_submissions`; a repeated exact
-request returns the same draft as `duplicate`, while a changed payload or replayed nonce fails
-closed.  Body size, source count, clock skew, replay TTL and request rate are configured by the
-`HERMES_INTAKE_*` variables in `.env.example`.
+The payload is `hermes-editorial-intake-v2`, with one allowlisted source packet including bounded
+source content/evidence digest, one structured draft proposal, provider/model/prompt/skill
+provenance and an immutable revision context. The source metadata hash and content digest are
+recomputed by YFC. Idempotency key and nonce are unique in
+`hermes_editorial_submissions`; a repeated exact request returns the same draft as `duplicate`,
+while a changed payload or replayed nonce fails closed. Body size, source count, clock skew, replay
+TTL and request rate are configured by the `HERMES_INTAKE_*` variables in `.env.example`.
 
 Receipts retain only operational metadata and hashes, never the full submitted source or draft
 payload.  Normal logs contain correlation-safe ids/reason codes only.
 
-### Hermes deterministic preflight and bounded repair (Task 142)
+### Hermes deterministic preflight and bounded repair (Task 238)
 
 Перед HMAC intake worker выполняет детерминированный preflight. Числовые токены в draft должны
 быть заземлены в разрешённом source packet; идентификаторы и URL не считаются доказательством
-числового утверждения. Консервативный plain-text photo caption считается вместе с доверенным
-source URL и меткой `Источник` и должен укладываться в лимит 1024 UTF-16 символа, установленный
+числового утверждения. Видимый plain-text photo caption с меткой `Источник` (URL находится в
+HTML `href` и не является видимым текстом) должен укладываться в лимит 1024 UTF-16 символа, установленный
 [официальной документацией Telegram Bot API](https://core.telegram.org/bots/api).
-Внешний GPT-OSS prompt получает динамический мягкий бюджет для трёх полей с учётом длины
-доверенного URL и служебных разделителей, чтобы использовать доступное место для подтверждённых
-деталей без filler; лимит 1024 и hard limits полей не изменяются.
+Внешний GPT-OSS prompt получает динамический мягкий бюджет для трёх полей с учётом служебной
+метки и разделителей, чтобы использовать доступное место для подтверждённых деталей без filler;
+trusted source URL остаётся HTML `href`, а лимит 1024 и hard limits полей не изменяются.
 
-Для `unsupported_number` и `telegram_photo_caption_too_long` разрешён один bounded repair request
-к тому же approved provider. Он делит общий бюджет максимум двух provider attempts с исходным
-draft и transient retry; paid/cloud fallback, новые credentials и provider shortcut запрещены.
-Если repair не снимает blocker, worker завершает job fail-closed: HMAC intake, Telegram preview
-и autopublish не вызываются. Успешный preflight только допускает intake; он не подтверждает
-публикацию. YFC по-прежнему применяет `manual_required`, Gate B/C и остаётся единственным
-publisher.
+Для любого детерминированного recoverable blocker YFC возвращает worker-у структурированный
+`remediation_required` без создания draft. Hermes запрашивает repair у того же approved provider
+и отправляет новую immutable revision с новым idempotency key/nonce и parent revision. Общий
+provider budget — максимум две попытки; после исчерпания job получает terminal
+`editorial_remediation_exhausted` и не переигрывается бесконечно. Paid/cloud fallback, новые
+credentials и provider shortcut запрещены.
 
-YFC имеет дополнительный final delivery gate. Hard preview states — fallback/provider failure и
-отсутствующее Hermes image — остаются fail-closed и не отправляются владельцу как готовый
-review item. Recoverable publication-quality warnings `unsupported_number` и
-`telegram_photo_caption_too_long` не должны скрывать материал из owner review queue: они
-остаются publication blockers и поэтому не дают кнопок publish/schedule.
-
-При `unsupported_number`, если exact artifact и image доступны, владельцу отправляются private
-preview и управляющая карточка. При `telegram_photo_caption_too_long` exact publication artifact
-может быть недоступен из-за лимита Telegram; тогда photo preview не отправляется, но владелец
-получает recovery/control card с действиями редактирования, перегенерации, отклонения и defer.
-Публикация остаётся запрещённой, пока blocker не устранён. Операционные состояния
-`publishing_disabled` и `channel_rights_missing` не превращают blocked material в publishable
-fallback.
+YFC имеет final ready-only gate. В scheduled Telegram review попадает только материал с точным
+artifact, artifact hash, обязательным image и пустым списком blockers/warnings; recoverable
+warnings, fallback/provider failure, missing image, disabled publication и missing channel rights
+не отправляются владельцу. Поэтому карточка ready-публикации содержит как минимум
+`Опубликовать сейчас`, `Запланировать`, `Отклонить` и `Открыть источник`; edit/image
+controls остаются только вторичными emergency actions. Batch size 5 считает только отправленные
+ready-публикации, а blocked/failed candidates слот не расходуют. Автопубликации нет.
 
 ## Taxonomy and policy
 
@@ -172,10 +163,9 @@ blocked | manual_required | auto_eligible
 Чувствительные medical/pharmacology, peptides, AAS/SARMs, dosage/cycle/protocol,
 индивидуальные рекомендации, pregnancy/minors/chronic disease/symptoms, interactions,
 recalls/contamination, preliminary или conflicting evidence и любая неоднозначность имеют как
-минимум `manual_required`; Hermes intake может доставить их владельцу как полноценный preview для
-ручного решения. Prompt injection и явные unsafe/guaranteed claims по-прежнему остаются hard
-blockers. `unsupported_number` может быть доставлен владельцу для ручного исправления, но
-остаётся publication blocker. `auto_eligible` дополнительно требует
+минимум `manual_required`, но recoverable quality warning сначала должен быть устранён Hermes
+repair-циклом. Prompt injection и явные unsafe/guaranteed claims по-прежнему остаются hard
+blockers. `auto_eligible` дополнительно требует
 owner-controlled `NEWS_AUTO_PUBLISH_LOW_RISK=true`, valid source provenance, quality checks, exact
 snapshot и active kill-switch. Committed default — `false`.
 
@@ -381,9 +371,10 @@ owner-approved config/code change. Будущий optional paid fallback — Ope
 подключён, credentials не создаются и автоматическим fallback не является. Gemini и OpenRouter
 не подключаются.
 
-В external mode наружу уходит source metadata/content packet только в approved Groq endpoint и
-structured draft metadata в approved YFC intake; source URL не fetch'ится, а YFC intake получает
-content hash вместо полного source content. Retention, training/model-improvement policy,
+В external mode наружу уходит bounded source metadata/content packet только в approved Groq endpoint
+и structured draft metadata в approved YFC intake; source URL не fetch'ится, а YFC intake получает
+только bounded content для финальной numeric-grounding проверки и его digest, не сохраняя полный
+source body в БД. Retention, training/model-improvement policy,
 processing/storage region, privacy terms и фактическая cost/quota policy Groq для конкретного
 account до owner verification не считаются подтверждёнными. Качество реальной модели проверяется
 только в owner-approved shadow-run после Gate A; local fake E2E не является model-quality proof.

@@ -178,11 +178,8 @@ def _claim_deliveries(
             )
             eligible = eligible.filter(~NewsReviewDelivery.draft_id.in_(sent_drafts_in_slot))
             remaining_batch_size = max(0, NEWS_REVIEW_BATCH_SIZE - sent_drafts_in_slot.count())
-            effective_draft_limit = (
-                remaining_batch_size
-                if effective_draft_limit is None
-                else min(effective_draft_limit, remaining_batch_size)
-            )
+            if effective_draft_limit is not None:
+                effective_draft_limit = min(effective_draft_limit, remaining_batch_size)
         if effective_draft_limit is None:
             rows = (
                 eligible.order_by(
@@ -264,6 +261,16 @@ def _mark_review_delivery_blocked(
     )
 
 
+def _release_claimed_delivery(delivery_id: int) -> None:
+    with get_session_context() as db:
+        delivery = db.get(NewsReviewDelivery, delivery_id)
+        if delivery is None or delivery.status != "processing":
+            return
+        delivery.status = "queued"
+        delivery.processing_started_at = None
+        delivery.next_attempt_at = utcnow()
+
+
 async def deliver_review_queue(
     client: httpx.AsyncClient,
     send_message: Callable[..., Awaitable[int | None]],
@@ -280,8 +287,23 @@ async def deliver_review_queue(
     with get_session_context() as db:
         cancel_non_hermes_review_deliveries(db)
     delivered = 0
+    sent_draft_ids: set[str] = set()
+    if review_slot is not None:
+        slot_start_utc = review_slot.local_start.astimezone(UTC).replace(tzinfo=None)
+        with get_session_context() as db:
+            sent_draft_ids = {
+                row.draft_id
+                for row in db.query(NewsReviewDelivery.draft_id)
+                .filter(
+                    NewsReviewDelivery.status == "sent",
+                    NewsReviewDelivery.sent_at.is_not(None),
+                    NewsReviewDelivery.sent_at >= slot_start_utc,
+                )
+                .distinct()
+                .all()
+            }
     for delivery_id in _claim_deliveries(
-        draft_limit=NEWS_REVIEW_BATCH_SIZE if review_slot is not None else None,
+        draft_limit=None,
         review_slot=review_slot,
     ):
         with get_session_context() as db:
@@ -329,6 +351,13 @@ async def deliver_review_queue(
                 attempt_count=attempt_count,
                 blockers=delivery_blockers,
             )
+            continue
+        if (
+            review_slot is not None
+            and draft_resource_id not in sent_draft_ids
+            and len(sent_draft_ids) >= NEWS_REVIEW_BATCH_SIZE
+        ):
+            _release_claimed_delivery(delivery_id)
             continue
         try:
             if artifact is not None and preview_message_id is None:
@@ -402,6 +431,8 @@ async def deliver_review_queue(
                     "image_revision": image_revision,
                 },
             )
+        if review_slot is not None:
+            sent_draft_ids.add(draft_resource_id)
         delivered += 1
         logger.info(
             "news_review_delivery_succeeded",

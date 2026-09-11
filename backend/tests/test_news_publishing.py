@@ -19,6 +19,7 @@ from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.news import (
     NewsCluster,
     NewsDraftRevision,
+    NewsEditorialAction,
     NewsImageRevision,
     NewsItem,
     NewsPublicationSnapshot,
@@ -1416,7 +1417,7 @@ def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatc
                 **draft.evidence_metadata,
                 "submitted_by": "hermes_narrow_intake",
             }
-            draft.warnings = []
+            draft.warnings = ["unsupported_number"] if index == 0 else []
             asyncio.run(create_image_revision(db, cluster, draft, client=None))
         assert enqueue_review_deliveries(db, {7001}) == len(titles)
 
@@ -1456,18 +1457,19 @@ def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatc
             row.status for row in db.query(NewsReviewDelivery).order_by(NewsReviewDelivery.id)
         ]
         assert statuses.count("sent") == 5
-        assert statuses.count("queued") == 1
+        assert statuses.count("failed") == 1
+        assert statuses.count("queued") == 0
 
     assert asyncio.run(deliver()) == 0
     assert len(preview_calls) == 5
     assert len(control_calls) == 5
     with get_session_context() as db:
         assert (
-            db.query(NewsReviewDelivery).filter(NewsReviewDelivery.status == "queued").count() == 1
+            db.query(NewsReviewDelivery).filter(NewsReviewDelivery.status == "queued").count() == 0
         )
 
 
-def test_sensitive_hermes_warning_reaches_owner_card_but_not_publish_button(monkeypatch) -> None:
+def test_sensitive_hermes_warning_is_not_delivered_to_owner(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="hermes-sensitive-card")
     draft_id, _ = _draft(cluster_id)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
@@ -1490,11 +1492,11 @@ def test_sensitive_hermes_warning_reaches_owner_card_but_not_publish_button(monk
     control_calls: list[dict[str, object]] = []
 
     async def send_preview(_client, _chat_id, *_args, **_kwargs):
-        return SimpleNamespace(message_id=631, message_date=utcnow())
+        raise AssertionError("blocked warning must not send preview")
 
     async def send_control(_client, _chat_id, text, *, reply_markup):
         control_calls.append({"text": text, "reply_markup": reply_markup})
-        return 632
+        raise AssertionError("blocked warning must not send control card")
 
     async def deliver() -> int:
         async with httpx.AsyncClient() as client:
@@ -1505,24 +1507,18 @@ def test_sensitive_hermes_warning_reaches_owner_card_but_not_publish_button(monk
                 channel_ready=True,
             )
 
-    assert asyncio.run(deliver()) == 1
-    assert len(control_calls) == 1
-    callback_values = [
-        button["callback_data"]
-        for row in control_calls[0]["reply_markup"]["inline_keyboard"]
-        for button in row
-        if "callback_data" in button
-    ]
-    assert "medical_prescription_language" in control_calls[0]["text"]
-    assert not any(value.startswith("newsp:p:") for value in callback_values)
+    assert asyncio.run(deliver()) == 0
+    assert control_calls == []
     with get_session_context() as db:
-        assert db.query(NewsReviewDelivery).one().status == "sent"
+        assert db.query(NewsReviewDelivery).one().status == "failed"
 
 
 def test_hermes_draft_reaches_telegram_when_legacy_fetch_is_disabled(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="hermes-downstream-enabled")
     draft_id, _ = _draft(cluster_id)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
     with get_session_context() as db:
         cluster = db.get(NewsCluster, cluster_id)
@@ -1602,9 +1598,7 @@ def test_owner_edited_hermes_revision_keeps_delivery_eligibility(monkeypatch) ->
         assert enqueue_review_deliveries(db, {7001}) == 1
 
 
-def test_hermes_regenerate_requeues_revision_without_legacy_candidate_generation(
-    monkeypatch,
-) -> None:
+def test_hermes_regenerate_never_requeues_same_immutable_revision(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="hermes-regenerate-disabled-legacy")
     draft_id, _ = _draft(cluster_id)
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
@@ -1627,41 +1621,14 @@ def test_hermes_regenerate_requeues_revision_without_legacy_candidate_generation
             admin_telegram_user_id=7001,
             action="regenerate",
         )
-        assert result.status == "queued"
-        assert result.cluster_status == "draft_ready"
-        assert cluster.status == "draft_ready"
-        assert cluster.delivery_round == 1
-        assert db.query(NewsReviewDelivery).one().status == "cancelled"
-
-    preview_calls: list[int] = []
-    control_calls: list[int] = []
-
-    async def send_preview(_client, chat_id, *_args, **_kwargs):
-        preview_calls.append(chat_id)
-        return SimpleNamespace(message_id=621, message_date=utcnow())
-
-    async def send_control(_client, chat_id, *_args, **_kwargs):
-        control_calls.append(chat_id)
-        return 622
-
-    async def unused_publication(*_args, **_kwargs):
-        raise AssertionError("publication is not part of Hermes regenerate review flow")
-
-    asyncio.run(
-        run_news_pipeline_once(
-            send_message=send_control,
-            send_preview=send_preview,
-            send_publication=unused_publication,
-            publication_ready=False,
-        )
-    )
-    assert preview_calls == [7001]
-    assert control_calls == [7001]
-    with get_session_context() as db:
-        cluster = db.get(NewsCluster, cluster_id)
-        assert cluster is not None and cluster.status == "awaiting_review"
-        deliveries = db.query(NewsReviewDelivery).order_by(NewsReviewDelivery.id).all()
-        assert [delivery.status for delivery in deliveries] == ["cancelled", "sent"]
+        assert result.status == "unavailable"
+        assert result.cluster_status == "awaiting_review"
+        assert cluster.status == "awaiting_review"
+        assert cluster.delivery_round == 0
+        assert db.query(NewsReviewDelivery).one().status == "queued"
+        db.flush()
+        action_record = db.query(NewsEditorialAction).filter_by(action="regenerate").one()
+        assert action_record.outcome == "generation_external"
 
 
 def test_hermes_fallback_draft_is_not_delivered_or_requeued(monkeypatch) -> None:
@@ -1723,7 +1690,7 @@ def test_hermes_fallback_draft_is_not_delivered_or_requeued(monkeypatch) -> None
         assert enqueue_review_deliveries(db, {7001}) == 0
 
 
-def test_overlong_hermes_preview_sends_recovery_control_card(monkeypatch) -> None:
+def test_overlong_hermes_preview_is_not_delivered_to_owner(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="overlong-delivery-guard")
     draft_id, _ = _draft(cluster_id)
     monkeypatch.setattr(settings, "news_image_provider", "disabled")
@@ -1768,13 +1735,13 @@ def test_overlong_hermes_preview_sends_recovery_control_card(monkeypatch) -> Non
             )
 
     delivered = asyncio.run(deliver())
-    assert delivered == 1
+    assert delivered == 0
     assert preview_calls == []
-    assert control_calls == [7001]
+    assert control_calls == []
     with get_session_context() as db:
         delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.status == "sent"
-        assert delivery.last_error_code is None
+        assert delivery.status == "failed"
+        assert delivery.last_error_code == "preview_delivery_blocked"
 
 
 def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None:
@@ -1810,7 +1777,7 @@ def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None
         assert delivery.last_error_code == "preview_delivery_blocked"
 
 
-def test_over_limit_photo_control_card_shows_measurement_and_recovery_actions(
+def test_over_limit_photo_review_message_shows_not_ready_state(
     monkeypatch,
 ) -> None:
     cluster_id = _source_and_candidate(external_id="over-limit-control")
@@ -1839,7 +1806,6 @@ def test_over_limit_photo_control_card_shows_measurement_and_recovery_actions(
         assert "Опубликовать сейчас" not in labels
         assert {
             "Изменить текст",
-            "Перегенерировать текст",
             "Убрать изображение",
             "Отклонить",
         }.issubset(labels)
@@ -1896,9 +1862,7 @@ def test_legacy_plain_snapshot_does_not_block_html_renderer_approval(monkeypatch
         assert current.link_preview_disabled is True
 
 
-def test_hermes_unsupported_number_reaches_owner_review_but_cannot_publish(
-    monkeypatch,
-) -> None:
+def test_hermes_unsupported_number_never_reaches_owner_review(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="hermes-unsupported-number-review")
     draft_id, _ = _draft(cluster_id)
 
@@ -1948,24 +1912,11 @@ def test_hermes_unsupported_number_reaches_owner_review_but_cannot_publish(
                 channel_ready=True,
             )
 
-    assert asyncio.run(deliver()) == 1
-    assert preview_calls == [7001]
-    assert len(control_calls) == 1
-
-    control = control_calls[0]
-    assert "unsupported_number" in control["text"]
-
-    callback_values = [
-        button["callback_data"]
-        for row in control["reply_markup"]["inline_keyboard"]
-        for button in row
-        if "callback_data" in button
-    ]
-
-    assert not any(value.startswith("newsp:p:") for value in callback_values)
-    assert not any(value.startswith("newsp:s:") for value in callback_values)
+    assert asyncio.run(deliver()) == 0
+    assert preview_calls == []
+    assert control_calls == []
 
     with get_session_context() as db:
         delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.status == "sent"
-        assert delivery.last_error_code is None
+        assert delivery.status == "failed"
+        assert delivery.last_error_code == "preview_delivery_blocked"

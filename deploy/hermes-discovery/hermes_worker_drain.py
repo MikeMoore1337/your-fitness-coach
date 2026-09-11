@@ -2,8 +2,8 @@
 
 This host-side adapter is intentionally not part of the discovery container.  It
 is the only component here that receives provider and YFC intake credentials.  A
-failed or uncertain worker call leaves the same job file in place; no new
-idempotency key is generated.
+transient or uncertain worker call leaves the same job file in place; terminal
+validation/remediation failures are recorded and quarantined without retry.
 """
 
 from __future__ import annotations
@@ -44,6 +44,17 @@ WORKER_ENV_NAMES = (
     "YFC_HERMES_KEY_ID",
     "YFC_HERMES_SHARED_SECRET",
     "YFC_INTAKE_TIMEOUT_SECONDS",
+)
+TERMINAL_WORKER_ERRORS = frozenset(
+    {
+        "editorial_preflight_repair_failed",
+        "editorial_remediation_exhausted",
+        "intake_rejected",
+        "source_content_digest_mismatch",
+        "source_content_too_large",
+        "source_not_allowlisted",
+        "source_prompt_injection_blocked",
+    }
 )
 
 
@@ -234,7 +245,22 @@ def drain_once() -> dict[str, Any]:
                 else:
                     completed_jobs.append({"job": job.stem, "status": code})
             else:
-                failed_jobs.append({"job": job.stem, "code": code})
+                if code in TERMINAL_WORKER_ERRORS:
+                    try:
+                        mark_candidate_status(
+                            state_dir,
+                            job.stem,
+                            "failed",
+                            stale_seconds=float(stale_seconds),
+                            error_code=code,
+                        )
+                        job.unlink()
+                    except DiscoveryError, OSError:
+                        failed_jobs.append({"job": job.stem, "code": "state_update_failed"})
+                    else:
+                        failed_jobs.append({"job": job.stem, "code": code, "status": "terminal"})
+                else:
+                    failed_jobs.append({"job": job.stem, "code": code})
     return {
         "status": "completed" if not failed_jobs else "partial",
         "processed": completed_jobs,

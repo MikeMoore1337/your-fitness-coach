@@ -212,6 +212,18 @@ def quality_warnings(
     return warnings
 
 
+def grounded_number_tokens(
+    *,
+    source_title: str,
+    source_summary: str,
+    source_context: str = "",
+) -> tuple[str, ...]:
+    """Return bounded numeric evidence tokens without retaining the source body."""
+
+    source_text = f"{source_title} {source_summary} {source_context}"
+    return tuple(sorted(set(NUMBER_PATTERN.findall(source_text))))
+
+
 def render_draft(fields: dict[str, str], packet: NewsEvidencePacket) -> str:
     source_url = packet.primary_url or packet.canonical_url
     sections = [

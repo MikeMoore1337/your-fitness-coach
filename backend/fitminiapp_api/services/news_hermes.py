@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import re
 import secrets
 import time
@@ -30,6 +31,7 @@ from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.news_drafts import (
     _validated_fields,
     evidence_packet,
+    grounded_number_tokens,
     quality_warnings,
     render_draft,
 )
@@ -44,6 +46,10 @@ from fitminiapp_api.services.news_ingestion import (
     utcnow,
 )
 from fitminiapp_api.services.news_origin import HERMES_SUBMISSION_MARKER
+from fitminiapp_api.services.news_publication import (
+    CLICKBAIT_PATTERNS,
+    PROHIBITED_EDITORIAL_PATTERNS,
+)
 from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.news_taxonomy import (
     RISK_POLICY_VERSION,
@@ -53,17 +59,50 @@ from fitminiapp_api.services.news_taxonomy import (
     evaluate_publication_policy,
 )
 
-HERMES_INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v1"
+HERMES_INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v2"
 HERMES_INTAKE_ENDPOINT = "/api/v1/hermes/editorial/intake"
 SUPPORTED_HERMES_SKILL_VERSIONS = frozenset({"yfc-hermes-editorial-v1"})
 HERMES_SIGNATURE_PREFIX = "sha256="
 HEX64_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+HERMES_SOURCE_CONTENT_MAX_BYTES = 32 * 1024
+HERMES_BLOCKER_CODE_PATTERN = re.compile(r"^[a-z0-9_.:-]{1,64}$")
+HERMES_REMEDIABLE_BLOCKERS = frozenset(
+    {
+        "clickbait_or_guarantee_language",
+        "clickbait_or_guarantee",
+        "ai_meta_or_template_language",
+        "fake_personal_voice",
+        "excessive_exclamation",
+        "mechanical_repetition",
+        "invented_quote_or_voice",
+        "medical_prescription_language",
+        "possible_source_copy",
+        "prohibited_medical_or_aas_language",
+        "research_context_or_limitations_missing",
+        "sensational_or_guaranteed_claim",
+        "telegram_message_too_long",
+        "telegram_photo_caption_too_long",
+        "unsupported_number",
+    }
+)
+
+logger = logging.getLogger(__name__)
 
 
 class HermesIntakeError(RuntimeError):
-    def __init__(self, code: str) -> None:
+    def __init__(
+        self,
+        code: str,
+        *,
+        blockers: tuple[str, ...] = (),
+        attempt: int | None = None,
+        revision_id: str | None = None,
+    ) -> None:
         super().__init__(code)
         self.code = code
+        self.blockers = blockers
+        self.attempt = attempt
+        self.revision_id = revision_id
 
 
 @dataclass(frozen=True)
@@ -209,6 +248,34 @@ def _find_existing_submission(
     return None
 
 
+def _safe_blocker_codes(values: object) -> tuple[str, ...]:
+    if not isinstance(values, (list, tuple)):
+        return ()
+    return tuple(
+        dict.fromkeys(
+            value
+            for value in values
+            if isinstance(value, str) and HERMES_BLOCKER_CODE_PATTERN.fullmatch(value)
+        )
+    )[:8]
+
+
+def _remediation_blockers(
+    warnings: tuple[str, ...], publication_blockers: tuple[str, ...]
+) -> tuple[str, ...]:
+    candidates: list[str] = [
+        warning for warning in warnings if HERMES_BLOCKER_CODE_PATTERN.fullmatch(warning)
+    ]
+    for blocker in publication_blockers:
+        if blocker.startswith("unresolved_warning:"):
+            candidates.append(blocker.removeprefix("unresolved_warning:"))
+        else:
+            candidates.append(blocker)
+    return tuple(
+        dict.fromkeys(blocker for blocker in candidates if blocker in HERMES_REMEDIABLE_BLOCKERS)
+    )
+
+
 def accept_hermes_submission(
     db: Session,
     payload,
@@ -256,6 +323,10 @@ def accept_hermes_submission(
         )
         title = plain_text(payload.source.title, maximum=500)
         summary = plain_text(payload.source.summary, maximum=4000)
+        source_content = payload.source.content
+        if len(source_content.encode("utf-8")) > HERMES_SOURCE_CONTENT_MAX_BYTES:
+            raise HermesIntakeError("source_content_too_large")
+        source_content = plain_text(source_content, maximum=HERMES_SOURCE_CONTENT_MAX_BYTES)
     except (ValueError, TypeError) as exc:
         raise HermesIntakeError("source_packet_invalid") from exc
     expected_source_hash = _canonical_source_hash(
@@ -266,6 +337,8 @@ def accept_hermes_submission(
     )
     if payload.source.content_hash != expected_source_hash:
         raise HermesIntakeError("source_content_hash_mismatch")
+    if sha256_text(payload.source.content) != payload.source.content_sha256:
+        raise HermesIntakeError("source_content_digest_mismatch")
 
     parsed = ParsedNewsItem(
         external_id=payload.source.external_id,
@@ -329,7 +402,7 @@ def accept_hermes_submission(
             fields,
             source_title=title,
             source_summary=summary,
-            source_context=canonical_url,
+            source_context=source_content,
         )
     )
     policy = evaluate_publication_policy(
@@ -342,7 +415,51 @@ def accept_hermes_submission(
     draft_text = render_draft(fields, packet)
     submission_id = secrets.token_hex(24)
     revision = cluster.latest_draft_revision + 1
-    draft = NewsDraftRevision(
+    trusted_source_url = packet.primary_url or packet.canonical_url
+    source_number_tokens = grounded_number_tokens(
+        source_title=title,
+        source_summary=summary,
+        source_context=source_content,
+    )
+    evidence_metadata = {
+        "source_packet_hash": payload.source.content_hash,
+        "source_content_sha256": payload.source.content_sha256,
+        "source_number_tokens": list(source_number_tokens[:128]),
+        "trusted_source_url": trusted_source_url,
+        "source_published_at": (
+            payload.source.published_at.isoformat() if payload.source.published_at else None
+        ),
+        "primary_topic": classification.primary_topic,
+        "topics": list(classification.topics),
+        "content_type": classification.content_type,
+        "product_class": classification.product_class,
+        "evidence_level": classification.evidence_level,
+        "risk_level": classification.risk_level,
+        "audience": classification.audience,
+        "geography": list(classification.geography),
+        "classification_version": TAXONOMY_VERSION,
+        "classification_reasons": list(classification.classification_reasons),
+        "publication_policy": policy.publication_policy,
+        "risk_reasons": list(policy.risk_reasons),
+        "risk_policy_version": RISK_POLICY_VERSION,
+        "voice_profile_version": VOICE_PROFILE_VERSION,
+        "editorial_profile": settings.news_draft_profile,
+        "submitted_by": HERMES_SUBMISSION_MARKER,
+        "hermes_skill_version": payload.provenance.skill_version,
+        "hermes_schema_version": payload.schema_version,
+        "hermes_submission_id": submission_id,
+        "hermes_revision_id": payload.revision.revision_id,
+        "hermes_parent_revision_id": payload.revision.parent_revision_id,
+        "hermes_remediation_attempt": payload.revision.attempt,
+        "hermes_requested_blockers": list(_safe_blocker_codes(payload.revision.requested_blockers)),
+        "article_candidate": article_candidate_handoff(
+            cluster_id=cluster.id,
+            draft_revision=revision,
+            primary_topic=classification.primary_topic,
+            content_type=classification.content_type,
+        ),
+    }
+    candidate = NewsDraftRevision(
         id=secrets.token_hex(16),
         cluster_id=cluster.id,
         primary_item_id=packet.primary_item_id,
@@ -352,42 +469,46 @@ def accept_hermes_submission(
         prompt_version=payload.provenance.prompt_version,
         source_digest=packet.source_digest,
         evidence_item_ids=list(packet.evidence_item_ids),
-        evidence_metadata={
-            "source_packet_hash": payload.source.content_hash,
-            "trusted_source_url": packet.primary_url or packet.canonical_url,
-            "source_published_at": (
-                payload.source.published_at.isoformat() if payload.source.published_at else None
-            ),
-            "primary_topic": classification.primary_topic,
-            "topics": list(classification.topics),
-            "content_type": classification.content_type,
-            "product_class": classification.product_class,
-            "evidence_level": classification.evidence_level,
-            "risk_level": classification.risk_level,
-            "audience": classification.audience,
-            "geography": list(classification.geography),
-            "classification_version": TAXONOMY_VERSION,
-            "classification_reasons": list(classification.classification_reasons),
-            "publication_policy": policy.publication_policy,
-            "risk_reasons": list(policy.risk_reasons),
-            "risk_policy_version": RISK_POLICY_VERSION,
-            "voice_profile_version": VOICE_PROFILE_VERSION,
-            "editorial_profile": settings.news_draft_profile,
-            "submitted_by": HERMES_SUBMISSION_MARKER,
-            "hermes_skill_version": payload.provenance.skill_version,
-            "hermes_schema_version": payload.schema_version,
-            "hermes_submission_id": submission_id,
-            "article_candidate": article_candidate_handoff(
-                cluster_id=cluster.id,
-                draft_revision=revision,
-                primary_topic=classification.primary_topic,
-                content_type=classification.content_type,
-            ),
-        },
+        evidence_metadata=evidence_metadata,
         draft_text=draft_text,
         warnings=list(warnings),
         generation_latency_ms=0,
     )
+    lowered_draft = draft_text.casefold()
+    publication_blocker_values: list[str] = []
+    if any(pattern in lowered_draft for pattern in PROHIBITED_EDITORIAL_PATTERNS):
+        publication_blocker_values.append("prohibited_medical_or_aas_language")
+    if any(pattern in lowered_draft for pattern in CLICKBAIT_PATTERNS):
+        publication_blocker_values.append("clickbait_or_guarantee_language")
+    if packet.topic == "research":
+        research_context = f"{fields['summary']} {fields['why_it_matters']}".casefold()
+        if not any(
+            marker in research_context
+            for marker in ("огранич", "контекст", "групп", "выборк", "применим")
+        ):
+            publication_blocker_values.append("research_context_or_limitations_missing")
+    publication_blockers = tuple(dict.fromkeys(publication_blocker_values))
+    remediation_blockers = _remediation_blockers(warnings, publication_blockers)
+    if remediation_blockers:
+        logger.info(
+            "hermes_editorial_remediation_required",
+            extra={
+                "pipeline_stage": "hermes_intake",
+                "event": "remediation_required",
+                "revision_id": payload.revision.revision_id,
+                "attempt": payload.revision.attempt,
+                "blockers": list(remediation_blockers),
+            },
+        )
+        raise HermesIntakeError(
+            "remediation_required",
+            blockers=remediation_blockers,
+            attempt=payload.revision.attempt,
+            revision_id=payload.revision.revision_id,
+        )
+    if publication_blockers:
+        raise HermesIntakeError("editorial_quality_blocked")
+    draft = candidate
     db.add(draft)
     cluster.latest_draft_revision = revision
     cluster.current_image_revision = 0
@@ -429,6 +550,11 @@ def accept_hermes_submission(
             "endpoint": HERMES_INTAKE_ENDPOINT,
             "source_id": source.id,
             "source_content_hash": payload.source.content_hash,
+            "source_content_sha256": payload.source.content_sha256,
+            "revision_id": payload.revision.revision_id,
+            "parent_revision_id": payload.revision.parent_revision_id,
+            "remediation_attempt": payload.revision.attempt,
+            "requested_blockers": list(_safe_blocker_codes(payload.revision.requested_blockers)),
             "publication_policy": policy.publication_policy,
             "risk_reason_count": len(policy.risk_reasons),
         },
@@ -438,7 +564,11 @@ def accept_hermes_submission(
     db.add(submission)
     record_audit_event(
         db,
-        action="news.hermes_intake_accepted",
+        action=(
+            "news.hermes_remediation_succeeded"
+            if payload.revision.attempt > 1
+            else "news.hermes_intake_accepted"
+        ),
         resource_type="hermes_editorial_submission",
         resource_id=submission_id,
         details={
@@ -449,6 +579,10 @@ def accept_hermes_submission(
             "taxonomy_version": TAXONOMY_VERSION,
             "risk_policy_version": RISK_POLICY_VERSION,
             "policy": policy.publication_policy,
+            "revision_id": payload.revision.revision_id,
+            "parent_revision_id": payload.revision.parent_revision_id,
+            "remediation_attempt": payload.revision.attempt,
+            "requested_blockers": list(_safe_blocker_codes(payload.revision.requested_blockers)),
         },
     )
     db.flush()

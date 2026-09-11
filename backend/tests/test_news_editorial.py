@@ -856,7 +856,7 @@ def test_review_message_uses_immutable_draft_evidence_after_cluster_changes(monk
         assert review_message(db, draft)[1] == original_url
 
 
-def test_regeneration_makes_old_revision_stale_for_other_admin(monkeypatch) -> None:
+def test_regeneration_does_not_change_revision_state_for_other_admin(monkeypatch) -> None:
     _create_source()
     cluster_id = _candidate_cluster()
     with get_session_context() as db:
@@ -871,7 +871,7 @@ def test_regeneration_makes_old_revision_stale_for_other_admin(monkeypatch) -> N
                 admin_telegram_user_id=7001,
                 action="regenerate",
             ).status
-            == "queued"
+            == "unavailable"
         )
         assert (
             moderate_draft(
@@ -880,9 +880,9 @@ def test_regeneration_makes_old_revision_stale_for_other_admin(monkeypatch) -> N
                 admin_telegram_user_id=7002,
                 action="accept_for_design",
             ).status
-            == "stale"
+            == "accepted"
         )
-        assert cluster.status == "draft_ready"
+        assert cluster.status == "accepted_for_design"
 
 
 def test_owner_only_moderation_is_revision_bound_idempotent_and_never_publishes(

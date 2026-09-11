@@ -110,78 +110,29 @@ class ReviewArtifact:
     limit: int | None
 
 
-PREVIEW_OPERATIONAL_BLOCKERS = frozenset({"publishing_disabled", "channel_rights_missing"})
 NON_HERMES_REVIEW_DELIVERY_DISABLED = "non_hermes_news_pipeline_retired"
-MANUAL_REVIEW_ALLOWED_WARNINGS = frozenset(
-    {
-        "medical_prescription_language",
-        "unsupported_number",
-        "telegram_photo_caption_too_long",
-    }
-)
-MANUAL_REVIEW_ALLOWED_BLOCKERS = frozenset(
-    {
-        "unresolved_warning:medical_prescription_language",
-        "unresolved_warning:unsupported_number",
-        "unresolved_warning:telegram_photo_caption_too_long",
-        "telegram_photo_caption_too_long",
-    }
-)
-MANUAL_REVIEW_ALLOWED_CONTENT_BLOCKERS = frozenset(
-    {
-        "prohibited_medical_or_aas_language",
-    }
-)
 
 
 def review_delivery_blockers(
     draft: NewsDraftRevision,
     review: ReviewArtifact,
 ) -> tuple[str, ...]:
-    """Block only owner-preview states that cannot be reviewed safely.
+    """Allow Telegram review only for an exact, immediately publishable state."""
 
-    Publication-quality warnings remain visible on the owner control card and
-    continue to block publication. Recoverable editorial issues must not make
-    the review item disappear from the owner's Telegram queue.
-    """
-
-    is_hermes_draft = is_hermes_origin_draft(draft)
-    blockers: list[str] = []
-
-    if is_hermes_draft:
-        blockers.extend(
-            blocker
-            for blocker in review.blockers
-            if blocker not in PREVIEW_OPERATIONAL_BLOCKERS
-            and blocker not in MANUAL_REVIEW_ALLOWED_BLOCKERS
-            and blocker not in MANUAL_REVIEW_ALLOWED_CONTENT_BLOCKERS
-        )
-        blockers.extend(
-            f"unresolved_warning:{warning}"
-            for warning in draft.warnings
-            if (
-                isinstance(warning, str)
-                and warning
-                and warning not in MANUAL_REVIEW_ALLOWED_WARNINGS
-            )
-        )
-
-    # An overlong photo caption is recoverable in the owner UI: the exact
-    # publication artifact is unavailable, but review_message() can still
-    # deliver a control card with edit/regenerate actions.
-    if is_hermes_draft and review.artifact is None:
-        recoverable_overlong_caption = (
-            "telegram_photo_caption_too_long" in review.blockers and not blockers
-        )
-        if not recoverable_overlong_caption:
-            blockers.append("preview_artifact_unavailable")
-
-    # Hermes publication still requires its image path. Keep this as a hard
-    # preview gate rather than silently degrading to a publishable text-only
-    # item.
-    if is_hermes_draft and (review.image is None or not review.image.image_data):
+    if not is_hermes_origin_draft(draft):
+        return (NON_HERMES_REVIEW_DELIVERY_DISABLED,)
+    blockers = list(review.blockers)
+    blockers.extend(
+        f"unresolved_warning:{warning}"
+        for warning in draft.warnings
+        if isinstance(warning, str) and warning
+    )
+    if review.artifact is None:
+        blockers.append("preview_artifact_unavailable")
+    if review.artifact_hash is None:
+        blockers.append("preview_artifact_hash_missing")
+    if review.image is None or not review.image.image_data:
         blockers.append("preview_image_missing")
-
     return tuple(dict.fromkeys(blockers))
 
 
@@ -276,6 +227,11 @@ def edit_text_revision(
         editorial_content.fields(),
         source_title=primary.title,
         source_summary=primary.summary,
+        source_context=" ".join(
+            value
+            for value in draft.evidence_metadata.get("source_number_tokens", [])
+            if isinstance(value, str)
+        ),
     )
     preserved_warnings = tuple(
         warning for warning in draft.warnings if warning not in OWNER_EDIT_REVALIDATED_WARNINGS
@@ -524,25 +480,14 @@ def moderate_draft(
         cluster.deferred_until = utcnow() + timedelta(hours=settings.news_defer_hours)
         cluster.delivery_round += 1
         result_status = "deferred"
+    elif action == "regenerate":
+        # Hermes owns text generation. A YFC callback must never requeue the
+        # same immutable revision while pretending that new text exists.
+        result_status = "unavailable"
+        outcome = "generation_external"
     else:
-        if cluster.generation_attempt_count > settings.news_max_regenerations:
-            result_status = "limit_reached"
-            outcome = "limit_reached"
-        else:
-            revoke_active_decisions(db, cluster.id, reason="editorial_regenerate")
-            # Hermes text generation lives outside YFC. Requeue the accepted
-            # immutable Hermes revision for owner review instead of manufacturing
-            # a new local candidate/draft.
-            cluster.delivery_round += 1
-            transition_news_cluster(
-                db,
-                cluster,
-                "draft_ready",
-                reason_code="owner_regenerate_hermes_revision",
-                actor_ref=actor_ref,
-            )
-            cluster.deferred_until = None
-            result_status = "queued"
+        result_status = "unavailable"
+        outcome = "unsupported_action"
     db.add(
         NewsEditorialAction(
             cluster_id=cluster.id,
@@ -880,6 +825,7 @@ def review_message(
     if primary is None or primary.id not in draft.evidence_item_ids:
         raise ValueError("primary_source_missing")
     review = compose_review_artifact(db, draft, channel_ready=channel_ready)
+    delivery_blockers = review_delivery_blockers(draft, review)
     metadata = draft.evidence_metadata
     warnings = ", ".join(draft.warnings) if draft.warnings else "нет автоматических флагов"
     score_reasons = ", ".join(metadata.get("score_reasons", [])[:6])
@@ -935,7 +881,7 @@ def review_message(
         primary.primary_url or primary.canonical_url
     )
     buttons = [[{"text": "Открыть источник", "url": source_url}]]
-    if not review.blockers and review.artifact_hash is not None:
+    if not delivery_blockers and review.artifact_hash is not None:
         buttons.append(
             [
                 {
@@ -967,10 +913,6 @@ def review_message(
                         "e", draft.id, cluster.current_image_revision
                     ),
                 },
-                {
-                    "text": "Перегенерировать текст",
-                    "callback_data": callback_data("regenerate", draft.id),
-                },
             ],
             [
                 {
@@ -1000,10 +942,6 @@ def review_message(
                     "callback_data": publishing_callback_data(
                         "x", draft.id, cluster.current_image_revision
                     ),
-                },
-                {
-                    "text": "Отложить рассмотрение",
-                    "callback_data": callback_data("defer", draft.id),
                 },
             ],
         ]
