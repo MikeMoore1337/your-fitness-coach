@@ -3,12 +3,12 @@ import { AppLink } from '../../shared/navigation/router';
 import { NutritionDiary } from './NutritionDiary';
 import { NutritionForm } from './NutritionForm';
 import type { MealType } from './FoodPickerDialog';
-import { AiCoachEntry } from '../ai/AiCoachExperience';
 
 export function NutritionPage({
   initial,
   initialDate,
   initialMealType,
+  initialFoodQuickAdd = false,
   initialHydrationOpen = false,
   onSaved,
   returnPath,
@@ -17,6 +17,7 @@ export function NutritionPage({
   initial?: NutritionTarget | null;
   initialDate?: string;
   initialMealType?: MealType;
+  initialFoodQuickAdd?: boolean;
   initialHydrationOpen?: boolean;
   onSaved?: () => void | Promise<void>;
   returnPath?: string;
@@ -31,9 +32,9 @@ export function NutritionPage({
           </AppLink>
         </nav>
       )}
-      <AiCoachEntry entryPoint="nutrition" />
       <NutritionDiary
         initialDate={initialDate}
+        initialFoodQuickAdd={initialFoodQuickAdd}
         initialMealType={initialMealType}
         initialHydrationOpen={initialHydrationOpen}
         timeZone={timeZone}

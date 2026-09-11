@@ -105,7 +105,7 @@ describe('AppShell', () => {
       'href',
       '/app?section=today',
     );
-    expect(screen.getByRole('link', { name: 'Программа' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'План' })).toHaveAttribute(
       'href',
       '/app?section=programs',
     );
@@ -113,12 +113,13 @@ describe('AppShell', () => {
       Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
         (link) => link.textContent,
       ),
-    ).toEqual(['Сегодня', 'Программа', 'Питание', 'Прогресс']);
+    ).toEqual(['Сегодня', 'План', 'Питание', 'Прогресс']);
     expect(screen.queryByRole('button', { name: 'Ещё' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Тренер' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('link', { name: 'Админ-панель' })).not.toBeInTheDocument();
     expect(screen.getByText('Ресурсы')).toBeInTheDocument();
     expect(screen.getByText('Михаил')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Быстро добавить' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Выйти из аккаунта' }));
     expect(logout).toHaveBeenCalledOnce();
@@ -128,7 +129,7 @@ describe('AppShell', () => {
     navigation.path = '/app';
     for (const [section, label] of [
       ['today', 'Сегодня'],
-      ['programs', 'Программа'],
+      ['programs', 'План'],
       ['nutrition', 'Питание'],
       ['progress', 'Прогресс'],
     ] as const) {
@@ -136,6 +137,27 @@ describe('AppShell', () => {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page');
       view.unmount();
     }
+  });
+
+  it('открывает единую панель быстрых действий и закрывает её Escape', () => {
+    navigation.path = '/app';
+    render(<AppShell section="today">Содержимое</AppShell>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Быстро добавить' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Что добавить?' });
+    expect(dialog).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: /Добавить еду/ })).toHaveAttribute(
+      'href',
+      '/app?section=nutrition&quick_add=food',
+    );
+    expect(within(dialog).getByRole('link', { name: /Открыть AI Coach/ })).toHaveAttribute(
+      'href',
+      '/app?section=profile#profile-ai-coach',
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
   });
 
   it('открывает доступное mobile-меню с secondary navigation и завершает exit после возврата фокуса', async () => {

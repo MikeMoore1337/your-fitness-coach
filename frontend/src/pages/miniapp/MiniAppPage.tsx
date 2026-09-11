@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { AppShell, type AppSection } from '../../app/AppShell';
 import '../../styles/react.css';
 import '../../styles/design-v2.css';
+import '../../styles/ux-ia-redesign.css';
 import { useAuth } from '../../app/AuthProvider';
 import {
   authRecoveryMessage,
@@ -12,7 +13,7 @@ import { TelegramLinkPrompt } from '../../features/account/TelegramLinkPrompt';
 import { TodayDashboard } from '../../features/dashboard/TodayDashboard';
 import type { WorkoutNavigationTarget } from '../../features/workouts/WorkoutHistory';
 import { AppLink, focusedContextReturn, useNavigation } from '../../shared/navigation/router';
-import { Badge, Card } from '../../shared/ui/common';
+import { Badge, Button, Card } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { AiCoachSettingsCard, useAiCoachStatus } from '../../features/ai/AiCoachExperience';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
@@ -75,9 +76,19 @@ const TemplatesList = lazy(() =>
     default: module.TemplatesList,
   })),
 );
-const ProgressSchedule = lazy(() =>
+const ProgressExperience = lazy(() =>
+  import('../../features/workouts/ProgressExperience').then((module) => ({
+    default: module.ProgressExperience,
+  })),
+);
+const SchedulePanel = lazy(() =>
   import('../../features/workouts/ProgressSchedule').then((module) => ({
-    default: module.ProgressSchedule,
+    default: module.SchedulePanel,
+  })),
+);
+const WeeklyCheckInCard = lazy(() =>
+  import('../../features/workouts/WeeklyCheckInCard').then((module) => ({
+    default: module.WeeklyCheckInCard,
   })),
 );
 const WorkoutHistory = lazy(() =>
@@ -120,6 +131,10 @@ function requestedHydrationQuick(search: string): boolean {
   return new URLSearchParams(search).get('hydration') === 'quick';
 }
 
+function requestedNutritionQuickAdd(search: string): boolean {
+  return new URLSearchParams(search).get('quick_add') === 'food';
+}
+
 function requestedWellbeingDate(search: string): string | undefined {
   const value = new URLSearchParams(search).get('wellbeing_date');
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
@@ -128,6 +143,14 @@ function requestedWellbeingDate(search: string): string | undefined {
 function requestedProgramStart(search: string): 'create' | 'templates' | null {
   const value = new URLSearchParams(search).get('start');
   return value === 'create' || value === 'templates' ? value : null;
+}
+
+function requestedProgramView(search: string): 'summary' | 'manage' {
+  return new URLSearchParams(search).get('view') === 'manage' ? 'manage' : 'summary';
+}
+
+function requestedMeasurementsFocus(search: string): boolean {
+  return new URLSearchParams(search).get('focus') === 'measurements';
 }
 
 function requestedProgressReturn(search: string): string | undefined {
@@ -187,6 +210,18 @@ function launchInviteToken(): string | null {
   return startParam?.startsWith('trainer_') ? startParam.slice('trainer_'.length) : null;
 }
 
+function ProgressCategoryNav() {
+  return (
+    <nav className="ux-progress-category-nav" aria-label="Категории прогресса">
+      <a href="#progress-body">Замеры</a>
+      <a href="#progress-training">Тренировки</a>
+      <a href="#progress-nutrition">Питание</a>
+      <a href="#progress-cardio">Кардио</a>
+      <a href="#progress-reports">Отчёты</a>
+    </nav>
+  );
+}
+
 export default function MiniAppPage() {
   const { user, reloadUser } = useAuth();
   const { navigate, search } = useNavigation();
@@ -204,6 +239,7 @@ export default function MiniAppPage() {
   const aiCoachStatus = useAiCoachStatus(section === 'profile');
   const nutritionDate = requestedNutritionDate(search);
   const nutritionMeal = requestedNutritionMeal(search);
+  const nutritionQuickAdd = requestedNutritionQuickAdd(search);
   const nutritionHydrationOpen = requestedHydrationQuick(search);
   const reportHandoffId =
     section === 'progress'
@@ -218,6 +254,8 @@ export default function MiniAppPage() {
   const workoutReturnPath = requestedFeedback ? focusedContextReturn(search) : null;
   const focusWeeklyReview = new URLSearchParams(search).get('weekly_review') === '1';
   const focusDailyWellbeing = new URLSearchParams(search).get('wellbeing') === '1';
+  const focusCardio = new URLSearchParams(search).get('cardio') === '1';
+  const focusMeasurements = requestedMeasurementsFocus(search);
   const dailyWellbeingDate = requestedWellbeingDate(search);
   const [focusedWorkout, setFocusedWorkout] = useState<{
     id: number;
@@ -285,6 +323,12 @@ export default function MiniAppPage() {
     );
   }, [toast]);
   const programStart = section === 'programs' ? requestedProgramStart(search) : null;
+  const programHistoryId = positiveId(new URLSearchParams(search).get('program_history'));
+  const programManagementOpen =
+    section === 'programs' &&
+    (requestedProgramView(search) === 'manage' ||
+      programStart !== null ||
+      programHistoryId !== null);
   const profileReadiness = programProfileReadiness(user?.profile);
   const profileFormKey = JSON.stringify([
     user?.profile?.full_name,
@@ -351,14 +395,14 @@ export default function MiniAppPage() {
                 {section === 'profile'
                   ? 'Профиль и настройки'
                   : section === 'programs'
-                    ? 'Программа тренировок'
+                    ? 'План'
                     : user?.profile?.full_name || user?.first_name || 'Мой фитнес'}
               </h1>
               <p className="muted">
                 {section === 'profile'
                   ? 'Личные данные, связи, уведомления и безопасность аккаунта.'
                   : section === 'programs'
-                    ? 'Текущая программа, тренировочные дни и создание своего плана.'
+                    ? 'Активная программа, ближайшие тренировки и управление планом.'
                     : 'Тренировки, питание и прогресс в одном месте.'}
               </p>
             </div>
@@ -375,6 +419,7 @@ export default function MiniAppPage() {
           >
             {section === 'today' && (
               <TodayDashboard
+                initialCardioOpen={focusCardio}
                 initialWellbeingDate={dailyWellbeingDate}
                 initialWellbeingOpen={focusDailyWellbeing}
               />
@@ -390,16 +435,17 @@ export default function MiniAppPage() {
                   <HistoricalProgramWorkout {...historicalProgramWorkout} />
                 )}
                 <div className="stack progress-workout-stack">
-                  <ProgressSchedule
-                    userId={user?.id}
+                  <ProgressCategoryNav />
+                  <ProgressExperience
+                    focusMeasurements={focusMeasurements}
                     timeZone={user?.profile?.timezone}
-                    focusedWorkoutId={historicalProgramWorkout ? null : scheduleFocusId}
-                    focusedCommentId={requestedFeedback?.commentId}
-                    focusedExerciseId={requestedFeedback?.workoutExerciseId}
-                    focusWeeklyReview={focusWeeklyReview}
                     measurementDiary={
                       <Diary embedded onSaved={async () => void (await reloadUser())} />
                     }
+                  />
+                  <WeeklyCheckInCard
+                    autoFocus={focusWeeklyReview}
+                    userId={user?.id ?? 'anonymous'}
                   />
                   <WorkoutHistory
                     timeZone={user?.profile?.timezone}
@@ -413,15 +459,34 @@ export default function MiniAppPage() {
             )}
             {section === 'programs' && (
               <>
-                <TemplatesList
-                  key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
-                  defaultLibraryOpen={programStart === 'templates'}
-                >
-                  <ProgramBuilder
-                    key={programStart === 'create' ? 'create-start' : 'create-default'}
-                    defaultOpen={programStart === 'create'}
-                  />
-                </TemplatesList>
+                {programManagementOpen ? (
+                  <TemplatesList
+                    key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
+                    defaultLibraryOpen={programStart === 'templates'}
+                    mode="full"
+                  >
+                    <ProgramBuilder
+                      key={programStart === 'create' ? 'create-start' : 'create-default'}
+                      defaultOpen={programStart === 'create'}
+                    />
+                  </TemplatesList>
+                ) : (
+                  <>
+                    <TemplatesList mode="summary" />
+                    <SchedulePanel
+                      focusedCommentId={requestedFeedback?.commentId}
+                      focusedExerciseId={requestedFeedback?.workoutExerciseId}
+                      focusedWorkoutId={scheduleFocusId}
+                      timeZone={user?.profile?.timezone}
+                    />
+                    <AppLink
+                      className="ux-plan-management-link"
+                      to="/app?section=programs&view=manage"
+                    >
+                      Открыть управление программой
+                    </AppLink>
+                  </>
+                )}
               </>
             )}
             {section === 'catalog' && <ExerciseCatalog canCreate={Boolean(user?.is_coach)} />}
@@ -431,10 +496,12 @@ export default function MiniAppPage() {
                   user?.profile?.kbju ?? null,
                   nutritionDate,
                   nutritionMeal,
+                  nutritionQuickAdd,
                   nutritionHydrationOpen,
                 ])}
                 initial={user?.profile?.kbju}
                 initialDate={nutritionDate}
+                initialFoodQuickAdd={nutritionQuickAdd}
                 initialMealType={nutritionMeal}
                 initialHydrationOpen={nutritionHydrationOpen}
                 returnPath={requestedProgressReturn(search)}
@@ -471,40 +538,95 @@ export default function MiniAppPage() {
                   aria-label="Разделы профиля"
                 >
                   <a
+                    className="profile-settings-nav__item"
                     href="#profile-personal"
+                    aria-label="Личные данные"
+                    aria-describedby="profile-nav-personal-description"
                     onClick={() => openProfileSection('profile-personal')}
                   >
-                    <Icon name="nav-profile" size={16} /> Личные данные
+                    <Icon name="nav-profile" size={16} />
+                    <span>Личные данные</span>
+                    <small id="profile-nav-personal-description">
+                      Имя, параметры, часовой пояс
+                    </small>
                   </a>
                   <a
+                    className="profile-settings-nav__item"
                     href="#profile-fitness"
+                    aria-label="Цели и параметры"
+                    aria-describedby="profile-nav-fitness-description"
                     onClick={() => openProfileSection('profile-personal', 'profile-fitness')}
                   >
-                    <Icon name="nav-plan" size={16} /> Цели и параметры
-                  </a>
-                  <a href="#profile-trainer" onClick={() => openProfileSection('profile-trainer')}>
-                    <Icon name="nav-coach" size={16} /> Тренер и приглашения
+                    <Icon name="nav-plan" size={16} />
+                    <span>Цели и параметры</span>
+                    <small id="profile-nav-fitness-description">Цель, уровень и частота</small>
                   </a>
                   <a
+                    className="profile-settings-nav__item"
+                    href="#profile-trainer"
+                    aria-label="Тренер и приглашения"
+                    aria-describedby="profile-nav-trainer-description"
+                    onClick={() => openProfileSection('profile-trainer')}
+                  >
+                    <Icon name="nav-coach" size={16} />
+                    <span>Тренер и приглашения</span>
+                    <small id="profile-nav-trainer-description">Приглашения и режим тренера</small>
+                  </a>
+                  <a
+                    className="profile-settings-nav__item"
                     href="#profile-notifications"
+                    aria-label="Уведомления"
+                    aria-describedby="profile-nav-notifications-description"
                     onClick={() => openProfileSection('profile-notifications')}
                   >
-                    <Icon name="nav-today" size={16} /> Уведомления
+                    <Icon name="nav-today" size={16} />
+                    <span>Уведомления</span>
+                    <small id="profile-nav-notifications-description">Напоминания и время</small>
                   </a>
                   <a
+                    className="profile-settings-nav__item"
                     href="#profile-security"
+                    aria-label="Доступ и безопасность"
+                    aria-describedby="profile-nav-security-description"
                     onClick={() => openProfileSection('profile-security')}
                   >
-                    <Icon name="account-security" size={16} /> Доступ и безопасность
+                    <Icon name="account-security" size={16} />
+                    <span>Доступ и безопасность</span>
+                    <small id="profile-nav-security-description">Вход, копия данных, аккаунт</small>
                   </a>
-                  {aiCoachStatus.data?.ui_enabled && (
-                    <a
-                      href="#profile-ai-coach"
-                      onClick={() => openProfileSection('profile-ai-coach')}
-                    >
-                      <Icon name="ai-coach" size={16} /> AI Coach beta
-                    </a>
-                  )}
+                  <a
+                    className="profile-settings-nav__item"
+                    href="#profile-ai-coach"
+                    aria-label="AI Coach"
+                    aria-describedby="profile-nav-ai-description"
+                    onClick={() => openProfileSection('profile-ai-coach')}
+                  >
+                    <Icon name="ai-coach" size={16} />
+                    <span>AI Coach</span>
+                    <small id="profile-nav-ai-description">
+                      {aiCoachStatus.isLoading
+                        ? 'Проверяем доступность'
+                        : aiCoachStatus.data?.ui_enabled
+                          ? 'Доступность и личный контекст'
+                          : 'Сейчас недоступен'}
+                    </small>
+                  </a>
+                  <span
+                    aria-disabled="true"
+                    className="profile-settings-nav__item profile-settings-nav__item--reserved"
+                  >
+                    <Icon name="sync" size={16} />
+                    <span>Интеграции</span>
+                    <small>Точка входа готовится</small>
+                  </span>
+                  <span
+                    aria-disabled="true"
+                    className="profile-settings-nav__item profile-settings-nav__item--reserved"
+                  >
+                    <Icon name="web-app" size={16} />
+                    <span>Приложение</span>
+                    <small>Тема, PWA и runtime</small>
+                  </span>
                 </nav>
 
                 <ProfileForm key={profileFormKey} />
@@ -526,11 +648,35 @@ export default function MiniAppPage() {
                   />
                   <TrainerCapabilityCard />
                 </Card>
-                {aiCoachStatus.data?.ui_enabled && (
+                {aiCoachStatus.data?.ui_enabled ? (
                   <AiCoachSettingsCard
                     defaultOpen={window.location.hash === '#profile-ai-coach'}
                     status={aiCoachStatus.data}
                   />
+                ) : (
+                  <section
+                    aria-labelledby="profile-ai-coach-title"
+                    className="profile-settings-ai-unavailable"
+                    id="profile-ai-coach"
+                  >
+                    <div>
+                      <span className="eyebrow">AI Coach</span>
+                      <h2 id="profile-ai-coach-title">AI Coach сейчас недоступен</h2>
+                      <p>
+                        Основные функции приложения продолжают работать. Доступность можно проверить
+                        позже.
+                      </p>
+                    </div>
+                    {aiCoachStatus.error && (
+                      <Button
+                        onClick={() => void aiCoachStatus.refetch()}
+                        type="button"
+                        variant="secondary"
+                      >
+                        Повторить
+                      </Button>
+                    )}
+                  </section>
                 )}
                 <Card
                   className="profile-settings-group"

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell, type DemoAppShellConfig } from '../../app/AppShell';
+import type { QuickAddAction } from '../../app/QuickAddSheet';
 import '../../styles/react.css';
 import '../../styles/design-v2.css';
+import '../../styles/ux-ia-redesign.css';
 import {
   applyDemoAction,
   clearAllDemoSessions,
@@ -37,7 +39,8 @@ import {
 } from '../../shared/ui/common';
 import './demo-cabinet.css';
 
-export type DemoCabinetSection = 'today' | 'nutrition' | 'progress' | 'trainer';
+export type DemoCabinetSection =
+  'today' | 'plan' | 'nutrition' | 'progress' | 'profile' | 'trainer';
 
 const SCENARIOS: ReadonlyArray<{
   value: DemoScenario;
@@ -64,7 +67,14 @@ function startSection(scenario: DemoScenario): DemoCabinetSection {
 
 function sectionFromSearch(search: string, scenario: DemoScenario): DemoCabinetSection {
   const value = new URLSearchParams(search).get('section');
-  if (value === 'today' || value === 'nutrition' || value === 'progress') return value;
+  if (
+    value === 'today' ||
+    value === 'plan' ||
+    value === 'nutrition' ||
+    value === 'progress' ||
+    value === 'profile'
+  )
+    return value;
   if (value === 'trainer' && scenario === 'trainer') return value;
   return startSection(scenario);
 }
@@ -87,6 +97,53 @@ function loginPath(scenario: DemoScenario, section: DemoCabinetSection): string 
     section,
   });
   return `/login?${params.toString()}`;
+}
+
+function demoQuickAddLinks(scenario: DemoScenario): ReadonlyArray<QuickAddAction> {
+  return [
+    {
+      key: 'food',
+      label: 'Добавить еду',
+      detail: 'Открыть подготовленный дневник',
+      icon: 'calories',
+      to: demoCabinetPath(scenario, 'nutrition'),
+    },
+    {
+      key: 'water',
+      label: 'Добавить воду',
+      detail: 'Точка входа в трекер жидкости',
+      icon: 'water',
+      to: demoCabinetPath(scenario, 'nutrition'),
+    },
+    {
+      key: 'cardio',
+      label: 'Добавить кардио',
+      detail: 'Точка входа в запись активности',
+      icon: 'week-cardio',
+      to: demoCabinetPath(scenario, 'today'),
+    },
+    {
+      key: 'measurement',
+      label: 'Добавить замер',
+      detail: 'Точка входа в историю тела',
+      icon: 'body-measurement',
+      to: demoCabinetPath(scenario, 'progress'),
+    },
+    {
+      key: 'wellbeing',
+      label: 'Отметить самочувствие',
+      detail: 'Точка входа в check-in',
+      icon: 'checklist',
+      to: demoCabinetPath(scenario, 'today'),
+    },
+    {
+      key: 'ai-coach',
+      label: 'Открыть AI Coach',
+      detail: 'Настройки открываются после входа',
+      icon: 'ai-coach',
+      to: demoCabinetPath(scenario, 'profile'),
+    },
+  ];
 }
 
 function trainingAction(state: DemoSelfTrainingState): { action: string; label: string } | null {
@@ -293,6 +350,126 @@ function TodaySection({
           </div>
         </aside>
       </div>
+    </>
+  );
+}
+
+function PlanSection({
+  scenario,
+  snapshot,
+}: {
+  scenario: DemoScenario;
+  snapshot: DemoSessionSnapshot;
+}) {
+  const today = dateInputValue(new Date());
+  const week = calendarWeek(today);
+  const currentDay = week.indexOf(today);
+  const getDayMeta = (date: string): WeekStripDayMeta => {
+    const index = week.indexOf(date);
+    const activity: WeekStripActivity = [0, 3, 5].includes(index)
+      ? { key: 'strength', label: 'Силовая' }
+      : [1, 4].includes(index)
+        ? { key: 'cardio', label: 'Кардио' }
+        : { key: 'rest', label: 'Отдых' };
+    const status =
+      date === today
+        ? { key: 'in-progress' as const, label: snapshot.cabinet.today.status_label }
+        : index >= 0 && index < snapshot.cabinet.today.completed_days
+          ? { key: 'completed' as const, label: 'День завершён' }
+          : index > currentDay && index < snapshot.cabinet.today.planned_days
+            ? { key: 'planned' as const, label: 'Есть план' }
+            : { key: 'neutral' as const, label: 'День отдыха' };
+    return { activities: [activity], status };
+  };
+
+  return (
+    <>
+      <header className="demo-cabinet-title">
+        <span className="eyebrow">План</span>
+        <h1>Один активный план, понятная следующая тренировка</h1>
+        <p>
+          В демо показана рабочая поверхность плана; управление программой остаётся отдельным
+          уровнем.
+        </p>
+      </header>
+      <div className="demo-cabinet-focus-grid demo-ia-plan-grid">
+        <Surface className="demo-ia-plan-summary">
+          <Badge tone="success">Активна</Badge>
+          <span className="demo-ia-kicker">Текущая программа</span>
+          <h2>Силовая база</h2>
+          <p>4 тренировки в неделю · неделя 3 из 8</p>
+          <dl>
+            <div>
+              <dt>Следующая</dt>
+              <dd>{snapshot.cabinet.today.title}</dd>
+            </div>
+            <div>
+              <dt>Сделано</dt>
+              <dd>{snapshot.cabinet.today.completed_days} тренировок</dd>
+            </div>
+          </dl>
+          <AppLink className="ui-button" to={demoCabinetPath(scenario, 'today')}>
+            Открыть следующую тренировку
+          </AppLink>
+        </Surface>
+        <Surface className="demo-ia-plan-management">
+          <span className="demo-ia-kicker">Второй уровень</span>
+          <h2>Управление программой</h2>
+          <p>Создание, готовые шаблоны, импорт и история открываются после входа в приложение.</p>
+          <AppLink className="ui-button ui-button--secondary" to={loginPath(scenario, 'plan')}>
+            Войти и открыть управление
+          </AppLink>
+        </Surface>
+      </div>
+      <WeekStrip
+        anchorDate={today}
+        ariaLabel="Контекст недели в демо-плане"
+        getDayMeta={getDayMeta}
+        legend={TRAINING_WEEK_LEGEND}
+        mode="overview"
+        title="Расписание недели"
+        today={today}
+      />
+    </>
+  );
+}
+
+function ProfileSection({ scenario }: { scenario: DemoScenario }) {
+  const rows = [
+    ['Личные данные и цели', 'Имя, параметры, часовой пояс'],
+    ['Тренер', 'Приглашения и режим тренера'],
+    ['Уведомления', 'Напоминания и время'],
+    ['AI Coach', 'Доступность и личный контекст'],
+    ['Интеграции', 'Точка входа готовится'],
+    ['Приложение', 'Тема, PWA и runtime'],
+    ['Аккаунт и безопасность', 'Вход, копия данных, аккаунт'],
+  ];
+  return (
+    <>
+      <header className="demo-cabinet-title">
+        <span className="eyebrow">Профиль</span>
+        <h1>Настройки по одной понятной группе</h1>
+        <p>Демо показывает IA профиля; реальные изменения доступны только после входа.</p>
+      </header>
+      <Surface className="demo-ia-profile">
+        <div className="demo-ia-profile__identity">
+          <Badge>Демо-профиль</Badge>
+          <h2>Алексей · самостоятельные тренировки</h2>
+          <p>Цель: поддержание формы · средний уровень · 4 тренировки в неделю</p>
+        </div>
+        <div className="demo-ia-profile__rows" aria-label="Группы настроек профиля">
+          {rows.map(([label, detail], index) => (
+            <div className={`demo-ia-profile__row${index >= 4 ? ' is-reserved' : ''}`} key={label}>
+              <strong>{label}</strong>
+              <span>{detail}</span>
+              {index >= 4 && <small>Скоро</small>}
+            </div>
+          ))}
+        </div>
+        <AppLink className="ui-button" to={loginPath(scenario, 'profile')}>
+          Войти и открыть настройки
+        </AppLink>
+      </Surface>
     </>
   );
 }
@@ -642,6 +819,7 @@ export default function DemoCabinet() {
   );
   const destinations: DemoAppShellConfig['destinations'] = [
     { key: 'today', label: 'Сегодня', icon: 'today', to: demoCabinetPath(scenario, 'today') },
+    { key: 'plan', label: 'План', icon: 'plan', to: demoCabinetPath(scenario, 'plan') },
     {
       key: 'nutrition',
       label: 'Питание',
@@ -667,6 +845,8 @@ export default function DemoCabinet() {
   ];
   const shellDemo: DemoAppShellConfig = {
     activeSection: section,
+    accountLabel: 'Профиль и настройки',
+    accountTo: demoCabinetPath(scenario, 'profile'),
     brandTo: demoCabinetPath(scenario),
     destinations,
     displayName: scenario === 'trainer' ? 'Демо тренера' : 'Демо-кабинет',
@@ -674,6 +854,7 @@ export default function DemoCabinet() {
     menuTitle: 'Выберите демо-сценарий',
     moreLinks: SCENARIOS.map((item) => ({ label: item.label, to: demoCabinetPath(item.value) })),
     onReset: reset,
+    quickAddLinks: demoQuickAddLinks(scenario),
     resetDisabled: busy || isLoading || !snapshot,
   };
 
@@ -749,6 +930,7 @@ export default function DemoCabinet() {
                 snapshot={snapshot}
               />
             )}
+            {section === 'plan' && <PlanSection scenario={scenario} snapshot={snapshot} />}
             {section === 'nutrition' && (
               <NutritionSection
                 busy={busy}
@@ -758,6 +940,7 @@ export default function DemoCabinet() {
               />
             )}
             {section === 'progress' && <ProgressSection scenario={scenario} snapshot={snapshot} />}
+            {section === 'profile' && <ProfileSection scenario={scenario} />}
             {section === 'trainer' && (
               <TrainerSection
                 busy={busy}

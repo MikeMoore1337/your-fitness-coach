@@ -23,6 +23,7 @@ import { ProgramRecommendation } from './ProgramRecommendation';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { AssignedProgramDetails } from './AssignedProgramDetails';
 import { ProgramImportPanel } from './ProgramImportPanel';
+import { AppLink } from '../../shared/navigation/router';
 
 const goalLabels: Record<string, string> = {
   muscle_gain: 'Набор мышечной массы',
@@ -82,9 +83,11 @@ function programKind(item: ProgramTemplate, currentUserId?: number): string {
 export function TemplatesList({
   children,
   defaultLibraryOpen = false,
+  mode = 'full',
 }: {
   children?: ReactNode;
   defaultLibraryOpen?: boolean;
+  mode?: 'full' | 'summary';
 }) {
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
@@ -225,7 +228,7 @@ export function TemplatesList({
     ) ?? [];
 
   useEffect(() => {
-    if (!defaultLibraryOpen || templates.isLoading) return;
+    if (mode !== 'full' || !defaultLibraryOpen || templates.isLoading) return;
     const frame = window.requestAnimationFrame(() => {
       const target = document.getElementById('program-library');
       if (!(target instanceof HTMLDetailsElement)) return;
@@ -234,7 +237,7 @@ export function TemplatesList({
       target.querySelector<HTMLElement>(':scope > summary')?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [defaultLibraryOpen, templates.isLoading]);
+  }, [defaultLibraryOpen, mode, templates.isLoading]);
 
   const renderTemplate = (item: ProgramTemplate) => (
     <article className="program-template-card" key={item.id}>
@@ -314,61 +317,72 @@ export function TemplatesList({
               </div>
               <Badge tone="success">Активна</Badge>
             </div>
-            <div className="program-active__source">
-              <strong>{programKind(activeTemplate, user?.id)}</strong>
-              {activeTemplate.assigned_by_user_id &&
-              activeTemplate.assigned_by_user_id !== user?.id ? (
-                <span>
-                  Назначил тренер
-                  {activeTemplate.assigned_by_full_name
-                    ? ` ${activeTemplate.assigned_by_full_name}`
-                    : ''}
-                </span>
-              ) : (
-                <span>Вы можете посмотреть состав или изменить будущий шаблон.</span>
-              )}
-            </div>
-            {activeTemplate.assigned_program_id &&
-              activeTemplate.assigned_program_start_date &&
-              activeTemplate.assigned_program_duration_weeks != null &&
-              activeTemplate.current_revision_number != null && (
-                <AssignedProgramDetails
-                  key={activeTemplate.assigned_program_id}
-                  programId={activeTemplate.assigned_program_id}
-                  currentRevisionNumber={activeTemplate.current_revision_number}
-                  startDate={activeTemplate.assigned_program_start_date}
-                  durationWeeks={activeTemplate.assigned_program_duration_weeks}
-                  workoutHistoryReturnPath="/app?section=programs"
-                />
-              )}
-            <div className="program-active__actions">
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setSelectedExample(activeTemplate)}
-              >
-                Посмотреть план
-              </button>
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => setRecommendationOpen(true)}
-              >
-                Подобрать другую
-              </button>
-              <button
-                type="button"
-                className="program-active__edit-action"
-                onClick={() => {
-                  setSaveAsCopy(shouldSaveTemplateAsCopy(activeTemplate));
-                  setEditingTemplate(activeTemplate);
-                }}
-              >
-                {shouldSaveTemplateAsCopy(activeTemplate)
-                  ? 'Настроить свою копию'
-                  : 'Редактировать шаблон'}
-              </button>
-            </div>
+            {mode === 'summary' ? (
+              <div className="program-active__summary">
+                <span>Ближайшие тренировки и календарь — в разделе «План».</span>
+                <AppLink className="button-link" to="/app?section=programs&view=manage">
+                  Управление программой
+                </AppLink>
+              </div>
+            ) : (
+              <>
+                <div className="program-active__source">
+                  <strong>{programKind(activeTemplate, user?.id)}</strong>
+                  {activeTemplate.assigned_by_user_id &&
+                  activeTemplate.assigned_by_user_id !== user?.id ? (
+                    <span>
+                      Назначил тренер
+                      {activeTemplate.assigned_by_full_name
+                        ? ` ${activeTemplate.assigned_by_full_name}`
+                        : ''}
+                    </span>
+                  ) : (
+                    <span>Вы можете посмотреть состав или изменить будущий шаблон.</span>
+                  )}
+                </div>
+                {activeTemplate.assigned_program_id &&
+                  activeTemplate.assigned_program_start_date &&
+                  activeTemplate.assigned_program_duration_weeks != null &&
+                  activeTemplate.current_revision_number != null && (
+                    <AssignedProgramDetails
+                      key={activeTemplate.assigned_program_id}
+                      programId={activeTemplate.assigned_program_id}
+                      currentRevisionNumber={activeTemplate.current_revision_number}
+                      startDate={activeTemplate.assigned_program_start_date}
+                      durationWeeks={activeTemplate.assigned_program_duration_weeks}
+                      workoutHistoryReturnPath="/app?section=programs"
+                    />
+                  )}
+                <div className="program-active__actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setSelectedExample(activeTemplate)}
+                  >
+                    Посмотреть план
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => setRecommendationOpen(true)}
+                  >
+                    Подобрать другую
+                  </button>
+                  <button
+                    type="button"
+                    className="program-active__edit-action"
+                    onClick={() => {
+                      setSaveAsCopy(shouldSaveTemplateAsCopy(activeTemplate));
+                      setEditingTemplate(activeTemplate);
+                    }}
+                  >
+                    {shouldSaveTemplateAsCopy(activeTemplate)
+                      ? 'Настроить свою копию'
+                      : 'Редактировать шаблон'}
+                  </button>
+                </div>
+              </>
+            )}
           </>
         ) : (
           <div className="program-active__empty">
@@ -376,86 +390,117 @@ export function TemplatesList({
             <h2 id="active-program-title">План ещё не выбран</h2>
             <p>Создайте свою программу сразу или выберите готовый шаблон.</p>
             <div className="program-active__actions">
-              <a className="button-link program-wizard__anchor" href="#program-builder">
-                Создать свою программу
-              </a>
-              <a className="secondary program-wizard__anchor" href="#program-library">
-                Программы и шаблоны
-              </a>
+              {mode === 'summary' ? (
+                <>
+                  <AppLink
+                    className="button-link program-wizard__anchor"
+                    to="/app?section=programs&view=manage&start=create"
+                  >
+                    Создать свою программу
+                  </AppLink>
+                  <AppLink
+                    className="secondary program-wizard__anchor"
+                    to="/app?section=programs&view=manage&start=templates"
+                  >
+                    Программы и шаблоны
+                  </AppLink>
+                </>
+              ) : (
+                <>
+                  <a className="button-link program-wizard__anchor" href="#program-builder">
+                    Создать свою программу
+                  </a>
+                  <a className="secondary program-wizard__anchor" href="#program-library">
+                    Программы и шаблоны
+                  </a>
+                </>
+              )}
             </div>
           </div>
         )}
       </section>
-      {children}
-      <ProgramImportPanel />
-      <ProgramRecommendation
-        open={recommendationOpen}
-        onOpenChange={setRecommendationOpen}
-        onPreview={setSelectedExample}
-        onEditCopy={editCopy}
-      />
-      <Card
-        defaultOpen={defaultLibraryOpen}
-        family="training"
-        id="program-library"
-        title="Программы и шаблоны"
-        description="Ваши заготовки и готовые варианты для быстрого запуска."
-      >
-        {templates.isLoading ? (
-          <LoadingState />
-        ) : templates.error ? (
-          <ErrorState message={(templates.error as Error).message} />
-        ) : !ownTemplates.length && !readyTemplates.length ? (
-          <EmptyState title="Программ пока нет" text="Создайте первую программу в конструкторе." />
-        ) : (
-          <div className="program-library top-gap">
-            {!!ownTemplates.length && (
-              <section className="program-library__group" aria-labelledby="own-programs-title">
-                <div>
-                  <h3 id="own-programs-title">Мои программы</h3>
-                  <span>{ownTemplates.length}</span>
-                </div>
-                <div className="program-template-grid">{ownTemplates.map(renderTemplate)}</div>
-              </section>
-            )}
-            {!!readyTemplates.length && (
-              <section className="program-library__group" aria-labelledby="ready-programs-title">
-                <div>
-                  <h3 id="ready-programs-title">Готовые шаблоны</h3>
-                  <span>{readyTemplates.length}</span>
-                </div>
-                <div className="program-template-grid">{readyTemplates.map(renderTemplate)}</div>
-              </section>
-            )}
-          </div>
-        )}
-        {!!hidden.data?.length && (
-          <details className="compact-disclosure top-gap">
-            <summary>
-              <span>Скрытые примеры программ ({hidden.data.length})</span>
-              <DisclosureIcon />
-            </summary>
-            <div className="list-grid top-gap">
-              {hidden.data.map((item) => (
-                <article className="list-row" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <button
-                    className="secondary"
-                    onClick={() =>
-                      mutation.mutate({
-                        path: `/api/v1/programs/templates/${item.id}/restore`,
-                        method: 'POST',
-                      })
-                    }
+      {mode === 'full' && (
+        <>
+          {children}
+          <ProgramImportPanel />
+          <ProgramRecommendation
+            open={recommendationOpen}
+            onOpenChange={setRecommendationOpen}
+            onPreview={setSelectedExample}
+            onEditCopy={editCopy}
+          />
+          <Card
+            defaultOpen={defaultLibraryOpen}
+            family="training"
+            id="program-library"
+            title="Программы и шаблоны"
+            description="Ваши заготовки и готовые варианты для быстрого запуска."
+          >
+            {templates.isLoading ? (
+              <LoadingState />
+            ) : templates.error ? (
+              <ErrorState message={(templates.error as Error).message} />
+            ) : !ownTemplates.length && !readyTemplates.length ? (
+              <EmptyState
+                title="Программ пока нет"
+                text="Создайте первую программу в конструкторе."
+              />
+            ) : (
+              <div className="program-library top-gap">
+                {!!ownTemplates.length && (
+                  <section className="program-library__group" aria-labelledby="own-programs-title">
+                    <div>
+                      <h3 id="own-programs-title">Мои программы</h3>
+                      <span>{ownTemplates.length}</span>
+                    </div>
+                    <div className="program-template-grid">{ownTemplates.map(renderTemplate)}</div>
+                  </section>
+                )}
+                {!!readyTemplates.length && (
+                  <section
+                    className="program-library__group"
+                    aria-labelledby="ready-programs-title"
                   >
-                    Восстановить
-                  </button>
-                </article>
-              ))}
-            </div>
-          </details>
-        )}
-      </Card>
+                    <div>
+                      <h3 id="ready-programs-title">Готовые шаблоны</h3>
+                      <span>{readyTemplates.length}</span>
+                    </div>
+                    <div className="program-template-grid">
+                      {readyTemplates.map(renderTemplate)}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+            {!!hidden.data?.length && (
+              <details className="compact-disclosure top-gap">
+                <summary>
+                  <span>Скрытые примеры программ ({hidden.data.length})</span>
+                  <DisclosureIcon />
+                </summary>
+                <div className="list-grid top-gap">
+                  {hidden.data.map((item) => (
+                    <article className="list-row" key={item.id}>
+                      <strong>{item.title}</strong>
+                      <button
+                        className="secondary"
+                        onClick={() =>
+                          mutation.mutate({
+                            path: `/api/v1/programs/templates/${item.id}/restore`,
+                            method: 'POST',
+                          })
+                        }
+                      >
+                        Восстановить
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </details>
+            )}
+          </Card>
+        </>
+      )}
       {selectedExample && (
         <div
           className="modal program-example-modal"

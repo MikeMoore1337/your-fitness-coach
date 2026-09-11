@@ -1,14 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { nutritionDaySummary, openDetailsByHeading as openCard } from './fixtures/locators';
+import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 
-type AppDestination = 'Сегодня' | 'Программа' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
+type AppDestination = 'Сегодня' | 'План' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
 
 async function openAppDestination(page: Page, destination: AppDestination) {
-  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
+  const mainNavigation = page.getByRole('navigation', { name: 'Основная навигация' });
+  await expect(mainNavigation).toBeVisible();
   const desktopLabel = destination === 'Профиль' ? 'Профиль и настройки' : destination;
   const mobileLabel = destination === 'Профиль' ? 'Профиль и настройки' : destination;
-  const directLink = page.getByRole('link', { name: desktopLabel, exact: true });
+  const directLink = mainNavigation.getByRole('link', { name: desktopLabel, exact: true });
   for (let index = 0; index < (await directLink.count()); index += 1) {
     const candidate = directLink.nth(index);
     if (await candidate.isVisible()) {
@@ -2270,7 +2271,14 @@ test('training preferences сохраняют Mobile Web/TMA композици�
     await page.screenshot({
       path: `../.artifacts/task-54-training-preferences/${current.surface}-${current.width}x${current.height}-${current.theme}.png`,
     });
-    await openAppDestination(page, 'Программа');
+    await openAppDestination(page, 'План');
+    const planManagementLink = page.getByRole('link', {
+      name: 'Управление программой',
+      exact: true,
+    });
+    await expect(planManagementLink).toBeVisible();
+    await planManagementLink.click();
+    await expect(page).toHaveURL('/app?section=programs&view=manage');
     await page.getByRole('button', { name: 'Подобрать другую' }).click();
     const wizard = page.getByRole('dialog', { name: 'Цель' });
     await expect(wizard).toBeVisible();
@@ -2588,8 +2596,9 @@ test('поля адаптируются к разным iPhone, а пример 
   );
 
   await openAppDestination(page, 'Питание');
-  await expect(nutritionDaySummary(page)).toHaveCount(1);
-  await expect(nutritionDaySummary(page)).toBeVisible();
+  const nutritionDiary = page.locator('.nutrition-day-summary');
+  await expect(nutritionDiary).toHaveCount(1);
+  await expect(nutritionDiary).toBeVisible();
   expect(
     await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
@@ -2627,8 +2636,15 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(search).toHaveValue('Тяга');
   await expect(page.getByText('Тяга блока', { exact: true })).toBeVisible();
 
-  await openAppDestination(page, 'Программа');
+  await openAppDestination(page, 'План');
   await expect(page.getByRole('heading', { name: 'Текущий план от тренера' })).toBeVisible();
+  const planManagementLink = page.getByRole('link', {
+    name: 'Управление программой',
+    exact: true,
+  });
+  await expect(planManagementLink).toBeVisible();
+  await planManagementLink.click();
+  await expect(page).toHaveURL('/app?section=programs&view=manage');
   await expect(page.getByText('Назначил тренер Тренер Анна')).toBeVisible();
   await page.getByText('Все этапы и изменения', { exact: true }).click();
   await expect(page.getByText('Тренировочные блоки ещё не настроены')).toBeVisible();
@@ -2685,7 +2701,15 @@ test('мастер подбора сохраняет ответы и ведёт 
   await mockApi(page);
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
-  await openAppDestination(page, 'Программа');
+  await openAppDestination(page, 'План');
+
+  const planManagementLink = page.getByRole('link', {
+    name: 'Управление программой',
+    exact: true,
+  });
+  await expect(planManagementLink).toBeVisible();
+  await planManagementLink.click();
+  await expect(page).toHaveURL('/app?section=programs&view=manage');
 
   const launcher = page.getByRole('button', { name: 'Подобрать другую' });
   await launcher.click();
@@ -2776,7 +2800,8 @@ test('клиент собирает и переупорядочивает лич
   await mockApi(page);
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
-  await openAppDestination(page, 'Программа');
+  await openAppDestination(page, 'План');
+  await page.goto('/app?section=programs&view=manage');
 
   const builder = page.locator('#program-builder');
   await expect(builder.getByRole('heading', { name: 'Создать свою программу' })).toBeVisible();

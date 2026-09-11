@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { ApiSchemas, ProgressSummary, TrainingAnalytics } from '../../shared/api/types';
@@ -20,7 +20,6 @@ import {
 } from '../../shared/ui/common';
 import { NutritionPeriodReport, type ControlledNutritionPeriod } from './NutritionReport';
 import { Icon } from '../../shared/ui/Icon';
-import { AiCoachEntry } from '../ai/AiCoachExperience';
 import { CardioHistory } from '../cardio/CardioLogging';
 import {
   nutritionPeriodForProgress,
@@ -1018,9 +1017,14 @@ function useTrainingAnalytics(selection: ProgressSelection) {
 }
 
 export function ProgressExperience({
+  focusMeasurements = false,
   measurementDiary,
   timeZone,
-}: { measurementDiary?: ReactNode; timeZone?: string | null } = {}) {
+}: {
+  focusMeasurements?: boolean;
+  measurementDiary?: ReactNode;
+  timeZone?: string | null;
+} = {}) {
   const { navigate, search } = useNavigation();
   const selection = useMemo(() => parseProgressSelection(search), [search]);
   const resolvedTimeZone = timeZone ?? detectedTimeZone();
@@ -1062,6 +1066,14 @@ export function ProgressExperience({
     : false;
   const isSummaryUpdating = Boolean(summary.data && !summaryMatchesSelection);
 
+  useEffect(() => {
+    if (!focusMeasurements || !summary.data) return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('measurement-diary')?.scrollIntoView({ block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusMeasurements, summary.data]);
+
   return (
     <div className="progress-experience progress-experience--bento">
       <header className="progress-hero">
@@ -1090,8 +1102,6 @@ export function ProgressExperience({
           </AppLink>
         </div>
       </header>
-
-      <AiCoachEntry entryPoint="progress" />
 
       {summary.isLoading ? (
         <LoadingState label="Собираем динамику за период…" />
@@ -1122,10 +1132,12 @@ export function ProgressExperience({
               weightChartInOverview
             />
             <NutritionSection summary={summary.data} />
-            <NutritionPeriodReport
-              controlledPeriod={controlledNutritionPeriod}
-              showSelector={false}
-            />
+            <div id="progress-reports">
+              <NutritionPeriodReport
+                controlledPeriod={controlledNutritionPeriod}
+                showSelector={false}
+              />
+            </div>
             <AdherenceSection summary={summary.data} />
           </div>
         </>

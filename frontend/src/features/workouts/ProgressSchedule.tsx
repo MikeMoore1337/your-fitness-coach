@@ -110,7 +110,7 @@ function ScheduleRow({
   );
 }
 
-function SchedulePanel({
+export function SchedulePanel({
   timeZone,
   focusedWorkoutId,
   focusedCommentId,

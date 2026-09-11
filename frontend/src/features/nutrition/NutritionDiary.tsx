@@ -730,11 +730,13 @@ export function NutritionDiary({
   timeZone,
   initialDate,
   initialMealType,
+  initialFoodQuickAdd = false,
   initialHydrationOpen = false,
 }: {
   timeZone?: string | null;
   initialDate?: string;
   initialMealType?: MealType;
+  initialFoodQuickAdd?: boolean;
   initialHydrationOpen?: boolean;
 }) {
   const today = dateInputValue(new Date(), timeZone || undefined);
@@ -742,9 +744,12 @@ export function NutritionDiary({
   const [addingTo, setAddingTo] = useState<{
     mealType: MealType;
     initialView?: 'browse' | 'quick-add';
-  } | null>(() =>
-    initialMealType ? { mealType: initialMealType, initialView: 'quick-add' } : null,
-  );
+  } | null>(() => {
+    if (initialMealType) return { mealType: initialMealType, initialView: 'quick-add' };
+    return initialFoodQuickAdd
+      ? { mealType: defaultMealType(timeZone), initialView: 'quick-add' }
+      : null;
+  });
   const [copySubject, setCopySubject] = useState<CopySubject | null>(null);
   const [lastAddedEntryId, setLastAddedEntryId] = useState<number | null>(null);
   const [mealExpansion, setMealExpansion] = useState<Partial<Record<MealType, boolean>>>({});

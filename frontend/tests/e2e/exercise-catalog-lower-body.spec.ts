@@ -265,7 +265,7 @@ test('lower-body aliases, compact guide and program selection work on small view
     .click();
 
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/app?section=programs');
+  await page.goto('/app?section=programs&view=manage');
   const builder = page.locator('#program-builder');
   const picker = builder.getByRole('combobox', { name: 'Поиск упражнения' }).first();
   await picker.fill('жим ногами на блинах');
@@ -343,7 +343,7 @@ test('lower-body catalog and picker keep Mobile Web and desktop parity', async (
   await page.emulateMedia({ colorScheme: 'light' });
 
   await page.setViewportSize({ width: 360, height: 800 });
-  await page.goto('/app?section=programs');
+  await page.goto('/app?section=programs&view=manage');
   const picker = page
     .locator('#program-builder')
     .getByRole('combobox', { name: 'Поиск упражнения' })

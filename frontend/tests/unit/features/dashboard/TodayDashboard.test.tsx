@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../../src/shared/api/client';
 import type { FoodDiaryDay, ProgressSummary, Workout } from '../../../../src/shared/api/types';
@@ -12,6 +13,7 @@ import {
 } from '../../../../src/features/dashboard/TodayDashboard';
 
 const apiMock = vi.hoisted(() => vi.fn());
+const navigateMock = vi.hoisted(() => vi.fn());
 const authState = vi.hoisted(() => ({
   user: {
     id: 7,
@@ -57,11 +59,17 @@ vi.mock('../../../../src/shared/navigation/router', () => ({
       {children}
     </a>
   ),
+  useNavigation: () => ({ navigate: navigateMock, search: window.location.search }),
 }));
 
 vi.mock('../../../../src/features/workouts/TodayWorkout', () => ({
   TodayWorkout: () => <div>Активная тренировка открыта</div>,
 }));
+
+Object.defineProperty(Element.prototype, 'scrollIntoView', {
+  configurable: true,
+  value: vi.fn(),
+});
 
 const plannedWorkout = {
   id: 42,
@@ -249,6 +257,18 @@ function renderDashboard() {
   );
 }
 
+function CardioRequestHarness() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)}>
+        Открыть cardio request
+      </button>
+      <TodayDashboard initialCardioOpen={open} />
+    </>
+  );
+}
+
 function auxiliaryResponse(
   path: string,
   options: {
@@ -341,7 +361,8 @@ describe('TodayDashboard', () => {
     expect(screen.getByRole('button', { name: 'Начать тренировку' })).toBeInTheDocument();
     expect(screen.getByText('Записей за день пока нет')).toBeInTheDocument();
     expect(screen.getByText(/последний вес 68,4 кг/)).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Добавить отметку' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Добавить отметку' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^Кардио$/ })).not.toBeInTheDocument();
     expect(screen.queryByText('84%')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Начать тренировку' }));
@@ -350,6 +371,26 @@ describe('TodayDashboard', () => {
       expect(apiMock).toHaveBeenCalledWith('/api/v1/workouts/42/start', { method: 'POST' }),
     );
     expect(await screen.findByText('Активная тренировка открыта')).toBeInTheDocument();
+  });
+
+  it('opens cardio when the quick-action intent arrives while Today is already mounted', async () => {
+    useAvailableData();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
+          <CardioRequestHarness />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Силовая база' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^Кардио$/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть cardio request' }));
+
+    expect(await screen.findByRole('heading', { name: /^Кардио$/ })).toBeInTheDocument();
   });
 
   it('announces the nutrition loading state from the live status element', async () => {
@@ -466,6 +507,8 @@ describe('TodayDashboard', () => {
       '/app?section=nutrition',
     );
     expect(screen.getByRole('button', { name: 'Добавить активность' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Сон и настроение' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /^Кардио$/ })).not.toBeInTheDocument();
   });
 
   it('guides a new user to a program and keeps incomplete profile secondary', async () => {
