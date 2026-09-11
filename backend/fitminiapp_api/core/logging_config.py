@@ -11,6 +11,7 @@ URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
 SAFE_CODE_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,127}\Z")
 SAFE_IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9_.:/-]{1,128}\Z")
 SAFE_REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
+SAFE_REPORT_REVISION_PATTERN = re.compile(r"[0-9a-f]{64}\Z", re.IGNORECASE)
 SAFE_METHOD_PATTERN = re.compile(r"[A-Z]{3,10}\Z")
 SAFE_ROUTE_PATTERN = re.compile(r"(?:/[A-Za-z0-9_./{}:-]{0,255}|unmatched)\Z")
 SAFE_EVENT_NAMES = frozenset(
@@ -254,6 +255,8 @@ class JsonFormatter(logging.Formatter):
             return value if value in SAFE_PROVIDER_NAMES else None
         if field in MODEL_FIELDS:
             return value if SAFE_IDENTIFIER_PATTERN.fullmatch(value) else None
+        if field == "report_revision":
+            return value if SAFE_REPORT_REVISION_PATTERN.fullmatch(value) else None
         if field in CODE_FIELDS:
             return value if SAFE_CODE_PATTERN.fullmatch(value) else None
         return None

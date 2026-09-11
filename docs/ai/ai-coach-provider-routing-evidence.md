@@ -104,9 +104,11 @@ transient provider condition по старому snapshot.
 5. capability/output-validation failures separately from safety refusal and local quota;
 6. no raw prompt/answer/context, user id, memory value, account id or provider payload.
 
-Минимально достаточный window и thresholds не выдумываются этой task: owner должен утвердить
-их вместе с job/cohort и target reliability/cost/latency. До этого текущий route остаётся
-единственным, а `unavailable` — валидным fallback без AI.
+Owner decision от 2026-09-11 утвердил bounded observation window: наблюдать минимум 14
+календарных дней и минимум 100 реальных `ai_coach_generation` запросов. Если за 14 дней
+100 запросов не набралось, наблюдение продолжается до достижения 100 запросов. Искусственный
+production traffic запрещён. До завершения окна текущий route остаётся единственным, а
+`unavailable` — валидным fallback без AI.
 
 ## Owner checkpoint
 

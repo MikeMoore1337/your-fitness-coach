@@ -116,7 +116,7 @@ def test_json_formatter_preserves_bounded_ai_coach_metadata_without_content() ->
         "total_tokens": 30,
         "cost_microunits": 0,
         "report_version": "progress-report-v1",
-        "report_revision": "report:0123456789abcdef",
+        "report_revision": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     }
     for key, value in fields.items():
         setattr(record, key, value)
