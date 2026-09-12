@@ -38,7 +38,7 @@ describe('LandingPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('follows the system dark theme and lets the visitor switch it', () => {
+  it('switches the page theme while keeping the dark-header brand readable', async () => {
     vi.stubGlobal(
       'matchMedia',
       vi.fn().mockReturnValue({
@@ -51,9 +51,18 @@ describe('LandingPage', () => {
     const { container } = renderLanding();
 
     expect(container.firstChild).toHaveClass('public-shell--dark');
+    expect(container.querySelector('.public-shell__logo')).toHaveAttribute(
+      'src',
+      '/assets/brand/yfc-mark-dark.svg',
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Включить светлую тему' }));
     expect(container.firstChild).toHaveClass('public-shell--light');
     expect(localStorage.getItem('app-theme')).toBe('light');
+    await waitFor(() => expect(document.documentElement.dataset.colorScheme).toBe('light'));
+    expect(container.querySelector('.public-shell__logo')).toHaveAttribute(
+      'src',
+      '/assets/brand/yfc-mark-dark.svg',
+    );
   });
 
   it('renders the approved photography and scroll story without manual tabs', () => {

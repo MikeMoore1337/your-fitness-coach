@@ -20,6 +20,17 @@ async function assertHeaderMark(page: Page, surface: 'light' | 'dark', size: num
   await expect(mark).toHaveAttribute('alt', '');
 }
 
+async function assertTransparentLoginHeader(page: Page) {
+  const header = page.locator('.auth-public-shell .public-shell__header');
+  await expect(header).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(header).toHaveCSS('background-image', 'none');
+  await expect(header).toHaveCSS('box-shadow', 'none');
+  await expect(header).toHaveCSS('border-top-width', '0px');
+  await expect(header).toHaveCSS('border-right-width', '0px');
+  await expect(header).toHaveCSS('border-bottom-width', '0px');
+  await expect(header).toHaveCSS('border-left-width', '0px');
+}
+
 test('canonical brand assets render on light and dark public surfaces', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const viewport of [
@@ -33,7 +44,8 @@ test('canonical brand assets render on light and dark public surfaces', async ({
       window.localStorage.removeItem('landing-theme');
     });
     await page.reload();
-    await assertHeaderMark(page, 'light', 44);
+    // The landing header stays on the dark surface even when the page theme is light.
+    await assertHeaderMark(page, 'dark', 44);
     const wordmark = page.locator('.landing-header .yfc-lockup__wordmark');
     await expect(wordmark).toBeVisible();
     const brandBounds = await page.locator('.public-shell__brand').boundingBox();
@@ -57,6 +69,7 @@ test('canonical brand assets render on light and dark public surfaces', async ({
     }
 
     await page.goto('/login');
+    await assertTransparentLoginHeader(page);
     if (viewport.name === 'mobile') {
       await assertHeaderMark(page, 'dark', 40);
       await expect(page.locator('.landing-header .yfc-lockup__wordmark')).toBeVisible();

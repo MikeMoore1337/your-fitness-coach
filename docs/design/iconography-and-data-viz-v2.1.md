@@ -10,7 +10,7 @@ Task 239 унифицирует функциональную иконограф�
 
 - Канонический renderer: `frontend/src/shared/ui/Icon.tsx`.
 - Статическая JSX-геометрия: `frontend/src/shared/ui/iconGlyphs.tsx`. HTML/SVG из внешних
-  источников не интерпретируется. Все 74 семантических имени используют Lucide без npm dependency.
+  источников не интерпретируется. Основной набор — Lucide; общая гантель — Phosphor Regular, без npm dependency.
 - Сетка: `24×24`; поддерживаемые optical sizes: `16`, `20`, `24`.
 - Иллюстративные экземпляры того же glyph на landing сохраняют размеры `56`, `80`, `110`;
   функциональные controls не используют эти размеры. Произвольное масштабирование отдельных nav icons запрещено.
@@ -21,8 +21,8 @@ Task 239 унифицирует функциональную иконограф�
   `pointer-events: none`; desktop date/time и нативные popup pickers остаются browser controls.
 - Default/active/hover/focus/disabled/destructive/unavailable наследуют цвет и состояние control.
   Иконка не меняет accessible name, tab order, обработчики, permissions или hit area.
-  Filled допустим только для явного `star-filled`; status dots не являются отдельным filled-семейством.
-- Все функциональные glyphs используют `currentColor`, round cap/join и общий stroke `1.8`.
+  Сплошная заливка допустима для `star-filled`; контур гантели Phosphor также описан залитым path с внутренними просветами.
+- Все функциональные glyphs используют `currentColor`. Lucide использует round cap/join и общий stroke `1.8`; гантель сохраняет оригинальную толщину Phosphor Regular.
 - Базовые actions, navigation, confidence, statuses, product и `WeekStrip` имеют уникальные
   семантические имена. Одинаковая семантика не получает page-local SVG, Unicode или CSS substitute.
 - `nav-exercise-catalog` использует `library-big`: каталог отделён от гантели плана и тренировок.
@@ -65,6 +65,17 @@ Revision 3 требует owner visual approval до merge/release. Статус
 `clipboard-check`, `clipboard-pen-line`, `clipboard-minus`; намеренное голодание — `circle-pause`.
 Уверенность в данных: `circle-question-mark`, `circle-dashed`, `rotate-ccw-clock`, `shield-check`.
 Названия и подписи статусов остаются прежними; цвет не является единственным различием.
+
+### Выбранная гантель Phosphor Regular
+
+После проверки production владелец выбрал вариант B из сравнения: горизонтальный
+[Phosphor barbell Regular](https://github.com/phosphor-icons/core/blob/main/assets/regular/barbell.svg).
+Он заменяет общий glyph `exercise` и aliases `nav-plan` / `week-strength`.
+Исходная сетка 256×256 масштабируется ровно в 24×24 (24/256), без дополнительного уменьшения.
+Внешние размеры Icon, цвета, подписи и accessibility сохраняются. Исходный path описывает контур
+через fill; stroke отключён внутри glyph, чтобы не утолщать выбранный вариант.
+Лицензия MIT сохранена в `frontend/public/licenses/phosphor-LICENSE.txt`.
+Новая npm dependency не добавляется. Локальная правка не означает разрешение на production.
 
 ## `WeekStrip`
 

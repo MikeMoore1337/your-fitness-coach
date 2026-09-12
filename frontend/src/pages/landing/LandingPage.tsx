@@ -221,6 +221,7 @@ export default function LandingPage() {
 
   return (
     <PublicShell
+      headerBrandSurface="dark"
       className="landing-page"
       homeHref="#top"
       skipTarget="landing-content"
