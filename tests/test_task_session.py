@@ -856,7 +856,7 @@ def test_codex_review_reuses_one_request_for_the_same_sha(
     assert f"head={head_sha}" in github.created_comments[0][1]
 
 
-def test_codex_review_reuses_external_running_summary_without_duplicate_request(
+def test_codex_review_does_not_reuse_security_only_summary_as_code_review(
     repository: tuple[Path, Any],
 ) -> None:
     controller, github, _, head_sha = _codex_review_fixture(repository)
@@ -873,20 +873,11 @@ def test_codex_review_reuses_external_running_summary_without_duplicate_request(
 
     result = controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
 
-    assert result["status"] == "PENDING"
-    assert result["reused"] is True
+    assert result["status"] == "REQUESTED"
+    assert result["reused"] is False
     assert result["review_budget"] == {"used": 1, "max": 2, "remaining": 1}
-    assert github.created_comments == []
-
-    github.comments[219][0]["body"] = (
-        "<!-- codex-security-review:v1 "
-        f'{{"headSha":"{head_sha}","pullRequestNumber":219,"status":"completed"}} -->'
-    )
-    completed = controller.validate_codex_review(pr_number=219, head_sha=head_sha)
-
-    assert completed["status"] == "CLEAN"
-    assert completed["merge_allowed"] is True
-    assert github.created_comments == []
+    assert len(github.created_comments) == 1
+    assert "@codex review" in github.created_comments[0][1]
 
 
 def test_codex_review_uses_external_code_review_row_for_current_head(
