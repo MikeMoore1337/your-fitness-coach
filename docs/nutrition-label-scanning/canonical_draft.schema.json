@@ -61,7 +61,7 @@
         }
       ]
     },
-    "source_facts": { "$ref": "#/$defs/facts" },
+    "source_facts": { "$ref": "#/$defs/source_facts" },
     "normalized_facts": { "$ref": "#/$defs/facts" },
     "derived_fields": { "$ref": "#/$defs/derived" },
     "displayed_daily_value_percent": { "$ref": "#/$defs/daily_values" },
@@ -141,6 +141,130 @@
           "then": { "properties": { "unit": { "const": "kJ" } } }
         }
       ]
+    },
+    "source_fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit", "basis_ref", "column_ref"],
+      "properties": {
+        "value": { "type": "number", "minimum": 0 },
+        "unit": { "enum": ["g", "mg", "kcal", "kJ"] },
+        "basis_ref": {
+          "enum": ["per_100_g", "per_100_ml", "per_serving"]
+        },
+        "column_ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      }
+    },
+    "source_fact_g": {
+      "allOf": [
+        { "$ref": "#/$defs/source_fact" },
+        { "properties": { "unit": { "const": "g" } } }
+      ]
+    },
+    "source_fact_mg": {
+      "allOf": [
+        { "$ref": "#/$defs/source_fact" },
+        { "properties": { "unit": { "const": "mg" } } }
+      ]
+    },
+    "source_fact_kcal": {
+      "allOf": [
+        { "$ref": "#/$defs/source_fact" },
+        { "properties": { "unit": { "const": "kcal" } } }
+      ]
+    },
+    "source_fact_kJ": {
+      "allOf": [
+        { "$ref": "#/$defs/source_fact" },
+        { "properties": { "unit": { "const": "kJ" } } }
+      ]
+    },
+    "source_fact_list_g": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/source_fact_g" }
+        }
+      ]
+    },
+    "source_fact_list_mg": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/source_fact_mg" }
+        }
+      ]
+    },
+    "source_fact_list_kcal": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/source_fact_kcal" }
+        }
+      ]
+    },
+    "source_fact_list_kJ": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/source_fact_kJ" }
+        }
+      ]
+    },
+    "source_facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy_kcal",
+        "energy_kj",
+        "protein_g",
+        "fat_g",
+        "saturated_fat_g",
+        "trans_fat_g",
+        "carbohydrate_g",
+        "sugars_g",
+        "added_sugars_g",
+        "fiber_g",
+        "salt_g",
+        "sodium_mg",
+        "cholesterol_mg"
+      ],
+      "properties": {
+        "energy_kcal": { "$ref": "#/$defs/source_fact_list_kcal" },
+        "energy_kj": { "$ref": "#/$defs/source_fact_list_kJ" },
+        "protein_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "fat_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "saturated_fat_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "trans_fat_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "carbohydrate_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "sugars_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "added_sugars_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "fiber_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "salt_g": { "$ref": "#/$defs/source_fact_list_g" },
+        "sodium_mg": { "$ref": "#/$defs/source_fact_list_mg" },
+        "cholesterol_mg": { "$ref": "#/$defs/source_fact_list_mg" }
+      }
     },
     "facts": {
       "type": "object",

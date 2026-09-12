@@ -55,6 +55,8 @@ EXPECTED_FACT_UNITS = {
     "sodium_mg": "mg",
     "cholesterol_mg": "mg",
 }
+SOURCE_FACT_MAX_ITEMS = 8
+COLUMN_REF_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 BASIS_VALUES = {"per_100_g", "per_100_ml", "per_serving", "ambiguous"}
 EVIDENCE_VALUES = {"read", "ambiguous", "unreadable", "absent", "derived"}
 WARNING_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
@@ -135,13 +137,18 @@ def _finite_number(
             errors.append(f"{label} must be {operator} {minimum}")
 
 
-def _fact(value: object, label: str, errors: list[str], *, field: str) -> None:
+def _fact(
+    value: object, label: str, errors: list[str], *, field: str, source: bool = False
+) -> None:
     if value is None:
         return
     fact = _mapping(value, label, errors)
     if fact is None:
         return
-    _exact_keys(fact, {"value", "unit", "basis_ref"}, label, errors)
+    expected_keys = {"value", "unit", "basis_ref"}
+    if source:
+        expected_keys.add("column_ref")
+    _exact_keys(fact, expected_keys, label, errors)
     _finite_number(fact.get("value"), f"{label}.value", errors, minimum=0)
     unit = fact.get("unit")
     if not isinstance(unit, str) or unit not in FACT_UNITS:
@@ -151,6 +158,29 @@ def _fact(value: object, label: str, errors: list[str], *, field: str) -> None:
     basis_ref = fact.get("basis_ref")
     if not isinstance(basis_ref, str) or basis_ref not in BASIS_VALUES - {"ambiguous"}:
         errors.append(f"{label}.basis_ref must identify a known basis")
+
+
+def _source_fact_list(value: object, label: str, errors: list[str], *, field: str) -> None:
+    if value is None:
+        return
+    if not isinstance(value, list) or not value:
+        errors.append(f"{label} must be a non-empty source fact list or null")
+        return
+    if len(value) > SOURCE_FACT_MAX_ITEMS:
+        errors.append(f"{label} must contain at most {SOURCE_FACT_MAX_ITEMS} source columns")
+    column_refs: set[str] = set()
+    for index, item in enumerate(value):
+        item_label = f"{label}[{index}]"
+        _fact(item, item_label, errors, field=field, source=True)
+        if not isinstance(item, dict):
+            continue
+        column_ref = item.get("column_ref")
+        if not isinstance(column_ref, str) or not COLUMN_REF_PATTERN.fullmatch(column_ref):
+            errors.append(f"{item_label}.column_ref must be a bounded safe identifier")
+        elif column_ref in column_refs:
+            errors.append(f"{label} contains duplicate column_ref={column_ref}")
+        else:
+            column_refs.add(column_ref)
 
 
 def _derived_fact(value: object, label: str, errors: list[str], *, field: str) -> None:
@@ -194,6 +224,18 @@ def _validate_field_map(
     else:
         for field in NUTRIENT_FIELDS:
             _derived_fact(value.get(field), f"{name}.{field}", errors, field=field)
+    return value
+
+
+def _validate_source_field_map(
+    draft: dict[str, object], name: str, errors: list[str]
+) -> dict[str, object] | None:
+    value = _mapping(draft.get(name), name, errors)
+    if value is None:
+        return None
+    _exact_keys(value, set(NUTRIENT_FIELDS), name, errors)
+    for field in NUTRIENT_FIELDS:
+        _source_fact_list(value.get(field), f"{name}.{field}", errors, field=field)
     return value
 
 
@@ -295,6 +337,47 @@ def _validate_schema_document(schema: dict[str, object]) -> list[str]:
         for unit in sorted(set(EXPECTED_FACT_UNITS.values())):
             if not isinstance(definitions.get(f"{prefix}_{unit}"), dict):
                 errors.append(f"$defs.{prefix}_{unit} must define a unit-scoped fact")
+    for suffix in ("g", "mg", "kcal", "kJ"):
+        if not isinstance(definitions.get(f"source_fact_{suffix}"), dict):
+            errors.append(f"$defs.source_fact_{suffix} must define a unit-scoped source fact")
+        if not isinstance(definitions.get(f"source_fact_list_{suffix}"), dict):
+            errors.append(f"$defs.source_fact_list_{suffix} must define a source-column list")
+    source_facts = _mapping(definitions.get("source_facts"), "$defs.source_facts", errors)
+    source_fact_properties = _mapping(
+        source_facts.get("properties") if source_facts else None,
+        "$defs.source_facts.properties",
+        errors,
+    )
+    if source_facts is None or source_facts.get("additionalProperties") is not False:
+        errors.append("$defs.source_facts must be closed")
+    if source_fact_properties is None or set(source_fact_properties) != set(NUTRIENT_FIELDS):
+        errors.append("$defs.source_facts properties must match the fixed nutrient vocabulary")
+    elif any(
+        not isinstance(source_fact_properties[field], dict)
+        or source_fact_properties[field].get("$ref")
+        != f"#/$defs/source_fact_list_{EXPECTED_FACT_UNITS[field]}"
+        for field in NUTRIENT_FIELDS
+    ):
+        errors.append("$defs.source_facts properties must enforce source column units")
+    source_fact_definition = _mapping(definitions.get("source_fact"), "$defs.source_fact", errors)
+    if source_fact_definition is not None:
+        if set(source_fact_definition.get("required", [])) != {
+            "value",
+            "unit",
+            "basis_ref",
+            "column_ref",
+        }:
+            errors.append("$defs.source_fact required fields are unexpected")
+        source_fact_properties = _mapping(
+            source_fact_definition.get("properties"), "$defs.source_fact.properties", errors
+        )
+        if source_fact_properties is None or set(source_fact_properties) != {
+            "value",
+            "unit",
+            "basis_ref",
+            "column_ref",
+        }:
+            errors.append("$defs.source_fact properties must include column_ref")
     facts = _mapping(definitions.get("facts"), "$defs.facts", errors)
     if facts is None or facts.get("additionalProperties") is not False:
         errors.append("$defs.facts must be closed")
@@ -386,7 +469,7 @@ def validate_draft(draft: object, schema: dict[str, object]) -> list[str]:
         )
     _validate_amount(value.get("package_amount"), "package_amount", errors)
 
-    source_facts = _validate_field_map(value, "source_facts", _fact, errors)
+    source_facts = _validate_source_field_map(value, "source_facts", errors)
     normalized_facts = _validate_field_map(value, "normalized_facts", _fact, errors)
     derived_fields = _validate_field_map(value, "derived_fields", _derived_fact, errors)
     daily_values = _validate_daily_values(value, errors)
@@ -474,7 +557,7 @@ def _synthetic_valid_draft() -> dict[str, object]:
     }
     for field, (numeric_value, unit) in values.items():
         fact = {"value": numeric_value, "unit": unit, "basis_ref": "per_100_g"}
-        source[field] = fact
+        source[field] = [{**fact, "column_ref": "per_100_g"}]
         normalized[field] = copy.deepcopy(fact)
         evidence[field] = "read"
         confidence[field] = None
@@ -533,9 +616,35 @@ def run_self_check(schema: dict[str, object]) -> None:
 
     wrong_source_unit = copy.deepcopy(valid)
     wrong_source_facts = cast(dict[str, object], wrong_source_unit["source_facts"])
-    wrong_source_protein = cast(dict[str, object], wrong_source_facts["protein_g"])
+    wrong_source_protein_items = cast(list[object], wrong_source_facts["protein_g"])
+    wrong_source_protein = cast(dict[str, object], wrong_source_protein_items[0])
     wrong_source_protein["unit"] = "kcal"
     _expect_rejected("wrong source nutrient unit", wrong_source_unit, schema)
+
+    multi_column = copy.deepcopy(valid)
+    multi_column_source = cast(dict[str, object], multi_column["source_facts"])
+    multi_column_source["protein_g"] = [
+        {
+            "value": 10.0,
+            "unit": "g",
+            "basis_ref": "per_100_g",
+            "column_ref": "per_100_g",
+        },
+        {
+            "value": 3.0,
+            "unit": "g",
+            "basis_ref": "per_serving",
+            "column_ref": "per_serving",
+        },
+    ]
+    _expect_valid("column-addressable source facts", multi_column, schema)
+
+    duplicate_column = copy.deepcopy(multi_column)
+    duplicate_source = cast(dict[str, object], duplicate_column["source_facts"])
+    duplicate_items = cast(list[object], duplicate_source["protein_g"])
+    duplicate_second = cast(dict[str, object], duplicate_items[1])
+    duplicate_second["column_ref"] = "per_100_g"
+    _expect_rejected("duplicate source column ref", duplicate_column, schema)
 
     wrong_normalized_unit = copy.deepcopy(valid)
     wrong_normalized_facts = cast(dict[str, object], wrong_normalized_unit["normalized_facts"])
@@ -561,20 +670,29 @@ def run_self_check(schema: dict[str, object]) -> None:
 
     percent_as_mass = copy.deepcopy(valid)
     percent_facts = cast(dict[str, object], percent_as_mass["source_facts"])
-    sodium = cast(dict[str, object], percent_facts["sodium_mg"])
+    percent_items = cast(list[object], percent_facts["sodium_mg"])
+    sodium = cast(dict[str, object], percent_items[0])
     sodium["unit"] = "%DV"
     _expect_rejected("percent daily value presented as mass", percent_as_mass, schema)
 
     unreadable_with_value = copy.deepcopy(valid)
     unreadable_facts = cast(dict[str, object], unreadable_with_value["source_facts"])
-    unreadable_facts["fiber_g"] = {"value": 3.0, "unit": "g", "basis_ref": "per_100_g"}
+    unreadable_facts["fiber_g"] = [
+        {
+            "value": 3.0,
+            "unit": "g",
+            "basis_ref": "per_100_g",
+            "column_ref": "per_100_g",
+        }
+    ]
     unreadable_evidence = cast(dict[str, object], unreadable_with_value["field_evidence"])
     unreadable_evidence["fiber_g"] = "unreadable"
     _expect_rejected("unreadable field hallucinated as a value", unreadable_with_value, schema)
 
     ambiguous_basis = copy.deepcopy(valid)
     ambiguous_facts = cast(dict[str, object], ambiguous_basis["source_facts"])
-    ambiguous_protein = cast(dict[str, object], ambiguous_facts["protein_g"])
+    ambiguous_items = cast(list[object], ambiguous_facts["protein_g"])
+    ambiguous_protein = cast(dict[str, object], ambiguous_items[0])
     ambiguous_protein["basis_ref"] = "ambiguous"
     _expect_rejected("ambiguous fact basis", ambiguous_basis, schema)
 

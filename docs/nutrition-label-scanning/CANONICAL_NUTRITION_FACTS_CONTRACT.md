@@ -12,12 +12,16 @@
 
 Каждый nutrient разделяется на три слоя:
 
-1. `source_facts` — что видно на конкретной колонке этикетки: value, unit и `basis_ref`;
+1. `source_facts` — что видно на конкретных колонках этикетки: каждая cell хранится как value,
+   unit, `basis_ref` и безопасный `column_ref`;
 2. `normalized_facts` — детерминированная YFC-нормализация в канонические единицы и basis;
 3. `derived_fields` — только явно помеченный вывод с причиной и списком source fields.
 
 `source_facts` и `normalized_facts` не смешиваются. На одном ответе не разрешается скрыто
-объединять `per 100 g`, `per serving`, `%DV` или соседние колонки.
+объединять `per 100 g`, `per serving`, `%DV` или соседние колонки. Для каждого
+`source_facts[field]` разрешён `null` либо непустой массив source cells (до 8 элементов) с
+уникальным `column_ref`; поэтому одновременно видимые `per 100 g` и `per serving` сохраняются
+раздельно. `normalized_facts[field]` остаётся одной детерминированно выбранной canonical fact.
 
 ## Schema-equivalent поля
 
@@ -33,7 +37,7 @@ strict schema; отсутствие факта выражается `null`, а �
 | `serving_size` | amount + `g`/`ml`; `null`, если mass/volume неизвестны |
 | `servings_per_container` | positive decimal, иначе `null` |
 | `package_amount` | amount + `g`/`ml`, только если явно виден на упаковке |
-| `source_facts[field]` | value + explicit unit + exact source column/basis ref; или `null` |
+| `source_facts[field]` | `null` либо непустой массив `{value, unit, basis_ref, column_ref}`; `column_ref` уникален в пределах field |
 | `normalized_facts[field]` | canonical unit/basis после deterministic validation; или `null` |
 | `derived_fields[field]` | value/reason/source fields только для разрешённого derived fact; иначе `null` |
 | `field_evidence[field]` | `read`, `ambiguous`, `unreadable`, `absent`, `derived` |
