@@ -9,9 +9,13 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import math
 import re
+import struct
+import time
+import zlib
 from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
@@ -39,6 +43,43 @@ FACT_UNITS = {"g", "mg", "kcal", "kJ"}
 BASIS_VALUES = {"per_100_g", "per_100_ml", "per_serving", "ambiguous"}
 EVIDENCE_VALUES = {"read", "ambiguous", "unreadable", "absent", "derived"}
 WARNING_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_IMAGE_PIXELS = 20_000_000
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+LOCKED_CASE_IDS = {
+    "RU-100G-01",
+    "RU-100G-02",
+    "RU-100G-03",
+    "RU-100G-04",
+    "RU-100G-05",
+    "RU-100G-06",
+    "RU-100G-07",
+    "RU-100G-08",
+    "RU-100G-09",
+    "RU-100G-10",
+    "RU-100ML-01",
+    "RU-MIX-01",
+    "EU-100G-01",
+    "EU-100ML-01",
+    "EU-SERV-01",
+    "EU-SERV-02",
+    "EU-OPT-01",
+    "EU-MIX-01",
+    "US-01",
+    "US-02",
+    "US-03",
+    "US-04",
+    "US-05",
+    "US-06",
+    "NEG-01",
+    "NEG-02",
+    "NEG-03",
+    "NEG-04",
+    "NEG-05",
+    "NEG-06",
+    "NEG-07",
+    "NEG-08",
+}
 
 
 def _mapping(value: object, label: str, errors: list[str]) -> dict[str, object] | None:
@@ -395,7 +436,7 @@ def _synthetic_valid_draft() -> dict[str, object]:
         source[field] = fact
         normalized[field] = copy.deepcopy(fact)
         evidence[field] = "read"
-        confidence[field] = 0.99
+        confidence[field] = None
     daily_values["energy_kcal"] = 5.0
     daily_values["sodium_mg"] = 4.0
     return {
@@ -411,7 +452,7 @@ def _synthetic_valid_draft() -> dict[str, object]:
         "derived_fields": derived,
         "displayed_daily_value_percent": daily_values,
         "field_evidence": evidence,
-        "confidence_kind": "calibrated_eval",
+        "confidence_kind": "none",
         "confidence": confidence,
         "warnings": ["user_review_required"],
         "requires_user_review": True,
@@ -469,7 +510,8 @@ def run_self_check(schema: dict[str, object]) -> None:
     _expect_rejected("ambiguous fact basis", ambiguous_basis, schema)
 
     confidence_without_semantics = copy.deepcopy(valid)
-    confidence_without_semantics["confidence_kind"] = "none"
+    confidence_values = cast(dict[str, object], confidence_without_semantics["confidence"])
+    confidence_values["energy_kcal"] = 0.99
     _expect_rejected("undocumented numeric confidence", confidence_without_semantics, schema)
 
     zero_serving = copy.deepcopy(valid)
@@ -486,15 +528,233 @@ def _load_json(path: Path) -> object:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _png_dimensions(payload: bytes) -> tuple[str, int, int]:
+    if len(payload) < 33 or payload[:8] != PNG_SIGNATURE:
+        raise ValueError("invalid PNG signature or truncated header")
+    chunk_length = struct.unpack(">I", payload[8:12])[0]
+    if chunk_length != 13 or payload[12:16] != b"IHDR":
+        raise ValueError("invalid PNG IHDR")
+    chunk_end = 16 + chunk_length
+    if len(payload) < chunk_end + 4:
+        raise ValueError("truncated PNG IHDR")
+    width, height = struct.unpack(">II", payload[16:24])
+    if width <= 0 or height <= 0:
+        raise ValueError("PNG dimensions must be positive")
+    expected_crc = struct.unpack(">I", payload[chunk_end : chunk_end + 4])[0]
+    actual_crc = zlib.crc32(payload[12:chunk_end]) & 0xFFFFFFFF
+    if expected_crc != actual_crc:
+        raise ValueError("invalid PNG IHDR checksum")
+    return "PNG", width, height
+
+
+def _jpeg_dimensions(payload: bytes) -> tuple[str, int, int]:
+    if len(payload) < 4 or payload[:2] != b"\xff\xd8":
+        raise ValueError("invalid JPEG signature or truncated header")
+    index = 2
+    sof_markers = {
+        *range(0xC0, 0xC4),
+        *range(0xC5, 0xC8),
+        *range(0xC9, 0xCC),
+        *range(0xCD, 0xD0),
+    }
+    while index < len(payload):
+        if payload[index] != 0xFF:
+            index += 1
+            continue
+        while index < len(payload) and payload[index] == 0xFF:
+            index += 1
+        if index >= len(payload):
+            break
+        marker = payload[index]
+        index += 1
+        if marker in {0xD8, 0xD9}:
+            continue
+        if marker == 0xDA:
+            break
+        if index + 2 > len(payload):
+            break
+        segment_length = struct.unpack(">H", payload[index : index + 2])[0]
+        if segment_length < 2 or index + segment_length > len(payload):
+            raise ValueError("invalid JPEG segment length")
+        if marker in sof_markers:
+            if segment_length < 7:
+                raise ValueError("truncated JPEG frame header")
+            height, width = struct.unpack(">HH", payload[index + 3 : index + 7])
+            if width <= 0 or height <= 0:
+                raise ValueError("JPEG dimensions must be positive")
+            return "JPEG", width, height
+        index += segment_length
+    raise ValueError("JPEG frame dimensions not found")
+
+
+def _webp_dimensions(payload: bytes) -> tuple[str, int, int]:
+    if len(payload) < 20 or payload[:4] != b"RIFF" or payload[8:12] != b"WEBP":
+        raise ValueError("invalid WEBP signature or truncated header")
+    index = 12
+    while index + 8 <= len(payload):
+        chunk_type = payload[index : index + 4]
+        chunk_size = struct.unpack("<I", payload[index + 4 : index + 8])[0]
+        chunk_start = index + 8
+        chunk_end = chunk_start + chunk_size
+        if chunk_end > len(payload):
+            raise ValueError("truncated WEBP chunk")
+        if chunk_type == b"VP8X" and chunk_size >= 10:
+            width = 1 + int.from_bytes(payload[chunk_start + 4 : chunk_start + 7], "little")
+            height = 1 + int.from_bytes(payload[chunk_start + 7 : chunk_start + 10], "little")
+            return "WEBP", width, height
+        index = chunk_end + chunk_size % 2
+    raise ValueError("WEBP VP8X dimensions not found")
+
+
+def _image_dimensions(payload: bytes) -> tuple[str, int, int]:
+    if payload.startswith(PNG_SIGNATURE):
+        return _png_dimensions(payload)
+    if payload.startswith(b"\xff\xd8"):
+        return _jpeg_dimensions(payload)
+    if payload.startswith(b"RIFF"):
+        return _webp_dimensions(payload)
+    raise ValueError("unsupported image signature")
+
+
+def _preflight_payload(payload: bytes) -> tuple[bool, str, int | None, int | None]:
+    if len(payload) > MAX_IMAGE_BYTES:
+        return False, "oversized_image", None, None
+    try:
+        image_format, width, height = _image_dimensions(payload)
+    except ValueError as exc:
+        return False, f"invalid_image:{exc}", None, None
+    if width * height > MAX_IMAGE_PIXELS:
+        return False, "oversized_pixels", width, height
+    return True, image_format, width, height
+
+
+def run_fixture_preflight(manifest_path: Path) -> dict[str, object]:
+    started = time.perf_counter()
+    errors: list[str] = []
+    accepted_images = 0
+    rejected_boundaries = 0
+    try:
+        raw_manifest = _load_json(manifest_path)
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"ok": False, "errors": [f"cannot load fixture manifest: {exc}"]}
+    manifest = _mapping(raw_manifest, "fixture_manifest", errors)
+    if manifest is None:
+        return {"ok": False, "errors": errors}
+    if manifest.get("contains_user_data") is not False:
+        errors.append("fixture manifest must declare contains_user_data=false")
+    entries = manifest.get("entries")
+    if not isinstance(entries, list):
+        errors.append("fixture manifest entries must be a list")
+        entries = []
+    case_ids = [
+        entry.get("case_id")
+        for entry in entries
+        if isinstance(entry, dict) and isinstance(entry.get("case_id"), str)
+    ]
+    if set(case_ids) != LOCKED_CASE_IDS or len(case_ids) != len(LOCKED_CASE_IDS):
+        errors.append("fixture manifest case IDs do not match locked corpus v1")
+
+    root = manifest_path.resolve().parent
+    for raw_entry in entries:
+        entry = _mapping(raw_entry, "fixture_entry", errors)
+        if entry is None:
+            continue
+        case_id = entry.get("case_id")
+        relative_value = entry.get("fixture_path")
+        if not isinstance(case_id, str) or not isinstance(relative_value, str):
+            errors.append("fixture entry needs string case_id and fixture_path")
+            continue
+        relative_path = Path(relative_value)
+        candidate_unresolved = root / relative_path
+        if candidate_unresolved.is_symlink():
+            errors.append(f"{case_id}: symlink fixture is not allowed")
+            continue
+        candidate = candidate_unresolved.resolve()
+        if not candidate.is_relative_to(root):
+            errors.append(f"{case_id}: fixture path escapes manifest root")
+            continue
+        if not candidate.is_file():
+            errors.append(f"{case_id}: fixture file is missing")
+            continue
+        byte_count = candidate.stat().st_size
+        fixture_kind = entry.get("fixture_kind")
+        if byte_count > MAX_IMAGE_BYTES:
+            if case_id == "NEG-08" and fixture_kind == "synthetic_owned_boundary_bytes":
+                rejected_boundaries += 1
+                continue
+            errors.append(f"{case_id}: image exceeds {MAX_IMAGE_BYTES} bytes")
+            continue
+        if case_id == "NEG-08":
+            errors.append("NEG-08: oversized boundary fixture was not oversized")
+            continue
+        payload = candidate.read_bytes()
+        expected_hash = entry.get("sha256")
+        actual_hash = hashlib.sha256(payload).hexdigest()
+        if expected_hash != actual_hash:
+            errors.append(f"{case_id}: fixture sha256 mismatch")
+        accepted, image_format, width, height = _preflight_payload(payload)
+        if not accepted:
+            errors.append(f"{case_id}: expected image accepted but got {image_format}")
+            continue
+        accepted_images += 1
+        if entry.get("format") != image_format:
+            errors.append(f"{case_id}: format metadata mismatch")
+        if entry.get("byte_count") != byte_count:
+            errors.append(f"{case_id}: byte_count metadata mismatch")
+        if entry.get("width") != width or entry.get("height") != height:
+            errors.append(f"{case_id}: dimensions metadata mismatch")
+        if entry.get("pixel_count") != width * height:
+            errors.append(f"{case_id}: pixel_count metadata mismatch")
+
+    png_header = PNG_SIGNATURE + struct.pack(">I", 13) + b"IHDR"
+    png_header += struct.pack(">IIBBBBB", 5000, 5000, 8, 2, 0, 0, 0)
+    png_header += struct.pack(">I", zlib.crc32(png_header[12:]) & 0xFFFFFFFF)
+    for label, payload in (
+        ("truncated", PNG_SIGNATURE + b"\x00\x00"),
+        ("unsupported", b"not-an-image"),
+        ("pixel-limit", png_header),
+    ):
+        accepted, error_code, _width, _height = _preflight_payload(payload)
+        if accepted:
+            errors.append(f"boundary {label}: malformed payload was accepted")
+        else:
+            rejected_boundaries += 1
+            if label == "pixel-limit" and error_code != "oversized_pixels":
+                errors.append(f"boundary {label}: expected oversized_pixels, got {error_code}")
+
+    elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
+    return {
+        "ok": not errors,
+        "entries": len(entries),
+        "accepted_images": accepted_images,
+        "rejected_boundaries": rejected_boundaries,
+        "elapsed_ms": elapsed_ms,
+        "max_image_bytes": MAX_IMAGE_BYTES,
+        "max_image_pixels": MAX_IMAGE_PIXELS,
+        "errors": errors,
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--self-check", action="store_true", help="run deterministic synthetic checks"
     )
     parser.add_argument("--input", type=Path, help="validate one provider-neutral draft JSON")
+    parser.add_argument(
+        "--fixture-preflight", type=Path, help="preflight a locked synthetic fixture manifest"
+    )
+    parser.add_argument("--report", type=Path, help="write fixture-preflight JSON evidence")
     args = parser.parse_args(argv)
-    if args.self_check == (args.input is not None):
-        parser.error("specify exactly one of --self-check or --input")
+    selected_modes = sum(
+        (
+            int(args.self_check),
+            int(args.input is not None),
+            int(args.fixture_preflight is not None),
+        )
+    )
+    if selected_modes != 1:
+        parser.error("specify exactly one of --self-check, --input, or --fixture-preflight")
 
     try:
         schema = _load_json(SCHEMA_PATH)
@@ -512,6 +772,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             run_self_check(typed_schema)
             print(
                 "PASS: contract structural/critical invariants (stdlib self-check; synthetic only)"
+            )
+            return 0
+        if args.fixture_preflight is not None:
+            result = run_fixture_preflight(args.fixture_preflight)
+            if args.report is not None:
+                try:
+                    args.report.write_text(
+                        json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+                    )
+                except OSError as exc:
+                    print(f"FAIL: cannot write fixture preflight report: {exc}")
+                    return 1
+            if not result.get("ok"):
+                print("FAIL: fixture preflight")
+                for error in cast(list[object], result.get("errors", [])):
+                    print(f"- {error}")
+                return 1
+            print(
+                "PASS: fixture preflight "
+                f"entries={result['entries']} accepted_images={result['accepted_images']} "
+                f"rejected_boundaries={result['rejected_boundaries']} "
+                f"elapsed_ms={result['elapsed_ms']}"
             )
             return 0
         errors = validate_draft(draft, typed_schema)

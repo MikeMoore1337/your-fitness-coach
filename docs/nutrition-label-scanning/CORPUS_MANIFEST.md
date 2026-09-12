@@ -2,20 +2,35 @@
 
 **Версия манифеста:** `nutrition-label-corpus-v1`
 **Дата фиксации матрицы:** 2026-09-12
-**Статус payload:** `MANIFEST_LOCKED_IMAGE_FIXTURES_REQUIRED_BEFORE_RUN`
+**Статус payload:** `FIXTURES_LOCKED_PRE_PROVIDER_RUN`
 **Происхождение:** только owner-provided, owned synthetic или отдельно лицензированные
 изображения; production user photos запрещены.
 
+## Фактически собранные fixtures
+
+В `.artifacts/tasks/128A/evidence/fixtures/fixture-manifest.json` зафиксированы все 32 case IDs:
+31 детерминированных PNG-файлов с SHA-256, byte count, dimensions и pixel count плюс `NEG-08`
+как oversized boundary payload. Все fixtures имеют `synthetic_owned` provenance,
+`contains_user_data=false` и `generated_locally_no_external_asset` license basis. Raw fixtures
+не входят в Git и не попадают в обычные логи.
+
+Локальный preflight по фактическим bytes выполнен командой
+`python docs/nutrition-label-scanning/eval_harness.py --fixture-preflight <fixture-manifest.json>`:
+`PASS`, `entries=32`, `accepted_images=31`, `rejected_boundaries=4`. Проверены magic/MIME,
+SHA-256, размер, dimensions, pixel limit, path containment, truncated/unsupported payload и
+oversized boundary. Это preflight/input-safety evidence; provider recognition quality не измерялась.
+
 ## Правила набора
 
-Каждый case получает один immutable `case_id`, один image hash, human ground truth и ожидаемые
-`field_evidence`. Ground truth записывается с видимой упаковки человеком до первого provider run;
-модель не участвует в подготовке эталона. Image hash, fixture license и transformation recipe
+Каждый case получает один immutable `case_id`, один image hash, synthetic/human ground truth и
+ожидаемые `field_evidence`. Для текущих synthetic fixtures oracle выведен из deterministic
+fixture recipe; human review ещё не выполнен. До provider-quality claim он должен быть заменён или
+подтверждён human-reviewed ground truth. Image hash, fixture license и transformation recipe
 попадают в manifest revision, но raw images не попадают в обычные логи.
 
-В текущей task зафиксирована полная матрица case IDs и ground-truth rules, но бинарные package
-images не собраны и не отправлялись провайдерам. Поэтому ниже — locked evaluation design, а не
-утверждение, что quality corpus уже пройден.
+Synthetic oracle и ожидаемые `field_evidence` зафиксированы для матрицы до любого provider run.
+Human review этого oracle ещё не выполнен, и ни один файл не отправлялся провайдеру; поэтому ниже
+— locked corpus и preflight evidence, а не утверждение, что recognition quality уже пройдена.
 
 ## Case matrix
 
@@ -71,7 +86,8 @@ images не собраны и не отправлялись провайдера
 
 Before any provider run, each case must have:
 
-- `fixture_path` with PNG/JPEG/WEBP bytes, dimensions, byte count and SHA-256;
+- `fixture_path` with PNG/JPEG/WEBP bytes, dimensions, byte count and SHA-256 (все обычные
+  cases выполнены; `NEG-08` — намеренно non-image boundary payload);
 - `image_license` or owner provenance, including permission for evaluation upload;
 - no face, name, Telegram identifier, diary context or other user data;
 - deterministic transformations for rotation, glare, low light, crop/occlusion and curved-like

@@ -10,23 +10,27 @@
 
 Технически production-suitable путь возможен, но эта task не доказала его для YFC. Официальные
 контракты подтверждают, что несколько внешних моделей принимают изображения и могут вернуть
-структурированный ответ. Они не подтверждают одновременно качество на русских/английских
-этикетках, нулевой critical-error rate, подходящую региональную/retention policy и допустимую
-стоимость для YFC.
+структурированный ответ. Synthetic corpus preflight теперь фактически доказал безопасную
+локальную проверку bytes, но ни один provider/local OCR engine не выполнил extraction run.
+Поэтому качество на русских/английских этикетках, нулевой critical-error rate, подходящая
+region/retention policy и допустимая стоимость для YFC всё ещё не доказаны.
 
-Решение `DEFER` рекомендовано по четырём конкретным причинам:
+Решение `DEFER` рекомендовано по пяти конкретным причинам:
 
-1. Бounded provider run на зафиксированном image corpus не выполнен: отсутствуют owner
-   authorization, approved provider account/terms и разрешение на отправку даже test images во
-   внешний сервис.
+1. Provider-quality run на зафиксированном image corpus не выполнен: текущая project policy не
+   даёт approved Vision credential, а paid calls, новый account/secret и новые provider terms не
+   разрешены. Это точный access/policy blocker, а не `FAIL` качества.
 2. Текущий YFC AI route — generic text-only Groq adapter; `90B` доказывает только ограниченный
    text beta, а не распознавание фотографий этикеток.
-3. Для cloud Vision обнаружены существенные policy gates: Groq хранит customer data в US GCP
+3. Local OCR quality run также не выполнен: PaddleOCR, Tesseract и проверенные альтернативные
+   runtime отсутствуют в task environment. Это точный `LOCAL_OCR_RUNTIME_UNAVAILABLE`, а не
+   `FAIL` качества.
+4. Для cloud Vision обнаружены существенные policy gates: Groq хранит customer data в US GCP
    при соответствующих режимах; OpenAI имеет default abuse-monitoring retention и отдельные
    ограничения для image/file inputs; Gemini unpaid tier допускает использование input/output
    для улучшения продуктов и human review. Это требует отдельного owner/legal decision, а не
    скрытой настройки в `128B`.
-4. Не измерены baseline ручного ввода, correction time, p50/p95 latency, quota behavior и
+5. Не измерены baseline ручного ввода, correction time, provider p50/p95 latency, quota behavior и
    стоимость одной принятой карточки. Без них нельзя честно выбрать provider или объявить GO.
 
 ## Что считается доказанным
@@ -42,9 +46,44 @@
 - Канонические nutrition facts в YFC сейчас нормализуются на 100 г; diary хранит snapshot на
   момент записи. `ml`, `serving` и неизвестные значения не дают права придумывать плотность,
   массу порции или нулевое значение.
+- 32 synthetic-owned corpus entries реально собраны; preflight принял 31 PNG и отклонил 4
+  malformed/oversized boundary cases, включая `NEG-08` до decode/provider. Это доказывает только
+  input-safety boundary, не OCR/модельную точность.
 - База decision packet, включающая local-first persistent catalog, source-vs-derived facts,
   `community_unverified`, explicit sharing и privacy gates, подготовлена в соседних документах
   этой папки.
+
+## Фактические результаты bounded evaluation
+
+- `schema validity`: synthetic valid draft принят, unknown field, `%DV` как mass, ambiguous basis,
+  unreadable value, undocumented confidence и zero serving amount отклонены; provider payloads не
+  получены.
+- `required-field/basis/column/hallucination/null/salt-sodium/%DV/RU/EU-UK/US/rotation/glare/
+  small/multi-column`: quality metrics `N/A`, потому что extraction engine не запускался.
+- `fixture preflight`: `PASS`, `entries=32`, `accepted_images=31`, `rejected_boundaries=4`,
+  observed local `elapsed_ms=8.025` in the latest run; это не provider latency.
+- `provider/model/prompt`: `NOT_RUN`; `schema_version=nutrition-label-draft-v1`,
+  `policy_revision=nutrition-label-vision-decision-v1`.
+- `quota/errors/cost/correction/retake`: provider values `N/A`; only deterministic boundary
+  errors were exercised (`oversized_image`, `oversized_pixels`, malformed/unsupported input).
+
+## Proposed route, cost и privacy contract (не owner approval)
+
+Proposed disposition после этой итерации — `DEFER`. Если owner позже выберет `NARROW GO`, первым
+кандидатом предлагается local-only OCR/preprocessing + deterministic table parser/validator;
+cloud provider не выбирается и automatic paid fallback запрещён.
+
+Для этого narrow spike зафиксирована следующая граница: external calls `0`, provider token cost
+`$0/request`, image не покидает YFC-controlled runtime, training/analytics/subprocessors/region
+transfer у provider отсутствуют, raw image/OCR не сохраняются в catalog, diary, logs или
+analytics, а user-confirmed facts сохраняются с provenance. Temporary raw image/OCR удаляются при
+cancel/expiry; точный runtime TTL, OCR package license и device-resource budget ещё не утверждены
+и должны быть gate в `128B/128C`. Поэтому этот контракт не является production approval.
+
+Cloud route остаётся `NOT_APPROVED`: no approved credential, no account-specific retention/region
+proof, no live quality/cost/quota evidence. Любой будущий cloud route потребует одного
+owner-approved provider, current legal/privacy review, explicit consent/revocation, pinned model,
+hard budget/kill switch и отсутствие automatic paid fallback.
 
 ## Поддерживаемый scope только после owner `GO`/`NARROW GO`
 
@@ -77,7 +116,8 @@
 - выбор Groq/OpenAI/Gemini как YFC default без corpus result и policy approval;
 - Cloudflare Workers AI как Vision fallback (он зарезервирован текущим news-image contract);
 - отправка real-user package photos, принятие новых provider terms, создание account/secret или
-  paid/live inference;
+  paid calls. Разрешён только явно bounded synthetic/public/legal live eval на существующем
+  approved режиме, если его terms/privacy совместимы с eval;
 - автоматическое сохранение model output в diary или shared catalog;
 - numeric confidence, если semantics не откалиброваны на locked corpus;
 - превращение external provider data в shared YFC facts без разрешающей license/terms boundary.

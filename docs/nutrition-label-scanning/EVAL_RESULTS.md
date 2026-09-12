@@ -2,7 +2,7 @@
 
 **Дата отчёта:** 2026-09-12
 **Contract:** `nutrition-label-eval-v1`
-**Итог:** `NOT_RUN`
+**Итог:** `PARTIAL_PRE_PROVIDER_RUN`
 **Recommendation:** `DEFER`
 
 ## Что реально проверено
@@ -14,8 +14,10 @@
 | Official provider capability/privacy/cost docs | PASS/PARTIAL | published contracts checked; account-specific settings не подтверждены |
 | Corpus case matrix and pre-registered thresholds | PASS | manifest IDs/rules fixed |
 | Bounded stdlib contract harness | PASS | `eval_harness.py --self-check`; deterministic synthetic payloads only |
-| Binary licensed image fixtures | NOT READY | no real-user photos and no approved fixture upload |
-| Provider quality run | NOT RUN | no credentials/terms acceptance/live call authorization |
+| Synthetic locked image fixtures | PASS | 31 PNG + 1 oversized boundary; recipe oracle; no user data/external assets; human review pending |
+| Fixture/input-safety preflight | PASS | 32 manifest entries; 31 accepted images; 4 malformed/oversized boundaries rejected |
+| Provider quality run | NOT RUN | exact blocker: `NO_APPROVED_VISION_CREDENTIAL`; no provider request was made |
+| Local OCR quality run | NOT RUN | exact blocker: `LOCAL_OCR_RUNTIME_UNAVAILABLE`; PaddleOCR/Tesseract/alternative runtimes absent |
 | p50/p95 latency, quota and cost | NOT MEASURED | no live requests |
 | Manual correction baseline | NOT MEASURED | no user study/instrumentation authorized |
 | Production/provider activation | NOT PERFORMED | outside scope |
@@ -42,16 +44,35 @@
 | Salt/sodium swap | `N/A` |
 | `%DV` false conversion | `N/A` |
 | Null/ambiguity calibration | `N/A` |
-| Schema validity | `N/A` for provider payloads; schema document and critical-invariant self-check pass locally |
+| Schema validity | `PARTIAL` | synthetic valid/invalid payloads pass/reject; no provider payloads |
 | p50/p95 latency | `N/A` |
 | Cost/request | `N/A` |
 | Scan correction time vs manual | `N/A` |
 
-Self-check запускается без зависимостей и сети:
-`python docs/nutrition-label-scanning/eval_harness.py --self-check`.
-Это не заменяет полный JSON Schema validator или provider-quality run; он лишь защищает
-воспроизводимые structural/critical инварианты до появления утверждённого eval environment.
+## Run metadata and exact blockers
 
-Любой production claim на основании этого отчёта был бы недоказанным. Следующий run требует
-owner-authorized provider and licensed fixtures, а затем выполняется строго по
+| Metadata | Value |
+|---|---|
+| Corpus / eval / schema versions | `nutrition-label-corpus-v1` / `nutrition-label-eval-v1` / `nutrition-label-draft-v1` |
+| Policy revision | `nutrition-label-vision-decision-v1` (`OWNER_DECISION_REQUIRED`) |
+| Provider / model / prompt | `NOT_RUN` / `NOT_RUN` / `NOT_RUN` (no request was authorized by available project policy) |
+| Local fixture generator | `build_synthetic_fixtures.py`, Python 3.14 + Pillow 12.3.0; synthetic-owned only |
+| Fixture preflight limit | max 8 MiB, max 20 megapixels; observed local preflight `elapsed_ms=8.025` in the latest recorded run |
+| Cloud live blocker | `NO_APPROVED_VISION_CREDENTIAL`; current YFC AI Coach policy is disabled/generic/free-only and no Vision key is available |
+| Local live blocker | `LOCAL_OCR_RUNTIME_UNAVAILABLE`; no approved OCR runtime is installed in the task environment |
+
+The preflight latency is input-boundary latency, not provider end-to-end latency and not a
+production SLO measurement. `NOT_RUN` is intentionally distinct from `FAIL`: no candidate was
+allowed to produce a quality result under the current credential, terms and privacy gates.
+
+Self-check и fixture preflight запускаются без сети; self-check не требует зависимостей:
+`python docs/nutrition-label-scanning/eval_harness.py --self-check`.
+`python docs/nutrition-label-scanning/eval_harness.py --fixture-preflight <fixture-manifest.json>`.
+Это не заменяет полный JSON Schema validator или provider-quality run; он защищает
+воспроизводимые structural/critical инварианты и image-boundary checks до появления утверждённого
+eval environment.
+
+Любой production claim на основании этого отчёта был бы недоказанным. Следующий quality run
+требует owner-authorized provider/local OCR route, а для cloud — совместимый terms/privacy
+режим и approved credential; затем выполняется строго по
 [`EVAL_CONTRACT.md`](EVAL_CONTRACT.md).

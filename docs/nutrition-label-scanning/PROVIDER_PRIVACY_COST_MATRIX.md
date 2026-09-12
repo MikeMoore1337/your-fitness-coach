@@ -28,6 +28,14 @@ production GO до owner/provider/legal decision.
 
 ## Policy decisions for YFC
 
+- Access check for this bounded run: no `GROQ_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` or
+  equivalent Vision credential is available under the current task environment. Current YFC AI
+  Coach policy is disabled/generic-only/free-only; an existing credential scoped to the separate
+  news flow is not eligible for reuse. No provider request was attempted.
+- Local runtime check: Pillow is available for legal synthetic fixture generation, but PaddleOCR,
+  Tesseract, `pytesseract` and checked alternative OCR runtimes are absent. Therefore local image
+  preflight passed, while local extraction quality remains `NOT_RUN` with blocker
+  `LOCAL_OCR_RUNTIME_UNAVAILABLE`.
 - Cloudflare Workers AI остаётся вне этой матрицы: текущий contract резервирует его для Telegram
   news image generation; это не Vision fallback.
 - Не считать OpenAI-compatible endpoint доказательством image capability: capability проверяется
@@ -37,3 +45,14 @@ production GO до owner/provider/legal decision.
   аккаунте и дате.
 - До owner/legal approval не передавать ни real-user photos, ни package photos с user-identifying
   context. Test fixture upload — отдельный explicit gate.
+
+## Exact disposition after the bounded run
+
+No cloud candidate is approved. The only currently actionable route is a future local-only
+OCR/preprocessing spike with deterministic parser/validator, zero external token cost and no
+provider retention/training/analytics/subprocessors. Its exact TTL, package license and
+device-resource budget are still gates for `128B/128C`.
+
+Any cloud route remains blocked by the combination of missing approved credential, absent
+account-specific region/retention/quota proof and missing corpus quality results. It must not be
+implemented as an automatic paid fallback.
