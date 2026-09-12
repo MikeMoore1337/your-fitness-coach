@@ -715,14 +715,11 @@ test('desktop demo keeps metric groups separated and conversion copy honest', as
       const pictogram = document.querySelector<HTMLElement>(
         `.week-strip__pictogram[data-pictogram="${kind}"]`,
       );
-      const icon = pictogram?.querySelector<HTMLElement>('.yfc-icon');
+      const icon = pictogram?.querySelector<SVGSVGElement>('svg.yfc-icon');
       if (!pictogram || !icon) return null;
-      const asset = Array.from(icon.querySelectorAll<HTMLElement>('img')).find(
-        (candidate) => window.getComputedStyle(candidate).display !== 'none',
-      );
-      if (!asset) return null;
-      const box = asset.getBoundingClientRect();
+      const box = icon.getBoundingClientRect();
       return {
+        viewBox: icon.getAttribute('viewBox'),
         canvasHeight: pictogram.getBoundingClientRect().height,
         canvasWidth: pictogram.getBoundingClientRect().width,
         iconHeight: icon.getBoundingClientRect().height,
@@ -733,12 +730,20 @@ test('desktop demo keeps metric groups separated and conversion copy honest', as
     };
     return { inProgress: geometry('in-progress'), planned: geometry('planned') };
   });
-  expect(statusGeometry.planned).toMatchObject({ canvasHeight: 16, canvasWidth: 16 });
+  expect(statusGeometry.planned).toMatchObject({
+    canvasHeight: 16,
+    canvasWidth: 16,
+    viewBox: '0 0 24 24',
+  });
   expect(statusGeometry.planned?.iconHeight).toBe(16);
   expect(statusGeometry.planned?.iconWidth).toBe(16);
   expect(statusGeometry.planned?.assetHeight).toBe(16);
   expect(statusGeometry.planned?.assetWidth).toBe(16);
-  expect(statusGeometry.inProgress).toMatchObject({ canvasHeight: 16, canvasWidth: 16 });
+  expect(statusGeometry.inProgress).toMatchObject({
+    canvasHeight: 16,
+    canvasWidth: 16,
+    viewBox: '0 0 24 24',
+  });
   expect(statusGeometry.inProgress?.iconHeight).toBe(16);
   expect(statusGeometry.inProgress?.iconWidth).toBe(16);
   expect(statusGeometry.inProgress?.assetHeight).toBe(16);
