@@ -27,6 +27,7 @@ for (const theme of ['light', 'dark'] as const) {
       await settle(page);
       await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
       await expect(page.locator('.public-shell__header')).toHaveCSS('backdrop-filter', 'none');
+      await expect(page.locator('.public-shell__header')).toHaveCSS('border-bottom-width', '0px');
       const headerBox = await page.locator('.public-shell__header').boundingBox();
       const heroBox = await page.locator('.landing-hero').boundingBox();
       expect(headerBox).not.toBeNull();
@@ -47,7 +48,10 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
       const nav = page.locator('.app-bottom-nav');
-      await expect(nav).toHaveCSS('backdrop-filter', 'none');
+      await expect(nav).toHaveCSS(
+        'backdrop-filter',
+        width < 900 ? 'blur(6px) saturate(1.08)' : 'none',
+      );
       await expect(nav).toHaveCSS('filter', 'none');
       await expect(nav).toHaveCSS(
         'background-color',
@@ -155,7 +159,10 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=today');
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
-      await expect(page.locator('.app-bottom-nav')).toHaveCSS('backdrop-filter', 'none');
+      await expect(page.locator('.app-bottom-nav')).toHaveCSS(
+        'backdrop-filter',
+        'blur(6px) saturate(1.08)',
+      );
       await page.screenshot({ path: testInfo.outputPath(`today-tma-${theme}.png`) });
       await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click();
       await expect(page.locator('.active-workout')).toBeVisible();

@@ -858,6 +858,16 @@ body:has(.app-shell--design-v2) {
   backdrop-filter: none;
 }
 
+/* Лёгкое рассеивание только плавающей нижней панели, без уплотнения заливки. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (max-width: 899px) and (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+    .app-shell--design-v2 .app-bottom-nav {
+      -webkit-backdrop-filter: blur(6px) saturate(1.08);
+      backdrop-filter: blur(6px) saturate(1.08);
+    }
+  }
+}
+
 .app-shell--design-v2 .app-bottom-nav__brand,
 .app-shell--design-v2 .app-bottom-nav__btn,
 .app-shell--design-v2 .app-bottom-nav__account-name {
