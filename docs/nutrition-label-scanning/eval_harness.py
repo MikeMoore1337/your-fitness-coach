@@ -40,6 +40,21 @@ NUTRIENT_FIELDS = (
     "cholesterol_mg",
 )
 FACT_UNITS = {"g", "mg", "kcal", "kJ"}
+EXPECTED_FACT_UNITS = {
+    "energy_kcal": "kcal",
+    "energy_kj": "kJ",
+    "protein_g": "g",
+    "fat_g": "g",
+    "saturated_fat_g": "g",
+    "trans_fat_g": "g",
+    "carbohydrate_g": "g",
+    "sugars_g": "g",
+    "added_sugars_g": "g",
+    "fiber_g": "g",
+    "salt_g": "g",
+    "sodium_mg": "mg",
+    "cholesterol_mg": "mg",
+}
 BASIS_VALUES = {"per_100_g", "per_100_ml", "per_serving", "ambiguous"}
 EVIDENCE_VALUES = {"read", "ambiguous", "unreadable", "absent", "derived"}
 WARNING_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
@@ -120,7 +135,7 @@ def _finite_number(
             errors.append(f"{label} must be {operator} {minimum}")
 
 
-def _fact(value: object, label: str, errors: list[str]) -> None:
+def _fact(value: object, label: str, errors: list[str], *, field: str) -> None:
     if value is None:
         return
     fact = _mapping(value, label, errors)
@@ -131,12 +146,14 @@ def _fact(value: object, label: str, errors: list[str]) -> None:
     unit = fact.get("unit")
     if not isinstance(unit, str) or unit not in FACT_UNITS:
         errors.append(f"{label}.unit is not a mass/energy unit")
+    elif unit != EXPECTED_FACT_UNITS[field]:
+        errors.append(f"{label}.unit must be {EXPECTED_FACT_UNITS[field]} for {field}")
     basis_ref = fact.get("basis_ref")
     if not isinstance(basis_ref, str) or basis_ref not in BASIS_VALUES - {"ambiguous"}:
         errors.append(f"{label}.basis_ref must identify a known basis")
 
 
-def _derived_fact(value: object, label: str, errors: list[str]) -> None:
+def _derived_fact(value: object, label: str, errors: list[str], *, field: str) -> None:
     if value is None:
         return
     fact = _mapping(value, label, errors)
@@ -147,6 +164,8 @@ def _derived_fact(value: object, label: str, errors: list[str]) -> None:
     unit = fact.get("unit")
     if not isinstance(unit, str) or unit not in FACT_UNITS:
         errors.append(f"{label}.unit is not a mass/energy unit")
+    elif unit != EXPECTED_FACT_UNITS[field]:
+        errors.append(f"{label}.unit must be {EXPECTED_FACT_UNITS[field]} for {field}")
     reason = fact.get("reason")
     if not isinstance(reason, str) or not reason:
         errors.append(f"{label}.reason must be non-empty")
@@ -171,10 +190,10 @@ def _validate_field_map(
     _exact_keys(value, set(NUTRIENT_FIELDS), name, errors)
     if validator is _fact:
         for field in NUTRIENT_FIELDS:
-            _fact(value.get(field), f"{name}.{field}", errors)
+            _fact(value.get(field), f"{name}.{field}", errors, field=field)
     else:
         for field in NUTRIENT_FIELDS:
-            _derived_fact(value.get(field), f"{name}.{field}", errors)
+            _derived_fact(value.get(field), f"{name}.{field}", errors, field=field)
     return value
 
 
@@ -272,6 +291,10 @@ def _validate_schema_document(schema: dict[str, object]) -> list[str]:
     definitions = _mapping(schema.get("$defs"), "$defs", errors)
     if definitions is None:
         return errors
+    for prefix in ("fact", "derived"):
+        for unit in sorted(set(EXPECTED_FACT_UNITS.values())):
+            if not isinstance(definitions.get(f"{prefix}_{unit}"), dict):
+                errors.append(f"$defs.{prefix}_{unit} must define a unit-scoped fact")
     facts = _mapping(definitions.get("facts"), "$defs.facts", errors)
     if facts is None or facts.get("additionalProperties") is not False:
         errors.append("$defs.facts must be closed")
@@ -280,6 +303,24 @@ def _validate_schema_document(schema: dict[str, object]) -> list[str]:
     )
     if fact_properties is None or set(fact_properties) != set(NUTRIENT_FIELDS):
         errors.append("$defs.facts properties must match the fixed nutrient vocabulary")
+    elif any(
+        not isinstance(fact_properties[field], dict)
+        or fact_properties[field].get("$ref") != f"#/$defs/fact_{EXPECTED_FACT_UNITS[field]}"
+        for field in NUTRIENT_FIELDS
+    ):
+        errors.append("$defs.facts properties must enforce each nutrient's canonical unit")
+    derived = _mapping(definitions.get("derived"), "$defs.derived", errors)
+    derived_properties = _mapping(
+        derived.get("properties") if derived else None, "$defs.derived.properties", errors
+    )
+    if derived_properties is None or set(derived_properties) != set(NUTRIENT_FIELDS):
+        errors.append("$defs.derived properties must match the fixed nutrient vocabulary")
+    elif any(
+        not isinstance(derived_properties[field], dict)
+        or derived_properties[field].get("$ref") != f"#/$defs/derived_{EXPECTED_FACT_UNITS[field]}"
+        for field in NUTRIENT_FIELDS
+    ):
+        errors.append("$defs.derived properties must enforce each nutrient's canonical unit")
     fact_definition = _mapping(definitions.get("fact"), "$defs.fact", errors)
     if fact_definition is None:
         return errors
@@ -489,6 +530,34 @@ def run_self_check(schema: dict[str, object]) -> None:
     review_bypass = copy.deepcopy(valid)
     review_bypass["requires_user_review"] = False
     _expect_rejected("review bypass", review_bypass, schema)
+
+    wrong_source_unit = copy.deepcopy(valid)
+    wrong_source_facts = cast(dict[str, object], wrong_source_unit["source_facts"])
+    wrong_source_protein = cast(dict[str, object], wrong_source_facts["protein_g"])
+    wrong_source_protein["unit"] = "kcal"
+    _expect_rejected("wrong source nutrient unit", wrong_source_unit, schema)
+
+    wrong_normalized_unit = copy.deepcopy(valid)
+    wrong_normalized_facts = cast(dict[str, object], wrong_normalized_unit["normalized_facts"])
+    wrong_normalized_sodium = cast(dict[str, object], wrong_normalized_facts["sodium_mg"])
+    wrong_normalized_sodium["unit"] = "g"
+    _expect_rejected("wrong normalized nutrient unit", wrong_normalized_unit, schema)
+
+    wrong_derived_unit = copy.deepcopy(valid)
+    wrong_derived_source = cast(dict[str, object], wrong_derived_unit["source_facts"])
+    wrong_derived_normalized = cast(dict[str, object], wrong_derived_unit["normalized_facts"])
+    wrong_derived_facts = cast(dict[str, object], wrong_derived_unit["derived_fields"])
+    wrong_derived_evidence = cast(dict[str, object], wrong_derived_unit["field_evidence"])
+    wrong_derived_source["fiber_g"] = None
+    wrong_derived_normalized["fiber_g"] = None
+    wrong_derived_facts["fiber_g"] = {
+        "value": 3.0,
+        "unit": "mg",
+        "reason": "derived from synthetic source",
+        "source_fields": ["carbohydrate_g"],
+    }
+    wrong_derived_evidence["fiber_g"] = "derived"
+    _expect_rejected("wrong derived nutrient unit", wrong_derived_unit, schema)
 
     percent_as_mass = copy.deepcopy(valid)
     percent_facts = cast(dict[str, object], percent_as_mass["source_facts"])

@@ -106,6 +106,42 @@
         }
       ]
     },
+    "fact_g": {
+      "allOf": [
+        { "$ref": "#/$defs/fact" },
+        {
+          "if": { "type": "object" },
+          "then": { "properties": { "unit": { "const": "g" } } }
+        }
+      ]
+    },
+    "fact_mg": {
+      "allOf": [
+        { "$ref": "#/$defs/fact" },
+        {
+          "if": { "type": "object" },
+          "then": { "properties": { "unit": { "const": "mg" } } }
+        }
+      ]
+    },
+    "fact_kcal": {
+      "allOf": [
+        { "$ref": "#/$defs/fact" },
+        {
+          "if": { "type": "object" },
+          "then": { "properties": { "unit": { "const": "kcal" } } }
+        }
+      ]
+    },
+    "fact_kJ": {
+      "allOf": [
+        { "$ref": "#/$defs/fact" },
+        {
+          "if": { "type": "object" },
+          "then": { "properties": { "unit": { "const": "kJ" } } }
+        }
+      ]
+    },
     "facts": {
       "type": "object",
       "additionalProperties": false,
@@ -125,19 +161,19 @@
         "cholesterol_mg"
       ],
       "properties": {
-        "energy_kcal": { "$ref": "#/$defs/fact" },
-        "energy_kj": { "$ref": "#/$defs/fact" },
-        "protein_g": { "$ref": "#/$defs/fact" },
-        "fat_g": { "$ref": "#/$defs/fact" },
-        "saturated_fat_g": { "$ref": "#/$defs/fact" },
-        "trans_fat_g": { "$ref": "#/$defs/fact" },
-        "carbohydrate_g": { "$ref": "#/$defs/fact" },
-        "sugars_g": { "$ref": "#/$defs/fact" },
-        "added_sugars_g": { "$ref": "#/$defs/fact" },
-        "fiber_g": { "$ref": "#/$defs/fact" },
-        "salt_g": { "$ref": "#/$defs/fact" },
-        "sodium_mg": { "$ref": "#/$defs/fact" },
-        "cholesterol_mg": { "$ref": "#/$defs/fact" }
+        "energy_kcal": { "$ref": "#/$defs/fact_kcal" },
+        "energy_kj": { "$ref": "#/$defs/fact_kJ" },
+        "protein_g": { "$ref": "#/$defs/fact_g" },
+        "fat_g": { "$ref": "#/$defs/fact_g" },
+        "saturated_fat_g": { "$ref": "#/$defs/fact_g" },
+        "trans_fat_g": { "$ref": "#/$defs/fact_g" },
+        "carbohydrate_g": { "$ref": "#/$defs/fact_g" },
+        "sugars_g": { "$ref": "#/$defs/fact_g" },
+        "added_sugars_g": { "$ref": "#/$defs/fact_g" },
+        "fiber_g": { "$ref": "#/$defs/fact_g" },
+        "salt_g": { "$ref": "#/$defs/fact_g" },
+        "sodium_mg": { "$ref": "#/$defs/fact_mg" },
+        "cholesterol_mg": { "$ref": "#/$defs/fact_mg" }
       }
     },
     "derived": {
@@ -159,19 +195,19 @@
         "cholesterol_mg"
       ],
       "properties": {
-        "energy_kcal": { "$ref": "#/$defs/derived_fact" },
-        "energy_kj": { "$ref": "#/$defs/derived_fact" },
-        "protein_g": { "$ref": "#/$defs/derived_fact" },
-        "fat_g": { "$ref": "#/$defs/derived_fact" },
-        "saturated_fat_g": { "$ref": "#/$defs/derived_fact" },
-        "trans_fat_g": { "$ref": "#/$defs/derived_fact" },
-        "carbohydrate_g": { "$ref": "#/$defs/derived_fact" },
-        "sugars_g": { "$ref": "#/$defs/derived_fact" },
-        "added_sugars_g": { "$ref": "#/$defs/derived_fact" },
-        "fiber_g": { "$ref": "#/$defs/derived_fact" },
-        "salt_g": { "$ref": "#/$defs/derived_fact" },
-        "sodium_mg": { "$ref": "#/$defs/derived_fact" },
-        "cholesterol_mg": { "$ref": "#/$defs/derived_fact" }
+        "energy_kcal": { "$ref": "#/$defs/derived_kcal" },
+        "energy_kj": { "$ref": "#/$defs/derived_kJ" },
+        "protein_g": { "$ref": "#/$defs/derived_g" },
+        "fat_g": { "$ref": "#/$defs/derived_g" },
+        "saturated_fat_g": { "$ref": "#/$defs/derived_g" },
+        "trans_fat_g": { "$ref": "#/$defs/derived_g" },
+        "carbohydrate_g": { "$ref": "#/$defs/derived_g" },
+        "sugars_g": { "$ref": "#/$defs/derived_g" },
+        "added_sugars_g": { "$ref": "#/$defs/derived_g" },
+        "fiber_g": { "$ref": "#/$defs/derived_g" },
+        "salt_g": { "$ref": "#/$defs/derived_g" },
+        "sodium_mg": { "$ref": "#/$defs/derived_mg" },
+        "cholesterol_mg": { "$ref": "#/$defs/derived_mg" }
       }
     },
     "derived_fact": {
@@ -193,6 +229,42 @@
               "maxItems": 8
             }
           }
+        }
+      ]
+    },
+    "derived_g": {
+      "allOf": [
+        { "$ref": "#/$defs/derived_fact" },
+        {
+          "if": { "type": "object" },
+          "then": { "properties": { "unit": { "const": "g" } } }
+        }
+      ]
+    },
+    "derived_mg": {
+      "allOf": [
+        { "$ref": "#/$defs/derived_fact" },
+        {
+          "if": { "type": "object" },
+          "then": { "properties": { "unit": { "const": "mg" } } }
+        }
+      ]
+    },
+    "derived_kcal": {
+      "allOf": [
+        { "$ref": "#/$defs/derived_fact" },
+        {
+          "if": { "type": "object" },
+          "then": { "properties": { "unit": { "const": "kcal" } } }
+        }
+      ]
+    },
+    "derived_kJ": {
+      "allOf": [
+        { "$ref": "#/$defs/derived_fact" },
+        {
+          "if": { "type": "object" },
+          "then": { "properties": { "unit": { "const": "kJ" } } }
         }
       ]
     },
