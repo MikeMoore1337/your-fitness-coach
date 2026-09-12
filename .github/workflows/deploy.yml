@@ -25,29 +25,48 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+    outputs:
+      deploy: ${{ steps.provenance.outputs.deploy }}
+      reason: ${{ steps.provenance.outputs.reason }}
     env:
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
-      - name: Verify merged task pull request provenance
+      - name: Verify merged pull request provenance and deployment scope
+        id: provenance
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -Eeuo pipefail
-          PR_NUMBERS="$(gh api \
+          PR_ROWS="$(gh api \
             -H 'Accept: application/vnd.github+json' \
             -H 'X-GitHub-Api-Version: 2022-11-28' \
             "repos/$REPOSITORY/commits/$DEPLOY_SHA/pulls" \
-            --jq ".[] | select(.merged_at != null and .base.ref == \"master\" and .merge_commit_sha == \"$DEPLOY_SHA\") | .number")"
-          if [ -z "$PR_NUMBERS" ]; then
-            echo "Refusing production deployment: $DEPLOY_SHA is not the merge result of a task pull request into master" >&2
+            --jq ".[] | select(.merged_at != null and .base.ref == \"master\" and .merge_commit_sha == \"$DEPLOY_SHA\") | [(.number|tostring), .head.ref] | @tsv")"
+          if [ -z "$PR_ROWS" ]; then
+            echo "Refusing production deployment: $DEPLOY_SHA is not the merge result of a pull request into master" >&2
             exit 1
           fi
-          echo "Authorized production revision $DEPLOY_SHA from pull request(s): $PR_NUMBERS"
+          CONTROLLER_ROWS="$(printf '%s\n' "$PR_ROWS" | awk -F '\t' '$2 ~ /^codex\/controller-[a-z0-9-]+$/')"
+          NON_CONTROLLER_ROWS="$(printf '%s\n' "$PR_ROWS" | awk -F '\t' '$2 !~ /^codex\/controller-[a-z0-9-]+$/')"
+          if [ -n "$CONTROLLER_ROWS" ]; then
+            if [ -n "$NON_CONTROLLER_ROWS" ]; then
+              echo "Refusing deployment: controller and product pull requests share merge SHA $DEPLOY_SHA" >&2
+              exit 1
+            fi
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "reason=controller-only governance merge; application deploy is not required" >> "$GITHUB_OUTPUT"
+            echo "Skipping application deployment for controller revision $DEPLOY_SHA: $CONTROLLER_ROWS"
+            exit 0
+          fi
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+          echo "reason=product pull request merge" >> "$GITHUB_OUTPUT"
+          echo "Authorized production revision $DEPLOY_SHA from pull request(s): $PR_ROWS"
 
   deploy:
     name: Deploy immutable tested bundle
     needs: authorize
+    if: needs.authorize.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 50
     permissions:

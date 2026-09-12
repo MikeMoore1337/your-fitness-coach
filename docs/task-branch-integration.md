@@ -2,26 +2,29 @@
 
 ## Постоянная политика quality gates
 
-Codex Code Review отключён и не используется как release gate, поскольку расходует Codex usage.
-Качество подтверждают детерминированные CI/tests/static-analysis checks и явно требуемые
-для конкретной task human/external gates. Отдельный LLM review verdict не требуется.
-Автоматические GitHub reviews, вызов `@codex review`, ожидание connector/fresh reviewed SHA,
-review rate-limit waits, usage-reset credit ради review и waiver отсутствующего review запрещены.
-Отдельную Codex review-задачу, роль или subagent для перечитывания diff не создавать.
-Implementer выполняет один ограниченный self-review в текущей рабочей сессии перед commit;
-после исправления дефекта повторяет только affected checks. Нового full self-audit не требуется.
+Deterministic CI/tests/static-analysis checks и специальные human/external gates остаются
+обязательными. Automatic Codex Code Review не включается; bounded review запрашивается только
+после GREEN exact-head `checks` как финальный semantic gate. Разрешены round 1 и максимум один
+re-review после одного batch fix blocking P0/P1 на изменившемся head SHA. MEDIUM/LOW/NIT не
+запускают re-review, clean verdict не повторяется, третий request запрещён.
+Implementer делает один bounded self-review до commit; отдельный reviewer-agent/subagent не создаётся.
+Controller-команды `request-codex-review` и `validate-codex-review` проверяют PR/status/comments/
+reviews/threads, переиспользуют pending/completed review текущего SHA и возвращают `HUMAN_REQUIRED`
+после второго blocking P0/P1.
 
-Normal path: implementation → targeted verification → self-review → commit/push → exact-head CI
-→ PR → required GitHub checks → merge → deploy → production smoke/closeout.
+Normal path: implementation → targeted verification → final deterministic verification → bounded
+self-review → commit/push → PR → exact-head CI GREEN → Codex review → merge → post-merge cleanup
+→ product-task deploy/production closeout.
 Для PR-triggered CI PR открывается перед ожиданием его required checks.
 Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved. Создавать новый Codex review для этого запрещено.
+нужно фактически исправить и resolved до bounded review. Review не запускается до GREEN CI,
+повторно на том же SHA или после clean verdict.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-они не должны заменять отдельный LLM review под другим названием.
+Codex review их не заменяет.
 Следующую product task автоматически не запускать.
 
 
@@ -47,12 +50,11 @@ Task A/B/C: implementation -> relevant fast checks -> self-review -> приме�
 worktree используется для координации и closeout, но не для feature implementation. Legacy `dev`
 refs могут оставаться в repository для recovery/inventory, но не являются частью normal delivery.
 
-Несколько task с `independent-write` могут одновременно иметь отдельные writer leases и worktrees.
-`independent-write` не блокируется активной `exclusive-write` task: раздельные worktree позволяют
-обнаружить реальный конфликт файлов при serial delivery. Новая `exclusive-write` task сохраняет
-консервативную блокировку на время активной implementation другой task. Очередь, delivery, GitHub
-CI и active production deploy не блокируют начало совместимой implementation. Merge в `master` и
-production deployment всегда serial.
+Несколько task могут одновременно иметь отдельные writer leases и worktrees. Legacy
+`exclusive-write` metadata не создаёт repository-wide implementation barrier: отдельные worktree
+позволяют независимым task идти параллельно, а реальный конфликт файлов обнаруживается при serial
+delivery refresh/rebase. Очередь, delivery, GitHub CI и active production deploy не блокируют
+начало отдельной implementation. Merge в `master` и product production deployment всегда serial.
 
 GitHub Ruleset для `master` обязан быть active и требовать pull request, deletion protection,
 non-fast-forward protection, strict current-base required checks и aggregate check `checks`.
@@ -112,9 +114,8 @@ snapshot.
 
 PR CI не выполняет отдельный LLM review job и не запускается на `pull_request_review` event.
 Merge-ready определяется exact-head `checks`, deterministic quality/policy checks, актуальной
-provenance, mergeability и отсутствием применимых blocking findings. Отсутствие Codex review,
-лимит review API и connector review не являются blocker; отдельного `validate-pr-review` перед
-merge нет.
+provenance, mergeability, resolved threads и `CLEAN` bounded Codex result. Review request не
+создаётся до GREEN CI; rate-limit/skip не ретраятся автоматически и дают `HUMAN_REQUIRED`.
 
 ## Leases и безопасный closeout
 
@@ -126,12 +127,15 @@ Controller хранит machine-local coordination state в shared Git common di
 ├── state.lock
 ├── delivery.json
 ├── leases/task-<ID>.json
+├── reviews/pr-<N>.json
 └── history/task-<ID>.json
 ```
 
 State не коммитится. Create использует `O_EXCL`, update — temporary file + atomic replace под
-`state.lock`. Corrupted JSON, оставшийся lock, duplicate branch/worktree, dirty/interrupted state
-и неизвестная lease являются blocker; controller не удаляет их автоматически.
+`state.lock`. Corrupted JSON, malformed/active lock, duplicate branch/worktree, dirty/interrupted
+state и неизвестная lease являются blocker; stale state lock reclaim-ится только по валидному owner
+metadata, достаточному возрасту и однозначно мёртвому PID. Controller не удаляет active чужой
+worktree или branch автоматически.
 
 Task lease содержит task ID/path, branch, абсолютный worktree, original/current
 `base_origin_master_sha`, target base, mode, timestamps, lifecycle state, queue sequence и session
@@ -247,12 +251,13 @@ bootstrap, infrastructure recovery или deployment SHA вне current merged `
 отдельного owner authorization, backup и operator preflight.
 
 `--quality-verdict PASS` подтверждает выполненные targeted tests и применимый static analysis,
-а не мнение LLM reviewer. `--qa-verdict PASS` подтверждает фактические проверки поведения;
+а не bounded Codex semantic verdict. `--qa-verdict PASS` подтверждает фактические проверки поведения;
 `--qa-verdict NOT_REQUIRED` используется, когда task не объявляет QA-проверку;
 отдельная QA-роль запускается только по task. Readiness не заменяет final exact-head CI gate.
 Legacy имя recovery-команды `reopen-for-review` означает возврат к исправлению и повторной
 проверке изменённых сценариев; отдельного reviewer оно не запускает.
 
-Automatic Codex GitHub review настраивается вне репозитория в Codex Cloud settings.
-Для этого репозитория владелец должен выключить automatic code review, если оно включено.
-GitHub ruleset уже допускает ноль approving reviews; его deterministic protections сохраняются.
+Automatic Codex GitHub review не включается изменениями репозитория и настраивается только вне
+репозитория в Codex Cloud settings. Если владелец не меняет внешнюю настройку, это фиксируется как
+`MANUAL_EXTERNAL_SETTING`, но не блокирует repository changes. GitHub ruleset допускает ноль
+approving reviews; его deterministic protections сохраняются.

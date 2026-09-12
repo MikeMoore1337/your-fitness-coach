@@ -22,13 +22,14 @@ PR`; implementation остаётся в task worktree, а refresh, merge, deploy
 
 - current base/head и task provenance;
 - `checks` на exact PR head;
-- отсутствие актуальных `BLOCKER`/`HIGH`/`P1`/`P2` findings из применимой проверки;
+- отсутствие актуальных blocking P0/P1 findings из применимой проверки;
 - clean/mergeable PR.
 
-Отдельный Codex Code Review постоянно отключён и не является release gate. Отсутствие LLM review,
-лимит review API или connector review не останавливают delivery. Release gate состоит из exact-head
-`checks`, deterministic quality/policy checks, mergeability, актуальной provenance и нулевого
-числа применимых blocking findings.
+После GREEN exact-head `checks` controller запрашивает один bounded Codex semantic review. CLEAN
+разрешает merge; только подтверждённые blocking P0/P1 разрешают один batch fix и re-review на новом
+SHA. MEDIUM/LOW/NIT не запускают повторный review, clean result не повторяется, а второй blocking
+result возвращает `HUMAN_REQUIRED`. CI не включает отдельный LLM job, automatic Code Review не
+включается, а review не заменяет security/legal/human/destructive gates.
 
 ## Непрерывная очередь
 
