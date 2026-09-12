@@ -376,6 +376,17 @@
   color: #f5f5f5;
 }
 
+.auth-public-shell--design-v2.auth-public-shell--design-v2-1
+  .public-shell__header[data-glass][data-glass-variant] {
+  border: 0;
+  background: transparent;
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 .auth-public-shell--design-v2-1 .login-surface-note {
   color: #b8b8b8;
   font-size: 12px;
