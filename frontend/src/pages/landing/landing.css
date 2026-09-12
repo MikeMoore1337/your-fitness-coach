@@ -23,7 +23,16 @@
   border-bottom: 1px solid #363b3b;
 }
 
-/* На главной фото действительно проходит под стеклом, без дублирования изображения. */
+/* Хедер главной — прозрачный слой навигации без подложки и декоративных кромок. */
+.landing-page.public-shell:has(> #landing-content) .public-shell__header {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Фото проходит под хедером без дублирования изображения. */
 .landing-page:has(> #landing-content) {
   display: grid;
 }

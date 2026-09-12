@@ -26,10 +26,12 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator('.landing-hero')).toBeVisible();
       await settle(page);
       await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
+      await expect(page.locator('.public-shell__header')).toHaveCSS('backdrop-filter', 'none');
       await expect(page.locator('.public-shell__header')).toHaveCSS(
-        'backdrop-filter',
-        'blur(3px) saturate(1.12) brightness(1.03)',
+        'background-color',
+        'rgba(0, 0, 0, 0)',
       );
+      await expect(page.locator('.public-shell__header')).toHaveCSS('box-shadow', 'none');
       await expect(page.locator('.public-shell__header')).toHaveCSS('border-bottom-width', '0px');
       const headerBox = await page.locator('.public-shell__header').boundingBox();
       const heroBox = await page.locator('.landing-hero').boundingBox();

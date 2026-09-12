@@ -152,12 +152,6 @@
   }
 }
 
-/* Home header retains the owner-approved seamless lower edge. */
-:root .landing-page .public-shell__header[data-glass] {
-  border-bottom: 0;
-  box-shadow: inset 0 1px 0 var(--glass-rim-light);
-}
-
 @media (prefers-reduced-motion: reduce) {
   :root [data-glass][data-glass-interactive] {
     transition: none;

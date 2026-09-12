@@ -54,8 +54,7 @@ export function PublicShell({
         К содержимому
       </a>
       <header
-        {...glassProps(skipTarget === 'landing-content' ? 'clear' : 'tinted')}
-        data-glass-tone={skipTarget === 'landing-content' ? 'on-image' : undefined}
+        {...(skipTarget === 'landing-content' ? {} : glassProps('tinted'))}
         className={`public-shell__header landing-header${
           headerNavigation ? '' : ' public-shell__header--simple'
         }`}
