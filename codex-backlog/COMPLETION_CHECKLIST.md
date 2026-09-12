@@ -2,7 +2,7 @@
 
 ## Per task
 
-- [ ] Worked in permanent `dev` or an explicitly authorized temporary branch from current `dev`.
+- [ ] Worked in a task/controller branch and separate worktree from exact current `origin/master`.
 - [ ] Read root `AGENTS.md`, `GLOBAL_RULES.md`, lifecycle, current task and primary role.
 - [ ] Loaded only core `Рекомендуемые skills` initially.
 - [ ] Loaded each `Условный skill` only after its actual trigger was proven.
@@ -13,8 +13,9 @@
 - [ ] For client-facing UI, preserved `GLOBAL_RULES.md` UI consistency contract and did not create a local duplicate primitive/system.
 - [ ] For client-facing scope, followed applicable mobile/TMA contract/matrix.
 - [ ] Выполнены targeted checks; записаны точные команды и результаты.
-- [ ] Self-review выполнен primary writer в текущей сессии, отдельный Codex reviewer не запускался.
-- [ ] Перед merge exact-head CI и aggregate `checks` GREEN; PR mergeable, существующие threads resolved.
+- [ ] Self-review выполнен primary writer в текущей сессии; отдельный reviewer-agent/subagent не создавался.
+- [ ] Перед merge exact-head CI и aggregate `checks` GREEN; bounded Codex review CLEAN, PR mergeable,
+      существующие threads resolved; максимум round 1 + один re-review после blocking P0/P1.
 - [ ] Only `BLOCKER/HIGH` blocked completion.
 - [ ] `MEDIUM/LOW/NIT/OUT_OF_SCOPE` did not create new schema/API/platform/product scope.
 - [ ] Added or updated every `MEDIUM/LOW` in `codex-backlog/bugs/FINDINGS.md`, including findings

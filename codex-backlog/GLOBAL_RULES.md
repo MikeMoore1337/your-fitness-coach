@@ -1,28 +1,21 @@
+# GLOBAL_RULES - правила выполнения release backlog v18 resource-efficient
+
 ## Постоянная политика quality gates
 
-Codex Code Review отключён и не используется как release gate, поскольку расходует Codex usage.
-Качество подтверждают детерминированные CI/tests/static-analysis checks и явно требуемые
-для конкретной task human/external gates. Отдельный LLM review verdict не требуется.
-Автоматические GitHub reviews, вызов `@codex review`, ожидание connector/fresh reviewed SHA,
-review rate-limit waits, usage-reset credit ради review и waiver отсутствующего review запрещены.
-Отдельную Codex review-задачу, роль или subagent для перечитывания diff не создавать.
-Implementer выполняет один ограниченный self-review в текущей рабочей сессии перед commit;
-после исправления дефекта повторяет только affected checks. Нового full self-audit не требуется.
-
-Normal path: implementation → targeted verification → self-review → commit/push → exact-head CI
-→ PR → required GitHub checks → merge → deploy → production smoke/closeout.
-Для PR-triggered CI PR открывается перед ожиданием его required checks.
-Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
-required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
-Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
-PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved. Создавать новый Codex review для этого запрещено.
-PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
-Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-они не должны заменять отдельный LLM review под другим названием.
-Следующую product task автоматически не запускать.
-
-# GLOBAL_RULES - правила выполнения release backlog v17 resource-aware
+Deterministic CI/tests/static-analysis checks и специальные human/external gates остаются
+источником release quality. Automatic Codex Code Review не включается; bounded Codex review
+используется только после GREEN exact-head `checks` как финальный semantic gate: round 1 плюс не
+более одного re-review после batch fix подтверждённых P0/P1 на изменившемся head SHA. MEDIUM/LOW/NIT
+не запускают re-review. Controller проверяет PR/status/comments/reviews перед запросом, не повторяет
+review для того же SHA, запрещает третий запрос и возвращает `HUMAN_REQUIRED` после второго blocking
+P0/P1. Отдельный reviewer-agent/subagent или adversarial audit не создаётся; implementer делает один
+bounded self-review до commit и после fix запускает только affected checks. PR-only master,
+required checks, non-fast-forward protection и thread resolution сохраняются.
+Automatic Security Review выключен для обычного PR и не сцепляется с Code Review, push, PR opened или
+mark-ready. Security Review запускается только отдельным manual/conditional gate при фактическом
+security trigger; отсутствие такого review не блокирует ordinary task. Deterministic security
+scanners остаются обязательной частью применимого CI. External Codex/GitHub setting не меняется
+repository changes; если она недоступна, фиксируется `MANUAL_EXTERNAL_SETTING_REQUIRED`.
 
 Этот файл действует для завершённых и архивированных release tasks `75-80`, включая буквенные
 подзадачи, owner-approved Pulse concepts pilot `75C`, завершённую UX-reset gate `115A` и
@@ -109,13 +102,13 @@ gate, evidence и точки остановки в task-файле.
 - Один executable task-файл = одна Codex-сессия = одна `task/<ID>-<slug>` ветка = один отдельный
   worktree = один законченный логический результат. Umbrella `90`, `92`, `93`, `94`, `95`, `99`,
   `100` являются coordination contracts и отдельно не выполняются.
-  Implementation exclusion действует только для `exclusive-write` lease в состояниях
-  `starting/implementation/review/qa`; после durable readiness task lease сохраняется, но
-  implementation exclusion освобождается. Обычная task без `concurrency` metadata считается
-  `independent-write`; `exclusive-write` используется только для действительно global или
-  coordination-sensitive изменений. Owner-authorized `supersede` является отдельным non-release
-  terminal переходом: он сохраняет clean branch/worktree lease как audit/recovery anchor, снимает
-  implementation exclusion, не получает delivery ownership и не считается `production-success`.
+  Обычная task без `concurrency` metadata считается `independent-write`. Legacy
+  `exclusive-write` сохраняется для metadata compatibility, но не создаёт repository-wide
+  implementation exclusion: каждый task владеет только своим branch/worktree/state. Реальные
+  shared mutations ограничены коротким state mutex и serial delivery lane. Owner-authorized
+  `supersede` является отдельным non-release terminal переходом: он сохраняет clean branch/worktree
+  lease как audit/recovery anchor, не получает delivery ownership и не считается
+  `production-success`.
   Delivery lane хранится отдельным минимальным mutex/queue.
 - `master` является единственной защищённой release-веткой. Task branch/worktree создаются от
   чистого, проверенного exact `origin/master` SHA; feature implementation непосредственно в
@@ -124,25 +117,26 @@ gate, evidence и точки остановки в task-файле.
   controller PR: branch `codex/controller-<lowercase-kebab-slug>`, title и commit messages с
   префиксом `[Controller]`, только allowlisted governance-файлы, exact required checks и тот же
   protected-master merge provenance.
-- Внутри текущей task после terminal success автоматически выполняются self-review, применимую QA,
-  commit, PR в `master`, CI и normal release шаги, если task явно не объявляет checkpoint или
-  blocker. Следующая product task автоматически не запускается.
+- Внутри текущей task после terminal success автоматически выполняются bounded self-review,
+  применимую QA, commit, PR в `master`, exact-head CI и bounded Codex review (round 1 плюс максимум
+  один re-review только после blocking P0/P1 и изменившегося head), затем normal release шаги, если
+  task явно не объявляет checkpoint или blocker. Следующая product task автоматически не запускается.
 - Явный выбор task владельцем или `scripts/run_task_delivery.py <ID>` является одним standing
   authorization на normal path этой task. Низкоуровневые controller stages не являются действиями
   владельца и не создают повторных generic approval prompts.
 - `scripts/task_session.py` и shared Git common-dir leases являются обязательной coordination
   boundary. Task PR идёт только в `master`; exact-head `checks` и current-base policy разрешают
-  merge только для текущего task head. Implementation compatible `independent-write` tasks может
-  идти параллельно, а одна delivery lane сериализует refresh, PR, CI, merge, production и smoke.
-  Занятая delivery lane, CI или active production deploy не блокируют новую совместимую
-  implementation task; они блокируют только acquisition/delivery critical section. `READY_FOR_DELIVERY`
-  также не удерживает implementation exclusion.
+  merge только для текущего task head. Отдельные implementation tasks могут идти параллельно, а
+  одна delivery lane сериализует refresh, PR, CI, merge, production и smoke. Занятая delivery
+  lane, CI или active production deploy не блокируют новую отдельную implementation task; они
+  блокируют только acquisition/delivery critical section. `READY_FOR_DELIVERY` также не удерживает
+  implementation exclusion.
 - Новая production revision попадает в remote `master` только через merged PR с обязательным green
-  check `checks`; direct push, force-push и удаление `master` запрещены Ruleset. Merge PR является
-  release authorization и без отдельного ручного approval запускает post-merge CI, exact-SHA
-  provenance gate и автоматический production deploy. History rewrite, ручные production-команды,
-  bootstrap, infrastructure recovery и SHA вне текущего merged `master` остаются exceptional
-  actions с отдельным owner approval, backup и preflight.
+  check `checks`; direct push, force-push и удаление `master` запрещены Ruleset. Product merge PR
+  является release authorization и запускает post-merge CI/production path; controller-only merge
+  не deploy-ит application bundle. History rewrite, ручные production-команды, bootstrap,
+  infrastructure recovery и SHA вне текущего merged `master` остаются exceptional actions с
+  отдельным owner approval, backup и preflight.
 - Для `AUTO_RELEASE_ELIGIBLE` task нормальный release path выполняется без дополнительного вопроса
   владельцу: `implementation/self-review/QA -> relevant local checks -> logical commit/push ->
   task PR master -> current-base/provenance check -> exact-head GitHub checks -> merge master ->
@@ -150,16 +144,17 @@ gate, evidence и точки остановки в task-файле.
   finish/clean task worktree and merged local branch -> archive task -> rebuild/check backlog
   manifests -> terminal report`. Полный локальный regression run доброволен и не создаёт release
   evidence; direct push в `master` запрещён.
-- Implementation/self-review/QA нескольких совместимых `independent-write` task могут быть
-  параллельными. Master integration и production delivery остаются **strictly serial**: только
-  delivery owner может refresh/rebase, проверить provenance, открыть/обновить PR, merge или deploy.
+- Implementation/self-review/QA нескольких task могут быть параллельными в отдельных worktree.
+  Master integration и production delivery остаются **strictly serial**: только delivery owner
+  может refresh/rebase, проверить provenance, открыть/обновить PR, дождаться exact-head CI и
+  bounded review, merge или deploy.
   Если current base изменился, candidate обновляется перед push; exact-head required checks
   выполняет GitHub CI. Busy delivery/production только переводит candidate в
   `WAITING_FOR_DELIVERY`, а dirty, interrupted, conflict или ambiguous state останавливаются с
-  точным blocker. READY/waiting/CI/production не блокируют новую совместимую `independent-write`
-  task; independent task совместима с активной `exclusive-write`, пока serial delivery не выявит
-  реальный конфликт файлов. Новая `exclusive-write` task консервативно ждёт активную implementation
-  task.
+  точным blocker. READY/waiting/CI/production не блокируют новую отдельную implementation task;
+  serial delivery обнаруживает реальный конфликт файлов при refresh/rebase. Legacy
+  `exclusive-write` task также может начать отдельный worktree; никакая implementation task не
+  получает repository-wide writer barrier.
 - Task с явно обязательным owner checkpoint/approve, human/device evidence, manual visual approval,
   legal-counsel gate или destructive/external authorization останавливается ровно перед указанным
   gate до фактического прохождения. Task без tracked logical commit не создаёт PR; отсутствие

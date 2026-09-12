@@ -95,26 +95,37 @@ in normal layout flow and verify relevant desktop/mobile geometry.
 
 ## Постоянная политика quality gates
 
-Codex Code Review отключён и не используется как release gate, поскольку расходует Codex usage.
-Качество подтверждают детерминированные CI/tests/static-analysis checks и явно требуемые
-для конкретной task human/external gates. Отдельный LLM review verdict не требуется.
-Автоматические GitHub reviews, вызов `@codex review`, ожидание connector/fresh reviewed SHA,
-review rate-limit waits, usage-reset credit ради review и waiver отсутствующего review запрещены.
-Отдельную Codex review-задачу, роль или subagent для перечитывания diff не создавать.
-Implementer выполняет один ограниченный self-review в текущей рабочей сессии перед commit;
-после исправления дефекта повторяет только affected checks. Нового full self-audit не требуется.
+Качество подтверждают deterministic CI/tests/static-analysis checks и явно требуемые для конкретной
+task human/external gates. Codex Code Review не включается автоматически и используется только как
+bounded final semantic gate после GREEN exact-head CI: максимум round 1 плюс один re-review для
+подтверждённых blocking P0/P1 после изменившегося head SHA. MEDIUM/LOW/NIT не запускают re-review.
+Не создавать отдельную review-задачу, reviewer role/subagent или adversarial LLM audit; implementer
+выполняет один ограниченный self-review до commit и после fix повторяет только affected checks.
+Controller-команды `request-codex-review` и `validate-codex-review` идемпотентны для одного SHA,
+запрещают третий review и возвращают `HUMAN_REQUIRED` после повторного P0/P1 на round 2.
 
-Normal path: implementation → targeted verification → self-review → commit/push → exact-head CI
-→ PR → required GitHub checks → merge → deploy → production smoke/closeout.
+Normal path: implementation → targeted verification → final deterministic verification → bounded
+self-review → commit/push → PR → exact-head required CI GREEN → Codex review round 1 → merge;
+при blocking P0/P1: one batch fix → affected checks → push → exact-head CI → round 2 → merge или
+`HUMAN_REQUIRED` → post-merge cleanup → deploy/production closeout только по contract product task.
 Для PR-triggered CI PR открывается перед ожиданием его required checks.
 Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved. Создавать новый Codex review для этого запрещено.
+нужно фактически исправить и resolved до bounded review. Review не запускается до implementation,
+до GREEN CI, повторно на том же SHA или после clean verdict.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-они не должны заменять отдельный LLM review под другим названием.
+Codex review их не заменяет. Automatic Security Review не является частью normal path обычного PR и
+не должен запускаться при PR opened, push, mark-ready или каждом Code Review. Security Review -
+отдельный manual/conditional gate для фактических security-sensitive surfaces: auth/authz, secrets,
+untrusted network, uploads/parsers, user-controlled URLs, sensitive data, payments, admin actions,
+cryptography/headers, webhook verification, privilege escalation, dependency-security task или
+dedicated security audit. Code Review и Security Review не сцепляются автоматически; deterministic
+security scanners остаются в CI, а отсутствие Security Review не блокирует ordinary task без
+security trigger. Automatic external Codex/GitHub settings не меняются repository changes; если
+настройка недоступна, фиксируй `MANUAL_EXTERNAL_SETTING_REQUIRED`.
 Следующую product task автоматически не запускать.
 
 # Skills
@@ -290,20 +301,18 @@ Use `python scripts/task_session.py doctor/start/status/finish/recover` as the
 repository-native coordination boundary. Runtime leases live only in the shared Git common dir;
 missing/corrupted state is a blocker. Task PRs target only `master`, preserve `[Task <ID>]` in branch,
 commit and PR provenance, and merge only after exact-head `checks` against the current base. A
-production deployment run occupies only the shared delivery lane; it does not block a compatible
-`independent-write` implementation lease. Delivery ownership still remains required for refresh,
+production deployment run occupies only the shared delivery lane; it does not block a separate
+implementation lease. Delivery ownership still remains required for refresh,
 final gate, PR, merge, deployment and production completion.
 The normal owner-facing entry is `python scripts/run_task_delivery.py <ID>`; direct controller
 commands are low-level implementation and recovery operations.
 
 Parallel read-only/research sessions are allowed only when task metadata permits them and each has
 its own lease. An ordinary executable task without `concurrency` metadata defaults to
-`independent-write`; declare `exclusive-write` only for genuinely global or coordination-sensitive
-changes. Independent implementation branches may run in separate worktrees, and an
-`independent-write` implementation may proceed alongside an active `exclusive-write` implementation
-when no real file/resource conflict is declared. A new `exclusive-write` implementation still waits
-for active implementation writers. The delivery critical section remains single-owner and serializes
-refresh/rebase, final gate, PR, merge, deploy and smoke; dirty, interrupted, corrupt, missing,
+`independent-write`; legacy `exclusive-write` metadata is accepted for compatibility but never
+blocks another task's separate worktree. Task/worktree ownership is scoped, while the delivery
+critical section remains single-owner and serializes refresh/rebase, final deterministic gate,
+PR, exact-head CI, bounded review, merge, deploy and smoke; dirty, interrupted, corrupt, missing,
 duplicate or ambiguous state remains fail-closed. Merge into `master` remains protected and
 serialized.
 

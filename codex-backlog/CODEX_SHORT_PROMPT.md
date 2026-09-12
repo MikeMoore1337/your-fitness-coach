@@ -27,8 +27,13 @@
 ```
 
 
-Codex Code Review отключён постоянно: не создавать отдельного reviewer и не ждать LLM verdict.
-Self-review выполняется один раз implementer в текущей сессии. Release требует targeted tests,
-применимых static analysis/integration/e2e, exact-head CI и aggregate `checks` GREEN,
-отсутствия unresolved BLOCKER/HIGH, mergeable PR и resolution существующих threads.
-Явные task-specific human/external/security/legal/destructive gates сохраняются.
+Automatic Codex Code Review не включается. После GREEN exact-head `checks` controller использует
+один bounded review round; второй разрешён только после blocking P0/P1 и изменившегося head SHA.
+Clean review не повторяется, третий request запрещён. Отдельный reviewer/subagent не создаётся.
+Release требует targeted tests, применимых static analysis/integration/e2e, exact-head CI и
+aggregate `checks` GREEN, CLEAN review, отсутствия unresolved BLOCKER/HIGH, mergeable PR и
+resolution существующих threads.
+Явные task-specific human/external/security/legal/destructive gates сохраняются. Automatic Security
+Review для обычного PR выключен и не сцепляется с Code Review; это отдельный
+manual/conditional gate, запрашивай его только при фактическом security trigger. Deterministic
+security scanners остаются в CI.
