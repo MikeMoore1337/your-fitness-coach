@@ -2,14 +2,26 @@
 
 ## Статус решения
 
-Этот документ расширяет активный `DESIGN_V2_1 Quiet Pace`. Владелец выбрал единую compact/mobile
-геометрию графиков v2 и гибридный набор пиктограмм v1/v2. Логотип YFC и официальные provider marks
-не входят в эту систему и не перерисовываются.
+Task 239 унифицирует функциональную иконографику поверх текущего Liquid Glass, сохраняя IA и
+геометрию графиков. До явного owner visual approval новый набор является кандидатом для выпуска.
+Логотип YFC, официальные provider marks и аватары не входят в функциональное семейство.
 
 ## Иконографика
 
 - Канонический renderer: `frontend/src/shared/ui/Icon.tsx`.
+- Статическая JSX-геометрия: `frontend/src/shared/ui/iconGlyphs.tsx`. HTML/SVG из внешних
+  источников не интерпретируется. Существующее векторное семейство YFC переиспользовано без dependency.
 - Сетка: `24×24`; поддерживаемые optical sizes: `16`, `20`, `24`.
+- Иллюстративные экземпляры того же glyph на landing сохраняют размеры `56`, `80`, `110`;
+  функциональные controls не используют эти размеры. Произвольное масштабирование отдельных nav icons запрещено.
+- Food entry использует `nav-nutrition`, workout — общую гантель `exercise`/`nav-plan`/`week-strength`.
+  `calendar` и `nav-today`, disclosure/chevron, more и rest/moon используют общую геометрию.
+- Select сохраняет native поведение и CSS background adapter с той же геометрией chevron;
+  unit check предотвращает расхождение. Touch date использует декоративный `Icon` с
+  `pointer-events: none`; desktop date/time и нативные popup pickers остаются browser controls.
+- Default/active/hover/focus/disabled/destructive/unavailable наследуют цвет и состояние control.
+  Иконка не меняет accessible name, tab order, обработчики, permissions или hit area.
+  Filled допустим только для явного `star-filled`; status dots не являются отдельным filled-семейством.
 - Все функциональные glyphs используют `currentColor`, round cap/join и общий stroke `1.8`.
 - Базовые actions, navigation, confidence, statuses, product и `WeekStrip` имеют уникальные
   семантические имена. Одинаковая семантика не получает page-local SVG, Unicode или CSS substitute.
