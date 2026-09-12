@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/ui/Icon';
 import { useEffect, useRef } from 'react';
 import './strength-scene.css';
 
@@ -127,13 +128,13 @@ export function StrengthScene() {
               </span>
             </div>
             <div className="strength-scene__result" hidden>
-              <img src="/assets/icons/flat-dumbbell.webp" alt="" width="110" height="110" />
+              <Icon name="exercise" size={110} />
               <strong>Подход сохранён.</strong>
               <span>18 кг × 3 повторения</span>
             </div>
           </div>
           <div className="strength-scene__record">
-            <img src="/assets/icons/flat-dumbbell.webp" alt="" width="56" height="56" />
+            <Icon name="exercise" size={56} />
             <span>
               <small>ЗАПИСЬ ПОДХОДА</small>
               <br />

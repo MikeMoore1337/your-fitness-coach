@@ -143,16 +143,6 @@
   opacity: 0.7;
   z-index: -1;
 }
-.landing-page .landing-feature__progress .yfc-icon > .yfc-icon__dark,
-.landing-page .landing-hero__platform .yfc-icon > .yfc-icon__dark,
-.landing-page .landing-hero .landing-button--secondary .yfc-icon > .yfc-icon__dark {
-  display: block;
-}
-.landing-page .landing-feature__progress .yfc-icon > .yfc-icon__light,
-.landing-page .landing-hero__platform .yfc-icon > .yfc-icon__light,
-.landing-page .landing-hero .landing-button--secondary .yfc-icon > .yfc-icon__light {
-  display: none;
-}
 .landing-hero__copy {
   padding: 150px 5vw 44px;
   max-width: 950px;
@@ -228,9 +218,7 @@
   margin-top: 18px;
   font-size: 11px;
 }
-.landing-practice__note img {
-  object-fit: contain;
-}
+
 .landing-practice__entry img {
   display: block;
   width: 100%;

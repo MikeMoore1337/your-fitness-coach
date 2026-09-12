@@ -17,20 +17,13 @@ for (const width of [360, 390, 768, 1440]) {
           await page.locator('.week-strip__legend-summary').click();
           await expect(page.getByRole('list', { name: 'Обозначения недели' })).toBeVisible();
         }
-        await expect
-          .poll(async () =>
-            page
-              .locator('[data-icon] img')
-              .evaluateAll((images) =>
-                images.every(
-                  (image) =>
-                    image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
-                ),
-              ),
-          )
-          .toBe(true);
-        for (const image of await page.locator('[data-icon] img').all()) {
-          await expect(image).toHaveAttribute('src', /\/assets\/icons\/flat-[a-z-]+\.webp$/);
+        const icons = page.locator('[data-icon]');
+        expect(await icons.count()).toBeGreaterThan(0);
+        for (const icon of await icons.all()) {
+          await expect(icon).toHaveAttribute('viewBox', '0 0 24 24');
+          await expect(icon).toHaveAttribute('stroke', 'currentColor');
+          await expect(icon).toHaveAttribute('stroke-width', '1.8');
+          await expect(icon.locator('img')).toHaveCount(0);
         }
         await page.screenshot({
           path: testInfo.outputPath(`${section}-${width}-${theme}.png`),

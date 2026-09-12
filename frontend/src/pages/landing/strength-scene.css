@@ -111,9 +111,7 @@
 .strength-scene__result[hidden] {
   display: none;
 }
-.strength-scene__result img {
-  object-fit: contain;
-}
+
 .strength-scene__result strong {
   font: 700 32px/1.1 var(--font-display);
 }
@@ -134,9 +132,8 @@
 .strength-scene[data-phase='2'] .strength-scene__record {
   background: #e7f5c8;
 }
-.strength-scene__record img {
-  filter: brightness(0.35);
-  object-fit: contain;
+.strength-scene__record > .yfc-icon {
+  color: #141717;
 }
 .strength-scene__record small {
   font-size: 9px;
