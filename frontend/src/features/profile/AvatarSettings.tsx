@@ -180,7 +180,12 @@ export function AvatarSettings({ open, onClose }: { open: boolean; onClose(): vo
         aria-busy={blocking || undefined}
         tabIndex={-1}
       >
-        <header className="avatar-editor__header" inert={confirmDelete}>
+        <header
+          data-glass=""
+          data-glass-variant="regular"
+          className="avatar-editor__header"
+          inert={confirmDelete}
+        >
           <div>
             <span className="eyebrow">Настройка аккаунта</span>
             <h2 id="avatar-editor-title">Аватар</h2>

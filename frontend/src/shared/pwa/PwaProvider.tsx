@@ -81,7 +81,13 @@ function PwaUpdateNotice() {
   const pwa = usePwa();
   if (!pwa.updateAvailable) return null;
   return (
-    <aside className="pwa-update-notice" role="status" aria-live="polite">
+    <aside
+      data-glass=""
+      data-glass-variant="tinted"
+      className="pwa-update-notice"
+      role="status"
+      aria-live="polite"
+    >
       <div>
         <strong>Доступно обновление</strong>
         <p>

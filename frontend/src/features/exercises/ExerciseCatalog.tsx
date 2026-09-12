@@ -255,6 +255,9 @@ export function ExerciseCatalog({
           <label className="field">
             <span>Мышцы</span>
             <select
+              data-glass=""
+              data-glass-variant="tinted"
+              data-glass-interactive=""
               value={muscle}
               onChange={(event) => {
                 setMuscle(event.target.value);
@@ -272,6 +275,9 @@ export function ExerciseCatalog({
           <label className="field">
             <span>Оборудование</span>
             <select
+              data-glass=""
+              data-glass-variant="tinted"
+              data-glass-interactive=""
               value={equipment}
               onChange={(event) => {
                 setEquipment(event.target.value);
@@ -289,6 +295,9 @@ export function ExerciseCatalog({
           <label className="field">
             <span>Опыт</span>
             <select
+              data-glass=""
+              data-glass-variant="tinted"
+              data-glass-interactive=""
               value={difficulty}
               onChange={(event) => {
                 setDifficulty(event.target.value as Exercise['difficulty_level'] | '');

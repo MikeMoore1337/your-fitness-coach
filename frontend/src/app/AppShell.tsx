@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { AppLink, useNavigation } from '../shared/navigation/router';
 import { AppThemeToggle } from '../shared/ui/AppThemeToggle';
+import { glassProps } from '../shared/ui/Glass';
 import { BrandLockup } from '../shared/ui/BrandLogo';
 import { AppNavigationIcon, type AppNavigationIconName } from './AppNavigationIcon';
 import { useOptionalAuth } from './AuthProvider';
@@ -325,6 +326,7 @@ export function AppShell({
         <>
           <nav
             id="appBottomNav"
+            {...glassProps()}
             className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
             aria-label="Основная навигация"
           >
@@ -387,6 +389,7 @@ export function AppShell({
                       'to' in destination ? destination.to : `/app?section=${destination.section}`
                     }
                     className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
+                    {...(active ? glassProps('clear', true) : {})}
                     aria-current={active ? 'page' : undefined}
                   >
                     <AppNavigationIcon name={destination.icon} />
@@ -437,6 +440,7 @@ export function AppShell({
                             key={destination.key}
                             to={destination.to}
                             className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
+                            {...(active ? glassProps('clear', true) : {})}
                             aria-current={active ? 'page' : undefined}
                           >
                             <AppNavigationIcon name={destination.icon} />
@@ -504,6 +508,7 @@ export function AppShell({
               <div
                 id="appMorePanel"
                 className="app-more-panel"
+                {...glassProps('tinted')}
                 ref={morePanelRef}
                 role="dialog"
                 aria-modal="true"

@@ -18,6 +18,7 @@ import { PUBLIC_TELEGRAM_LINKS } from '../../shared/telegram/publicLinks';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { Icon, type IconName } from '../../shared/ui/Icon';
 import { PublicShell } from '../../shared/ui/PublicShell';
+import { glassProps } from '../../shared/ui/Glass';
 import { LandingPractice } from './LandingPractice';
 import { LandingProgress } from './LandingProgress';
 import { StrengthScene } from './StrengthScene';
@@ -291,6 +292,8 @@ export default function LandingPage() {
               </a>
               <a
                 className="landing-button landing-button--secondary"
+                {...glassProps('clear', true)}
+                data-glass-tone="on-image"
                 href={cabinetScenarioUrl(demoUrl, 'self_training')}
                 onClick={trackDemoSelection}
               >

@@ -162,7 +162,7 @@ test('вторичный hero CTA сохраняет контрастный те
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
     await page.reload();
 
-    const expectedBackground = 'rgba(0, 0, 0, 0)';
+    const expectedBackground = 'rgba(20, 25, 25, 0.64)';
     const expectedText = 'rgb(255, 255, 255)';
     for (const link of [
       page.locator('.landing-hero__actions').getByRole('link', { name: /Попробовать демо/ }),

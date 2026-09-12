@@ -597,7 +597,7 @@ export function FoodPickerDialog({
     >
       <div className="modal__backdrop" aria-hidden="true" onClick={onClose} />
       <div className="modal__panel nutrition-picker__panel" ref={panelRef} tabIndex={-1}>
-        <header className="nutrition-picker__header">
+        <header data-glass="" data-glass-variant="regular" className="nutrition-picker__header">
           <div>
             <span className="eyebrow">Добавить в {mealLabels[mealType]}</span>
             <h2 id="nutrition-picker-title">{title}</h2>

@@ -6,6 +6,7 @@ import { AuthGate } from './app/AuthGate';
 import { OnboardingGate } from './app/OnboardingGate';
 import { ErrorBoundary } from './app/ErrorBoundary';
 import { FeedbackProvider } from './shared/ui/FeedbackProvider';
+import { GlassInteractions } from './shared/ui/GlassInteractions';
 import { OnlineStatus } from './shared/ui/OnlineStatus';
 import { LoadingState } from './shared/ui/common';
 import { isTelegramLaunch } from './shared/telegram/launch';
@@ -21,6 +22,7 @@ import { PwaProvider } from './shared/pwa/PwaProvider';
 import './styles/legacy.css';
 import './styles/fonts.css';
 import './styles/design-system.css';
+import './styles/liquid-glass.css';
 
 const publicContentRoots = new Set([
   '/training',
@@ -182,6 +184,7 @@ function Root() {
       <PwaProvider>
         <ErrorBoundary>
           <FeedbackProvider>
+            <GlassInteractions />
             <NavigationProvider>
               <OnlineStatus />
               <Suspense

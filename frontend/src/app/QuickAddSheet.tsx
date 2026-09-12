@@ -1,4 +1,5 @@
 import { AppLink } from '../shared/navigation/router';
+import { Glass, glassProps } from '../shared/ui/Glass';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import { useModalA11y } from '../shared/ui/useModalA11y';
 
@@ -60,6 +61,8 @@ export function QuickAddTrigger({ onOpen }: { onOpen(): void }) {
     <button
       aria-haspopup="dialog"
       aria-label="Быстро добавить"
+      {...glassProps('tinted', true)}
+      data-glass-accent="lime"
       className="app-quick-add-trigger"
       data-testid="quick-add-trigger"
       type="button"
@@ -93,8 +96,9 @@ export function QuickAddSheet({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div
+      <Glass
         aria-labelledby="quick-add-title"
+        variant="tinted"
         aria-modal="true"
         className="app-quick-add-panel"
         data-testid="quick-add-sheet"
@@ -144,7 +148,7 @@ export function QuickAddSheet({
             </AppLink>
           ))}
         </nav>
-      </div>
+      </Glass>
     </div>
   );
 }

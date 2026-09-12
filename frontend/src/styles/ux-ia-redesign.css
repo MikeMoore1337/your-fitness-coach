@@ -25,6 +25,13 @@
   background: var(--v2-lime-hover);
 }
 
+/* Во время отдыха tablet FAB не перекрывает кнопки таймера. */
+@media (min-width: 521px) and (max-width: 899px) {
+  body:has(.active-workout-rest) .app-quick-add-trigger {
+    bottom: calc(176px + max(8px, var(--yfc-layout-safe-bottom, 0px)));
+  }
+}
+
 .app-quick-add-trigger__plus {
   display: inline-grid;
   width: 20px;
