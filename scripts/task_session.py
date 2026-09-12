@@ -1264,6 +1264,16 @@ def _codex_request_records(
     return records
 
 
+def _unresolved_review_thread_indices(
+    review_threads: Sequence[Mapping[str, Any]],
+) -> list[int]:
+    return [
+        index
+        for index, thread in enumerate(review_threads, start=1)
+        if thread.get("isResolved") is not True and thread.get("isOutdated") is not True
+    ]
+
+
 def _latest_codex_result(
     comments: Sequence[Mapping[str, Any]],
     *,
@@ -1324,7 +1334,10 @@ def _latest_codex_result(
                 )
     if not candidates:
         return None
-    _, status, comment = max(candidates, key=lambda item: item[0])
+    _, status, comment = max(
+        candidates,
+        key=lambda item: (item[1] == "BLOCKING_P0_P1", item[0]),
+    )
     return status, comment
 
 
@@ -1424,11 +1437,7 @@ def validate_pull_request_review_contract(
                 f"{mergeable_state or '<missing>'}"
             )
 
-    unresolved_threads = [
-        index
-        for index, thread in enumerate(review_threads, start=1)
-        if thread.get("isResolved") is not True
-    ]
+    unresolved_threads = _unresolved_review_thread_indices(review_threads)
     if unresolved_threads:
         raise TaskSessionError(
             "PR review gate refuses unresolved review threads: "
@@ -1968,7 +1977,13 @@ class TaskController:
         path = self.store.codex_review_path(pr_number)
         StateStore.replace_json(path, dict(state))
 
-    def _codex_review_preflight(self, pr_number: int, *, expected_head_sha: str) -> dict[str, Any]:
+    def _codex_review_preflight(
+        self,
+        pr_number: int,
+        *,
+        expected_head_sha: str,
+        reject_unresolved_threads: bool = True,
+    ) -> dict[str, Any]:
         head_sha = expected_head_sha.strip().lower()
         if not re.fullmatch(r"[0-9a-f]{40}", head_sha):
             raise TaskSessionError("Codex review requires a full lowercase 40-character head SHA")
@@ -2008,12 +2023,8 @@ class TaskController:
         reviews = github.pull_request_reviews(pr_number)
         comments = github.issue_comments(pr_number)
         threads = github.review_threads(pr_number)
-        unresolved = [
-            index
-            for index, thread in enumerate(threads, start=1)
-            if thread.get("isResolved") is not True
-        ]
-        if unresolved:
+        unresolved = _unresolved_review_thread_indices(threads)
+        if reject_unresolved_threads and unresolved:
             raise TaskSessionError(
                 "Codex review refuses unresolved review threads: "
                 + ", ".join(str(item) for item in unresolved)
@@ -2261,7 +2272,11 @@ class TaskController:
         self.store.initialize()
         expected_head = head_sha.strip().lower()
         with self.store.lock():
-            preflight = self._codex_review_preflight(pr_number, expected_head_sha=expected_head)
+            preflight = self._codex_review_preflight(
+                pr_number,
+                expected_head_sha=expected_head,
+                reject_unresolved_threads=False,
+            )
             state = self._codex_review_state(pr_number)
             state["state_path"] = str(self.store.codex_review_path(pr_number))
             matching = [
@@ -2294,6 +2309,12 @@ class TaskController:
                 reason = "exact-head Codex result classified"
                 blocker_report = (
                     _review_body(result_comment).strip() if status == "BLOCKING_P0_P1" else None
+                )
+            unresolved_threads = _unresolved_review_thread_indices(preflight["threads"])
+            if unresolved_threads and status != "BLOCKING_P0_P1":
+                raise TaskSessionError(
+                    "Codex review refuses unresolved review threads: "
+                    + ", ".join(str(item) for item in unresolved_threads)
                 )
             record.update({"status": status, "updated_at": utc_now()})
             state["rounds"] = [

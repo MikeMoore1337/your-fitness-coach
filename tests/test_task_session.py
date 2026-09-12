@@ -945,6 +945,40 @@ def test_codex_review_classifies_structured_p1_thread_as_blocking(
     assert "P1" in result["blocker_report"]
 
 
+def test_codex_review_classifies_unresolved_p1_thread_before_clean_summary(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+    github.threads[219] = [
+        {
+            "isResolved": False,
+            "isOutdated": False,
+            "comments": [
+                {
+                    "id": 51,
+                    "user": {"login": "chatgpt-codex-connector[bot]"},
+                    "created_at": "2026-09-12T10:00:58Z",
+                    "body": "**[P1] Preserve exact-head approval**\nRequire explicit CLEAN.",
+                    "pullRequestReview": {"commit": {"oid": head_sha}},
+                }
+            ],
+        }
+    ]
+    _append_codex_result(
+        github,
+        head_sha=head_sha,
+        body="review status completed; no blocking findings",
+        comment_id=59,
+    )
+
+    result = controller.validate_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert result["status"] == "BLOCKING_P0_P1"
+    assert result["merge_allowed"] is False
+    assert "P1" in result["blocker_report"]
+
+
 def test_codex_clean_round_one_allows_merge_without_rereview(
     repository: tuple[Path, Any],
 ) -> None:
