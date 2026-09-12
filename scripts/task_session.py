@@ -1270,7 +1270,7 @@ def _unresolved_review_thread_indices(
     return [
         index
         for index, thread in enumerate(review_threads, start=1)
-        if thread.get("isResolved") is not True and thread.get("isOutdated") is not True
+        if thread.get("isResolved") is not True
     ]
 
 

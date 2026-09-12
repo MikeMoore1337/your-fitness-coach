@@ -35,8 +35,13 @@ PR должен быть mergeable и соответствовать branch/rule
 до GREEN CI, повторно на том же SHA или после clean verdict.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-Codex review их не заменяет. Automatic Codex/GitHub setting не включается repository changes; если
-внешняя настройка недоступна, финальный отчёт фиксирует `MANUAL_EXTERNAL_SETTING`.
+Codex review их не заменяет. Automatic Security Review не является частью normal path обычного PR:
+он не запускается при PR opened, push, mark-ready или каждом Code Review. Security Review остаётся
+отдельным manual/conditional gate для фактических security-sensitive surfaces; Code Review и Security
+Review не сцепляются автоматически, а deterministic security scanners остаются в CI. Отсутствие
+Security Review не блокирует ordinary task без security trigger. Automatic external Codex/GitHub
+settings не меняются repository changes; если настройка недоступна, финальный отчёт фиксирует
+`MANUAL_EXTERNAL_SETTING_REQUIRED`.
 Следующую product task автоматически не запускать.
 
 ## 0. Coordination lanes

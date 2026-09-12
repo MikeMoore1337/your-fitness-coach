@@ -11,6 +11,11 @@ review для того же SHA, запрещает третий запрос и
 P0/P1. Отдельный reviewer-agent/subagent или adversarial audit не создаётся; implementer делает один
 bounded self-review до commit и после fix запускает только affected checks. PR-only master,
 required checks, non-fast-forward protection и thread resolution сохраняются.
+Automatic Security Review выключен для обычного PR и не сцепляется с Code Review, push, PR opened или
+mark-ready. Security Review запускается только отдельным manual/conditional gate при фактическом
+security trigger; отсутствие такого review не блокирует ordinary task. Deterministic security
+scanners остаются обязательной частью применимого CI. External Codex/GitHub setting не меняется
+repository changes; если она недоступна, фиксируется `MANUAL_EXTERNAL_SETTING_REQUIRED`.
 
 Этот файл действует для завершённых и архивированных release tasks `75-80`, включая буквенные
 подзадачи, owner-approved Pulse concepts pilot `75C`, завершённую UX-reset gate `115A` и

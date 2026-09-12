@@ -24,7 +24,9 @@ PR должен быть mergeable и соответствовать branch/rule
 повторно на том же SHA или после clean verdict.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-Codex review их не заменяет.
+Codex review их не заменяет. Automatic Security Review не запускается для обычного PR и не
+сцепляется с Code Review; это отдельный manual/conditional gate только при фактическом security
+trigger. Deterministic security scanners остаются в CI.
 Следующую product task автоматически не запускать.
 
 

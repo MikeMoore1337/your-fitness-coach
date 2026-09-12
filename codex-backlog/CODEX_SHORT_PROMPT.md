@@ -33,4 +33,7 @@ Clean review не повторяется, третий request запрещён.
 Release требует targeted tests, применимых static analysis/integration/e2e, exact-head CI и
 aggregate `checks` GREEN, CLEAN review, отсутствия unresolved BLOCKER/HIGH, mergeable PR и
 resolution существующих threads.
-Явные task-specific human/external/security/legal/destructive gates сохраняются.
+Явные task-specific human/external/security/legal/destructive gates сохраняются. Automatic Security
+Review для обычного PR выключен и не сцепляется с Code Review; это отдельный
+manual/conditional gate, запрашивай его только при фактическом security trigger. Deterministic
+security scanners остаются в CI.

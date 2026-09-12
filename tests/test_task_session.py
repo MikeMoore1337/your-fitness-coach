@@ -592,6 +592,35 @@ def test_review_contract_rejects_unresolved_thread_even_with_exact_approval() ->
         )
 
 
+@pytest.mark.parametrize(
+    ("is_resolved", "is_outdated", "blocks"),
+    [
+        (False, False, True),
+        (False, True, True),
+        (True, False, False),
+        (True, True, False),
+    ],
+)
+def test_review_thread_gate_uses_only_is_resolved(
+    is_resolved: bool, is_outdated: bool, blocks: bool
+) -> None:
+    head_sha = "b" * 40
+    reviews = [{"state": "APPROVED", "commit_id": head_sha, "user": {"login": "owner"}}]
+    threads = [{"isResolved": is_resolved, "isOutdated": is_outdated}]
+
+    if blocks:
+        with pytest.raises(task_session.TaskSessionError, match="unresolved review threads"):
+            task_session.validate_pull_request_review_contract(
+                _review_pr(head_sha), reviews, [], threads
+            )
+        return
+
+    result = task_session.validate_pull_request_review_contract(
+        _review_pr(head_sha), reviews, [], threads
+    )
+    assert result["status"] == "PASS"
+
+
 def test_review_contract_accepts_exact_codex_comment_and_resolved_threads() -> None:
     head_sha = "b" * 40
     comments = [
@@ -1038,6 +1067,7 @@ def test_codex_round_two_requires_changed_head_and_ends_human_required(
 
     assert second_request["status"] == "REQUESTED"
     assert second_result["status"] == "HUMAN_REQUIRED"
+    assert second_result["review_budget"] == {"used": 2, "max": 2, "remaining": 0}
     assert "P1" in second_result["blocker_report"]
     assert repeated["status"] == "HUMAN_REQUIRED"
     assert len(github.created_comments) == 2
@@ -1055,6 +1085,51 @@ def test_codex_review_rejects_unresolved_thread_before_request(
         controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
 
     assert github.created_comments == []
+
+
+def test_codex_review_rejects_outdated_unresolved_thread_before_request(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    github.threads[219] = [{"isResolved": False, "isOutdated": True}]
+
+    with pytest.raises(task_session.TaskSessionError, match="unresolved review threads"):
+        controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert github.created_comments == []
+
+
+def test_codex_review_ignores_resolved_outdated_old_head_finding(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+    github.threads[219] = [
+        {
+            "isResolved": True,
+            "isOutdated": True,
+            "comments": [
+                {
+                    "id": 51,
+                    "user": {"login": "chatgpt-codex-connector[bot]"},
+                    "created_at": "2026-09-12T10:01:00Z",
+                    "body": "**[P1] Old-head finding**",
+                    "pullRequestReview": {"commit": {"oid": "a" * 40}},
+                }
+            ],
+        }
+    ]
+    _append_codex_result(
+        github,
+        head_sha=head_sha,
+        body="review status completed; no blocking findings",
+        comment_id=52,
+    )
+
+    result = controller.validate_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert result["status"] == "CLEAN"
+    assert result["merge_allowed"] is True
 
 
 def test_master_ruleset_requires_pr_current_base_and_aggregate_check() -> None:

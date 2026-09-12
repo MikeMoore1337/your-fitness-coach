@@ -59,6 +59,23 @@ def test_canonical_policy_preserves_deterministic_and_explicit_gates() -> None:
         assert "Codex Code Review отключён" not in source, name
 
 
+def test_security_review_is_separate_conditional_gate() -> None:
+    for name in (
+        "AGENTS.md",
+        "codex-backlog/GLOBAL_RULES.md",
+        "codex-backlog/TASK_EXECUTION_LIFECYCLE.md",
+        "codex-backlog/CODEX_PROMPT_TEMPLATE.md",
+        "codex-backlog/CODEX_SHORT_PROMPT.md",
+        "docs/codex-code-review-retirement.md",
+        "docs/issue-driven-continuous-workflow.md",
+        "docs/task-branch-integration.md",
+    ):
+        source = " ".join((ROOT / name).read_text(encoding="utf-8").lower().split())
+        assert "automatic security review" in source, name
+        assert "manual/conditional" in source, name
+        assert "deterministic security" in source, name
+
+
 def test_quality_gate_cli_does_not_make_qa_a_universal_stage() -> None:
     args = task_session._parser().parse_args(
         ["mark-ready", "229", "--head-sha", "exact-sha", "--quality-verdict", "PASS"]

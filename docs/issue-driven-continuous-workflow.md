@@ -29,7 +29,9 @@ PR`; implementation остаётся в task worktree, а refresh, merge, deploy
 разрешает merge; только подтверждённые blocking P0/P1 разрешают один batch fix и re-review на новом
 SHA. MEDIUM/LOW/NIT не запускают повторный review, clean result не повторяется, а второй blocking
 result возвращает `HUMAN_REQUIRED`. CI не включает отдельный LLM job, automatic Code Review не
-включается, а review не заменяет security/legal/human/destructive gates.
+включается, а review не заменяет security/legal/human/destructive gates. Automatic Security Review
+для обычного PR выключен и не сцепляется с Code Review; это отдельный manual/conditional gate,
+запускаемый только при фактическом security trigger. Deterministic security scanners остаются в CI.
 
 ## Непрерывная очередь
 

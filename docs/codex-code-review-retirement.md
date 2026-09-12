@@ -34,9 +34,20 @@ round 2 возвращает `HUMAN_REQUIRED` с точным blocker report.
 Профильные QA, security, legal, human, external и destructive gates сохраняются. Codex review их
 не заменяет; `master` остаётся PR-only, exact-head CI и aggregate `checks` не ослабляются.
 
+## Отдельный Security Review
+
+Automatic Security Review выключен для обычного PR: он не запускается при открытии PR, push,
+mark-ready, обычном Code Review или просто из-за существования PR. Security Review - отдельный
+manual/conditional gate для фактических security-sensitive surfaces: auth/authz, secrets, untrusted
+network, uploads/parsers, user-controlled URLs, sensitive data, payments, admin actions,
+cryptography/headers, webhook verification, privilege escalation, dependency-security task или
+dedicated security audit. Code Review и Security Review не сцепляются автоматически, отсутствие
+Security Review не блокирует ordinary task без security trigger, а deterministic security scanners
+остаются в CI.
+
 ## Внешняя настройка
 
-Если владелец хочет отключить внешнюю автоматическую настройку Code Review, это выполняется вручную
-в Codex/GitHub integration settings; repository не создаёт secret, token или автоматическое правило.
-Недоступная внешняя настройка не блокирует repository changes и указывается как
-`MANUAL_EXTERNAL_SETTING`.
+Если владелец хочет отключить внешнюю автоматическую настройку Code Review или Security Review, это
+выполняется вручную в Codex/GitHub integration settings; repository не создаёт secret, token или
+автоматическое правило. Недоступная внешняя настройка не блокирует repository changes и указывается
+как `MANUAL_EXTERNAL_SETTING_REQUIRED`.

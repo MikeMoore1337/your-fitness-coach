@@ -28,7 +28,9 @@ bounded Codex review, merge и product delivery. После GREEN `checks` од�
 `request-codex-review --round 1`; при blocking P0/P1 сделай один batch fix, affected checks, новый
 exact-head CI и максимум `--round 2`. CLEAN разрешает merge, второй blocking result даёт
 `HUMAN_REQUIRED`, третья проверка запрещена. Не deploy production вне task release contract. Не
-переходи к следующей task.
+переходи к следующей task. Automatic Security Review не запускай автоматически для обычной task
+и не сцепляй с Code Review; это отдельный manual/conditional gate только при фактическом
+security trigger. Deterministic security scanners остаются в CI.
 ```
 
 ## Current start
@@ -47,4 +49,6 @@ GREEN; отдельный reviewer/subagent не создаётся. Self-review
 текущей сессии. Release требует targeted tests, применимых static analysis/integration/e2e,
 exact-head CI и aggregate `checks` GREEN, CLEAN review, отсутствия unresolved BLOCKER/HIGH,
 mergeable PR и resolution существующих threads.
-Явные task-specific human/external/security/legal/destructive gates сохраняются.
+Явные task-specific human/external/security/legal/destructive gates сохраняются. Без security
+trigger отсутствие Security Review не блокирует обычную task; при наличии trigger его запрашивай
+отдельно и явно, не выдавая Code Review за Security Review.
