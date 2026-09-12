@@ -889,6 +889,71 @@ def test_codex_review_reuses_external_running_summary_without_duplicate_request(
     assert github.created_comments == []
 
 
+def test_codex_review_uses_external_code_review_row_for_current_head(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    stale_sha = "a" * 40
+    github.comments[219] = [
+        {
+            "id": 49,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                "<!-- codex-security-review:v1 "
+                f'{{"headSha":"{stale_sha}","pullRequestNumber":219,"status":"completed"}} -->\n'
+                "| Review | Status | Commit | Review trigger |\n"
+                f"| 📝 **Code Review** | 🔄 **Running** | `{head_sha[:7]}` | Manual request |"
+            ),
+        }
+    ]
+
+    running = controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert running["status"] == "PENDING"
+    assert running["reused"] is True
+    assert github.created_comments == []
+
+    github.comments[219][0]["body"] = (
+        "<!-- codex-security-review:v1 "
+        f'{{"headSha":"{stale_sha}","pullRequestNumber":219,"status":"completed"}} -->\n'
+        "| Review | Status | Commit | Review trigger |\n"
+        f"| 📝 **Code Review** | ✅ **Completed** | `{head_sha[:7]}` | Manual request |"
+    )
+    completed = controller.validate_codex_review(pr_number=219, head_sha=head_sha)
+
+    assert completed["status"] == "CLEAN"
+    assert completed["merge_allowed"] is True
+    assert github.created_comments == []
+
+
+def test_codex_review_classifies_structured_p1_thread_as_blocking(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+    github.threads[219] = [
+        {
+            "isResolved": True,
+            "isOutdated": False,
+            "comments": [
+                {
+                    "id": 51,
+                    "user": {"login": "chatgpt-codex-connector[bot]"},
+                    "created_at": "2026-09-12T10:01:00Z",
+                    "body": "**[P1] Preserve exact-head approval**\nRequire explicit CLEAN.",
+                    "pullRequestReview": {"commit": {"oid": head_sha}},
+                }
+            ],
+        }
+    ]
+
+    result = controller.validate_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert result["status"] == "BLOCKING_P0_P1"
+    assert result["merge_allowed"] is False
+    assert "P1" in result["blocker_report"]
+
+
 def test_codex_clean_round_one_allows_merge_without_rereview(
     repository: tuple[Path, Any],
 ) -> None:

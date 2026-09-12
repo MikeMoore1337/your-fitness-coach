@@ -101,6 +101,10 @@ CODEX_REVIEW_REQUEST_RE = re.compile(
 CODEX_EXTERNAL_REVIEW_RE = re.compile(
     r"(?s)<!--\s*codex-security-review:v1\s+(?P<payload>\{.*?\})\s*-->"
 )
+CODEX_EXTERNAL_REVIEW_ROW_RE = re.compile(
+    r"(?im)^\|\s*[^|]*\*\*Code Review\*\*[^|]*\|\s*"
+    r"(?P<status>[^|]+)\|\s*`(?P<head>[0-9a-f]{7,40})`\s*\|"
+)
 CODEX_REVIEW_BLOCKING_FINDING_RE = re.compile(
     r"(?i)\b(?:P0|P1|BLOCKER|HIGH)\b[^\n]{0,120}\b"
     r"(?:blocking|finding|issue|defect|bug|must\s+fix|changes?\s+requested)\b"
@@ -955,7 +959,21 @@ query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviewThreads(first: 100) {
-        nodes { isResolved }
+        nodes {
+          isResolved
+          isOutdated
+          comments(first: 20) {
+            nodes {
+              id
+              author { login }
+              body
+              createdAt
+              updatedAt
+              pullRequestReview { commit { oid } }
+            }
+            pageInfo { hasNextPage }
+          }
+        }
         pageInfo { hasNextPage }
       }
     }
@@ -997,7 +1015,26 @@ query($owner: String!, $name: String!, $number: Int!) {
         nodes = threads.get("nodes", [])
         if not isinstance(nodes, list):
             raise TaskSessionError("GitHub review-thread query returned invalid nodes")
-        return [dict(item) for item in nodes if isinstance(item, Mapping)]
+        normalized: list[dict[str, Any]] = []
+        for item in nodes:
+            if not isinstance(item, Mapping):
+                continue
+            thread = dict(item)
+            comments = thread.get("comments", {})
+            if isinstance(comments, Mapping):
+                comment_page_info = comments.get("pageInfo", {})
+                if isinstance(comment_page_info, Mapping) and comment_page_info.get("hasNextPage"):
+                    raise TaskSessionError(
+                        "GitHub review-thread comment inventory exceeds the bounded page size"
+                    )
+                comment_nodes = comments.get("nodes", [])
+                thread["comments"] = (
+                    [dict(comment) for comment in comment_nodes if isinstance(comment, Mapping)]
+                    if isinstance(comment_nodes, list)
+                    else []
+                )
+            normalized.append(thread)
+        return normalized
 
     def check_runs(self, sha: str) -> list[dict[str, Any]]:
         payload = self.api(f"commits/{sha}/check-runs?per_page=100")
@@ -1148,6 +1185,17 @@ def _codex_review_has_blocking_p0_p1(body: str) -> bool:
         return False
     if re.search(r"(?i)\bno\s+blocking\s+(?:findings|issues)\b", body):
         return False
+    if re.search(
+        r"(?i)(?:\[\s*P[01]\s*\]|\bP[01]\s+(?:badge|finding|issue|defect|bug)\b)",
+        body,
+    ):
+        return True
+    if re.search(
+        r'(?i)"(?:severity|priority)"\s*:\s*"?P[01]\b|'
+        r"\b(?:severity|priority)\s*[:=]\s*P[01]\b",
+        body,
+    ):
+        return True
     if CODEX_REVIEW_BLOCKING_FINDING_RE.search(body):
         return True
     for match in re.finditer(r"(?im)^\s*(?:[-*]\s*)?(?:P0|P1)\b\s*[:\-]\s*(?P<detail>.+)$", body):
@@ -1179,7 +1227,11 @@ def _classify_codex_review_body(body: str) -> str:
 
 
 def _classify_external_codex_review(
-    body: str, *, head_sha: str, pr_number: int | None = None
+    body: str,
+    *,
+    head_sha: str,
+    pr_number: int | None = None,
+    known_commit_shas: Sequence[str] | None = None,
 ) -> str | None:
     """Classify the trusted connector's exact-head summary without creating a duplicate request."""
 
@@ -1200,6 +1252,21 @@ def _classify_external_codex_review(
         if raw_status in {"skipped", "rate_limited", "failed"}:
             return "SKIPPED"
         if raw_status in {"completed", "success", "passed", "clean", "approved"}:
+            return "BLOCKING_P0_P1" if _codex_review_has_blocking_p0_p1(body) else "CLEAN"
+    for match in CODEX_EXTERNAL_REVIEW_ROW_RE.finditer(body):
+        if not _marker_matches_head(
+            match.group("head"), head_sha, known_commit_shas=known_commit_shas
+        ):
+            continue
+        raw_status = match.group("status").casefold()
+        if any(marker in raw_status for marker in ("running", "queued", "pending", "in progress")):
+            return "PENDING"
+        if any(marker in raw_status for marker in ("skipped", "rate limit", "failed")):
+            return "SKIPPED"
+        if any(
+            marker in raw_status
+            for marker in ("completed", "success", "passed", "clean", "approved")
+        ):
             return "BLOCKING_P0_P1" if _codex_review_has_blocking_p0_p1(body) else "CLEAN"
     return None
 
@@ -1225,6 +1292,7 @@ def _latest_codex_result(
     head_sha: str,
     pr_number: int | None = None,
     known_commit_shas: Sequence[str] | None = None,
+    review_threads: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[str, Mapping[str, Any]] | None:
     candidates: list[tuple[tuple[str, int], str, Mapping[str, Any]]] = []
     for index, comment in enumerate(comments):
@@ -1232,7 +1300,10 @@ def _latest_codex_result(
             continue
         body = _review_body(comment)
         external_status = _classify_external_codex_review(
-            body, head_sha=head_sha, pr_number=pr_number
+            body,
+            head_sha=head_sha,
+            pr_number=pr_number,
+            known_commit_shas=known_commit_shas,
         )
         if external_status is not None:
             candidates.append((_codex_review_timestamp(comment, index), external_status, comment))
@@ -1246,6 +1317,35 @@ def _latest_codex_result(
         candidates.append(
             (_codex_review_timestamp(comment, index), _classify_codex_review_body(body), comment)
         )
+    for thread_index, thread in enumerate(review_threads or (), start=len(comments)):
+        if thread.get("isOutdated") is True:
+            continue
+        raw_comments = thread.get("comments", [])
+        if isinstance(raw_comments, Mapping):
+            raw_comments = raw_comments.get("nodes", [])
+        if not isinstance(raw_comments, Sequence) or isinstance(raw_comments, (str, bytes)):
+            continue
+        for comment_index, comment in enumerate(raw_comments, start=thread_index):
+            if not isinstance(comment, Mapping):
+                continue
+            if _review_login(comment) not in TRUSTED_REVIEW_LOGINS:
+                continue
+            review = comment.get("pullRequestReview")
+            review_commit = review.get("commit") if isinstance(review, Mapping) else None
+            review_head = review_commit.get("oid") if isinstance(review_commit, Mapping) else None
+            if not _marker_matches_head(
+                str(review_head or ""), head_sha, known_commit_shas=known_commit_shas
+            ):
+                continue
+            body = _review_body(comment)
+            if _codex_review_has_blocking_p0_p1(body):
+                candidates.append(
+                    (
+                        _codex_review_timestamp(comment, comment_index),
+                        "BLOCKING_P0_P1",
+                        comment,
+                    )
+                )
     if not candidates:
         return None
     _, status, comment = max(candidates, key=lambda item: item[0])
@@ -2038,6 +2138,7 @@ class TaskController:
                 head_sha=expected_head,
                 pr_number=pr_number,
                 known_commit_shas=preflight["known_commit_shas"],
+                review_threads=preflight["threads"],
             )
             if latest_result is not None:
                 result_status, result_comment = latest_result
@@ -2208,6 +2309,7 @@ class TaskController:
                 head_sha=expected_head,
                 pr_number=pr_number,
                 known_commit_shas=preflight["known_commit_shas"],
+                review_threads=preflight["threads"],
             )
             if latest_result is None:
                 status = "PENDING"
