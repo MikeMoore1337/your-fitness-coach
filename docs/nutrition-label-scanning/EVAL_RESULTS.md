@@ -3,7 +3,9 @@
 **Дата отчёта:** 2026-09-12
 **Contract:** `nutrition-label-eval-v1`
 **Итог:** `PARTIAL_PRE_PROVIDER_RUN`
-**Recommendation:** `DEFER`
+**Recommendation:** `NARROW GO - IMPLEMENTATION + OWNER-ONLY PRODUCTION VALIDATION`
+**Owner decision (2026-09-13):** `NARROW GO`; pre-production quality remains `NOT MEASURED`.
+**Public rollout:** `BLOCKED`; next task `128B` permitted but not launched.
 
 ## Что реально проверено
 
@@ -57,7 +59,7 @@
 | Policy revision | `nutrition-label-vision-decision-v1` (`OWNER_DECISION_REQUIRED`) |
 | Provider / model / prompt | `NOT_RUN` / `NOT_RUN` / `NOT_RUN` (no request was authorized by available project policy) |
 | Local fixture generator | `build_synthetic_fixtures.py`, Python 3.14 + Pillow 12.3.0; synthetic-owned only |
-| Fixture preflight limit | max 8 MiB, max 20 megapixels; observed local preflight `elapsed_ms=8.025` in the latest recorded run |
+| Fixture preflight limit | max 8 MiB, max 20 megapixels; observed local preflight `elapsed_ms=7.489` in the latest recorded run |
 | Cloud live blocker | `NO_APPROVED_VISION_CREDENTIAL`; current YFC AI Coach policy is disabled/generic/free-only and no Vision key is available |
 | Local live blocker | `LOCAL_OCR_RUNTIME_UNAVAILABLE`; no approved OCR runtime is installed in the task environment |
 
@@ -72,7 +74,8 @@ Self-check и fixture preflight запускаются без сети; self-che
 воспроизводимые structural/critical инварианты и image-boundary checks до появления утверждённого
 eval environment.
 
-Любой production claim на основании этого отчёта был бы недоказанным. Следующий quality run
-требует owner-authorized provider/local OCR route, а для cloud — совместимый terms/privacy
-режим и approved credential; затем выполняется строго по
+Любой recognition-quality или public-rollout claim на основании этого отчёта был бы недоказанным.
+Следующая validation run разрешена только в owner/internal allowlist после реализации `128B` и
+`128C`; для cloud по-прежнему нужны совместимый terms/privacy режим и approved credential.
+Пороговые значения не изменены и применяются строго по
 [`EVAL_CONTRACT.md`](EVAL_CONTRACT.md).

@@ -48,10 +48,10 @@ production GO до owner/provider/legal decision.
 
 ## Exact disposition after the bounded run
 
-No cloud candidate is approved. The only currently actionable route is a future local-only
-OCR/preprocessing spike with deterministic parser/validator, zero external token cost and no
+No cloud candidate is approved. Owner decision permits implementation of the local-only
+OCR/preprocessing route with deterministic parser/validator, zero external token cost and no
 provider retention/training/analytics/subprocessors. Its exact TTL, package license and
-device-resource budget are still gates for `128B/128C`.
+device-resource budget remain gates before owner-only production validation/public enable.
 
 Any cloud route remains blocked by the combination of missing approved credential, absent
 account-specific region/retention/quota proof and missing corpus quality results. It must not be
