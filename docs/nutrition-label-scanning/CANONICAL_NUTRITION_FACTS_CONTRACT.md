@@ -12,8 +12,8 @@
 
 Каждый nutrient разделяется на три слоя:
 
-1. `source_facts` — что видно на конкретных колонках этикетки: каждая cell хранится как value,
-   unit, `basis_ref` и безопасный `column_ref`;
+1. `source_facts` — что видно на конкретных колонках этикетки: каждая cell хранится как value
+   (либо `null`), unit, `basis_ref`, безопасный `column_ref` и собственный `evidence`;
 2. `normalized_facts` — детерминированная YFC-нормализация в канонические единицы и basis;
 3. `derived_fields` — только явно помеченный вывод с причиной и списком source fields.
 
@@ -21,7 +21,12 @@
 объединять `per 100 g`, `per serving`, `%DV` или соседние колонки. Для каждого
 `source_facts[field]` разрешён `null` либо непустой массив source cells (до 8 элементов) с
 уникальным `column_ref`; поэтому одновременно видимые `per 100 g` и `per serving` сохраняются
-раздельно. `normalized_facts[field]` остаётся одной детерминированно выбранной canonical fact.
+раздельно. Source cell имеет `evidence=read|ambiguous|unreadable`: при `read` `value` обязателен,
+при `ambiguous` или `unreadable` `value` обязан быть `null`. `field_evidence[field]` остаётся
+консервативным aggregate summary: `read`, только если все source cells прочитаны; `unreadable`,
+если все нечитаемы; смешанный или неоднозначный набор получает `ambiguous`. `normalized_facts[field]`
+остаётся одной детерминированно выбранной canonical fact и допускается при смешанном наборе только
+если существует хотя бы одна readable source cell.
 
 ## Schema-equivalent поля
 
@@ -37,10 +42,10 @@ strict schema; отсутствие факта выражается `null`, а �
 | `serving_size` | amount + `g`/`ml`; `null`, если mass/volume неизвестны |
 | `servings_per_container` | positive decimal, иначе `null` |
 | `package_amount` | amount + `g`/`ml`, только если явно виден на упаковке |
-| `source_facts[field]` | `null` либо непустой массив `{value, unit, basis_ref, column_ref}`; `column_ref` уникален в пределах field |
+| `source_facts[field]` | `null` либо непустой массив `{value, unit, basis_ref, column_ref, evidence}`; `value=null` для `ambiguous`/`unreadable`, `column_ref` уникален в пределах field |
 | `normalized_facts[field]` | canonical unit/basis после deterministic validation; или `null` |
 | `derived_fields[field]` | value/reason/source fields только для разрешённого derived fact; иначе `null` |
-| `field_evidence[field]` | `read`, `ambiguous`, `unreadable`, `absent`, `derived` |
+| `field_evidence[field]` | aggregate: `read`, `ambiguous`, `unreadable`, `absent`, `derived`; source-cell evidence хранится внутри `source_facts` |
 | `confidence_kind` | `provider_native`, `calibrated_eval`, `none` |
 | `confidence[field]` | `[0,1]` только при documented/calibrated semantics; иначе `null` |
 | `warnings` | machine-readable safe warning codes, без raw provider text |

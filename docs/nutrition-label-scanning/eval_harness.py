@@ -59,6 +59,7 @@ SOURCE_FACT_MAX_ITEMS = 8
 COLUMN_REF_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 BASIS_VALUES = {"per_100_g", "per_100_ml", "per_serving", "ambiguous"}
 EVIDENCE_VALUES = {"read", "ambiguous", "unreadable", "absent", "derived"}
+SOURCE_EVIDENCE_VALUES = {"read", "ambiguous", "unreadable"}
 WARNING_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_IMAGE_PIXELS = 20_000_000
@@ -147,9 +148,18 @@ def _fact(
         return
     expected_keys = {"value", "unit", "basis_ref"}
     if source:
-        expected_keys.add("column_ref")
+        expected_keys.update({"column_ref", "evidence"})
     _exact_keys(fact, expected_keys, label, errors)
-    _finite_number(fact.get("value"), f"{label}.value", errors, minimum=0)
+    if source:
+        source_evidence = fact.get("evidence")
+        if not isinstance(source_evidence, str) or source_evidence not in SOURCE_EVIDENCE_VALUES:
+            errors.append(f"{label}.evidence has an unknown source-cell evidence state")
+        elif source_evidence == "read":
+            _finite_number(fact.get("value"), f"{label}.value", errors, minimum=0)
+        elif fact.get("value") is not None:
+            errors.append(f"{label}.value must be null when evidence={source_evidence}")
+    else:
+        _finite_number(fact.get("value"), f"{label}.value", errors, minimum=0)
     unit = fact.get("unit")
     if not isinstance(unit, str) or unit not in FACT_UNITS:
         errors.append(f"{label}.unit is not a mass/energy unit")
@@ -181,6 +191,27 @@ def _source_fact_list(value: object, label: str, errors: list[str], *, field: st
             errors.append(f"{label} contains duplicate column_ref={column_ref}")
         else:
             column_refs.add(column_ref)
+
+
+def _source_evidence_summary(value: object) -> str | None:
+    if not isinstance(value, list) or not value:
+        return None
+    states = [item.get("evidence") for item in value if isinstance(item, dict)]
+    if len(states) != len(value) or not all(
+        isinstance(state, str) and state in SOURCE_EVIDENCE_VALUES for state in states
+    ):
+        return None
+    if all(state == "read" for state in states):
+        return "read"
+    if all(state == "unreadable" for state in states):
+        return "unreadable"
+    return "ambiguous"
+
+
+def _source_has_readable_cell(value: object) -> bool:
+    return isinstance(value, list) and any(
+        isinstance(item, dict) and item.get("evidence") == "read" for item in value
+    )
 
 
 def _derived_fact(value: object, label: str, errors: list[str], *, field: str) -> None:
@@ -366,6 +397,7 @@ def _validate_schema_document(schema: dict[str, object]) -> list[str]:
             "unit",
             "basis_ref",
             "column_ref",
+            "evidence",
         }:
             errors.append("$defs.source_fact required fields are unexpected")
         source_fact_properties = _mapping(
@@ -376,8 +408,30 @@ def _validate_schema_document(schema: dict[str, object]) -> list[str]:
             "unit",
             "basis_ref",
             "column_ref",
+            "evidence",
         }:
-            errors.append("$defs.source_fact properties must include column_ref")
+            errors.append("$defs.source_fact properties must include column_ref and evidence")
+        else:
+            source_value = _mapping(
+                source_fact_properties.get("value"),
+                "$defs.source_fact.properties.value",
+                errors,
+            )
+            if source_value is None or not any(
+                isinstance(option, dict) and option.get("type") == "null"
+                for option in source_value.get("anyOf", [])
+            ):
+                errors.append("$defs.source_fact value must allow null")
+            source_evidence = _mapping(
+                source_fact_properties.get("evidence"),
+                "$defs.source_fact.properties.evidence",
+                errors,
+            )
+            if (
+                source_evidence is None
+                or set(source_evidence.get("enum", [])) != SOURCE_EVIDENCE_VALUES
+            ):
+                errors.append("$defs.source_fact evidence states are unexpected")
     facts = _mapping(definitions.get("facts"), "$defs.facts", errors)
     if facts is None or facts.get("additionalProperties") is not False:
         errors.append("$defs.facts must be closed")
@@ -517,12 +571,30 @@ def validate_draft(draft: object, schema: dict[str, object]) -> list[str]:
     if evidence is not None:
         for field in NUTRIENT_FIELDS:
             state = evidence.get(field)
+            source_value = source_facts.get(field) if source_facts is not None else None
+            source_summary = _source_evidence_summary(source_value)
+            if source_value is not None and source_summary is not None and state != source_summary:
+                errors.append(
+                    f"{field} field_evidence={state} does not summarize source evidence={source_summary}"
+                )
+            readable_source = _source_has_readable_cell(source_value)
             if isinstance(state, str) and state in {"absent", "ambiguous", "unreadable"}:
-                if any(
+                if source_value is None and any(
                     facts is not None and facts.get(field) is not None
-                    for facts in (source_facts, normalized_facts, derived_fields)
+                    for facts in (normalized_facts, derived_fields)
                 ):
                     errors.append(f"{field} with evidence={state} must remain null")
+                if (
+                    source_value is not None
+                    and not readable_source
+                    and any(
+                        facts is not None and facts.get(field) is not None
+                        for facts in (normalized_facts, derived_fields)
+                    )
+                ):
+                    errors.append(
+                        f"{field} with evidence={state} needs a readable source cell for derived facts"
+                    )
                 if confidence is not None and confidence.get(field) is not None:
                     errors.append(f"{field} with evidence={state} cannot have confidence")
             if state == "derived" and (derived_fields is None or derived_fields.get(field) is None):
@@ -556,8 +628,12 @@ def _synthetic_valid_draft() -> dict[str, object]:
         "sodium_mg": (600.0, "mg"),
     }
     for field, (numeric_value, unit) in values.items():
-        fact = {"value": numeric_value, "unit": unit, "basis_ref": "per_100_g"}
-        source[field] = [{**fact, "column_ref": "per_100_g"}]
+        fact = {
+            "value": numeric_value,
+            "unit": unit,
+            "basis_ref": "per_100_g",
+        }
+        source[field] = [{**fact, "column_ref": "per_100_g", "evidence": "read"}]
         normalized[field] = copy.deepcopy(fact)
         evidence[field] = "read"
         confidence[field] = None
@@ -629,12 +705,14 @@ def run_self_check(schema: dict[str, object]) -> None:
             "unit": "g",
             "basis_ref": "per_100_g",
             "column_ref": "per_100_g",
+            "evidence": "read",
         },
         {
             "value": 3.0,
             "unit": "g",
             "basis_ref": "per_serving",
             "column_ref": "per_serving",
+            "evidence": "read",
         },
     ]
     _expect_valid("column-addressable source facts", multi_column, schema)
@@ -645,6 +723,59 @@ def run_self_check(schema: dict[str, object]) -> None:
     duplicate_second = cast(dict[str, object], duplicate_items[1])
     duplicate_second["column_ref"] = "per_100_g"
     _expect_rejected("duplicate source column ref", duplicate_column, schema)
+
+    mixed_column_evidence = copy.deepcopy(valid)
+    mixed_column_source = cast(dict[str, object], mixed_column_evidence["source_facts"])
+    mixed_column_source["protein_g"] = [
+        {
+            "value": 10.0,
+            "unit": "g",
+            "basis_ref": "per_100_g",
+            "column_ref": "per_100_g",
+            "evidence": "read",
+        },
+        {
+            "value": None,
+            "unit": "g",
+            "basis_ref": "per_serving",
+            "column_ref": "per_serving",
+            "evidence": "unreadable",
+        },
+    ]
+    mixed_column_evidence_map = cast(dict[str, object], mixed_column_evidence["field_evidence"])
+    mixed_column_evidence_map["protein_g"] = "ambiguous"
+    _expect_valid("column-addressable evidence and null value", mixed_column_evidence, schema)
+
+    read_without_value = copy.deepcopy(valid)
+    read_without_value_source = cast(dict[str, object], read_without_value["source_facts"])
+    read_without_value_items = cast(list[object], read_without_value_source["protein_g"])
+    read_without_value_item = cast(dict[str, object], read_without_value_items[0])
+    read_without_value_item["value"] = None
+    _expect_rejected("read source cell without value", read_without_value, schema)
+
+    unreadable_with_value = copy.deepcopy(valid)
+    unreadable_facts = cast(dict[str, object], unreadable_with_value["source_facts"])
+    unreadable_facts["fiber_g"] = [
+        {
+            "value": 3.0,
+            "unit": "g",
+            "basis_ref": "per_100_g",
+            "column_ref": "per_100_g",
+            "evidence": "unreadable",
+        }
+    ]
+    unreadable_evidence = cast(dict[str, object], unreadable_with_value["field_evidence"])
+    unreadable_evidence["fiber_g"] = "unreadable"
+    unreadable_normalized = cast(dict[str, object], unreadable_with_value["normalized_facts"])
+    unreadable_normalized["fiber_g"] = None
+    _expect_rejected("unreadable source cell with value", unreadable_with_value, schema)
+
+    missing_source_evidence = copy.deepcopy(valid)
+    missing_source_facts = cast(dict[str, object], missing_source_evidence["source_facts"])
+    missing_source_items = cast(list[object], missing_source_facts["protein_g"])
+    missing_source_item = cast(dict[str, object], missing_source_items[0])
+    del missing_source_item["evidence"]
+    _expect_rejected("source cell without evidence", missing_source_evidence, schema)
 
     wrong_normalized_unit = copy.deepcopy(valid)
     wrong_normalized_facts = cast(dict[str, object], wrong_normalized_unit["normalized_facts"])
@@ -674,20 +805,6 @@ def run_self_check(schema: dict[str, object]) -> None:
     sodium = cast(dict[str, object], percent_items[0])
     sodium["unit"] = "%DV"
     _expect_rejected("percent daily value presented as mass", percent_as_mass, schema)
-
-    unreadable_with_value = copy.deepcopy(valid)
-    unreadable_facts = cast(dict[str, object], unreadable_with_value["source_facts"])
-    unreadable_facts["fiber_g"] = [
-        {
-            "value": 3.0,
-            "unit": "g",
-            "basis_ref": "per_100_g",
-            "column_ref": "per_100_g",
-        }
-    ]
-    unreadable_evidence = cast(dict[str, object], unreadable_with_value["field_evidence"])
-    unreadable_evidence["fiber_g"] = "unreadable"
-    _expect_rejected("unreadable field hallucinated as a value", unreadable_with_value, schema)
 
     ambiguous_basis = copy.deepcopy(valid)
     ambiguous_facts = cast(dict[str, object], ambiguous_basis["source_facts"])

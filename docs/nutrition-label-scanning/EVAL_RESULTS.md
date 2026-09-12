@@ -46,7 +46,7 @@
 | Salt/sodium swap | `N/A` |
 | `%DV` false conversion | `N/A` |
 | Null/ambiguity calibration | `N/A` |
-| Schema validity | `PARTIAL` | synthetic valid/invalid payloads pass/reject, including column-addressable source facts and duplicate-column rejection; no provider payloads |
+| Schema validity | `PARTIAL` | synthetic valid/invalid payloads pass/reject, including column-addressable source facts, per-column null/evidence states and duplicate-column rejection; no provider payloads |
 | p50/p95 latency | `N/A` |
 | Cost/request | `N/A` |
 | Scan correction time vs manual | `N/A` |

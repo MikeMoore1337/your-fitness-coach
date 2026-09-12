@@ -145,9 +145,14 @@
     "source_fact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["value", "unit", "basis_ref", "column_ref"],
+      "required": ["value", "unit", "basis_ref", "column_ref", "evidence"],
       "properties": {
-        "value": { "type": "number", "minimum": 0 },
+        "value": {
+          "anyOf": [
+            { "type": "null" },
+            { "type": "number", "minimum": 0 }
+          ]
+        },
         "unit": { "enum": ["g", "mg", "kcal", "kJ"] },
         "basis_ref": {
           "enum": ["per_100_g", "per_100_ml", "per_serving"]
@@ -157,8 +162,29 @@
           "minLength": 1,
           "maxLength": 64,
           "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "evidence": { "enum": ["read", "ambiguous", "unreadable"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "evidence": { "const": "read" } }
+          },
+          "then": {
+            "properties": {
+              "value": { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "evidence": { "enum": ["ambiguous", "unreadable"] }
+            }
+          },
+          "then": { "properties": { "value": { "type": "null" } } }
         }
-      }
+      ]
     },
     "source_fact_g": {
       "allOf": [

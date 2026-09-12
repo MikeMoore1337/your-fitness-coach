@@ -61,8 +61,9 @@ Owner разрешил `NARROW GO` только для реализации и �
 ## Фактические результаты bounded evaluation
 
 - `schema validity`: synthetic valid draft принят, unknown field, `%DV` как mass, ambiguous basis,
-  unreadable value, undocumented confidence и zero serving amount отклонены; provider payloads не
-  получены.
+  per-column `ambiguous`/`unreadable` value, undocumented confidence и zero serving amount
+  отклонены; смешанные source columns сохраняют собственный evidence и `null`; provider payloads
+  не получены.
 - `required-field/basis/column/hallucination/null/salt-sodium/%DV/RU/EU-UK/US/rotation/glare/
   small/multi-column`: quality metrics `N/A`, потому что extraction engine не запускался.
 - `fixture preflight`: `PASS`, `entries=32`, `accepted_images=31`, `rejected_boundaries=4`,
