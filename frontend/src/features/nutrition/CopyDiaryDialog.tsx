@@ -109,7 +109,7 @@ export function CopyDiaryDialog({
     >
       <div className="modal__backdrop" aria-hidden="true" onClick={onClose} />
       <div className="modal__panel nutrition-copy__panel" ref={panelRef} tabIndex={-1}>
-        <header className="nutrition-picker__header">
+        <header data-glass="" data-glass-variant="regular" className="nutrition-picker__header">
           <div>
             <span className="eyebrow">Проверьте источник и цель</span>
             <h2 id="nutrition-copy-title">{scopeLabel}</h2>

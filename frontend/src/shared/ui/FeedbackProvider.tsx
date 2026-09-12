@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 import { CloseIcon } from './common';
 import { useModalA11y } from './useModalA11y';
 import { useMotionPresence } from './useMotionPresence';
+import { glassProps } from './Glass';
 
 interface ConfirmOptions {
   title: string;
@@ -67,6 +68,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       {toastState && toastPresence.present && (
         <div
           className={`toast${toastState.type === 'error' ? ' error' : ''}`}
+          {...glassProps('tinted')}
           data-motion-phase={toastPresence.phase}
           role={
             toastPresence.phase === 'closing'
@@ -104,7 +106,12 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
             aria-label="Закрыть"
             onClick={() => finishConfirm(false)}
           />
-          <div ref={confirmPanelRef} className="modal__panel card" tabIndex={-1}>
+          <div
+            {...glassProps('tinted')}
+            ref={confirmPanelRef}
+            className="modal__panel card"
+            tabIndex={-1}
+          >
             <h3 id="confirm-title" className="modal__title">
               {confirmState.title}
             </h3>

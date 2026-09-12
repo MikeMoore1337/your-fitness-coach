@@ -26,7 +26,10 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator('.landing-hero')).toBeVisible();
       await settle(page);
       await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
-      await expect(page.locator('.public-shell__header')).toHaveCSS('backdrop-filter', 'none');
+      await expect(page.locator('.public-shell__header')).toHaveCSS(
+        'backdrop-filter',
+        'blur(3px) saturate(1.12) brightness(1.03)',
+      );
       await expect(page.locator('.public-shell__header')).toHaveCSS('border-bottom-width', '0px');
       const headerBox = await page.locator('.public-shell__header').boundingBox();
       const heroBox = await page.locator('.landing-hero').boundingBox();
@@ -35,7 +38,10 @@ for (const theme of ['light', 'dark'] as const) {
       expect(headerBox!.y).toBe(heroBox!.y);
       const heroAction = page.locator('.landing-hero .landing-button--secondary');
       await expect(heroAction).toHaveCSS('background-color', 'rgba(20, 25, 25, 0.64)');
-      await expect(heroAction).toHaveCSS('backdrop-filter', 'none');
+      await expect(heroAction).toHaveCSS(
+        'backdrop-filter',
+        'blur(3px) saturate(1.12) brightness(1.03)',
+      );
       await expect(heroAction).toHaveCSS('filter', 'none');
       if (width < 500) {
         await page.getByRole('button', { name: 'Открыть меню', exact: true }).click();
@@ -50,12 +56,18 @@ for (const theme of ['light', 'dark'] as const) {
       const nav = page.locator('.app-bottom-nav');
       await expect(nav).toHaveCSS(
         'backdrop-filter',
-        width < 900 ? 'blur(6px) saturate(1.08)' : 'none',
+        width < 900 ? 'blur(6px) saturate(1.12) brightness(1.03)' : 'none',
       );
       await expect(nav).toHaveCSS('filter', 'none');
       await expect(nav).toHaveCSS(
         'background-color',
-        theme === 'dark' ? 'rgba(28, 33, 33, 0.8)' : 'rgba(247, 249, 249, 0.84)',
+        width >= 900
+          ? theme === 'dark'
+            ? 'rgb(32, 37, 37)'
+            : 'rgb(243, 245, 245)'
+          : theme === 'dark'
+            ? 'rgba(28, 33, 33, 0.78)'
+            : 'rgba(248, 250, 250, 0.8)',
       );
       const actionContrast = await page
         .getByRole('button', { name: 'Посмотреть упражнения', exact: true })
@@ -161,7 +173,7 @@ for (const theme of ['light', 'dark'] as const) {
       await settle(page);
       await expect(page.locator('.app-bottom-nav')).toHaveCSS(
         'backdrop-filter',
-        'blur(6px) saturate(1.08)',
+        'blur(6px) saturate(1.12) brightness(1.03)',
       );
       await page.screenshot({ path: testInfo.outputPath(`today-tma-${theme}.png`) });
       await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click();

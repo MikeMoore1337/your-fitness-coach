@@ -3,6 +3,7 @@ import { AppLink } from '../navigation/router';
 import { useWebTheme } from '../useWebTheme';
 import { AppThemeToggle } from './AppThemeToggle';
 import { BrandLockup } from './BrandLogo';
+import { glassProps } from './Glass';
 import './public-shell.css';
 import '../../styles/react.css';
 import '../../styles/design-v2.css';
@@ -53,6 +54,8 @@ export function PublicShell({
         К содержимому
       </a>
       <header
+        {...glassProps(skipTarget === 'landing-content' ? 'clear' : 'tinted')}
+        data-glass-tone={skipTarget === 'landing-content' ? 'on-image' : undefined}
         className={`public-shell__header landing-header${
           headerNavigation ? '' : ' public-shell__header--simple'
         }`}

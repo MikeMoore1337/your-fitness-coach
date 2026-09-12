@@ -1,6 +1,7 @@
 import { useId, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { handleTabKeyDown } from './tabs';
 import { Icon, type IconName } from './Icon';
+import { glassProps, type GlassVariant } from './Glass';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger';
@@ -18,13 +19,16 @@ export function Button({
   className = '',
   fullWidth = false,
   variant = 'primary',
+  glass,
   ...props
 }: ComponentPropsWithoutRef<'button'> & {
   fullWidth?: boolean;
   variant?: ButtonVariant;
+  glass?: GlassVariant;
 }) {
   return (
     <button
+      {...(glass ? glassProps(glass, true) : {})}
       {...props}
       className={`ui-button ui-button--${variant}${fullWidth ? ' ui-button--full' : ''} ${className}`.trim()}
     />
@@ -35,7 +39,13 @@ export function IconButton({
   className = '',
   ...props
 }: ComponentPropsWithoutRef<'button'> & { 'aria-label': string }) {
-  return <button {...props} className={`ui-icon-button ${className}`.trim()} />;
+  return (
+    <button
+      {...glassProps('clear', true)}
+      {...props}
+      className={`ui-icon-button ${className}`.trim()}
+    />
+  );
 }
 
 export function Field({
@@ -73,7 +83,13 @@ export function Input({ className = '', ...props }: ComponentPropsWithoutRef<'in
 }
 
 export function Select({ className = '', ...props }: ComponentPropsWithoutRef<'select'>) {
-  return <select {...props} className={`ui-select ${className}`.trim()} />;
+  return (
+    <select
+      {...glassProps('tinted', true)}
+      {...props}
+      className={`ui-select ${className}`.trim()}
+    />
+  );
 }
 
 export function Surface({
@@ -133,10 +149,11 @@ export function SegmentedControl({
   value: string;
 }) {
   return (
-    <div aria-label={ariaLabel} className="ui-tabs" role="tablist">
+    <div {...glassProps()} aria-label={ariaLabel} className="ui-tabs" role="tablist">
       {options.map((option) => (
         <button
           aria-selected={option.value === value}
+          {...(option.value === value ? glassProps('clear', true) : {})}
           className="ui-tab"
           disabled={option.disabled}
           key={option.value}

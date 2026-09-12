@@ -65,7 +65,7 @@ export function ExerciseGuideDialog({
     >
       <div className="modal__backdrop" aria-hidden="true" onClick={onClose} />
       <div className="modal__panel card exercise-guide-modal__panel" ref={panelRef} tabIndex={-1}>
-        <div className="exercise-guide-modal__head">
+        <div data-glass="" data-glass-variant="regular" className="exercise-guide-modal__head">
           <div>
             <span className="eyebrow">Карточка упражнения</span>
             <h2 className="modal__title" id="exercise-guide-title" aria-live="polite">

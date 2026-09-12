@@ -847,27 +847,6 @@ body:has(.app-shell--design-v2) {
   min-height: 100dvh;
 }
 
-.app-shell--design-v2 .app-bottom-nav {
-  border-color: var(--glass-edge);
-  background: var(--glass-background);
-  box-shadow:
-    inset 0 1px var(--glass-light),
-    var(--glass-shadow);
-  color: var(--v2-text-primary);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-/* Лёгкое рассеивание только плавающей нижней панели, без уплотнения заливки. */
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  @media (max-width: 899px) and (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-    .app-shell--design-v2 .app-bottom-nav {
-      -webkit-backdrop-filter: blur(6px) saturate(1.08);
-      backdrop-filter: blur(6px) saturate(1.08);
-    }
-  }
-}
-
 .app-shell--design-v2 .app-bottom-nav__brand,
 .app-shell--design-v2 .app-bottom-nav__btn,
 .app-shell--design-v2 .app-bottom-nav__account-name {
@@ -1477,6 +1456,8 @@ body:has(.app-shell--design-v2) {
 
 .app-shell--design-v2 .app-mobile-header__profile {
   border-color: var(--v2-lime);
+  background: transparent;
+  box-shadow: none;
 }
 
 .today-dashboard--design-v2 .today-panel,
@@ -9872,58 +9853,9 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   color: white;
 }
 
-/* Мягкие полупрозрачные вторичные действия без фильтров поверх рабочих данных. */
+/* Сохраняем контраст самостоятельных вторичных действий после замены материала. */
 .app-section--design-v2
   :is(.today-dashboard, .active-workout, .nutrition-diary)
   :where(.secondary, .button-link.secondary, .ui-button--secondary, .ui-button--ghost) {
-  background: var(--glass-background);
   border-color: var(--glass-edge);
-  box-shadow: inset 0 1px var(--glass-light);
-}
-
-.app-section--design-v2
-  :is(.today-dashboard, .active-workout, .nutrition-diary)
-  :where(.secondary, .button-link.secondary, .ui-button--secondary, .ui-button--ghost):hover:not(
-    :disabled
-  ) {
-  background: var(--v2-surface-strong);
-  border-color: var(--v2-text-secondary);
-}
-
-/* Общий материал всплывающих поверхностей, включая порталы за пределами app shell.
-   Токены автоматически дают сплошную заливку при reduced transparency / forced colors. */
-body:has(.app-shell--design-v2)
-  :is(
-    .modal__panel,
-    .avatar-editor,
-    .app-more-panel,
-    .app-quick-add-panel,
-    .toast,
-    .pwa-update-notice
-  ) {
-  background: var(--glass-background);
-  color: var(--v2-text-primary);
-  box-shadow:
-    inset 0 1px var(--glass-light),
-    var(--elevation-overlay);
-  backdrop-filter: var(--glass-overlay-filter, none);
-}
-
-@media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-  body:has(.app-shell--design-v2) {
-    --glass-overlay-filter: blur(6px) saturate(1.08);
-  }
-}
-
-body:has(.app-shell--design-v2)
-  :is(.modal__panel, .avatar-editor, .app-more-panel, .app-quick-add-panel, .pwa-update-notice) {
-  border-color: var(--glass-edge);
-}
-
-body:has(.app-shell--design-v2) .account-delete-modal__panel {
-  border-color: var(--v2-danger);
-}
-
-body:has(.app-shell--design-v2) .toast.error {
-  color: var(--danger-text);
 }

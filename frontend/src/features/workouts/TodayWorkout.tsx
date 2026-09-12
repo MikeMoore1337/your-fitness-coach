@@ -6,6 +6,7 @@ import type { Workout } from '../../shared/api/types';
 import { haptic } from '../../shared/telegram/useTelegram';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
+import { glassProps } from '../../shared/ui/Glass';
 import { TaskProgress } from '../../shared/ui/DataViz';
 import {
   Badge,
@@ -706,7 +707,12 @@ function RestTimer({
   }, [deadline, storageKey]);
   if (!seconds) return null;
   return (
-    <aside className="active-workout-rest" role="timer" aria-live="polite">
+    <aside
+      {...glassProps('tinted')}
+      className="active-workout-rest"
+      role="timer"
+      aria-live="polite"
+    >
       <div className="active-workout-rest__time">
         <span>Отдых</span>
         <strong>
@@ -716,6 +722,7 @@ function RestTimer({
       <span className="active-workout-rest__next">Дальше: {nextLabel}</span>
       <div className="active-workout-rest__actions">
         <button
+          {...glassProps('clear', true)}
           type="button"
           className="secondary"
           onClick={() => {
@@ -727,6 +734,7 @@ function RestTimer({
           +30 сек
         </button>
         <button
+          {...glassProps('clear', true)}
           type="button"
           className="secondary"
           onClick={() => {
@@ -1179,6 +1187,7 @@ export function TodayWorkout({
             </div>
             <Button
               variant={currentSet ? 'secondary' : 'primary'}
+              glass={currentSet ? 'regular' : undefined}
               disabled={mutation.isPending}
               onClick={async () => {
                 if (!(await activeSync.flushNow())) {

@@ -91,7 +91,7 @@ for (const theme of ['light', 'dark'] as const) {
       const avatarButton = page.getByRole('button', { name: 'Изменить аватар' });
       await avatarButton.click();
       const avatar = page.getByRole('dialog', { name: 'Аватар', exact: true });
-      await expectReadableGlass(avatar);
+      await expectReadableGlass(avatar.locator('.avatar-editor__header'));
       await expectNoHorizontalOverflow(page);
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: testInfo.outputPath(`avatar-${theme}-${width}.png`) });
@@ -105,7 +105,7 @@ for (const theme of ['light', 'dark'] as const) {
         .getByRole('button', { name: /Добавить/ })
         .click();
       const picker = page.locator('.nutrition-picker__panel');
-      await expectReadableGlass(picker);
+      await expectReadableGlass(picker.locator('.nutrition-picker__header'));
       await expectNoHorizontalOverflow(page);
       await page.screenshot({ path: testInfo.outputPath(`nutrition-${theme}-${width}.png`) });
       await page.keyboard.press('Escape');
@@ -122,7 +122,7 @@ for (const theme of ['light', 'dark'] as const) {
         .getByRole('button', { name: /Техника и детали:|Подробнее:/ })
         .first()
         .click();
-      const guide = page.locator('.exercise-guide-modal__panel');
+      const guide = page.locator('.exercise-guide-modal__head');
       await expectReadableGlass(guide);
       // Portal surfaces must retain the same material outside the shell subtree.
       expect(
