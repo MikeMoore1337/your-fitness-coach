@@ -115,21 +115,9 @@ describe('WeekStrip', () => {
     expect(
       container.querySelector('[data-pictogram="in-progress"] [data-icon="week-in-progress"]'),
     ).toBeInTheDocument();
-    expect(
-      container.querySelector(
-        '[data-icon="week-planned"] img[src="/assets/icons/flat-week-planned.webp"]',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      container.querySelector(
-        '[data-icon="week-in-progress"] img[src="/assets/icons/flat-week-in-progress.webp"]',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      container.querySelector(
-        '[data-icon="week-skipped"] img[src="/assets/icons/flat-week-skipped.webp"]',
-      ),
-    ).toBeInTheDocument();
+    expect(container.querySelector('svg[data-icon="week-planned"]')).toBeInTheDocument();
+    expect(container.querySelector('svg[data-icon="week-in-progress"]')).toBeInTheDocument();
+    expect(container.querySelector('svg[data-icon="week-skipped"]')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Выполнено.*Открыть тренировку/i })).toHaveAttribute(
       'href',
       '/app?section=progress&workout_id=42',

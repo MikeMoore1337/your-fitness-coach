@@ -1,118 +1,37 @@
-import type { HTMLAttributes } from 'react';
-export type IconName =
-  | 'arrow-left'
-  | 'arrow-right'
-  | 'check'
-  | 'chevron-down'
-  | 'chevron-left'
-  | 'chevron-right'
-  | 'chevron-up'
-  | 'close'
-  | 'disclosure-closed'
-  | 'disclosure-open'
-  | 'external-link'
-  | 'logout'
-  | 'account-security'
-  | 'ai-coach'
-  | 'menu'
-  | 'mini-app'
-  | 'minus'
-  | 'more-horizontal'
-  | 'move-down'
-  | 'move-up'
-  | 'plus'
-  | 'star-filled'
-  | 'star'
-  | 'sync'
-  | 'theme-moon'
-  | 'theme-sun'
-  | 'timer'
-  | 'trash'
-  | 'web-app'
-  | 'confidence-insufficient'
-  | 'confidence-limited'
-  | 'confidence-stale'
-  | 'confidence-sufficient'
-  | 'nav-admin'
-  | 'nav-coach'
-  | 'nav-exercise-catalog'
-  | 'nav-knowledge'
-  | 'nav-more'
-  | 'nav-nutrition'
-  | 'nav-plan'
-  | 'nav-profile'
-  | 'nav-progress'
-  | 'nav-today'
-  | 'achievement'
-  | 'body-measurement'
-  | 'body-weight'
-  | 'calories'
-  | 'checklist'
-  | 'download'
-  | 'edit'
-  | 'exercise'
-  | 'print'
-  | 'protein'
-  | 'water'
-  | 'workout-volume'
-  | 'error'
-  | 'info'
-  | 'loading'
-  | 'permission-denied'
-  | 'status-stale'
-  | 'success'
-  | 'warning'
-  | 'week-cardio'
-  | 'week-completed'
-  | 'week-in-progress'
-  | 'week-nutrition-complete'
-  | 'week-nutrition-fasted'
-  | 'week-nutrition-incomplete'
-  | 'week-nutrition-missing'
-  | 'week-planned'
-  | 'week-rest'
-  | 'week-skipped'
-  | 'week-strength';
-export interface IconProps extends Omit<HTMLAttributes<HTMLSpanElement>, 'children'> {
+import type { SVGProps } from 'react';
+import { iconGlyphs, type IconName } from './iconGlyphs';
+export type { IconName } from './iconGlyphs';
+
+export interface IconProps extends Omit<
+  SVGProps<SVGSVGElement>,
+  'children' | 'dangerouslySetInnerHTML'
+> {
   label?: string;
   name: IconName;
-  size?: 16 | 20 | 24;
+  size?: 16 | 20 | 24 | 56 | 80 | 110;
 }
-const objects: Partial<Record<IconName, string>> = {
-  'nav-today': 'calendar',
-  'nav-plan': 'dumbbell',
-  'week-strength': 'dumbbell',
-  exercise: 'dumbbell',
-  'nav-exercise-catalog': 'dumbbell',
-  'nav-nutrition': 'nutrition',
-  'nav-progress': 'progress',
-  'nav-profile': 'profile',
-  'nav-coach': 'nav-coach',
-  'nav-admin': 'nav-admin',
-  'nav-knowledge': 'nav-knowledge',
-  achievement: 'achievement',
-  'account-security': 'security',
-  'ai-coach': 'ai',
-  'theme-sun': 'sun',
-  'theme-moon': 'moon',
-  logout: 'logout',
-};
-/** Единое авторское растровое flat/squircle-семейство для разделов, действий и статусов. */
+
+/** Единый векторный renderer для landing, приложения и TMA. */
 export function Icon({ className = '', label, name, size = 24, ...props }: IconProps) {
-  const object = objects[name] ?? name;
-  const src = '/assets/icons/flat-' + object + '.webp';
   return (
-    <span
+    <svg
       {...props}
-      className={`yfc-icon yfc-icon--${size} ${object ? 'yfc-icon--object' : ''} ${className}`}
+      className={`yfc-icon yfc-icon--${size} ${className}`.trim()}
       data-icon={name}
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill={name === 'star-filled' ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      focusable="false"
       role={label ? 'img' : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
-      style={{ width: size, height: size, ...props.style }}
     >
-      <img className="yfc-icon__light" src={src} alt="" width={size} height={size} />
-      <img className="yfc-icon__dark" src={src} alt="" width={size} height={size} />
-    </span>
+      {iconGlyphs[name]}
+    </svg>
   );
 }

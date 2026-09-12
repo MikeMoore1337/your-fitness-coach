@@ -329,7 +329,7 @@ export default function LandingPage() {
             </h2>
             <p>Попробуй сам: начни тренировку и запиши подход.</p>
             <div className="landing-practice__note">
-              <img src="/assets/icons/flat-dumbbell.webp" alt="" width="80" height="80" />
+              <Icon name="exercise" size={80} />
               <small>
                 Демо без регистрации.
                 <br />

@@ -2912,23 +2912,23 @@ test('сенсорное поле даты сохраняет нативный �
     const dateField = page.getByLabel('Дата');
     const dateControl = page.locator('.diary-date-control');
     await expect(dateField).toHaveAttribute('type', 'date');
-    const fallbackIcon = await dateControl.evaluate((element) => {
-      const style = getComputedStyle(element, '::after');
+    const calendarIcon = dateControl.locator('svg[data-icon="calendar"]');
+    await expect(calendarIcon).toBeVisible();
+    await expect(calendarIcon).toHaveAttribute('viewBox', '0 0 24 24');
+    await expect(calendarIcon).toHaveAttribute('aria-hidden', 'true');
+    const fallbackIcon = await calendarIcon.evaluate((element) => {
+      const style = getComputedStyle(element);
       return {
-        content: style.content,
         height: style.height,
-        mask: style.maskImage || style.getPropertyValue('-webkit-mask-image'),
         pointerEvents: style.pointerEvents,
         width: style.width,
       };
     });
     expect(fallbackIcon).toMatchObject({
-      content: '""',
       height: '18px',
       pointerEvents: 'none',
       width: '18px',
     });
-    expect(fallbackIcon.mask).toContain('svg');
 
     await dateControl.scrollIntoViewIfNeeded();
     const dateControlBox = await dateControl.boundingBox();

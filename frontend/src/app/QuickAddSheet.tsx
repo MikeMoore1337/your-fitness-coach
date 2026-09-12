@@ -16,7 +16,7 @@ export const DEFAULT_QUICK_ADD_ACTIONS: ReadonlyArray<QuickAddAction> = [
     key: 'food',
     label: 'Добавить еду',
     detail: 'Быстрый ввод в дневник питания',
-    icon: 'calories',
+    icon: 'nav-nutrition',
     to: '/app?section=nutrition&quick_add=food',
   },
   {
@@ -68,9 +68,7 @@ export function QuickAddTrigger({ onOpen }: { onOpen(): void }) {
       type="button"
       onClick={onOpen}
     >
-      <span aria-hidden="true" className="app-quick-add-trigger__plus">
-        +
-      </span>
+      <Icon name="plus" className="app-quick-add-trigger__plus" />
       <span className="app-quick-add-trigger__label">Добавить</span>
     </button>
   );

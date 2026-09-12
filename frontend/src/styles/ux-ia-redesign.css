@@ -33,13 +33,13 @@
 }
 
 .app-quick-add-trigger__plus {
-  display: inline-grid;
   width: 20px;
   height: 20px;
-  place-items: center;
-  font-size: 1.45rem;
-  font-weight: 700;
-  line-height: 1;
+}
+
+.today-nutrition__water .today-summary-card__action {
+  grid-auto-flow: column;
+  gap: 4px;
 }
 
 .app-quick-add-trigger:focus-visible,

@@ -109,7 +109,8 @@ test('landing keeps the approved sports composition across themes and viewports'
       await expectLandingReady(page);
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       await expect(page.locator('h1')).toHaveCount(1);
-      await expect(page.locator('.strength-scene img')).toHaveCount(4);
+      await expect(page.locator('.strength-scene img')).toHaveCount(2);
+      await expect(page.locator('.strength-scene svg[data-icon="exercise"]')).toHaveCount(2);
       await expect(page.locator('.landing-energy-path')).toHaveCount(0);
       await expect(page.getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute(
         'href',

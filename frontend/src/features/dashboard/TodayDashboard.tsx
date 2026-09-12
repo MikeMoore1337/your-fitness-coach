@@ -303,8 +303,9 @@ function NutritionSummary({ date, today }: { date: string; today: string }) {
         <AppLink
           className="today-summary-card__action"
           to={`/app?section=nutrition&date=${date}&hydration=quick`}
+          aria-label="+ Вода"
         >
-          + Вода
+          <Icon name="plus" size={16} /> Вода
         </AppLink>
       </div>
     </section>

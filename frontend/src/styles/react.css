@@ -284,10 +284,11 @@ select:not([multiple]) {
   -webkit-appearance: none;
   appearance: none;
   padding-right: 42px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4.5 6.5 3.5 3 3.5-3' fill='none' stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.75'/%3E%3C/svg%3E");
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
   background-repeat: no-repeat;
   background-position: right 14px center;
-  background-size: 14px 14px;
+  background-size: 20px 20px;
 }
 @media (forced-colors: active) {
   select:not([multiple]) {
@@ -2766,25 +2767,25 @@ details[open] > summary .disclosure-icon .yfc-icon {
   text-align: center;
 }
 
-/* iOS keeps the native date picker but does not draw a calendar indicator. */
+/* Native picker interaction is retained; the touch indicator uses shared Icon. */
+.date-control__icon {
+  display: none;
+}
+
 @media (hover: none) and (pointer: coarse) {
   .date-control {
     position: relative;
   }
-  .date-control::after {
+  .date-control > .date-control__icon {
+    display: block;
     position: absolute;
     inset-block-start: 50%;
     inset-inline-end: 14px;
     width: 18px;
     height: 18px;
     transform: translateY(-50%);
-    background: var(--text);
-    content: '';
+    color: var(--text);
     pointer-events: none;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01'/%3E%3C/svg%3E")
-      center / contain no-repeat;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01'/%3E%3C/svg%3E")
-      center / contain no-repeat;
   }
   .date-control input[type='date']::-webkit-calendar-picker-indicator {
     opacity: 0;
