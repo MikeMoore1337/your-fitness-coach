@@ -5,13 +5,12 @@
   --v2-surface: #141717;
   --v2-surface-secondary: #1b1f1f;
   --v2-surface-strong: #303030;
-  --matte-solid: #202525;
-  --matte-tint: rgb(28 33 33 / 80%);
-  --matte-edge: #707777;
-  --matte-light: rgb(255 255 255 / 5%);
-  --matte-shadow: 0 6px 20px rgb(0 0 0 / 16%);
-  --matte-background: var(--matte-solid);
-  --matte-blur: none;
+  --glass-solid: #202525;
+  --glass-tint: rgb(28 33 33 / 80%);
+  --glass-edge: #707777;
+  --glass-light: rgb(255 255 255 / 5%);
+  --glass-shadow: 0 6px 20px rgb(0 0 0 / 16%);
+  --glass-background: var(--glass-solid);
   --v2-text-primary: #f5f5f5;
   --v2-text-secondary: #b8b8b8;
   --v2-border: #404040;
@@ -128,22 +127,19 @@
   --elevation-overlay: 0 18px 42px rgba(0, 0, 0, 0.28);
 }
 
-/* Матовый материал: непрозрачный fallback; фильтр включён только для навигации. */
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-    :root {
-      --matte-background: var(--matte-tint);
-      --matte-blur: blur(12px);
-    }
+/* Мягкий гибрид: прозрачная заливка без размытия или матовой дымки. */
+@media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+  :root {
+    --glass-background: var(--glass-tint);
   }
 }
 
 @media (forced-colors: active) {
   :root:root {
-    --matte-solid: Canvas;
-    --matte-edge: ButtonText;
-    --matte-light: transparent;
-    --matte-shadow: none;
+    --glass-solid: Canvas;
+    --glass-edge: ButtonText;
+    --glass-light: transparent;
+    --glass-shadow: none;
   }
 }
 
@@ -164,11 +160,11 @@
 }
 
 :root[data-color-scheme='light'] {
-  --matte-solid: #f3f5f5;
-  --matte-tint: rgb(247 249 249 / 84%);
-  --matte-edge: #7c8585;
-  --matte-light: rgb(255 255 255 / 55%);
-  --matte-shadow: 0 6px 20px rgb(20 28 28 / 8%);
+  --glass-solid: #f3f5f5;
+  --glass-tint: rgb(247 249 249 / 84%);
+  --glass-edge: #7c8585;
+  --glass-light: rgb(255 255 255 / 55%);
+  --glass-shadow: 0 6px 20px rgb(20 28 28 / 8%);
   --v2-canvas: #ffffff;
   --v2-surface: #ffffff;
   --v2-surface-secondary: #f0f0f0;

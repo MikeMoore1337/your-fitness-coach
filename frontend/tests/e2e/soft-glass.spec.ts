@@ -10,7 +10,7 @@ async function settle(page: Page) {
 
 for (const theme of ['light', 'dark'] as const) {
   for (const width of [360, 390, 430, 1440]) {
-    test(`matte surfaces ${theme} ${width}`, async ({ page }, testInfo) => {
+    test(`soft glass surfaces ${theme} ${width}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
@@ -26,10 +26,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator('.landing-hero')).toBeVisible();
       await settle(page);
       await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
-      await expect(page.locator('.public-shell__header')).toHaveCSS(
-        'backdrop-filter',
-        'blur(12px)',
-      );
+      await expect(page.locator('.public-shell__header')).toHaveCSS('backdrop-filter', 'none');
       const headerBox = await page.locator('.public-shell__header').boundingBox();
       const heroBox = await page.locator('.landing-hero').boundingBox();
       expect(headerBox).not.toBeNull();
@@ -37,6 +34,8 @@ for (const theme of ['light', 'dark'] as const) {
       expect(headerBox!.y).toBe(heroBox!.y);
       const heroAction = page.locator('.landing-hero .landing-button--secondary');
       await expect(heroAction).toHaveCSS('background-color', 'rgba(20, 25, 25, 0.64)');
+      await expect(heroAction).toHaveCSS('backdrop-filter', 'none');
+      await expect(heroAction).toHaveCSS('filter', 'none');
       if (width < 500) {
         await page.getByRole('button', { name: 'Открыть меню', exact: true }).click();
         await expect(page.getByRole('navigation', { name: 'Навигация по странице' })).toBeVisible();
@@ -48,7 +47,8 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
       const nav = page.locator('.app-bottom-nav');
-      await expect(nav).toHaveCSS('backdrop-filter', 'blur(12px)');
+      await expect(nav).toHaveCSS('backdrop-filter', 'none');
+      await expect(nav).toHaveCSS('filter', 'none');
       await expect(nav).toHaveCSS(
         'background-color',
         theme === 'dark' ? 'rgba(28, 33, 33, 0.8)' : 'rgba(247, 249, 249, 0.84)',
@@ -140,7 +140,7 @@ for (const theme of ['light', 'dark'] as const) {
     });
   }
 
-  test(`matte navigation mocked TMA ${theme}`, async ({ browser }, testInfo) => {
+  test(`soft glass navigation mocked TMA ${theme}`, async ({ browser }, testInfo) => {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       isMobile: true,
@@ -155,7 +155,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=today');
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
-      await expect(page.locator('.app-bottom-nav')).toHaveCSS('backdrop-filter', 'blur(12px)');
+      await expect(page.locator('.app-bottom-nav')).toHaveCSS('backdrop-filter', 'none');
       await page.screenshot({ path: testInfo.outputPath(`today-tma-${theme}.png`) });
       await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click();
       await expect(page.locator('.active-workout')).toBeVisible();
