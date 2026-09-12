@@ -199,15 +199,15 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
       collapsible={false}
       family="training"
       title="Импорт программы"
-      description="Загрузите XLSX или CSV с программой. YFC извлечёт упражнения и назначения, а программа появится только после проверки и подтверждения."
+      description="Загрузите XLSX, CSV, TXT или DOCX с программой. YFC сначала детерминированно извлечёт данные, а программа появится только после проверки и подтверждения."
     >
       {!preview ? (
         <div className="program-import-intro">
           <div className="program-import-intro__actions">
             <label className="program-import-upload">
-              <span>{busy ? 'Проверяем файл…' : 'Загрузить XLSX или CSV'}</span>
+              <span>{busy ? 'Проверяем файл…' : 'Загрузить документ программы'}</span>
               <input
-                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".csv,.xlsx,.txt,.docx,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 disabled={busy}
                 onChange={upload}
                 type="file"
@@ -231,9 +231,8 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
             </div>
           </div>
           <p className="muted">
-            Поддерживаются каноническая таблица, обычные таблицы и матрицы недель. Макросы и формулы
-            запрещены; внешние ссылки на видео не загружаются. Неоднозначные упражнения можно
-            выбрать вручную перед сохранением.
+            Поддерживаются каноническая таблица, обычные таблицы, списки и таблицы недель. Макросы,
+            формулы и внешние связи запрещены; неоднозначные упражнения всегда выбираются вручную.
           </p>
         </div>
       ) : (
@@ -294,6 +293,23 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
             {new Set(preview.rows.map((row) => row.day_number).filter((day) => day != null)).size}
             {preview.duration_weeks ? ` · Недель: ${preview.duration_weeks}` : ''}
           </p>
+
+          {preview.ai && preview.ai.status !== 'not_needed' && (
+            <div className="program-import-ai" role="status">
+              <strong>
+                AI-помощь:{' '}
+                {preview.ai.status === 'proposed' ? 'есть предложения для проверки' : 'недоступна'}
+              </strong>
+              <p>
+                {preview.ai.status === 'proposed'
+                  ? `Предложений: ${preview.ai.proposal_count}. Они привязаны к источнику и не подтверждают импорт автоматически.`
+                  : 'Документ не отправлялся внешнему provider. Используйте детерминированные значения и ручное разрешение.'}
+              </p>
+              {preview.ai.conflict_count > 0 && (
+                <small>Отклонено конфликтующих предложений: {preview.ai.conflict_count}</small>
+              )}
+            </div>
+          )}
 
           {!!preview.issues.length && (
             <div className="program-import-issues" role="status">
@@ -364,9 +380,26 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                           ))}
                         </Select>
                       )}
+                      {row.ai_rerank_reason && (
+                        <small className="program-import-ai-evidence">
+                          AI предложил порядок candidates: {row.ai_rerank_reason} Только ручной
+                          выбор подтверждает упражнение.
+                        </small>
+                      )}
                       {row.exercise_name && row.match_status === 'matched' && (
                         <small>Из файла: {row.exercise_name}</small>
                       )}
+                      {row.ai_proposals?.map((proposal, index) => (
+                        <small
+                          className="program-import-ai-evidence"
+                          key={`${proposal.evidence_id}-${index}`}
+                        >
+                          AI-подсказка: {proposal.field} = {proposal.value} ·{' '}
+                          {proposal.applied ? 'применена' : 'только подсказка'}
+                          <br />
+                          Источник: {proposal.source_location} — {proposal.source_text}
+                        </small>
+                      ))}
                     </td>
                     <td>
                       {row.metric_type === 'cardio'

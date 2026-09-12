@@ -82,7 +82,10 @@ async def upload_program_import(
     del request
     source_format = _format_from_filename(file.filename)
     if source_format not in PROGRAM_IMPORT_SUPPORTED_FORMATS:
-        raise HTTPException(status_code=415, detail="Поддерживаются только файлы .xlsx и .csv")
+        raise HTTPException(
+            status_code=415,
+            detail="Поддерживаются только файлы .xlsx, .csv, .txt и .docx",
+        )
     try:
         source = await file.read()
         import_row = create_program_import(

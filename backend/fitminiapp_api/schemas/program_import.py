@@ -10,7 +10,7 @@ from fitminiapp_api.schemas.program import (
     ProgramTemplateResponse,
 )
 
-ImportFormat = Literal["csv", "xlsx"]
+ImportFormat = Literal["csv", "xlsx", "txt", "docx"]
 ImportStatus = Literal["pending", "confirmed", "cancelled", "expired"]
 ImportIssueSeverity = Literal["blocking", "warning"]
 ImportMatchStatus = Literal["matched", "needs_resolution", "invalid"]
@@ -18,6 +18,19 @@ ImportMatchType = Literal["id", "slug", "title", "alias", "transliteration", "ma
 ImportMetricType = Literal["strength", "cardio"]
 ImportGoal = Literal["muscle_gain", "fat_loss", "maintenance", "recomposition"]
 ImportLevel = Literal["beginner", "intermediate", "advanced"]
+ImportAiField = Literal[
+    "program_title",
+    "goal",
+    "level",
+    "day_number",
+    "day_title",
+    "prescribed_sets",
+    "prescribed_reps",
+    "prescribed_duration_minutes",
+    "rest_seconds",
+    "notes",
+    "exercise_mapping",
+]
 
 
 class ProgramImportIssue(BaseModel):
@@ -37,6 +50,16 @@ class ProgramImportCandidate(BaseModel):
     slug: str = Field(min_length=1, max_length=128)
     metric_type: ImportMetricType
     match_type: ImportMatchType
+
+
+class ProgramImportAiProposal(BaseModel):
+    field: ImportAiField
+    value: str = Field(min_length=1, max_length=512)
+    evidence_id: str = Field(min_length=1, max_length=64)
+    source_location: str = Field(min_length=1, max_length=128)
+    source_text: str = Field(min_length=1, max_length=512)
+    rationale: str = Field(default="", max_length=240)
+    applied: bool = False
 
 
 class ProgramImportRow(BaseModel):
@@ -64,6 +87,8 @@ class ProgramImportRow(BaseModel):
     match_status: ImportMatchStatus
     match_type: ImportMatchType | None = None
     candidates: list[ProgramImportCandidate] = Field(default_factory=list, max_length=5)
+    ai_proposals: list[ProgramImportAiProposal] = Field(default_factory=list, max_length=20)
+    ai_rerank_reason: str | None = Field(default=None, max_length=240)
     issues: list[ProgramImportIssue] = Field(default_factory=list, max_length=20)
 
 
@@ -74,6 +99,25 @@ class ProgramImportSummary(BaseModel):
     unresolved_row_count: int = Field(ge=0)
     blocking_issue_count: int = Field(ge=0)
     warning_count: int = Field(ge=0)
+
+
+class ProgramImportAiInfo(BaseModel):
+    contract_version: str = Field(min_length=1, max_length=64)
+    prompt_version: str = Field(min_length=1, max_length=64)
+    status: Literal[
+        "disabled",
+        "policy_blocked",
+        "unavailable",
+        "no_change",
+        "proposed",
+        "invalid_output",
+        "not_needed",
+    ]
+    attempts: int = Field(ge=0, le=1)
+    proposal_count: int = Field(ge=0)
+    candidate_rerank_count: int = Field(ge=0)
+    conflict_count: int = Field(ge=0)
+    fallback: Literal["deterministic_manual"] = "deterministic_manual"
 
 
 class ProgramImportResponse(BaseModel):
@@ -91,6 +135,7 @@ class ProgramImportResponse(BaseModel):
     rows: list[ProgramImportRow]
     issues: list[ProgramImportIssue]
     summary: ProgramImportSummary
+    ai: ProgramImportAiInfo | None = None
 
 
 class ProgramImportRowResolution(BaseModel):

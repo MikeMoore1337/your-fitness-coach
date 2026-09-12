@@ -11,10 +11,10 @@ import time
 import unicodedata
 import zipfile
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from itertools import pairwise
-from typing import Final, TypedDict, cast
+from typing import Final, Literal, NotRequired, TypedDict, cast
 from uuid import uuid4
 from xml.etree import ElementTree
 
@@ -47,6 +47,17 @@ from fitminiapp_api.services.exercise_catalog_metadata import (
     exercise_catalog_metadata,
 )
 from fitminiapp_api.services.program_common import ProgramError
+from fitminiapp_api.services.program_import_ai import (
+    PROGRAM_IMPORT_AI_CONTRACT_VERSION,
+    PROGRAM_IMPORT_AI_PROMPT_VERSION,
+    DisabledProgramImportAiPort,
+    ProgramImportAiPort,
+    ProgramImportAiProposal,
+    ProgramImportAiRequest,
+    ProgramImportAiResponse,
+    ProgramImportAiRowContext,
+    ProgramImportAiSourceSpan,
+)
 from fitminiapp_api.services.programs import create_template
 from fitminiapp_api.services.workout_metrics import (
     exercise_metric_type,
@@ -55,11 +66,13 @@ from fitminiapp_api.services.workout_metrics import (
 
 logger = logging.getLogger(__name__)
 
-PROGRAM_IMPORT_SCHEMA_VERSION: Final = 1
-PROGRAM_IMPORT_PARSER_VERSION: Final = "program-import-v2"
+PROGRAM_IMPORT_SCHEMA_VERSION: Final = 2
+PROGRAM_IMPORT_PARSER_VERSION: Final = "program-import-v3"
 PROGRAM_IMPORT_CANONICAL_LAYOUT: Final = "canonical-table-v1"
 PROGRAM_IMPORT_MATRIX_LAYOUT: Final = "weekly-matrix-v1"
 PROGRAM_IMPORT_GENERIC_LAYOUT: Final = "generic-table-v1"
+PROGRAM_IMPORT_TEXT_LAYOUT: Final = "text-list-v1"
+PROGRAM_IMPORT_DOCX_LAYOUT: Final = "docx-document-v1"
 PROGRAM_IMPORT_MARKER: Final = "#yfc_template_version"
 PROGRAM_IMPORT_MARKER_VALUE: Final = "1"
 PROGRAM_IMPORT_COLUMNS: Final = (
@@ -94,7 +107,8 @@ PROGRAM_IMPORT_REQUIRED_COLUMNS: Final = frozenset(
     }
 )
 PROGRAM_IMPORT_MAX_CANDIDATES: Final = 5
-PROGRAM_IMPORT_SUPPORTED_FORMATS: Final = frozenset({"csv", "xlsx"})
+PROGRAM_IMPORT_SUPPORTED_FORMATS: Final = frozenset({"csv", "xlsx", "txt", "docx"})
+PROGRAM_IMPORT_TEMPLATE_FORMATS: Final = frozenset({"csv", "xlsx"})
 _CONTROL_CHARACTERS = frozenset(chr(value) for value in range(32)) - {"\t", "\r", "\n"}
 _INTEGER_PATTERN = re.compile(r"\d+")
 _COLUMN_PATTERN = re.compile(r"[A-Z]+")
@@ -103,6 +117,18 @@ _CELL_RANGE_PATTERN = re.compile(r"([A-Z]+)(\d+):([A-Z]+)(\d+)\Z")
 _REL_NAMESPACE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _WEEK_HEADER_PATTERN = re.compile(r"^неделя\s*(\d+)$", re.IGNORECASE)
 _DAY_HEADER_PATTERN = re.compile(r"^день\s*(\d+)$", re.IGNORECASE)
+_DOCUMENT_DAY_PATTERN = re.compile(
+    r"^(?:[-*•]\s*)?(?:день|day)\s*(\d+)\s*(?:[-:–—]\s*(.*))?$", re.IGNORECASE
+)
+_DOCUMENT_WEEK_PATTERN = re.compile(
+    r"^(?:[-*•]\s*)?(?:неделя|week)\s*(\d+)\s*(?:[-:–—]\s*(.*))?$", re.IGNORECASE
+)
+_DOCUMENT_REST_PATTERN = re.compile(
+    r"^(?:[-*•]\s*)?(?:отдых|rest)\s*[:：-]?\s*(\d+(?:[.,]\d+)?)\s*"
+    r"(сек(?:унд)?|с|seconds?|sec|мин(?:уты|ут)?|м|minutes?|min)?\s*$",
+    re.IGNORECASE,
+)
+_DOCUMENT_LIST_PREFIX_PATTERN = re.compile(r"^(?:[-*•]\s+|\d+[.)]\s+)")
 _PRESCRIPTION_PATTERN = re.compile(
     r"^(?P<sets>\d{1,2})\s*(?:×|x|х|\*)\s*(?P<reps>.+)$", re.IGNORECASE
 )
@@ -232,6 +258,18 @@ class _ExtractedRow:
     source_auxiliary: str | None = None
     resolution_key: str | None = None
     exercise_match_name: str | None = None
+    source_sheet: str | None = None
+    source_evidence: str | None = None
+
+
+@dataclass(frozen=True)
+class _DocumentLine:
+    line_number: int
+    text: str
+    source_range: str
+    source_cells: dict[str, str]
+    cells: tuple[str, ...] = ()
+    table_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -312,6 +350,11 @@ class _RowDraft(TypedDict, total=False):
     program_title: str | None
     goal: str | None
     level: str | None
+    source_evidence: str | None
+    rest_defaulted: bool
+    ai_proposals: list[dict[str, object]]
+    ai_candidate_order: list[int]
+    ai_rerank_reason: str | None
 
 
 class _Summary(TypedDict):
@@ -335,6 +378,7 @@ class _Draft(TypedDict):
     rows: list[_RowDraft]
     issues: list[_Issue]
     summary: _Summary
+    ai: NotRequired[dict[str, object]]
 
 
 def _local_name(tag: str) -> str:
@@ -588,25 +632,34 @@ def _generic_table_from_rows(
     )
 
 
-def _safe_zip_path(name: str) -> str:
+def _safe_zip_path(name: str, *, container: str = "XLSX") -> str:
     normalized = name.replace("\\", "/")
     if not normalized or normalized.startswith("/") or ":" in normalized.split("/", 1)[0]:
-        raise ProgramImportError("xlsx_path", "XLSX содержит небезопасный путь внутри архива")
+        raise ProgramImportError(
+            f"{container.casefold()}_path",
+            f"{container} содержит небезопасный путь внутри архива",
+        )
     parts = normalized.split("/")
     path_parts = parts[:-1] if parts[-1] == "" else parts
     if any(part in {"", ".", ".."} for part in path_parts):
-        raise ProgramImportError("xlsx_path", "XLSX содержит небезопасный путь внутри архива")
+        raise ProgramImportError(
+            f"{container.casefold()}_path",
+            f"{container} содержит небезопасный путь внутри архива",
+        )
     return normalized
 
 
-def _xml_root(source: bytes, code: str) -> ElementTree.Element:
+def _xml_root(source: bytes, code: str, *, container: str = "XLSX") -> ElementTree.Element:
     lowered = source.lower()
     if b"<!doctype" in lowered or b"<!entity" in lowered:
-        raise ProgramImportError("xlsx_xml", "XLSX содержит запрещённую XML-конструкцию")
+        raise ProgramImportError(
+            f"{container.casefold()}_xml",
+            f"{container} содержит запрещённую XML-конструкцию",
+        )
     try:
         return ElementTree.fromstring(source)
     except ElementTree.ParseError as exc:
-        raise ProgramImportError(code, "XLSX содержит некорректный XML") from exc
+        raise ProgramImportError(code, f"{container} содержит некорректный XML") from exc
 
 
 def _xlsx_relationship_target(source: bytes) -> dict[str, str]:
@@ -1009,6 +1062,624 @@ def _parse_xlsx(source: bytes) -> _Table:
         )
 
 
+def _parse_txt(source: bytes) -> tuple[_DocumentLine, ...]:
+    try:
+        text = source.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ProgramImportError("text_encoding", "TXT должен быть сохранён в UTF-8") from exc
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    if len(lines) > settings.program_import_max_txt_lines:
+        raise ProgramImportError("text_line_limit", "TXT превышает лимит строк")
+    parsed: list[_DocumentLine] = []
+    for line_number, raw_line in enumerate(lines, start=1):
+        if "\x00" in raw_line or any(character in _CONTROL_CHARACTERS for character in raw_line):
+            raise ProgramImportError(
+                "control_character", f"Недопустимый управляющий символ в строке {line_number}"
+            )
+        if len(raw_line) > settings.program_import_max_cell_chars:
+            raise ProgramImportError("line_too_long", f"Строка {line_number} превышает лимит длины")
+        value = _text(raw_line)
+        if not value:
+            continue
+        source_range = f"строка {line_number}"
+        parsed.append(
+            _DocumentLine(
+                line_number=line_number,
+                text=value,
+                source_range=source_range,
+                source_cells={"text": source_range},
+                cells=(value,),
+            )
+        )
+    return tuple(parsed)
+
+
+def _docx_text(element: ElementTree.Element) -> str:
+    parts: list[str] = []
+    for child in element.iter():
+        local_name = _local_name(child.tag)
+        if local_name == "t":
+            parts.append(child.text or "")
+        elif local_name == "tab":
+            parts.append("\t")
+        elif local_name in {"br", "cr"}:
+            parts.append("\n")
+    return _text("".join(parts))
+
+
+def _parse_docx(source: bytes) -> tuple[_DocumentLine, ...]:
+    if not source.startswith(b"PK"):
+        raise ProgramImportError(
+            "docx_signature", "Файл с расширением DOCX не является ZIP-контейнером"
+        )
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(source))
+    except zipfile.BadZipFile as exc:
+        raise ProgramImportError(
+            "docx_container", "DOCX повреждён или не является ZIP-контейнером"
+        ) from exc
+
+    with archive:
+        infos = archive.infolist()
+        if len(infos) > settings.program_import_max_docx_entries:
+            raise ProgramImportError(
+                "docx_entry_limit", "DOCX содержит слишком много архивных записей"
+            )
+        names: list[str] = []
+        expanded_bytes = 0
+        for info in infos:
+            name = _safe_zip_path(info.filename, container="DOCX")
+            if name in names:
+                raise ProgramImportError(
+                    "docx_duplicate_entry", "DOCX содержит дублирующиеся записи"
+                )
+            names.append(name)
+            if info.flag_bits & 0x1:
+                raise ProgramImportError("docx_encrypted", "Зашифрованные DOCX не поддерживаются")
+            if (info.external_attr >> 16) & 0o170000 == 0o120000:
+                raise ProgramImportError(
+                    "docx_symlink", "DOCX содержит небезопасную архивную запись"
+                )
+            expanded_bytes += info.file_size
+            if expanded_bytes > settings.program_import_max_docx_expanded_bytes:
+                raise ProgramImportError(
+                    "docx_expansion", "DOCX превышает лимит распакованного размера"
+                )
+            if (
+                info.file_size
+                > max(1, info.compress_size) * settings.program_import_max_docx_compression_ratio
+            ):
+                raise ProgramImportError(
+                    "docx_compression_ratio", "DOCX имеет небезопасный коэффициент сжатия"
+                )
+            lowered_name = name.casefold()
+            if lowered_name.endswith((".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar", ".cab")):
+                raise ProgramImportError(
+                    "docx_nested_archive", "DOCX не должен содержать вложенные архивы"
+                )
+            if (
+                lowered_name.endswith((".bin", ".exe", ".dll", ".js", ".vbs", ".docm"))
+                or "/embeddings/" in lowered_name
+                or lowered_name.endswith("/altchunk.xml")
+            ):
+                raise ProgramImportError(
+                    "docx_active_content", "Макросы и встроенные объекты DOCX запрещены"
+                )
+
+        name_set = set(names)
+        required = {"[Content_Types].xml", "word/document.xml"}
+        if not required.issubset(name_set):
+            raise ProgramImportError("docx_structure", "DOCX не содержит поддерживаемый документ")
+        _xml_root(
+            archive.read("[Content_Types].xml"),
+            "docx_content_types",
+            container="DOCX",
+        )
+        for name in names:
+            if not name.casefold().endswith(".rels"):
+                continue
+            root = _xml_root(
+                archive.read(name),
+                "docx_relationships",
+                container="DOCX",
+            )
+            for relationship in root.iter():
+                if _local_name(relationship.tag) != "Relationship":
+                    continue
+                target = relationship.attrib.get("Target", "")
+                if (
+                    relationship.attrib.get("TargetMode", "").casefold() == "external"
+                    or re.match(r"(?i)https?://", target)
+                    or target.startswith("//")
+                ):
+                    raise ProgramImportError(
+                        "docx_external_link", "DOCX не должен содержать внешние связи"
+                    )
+
+        document_root = _xml_root(
+            archive.read("word/document.xml"),
+            "docx_document",
+            container="DOCX",
+        )
+        body = next(
+            (element for element in document_root.iter() if _local_name(element.tag) == "body"),
+            None,
+        )
+        if body is None:
+            raise ProgramImportError("docx_structure", "DOCX не содержит тела документа")
+
+        parsed: list[_DocumentLine] = []
+        paragraph_count = 0
+        table_cell_count = 0
+        physical_line = 0
+        table_number = 0
+        for child in body:
+            local_name = _local_name(child.tag)
+            if local_name == "p":
+                paragraph_count += 1
+                if paragraph_count > settings.program_import_max_docx_paragraphs:
+                    raise ProgramImportError(
+                        "docx_paragraph_limit", "DOCX содержит слишком много абзацев"
+                    )
+                paragraph_text = _docx_text(child)
+                for part_number, raw_part in enumerate(
+                    paragraph_text.splitlines() or (paragraph_text,), start=1
+                ):
+                    value = _text(raw_part)
+                    if not value:
+                        continue
+                    physical_line += 1
+                    source_range = f"абзац {paragraph_count}" + (
+                        f", строка {part_number}" if "\n" in paragraph_text else ""
+                    )
+                    parsed.append(
+                        _DocumentLine(
+                            line_number=physical_line,
+                            text=value,
+                            source_range=source_range,
+                            source_cells={"text": source_range},
+                            cells=(value,),
+                        )
+                    )
+                continue
+            if local_name != "tbl":
+                continue
+            table_number += 1
+            table_rows = [row for row in child.iter() if _local_name(row.tag) == "tr"]
+            for row_number, row in enumerate(table_rows, start=1):
+                cells = [cell for cell in row if _local_name(cell.tag) == "tc"]
+                table_cell_count += len(cells)
+                if table_cell_count > settings.program_import_max_docx_table_cells:
+                    raise ProgramImportError(
+                        "docx_cell_limit", "DOCX содержит слишком много ячеек таблиц"
+                    )
+                values = tuple(_docx_text(cell) for cell in cells)
+                if not any(values):
+                    continue
+                physical_line += 1
+                source_range = f"таблица {table_number}, строка {row_number}"
+                source_cells = {
+                    f"column_{index}": f"таблица {table_number}, строка {row_number}, ячейка {index}"
+                    for index in range(1, len(values) + 1)
+                }
+                parsed.append(
+                    _DocumentLine(
+                        line_number=physical_line,
+                        text=" | ".join(value for value in values if value),
+                        source_range=source_range,
+                        source_cells=source_cells,
+                        cells=values,
+                        table_id=table_number,
+                    )
+                )
+        return tuple(parsed)
+
+
+def _document_header_mapping(values: tuple[str, ...]) -> tuple[dict[str, int], int | None]:
+    mapping: dict[str, int] = {}
+    prescription_index: int | None = None
+    for index, value in enumerate(values):
+        key = _normalized_header_key(value)
+        if key in {"setsreps", "подходыповторы", "подходыповторения"}:
+            prescription_index = index
+            continue
+        for field, aliases in _GENERIC_HEADER_ALIASES.items():
+            if key in aliases and field not in mapping:
+                mapping[field] = index
+                break
+    return mapping, prescription_index
+
+
+def _document_metadata(label: str, value: str) -> tuple[str, str] | None:
+    key = _normalized_match_key(label)
+    field_by_key = {
+        "название": "program_title",
+        "названиепрограммы": "program_title",
+        "программа": "program_title",
+        "title": "program_title",
+        "program": "program_title",
+        "programtitle": "program_title",
+        "цель": "goal",
+        "цельпрограммы": "goal",
+        "goal": "goal",
+        "уровень": "level",
+        "level": "level",
+    }
+    field = field_by_key.get(key)
+    if field is None:
+        return None
+    normalized = _optional_text(value)
+    if normalized is None:
+        return None
+    return field, _normalize_document_metadata_value(field, normalized)
+
+
+def _normalize_document_metadata_value(field: str, normalized: str) -> str:
+    if field == "goal":
+        normalized = {
+            "набормышечноймассы": "muscle_gain",
+            "набормассы": "muscle_gain",
+            "снижениевеса": "fat_loss",
+            "жиросжигание": "fat_loss",
+            "поддержаниеформы": "maintenance",
+            "поддержание": "maintenance",
+            "рекомпозиция": "recomposition",
+        }.get(_normalized_match_key(normalized), normalized)
+    elif field == "level":
+        normalized = {
+            "начальный": "beginner",
+            "начинающий": "beginner",
+            "средний": "intermediate",
+            "продвинутый": "advanced",
+        }.get(_normalized_match_key(normalized), normalized)
+    return normalized
+
+
+def _document_context(
+    value: str | None, kind: Literal["day", "week"]
+) -> tuple[int, str | None] | None:
+    normalized = _optional_text(value)
+    if normalized is None:
+        return None
+    pattern = _DOCUMENT_DAY_PATTERN if kind == "day" else _DOCUMENT_WEEK_PATTERN
+    match = pattern.fullmatch(normalized)
+    if match is not None:
+        label = _optional_text(match.group(2))
+        return int(match.group(1)), label
+    if normalized.isdecimal():
+        return int(normalized), None
+    return None
+
+
+def _document_rest_seconds(value: str) -> int | None:
+    match = _DOCUMENT_REST_PATTERN.fullmatch(_text(value))
+    if match is None:
+        return None
+    amount = float(match.group(1).replace(",", "."))
+    unit = (match.group(2) or "сек").casefold()
+    seconds = round(amount * 60) if unit.startswith(("м", "min", "minute")) else round(amount)
+    return seconds
+
+
+def _parse_integer_text(value: str | None) -> int | None:
+    normalized = _optional_text(value)
+    if normalized is None or not _INTEGER_PATTERN.fullmatch(normalized):
+        return None
+    return int(normalized)
+
+
+def _document_exercise(value: str) -> tuple[str | None, int | None, str | None]:
+    normalized = _optional_text(_DOCUMENT_LIST_PREFIX_PATTERN.sub("", value, count=1))
+    if normalized is None:
+        return None, None, None
+    name, sets, reps = _exercise_name_and_prescription(normalized)
+    if sets is not None and reps is not None:
+        return _optional_text(name), sets, reps
+    text_match = re.search(
+        r"\s+(?P<sets>\d{1,2})\s*(?:подход(?:а|ов)?|sets?)\s*"
+        r"(?:по|x|×|х)?\s*(?P<reps>[^\n]+)$",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if text_match is not None:
+        reps_text = _normalize_repetitions(text_match.group("reps"))
+        return (
+            _optional_text(normalized[: text_match.start()]),
+            int(text_match.group("sets")),
+            reps_text,
+        )
+    return normalized, None, None
+
+
+def _document_evidence(line: _DocumentLine) -> str:
+    return _text(line.text or " | ".join(line.cells))[:512]
+
+
+def _document_values(
+    *,
+    line: _DocumentLine,
+    metadata: dict[str, str],
+    day_number: int | None,
+    day_title: str | None,
+    week_number: int | None,
+    exercise_name: str,
+    prescribed_sets: int | None,
+    prescribed_reps: str | None,
+    rest_seconds: int | None,
+    source_sheet: str | None,
+    source_cells: dict[str, str] | None = None,
+    extra: dict[str, str] | None = None,
+) -> _ExtractedRow:
+    values = {
+        "program_title": metadata.get("program_title", ""),
+        "goal": metadata.get("goal", ""),
+        "level": metadata.get("level", ""),
+        "day_number": str(day_number) if day_number is not None else "",
+        "day_title": day_title or "",
+        "week_number": str(week_number) if week_number is not None else "",
+        "exercise_name": exercise_name,
+        "prescribed_sets": str(prescribed_sets) if prescribed_sets is not None else "",
+        "prescribed_reps": prescribed_reps or "",
+        "rest_seconds": str(rest_seconds) if rest_seconds is not None else "",
+    }
+    if extra:
+        values.update(extra)
+    return _ExtractedRow(
+        row_number=0,
+        source_row=line.line_number,
+        source_range=line.source_range,
+        source_cells=source_cells or {"exercise_name": line.source_range},
+        values=values,
+        week_number=week_number,
+        resolution_key=_normalized_match_key(exercise_name),
+        source_sheet=source_sheet,
+        source_evidence=_document_evidence(line),
+    )
+
+
+def _extract_document_rows(
+    lines: tuple[_DocumentLine, ...],
+    *,
+    source_format: str,
+) -> tuple[tuple[_ExtractedRow, ...], int, tuple[tuple[str, str, str], ...], str]:
+    metadata: dict[str, str] = {}
+    current_day: int | None = None
+    current_day_title: str | None = None
+    current_week: int | None = None
+    current_rest: int | None = None
+    active_table_id: int | None = None
+    table_mapping: tuple[dict[str, int], int | None] | None = None
+    extracted: list[_ExtractedRow] = []
+    current_day_start_index = 0
+    saw_explicit_day = False
+    saw_explicit_week = False
+    last_row: _ExtractedRow | None = None
+
+    for line in lines:
+        if line.table_id != active_table_id:
+            active_table_id = line.table_id
+            table_mapping = None
+
+        if line.table_id is not None and len(line.cells) > 1:
+            mapping, prescription_index = _document_header_mapping(line.cells)
+            if "exercise_name" in mapping and len(mapping) >= 2:
+                table_mapping = (mapping, prescription_index)
+                continue
+            if table_mapping is not None:
+                mapping, prescription_index = table_mapping
+                row_cells = line.cells
+                field_mapping = mapping
+
+                def cell(
+                    field: str,
+                    *,
+                    cells: tuple[str, ...] = row_cells,
+                    mapping_snapshot: dict[str, int] = field_mapping,
+                ) -> str:
+                    index = mapping_snapshot.get(field)
+                    return cells[index] if index is not None and index < len(cells) else ""
+
+                raw_exercise = cell("exercise_name")
+                exercise_name, inline_sets, inline_reps = _document_exercise(raw_exercise)
+                if exercise_name is None:
+                    continue
+                sets = _parse_integer_text(cell("prescribed_sets")) or inline_sets
+                reps = _optional_text(cell("prescribed_reps")) or inline_reps
+                if sets is None or reps is None:
+                    combined = (
+                        line.cells[prescription_index]
+                        if prescription_index is not None and prescription_index < len(line.cells)
+                        else ""
+                    )
+                    parsed = _parse_prescription(combined)
+                    if parsed is not None:
+                        sets, reps = parsed
+                day_context = _document_context(cell("day_number"), "day")
+                week_context = _document_context(cell("week_number"), "week")
+                if day_context is not None:
+                    current_day, explicit_title = day_context
+                    current_day_title = (
+                        _optional_text(cell("day_title")) or explicit_title or f"День {current_day}"
+                    )
+                    saw_explicit_day = True
+                if week_context is not None:
+                    current_week = week_context[0]
+                    saw_explicit_week = True
+                day_number = day_context[0] if day_context is not None else current_day
+                day_title = _optional_text(cell("day_title")) or current_day_title
+                week_number = week_context[0] if week_context is not None else current_week
+                local_metadata = dict(metadata)
+                for field in ("program_title", "goal", "level"):
+                    value = _optional_text(cell(field))
+                    if value is not None:
+                        normalized_value = _normalize_document_metadata_value(field, value)
+                        local_metadata[field] = normalized_value
+                        metadata[field] = normalized_value
+                rest = _document_rest_seconds(cell("rest_seconds"))
+                if rest is None:
+                    rest = _parse_integer_text(cell("rest_seconds"))
+                values_extra = {
+                    "notes": cell("notes"),
+                    "rest_seconds": str(
+                        rest
+                        if rest is not None
+                        else current_rest
+                        if current_rest is not None
+                        else ""
+                    ),
+                }
+                source_cells = {
+                    field: line.source_cells.get(f"column_{index + 1}", line.source_range)
+                    for field, index in mapping.items()
+                    if index < len(line.cells)
+                }
+                extracted_row = _document_values(
+                    line=line,
+                    metadata=local_metadata,
+                    day_number=day_number,
+                    day_title=day_title,
+                    week_number=week_number,
+                    exercise_name=exercise_name,
+                    prescribed_sets=sets,
+                    prescribed_reps=reps,
+                    rest_seconds=rest if rest is not None else current_rest,
+                    source_cells=source_cells,
+                    source_sheet="DOCX" if source_format == "docx" else None,
+                    extra=values_extra,
+                )
+                extracted.append(extracted_row)
+                last_row = extracted_row
+                continue
+
+        content = line.text
+        day_match = _DOCUMENT_DAY_PATTERN.fullmatch(content)
+        if day_match is not None:
+            current_day = int(day_match.group(1))
+            current_day_title = _optional_text(day_match.group(2)) or f"День {current_day}"
+            current_day_start_index = len(extracted)
+            saw_explicit_day = True
+            continue
+        week_match = _DOCUMENT_WEEK_PATTERN.fullmatch(content)
+        if week_match is not None:
+            current_week = int(week_match.group(1))
+            saw_explicit_week = True
+            continue
+        metadata_match = re.match(
+            r"^(?:[-*•]\s*)?(.+?)\s*[:：-]\s*(.+)$", content, flags=re.IGNORECASE
+        )
+        if metadata_match is not None:
+            metadata_item = _document_metadata(metadata_match.group(1), metadata_match.group(2))
+            if metadata_item is not None:
+                metadata[metadata_item[0]] = metadata_item[1]
+                continue
+        rest = _document_rest_seconds(content)
+        if rest is not None:
+            current_rest = rest
+            for index in range(current_day_start_index, len(extracted)):
+                previous = extracted[index]
+                if previous.values.get("rest_seconds"):
+                    continue
+                previous.values["rest_seconds"] = str(rest)
+                extracted[index] = replace(
+                    previous,
+                    source_evidence=f"{previous.source_evidence} | {content}"[:512],
+                )
+            continue
+        if re.match(r"^(?:примечание|заметка|note|notes)\s*[:：-]", content, re.IGNORECASE):
+            note = _optional_text(re.split(r"[:：-]", content, maxsplit=1)[1])
+            if note is not None and last_row is not None:
+                last_row.values["notes"] = note
+                last_row = replace(
+                    last_row,
+                    source_evidence=f"{last_row.source_evidence} | {content}"[:512],
+                )
+                extracted[-1] = last_row
+            continue
+        standalone_prescription = _parse_prescription(content)
+        if standalone_prescription is not None and last_row is not None:
+            sets, reps = standalone_prescription
+            last_row.values["prescribed_sets"] = str(sets)
+            last_row.values["prescribed_reps"] = reps
+            last_row = replace(
+                last_row,
+                source_evidence=f"{last_row.source_evidence} | {content}"[:512],
+            )
+            extracted[-1] = last_row
+            continue
+
+        name, sets, reps = _document_exercise(content)
+        if name is None:
+            continue
+        has_list_prefix = _DOCUMENT_LIST_PREFIX_PATTERN.match(content) is not None
+        if sets is None and reps is None and current_day is None and not has_list_prefix:
+            continue
+        extracted.append(
+            _document_values(
+                line=line,
+                metadata=metadata,
+                day_number=current_day,
+                day_title=current_day_title,
+                week_number=current_week,
+                exercise_name=name,
+                prescribed_sets=sets,
+                prescribed_reps=reps,
+                rest_seconds=current_rest,
+                source_sheet="DOCX" if source_format == "docx" else None,
+                source_cells={
+                    "exercise_name": line.source_cells.get("text", line.source_range),
+                    "prescribed_sets": line.source_cells.get("text", line.source_range),
+                    "prescribed_reps": line.source_cells.get("text", line.source_range),
+                    "rest_seconds": line.source_cells.get("text", line.source_range),
+                },
+            )
+        )
+        last_row = extracted[-1]
+
+    warnings: tuple[tuple[str, str, str], ...]
+    if not extracted:
+        warnings = (
+            (
+                "document_no_structured_rows",
+                "warning",
+                "В документе не найдены строки упражнений; можно использовать ручное исправление после распознавания",
+            ),
+        )
+    else:
+        warnings_list: list[tuple[str, str, str]] = [
+            (
+                "document_layout_detected",
+                "warning",
+                "Распознан текстовый документ; проверьте каждое предложенное поле перед сохранением",
+            )
+        ]
+        if not saw_explicit_day:
+            warnings_list.append(
+                (
+                    "day_inferred",
+                    "warning",
+                    "День не указан явно; его нужно подтвердить вручную или заполнить предложением",
+                )
+            )
+        if not saw_explicit_week:
+            warnings_list.append(
+                (
+                    "week_inferred",
+                    "warning",
+                    "Неделя не указана явно, поэтому документ рассматривается как одна неделя",
+                )
+            )
+        warnings = tuple(warnings_list)
+    duration_weeks = max((row.week_number or 1 for row in extracted), default=1)
+    if duration_weeks > 24:
+        raise ProgramImportError("week_limit", "Документ содержит более 24 недель")
+    return (
+        tuple(extracted),
+        duration_weeks,
+        warnings,
+        (PROGRAM_IMPORT_DOCX_LAYOUT if source_format == "docx" else PROGRAM_IMPORT_TEXT_LAYOUT),
+    )
+
+
 def _normalized_header_key(value: str) -> str:
     return _normalized_match_key(value)
 
@@ -1054,7 +1725,12 @@ def _exercise_name_and_prescription(value: str | None) -> tuple[str | None, int 
         return None, None, None
     lines = [_text(line) for line in normalized.replace("\r\n", "\n").split("\n")]
     lines = [line for line in lines if line]
-    parsed = _parse_prescription(lines[-1] if lines else normalized)
+    last_line = lines[-1] if lines else normalized
+    is_standalone_prescription = (
+        _PRESCRIPTION_PATTERN.fullmatch(last_line) is not None
+        or _SETS_REPS_TEXT_PATTERN.fullmatch(last_line) is not None
+    )
+    parsed = _parse_prescription(last_line) if is_standalone_prescription else None
     if parsed is not None:
         name_lines = lines[:-1]
         if not name_lines:
@@ -1769,6 +2445,7 @@ def _row_from_values(
     values: dict[str, str],
 ) -> tuple[_RowDraft, list[_Issue]]:
     issues: list[_Issue] = []
+    raw_rest_seconds = _optional_text(values.get("rest_seconds"))
     row: _RowDraft = {
         "row_number": row_number,
         "source_sheet": source_sheet,
@@ -1819,6 +2496,7 @@ def _row_from_values(
         "match_status": "needs_resolution",
         "match_type": None,
         "candidates": [],
+        "rest_defaulted": raw_rest_seconds is None,
     }
     if row["metric_type"] is not None:
         row["metric_type"] = str(row["metric_type"]).casefold()
@@ -1891,6 +2569,31 @@ def _source_name_values(row: _RowDraft) -> tuple[tuple[str, bool], ...]:
         for alias in _SOURCE_EXERCISE_ALIASES.get(_normalized_match_key(match_name), ()):
             values.append((alias, True))
     return tuple(values)
+
+
+def _apply_ai_candidate_order(row: _RowDraft) -> None:
+    if row.get("match_status") != "needs_resolution":
+        row["ai_rerank_reason"] = None
+        return
+    requested_order = row.get("ai_candidate_order")
+    candidates = row.get("candidates", [])
+    if not isinstance(requested_order, list) or not candidates:
+        row["ai_rerank_reason"] = None
+        return
+    candidates_by_id = {
+        candidate["exercise_id"]: candidate
+        for candidate in candidates
+        if isinstance(candidate.get("exercise_id"), int)
+    }
+    ordered = [
+        candidates_by_id[exercise_id]
+        for exercise_id in requested_order
+        if exercise_id in candidates_by_id
+    ]
+    ordered_ids = {candidate["exercise_id"] for candidate in ordered}
+    row["candidates"] = ordered + [
+        candidate for candidate in candidates if candidate["exercise_id"] not in ordered_ids
+    ]
 
 
 def _resolve_row(
@@ -2049,7 +2752,10 @@ def _resolve_row(
         row["resolved_exercise_title"] = candidate.title
         row["match_status"] = "matched"
         imported_metric = row.get("metric_type")
+        if imported_metric is None:
+            row["metric_type"] = candidate.metric_type
         if imported_metric is not None and imported_metric not in {"strength", "cardio"}:
+            row["metric_type"] = None
             _append_issue(
                 row_issues,
                 "metric_type_invalid",
@@ -2096,6 +2802,7 @@ def _resolve_row(
             )
             else "invalid"
         )
+    _apply_ai_candidate_order(row)
 
 
 def _metadata_value(
@@ -2234,6 +2941,7 @@ def _build_draft(
     layout_version: str = PROGRAM_IMPORT_CANONICAL_LAYOUT,
     duration_weeks: int = 1,
     layout_warnings: tuple[tuple[str, str, str], ...] = (),
+    ai_metadata: dict[str, object] | None = None,
 ) -> _Draft:
     global_issues: list[_Issue] = []
     for code, severity, message in layout_warnings:
@@ -2269,6 +2977,7 @@ def _build_draft(
                 row_number=row["row_number"],
                 field="day_title",
             )
+        _resolve_row(row, row_issues, by_id=by_id, by_key=by_key)
         if row.get("metric_type") != "cardio" and (
             row.get("prescribed_sets") is None or not row.get("prescribed_reps")
         ):
@@ -2280,7 +2989,6 @@ def _build_draft(
                 row_number=row["row_number"],
                 field="prescribed_sets",
             )
-        _resolve_row(row, row_issues, by_id=by_id, by_key=by_key)
         row["issues"] = row_issues
 
     if not rows:
@@ -2449,7 +3157,7 @@ def _build_draft(
     blocking_count = sum(issue["severity"] == "blocking" for issue in all_issues)
     warning_count = sum(issue["severity"] == "warning" for issue in all_issues)
     matched_count = sum(row.get("match_status") == "matched" for row in rows)
-    return {
+    draft: _Draft = {
         "source_format": source_format,
         "schema_version": PROGRAM_IMPORT_SCHEMA_VERSION,
         "parser_version": PROGRAM_IMPORT_PARSER_VERSION,
@@ -2469,6 +3177,385 @@ def _build_draft(
             "warning_count": warning_count,
         },
     }
+    if ai_metadata is not None:
+        draft["ai"] = dict(ai_metadata)
+    return draft
+
+
+def _program_import_ai_port() -> ProgramImportAiPort:
+    if not settings.program_import_ai_enabled:
+        return DisabledProgramImportAiPort("disabled")
+    if settings.program_import_ai_data_policy != "synthetic_only":
+        return DisabledProgramImportAiPort("policy_blocked")
+    # No provider adapter is wired by this task.  Enabling the flag cannot turn
+    # a user document into an outbound request accidentally.
+    return DisabledProgramImportAiPort("unavailable")
+
+
+def _ai_metadata(
+    status: str,
+    *,
+    attempts: int = 0,
+    proposal_count: int = 0,
+    candidate_rerank_count: int = 0,
+    conflict_count: int = 0,
+) -> dict[str, object]:
+    return {
+        "contract_version": PROGRAM_IMPORT_AI_CONTRACT_VERSION,
+        "prompt_version": PROGRAM_IMPORT_AI_PROMPT_VERSION,
+        "status": status,
+        "attempts": attempts,
+        "proposal_count": proposal_count,
+        "candidate_rerank_count": candidate_rerank_count,
+        "conflict_count": conflict_count,
+        "fallback": "deterministic_manual",
+    }
+
+
+_AI_PROPOSABLE_FIELDS: Final = (
+    "program_title",
+    "goal",
+    "level",
+    "day_number",
+    "day_title",
+    "prescribed_sets",
+    "prescribed_reps",
+    "prescribed_duration_minutes",
+    "rest_seconds",
+    "notes",
+)
+
+
+def _ai_unresolved_fields(row: _RowDraft) -> tuple[str, ...]:
+    fields: list[str] = []
+    for field in (
+        "program_title",
+        "goal",
+        "level",
+        "day_number",
+        "day_title",
+        "prescribed_sets",
+        "prescribed_reps",
+        "prescribed_duration_minutes",
+    ):
+        if field in {"prescribed_sets", "prescribed_reps"} and row.get("metric_type") == "cardio":
+            continue
+        if field == "prescribed_duration_minutes" and row.get("metric_type") != "cardio":
+            continue
+        if row.get(field) in (None, ""):
+            fields.append(field)
+    if row.get("match_status") != "matched":
+        fields.append("exercise_mapping")
+    return tuple(dict.fromkeys(fields))
+
+
+def _ai_source_evidence(
+    row: _RowDraft,
+    unresolved_fields: tuple[str, ...],
+) -> str | None:
+    """Build the minimum normalized evidence needed for the unresolved fields.
+
+    The deterministic draft may carry richer evidence while parsing, but a
+    future provider adapter must not receive optional notes, auxiliary load
+    values or other unrelated cells just because they share a source row.
+    """
+
+    context_fields = tuple(dict.fromkeys(("exercise_name", *unresolved_fields)))
+    values = [
+        (field, value)
+        for field in context_fields
+        if (value := _optional_text(row.get(field))) is not None
+    ]
+    if len(values) == 1 and values[0][0] == "exercise_name":
+        return values[0][1]
+    return _optional_text(" | ".join(f"{field}: {value}" for field, value in values)[:512])
+
+
+def _build_ai_request(
+    draft: _Draft,
+    *,
+    source_format: str,
+) -> tuple[ProgramImportAiRequest | None, dict[str, ProgramImportAiSourceSpan]]:
+    contexts: list[ProgramImportAiRowContext] = []
+    source_spans: list[ProgramImportAiSourceSpan] = []
+    evidence_by_id: dict[str, ProgramImportAiSourceSpan] = {}
+    for row in draft["rows"]:
+        unresolved_fields = _ai_unresolved_fields(row)
+        if not unresolved_fields:
+            continue
+        source_evidence = _ai_source_evidence(row, unresolved_fields)
+        evidence_id = f"source:{source_format}:{row['row_number']}"
+        if source_evidence is None or len(source_spans) >= 32:
+            continue
+        span = ProgramImportAiSourceSpan(
+            evidence_id=evidence_id,
+            location=str(row.get("source_range") or f"строка {row['row_number']}"),
+            text=source_evidence,
+        )
+        source_spans.append(span)
+        evidence_by_id[evidence_id] = span
+        context_fields = {"exercise_name", *unresolved_fields}
+        fields = {
+            field: str(row[field])
+            for field in (
+                "program_title",
+                "goal",
+                "level",
+                "day_number",
+                "day_title",
+                "exercise_name",
+                "prescribed_sets",
+                "prescribed_reps",
+                "prescribed_duration_minutes",
+                "rest_seconds",
+                "notes",
+            )
+            if field in context_fields and row.get(field) not in (None, "")
+        }
+        candidate_ids = tuple(
+            candidate["exercise_id"]
+            for candidate in row.get("candidates", [])
+            if isinstance(candidate.get("exercise_id"), int)
+        )
+        contexts.append(
+            ProgramImportAiRowContext(
+                row_number=row["row_number"],
+                unresolved_fields=unresolved_fields,
+                fields=cast(dict[str, str], fields),
+                candidate_exercise_ids=candidate_ids[:5],
+            )
+        )
+    if not contexts:
+        return None, evidence_by_id
+    locale = "ru"
+    if any(
+        any("a" <= character.casefold() <= "z" for character in span.text) for span in source_spans
+    ):
+        locale = "mixed"
+    return (
+        ProgramImportAiRequest(
+            source_format=cast(Literal["csv", "xlsx", "txt", "docx"], source_format),
+            locale=cast(Literal["ru", "en", "mixed"], locale),
+            source_spans=tuple(source_spans),
+            rows=tuple(contexts),
+        ),
+        evidence_by_id,
+    )
+
+
+def _ai_value(field: str, value: str) -> object | None:
+    if field in {
+        "day_number",
+        "prescribed_sets",
+        "prescribed_duration_minutes",
+        "rest_seconds",
+    }:
+        parsed = _parse_integer_text(value)
+        if parsed is None:
+            return None
+        numeric_limits: dict[str, tuple[int, int]] = {
+            "day_number": (1, 8),
+            "prescribed_sets": (1, 10),
+            "prescribed_duration_minutes": (1, 600),
+            "rest_seconds": (0, 600),
+        }
+        minimum, maximum = numeric_limits[field]
+        return parsed if minimum <= parsed <= maximum else None
+    if field == "goal":
+        return (
+            value if value in {"muscle_gain", "fat_loss", "maintenance", "recomposition"} else None
+        )
+    if field == "level":
+        return value if value in {"beginner", "intermediate", "advanced"} else None
+    text_limits: dict[str, int] = {
+        "program_title": 128,
+        "day_title": 128,
+        "prescribed_reps": 32,
+        "notes": 2_000,
+    }
+    text_maximum = text_limits.get(field)
+    if text_maximum is None:
+        return None
+    normalized = _optional_text(value)
+    return normalized if normalized is not None and len(normalized) <= text_maximum else None
+
+
+def _ai_row_field_is_present(row: _RowDraft, field: str) -> bool:
+    if field == "rest_seconds" and row.get("rest_defaulted"):
+        return False
+    return row.get(field) not in (None, "")
+
+
+def _append_ai_proposal(
+    row: _RowDraft,
+    proposal: ProgramImportAiProposal,
+    evidence: ProgramImportAiSourceSpan,
+    *,
+    applied: bool,
+) -> None:
+    row.setdefault("ai_proposals", []).append(
+        {
+            "field": proposal.field,
+            "value": proposal.value,
+            "evidence_id": evidence.evidence_id,
+            "source_location": evidence.location,
+            "source_text": evidence.text,
+            "rationale": proposal.rationale,
+            "applied": applied,
+        }
+    )
+
+
+def _apply_ai_response(
+    rows: list[_RowDraft],
+    response: ProgramImportAiResponse,
+    evidence_by_id: dict[str, ProgramImportAiSourceSpan],
+) -> tuple[int, int, int, bool]:
+    row_by_number = {row["row_number"]: row for row in rows}
+    applied_count = 0
+    rerank_count = 0
+    conflict_count = 0
+    invalid_output = False
+    metadata_fields = {"program_title", "goal", "level"}
+    for proposal in response.proposals:
+        row = row_by_number.get(proposal.row_number)
+        evidence = evidence_by_id.get(proposal.evidence_id)
+        if row is None or evidence is None:
+            conflict_count += 1
+            invalid_output = True
+            continue
+        if len(row.get("ai_proposals", [])) >= 20:
+            conflict_count += 1
+            invalid_output = True
+            continue
+        if proposal.field == "exercise_mapping":
+            # The proposal is intentionally visible but never changes the selected
+            # exercise.  Ambiguity always remains a manual user decision.
+            _append_ai_proposal(row, proposal, evidence, applied=False)
+            continue
+        if proposal.field not in _AI_PROPOSABLE_FIELDS:
+            conflict_count += 1
+            invalid_output = True
+            continue
+        value = _ai_value(proposal.field, proposal.value)
+        if value is None:
+            conflict_count += 1
+            invalid_output = True
+            continue
+        target_rows = rows if proposal.field in metadata_fields else [row]
+        if any(
+            _ai_row_field_is_present(target, proposal.field) and target.get(proposal.field) != value
+            for target in target_rows
+        ):
+            conflict_count += 1
+            _append_ai_proposal(row, proposal, evidence, applied=False)
+            continue
+        if all(target.get(proposal.field) == value for target in target_rows):
+            _append_ai_proposal(row, proposal, evidence, applied=False)
+            continue
+        for target in target_rows:
+            cast(dict[str, object], target)[proposal.field] = value
+            if proposal.field == "rest_seconds":
+                target["rest_defaulted"] = False
+        _append_ai_proposal(row, proposal, evidence, applied=True)
+        applied_count += 1
+
+    for rerank in response.candidate_reranks:
+        row = row_by_number.get(rerank.row_number)
+        if row is None:
+            conflict_count += 1
+            invalid_output = True
+            continue
+        candidates = row.get("candidates", [])
+        candidate_by_id = {
+            candidate["exercise_id"]: candidate
+            for candidate in candidates
+            if isinstance(candidate.get("exercise_id"), int)
+        }
+        requested = tuple(rerank.candidate_ids)
+        if (
+            not candidate_by_id
+            or set(requested) != set(candidate_by_id)
+            or len(requested) != len(candidate_by_id)
+        ):
+            conflict_count += 1
+            invalid_output = True
+            continue
+        row["candidates"] = [candidate_by_id[candidate_id] for candidate_id in requested]
+        row["ai_candidate_order"] = list(requested)
+        row["ai_rerank_reason"] = rerank.rationale or None
+        rerank_count += 1
+    return applied_count, rerank_count, conflict_count, invalid_output
+
+
+def _ai_warning(status: str) -> tuple[str, str, str] | None:
+    messages = {
+        "disabled": "AI-помощь отключена; используйте детерминированный предпросмотр и ручное разрешение",
+        "policy_blocked": "AI-помощь недоступна по политике данных; исходный документ не отправлялся наружу",
+        "unavailable": "AI-помощь временно недоступна; продолжайте с детерминированным предпросмотром и ручным разрешением",
+        "invalid_output": "Предложение AI отклонено проверкой; исходные детерминированные значения сохранены",
+    }
+    message = messages.get(status)
+    return ("ai_assistance_unavailable", "warning", message) if message else None
+
+
+def _run_ai_assistance(
+    db: Session,
+    current_user: User,
+    *,
+    draft: _Draft,
+    source_format: str,
+    layout_warnings: tuple[tuple[str, str, str], ...],
+    ai_port: ProgramImportAiPort | None,
+) -> _Draft:
+    request, evidence_by_id = _build_ai_request(draft, source_format=source_format)
+    if request is None:
+        draft["ai"] = _ai_metadata("not_needed")
+        return draft
+    port = ai_port or _program_import_ai_port()
+    try:
+        response = ProgramImportAiResponse.model_validate(port.propose(request))
+    except Exception:
+        logger.warning(
+            "program_import_ai_unavailable",
+            extra={"source_format": source_format, "reason": "port_error"},
+        )
+        response = ProgramImportAiResponse(status="unavailable", attempts=1)
+
+    if response.status not in {"proposed", "no_change"}:
+        response = ProgramImportAiResponse(status=response.status, attempts=response.attempts)
+
+    working_rows = [cast(_RowDraft, dict(row)) for row in draft["rows"]]
+    applied_count, rerank_count, conflict_count, invalid_output = _apply_ai_response(
+        working_rows, response, evidence_by_id
+    )
+    status = response.status
+    if invalid_output:
+        status = "invalid_output"
+    elif response.status == "proposed" and not (
+        applied_count or rerank_count or response.proposals
+    ):
+        status = "no_change"
+    warning = _ai_warning(status)
+    warnings = layout_warnings + ((warning,) if warning is not None else ())
+    ai_info = _ai_metadata(
+        status,
+        attempts=response.attempts,
+        proposal_count=len(response.proposals),
+        candidate_rerank_count=rerank_count,
+        conflict_count=conflict_count,
+    )
+    return _build_draft(
+        db,
+        current_user,
+        source_format=source_format,
+        cell_count=draft["summary"]["cell_count"],
+        raw_rows=working_rows,
+        layout_version=draft["layout_version"],
+        duration_weeks=draft["duration_weeks"],
+        layout_warnings=warnings,
+        ai_metadata=ai_info,
+    )
 
 
 def parse_program_import(
@@ -2477,24 +3564,50 @@ def parse_program_import(
     *,
     source: bytes,
     source_format: str,
+    ai_port: ProgramImportAiPort | None = None,
 ) -> _Draft:
     started = time.perf_counter()
     if len(source) > settings.program_import_max_file_bytes:
         raise ProgramImportError("file_too_large", "Файл превышает допустимый размер", 413)
+    table: _Table | None = None
+    document_lines: tuple[_DocumentLine, ...] | None = None
     if source_format == "csv":
         table = _parse_csv(source)
     elif source_format == "xlsx":
         table = _parse_xlsx(source)
+    elif source_format == "txt":
+        document_lines = _parse_txt(source)
+    elif source_format == "docx":
+        document_lines = _parse_docx(source)
     else:
-        raise ProgramImportError("format_unsupported", "Поддерживаются только XLSX и CSV", 415)
+        raise ProgramImportError(
+            "format_unsupported", "Поддерживаются файлы XLSX, CSV, TXT и DOCX", 415
+        )
 
     raw_rows: list[_RowDraft] = []
-    extracted_rows, duration_weeks, layout_warnings, layout_version = _extract_layout_rows(table)
+    if document_lines is not None:
+        extracted_rows, duration_weeks, layout_warnings, layout_version = _extract_document_rows(
+            document_lines,
+            source_format=source_format,
+        )
+        cell_count = sum(
+            len(line.cells) if line.table_id is not None else 1 for line in document_lines
+        )
+    else:
+        assert table is not None
+        extracted_rows, duration_weeks, layout_warnings, layout_version = _extract_layout_rows(
+            table
+        )
+        cell_count = table.cell_count
     if extracted_rows:
         for extracted in extracted_rows:
+            row_number = extracted.row_number if extracted.row_number >= 3 else len(raw_rows) + 3
+            source_sheet = extracted.source_sheet or (
+                table.sheet_name if table is not None else None
+            )
             parsed_row, row_issues = _row_from_values(
-                row_number=extracted.row_number,
-                source_sheet=table.sheet_name,
+                row_number=row_number,
+                source_sheet=source_sheet,
                 source_range=extracted.source_range,
                 source_cells=extracted.source_cells,
                 values=extracted.values,
@@ -2507,9 +3620,19 @@ def parse_program_import(
             parsed_row["program_title"] = _optional_text(extracted.values.get("program_title"))
             parsed_row["goal"] = _optional_text(extracted.values.get("goal"))
             parsed_row["level"] = _optional_text(extracted.values.get("level"))
+            parsed_row["source_evidence"] = (
+                extracted.source_evidence
+                or _text(
+                    " | ".join(
+                        f"{field}: {value}"
+                        for field, value in extracted.values.items()
+                        if _optional_text(value) is not None
+                    )
+                )[:512]
+            )
             parsed_row["parse_issues"] = row_issues
             raw_rows.append(parsed_row)
-    else:
+    elif table is not None:
         values_by_column = {field: index for index, field in enumerate(table.header)}
         for row_number, values in table.rows:
             if not any(_text(value) for value in values):
@@ -2532,6 +3655,13 @@ def parse_program_import(
             parsed_row["program_title"] = _optional_text(row_values.get("program_title"))
             parsed_row["goal"] = _optional_text(row_values.get("goal"))
             parsed_row["level"] = _optional_text(row_values.get("level"))
+            parsed_row["source_evidence"] = _text(
+                " | ".join(
+                    f"{field}: {value}"
+                    for field, value in row_values.items()
+                    if _optional_text(value) is not None
+                )
+            )[:512]
             parsed_row["parse_issues"] = row_issues
             raw_rows.append(parsed_row)
     # Empty lines are intentionally ignored. Their presence does not alter the
@@ -2542,12 +3672,23 @@ def parse_program_import(
         db,
         current_user,
         source_format=source_format,
-        cell_count=table.cell_count,
+        cell_count=cell_count,
         raw_rows=raw_rows,
         layout_version=layout_version,
         duration_weeks=duration_weeks,
         layout_warnings=layout_warnings,
     )
+    draft = _run_ai_assistance(
+        db,
+        current_user,
+        draft=draft,
+        source_format=source_format,
+        layout_warnings=layout_warnings,
+        ai_port=ai_port,
+    )
+    for row in draft["rows"]:
+        row.pop("source_evidence", None)
+        row.pop("rest_defaulted", None)
     elapsed = time.perf_counter() - started
     if elapsed > settings.program_import_parse_timeout_seconds:
         raise ProgramImportError("parse_timeout", "Файл не удалось разобрать в установленный срок")
@@ -2570,12 +3711,19 @@ def _public_row(row: _RowDraft) -> dict[str, object]:
             "exercise_match_name",
             "name_normalized",
             "source_alias_used",
+            "source_evidence",
+            "rest_defaulted",
+            "ai_candidate_order",
         }
     }
 
 
 def _public_issue(issue: _Issue) -> dict[str, object]:
     return {key: value for key, value in issue.items() if key != "row_number"}
+
+
+def _document_format(import_row: ProgramImport) -> str:
+    return import_row.document_format or import_row.source_format
 
 
 def serialize_import(import_row: ProgramImport) -> dict[str, object]:
@@ -2603,7 +3751,7 @@ def serialize_import(import_row: ProgramImport) -> dict[str, object]:
     return {
         "id": import_row.id,
         "status": import_row.status,
-        "source_format": import_row.source_format,
+        "source_format": _document_format(import_row),
         "schema_version": import_row.schema_version,
         "parser_version": import_row.parser_version,
         "layout_version": draft.get("layout_version") if draft is not None else None,
@@ -2615,6 +3763,7 @@ def serialize_import(import_row: ProgramImport) -> dict[str, object]:
         "rows": row_list if import_row.status == "pending" else [],
         "issues": issues if import_row.status == "pending" else [],
         "summary": summary,
+        "ai": draft.get("ai") if draft is not None else None,
     }
 
 
@@ -2647,7 +3796,7 @@ def expire_program_imports(
             action="program_import.expired",
             resource_type="program_import",
             resource_id=row.id,
-            details={"source_format": row.source_format, "row_count": row.row_count},
+            details={"source_format": _document_format(row), "row_count": row.row_count},
         )
     if rows:
         db.flush()
@@ -2661,6 +3810,11 @@ def create_program_import(
     source: bytes,
     source_format: str,
 ) -> ProgramImport:
+    source_format = _text(source_format).casefold()
+    if source_format not in PROGRAM_IMPORT_SUPPORTED_FORMATS:
+        raise ProgramImportError(
+            "format_unsupported", "Поддерживаются файлы XLSX, CSV, TXT и DOCX", 415
+        )
     expire_program_imports(db, owner_user_id=current_user.id)
     source_sha256 = hashlib.sha256(source).hexdigest()
     duplicate = (
@@ -2682,10 +3836,12 @@ def create_program_import(
         source_format=source_format,
     )
     current = now_msk_naive()
+    stored_source_format = source_format if source_format in {"csv", "xlsx"} else "csv"
     import_row = ProgramImport(
         id=str(uuid4()),
         owner_user_id=current_user.id,
-        source_format=source_format,
+        source_format=stored_source_format,
+        document_format=source_format if source_format not in {"csv", "xlsx"} else None,
         source_sha256=source_sha256,
         schema_version=PROGRAM_IMPORT_SCHEMA_VERSION,
         parser_version=PROGRAM_IMPORT_PARSER_VERSION,
@@ -2759,7 +3915,10 @@ def get_program_import(
             action="program_import.expired",
             resource_type="program_import",
             resource_id=import_row.id,
-            details={"source_format": import_row.source_format, "row_count": import_row.row_count},
+            details={
+                "source_format": _document_format(import_row),
+                "row_count": import_row.row_count,
+            },
         )
         db.commit()
         raise ProgramImportError("import_expired", "Срок действия предпросмотра истёк", 410)
@@ -2807,7 +3966,7 @@ def resolve_program_import(
     rebuilt = _build_draft(
         db,
         current_user,
-        source_format=import_row.source_format,
+        source_format=_document_format(import_row),
         cell_count=import_row.cell_count,
         raw_rows=rows,
         layout_version=draft.get("layout_version", PROGRAM_IMPORT_CANONICAL_LAYOUT),
@@ -2821,6 +3980,7 @@ def resolve_program_import(
             for issue in draft.get("issues", [])
             if issue.get("severity") == "warning"
         ),
+        ai_metadata=draft.get("ai"),
     )
     import_row.draft_json = dict(rebuilt)
     import_row.blocking_issue_count = rebuilt["summary"]["blocking_issue_count"]
@@ -3022,7 +4182,7 @@ def confirm_program_import(
     rebuilt = _build_draft(
         db,
         current_user,
-        source_format=import_row.source_format,
+        source_format=_document_format(import_row),
         cell_count=import_row.cell_count,
         raw_rows=[cast(_RowDraft, dict(row)) for row in draft["rows"]],
         layout_version=draft.get("layout_version", PROGRAM_IMPORT_CANONICAL_LAYOUT),
@@ -3036,6 +4196,7 @@ def confirm_program_import(
             for issue in draft.get("issues", [])
             if issue.get("severity") == "warning"
         ),
+        ai_metadata=draft.get("ai"),
     )
     import_row.draft_json = dict(rebuilt)
     import_row.blocking_issue_count = rebuilt["summary"]["blocking_issue_count"]
@@ -3068,7 +4229,7 @@ def confirm_program_import(
             resource_type="program_import",
             resource_id=import_row.id,
             details={
-                "source_format": import_row.source_format,
+                "source_format": _document_format(import_row),
                 "schema_version": import_row.schema_version,
                 "parser_version": import_row.parser_version,
                 "row_count": import_row.row_count,
@@ -3109,7 +4270,7 @@ def cancel_program_import(db: Session, current_user: User, import_id: str) -> No
         action="program_import.cancelled",
         resource_type="program_import",
         resource_id=import_row.id,
-        details={"source_format": import_row.source_format, "row_count": import_row.row_count},
+        details={"source_format": _document_format(import_row), "row_count": import_row.row_count},
     )
     db.commit()
 
@@ -3147,8 +4308,10 @@ def _template_matrix() -> list[list[str]]:
 
 
 def build_program_import_template(source_format: str) -> tuple[bytes, str, str]:
-    if source_format not in PROGRAM_IMPORT_SUPPORTED_FORMATS:
-        raise ProgramImportError("format_unsupported", "Поддерживаются только XLSX и CSV", 415)
+    if source_format not in PROGRAM_IMPORT_TEMPLATE_FORMATS:
+        raise ProgramImportError(
+            "format_unsupported", "Канонические шаблоны доступны только для XLSX и CSV", 415
+        )
     matrix = _template_matrix()
     if source_format == "csv":
         csv_output = io.StringIO(newline="")
