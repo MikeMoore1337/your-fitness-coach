@@ -141,3 +141,8 @@ dashed и ring geometry и не зависит от tooltip или выбран�
 - Не вставлять reference SVG графиков из design package: в них текст переведён в outlines.
 - Не создавать page-local `line/polyline/circle` chart grammar или новый CSS progress meter.
 - Не использовать emoji, Unicode arrows/stars/plus/minus и CSS-generated functional glyphs.
+
+### Финальная правка владельца
+
+12.09.2026 владелец разрешил выпуск с горизонтальной гантелью. Общий exercise и его aliases
+повёрнуты на 45° и вписаны в canvas масштабом 0.72; stroke группы 2.5 даёт итоговые 1.8.
