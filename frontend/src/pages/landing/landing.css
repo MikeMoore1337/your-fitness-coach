@@ -15,12 +15,17 @@
   --landing-muted: #acb1b1;
   --landing-line: #363b3b;
 }
-.landing-page .public-shell__header {
+.landing-page.public-shell .public-shell__header {
   width: 100%;
   padding-inline: max(5vw, calc((100vw - 1180px) / 2));
-  background: #090b0b;
-  color: white;
-  border-bottom: 1px solid #363b3b;
+  background: var(--matte-background);
+  color: var(--landing-ink);
+  border-bottom: 1px solid var(--matte-edge);
+  box-shadow:
+    inset 0 1px var(--matte-light),
+    var(--matte-shadow);
+  -webkit-backdrop-filter: var(--matte-blur);
+  backdrop-filter: var(--matte-blur);
 }
 .landing-page h1,
 .landing-page h2,
@@ -81,9 +86,27 @@
   transform: scale(0.97);
 }
 .landing-page .landing-button--secondary {
-  background: transparent;
+  background: var(--matte-solid);
   color: inherit;
-  border-color: currentColor;
+  border-color: var(--matte-edge);
+  box-shadow: inset 0 1px var(--matte-light);
+}
+
+/* Фото остаётся резким; CTA получает плотную тёмную подложку в обеих темах. */
+.landing-page .landing-hero .landing-button--secondary {
+  background: #202525;
+  border-color: #828b8b;
+  color: #f5f5f5;
+  box-shadow: inset 0 1px rgb(255 255 255 / 5%);
+}
+
+@media (forced-colors: active) {
+  .landing-page .landing-hero .landing-button--secondary {
+    background: ButtonFace;
+    border-color: ButtonText;
+    color: ButtonText;
+    box-shadow: none;
+  }
 }
 .landing-page .landing-button:hover {
   text-decoration: none;
