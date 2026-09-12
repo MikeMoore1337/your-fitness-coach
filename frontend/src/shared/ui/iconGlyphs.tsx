@@ -68,10 +68,9 @@ const glyphs = {
   ),
   'mini-app': (
     <>
-      <rect x="3" y="4" width="18" height="14" rx="2.5" />
-      <path d="M7 18v2.5l3.5-2.5H18" />
-      <line x1="7" y1="9" x2="17" y2="9" />
-      <line x1="7" y1="13" x2="13" y2="13" />
+      {/* Lucide: smartphone; source and license: docs/design/iconography-and-data-viz-v2.1.md */}
+      <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+      <path d="M12 18h.01" />
     </>
   ),
   minus: (
@@ -174,11 +173,15 @@ const glyphs = {
   ),
   'confidence-limited': (
     <>
-      <rect x="4" y="4" width="16" height="16" rx="3" />
-      <line x1="7.5" y1="16" x2="7.5" y2="13" />
-      <line x1="12" y1="16" x2="12" y2="9" />
-      <line x1="16.5" y1="16" x2="16.5" y2="6" />
-      <line x1="6" y1="18" x2="18" y2="18" />
+      {/* Lucide: circle-dashed; source and license: docs/design/iconography-and-data-viz-v2.1.md */}
+      <path d="M10.1 2.182a10 10 0 0 1 3.8 0" />
+      <path d="M13.9 21.818a10 10 0 0 1-3.8 0" />
+      <path d="M17.609 3.721a10 10 0 0 1 2.69 2.7" />
+      <path d="M2.182 13.9a10 10 0 0 1 0-3.8" />
+      <path d="M20.279 17.609a10 10 0 0 1-2.7 2.69" />
+      <path d="M21.818 10.1a10 10 0 0 1 0 3.8" />
+      <path d="M3.721 6.391a10 10 0 0 1 2.7-2.69" />
+      <path d="M6.391 20.279a10 10 0 0 1-2.69-2.7" />
     </>
   ),
   'confidence-stale': (
@@ -229,10 +232,10 @@ const glyphs = {
   ),
   'nav-nutrition': (
     <>
-      <path d="M4 12h16c-.7 5-3.3 8-8 8s-7.3-3-8-8Z" />
-      <path d="M6 12c.4-2.5 2.2-4 4.5-4 1.3 0 2 .4 3 .8 1.2-1.5 2.5-2.3 4.3-2.3" />
-      <path d="M16.2 7.7c.4-1.9 1.6-3.2 3.3-3.7-.1 1.9-1.1 3.2-3.3 3.7Z" />
-      <line x1="7" y1="16" x2="17" y2="16" />
+      {/* Lucide: utensils; source and license: docs/design/iconography-and-data-viz-v2.1.md */}
+      <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+      <path d="M7 2v20" />
+      <path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
     </>
   ),
   'nav-profile': (
@@ -266,9 +269,12 @@ const glyphs = {
   ),
   'body-measurement': (
     <>
-      <path d="M8.2 3.2c.4 1.7-.2 3.2-1.6 4.3C5.4 8.5 5 10 5 11.8v6.7M15.8 3.2c-.4 1.7.2 3.2 1.6 4.3 1.2 1 1.6 2.5 1.6 4.3v6.7M8 10.5c.7 1 1 2.2 1 3.7M16 10.5c-.7 1-1 2.2-1 3.7" />
-      <rect x="4" y="15.2" width="16" height="4.3" rx="1" />
-      <path d="M7 15.2v2.2M10 15.2v1.4M13 15.2v2.2M16 15.2v1.4M6 19.5v2M18 19.5v2" />
+      {/* Lucide: ruler; source and license: docs/design/iconography-and-data-viz-v2.1.md */}
+      <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
+      <path d="m14.5 12.5 2-2" />
+      <path d="m11.5 9.5 2-2" />
+      <path d="m8.5 6.5 2-2" />
+      <path d="m17.5 15.5 2-2" />
     </>
   ),
   'body-weight': (
@@ -332,13 +338,9 @@ const glyphs = {
   ),
   'workout-volume': (
     <>
-      <line x1="4" y1="7" x2="4" y2="17" />
-      <line x1="7" y1="5" x2="7" y2="19" />
-      <line x1="17" y1="5" x2="17" y2="19" />
-      <line x1="20" y1="7" x2="20" y2="17" />
-      <line x1="7" y1="12" x2="17" y2="12" />
-      <path d="M8 21l3-3 2 2 3-4" />
-      <path d="M14.5 16H16v1.5" />
+      {/* Lucide: weight; source and license: docs/design/iconography-and-data-viz-v2.1.md */}
+      <circle cx="12" cy="5" r="3" />
+      <path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z" />
     </>
   ),
   error: (
@@ -433,10 +435,10 @@ const glyphs = {
   ),
   'week-nutrition-missing': (
     <>
-      <path d="M4 12h6M14 12h6c-.6 4.8-3.2 7.5-8 7.5S4.6 16.8 4 12" />
-      <circle cx="9" cy="8" r="0.8" fill="currentColor" stroke="none" />
-      <circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none" />
-      <circle cx="15" cy="8" r="0.8" fill="currentColor" stroke="none" />
+      {/* Lucide: clipboard-minus; source and license: docs/design/iconography-and-data-viz-v2.1.md */}
+      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <path d="M9 14h6" />
     </>
   ),
   'week-planned': (
@@ -463,9 +465,10 @@ const glyphs = {
   ),
   'ai-coach': (
     <>
-      <path d="M14 4H6a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h2v2l4-2h6a3 3 0 0 0 3-3v-5" />
-      <path d="m18 2 1.3 3.7L23 7l-3.7 1.3L18 12l-1.3-3.7L13 7l3.7-1.3Z" />
-      <path d="M7 12h4M7 16h9" />
+      {/* Lucide: sparkles; source and license: docs/design/iconography-and-data-viz-v2.1.md */}
+      <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+      <path d="M20 2v4" />
+      <path d="M22 4h-4" />
     </>
   ),
 } as const satisfies Record<string, ReactNode>;

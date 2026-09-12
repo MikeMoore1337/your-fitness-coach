@@ -10,7 +10,7 @@ Task 239 унифицирует функциональную иконограф�
 
 - Канонический renderer: `frontend/src/shared/ui/Icon.tsx`.
 - Статическая JSX-геометрия: `frontend/src/shared/ui/iconGlyphs.tsx`. HTML/SVG из внешних
-  источников не интерпретируется. Существующее векторное семейство YFC переиспользовано без dependency.
+  источников не интерпретируется. Существующее векторное семейство YFC переиспользовано без npm dependency.
 - Сетка: `24×24`; поддерживаемые optical sizes: `16`, `20`, `24`.
 - Иллюстративные экземпляры того же glyph на landing сохраняют размеры `56`, `80`, `110`;
   функциональные controls не используют эти размеры. Произвольное масштабирование отдельных nav icons запрещено.
@@ -36,6 +36,32 @@ Task 239 унифицирует функциональную иконограф�
 - Active state использует neutral surface, усиленный label и lime boundary. Цвет не заменяет форму
   или подпись.
 - YFC brand assets и Google/Yandex/Telegram/VK/Apple marks остаются защищёнными исключениями.
+
+### Семь уточнённых glyphs — owner visual revision 2
+
+По обратной связи владельца AI Coach сохраняет образ искр, mini-app — телефона. Для пяти
+отклонённых предметных/статусных форм выбран небольшой набор Lucide с общей геометрией 24×24:
+
+| Semantic name            | Lucide source     | Образ                                                      |
+| ------------------------ | ----------------- | ---------------------------------------------------------- |
+| `ai-coach`               | `sparkles`        | Искры, без диалогового облака                              |
+| `mini-app`               | `smartphone`      | Телефон                                                    |
+| `body-measurement`       | `ruler`           | Диагональная измерительная линейка                         |
+| `workout-volume`         | `weight`          | Гиря — накопленная тренировочная нагрузка                  |
+| `confidence-limited`     | `circle-dashed`   | Неполный контур — ограниченные данные, без числового score |
+| `nav-nutrition`          | `utensils`        | Вилка и нож                                                |
+| `week-nutrition-missing` | `clipboard-minus` | Журнал без записи; не голодание и не нулевое питание       |
+
+SVG взяты из [Lucide](https://github.com/lucide-icons/lucide/tree/a79b2d131dab2bf20cb224bd0937b439a9c4fa99/icons),
+revision `a79b2d131dab2bf20cb224bd0937b439a9c4fa99`, и преобразованы в статический JSX.
+Исходная геометрия сохранена; у `sparkles` удалён дополнительный круг внизу слева, чтобы оставить
+выбранную владельцем композицию из основной искры и маленькой искры справа сверху.
+Renderer применяет общий stroke 1.8 вместо исходного 2.
+Новые npm dependencies отсутствуют. Исходный ISC/MIT notice сохранён без перевода в
+`frontend/public/licenses/lucide-LICENSE.txt` и копируется в production bundle как статический файл.
+SF Symbols не включены. Визуальный ориентир iOS выражен простыми монохромными формами,
+общим весом, round cap/join и оптическими размерами; это не копия системного набора Apple.
+Revision 2 также требует owner visual approval до merge/release.
 
 ## `WeekStrip`
 
