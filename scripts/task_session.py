@@ -98,6 +98,9 @@ CODEX_REVIEW_REQUEST_RE = re.compile(
     rf"(?im)^\s*{re.escape(CODEX_REVIEW_REQUEST_MARKER)}\s+"
     r"round=(?P<round>[12])\s+head=(?P<head>[0-9a-f]{40})\s*$"
 )
+CODEX_EXTERNAL_REVIEW_RE = re.compile(
+    r"(?s)<!--\s*codex-security-review:v1\s+(?P<payload>\{.*?\})\s*-->"
+)
 CODEX_REVIEW_BLOCKING_FINDING_RE = re.compile(
     r"(?i)\b(?:P0|P1|BLOCKER|HIGH)\b[^\n]{0,120}\b"
     r"(?:blocking|finding|issue|defect|bug|must\s+fix|changes?\s+requested)\b"
@@ -1175,6 +1178,32 @@ def _classify_codex_review_body(body: str) -> str:
     return "PENDING"
 
 
+def _classify_external_codex_review(
+    body: str, *, head_sha: str, pr_number: int | None = None
+) -> str | None:
+    """Classify the trusted connector's exact-head summary without creating a duplicate request."""
+
+    for match in CODEX_EXTERNAL_REVIEW_RE.finditer(body):
+        try:
+            payload = json.loads(match.group("payload"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, Mapping):
+            continue
+        if str(payload.get("headSha", "")).casefold() != head_sha.casefold():
+            continue
+        if pr_number is not None and payload.get("pullRequestNumber") != pr_number:
+            continue
+        raw_status = str(payload.get("status", "")).casefold().replace("-", "_")
+        if raw_status in {"running", "queued", "pending", "in_progress"}:
+            return "PENDING"
+        if raw_status in {"skipped", "rate_limited", "failed"}:
+            return "SKIPPED"
+        if raw_status in {"completed", "success", "passed", "clean", "approved"}:
+            return "BLOCKING_P0_P1" if _codex_review_has_blocking_p0_p1(body) else "CLEAN"
+    return None
+
+
 def _codex_request_records(
     comments: Sequence[Mapping[str, Any]], *, round_number: int, head_sha: str
 ) -> list[Mapping[str, Any]]:
@@ -1194,6 +1223,7 @@ def _latest_codex_result(
     comments: Sequence[Mapping[str, Any]],
     *,
     head_sha: str,
+    pr_number: int | None = None,
     known_commit_shas: Sequence[str] | None = None,
 ) -> tuple[str, Mapping[str, Any]] | None:
     candidates: list[tuple[tuple[str, int], str, Mapping[str, Any]]] = []
@@ -1201,6 +1231,12 @@ def _latest_codex_result(
         if _review_login(comment) not in TRUSTED_REVIEW_LOGINS:
             continue
         body = _review_body(comment)
+        external_status = _classify_external_codex_review(
+            body, head_sha=head_sha, pr_number=pr_number
+        )
+        if external_status is not None:
+            candidates.append((_codex_review_timestamp(comment, index), external_status, comment))
+            continue
         markers = reviewed_commit_markers(body)
         if not markers or not any(
             _marker_matches_head(marker, head_sha, known_commit_shas=known_commit_shas)
@@ -2000,6 +2036,7 @@ class TaskController:
             latest_result = _latest_codex_result(
                 preflight["comments"],
                 head_sha=expected_head,
+                pr_number=pr_number,
                 known_commit_shas=preflight["known_commit_shas"],
             )
             if latest_result is not None:
@@ -2169,6 +2206,7 @@ class TaskController:
             latest_result = _latest_codex_result(
                 preflight["comments"],
                 head_sha=expected_head,
+                pr_number=pr_number,
                 known_commit_shas=preflight["known_commit_shas"],
             )
             if latest_result is None:

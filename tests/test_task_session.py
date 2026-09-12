@@ -856,6 +856,39 @@ def test_codex_review_reuses_one_request_for_the_same_sha(
     assert f"head={head_sha}" in github.created_comments[0][1]
 
 
+def test_codex_review_reuses_external_running_summary_without_duplicate_request(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    github.comments[219] = [
+        {
+            "id": 49,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                "<!-- codex-security-review:v1 "
+                f'{{"headSha":"{head_sha}","pullRequestNumber":219,"status":"running"}} -->'
+            ),
+        }
+    ]
+
+    result = controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert result["status"] == "PENDING"
+    assert result["reused"] is True
+    assert result["review_budget"] == {"used": 1, "max": 2, "remaining": 1}
+    assert github.created_comments == []
+
+    github.comments[219][0]["body"] = (
+        "<!-- codex-security-review:v1 "
+        f'{{"headSha":"{head_sha}","pullRequestNumber":219,"status":"completed"}} -->'
+    )
+    completed = controller.validate_codex_review(pr_number=219, head_sha=head_sha)
+
+    assert completed["status"] == "CLEAN"
+    assert completed["merge_allowed"] is True
+    assert github.created_comments == []
+
+
 def test_codex_clean_round_one_allows_merge_without_rereview(
     repository: tuple[Path, Any],
 ) -> None:
