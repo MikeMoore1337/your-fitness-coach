@@ -1,0 +1,315 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "YFC nutrition label draft v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_language",
+    "label_format",
+    "source_basis",
+    "serving_size",
+    "servings_per_container",
+    "package_amount",
+    "source_facts",
+    "normalized_facts",
+    "derived_fields",
+    "displayed_daily_value_percent",
+    "field_evidence",
+    "confidence_kind",
+    "confidence",
+    "warnings",
+    "requires_user_review",
+    "metadata"
+  ],
+  "properties": {
+    "schema_version": { "const": "nutrition-label-draft-v1" },
+    "source_language": { "enum": ["ru", "en", "mixed", "unknown"] },
+    "label_format": { "enum": ["ru_standard", "eu_uk", "us_nutrition_facts", "unknown"] },
+    "source_basis": { "enum": ["per_100_g", "per_100_ml", "per_serving", "ambiguous"] },
+    "serving_size": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["amount", "unit"],
+          "properties": {
+            "amount": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "enum": ["g", "ml"] }
+          }
+        }
+      ]
+    },
+    "servings_per_container": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "number", "exclusiveMinimum": 0 }
+      ]
+    },
+    "package_amount": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["amount", "unit"],
+          "properties": {
+            "amount": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "enum": ["g", "ml"] }
+          }
+        }
+      ]
+    },
+    "source_facts": { "$ref": "#/$defs/facts" },
+    "normalized_facts": { "$ref": "#/$defs/facts" },
+    "derived_fields": { "$ref": "#/$defs/derived" },
+    "displayed_daily_value_percent": { "$ref": "#/$defs/daily_values" },
+    "field_evidence": { "$ref": "#/$defs/evidence" },
+    "confidence_kind": { "enum": ["provider_native", "calibrated_eval", "none"] },
+    "confidence": { "$ref": "#/$defs/confidence" },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+      "uniqueItems": true,
+      "maxItems": 32
+    },
+    "requires_user_review": { "const": true },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model", "prompt_version", "schema_version", "policy_revision"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "prompt_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "schema_version": { "const": "nutrition-label-draft-v1" },
+        "policy_revision": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    }
+  },
+  "$defs": {
+    "fact": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "unit", "basis_ref"],
+          "properties": {
+            "value": { "type": "number", "minimum": 0 },
+            "unit": { "enum": ["g", "mg", "kcal", "kJ"] },
+            "basis_ref": {
+              "enum": ["per_100_g", "per_100_ml", "per_serving"]
+            }
+          }
+        }
+      ]
+    },
+    "facts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy_kcal",
+        "energy_kj",
+        "protein_g",
+        "fat_g",
+        "saturated_fat_g",
+        "trans_fat_g",
+        "carbohydrate_g",
+        "sugars_g",
+        "added_sugars_g",
+        "fiber_g",
+        "salt_g",
+        "sodium_mg",
+        "cholesterol_mg"
+      ],
+      "properties": {
+        "energy_kcal": { "$ref": "#/$defs/fact" },
+        "energy_kj": { "$ref": "#/$defs/fact" },
+        "protein_g": { "$ref": "#/$defs/fact" },
+        "fat_g": { "$ref": "#/$defs/fact" },
+        "saturated_fat_g": { "$ref": "#/$defs/fact" },
+        "trans_fat_g": { "$ref": "#/$defs/fact" },
+        "carbohydrate_g": { "$ref": "#/$defs/fact" },
+        "sugars_g": { "$ref": "#/$defs/fact" },
+        "added_sugars_g": { "$ref": "#/$defs/fact" },
+        "fiber_g": { "$ref": "#/$defs/fact" },
+        "salt_g": { "$ref": "#/$defs/fact" },
+        "sodium_mg": { "$ref": "#/$defs/fact" },
+        "cholesterol_mg": { "$ref": "#/$defs/fact" }
+      }
+    },
+    "derived": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy_kcal",
+        "energy_kj",
+        "protein_g",
+        "fat_g",
+        "saturated_fat_g",
+        "trans_fat_g",
+        "carbohydrate_g",
+        "sugars_g",
+        "added_sugars_g",
+        "fiber_g",
+        "salt_g",
+        "sodium_mg",
+        "cholesterol_mg"
+      ],
+      "properties": {
+        "energy_kcal": { "$ref": "#/$defs/derived_fact" },
+        "energy_kj": { "$ref": "#/$defs/derived_fact" },
+        "protein_g": { "$ref": "#/$defs/derived_fact" },
+        "fat_g": { "$ref": "#/$defs/derived_fact" },
+        "saturated_fat_g": { "$ref": "#/$defs/derived_fact" },
+        "trans_fat_g": { "$ref": "#/$defs/derived_fact" },
+        "carbohydrate_g": { "$ref": "#/$defs/derived_fact" },
+        "sugars_g": { "$ref": "#/$defs/derived_fact" },
+        "added_sugars_g": { "$ref": "#/$defs/derived_fact" },
+        "fiber_g": { "$ref": "#/$defs/derived_fact" },
+        "salt_g": { "$ref": "#/$defs/derived_fact" },
+        "sodium_mg": { "$ref": "#/$defs/derived_fact" },
+        "cholesterol_mg": { "$ref": "#/$defs/derived_fact" }
+      }
+    },
+    "derived_fact": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["value", "unit", "reason", "source_fields"],
+          "properties": {
+            "value": { "type": "number", "minimum": 0 },
+            "unit": { "enum": ["g", "mg", "kcal", "kJ"] },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 256 },
+            "source_fields": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "minItems": 1,
+              "uniqueItems": true,
+              "maxItems": 8
+            }
+          }
+        }
+      ]
+    },
+    "daily_values": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy_kcal",
+        "protein_g",
+        "fat_g",
+        "saturated_fat_g",
+        "trans_fat_g",
+        "carbohydrate_g",
+        "fiber_g",
+        "sugars_g",
+        "added_sugars_g",
+        "salt_g",
+        "sodium_mg",
+        "cholesterol_mg"
+      ],
+      "properties": {
+        "energy_kcal": { "$ref": "#/$defs/daily_value" },
+        "protein_g": { "$ref": "#/$defs/daily_value" },
+        "fat_g": { "$ref": "#/$defs/daily_value" },
+        "saturated_fat_g": { "$ref": "#/$defs/daily_value" },
+        "trans_fat_g": { "$ref": "#/$defs/daily_value" },
+        "carbohydrate_g": { "$ref": "#/$defs/daily_value" },
+        "fiber_g": { "$ref": "#/$defs/daily_value" },
+        "sugars_g": { "$ref": "#/$defs/daily_value" },
+        "added_sugars_g": { "$ref": "#/$defs/daily_value" },
+        "salt_g": { "$ref": "#/$defs/daily_value" },
+        "sodium_mg": { "$ref": "#/$defs/daily_value" },
+        "cholesterol_mg": { "$ref": "#/$defs/daily_value" }
+      }
+    },
+    "daily_value": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "number", "minimum": 0, "maximum": 1000 }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy_kcal",
+        "energy_kj",
+        "protein_g",
+        "fat_g",
+        "saturated_fat_g",
+        "trans_fat_g",
+        "carbohydrate_g",
+        "sugars_g",
+        "added_sugars_g",
+        "fiber_g",
+        "salt_g",
+        "sodium_mg",
+        "cholesterol_mg"
+      ],
+      "properties": {
+        "energy_kcal": { "$ref": "#/$defs/evidence_value" },
+        "energy_kj": { "$ref": "#/$defs/evidence_value" },
+        "protein_g": { "$ref": "#/$defs/evidence_value" },
+        "fat_g": { "$ref": "#/$defs/evidence_value" },
+        "saturated_fat_g": { "$ref": "#/$defs/evidence_value" },
+        "trans_fat_g": { "$ref": "#/$defs/evidence_value" },
+        "carbohydrate_g": { "$ref": "#/$defs/evidence_value" },
+        "sugars_g": { "$ref": "#/$defs/evidence_value" },
+        "added_sugars_g": { "$ref": "#/$defs/evidence_value" },
+        "fiber_g": { "$ref": "#/$defs/evidence_value" },
+        "salt_g": { "$ref": "#/$defs/evidence_value" },
+        "sodium_mg": { "$ref": "#/$defs/evidence_value" },
+        "cholesterol_mg": { "$ref": "#/$defs/evidence_value" }
+      }
+    },
+    "evidence_value": {
+      "enum": ["read", "ambiguous", "unreadable", "absent", "derived"]
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "energy_kcal",
+        "energy_kj",
+        "protein_g",
+        "fat_g",
+        "saturated_fat_g",
+        "trans_fat_g",
+        "carbohydrate_g",
+        "sugars_g",
+        "added_sugars_g",
+        "fiber_g",
+        "salt_g",
+        "sodium_mg",
+        "cholesterol_mg"
+      ],
+      "properties": {
+        "energy_kcal": { "$ref": "#/$defs/confidence_value" },
+        "energy_kj": { "$ref": "#/$defs/confidence_value" },
+        "protein_g": { "$ref": "#/$defs/confidence_value" },
+        "fat_g": { "$ref": "#/$defs/confidence_value" },
+        "saturated_fat_g": { "$ref": "#/$defs/confidence_value" },
+        "trans_fat_g": { "$ref": "#/$defs/confidence_value" },
+        "carbohydrate_g": { "$ref": "#/$defs/confidence_value" },
+        "sugars_g": { "$ref": "#/$defs/confidence_value" },
+        "added_sugars_g": { "$ref": "#/$defs/confidence_value" },
+        "fiber_g": { "$ref": "#/$defs/confidence_value" },
+        "salt_g": { "$ref": "#/$defs/confidence_value" },
+        "sodium_mg": { "$ref": "#/$defs/confidence_value" },
+        "cholesterol_mg": { "$ref": "#/$defs/confidence_value" }
+      }
+    },
+    "confidence_value": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "number", "minimum": 0, "maximum": 1 }
+      ]
+    }
+  }
+}
