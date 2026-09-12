@@ -156,16 +156,27 @@ test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on on
   );
   expect(contextualDayIndex).toBeGreaterThanOrEqual(0);
   const contextualWorkoutDay = workoutDays.nth(contextualDayIndex);
+  const contextualDayLabel = await contextualWorkoutDay.getAttribute('aria-label');
+  expect(contextualDayLabel).toMatch(/(?:Запланировано|Предстоит тренировка|Выполнено)/i);
+  const contextIsCompleted = /Выполнено/i.test(contextualDayLabel ?? '');
   await contextualWorkoutDay.click();
   const weekLink = tmaPage.getByRole('link', { name: 'Открыть тренировку' });
   await weekLink.focus();
   await expect(weekLink).toBeFocused();
   await weekLink.press('Enter');
-  await expect(tmaPage).toHaveURL(/section=programs&workout_id=43/);
-  await expect(tmaPage.locator('#workout-schedule-43')).toBeVisible();
+  await expect(tmaPage).toHaveURL(
+    contextIsCompleted ? /section=progress&workout_id=43/ : /section=programs&workout_id=43/,
+  );
+  await expect(
+    contextIsCompleted
+      ? tmaPage.locator('#workout-history-43')
+      : tmaPage.locator('#workout-schedule-43'),
+  ).toBeVisible();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=today');
+  await expect(tmaPage).toHaveURL(
+    contextIsCompleted ? '/app?section=progress' : '/app?section=today',
+  );
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(false);
 });
 
