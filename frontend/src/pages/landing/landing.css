@@ -27,6 +27,20 @@
   -webkit-backdrop-filter: var(--matte-blur);
   backdrop-filter: var(--matte-blur);
 }
+
+/* На главной фото действительно проходит под стеклом, без дублирования изображения. */
+.landing-page:has(> #landing-content) {
+  display: grid;
+}
+.landing-page:has(> #landing-content) > :is(.public-shell__header, #landing-content) {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.landing-page:has(> #landing-content) > .public-shell__header {
+  align-self: start;
+  position: relative;
+  z-index: 20;
+}
 .landing-page h1,
 .landing-page h2,
 .landing-page h3 {
@@ -86,18 +100,28 @@
   transform: scale(0.97);
 }
 .landing-page .landing-button--secondary {
-  background: var(--matte-solid);
+  background: var(--matte-background);
   color: inherit;
   border-color: var(--matte-edge);
   box-shadow: inset 0 1px var(--matte-light);
 }
 
-/* Фото остаётся резким; CTA получает плотную тёмную подложку в обеих темах. */
+/* Фото просвечивает только через вторичный CTA; текст остаётся белым в обеих темах. */
 .landing-page .landing-hero .landing-button--secondary {
-  background: #202525;
+  --hero-glass: #202525;
+  background: var(--hero-glass);
   border-color: #828b8b;
   color: #f5f5f5;
   box-shadow: inset 0 1px rgb(255 255 255 / 5%);
+  -webkit-backdrop-filter: var(--matte-blur);
+  backdrop-filter: var(--matte-blur);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+    .landing-page .landing-hero .landing-button--secondary {
+      --hero-glass: rgb(20 25 25 / 64%);
+    }
+  }
 }
 
 @media (forced-colors: active) {
@@ -481,7 +505,8 @@
     left: 0;
     right: 0;
     padding: 20px;
-    background: #090b0b;
+    background: var(--matte-solid);
+    color: var(--landing-ink);
     flex-direction: column;
     z-index: 20;
   }

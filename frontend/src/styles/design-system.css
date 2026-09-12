@@ -6,7 +6,7 @@
   --v2-surface-secondary: #1b1f1f;
   --v2-surface-strong: #303030;
   --matte-solid: #202525;
-  --matte-tint: rgb(28 33 33 / 94%);
+  --matte-tint: rgb(28 33 33 / 80%);
   --matte-edge: #707777;
   --matte-light: rgb(255 255 255 / 5%);
   --matte-shadow: 0 6px 20px rgb(0 0 0 / 16%);
@@ -165,7 +165,7 @@
 
 :root[data-color-scheme='light'] {
   --matte-solid: #f3f5f5;
-  --matte-tint: rgb(247 249 249 / 94%);
+  --matte-tint: rgb(247 249 249 / 84%);
   --matte-edge: #7c8585;
   --matte-light: rgb(255 255 255 / 55%);
   --matte-shadow: 0 6px 20px rgb(20 28 28 / 8%);

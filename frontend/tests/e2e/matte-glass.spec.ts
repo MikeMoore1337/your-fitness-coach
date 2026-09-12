@@ -30,6 +30,18 @@ for (const theme of ['light', 'dark'] as const) {
         'backdrop-filter',
         'blur(12px)',
       );
+      const headerBox = await page.locator('.public-shell__header').boundingBox();
+      const heroBox = await page.locator('.landing-hero').boundingBox();
+      expect(headerBox).not.toBeNull();
+      expect(heroBox).not.toBeNull();
+      expect(headerBox!.y).toBe(heroBox!.y);
+      const heroAction = page.locator('.landing-hero .landing-button--secondary');
+      await expect(heroAction).toHaveCSS('background-color', 'rgba(20, 25, 25, 0.64)');
+      if (width < 500) {
+        await page.getByRole('button', { name: 'Открыть меню', exact: true }).click();
+        await expect(page.getByRole('navigation', { name: 'Навигация по странице' })).toBeVisible();
+        await page.getByRole('button', { name: 'Закрыть меню', exact: true }).click();
+      }
       await page.screenshot({ path: testInfo.outputPath(`landing-${width}-${theme}.png`) });
 
       await page.goto('/app?section=today');
@@ -37,21 +49,30 @@ for (const theme of ['light', 'dark'] as const) {
       await settle(page);
       const nav = page.locator('.app-bottom-nav');
       await expect(nav).toHaveCSS('backdrop-filter', 'blur(12px)');
+      await expect(nav).toHaveCSS(
+        'background-color',
+        theme === 'dark' ? 'rgba(28, 33, 33, 0.8)' : 'rgba(247, 249, 249, 0.84)',
+      );
       const actionContrast = await page
         .getByRole('button', { name: 'Посмотреть упражнения', exact: true })
         .evaluate((element) => {
           const style = getComputedStyle(element);
+          const canvas = getComputedStyle(document.documentElement)
+            .getPropertyValue('--v2-canvas')
+            .trim()
+            .replace('#', '');
+          const backdrop = [0, 2, 4].map((offset) =>
+            parseInt(canvas.slice(offset, offset + 2), 16),
+          );
           const luminance = (color: string) => {
-            const channels = color
-              .match(/[\d.]+/g)!
-              .slice(0, 3)
-              .map(Number)
-              .map((value) => {
-                const normalized = value / 255;
-                return normalized <= 0.04045
-                  ? normalized / 12.92
-                  : ((normalized + 0.055) / 1.055) ** 2.4;
-              });
+            const rgba = color.match(/[\d.]+/g)!.map(Number);
+            const alpha = rgba[3] ?? 1;
+            const channels = rgba.slice(0, 3).map((value, index) => {
+              const normalized = (value * alpha + (backdrop[index] ?? 0) * (1 - alpha)) / 255;
+              return normalized <= 0.04045
+                ? normalized / 12.92
+                : ((normalized + 0.055) / 1.055) ** 2.4;
+            });
             return channels.reduce(
               (sum, value, index) =>
                 sum + value * (index === 0 ? 0.2126 : index === 1 ? 0.7152 : 0.0722),

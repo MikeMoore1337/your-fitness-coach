@@ -9866,7 +9866,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 .app-section--design-v2
   :is(.today-dashboard, .active-workout, .nutrition-diary)
   :where(.secondary, .button-link.secondary, .ui-button--secondary, .ui-button--ghost) {
-  background: var(--matte-solid);
+  background: var(--matte-background);
   border-color: var(--matte-edge);
   box-shadow: inset 0 1px var(--matte-light);
 }
