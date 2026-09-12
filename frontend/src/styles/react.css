@@ -284,7 +284,7 @@ select:not([multiple]) {
   -webkit-appearance: none;
   appearance: none;
   padding-right: 42px;
-  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolyline points='5,9 12,16 19,9' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E");
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E");
   background-image: var(--select-chevron);
   background-repeat: no-repeat;
   background-position: right 14px center;

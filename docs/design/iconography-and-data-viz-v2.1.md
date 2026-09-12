@@ -10,7 +10,7 @@ Task 239 унифицирует функциональную иконограф�
 
 - Канонический renderer: `frontend/src/shared/ui/Icon.tsx`.
 - Статическая JSX-геометрия: `frontend/src/shared/ui/iconGlyphs.tsx`. HTML/SVG из внешних
-  источников не интерпретируется. Существующее векторное семейство YFC переиспользовано без npm dependency.
+  источников не интерпретируется. Все 74 семантических имени используют Lucide без npm dependency.
 - Сетка: `24×24`; поддерживаемые optical sizes: `16`, `20`, `24`.
 - Иллюстративные экземпляры того же glyph на landing сохраняют размеры `56`, `80`, `110`;
   функциональные controls не используют эти размеры. Произвольное масштабирование отдельных nav icons запрещено.
@@ -25,9 +25,8 @@ Task 239 унифицирует функциональную иконограф�
 - Все функциональные glyphs используют `currentColor`, round cap/join и общий stroke `1.8`.
 - Базовые actions, navigation, confidence, statuses, product и `WeekStrip` имеют уникальные
   семантические имена. Одинаковая семантика не получает page-local SVG, Unicode или CSS substitute.
-- `nav-exercise-catalog` использует выбранный владельцем разреженный силуэт открытой папки с одной
-  гантелью: внешний контур означает каталог, внутренний — упражнения; повторяющаяся grid-геометрия
-  не используется.
+- `nav-exercise-catalog` использует `library-big`: каталог отделён от гантели плана и тренировок.
+  `body-weight` использует циферблат `gauge`, объём тренировки — гирю `weight`.
 - `AppNavigationIcon`, `CloseIcon`, `TrashIcon`, `ChevronIcon`, `CheckIcon`, `DisclosureIcon`,
   `ThemeIcon`, `DataConfidence` и `WeekStrip` являются адаптерами над тем же renderer.
 - Icon-only action всегда получает accessible name от control и touch target не меньше `44px`.
@@ -37,10 +36,11 @@ Task 239 унифицирует функциональную иконограф�
   или подпись.
 - YFC brand assets и Google/Yandex/Telegram/VK/Apple marks остаются защищёнными исключениями.
 
-### Семь уточнённых glyphs — owner visual revision 2
+### Единый набор Lucide — owner visual revision 3
 
-По обратной связи владельца AI Coach сохраняет образ искр, mini-app — телефона. Для пяти
-отклонённых предметных/статусных форм выбран небольшой набор Lucide с общей геометрией 24×24:
+По обратной связи владельца AI Coach сохраняет образ искр, mini-app — телефона. По следующему
+запросу владельца весь набор переведён на Lucide: 74 семантических имени, 65 исходных SVG.
+Семь ранее показанных вариантов сохранены:
 
 | Semantic name            | Lucide source     | Образ                                                      |
 | ------------------------ | ----------------- | ---------------------------------------------------------- |
@@ -61,7 +61,10 @@ Renderer применяет общий stroke 1.8 вместо исходног�
 `frontend/public/licenses/lucide-LICENSE.txt` и копируется в production bundle как статический файл.
 SF Symbols не включены. Визуальный ориентир iOS выражен простыми монохромными формами,
 общим весом, round cap/join и оптическими размерами; это не копия системного набора Apple.
-Revision 2 также требует owner visual approval до merge/release.
+Revision 3 требует owner visual approval до merge/release. Статусы питания используют
+`clipboard-check`, `clipboard-pen-line`, `clipboard-minus`; намеренное голодание — `circle-pause`.
+Уверенность в данных: `circle-question-mark`, `circle-dashed`, `rotate-ccw-clock`, `shield-check`.
+Названия и подписи статусов остаются прежними; цвет не является единственным различием.
 
 ## `WeekStrip`
 

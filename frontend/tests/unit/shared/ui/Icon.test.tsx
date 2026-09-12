@@ -49,9 +49,10 @@ describe('Icon', () => {
   });
   it('keeps native select geometry synchronized with the shared chevron', () => {
     const { container } = render(<Icon name="chevron-down" />);
-    const points = container.querySelector('polyline')?.getAttribute('points');
+    const geometry = container.querySelector('path')?.getAttribute('d');
+    expect(geometry).toBeTruthy();
     const css = readFileSync('src/styles/react.css', 'utf8');
-    expect(css).toContain(`points='${points}'`);
+    expect(css).toContain(`d='${geometry}'`);
     expect(css).toContain("stroke-width='1.8'");
   });
   it('fills only the explicit selected star state', () => {
