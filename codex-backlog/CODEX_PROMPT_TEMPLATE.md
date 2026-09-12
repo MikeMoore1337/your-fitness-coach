@@ -20,11 +20,14 @@ dependencies/concurrency и recovery command. Не меняй другой workt
 Не запускай полный audit/suite и не подключай новые роли "для надёжности" без требования task/доказанного риска.
 Только BLOCKER/HIGH блокируют завершение; non-blocking findings не расширяют scope.
 Каждый MEDIUM/LOW до commit добавь или обнови в `codex-backlog/bugs/FINDINGS.md`.
-Обычная task без `concurrency` metadata считается `independent-write`; `exclusive-write` допустим
-только для global/coordination-sensitive изменений. Task PR открывай только в `master`, сохраняя
-`[Task <ID>]`; implementation/self-review/QA совместимых task могут идти параллельно, а delivery owner
-единолично сериализует refresh, current-base/provenance check, PR, CI, merge и production. READY/waiting/CI/production
-не удерживают implementation exclusion. Не deploy production вне task release contract. Не
+Обычная task без `concurrency` metadata считается `independent-write`; legacy `exclusive-write` не
+создаёт repository-wide implementation barrier. Task PR открывай только в `master`, сохраняя
+`[Task <ID>]`; implementation/self-review/QA task могут идти параллельно в отдельных worktree, а
+delivery owner единолично сериализует refresh, current-base/provenance check, PR, exact-head CI,
+bounded Codex review, merge и product delivery. После GREEN `checks` один раз вызови
+`request-codex-review --round 1`; при blocking P0/P1 сделай один batch fix, affected checks, новый
+exact-head CI и максимум `--round 2`. CLEAN разрешает merge, второй blocking result даёт
+`HUMAN_REQUIRED`, третья проверка запрещена. Не deploy production вне task release contract. Не
 переходи к следующей task.
 ```
 
@@ -39,8 +42,9 @@ dependencies/concurrency и recovery command. Не меняй другой workt
 После успешного завершения `58` следующая task — `59`. Не переходить к ней в той же сессии.
 
 
-Codex Code Review отключён постоянно: не создавать отдельного reviewer и не ждать LLM verdict.
-Self-review выполняется один раз implementer в текущей сессии. Release требует targeted tests,
-применимых static analysis/integration/e2e, exact-head CI и aggregate `checks` GREEN,
-отсутствия unresolved BLOCKER/HIGH, mergeable PR и resolution существующих threads.
+Automatic Codex Code Review не включается. Bounded review запускается только после exact-head CI
+GREEN; отдельный reviewer/subagent не создаётся. Self-review выполняется один раз implementer в
+текущей сессии. Release требует targeted tests, применимых static analysis/integration/e2e,
+exact-head CI и aggregate `checks` GREEN, CLEAN review, отсутствия unresolved BLOCKER/HIGH,
+mergeable PR и resolution существующих threads.
 Явные task-specific human/external/security/legal/destructive gates сохраняются.

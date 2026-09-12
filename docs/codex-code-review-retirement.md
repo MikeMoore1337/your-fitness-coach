@@ -1,40 +1,42 @@
-# Постоянная политика: без Codex Code Review
+# Bounded Codex Code Review для final semantic gate
 
-Это owner-level решение для всего репозитория Your Fitness Coach. Отдельный Codex Code Review
-не является частью development, release или merge lifecycle и не запускается вручную или
-автоматически.
-
-В active process запрещены вызов `@codex review`, `chatgpt-codex-connector`, mandatory/fresh
-review, reviewed-SHA gate, connector verdict, ожидание review rate limit, usage-reset credit
-ради review, waiver отсутствующего review и отдельный Codex reviewer/subagent только для
-проверки diff. Исторические комментарии закрытых PR/Issue не изменяются.
+Файл сохраняет историческое имя для durable-ссылок, но действующий контракт больше не запрещает
+Codex review полностью. Automatic Code Review в Codex/GitHub integration не включается изменениями
+репозитория. Review запускается только явной controller-командой после GREEN exact-head required
+`checks`; review-job в CI и отдельный reviewer-agent не создаются.
 
 ## Канонический quality gate
 
-Обычная task проходит:
-
 ```text
 implementation
-→ targeted tests
-→ implementer self-review
-→ lint/typecheck/static checks
+→ targeted verification
+→ final deterministic verification
+→ один bounded self-review implementer
 → commit/push
 → PR в master
-→ exact-head CI
-→ required checks
-→ resolution существующих blocking threads
-→ merge
-→ deploy
-→ production smoke/closeout
+→ exact-head required CI GREEN
+→ Codex review round 1
+→ CLEAN → merge
+→ blocking P0/P1 → один batch fix → affected checks → push → exact-head CI GREEN
+→ Codex review round 2
+→ CLEAN → merge | blocking P0/P1 → HUMAN_REQUIRED
+→ post-merge cleanup
+→ product-task deploy/production closeout, если требуется task contract
 ```
 
-Профильные QA, security, legal, human, external и destructive gates остаются только там, где
-их требует конкретная task. `master` остаётся PR-only; exact-head CI, aggregate `checks`, current
-base, non-fast-forward protection, thread resolution и production closeout не ослабляются.
+Controller хранит round state в shared Git common-dir и перед запросом проверяет PR, current head,
+mergeability, exact-head `checks`, comments/reviews и resolved threads. Запрос для уже pending или
+completed SHA переиспользуется. Разрешены максимум два managed requests на PR: round 2 возможен
+только после blocking P0/P1 round 1 и изменившегося head SHA. MEDIUM/LOW/NIT не открывают round 2,
+clean verdict не запускается повторно, третий request запрещён. Повторный blocking P0/P1 после
+round 2 возвращает `HUMAN_REQUIRED` с точным blocker report.
+
+Профильные QA, security, legal, human, external и destructive gates сохраняются. Codex review их
+не заменяет; `master` остаётся PR-only, exact-head CI и aggregate `checks` не ослабляются.
 
 ## Внешняя настройка
 
-Automatic Code Review в Codex Cloud/GitHub integration не управляется файлами репозитория.
-Владелец должен открыть настройки Codex Cloud для GitHub integration, выбрать этот repository и
-выключить `Automatic Code Review`, если функция включена. Этот ручной шаг не является частью
-repository lifecycle и не заменяется новым review для проверки данной task.
+Если владелец хочет отключить внешнюю автоматическую настройку Code Review, это выполняется вручную
+в Codex/GitHub integration settings; repository не создаёт secret, token или автоматическое правило.
+Недоступная внешняя настройка не блокирует repository changes и указывается как
+`MANUAL_EXTERNAL_SETTING`.

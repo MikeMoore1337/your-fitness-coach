@@ -103,6 +103,9 @@ def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() 
     assert "git rev-parse" not in deploy
     assert "deployment_contract.py refs" in deploy
     assert "bundle" in deploy.lower()
+    assert "controller-only governance merge" in deploy
+    assert "deploy=false" in deploy
+    assert "if: needs.authorize.outputs.deploy == 'true'" in deploy
     assert "git fetch" not in deploy_script
     assert "git reset" not in deploy_script
     assert "git rev-parse" not in deploy_script
@@ -151,6 +154,9 @@ def test_delivery_contract_is_master_only_and_github_gate_driven() -> None:
     assert "GitHub" in controller or "github" in controller
     assert "resolve-recovery" in controller
     assert "owner_authorize" in controller
+    assert "request_codex_review" in controller
+    assert "validate_codex_review" in controller
+    assert "CODEX_REVIEW_MAX_ROUNDS = 2" in controller
     assert "review_contract = validate_pull_request_review_contract" not in controller
     assert "validate-pr-review" not in launcher
     assert "--continue-queue" in launcher
@@ -161,6 +167,7 @@ def test_delivery_contract_is_master_only_and_github_gate_driven() -> None:
     assert '"--owner-launch"' in launcher
     assert '"--approve-for-me"' in launcher
     assert "Do not merge" in controller
+    assert "Codex review" in launcher
     assert "Не запускай следующую product task" in launcher
 
 

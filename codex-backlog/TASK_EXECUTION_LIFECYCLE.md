@@ -12,33 +12,31 @@ authorization на весь normal path этой task. Launcher/controller ав�
 
 ## Постоянная политика quality gates
 
-Отдельный Codex Code Review, `chatgpt-codex-connector` review, reviewed-SHA gate и ожидание
-review rate limit не используются и не являются release gate. Для YFC достаточно deterministic
-quality/policy checks, exact-head required `checks`, актуальной PR provenance, mergeability и
-нулевого числа применимых `BLOCKER`/`HIGH`/`P1`/`P2` findings. Это решение имеет приоритет над
-старыми формулировками lifecycle о LLM review; human, legal, external, destructive и явно
-task-specific gates сохраняются.
+Deterministic CI/tests/static-analysis checks и специальные human/legal/external/destructive gates
+остаются обязательными. Automatic Codex Code Review не включается; controller запрашивает bounded
+final semantic review только после GREEN exact-head `checks`: round 1, затем максимум один
+re-review после одного batch fix подтверждённых blocking P0/P1 на изменившемся head SHA. MEDIUM/LOW/NIT
+не запускают re-review, а clean result не перепроверяется «для уверенности».
+Перед request controller проверяет PR, current head, checks, mergeability, comments/reviews и
+resolved threads; duplicate для одного SHA переиспользуется. Третий request запрещён; повторный
+P0/P1 после round 2 возвращает `HUMAN_REQUIRED`. Отдельный reviewer-agent/subagent не создаётся,
+implementer делает один bounded self-review до commit и после fix повторяет только affected checks.
 
-Codex Code Review отключён и не используется как release gate, поскольку расходует Codex usage.
-Качество подтверждают детерминированные CI/tests/static-analysis checks и явно требуемые
-для конкретной task human/external gates. Отдельный LLM review verdict не требуется.
-Автоматические GitHub reviews, вызов `@codex review`, ожидание connector/fresh reviewed SHA,
-review rate-limit waits, usage-reset credit ради review и waiver отсутствующего review запрещены.
-Отдельную Codex review-задачу, роль или subagent для перечитывания diff не создавать.
-Implementer выполняет один ограниченный self-review в текущей рабочей сессии перед commit;
-после исправления дефекта повторяет только affected checks. Нового full self-audit не требуется.
-
-Normal path: implementation → targeted verification → self-review → commit/push → exact-head CI
-→ PR → required GitHub checks → merge → deploy → production smoke/closeout.
+Normal path: implementation → targeted verification → final deterministic verification → bounded
+self-review → commit/push → PR → exact-head required CI GREEN → Codex review round 1 → merge;
+если есть blocking P0/P1: batch fix → affected checks → push → exact-head CI GREEN → round 2 →
+merge или `HUMAN_REQUIRED` → post-merge cleanup → product-task deploy/closeout.
 Для PR-triggered CI PR открывается перед ожиданием его required checks.
 Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved. Создавать новый Codex review для этого запрещено.
+нужно фактически исправить и resolved до bounded review. Review не запускается до implementation,
+до GREEN CI, повторно на том же SHA или после clean verdict.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-они не должны заменять отдельный LLM review под другим названием.
+Codex review их не заменяет. Automatic Codex/GitHub setting не включается repository changes; если
+внешняя настройка недоступна, финальный отчёт фиксирует `MANUAL_EXTERNAL_SETTING`.
 Следующую product task автоматически не запускать.
 
 ## 0. Coordination lanes
@@ -46,12 +44,11 @@ PR-only master, required checks, non-fast-forward protection, thread resolution 
 Lifecycle разделён на две coordination boundary:
 
 - `implementation lane`: отдельные task leases и worktrees. Обычная task без `concurrency`
-  metadata считается `independent-write`. Такие task могут одновременно находиться в
-  `implementation`, `qa`, legacy `review` rework, `ready-for-delivery` и `waiting-for-delivery`. Только
-  `exclusive-write` task удерживает implementation exclusion и только в `starting`,
-  `implementation`, legacy `review` rework или `qa`; queued, delivery, CI и production states этот exclusion
-  не удерживают. Dirty, interrupted, corrupt, missing, duplicate, recovery и ambiguous state
-  остаются fail-closed.
+  metadata считается `independent-write`; legacy `exclusive-write` принимается для совместимости,
+  но ни один concurrency label не удерживает repository-wide implementation exclusion. Task может
+  одновременно находиться в `implementation`, `qa`, legacy `review` rework, `ready-for-delivery`
+  и `waiting-for-delivery`, если владеет отдельным worktree. Dirty, interrupted, corrupt, missing,
+  duplicate, recovery и ambiguous state остаются fail-closed.
 - Owner-authorized `supersede` — отдельный non-release terminal переход для task, которую владелец
   заменил другой канонической task. Он проверяет clean, однозначные branch/worktree и сохраняет
   lease и Git anchor для audit/recovery, но снимает implementation exclusion и не получает delivery
@@ -60,9 +57,9 @@ Lifecycle разделён на две coordination boundary:
   `production-success`; такой task нельзя закрывать через `finish` или выпускать в production.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
   может выполнить `refresh/rebase` относительно latest `origin/master`, current-base/provenance
-  check, PR/CI, merge, production deploy, smoke и terminal closeout. Owner сохраняется до завершения
+  check, PR/CI, bounded Codex review, merge, product-task production deploy, smoke и terminal closeout. Owner сохраняется до завершения
   `finish`, после чего lane передаётся следующему FIFO candidate. Busy delivery/CI/production не
-  блокирует запуск совместимой implementation task.
+  блокирует запуск отдельной implementation task.
 
 `READY_FOR_DELIVERY` фиксирует task ID, branch, HEAD, исходный/current base, quality/QA, clean
 worktree и provenance. Это очередь, а не разрешение merge: перед PR владелец delivery должен
@@ -209,7 +206,8 @@ Full repository suite, полный visual audit и полный security audit 
 ## 5. Детерминированная проверка
 
 Использовать результаты targeted tests, static analysis и применимой QA.
-Self-review из раздела 4 не является отдельной ролью или LLM verdict gate.
+Self-review из раздела 4 не является отдельной ролью; bounded Codex review выполняется только по
+контракту round 1/round 2 после GREEN exact-head CI.
 
 ### Severity и blocking policy
 
@@ -358,7 +356,9 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 5. task не содержит незавершённый явно обязательный owner checkpoint/approve, human/device evidence,
    legal-counsel gate или manual visual gate;
 6. нет unresolved production/recovery blocker;
-7. task PR уже merged в `master`, exact PR head прошёл required `checks`, post-merge provenance
+7. до merge task PR прошёл exact-head required `checks` и bounded Codex review с итогом `CLEAN`
+   (round 1 либо round 2); blocking P0/P1 после round 2 переводят задачу в `HUMAN_REQUIRED`.
+8. task PR уже merged в `master`, exact PR head прошёл required `checks`, post-merge provenance
    подтвердил merge SHA, а task worktree чист от accidental scope, secrets и debug artifacts.
 
 Иначе task получает `AUTO_RELEASE_BLOCKED` с точной причиной. `LOW`, `NIT` и `OUT_OF_SCOPE` сами по
@@ -372,22 +372,26 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 2. проверить expected PR head SHA и required check `checks`. PR-triggered CI выполняет полный
    regression profile, а post-merge `master` CI выполняет только provenance, immutable image
    publication и deployment-source checks для того же exact tree;
-3. включить GitHub auto-merge либо после green required PR checks выполнить эквивалентный обычный
-   PR merge только для ожидаемого head SHA;
-4. проверить post-merge CI exact merged `master` SHA и затем автоматически запущенный production
+3. после GREEN exact-head checks выполнить `request-codex-review --round 1` и дождаться
+   `validate-codex-review`. При `BLOCKING_P0_P1` исправить подтверждённые findings одним batch,
+   повторить affected checks, push, exact-head CI и не более одного `--round 2` на новом SHA.
+   `CLEAN` разрешает merge; второй blocking P0/P1 возвращает `HUMAN_REQUIRED`, без третьего request;
+4. включить GitHub auto-merge только если это не запускает review до green CI, либо после bounded
+   review выполнить эквивалентный обычный PR merge только для ожидаемого head SHA;
+5. проверить post-merge CI exact merged `master` SHA и затем автоматически запущенный production
    deploy того же SHA до terminal success. Deploy обязан передать immutable bundle, image refs и
    migration manifest, а host не должен требовать Git checkout. Failure/rollback/manual-intervention
    verdict останавливает sequence fail-closed. Failure/rollback/manual-intervention verdict is a
    terminal release blocker;
-5. после terminal production success выполнить `git fetch --prune origin`, перейти в canonical
+6. после terminal production success выполнить `git fetch --prune origin`, перейти в canonical
    controller worktree и запустить `scripts/task_session.py finish <ID>`. `finish` без отдельного
    owner prompt удаляет только exact matching clean task worktree и merged local branch. Dirty state,
    Git operation, unique commits, ambiguous/mismatched state или divergence refs останавливают
    closeout fail-closed без `--force` и без очистки сохранившихся данных;
-6. после successful `finish` автоматически перенести canonical task-файл через
+7. после successful `finish` автоматически перенести canonical task-файл через
     `scripts/archive_backlog_task.py archive`, затем выполнить `scripts/archive_backlog_task.py
     check`. Ошибка archive/manifest check является terminal closeout blocker и не скрывается;
-7. сформировать terminal final report только после successful finish, archive и manifest check.
+8. сформировать terminal final report только после successful finish, archive и manifest check.
 
 Canonical sequencing для нового release candidate:
 
@@ -395,6 +399,7 @@ Canonical sequencing для нового release candidate:
 implementation/self-review/QA -> logical commit -> PR master
   -> current-base/provenance delivery check
   -> exact-head required checks in GitHub CI
+  -> bounded Codex review round 1 (optional one round 2 only after blocking P0/P1 + changed SHA)
   -> merge exact PR head
   -> WAIT post-merge master provenance/image publication: success
   -> immutable bundle deploy exact master SHA
@@ -407,7 +412,7 @@ implementation/self-review/QA -> logical commit -> PR master
 Legacy `dev` refs не являются частью normal delivery и не используются как base, release queue или
 post-deploy synchronization step. Если current `master` изменился до delivery refresh/push/merge,
 candidate заново проходит current-base gate и exact-head checks. Waiting delivery task не блокирует
-новый совместимый implementation lease.
+новый отдельный implementation lease.
 
 Автоматизация никогда не делает direct push в `master`, не обходит ruleset/required checks,
 PR provenance/exact-SHA guard и не запускает manual production command. Task с явно объявленным

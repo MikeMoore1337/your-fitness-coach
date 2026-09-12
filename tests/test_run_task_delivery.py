@@ -515,17 +515,17 @@ def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
     assert "refresh-canonical-master" in prompt
     assert "branch-safety check, not a release gate" in prompt
     assert "Не запускай следующую product task" in prompt
-    assert "Отдельный LLM code review не является gate" in prompt
-    assert "usage-reset" in prompt
+    assert "request-codex-review --pr <N> --head-sha <SHA> --round 1" in prompt
+    assert "validate-codex-review" in prompt
+    assert "Existing pending" in prompt
     assert "exact-head CI GREEN" in prompt
     assert "aggregate checks GREEN" in prompt
     assert "validate-pr-review --pr <N> --head-sha <SHA>" not in prompt
     assert "3 review-fix cycles" in prompt
     assert "3 CI-fix cycles" in prompt
-    assert "Codex Code Review отключён" in prompt
-    assert "LLM verdict не требуется" in prompt
-    assert "aggregate checks GREEN" in prompt
-    assert "разрешения существующих review threads" in prompt
+    assert "CLEAN" in prompt
+    assert "третья проверка запрещена" in prompt
+    assert "reviewer/subagent/adversarial audit" in prompt
 
 
 def test_issue_authorization_normalizes_connector_bot_login(

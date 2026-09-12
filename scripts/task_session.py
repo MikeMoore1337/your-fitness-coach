@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 try:
     from scripts.artifact_manager import ArtifactError, ArtifactManager
@@ -43,11 +44,24 @@ TASK_COMMIT_RE = re.compile(rf"\[Task (?P<task_id>{TASK_ID_PATTERN})\]", re.IGNO
 CONTROLLER_COMMIT_RE = re.compile(r"^\[Controller\]\s+\S")
 CONTROLLER_ALLOWED_PATHS = frozenset(
     {
+        ".github/workflows/deploy.yml",
+        "AGENTS.md",
+        "codex-backlog/CODEX_PROMPT_TEMPLATE.md",
+        "codex-backlog/CODEX_SHORT_PROMPT.md",
+        "codex-backlog/COMPLETION_CHECKLIST.md",
         "codex-backlog/GLOBAL_RULES.md",
         "codex-backlog/TASK_EXECUTION_LIFECYCLE.md",
+        "docs/codex-code-review-retirement.md",
+        "docs/issue-driven-continuous-workflow.md",
+        "docs/task-branch-integration.md",
         "scripts/archive_backlog_task.py",
+        "scripts/run_task_delivery.py",
         "scripts/task_session.py",
         "tests/test_archive_backlog_task.py",
+        "tests/test_deployment_contract.py",
+        "tests/test_quality_gate_policy.py",
+        "tests/test_release_safeguards.py",
+        "tests/test_run_task_delivery.py",
         "tests/test_task_session.py",
     }
 )
@@ -77,11 +91,46 @@ REVIEW_APPROVAL_RE = re.compile(
 REVIEW_BLOCKING_MARKER_RE = re.compile(
     r"(?i)(?<![a-z0-9])(?:P[0-2]|BLOCKER|HIGH|MEDIUM)(?![a-z0-9])"
 )
+CODEX_REVIEW_STATE_VERSION = 1
+CODEX_REVIEW_MAX_ROUNDS = 2
+CODEX_REVIEW_REQUEST_MARKER = "yfc-codex-review-v1"
+CODEX_REVIEW_REQUEST_RE = re.compile(
+    rf"(?im)^\s*{re.escape(CODEX_REVIEW_REQUEST_MARKER)}\s+"
+    r"round=(?P<round>[12])\s+head=(?P<head>[0-9a-f]{40})\s*$"
+)
+CODEX_REVIEW_BLOCKING_FINDING_RE = re.compile(
+    r"(?i)\b(?:P0|P1|BLOCKER|HIGH)\b[^\n]{0,120}\b"
+    r"(?:blocking|finding|issue|defect|bug|must\s+fix|changes?\s+requested)\b"
+    r"|\b(?:blocking|finding|issue|defect|bug|must\s+fix|changes?\s+requested)\b"
+    r"[^\n]{0,120}\b(?:P0|P1|BLOCKER|HIGH)\b"
+)
+CODEX_REVIEW_PENDING_MARKERS = (
+    "review queued",
+    "review pending",
+    "review started",
+    "review in progress",
+)
+CODEX_REVIEW_SKIP_MARKERS = ("review skipped", "rate limit exceeded")
+CODEX_REVIEW_COMPLETED_MARKERS = (
+    "review completed",
+    "review status completed",
+    "no blocking findings",
+    "no blocking issues",
+    "verdict: pass",
+    "verdict: approved",
+    "status: pass",
+    "status: approved",
+    "changes requested",
+)
+CODEX_REVIEW_STATUSES = frozenset(
+    {"REQUESTED", "PENDING", "CLEAN", "BLOCKING_P0_P1", "SKIPPED", "HUMAN_REQUIRED"}
+)
+STATE_LOCK_STALE_SECONDS = 300
 
-# A task lease, an implementation exclusion, and delivery ownership are separate controller
-# concerns.  Only an exclusive-write lease in an implementation state owns the implementation
-# exclusion.  A ready, waiting, delivery, production-success, or superseded lease does not hold
-# that exclusion; delivery ownership is serialized independently below. A superseded lease is a
+# A task lease and delivery ownership are separate controller concerns.  Every task owns only its
+# own worktree/branch and task-state record.  ``exclusive-write`` remains a legacy metadata value
+# for compatibility, but never creates a repository-wide implementation barrier; genuinely shared
+# mutations are serialized by the narrower state/delivery mutexes below.  A superseded lease is a
 # non-release terminal record whose clean Git anchor is retained for audit/recovery.
 IMPLEMENTATION_STATES = frozenset({"starting", "implementation", "review", "qa"})
 READY_STATES = frozenset({"ready-for-delivery", "ready-for-pr"})
@@ -210,9 +259,13 @@ def normalize_concurrency_class(value: str) -> str:
 
 
 def write_lanes_compatible(first: str, second: str) -> bool:
-    left = normalize_concurrency_class(first)
-    right = normalize_concurrency_class(second)
-    return left == right == "independent-write"
+    # The old implementation treated ``exclusive-write`` as a repository-wide writer lock.  That
+    # made an otherwise unrelated implementation wait without a shared resource to justify it.
+    # Keep validating the legacy labels, while making compatibility mean what the worktree model
+    # actually guarantees: separate task worktrees can be written concurrently.
+    normalize_concurrency_class(first)
+    normalize_concurrency_class(second)
+    return True
 
 
 def _task_commit_ids(message: str) -> set[str]:
@@ -548,8 +601,8 @@ def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
         )
         or _legacy_dependencies(text, expected),
         executable=metadata.get("executable", str(executable_default)).lower() == "true",
-        # Ordinary tasks are safe to start in separate worktrees.  A task must opt into the
-        # stronger class explicitly because it changes the global implementation lane.
+        # Ordinary tasks are safe to start in separate worktrees.  Preserve the explicit class
+        # only as task metadata; final shared mutations are serialized by delivery coordination.
         concurrency_class=normalize_concurrency_class(
             metadata.get("concurrency", "independent-write")
         ),
@@ -578,11 +631,13 @@ class StateStore:
         self.root = common_dir / STATE_DIRECTORY_NAME
         self.leases = self.root / "leases"
         self.history = self.root / "history"
+        self.reviews = self.root / "reviews"
         self.lock_path = self.root / "state.lock"
 
     def initialize(self) -> None:
         self.leases.mkdir(parents=True, exist_ok=True)
         self.history.mkdir(parents=True, exist_ok=True)
+        self.reviews.mkdir(parents=True, exist_ok=True)
         contract = self.root / "contract.json"
         if not contract.exists():
             try:
@@ -597,18 +652,102 @@ class StateStore:
     @contextmanager
     def lock(self) -> Iterator[None]:
         self.root.mkdir(parents=True, exist_ok=True)
+        owner = {
+            "pid": os.getpid(),
+            "created_at": utc_now(),
+            "token": uuid4().hex,
+        }
+        owner_text = json.dumps(owner, ensure_ascii=True, sort_keys=True) + "\n"
         try:
             descriptor = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError as error:
-            raise TaskSessionError(
-                f"Coordination state is locked: {self.lock_path}; run recover, do not delete it"
-            ) from error
+            self._reclaim_stale_lock_if_safe()
+            try:
+                descriptor = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except FileExistsError:
+                raise TaskSessionError(
+                    f"Coordination state is locked: {self.lock_path}; wait for the active owner"
+                ) from error
         try:
-            os.write(descriptor, f"pid={os.getpid()} created_at={utc_now()}\n".encode())
-            os.close(descriptor)
+            with os.fdopen(descriptor, "w", encoding="utf-8", newline="") as handle:
+                handle.write(owner_text)
+                handle.flush()
             yield
         finally:
-            self.lock_path.unlink(missing_ok=True)
+            try:
+                current = self.lock_path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                current = ""
+            except OSError as error:
+                raise TaskSessionError(
+                    f"Cannot verify coordination lock ownership {self.lock_path}: {error}"
+                ) from error
+            if current == owner_text:
+                self.lock_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def _pid_is_alive(pid: int) -> bool:
+        if pid < 1:
+            return False
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        except OSError:
+            return True
+        return True
+
+    def _reclaim_stale_lock_if_safe(self) -> None:
+        try:
+            raw = self.lock_path.read_text(encoding="utf-8")
+            payload = json.loads(raw)
+        except FileNotFoundError:
+            return
+        except (OSError, json.JSONDecodeError) as error:
+            raise TaskSessionError(
+                f"Coordination state lock is malformed or unreadable: {self.lock_path}"
+            ) from error
+        if not isinstance(payload, Mapping):
+            raise TaskSessionError(f"Coordination state lock is malformed: {self.lock_path}")
+        pid = payload.get("pid")
+        created_at = payload.get("created_at")
+        token = payload.get("token")
+        if (
+            isinstance(pid, bool)
+            or not isinstance(pid, int)
+            or pid < 1
+            or not isinstance(created_at, str)
+            or not created_at.strip()
+            or not isinstance(token, str)
+            or not re.fullmatch(r"[0-9a-f]{32}", token)
+        ):
+            raise TaskSessionError(f"Coordination state lock is malformed: {self.lock_path}")
+        try:
+            created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise TaskSessionError(
+                f"Coordination state lock timestamp is malformed: {self.lock_path}"
+            ) from error
+        if created.tzinfo is None:
+            raise TaskSessionError(
+                f"Coordination state lock timestamp has no timezone: {self.lock_path}"
+            )
+        age = (datetime.now(UTC) - created.astimezone(UTC)).total_seconds()
+        if age < STATE_LOCK_STALE_SECONDS or self._pid_is_alive(pid):
+            return
+        try:
+            current = self.lock_path.read_text(encoding="utf-8")
+            if current != raw:
+                return
+            self.lock_path.unlink()
+        except FileNotFoundError:
+            return
+        except OSError as error:
+            raise TaskSessionError(
+                f"Cannot reclaim stale coordination lock safely: {self.lock_path}"
+            ) from error
 
     @staticmethod
     def read_json(path: Path, default: Any = None) -> Any:
@@ -646,6 +785,11 @@ class StateStore:
 
     def task_lease_path(self, task_id: str) -> Path:
         return self.leases / f"task-{normalize_task_id(task_id)}.json"
+
+    def codex_review_path(self, pr_number: int) -> Path:
+        if isinstance(pr_number, bool) or not isinstance(pr_number, int) or pr_number < 1:
+            raise TaskSessionError("PR number must be a positive integer")
+        return self.reviews / f"pr-{pr_number}.json"
 
     @property
     def delivery_path(self) -> Path:
@@ -775,6 +919,29 @@ class GitHubClient:
             if len(batch) < 100:
                 return comments
             page += 1
+
+    def create_issue_comment(self, number: int, body: str) -> dict[str, Any]:
+        if not body.strip():
+            raise TaskSessionError("GitHub issue comment body must not be empty")
+        result = _run(
+            [
+                "gh",
+                "api",
+                f"repos/{self.repo_slug}/issues/{number}/comments",
+                "--method",
+                "POST",
+                "-f",
+                f"body={body}",
+            ],
+            cwd=self.repository.current_worktree,
+        )
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError as error:
+            raise TaskSessionError("GitHub returned invalid issue-comment JSON") from error
+        if not isinstance(payload, Mapping):
+            raise TaskSessionError("GitHub returned an invalid issue-comment payload")
+        return dict(payload)
 
     def review_threads(self, number: int) -> list[dict[str, Any]]:
         owner, separator, name = self.repo_slug.partition("/")
@@ -950,6 +1117,103 @@ def _marker_matches_head(
 
 def _review_body(item: Mapping[str, Any]) -> str:
     return str(item.get("body") or item.get("text") or "")
+
+
+def _codex_review_timestamp(item: Mapping[str, Any], index: int) -> tuple[str, int]:
+    timestamp = str(
+        item.get("updated_at")
+        or item.get("updatedAt")
+        or item.get("submitted_at")
+        or item.get("submittedAt")
+        or item.get("created_at")
+        or item.get("createdAt")
+        or ""
+    )
+    try:
+        comment_id = int(item.get("id", index))
+    except TypeError, ValueError:
+        comment_id = index
+    return timestamp, comment_id
+
+
+def _codex_review_has_blocking_p0_p1(body: str) -> bool:
+    lowered = body.casefold()
+    if re.search(
+        r"(?i)\b(?:no|none|zero)\s+(?:blocking\s+)?(?:findings?\s+at\s+)?(?:for\s+)?p0\s*/\s*p1\b",
+        body,
+    ):
+        return False
+    if re.search(r"(?i)\bno\s+blocking\s+(?:findings|issues)\b", body):
+        return False
+    if CODEX_REVIEW_BLOCKING_FINDING_RE.search(body):
+        return True
+    for match in re.finditer(r"(?im)^\s*(?:[-*]\s*)?(?:P0|P1)\b\s*[:\-]\s*(?P<detail>.+)$", body):
+        detail = match.group("detail").strip().casefold()
+        if detail and not re.match(r"(?:none|no\b|zero\b|n/?a\b|not\s+found\b)", detail):
+            return True
+    return bool(
+        re.search(r"(?i)\b(?:severity|priority)\s*[:=]\s*P[01]\b", body)
+        and not any(marker in lowered for marker in ("no blocking", "none", "zero"))
+    )
+
+
+def _codex_review_is_completed(body: str) -> bool:
+    lowered = body.casefold()
+    return any(marker in lowered for marker in CODEX_REVIEW_COMPLETED_MARKERS)
+
+
+def _classify_codex_review_body(body: str) -> str:
+    lowered = body.casefold()
+    if any(marker in lowered for marker in CODEX_REVIEW_SKIP_MARKERS):
+        return "SKIPPED"
+    if _codex_review_has_blocking_p0_p1(body):
+        return "BLOCKING_P0_P1"
+    if _codex_review_is_completed(body):
+        return "CLEAN"
+    if any(marker in lowered for marker in CODEX_REVIEW_PENDING_MARKERS):
+        return "PENDING"
+    return "PENDING"
+
+
+def _codex_request_records(
+    comments: Sequence[Mapping[str, Any]], *, round_number: int, head_sha: str
+) -> list[Mapping[str, Any]]:
+    records: list[Mapping[str, Any]] = []
+    for comment in comments:
+        body = _review_body(comment)
+        if any(
+            int(match.group("round")) == round_number
+            and match.group("head").lower() == head_sha.lower()
+            for match in CODEX_REVIEW_REQUEST_RE.finditer(body)
+        ):
+            records.append(comment)
+    return records
+
+
+def _latest_codex_result(
+    comments: Sequence[Mapping[str, Any]],
+    *,
+    head_sha: str,
+    known_commit_shas: Sequence[str] | None = None,
+) -> tuple[str, Mapping[str, Any]] | None:
+    candidates: list[tuple[tuple[str, int], str, Mapping[str, Any]]] = []
+    for index, comment in enumerate(comments):
+        if _review_login(comment) not in TRUSTED_REVIEW_LOGINS:
+            continue
+        body = _review_body(comment)
+        markers = reviewed_commit_markers(body)
+        if not markers or not any(
+            _marker_matches_head(marker, head_sha, known_commit_shas=known_commit_shas)
+            for marker in markers
+        ):
+            continue
+        candidates.append(
+            (_codex_review_timestamp(comment, index), _classify_codex_review_body(body), comment)
+        )
+    if not candidates:
+        return None
+    _, status, comment = max(candidates, key=lambda item: item[0])
+    return status, comment
 
 
 def _is_approving_codex_review(body: str) -> bool:
@@ -1530,6 +1794,420 @@ class TaskController:
         if self.github is None:
             self.github = GitHubClient(self.repository)
         return self.github
+
+    @staticmethod
+    def _review_round_entry(
+        state: Mapping[str, Any], *, round_number: int, head_sha: str | None = None
+    ) -> dict[str, Any] | None:
+        rounds = state.get("rounds", [])
+        if not isinstance(rounds, list):
+            raise TaskSessionError("Codex review state has an invalid rounds collection")
+        matches = [
+            item
+            for item in rounds
+            if isinstance(item, Mapping)
+            and item.get("round") == round_number
+            and (head_sha is None or str(item.get("head_sha", "")).lower() == head_sha.lower())
+        ]
+        if len(matches) > 1:
+            raise TaskSessionError("Codex review state contains duplicate round records")
+        return dict(matches[0]) if matches else None
+
+    def _codex_review_state(self, pr_number: int) -> dict[str, Any]:
+        self.store.initialize()
+        path = self.store.codex_review_path(pr_number)
+        payload = self.store.read_json(path)
+        if payload is None:
+            return {
+                "version": CODEX_REVIEW_STATE_VERSION,
+                "pr_number": pr_number,
+                "rounds": [],
+                "updated_at": utc_now(),
+            }
+        if not isinstance(payload, dict):
+            raise TaskSessionError(f"Invalid Codex review state: {path}")
+        if payload.get("version") != CODEX_REVIEW_STATE_VERSION:
+            raise TaskSessionError(f"Unsupported Codex review state: {path}")
+        if payload.get("pr_number") != pr_number:
+            raise TaskSessionError(f"Codex review state PR mismatch: {path}")
+        rounds = payload.get("rounds")
+        if not isinstance(rounds, list) or len(rounds) > CODEX_REVIEW_MAX_ROUNDS:
+            raise TaskSessionError(f"Invalid Codex review round inventory: {path}")
+        seen_rounds: set[int] = set()
+        for item in rounds:
+            if not isinstance(item, dict):
+                raise TaskSessionError(f"Invalid Codex review round record: {path}")
+            round_number = item.get("round")
+            head_sha = str(item.get("head_sha", "")).lower()
+            status = item.get("status")
+            if (
+                isinstance(round_number, bool)
+                or not isinstance(round_number, int)
+                or round_number not in {1, 2}
+                or round_number in seen_rounds
+                or not re.fullmatch(r"[0-9a-f]{40}", head_sha)
+                or status not in CODEX_REVIEW_STATUSES
+            ):
+                raise TaskSessionError(f"Invalid Codex review round record: {path}")
+            seen_rounds.add(round_number)
+        return payload
+
+    def _save_codex_review_state(self, pr_number: int, state: Mapping[str, Any]) -> None:
+        path = self.store.codex_review_path(pr_number)
+        StateStore.replace_json(path, dict(state))
+
+    def _codex_review_preflight(self, pr_number: int, *, expected_head_sha: str) -> dict[str, Any]:
+        head_sha = expected_head_sha.strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{40}", head_sha):
+            raise TaskSessionError("Codex review requires a full lowercase 40-character head SHA")
+        github = self._github()
+        pull_request = _pull_request_with_resolved_mergeability(github, pr_number)
+        current_head_sha = str(pull_request.get("head", {}).get("sha", "")).lower()
+        if current_head_sha != head_sha:
+            raise TaskSessionError(
+                f"Codex review received stale head {head_sha}; current PR head is {current_head_sha}"
+            )
+        if str(pull_request.get("state", "")).lower() != "open":
+            raise TaskSessionError("Codex review requires an open PR")
+        if pull_request.get("draft") is True:
+            raise TaskSessionError("Codex review refuses a draft PR")
+        if pull_request.get("base", {}).get("ref") != TARGET_BASE_BRANCH:
+            raise TaskSessionError(
+                f"Codex review requires a {TARGET_BASE_BRANCH} pull request base"
+            )
+        live_base_sha = github.branch_head(TARGET_BASE_BRANCH)
+        if pull_request.get("base", {}).get("sha") != live_base_sha:
+            raise TaskSessionError(
+                "Codex review refuses a stale PR base: "
+                f"{pull_request.get('base', {}).get('sha')} != {live_base_sha}"
+            )
+        if pull_request.get("mergeable") is not True:
+            raise TaskSessionError("Codex review requires an explicitly mergeable PR")
+        mergeable_state = str(pull_request.get("mergeable_state", "")).lower()
+        if mergeable_state not in {"clean", "has_hooks", "blocked", "unstable"}:
+            raise TaskSessionError(
+                f"Codex review requires a mergeable PR, found {mergeable_state or '<missing>'}"
+            )
+        checks = github.check_runs(head_sha)
+        if not _successful_exact_check(checks, "checks", head_sha):
+            raise TaskSessionError(
+                f"Codex review requires exact-head required check 'checks' GREEN for {head_sha}"
+            )
+        reviews = github.pull_request_reviews(pr_number)
+        comments = github.issue_comments(pr_number)
+        threads = github.review_threads(pr_number)
+        unresolved = [
+            index
+            for index, thread in enumerate(threads, start=1)
+            if thread.get("isResolved") is not True
+        ]
+        if unresolved:
+            raise TaskSessionError(
+                "Codex review refuses unresolved review threads: "
+                + ", ".join(str(item) for item in unresolved)
+            )
+        commits = github.pull_request_commits(pr_number)
+        return {
+            "pull_request": pull_request,
+            "checks": checks,
+            "reviews": reviews,
+            "comments": comments,
+            "threads": threads,
+            "known_commit_shas": _commit_shas(commits),
+            "head_sha": head_sha,
+        }
+
+    @staticmethod
+    def _review_budget_summary(state: Mapping[str, Any]) -> dict[str, int]:
+        rounds = state.get("rounds", [])
+        used = len(rounds) if isinstance(rounds, list) else 0
+        return {
+            "used": used,
+            "max": CODEX_REVIEW_MAX_ROUNDS,
+            "remaining": max(0, CODEX_REVIEW_MAX_ROUNDS - used),
+        }
+
+    @staticmethod
+    def _codex_review_result_payload(
+        *,
+        pr_number: int,
+        head_sha: str,
+        round_number: int,
+        status: str,
+        state: Mapping[str, Any],
+        reused: bool,
+        reason: str | None = None,
+        blocker_report: str | None = None,
+    ) -> dict[str, Any]:
+        payload = {
+            "operation": "codex-review",
+            "pr_number": pr_number,
+            "round": round_number,
+            "head_sha": head_sha,
+            "status": status,
+            "reused": reused,
+            "merge_allowed": status == "CLEAN",
+            "review_budget": TaskController._review_budget_summary(state),
+            "state_path": str(state.get("state_path", "")),
+        }
+        if reason:
+            payload["reason"] = reason
+        if blocker_report:
+            payload["blocker_report"] = blocker_report
+        return payload
+
+    def request_codex_review(
+        self,
+        *,
+        pr_number: int,
+        head_sha: str,
+        round_number: int,
+        task_id: str | None = None,
+    ) -> dict[str, Any]:
+        if isinstance(round_number, bool) or round_number not in {1, 2}:
+            raise TaskSessionError("Codex review round must be 1 or 2")
+        expected_head = head_sha.strip().lower()
+        if task_id is not None:
+            lease, _ = self._require_delivery_owner(task_id)
+            if lease.get("delivery_head_sha") not in {None, expected_head}:
+                raise TaskSessionError(
+                    "Codex review head does not match the delivery lane exact-head anchor"
+                )
+        self.store.initialize()
+        with self.store.lock():
+            preflight = self._codex_review_preflight(pr_number, expected_head_sha=expected_head)
+            state = self._codex_review_state(pr_number)
+            state["state_path"] = str(self.store.codex_review_path(pr_number))
+            rounds = list(state.get("rounds", []))
+            current = self._review_round_entry(
+                state, round_number=round_number, head_sha=expected_head
+            )
+            same_round = self._review_round_entry(state, round_number=round_number)
+            if same_round is not None and same_round.get("head_sha") != expected_head:
+                raise TaskSessionError(
+                    f"Codex review round {round_number} was already spent on another head; HUMAN_REQUIRED"
+                )
+            previous = self._review_round_entry(state, round_number=1)
+            if round_number == 2 and same_round is None:
+                if previous is None or previous.get("status") != "BLOCKING_P0_P1":
+                    raise TaskSessionError(
+                        "Codex review round 2 requires a blocking P0/P1 result from round 1"
+                    )
+                if str(previous.get("head_sha", "")).lower() == expected_head:
+                    raise TaskSessionError(
+                        "Codex review round 2 requires a changed head SHA after the batch fix"
+                    )
+            latest_result = _latest_codex_result(
+                preflight["comments"],
+                head_sha=expected_head,
+                known_commit_shas=preflight["known_commit_shas"],
+            )
+            if latest_result is not None:
+                result_status, result_comment = latest_result
+                if result_status == "SKIPPED" or (
+                    result_status == "BLOCKING_P0_P1" and round_number == 2
+                ):
+                    result_status = "HUMAN_REQUIRED"
+                if current is None:
+                    current = {
+                        "round": round_number,
+                        "head_sha": expected_head,
+                        "requested_at": utc_now(),
+                    }
+                current.update(
+                    {
+                        "status": result_status,
+                        "updated_at": utc_now(),
+                        "result_comment_id": result_comment.get("id"),
+                    }
+                )
+                if same_round is None:
+                    rounds.append(current)
+                else:
+                    rounds = [
+                        current if item.get("round") == round_number else item for item in rounds
+                    ]
+                state["rounds"] = sorted(rounds, key=lambda item: item["round"])
+                state["status"] = result_status
+                state["updated_at"] = utc_now()
+                self._save_codex_review_state(pr_number, state)
+                return self._codex_review_result_payload(
+                    pr_number=pr_number,
+                    head_sha=expected_head,
+                    round_number=round_number,
+                    status=result_status,
+                    state=state,
+                    reused=True,
+                    reason="existing exact-head Codex result reused",
+                )
+            if current is not None and current.get("status") in {
+                "REQUESTED",
+                "PENDING",
+            }:
+                state["status"] = "PENDING"
+                state["updated_at"] = utc_now()
+                self._save_codex_review_state(pr_number, state)
+                return self._codex_review_result_payload(
+                    pr_number=pr_number,
+                    head_sha=expected_head,
+                    round_number=round_number,
+                    status="PENDING",
+                    state=state,
+                    reused=True,
+                    reason="existing managed review request is still pending",
+                )
+            if _codex_request_records(
+                preflight["comments"], round_number=round_number, head_sha=expected_head
+            ):
+                record = current or {
+                    "round": round_number,
+                    "head_sha": expected_head,
+                    "requested_at": utc_now(),
+                }
+                record.update({"status": "PENDING", "updated_at": utc_now()})
+                if same_round is None:
+                    rounds.append(record)
+                else:
+                    rounds = [
+                        record if item.get("round") == round_number else item for item in rounds
+                    ]
+                state["rounds"] = sorted(rounds, key=lambda item: item["round"])
+                state["status"] = "PENDING"
+                state["updated_at"] = utc_now()
+                self._save_codex_review_state(pr_number, state)
+                return self._codex_review_result_payload(
+                    pr_number=pr_number,
+                    head_sha=expected_head,
+                    round_number=round_number,
+                    status="PENDING",
+                    state=state,
+                    reused=True,
+                    reason="existing exact-head review request reused",
+                )
+            if round_number == 2:
+                if previous is None or previous.get("status") != "BLOCKING_P0_P1":
+                    raise TaskSessionError(
+                        "Codex review round 2 requires a blocking P0/P1 result from round 1"
+                    )
+                if str(previous.get("head_sha", "")).lower() == expected_head:
+                    raise TaskSessionError(
+                        "Codex review round 2 requires a changed head SHA after the batch fix"
+                    )
+            elif previous is not None:
+                previous_head = str(previous.get("head_sha", "")).lower()
+                if previous_head != expected_head:
+                    raise TaskSessionError(
+                        "Codex review round 1 is stale and its second request is not allowed; HUMAN_REQUIRED"
+                    )
+                if previous.get("status") in {"CLEAN", "SKIPPED", "HUMAN_REQUIRED"}:
+                    raise TaskSessionError(
+                        "Codex review round 1 is already terminal; duplicate review is forbidden"
+                    )
+            if len(rounds) >= CODEX_REVIEW_MAX_ROUNDS:
+                raise TaskSessionError("Codex review budget exhausted; HUMAN_REQUIRED")
+            body = (
+                "@codex review\n\n"
+                f"{CODEX_REVIEW_REQUEST_MARKER} round={round_number} head={expected_head}\n"
+                f"Reviewed commit: `{expected_head}`\n\n"
+                "This is the bounded final semantic review for the exact PR head. Report only "
+                "reproducible blocking P0/P1 findings that must be fixed before merge. P2/P3, "
+                "MEDIUM/LOW and NIT findings are non-blocking and must not trigger another review. "
+                "Finish with an explicit completed verdict: CLEAN if there are no blocking P0/P1 "
+                "findings, otherwise list each blocking finding with its severity."
+            )
+            created = self._github().create_issue_comment(pr_number, body)
+            record = {
+                "round": round_number,
+                "head_sha": expected_head,
+                "status": "REQUESTED",
+                "requested_at": utc_now(),
+                "request_comment_id": created.get("id"),
+            }
+            rounds.append(record)
+            state.update(
+                {
+                    "rounds": sorted(rounds, key=lambda item: item["round"]),
+                    "status": "REQUESTED",
+                    "updated_at": utc_now(),
+                }
+            )
+            self._save_codex_review_state(pr_number, state)
+            return self._codex_review_result_payload(
+                pr_number=pr_number,
+                head_sha=expected_head,
+                round_number=round_number,
+                status="REQUESTED",
+                state=state,
+                reused=False,
+                reason="exact-head Codex review requested after GREEN checks",
+            )
+
+    def validate_codex_review(
+        self, *, pr_number: int, head_sha: str, round_number: int | None = None
+    ) -> dict[str, Any]:
+        self.store.initialize()
+        expected_head = head_sha.strip().lower()
+        with self.store.lock():
+            preflight = self._codex_review_preflight(pr_number, expected_head_sha=expected_head)
+            state = self._codex_review_state(pr_number)
+            state["state_path"] = str(self.store.codex_review_path(pr_number))
+            matching = [
+                item
+                for item in state.get("rounds", [])
+                if item.get("head_sha", "").lower() == expected_head
+            ]
+            if len(matching) != 1:
+                raise TaskSessionError(
+                    "No managed Codex review request exists for the exact current head"
+                )
+            record = dict(matching[0])
+            actual_round = int(record["round"])
+            if round_number is not None and round_number != actual_round:
+                raise TaskSessionError(
+                    f"Codex review round mismatch: state has round {actual_round}, requested {round_number}"
+                )
+            latest_result = _latest_codex_result(
+                preflight["comments"],
+                head_sha=expected_head,
+                known_commit_shas=preflight["known_commit_shas"],
+            )
+            if latest_result is None:
+                status = "PENDING"
+                reason = "exact-head Codex review request exists without a completed result"
+                blocker_report = None
+            else:
+                status, result_comment = latest_result
+                reason = "exact-head Codex result classified"
+                blocker_report = (
+                    _review_body(result_comment).strip() if status == "BLOCKING_P0_P1" else None
+                )
+            record.update({"status": status, "updated_at": utc_now()})
+            state["rounds"] = [
+                record if item.get("round") == actual_round else item for item in state["rounds"]
+            ]
+            state["status"] = status
+            state["updated_at"] = utc_now()
+            if status == "BLOCKING_P0_P1" and actual_round == 2:
+                status = "HUMAN_REQUIRED"
+                record["status"] = status
+                state["status"] = status
+                reason = "round 2 still has reproducible blocking P0/P1 findings"
+            elif status == "SKIPPED":
+                status = "HUMAN_REQUIRED"
+                record["status"] = status
+                state["status"] = status
+                reason = "Codex review was skipped or rate-limited; no automatic retry is allowed"
+            self._save_codex_review_state(pr_number, state)
+            return self._codex_review_result_payload(
+                pr_number=pr_number,
+                head_sha=expected_head,
+                round_number=actual_round,
+                status=status,
+                state=state,
+                reused=True,
+                reason=reason,
+                blocker_report=blocker_report,
+            )
 
     def _canonical_root(self) -> Path:
         return self.repository.repository_root
@@ -2299,12 +2977,12 @@ class TaskController:
 
     @classmethod
     def _lease_holds_implementation_exclusion(cls, lease: Mapping[str, Any]) -> bool:
-        if lease.get("mode") != "write":
-            return False
-        state = cls._lease_state(lease)
-        if state not in IMPLEMENTATION_STATES | RECOVERY_STATES:
-            return False
-        return cls._validated_lease_concurrency_class(lease) == "exclusive-write"
+        # ``exclusive-write`` is retained in old leases as metadata only.  A task lease owns its
+        # worktree, not the repository's implementation lane; serial delivery is the only global
+        # write boundary.  Keep this helper for status/backward compatibility with older state.
+        if lease.get("mode") == "write":
+            cls._validated_lease_concurrency_class(lease)
+        return False
 
     @classmethod
     def _validate_lease_concurrency_classes(cls, leases: Sequence[Mapping[str, Any]]) -> None:
@@ -2358,14 +3036,14 @@ class TaskController:
         task_id: str,
         concurrency_class: str,
     ) -> list[dict[str, Any]]:
-        candidate_class = normalize_concurrency_class(concurrency_class)
+        normalize_concurrency_class(concurrency_class)
         conflicts: list[dict[str, Any]] = []
         for lease in leases:
             if lease.get("mode") != "write":
                 continue
             if str(lease.get("task_id", "")).upper() == task_id.upper():
                 continue
-            existing_class = cls._validated_lease_concurrency_class(lease)
+            cls._validated_lease_concurrency_class(lease)
             state = cls._lease_state(lease)
             if state not in KNOWN_LEASE_STATES:
                 raise TaskSessionError(
@@ -2377,22 +3055,10 @@ class TaskController:
                     f"Task {str(lease.get('task_id', '')).upper() or '<unknown>'} lease "
                     "requires controller recovery"
                 )
-            # An independent writer is compatible with an existing exclusive task.  The
-            # exclusive task still owns its own implementation boundary, but it must not
-            # turn that boundary into a repository-wide start lock for unrelated worktrees.
-            # A new exclusive task remains conservative and waits for every active writer;
-            # actual file overlap is discovered at the serialized delivery refresh/rebase.
-            candidate_requires_exclusion = candidate_class == "exclusive-write" and (
-                state in IMPLEMENTATION_STATES
-            )
-            if candidate_requires_exclusion:
-                conflicts.append(
-                    {
-                        "task_id": str(lease.get("task_id", "")).upper(),
-                        "concurrency_class": existing_class,
-                        "lifecycle_state": state,
-                    }
-                )
+            # The class is deliberately not used as a repository-wide lock.  Distinct task
+            # worktrees have distinct mutable ownership; real file conflicts are discovered by
+            # the serialized refresh/rebase/finalization path.  The state validation above still
+            # fails closed for malformed or recovery-required leases.
         return conflicts
 
     @classmethod
@@ -2914,9 +3580,9 @@ class TaskController:
                 f"{', '.join(resolved_dependencies) or 'none'}\n"
                 f"Canonical master checkpoint: {canonical_refresh['result']}\n"
                 "Concurrency: missing task concurrency metadata defaults to independent-write; "
-                "exclusive-write is reserved for global/coordination-sensitive scope. Only an "
-                "exclusive lease in starting/implementation/review/qa (or unresolved recovery) "
-                "holds implementation exclusion; readiness, waiting, CI and production do not.\n"
+                "legacy exclusive-write metadata does not block another task's separate worktree. "
+                "Task/worktree ownership is scoped; final refresh, CI, review and merge use the "
+                "serial delivery lane.\n"
                 "Normal path: targeted checks/self-review/QA/commit -> push task branch -> PR master\n"
                 "-> GitHub exact-head checks -> merge -> exact-SHA production deployment.\n"
                 "Local checks are fast feedback only; they do not create release evidence or decide\n"
@@ -4403,6 +5069,15 @@ def _parser() -> argparse.ArgumentParser:
     validate_pr.add_argument("--event", type=Path, required=True)
     merge = subparsers.add_parser("verify-master-merge")
     merge.add_argument("--sha", required=True)
+    request_review = subparsers.add_parser("request-codex-review")
+    request_review.add_argument("--pr", type=int, required=True)
+    request_review.add_argument("--head-sha", required=True)
+    request_review.add_argument("--round", dest="round_number", type=int, required=True)
+    request_review.add_argument("--task-id")
+    validate_review = subparsers.add_parser("validate-codex-review")
+    validate_review.add_argument("--pr", type=int, required=True)
+    validate_review.add_argument("--head-sha", required=True)
+    validate_review.add_argument("--round", dest="round_number", type=int)
     return parser
 
 
@@ -4537,6 +5212,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "verify-master-merge":
             _print(verify_master_merge(repository, github, sha=args.sha))
             return 0
+        if args.command == "request-codex-review":
+            _print(
+                controller.request_codex_review(
+                    pr_number=args.pr,
+                    head_sha=args.head_sha,
+                    round_number=args.round_number,
+                    task_id=args.task_id,
+                )
+            )
+            return 0
+        if args.command == "validate-codex-review":
+            payload = controller.validate_codex_review(
+                pr_number=args.pr,
+                head_sha=args.head_sha,
+                round_number=args.round_number,
+            )
+            _print(payload)
+            return 0 if payload["status"] != "HUMAN_REQUIRED" else 1
         raise AssertionError(f"Unhandled command: {args.command}")
     except (TaskSessionError, OSError, json.JSONDecodeError) as error:
         print(f"task session error: {error}", file=sys.stderr)

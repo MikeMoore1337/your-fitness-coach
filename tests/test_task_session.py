@@ -104,6 +104,8 @@ class FakeGitHub:
         self.ruleset_payload: list[dict[str, Any]] = []
         self.successful_deployments: set[tuple[str, str]] = set()
         self.associated_pulls: list[dict[str, Any]] = []
+        self.created_comments: list[tuple[int, str]] = []
+        self.next_comment_id = 1000
 
     def api(self, endpoint: str) -> Any:
         if endpoint.startswith("commits/") and endpoint.endswith("/pulls"):
@@ -130,6 +132,18 @@ class FakeGitHub:
 
     def issue_comments(self, number: int) -> list[dict[str, Any]]:
         return self.comments.get(number, [])
+
+    def create_issue_comment(self, number: int, body: str) -> dict[str, Any]:
+        self.next_comment_id += 1
+        comment = {
+            "id": self.next_comment_id,
+            "user": {"login": "pytest"},
+            "body": body,
+            "created_at": "2026-09-12T10:00:00Z",
+        }
+        self.created_comments.append((number, body))
+        self.comments.setdefault(number, []).append(comment)
+        return comment
 
     def review_threads(self, number: int) -> list[dict[str, Any]]:
         return self.threads.get(number, [])
@@ -784,6 +798,142 @@ def test_review_event_polls_transient_mergeability_before_validation(
     assert waits == [1.0, 1.0]
 
 
+def _codex_review_fixture(repository: tuple[Path, Any]) -> tuple[Any, Any, str, str]:
+    _, git_repository = repository
+    base_sha = git_repository.ref("origin/master")
+    head_sha = "b" * 40
+    github = FakeGitHub(base_sha)
+    pull_request = _review_pr(head_sha)
+    pull_request["base"]["sha"] = base_sha
+    github.pulls[219] = pull_request
+    github.commits[219] = [{"sha": head_sha}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    controller = task_session.TaskController(git_repository, github=github)
+    return controller, github, base_sha, head_sha
+
+
+def _append_codex_result(
+    github: FakeGitHub,
+    *,
+    head_sha: str,
+    body: str,
+    comment_id: int = 50,
+) -> None:
+    github.comments.setdefault(219, []).append(
+        {
+            "id": comment_id,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "created_at": f"2026-09-12T10:00:{comment_id:02d}Z",
+            "body": f"Codex Review Summary\nReviewed commit: `{head_sha}`\n{body}",
+        }
+    )
+
+
+def test_codex_review_refuses_non_green_exact_head_ci(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    github.checks[head_sha] = [{**_success_check("c" * 40)}]
+
+    with pytest.raises(task_session.TaskSessionError, match="exact-head required check"):
+        controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert github.created_comments == []
+
+
+def test_codex_review_reuses_one_request_for_the_same_sha(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+
+    first = controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+    second = controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert first["status"] == "REQUESTED"
+    assert second["status"] == "PENDING"
+    assert second["reused"] is True
+    assert len(github.created_comments) == 1
+    assert f"head={head_sha}" in github.created_comments[0][1]
+
+
+def test_codex_clean_round_one_allows_merge_without_rereview(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+    _append_codex_result(
+        github, head_sha=head_sha, body="review status completed; no blocking findings"
+    )
+
+    result = controller.validate_codex_review(pr_number=219, head_sha=head_sha)
+    reused = controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert result["status"] == "CLEAN"
+    assert result["merge_allowed"] is True
+    assert reused["status"] == "CLEAN"
+    assert len(github.created_comments) == 1
+    with pytest.raises(task_session.TaskSessionError, match="requires a blocking P0/P1"):
+        controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=2)
+
+
+def test_codex_medium_finding_does_not_open_a_second_round(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+    _append_codex_result(github, head_sha=head_sha, body="review completed; P2 medium finding")
+
+    result = controller.validate_codex_review(pr_number=219, head_sha=head_sha)
+
+    assert result["status"] == "CLEAN"
+    assert result["review_budget"] == {"used": 1, "max": 2, "remaining": 1}
+    with pytest.raises(task_session.TaskSessionError, match="requires a blocking P0/P1"):
+        controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=2)
+
+
+def test_codex_round_two_requires_changed_head_and_ends_human_required(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, first_head = _codex_review_fixture(repository)
+    controller.request_codex_review(pr_number=219, head_sha=first_head, round_number=1)
+    _append_codex_result(github, head_sha=first_head, body="review completed; P1 blocking defect")
+    first_result = controller.validate_codex_review(pr_number=219, head_sha=first_head)
+    assert first_result["status"] == "BLOCKING_P0_P1"
+
+    second_head = "c" * 40
+    github.pulls[219]["head"]["sha"] = second_head
+    github.commits[219] = [{"sha": second_head}]
+    github.checks[second_head] = [_success_check(second_head)]
+    second_request = controller.request_codex_review(
+        pr_number=219, head_sha=second_head, round_number=2
+    )
+    _append_codex_result(
+        github, head_sha=second_head, body="review completed; P1 blocking regression", comment_id=51
+    )
+    second_result = controller.validate_codex_review(pr_number=219, head_sha=second_head)
+    repeated = controller.request_codex_review(pr_number=219, head_sha=second_head, round_number=2)
+
+    assert second_request["status"] == "REQUESTED"
+    assert second_result["status"] == "HUMAN_REQUIRED"
+    assert "P1" in second_result["blocker_report"]
+    assert repeated["status"] == "HUMAN_REQUIRED"
+    assert len(github.created_comments) == 2
+    with pytest.raises(task_session.TaskSessionError, match="must be 1 or 2"):
+        controller.request_codex_review(pr_number=219, head_sha=second_head, round_number=3)
+
+
+def test_codex_review_rejects_unresolved_thread_before_request(
+    repository: tuple[Path, Any],
+) -> None:
+    controller, github, _, head_sha = _codex_review_fixture(repository)
+    github.threads[219] = [{"isResolved": False}]
+
+    with pytest.raises(task_session.TaskSessionError, match="unresolved review threads"):
+        controller.request_codex_review(pr_number=219, head_sha=head_sha, round_number=1)
+
+    assert github.created_comments == []
+
+
 def test_master_ruleset_requires_pr_current_base_and_aggregate_check() -> None:
     weak = [
         {
@@ -908,7 +1058,7 @@ def test_three_independent_write_tasks_can_run_at_once(
         ("exclusive-write", "exclusive-write"),
     ],
 )
-def test_exclusive_write_only_blocks_another_exclusive_writer(
+def test_legacy_exclusive_metadata_does_not_block_distinct_worktrees(
     repository: tuple[Path, Any], existing_class: str, candidate_class: str
 ) -> None:
     root, git_repository = repository
@@ -917,16 +1067,8 @@ def test_exclusive_write_only_blocks_another_exclusive_writer(
     controller = task_session.TaskController(git_repository)
     controller.start("225", owner_launch=True, session_label="existing", offline=True)
 
-    if candidate_class == "independent-write":
-        started = controller.start(
-            "226", owner_launch=True, session_label="candidate", offline=True
-        )
-        assert started["lease"]["lifecycle_state"] == "implementation"
-    else:
-        with pytest.raises(
-            task_session.TaskSessionError, match="incompatible implementation write lease"
-        ):
-            controller.start("226", owner_launch=True, session_label="candidate", offline=True)
+    started = controller.start("226", owner_launch=True, session_label="candidate", offline=True)
+    assert started["lease"]["lifecycle_state"] == "implementation"
 
 
 def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
@@ -962,7 +1104,7 @@ def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
         ("qa", "exclusive-write", "independent-write", False),
         ("review", "independent-write", "independent-write", False),
         ("qa", "independent-write", "independent-write", False),
-        ("implementation", "independent-write", "exclusive-write", True),
+        ("implementation", "independent-write", "exclusive-write", False),
         ("ready-for-delivery", "independent-write", "independent-write", False),
         ("waiting-for-delivery", "independent-write", "independent-write", False),
         ("ready-for-delivery", "exclusive-write", "independent-write", False),
@@ -975,7 +1117,7 @@ def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
         ("superseded", "exclusive-write", "exclusive-write", False),
     ],
 )
-def test_implementation_exclusion_is_state_aware(
+def test_implementation_metadata_never_creates_repository_wide_exclusion(
     existing_state: str,
     existing_class: str,
     candidate_class: str,
@@ -1654,6 +1796,95 @@ def test_first_controller_state_initialization_is_safe_under_concurrency(
     assert not any(worker.is_alive() for worker in workers)
     assert not errors
     assert (store.root / "contract.json").is_file()
+
+
+def test_state_lock_reclaims_only_a_stale_dead_owner(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, git_repository = repository
+    store = task_session.StateStore(git_repository.common_dir)
+    store.initialize()
+    store.lock_path.write_text(
+        json.dumps(
+            {
+                "pid": 424242,
+                "created_at": "2020-01-01T00:00:00Z",
+                "token": "a" * 32,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(store, "_pid_is_alive", lambda pid: False)
+
+    with store.lock():
+        assert store.lock_path.is_file()
+
+    assert not store.lock_path.exists()
+
+
+def test_state_lock_refuses_active_owner_and_preserves_lock(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository = repository
+    store = task_session.StateStore(git_repository.common_dir)
+    store.initialize()
+    store.lock_path.write_text(
+        json.dumps(
+            {
+                "pid": task_session.os.getpid(),
+                "created_at": task_session.utc_now(),
+                "token": "b" * 32,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    with (
+        pytest.raises(task_session.TaskSessionError, match="Coordination state is locked"),
+        store.lock(),
+    ):
+        pass
+
+    assert json.loads(store.lock_path.read_text(encoding="utf-8"))["token"] == "b" * 32
+
+
+def test_state_lock_refuses_malformed_owner_metadata(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository = repository
+    store = task_session.StateStore(git_repository.common_dir)
+    store.initialize()
+    store.lock_path.write_text("partial owner metadata", encoding="utf-8")
+
+    with pytest.raises(task_session.TaskSessionError, match="malformed"), store.lock():
+        pass
+
+    assert store.lock_path.read_text(encoding="utf-8") == "partial owner metadata"
+
+
+def test_state_lock_release_does_not_delete_a_replaced_foreign_lock(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository = repository
+    store = task_session.StateStore(git_repository.common_dir)
+    store.initialize()
+
+    with store.lock():
+        store.lock_path.write_text(
+            json.dumps(
+                {
+                    "pid": task_session.os.getpid(),
+                    "created_at": task_session.utc_now(),
+                    "token": "c" * 32,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    assert store.lock_path.exists()
 
 
 def test_canonical_refresh_reports_post_update_worktree_change(
