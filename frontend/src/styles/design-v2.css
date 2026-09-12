@@ -848,11 +848,24 @@ body:has(.app-shell--design-v2) {
 }
 
 .app-shell--design-v2 .app-bottom-nav {
-  border-color: var(--v2-border);
-  background: var(--v2-surface);
-  box-shadow: none;
+  border-color: var(--glass-edge);
+  background: var(--glass-background);
+  box-shadow:
+    inset 0 1px var(--glass-light),
+    var(--glass-shadow);
   color: var(--v2-text-primary);
+  -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+/* Лёгкое рассеивание только плавающей нижней панели, без уплотнения заливки. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (max-width: 899px) and (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+    .app-shell--design-v2 .app-bottom-nav {
+      -webkit-backdrop-filter: blur(6px) saturate(1.08);
+      backdrop-filter: blur(6px) saturate(1.08);
+    }
+  }
 }
 
 .app-shell--design-v2 .app-bottom-nav__brand,
@@ -4272,7 +4285,6 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     padding-right: max(6px, var(--yfc-layout-safe-right));
     padding-bottom: max(6px, var(--yfc-layout-safe-bottom));
     padding-left: max(6px, var(--yfc-layout-safe-left));
-    backdrop-filter: none;
   }
 
   html[data-yfc-keyboard='visible'] .app-shell--design-v2 .app-bottom-nav {
@@ -4308,10 +4320,12 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
       max(10px, var(--yfc-layout-safe-left));
     width: auto;
     padding: 6px;
-    border: 1px solid var(--v2-border);
+    border: 1px solid var(--glass-edge);
     border-radius: var(--v2-panel-radius);
-    background: var(--v2-surface);
-    box-shadow: var(--elevation-overlay);
+    background: var(--glass-background);
+    box-shadow:
+      inset 0 1px var(--glass-light),
+      var(--glass-shadow);
   }
 }
 
@@ -9856,4 +9870,22 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 .today-workout-copy:has(.today-workout-photo) .ui-badge {
   background: #090b0bc9;
   color: white;
+}
+
+/* Мягкие полупрозрачные вторичные действия без фильтров поверх рабочих данных. */
+.app-section--design-v2
+  :is(.today-dashboard, .active-workout, .nutrition-diary)
+  :where(.secondary, .button-link.secondary, .ui-button--secondary, .ui-button--ghost) {
+  background: var(--glass-background);
+  border-color: var(--glass-edge);
+  box-shadow: inset 0 1px var(--glass-light);
+}
+
+.app-section--design-v2
+  :is(.today-dashboard, .active-workout, .nutrition-diary)
+  :where(.secondary, .button-link.secondary, .ui-button--secondary, .ui-button--ghost):hover:not(
+    :disabled
+  ) {
+  background: var(--v2-surface-strong);
+  border-color: var(--v2-text-secondary);
 }

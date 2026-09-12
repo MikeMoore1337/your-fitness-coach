@@ -15,12 +15,36 @@
   --landing-muted: #acb1b1;
   --landing-line: #363b3b;
 }
-.landing-page .public-shell__header {
+.landing-page.public-shell .public-shell__header {
   width: 100%;
   padding-inline: max(5vw, calc((100vw - 1180px) / 2));
   background: #090b0b;
   color: white;
   border-bottom: 1px solid #363b3b;
+}
+
+/* Только первый экран главного лендинга показывает фото сквозь хедер. */
+.landing-page.public-shell:has(> #landing-content) .public-shell__header {
+  background: var(--glass-background);
+  color: var(--landing-ink);
+  border-bottom: 0;
+  box-shadow: inset 0 1px var(--glass-light);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* На главной фото действительно проходит под стеклом, без дублирования изображения. */
+.landing-page:has(> #landing-content) {
+  display: grid;
+}
+.landing-page:has(> #landing-content) > :is(.public-shell__header, #landing-content) {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.landing-page:has(> #landing-content) > .public-shell__header {
+  align-self: start;
+  position: relative;
+  z-index: 20;
 }
 .landing-page h1,
 .landing-page h2,
@@ -81,12 +105,41 @@
   transform: scale(0.97);
 }
 .landing-page .landing-button--secondary {
-  background: transparent;
+  background: var(--glass-background);
   color: inherit;
-  border-color: currentColor;
+  border-color: var(--glass-edge);
+  box-shadow: inset 0 1px var(--glass-light);
+}
+
+/* Фото просвечивает только через вторичный CTA; текст остаётся белым в обеих темах. */
+.landing-page .landing-hero .landing-button--secondary {
+  --hero-glass: #202525;
+  background: var(--hero-glass);
+  border-color: #828b8b;
+  color: #fff;
+  box-shadow: inset 0 1px rgb(255 255 255 / 5%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+@media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+  .landing-page .landing-hero .landing-button--secondary {
+    --hero-glass: rgb(20 25 25 / 64%);
+  }
+}
+
+@media (forced-colors: active) {
+  .landing-page .landing-hero .landing-button--secondary {
+    background: ButtonFace;
+    border-color: ButtonText;
+    color: ButtonText;
+    box-shadow: none;
+  }
 }
 .landing-page .landing-button:hover {
   text-decoration: none;
+}
+.landing-page .landing-hero .landing-button--secondary:hover {
+  background: transparent;
 }
 .landing-button--compact {
   min-height: 44px;
@@ -458,7 +511,8 @@
     left: 0;
     right: 0;
     padding: 20px;
-    background: #090b0b;
+    background: var(--glass-solid);
+    color: var(--landing-ink);
     flex-direction: column;
     z-index: 20;
   }

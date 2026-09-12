@@ -5,6 +5,12 @@
   --v2-surface: #141717;
   --v2-surface-secondary: #1b1f1f;
   --v2-surface-strong: #303030;
+  --glass-solid: #202525;
+  --glass-tint: rgb(28 33 33 / 80%);
+  --glass-edge: #707777;
+  --glass-light: rgb(255 255 255 / 5%);
+  --glass-shadow: 0 6px 20px rgb(0 0 0 / 16%);
+  --glass-background: var(--glass-solid);
   --v2-text-primary: #f5f5f5;
   --v2-text-secondary: #b8b8b8;
   --v2-border: #404040;
@@ -121,6 +127,22 @@
   --elevation-overlay: 0 18px 42px rgba(0, 0, 0, 0.28);
 }
 
+/* Мягкий гибрид: прозрачная заливка без размытия или матовой дымки. */
+@media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+  :root {
+    --glass-background: var(--glass-tint);
+  }
+}
+
+@media (forced-colors: active) {
+  :root:root {
+    --glass-solid: Canvas;
+    --glass-edge: ButtonText;
+    --glass-light: transparent;
+    --glass-shadow: none;
+  }
+}
+
 /* Общая геометрия растровых объектов и служебных пиктограмм. */
 .yfc-icon {
   position: relative;
@@ -138,6 +160,11 @@
 }
 
 :root[data-color-scheme='light'] {
+  --glass-solid: #f3f5f5;
+  --glass-tint: rgb(247 249 249 / 84%);
+  --glass-edge: #7c8585;
+  --glass-light: rgb(255 255 255 / 55%);
+  --glass-shadow: 0 6px 20px rgb(20 28 28 / 8%);
   --v2-canvas: #ffffff;
   --v2-surface: #ffffff;
   --v2-surface-secondary: #f0f0f0;
