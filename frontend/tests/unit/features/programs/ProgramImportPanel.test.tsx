@@ -8,8 +8,8 @@ const previewWithIssues = {
   id: 'import-1',
   status: 'pending',
   source_format: 'csv',
-  schema_version: 1,
-  parser_version: 'program-import-v1',
+  schema_version: 2,
+  parser_version: 'program-import-v3',
   expires_at: '2026-09-06T12:00:00Z',
   program_title: null,
   goal: null,
@@ -89,6 +89,36 @@ const resolvedPreview = {
   },
 };
 
+const previewWithAi = {
+  ...previewWithIssues,
+  ai: {
+    contract_version: 'program-import-ai-v1',
+    prompt_version: 'program-import-ai-prompt-v1',
+    status: 'proposed',
+    attempts: 1,
+    proposal_count: 1,
+    candidate_rerank_count: 0,
+    conflict_count: 0,
+    fallback: 'deterministic_manual',
+  },
+  rows: [
+    {
+      ...previewWithIssues.rows[0],
+      ai_proposals: [
+        {
+          field: 'prescribed_sets',
+          value: '4',
+          evidence_id: 'source:txt:3',
+          source_location: 'строка 3',
+          source_text: 'Приседания без веса 4x8',
+          rationale: 'Источник содержит количество подходов',
+          applied: false,
+        },
+      ],
+    },
+  ],
+};
+
 function renderPanel() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -152,7 +182,7 @@ describe('ProgramImportPanel', () => {
     renderPanel();
 
     const file = new File(['canonical csv'], 'plan.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText('Загрузить XLSX или CSV'), {
+    fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
       target: { files: [file] },
     });
 
@@ -203,13 +233,34 @@ describe('ProgramImportPanel', () => {
     );
     renderPanel();
 
-    fireEvent.change(screen.getByLabelText('Загрузить XLSX или CSV'), {
+    fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
       target: { files: [new File(['arbitrary'], 'arbitrary.csv', { type: 'text/csv' })] },
     });
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Нужен канонический шаблон YFC версии 1',
     );
-    expect(screen.getByLabelText('Загрузить XLSX или CSV')).toBeInTheDocument();
+    expect(screen.getByLabelText('Загрузить документ программы')).toBeInTheDocument();
+  });
+
+  it('shows source evidence for advisory AI proposals', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(async (input, init) => {
+      if (String(input) === '/api/v1/programs/imports' && init?.method === 'POST') {
+        return new Response(JSON.stringify(previewWithAi), { status: 201 });
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText('Загрузить документ программы'), {
+      target: { files: [new File(['program'], 'program.txt', { type: 'text/plain' })] },
+    });
+
+    expect(await screen.findByText(/AI-помощь:/)).toHaveTextContent(
+      'есть предложения для проверки',
+    );
+    expect(screen.getByText(/AI-подсказка: prescribed_sets/)).toHaveTextContent('= 4');
+    expect(screen.getByText(/AI-подсказка: prescribed_sets/)).toHaveTextContent('только подсказка');
+    expect(screen.getByText(/Источник: строка 3/)).toHaveTextContent('Приседания без веса 4x8');
   });
 });

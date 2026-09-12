@@ -76,6 +76,24 @@
   color: var(--text);
 }
 
+.program-import-ai {
+  padding: 12px 14px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--v2-control-radius, 10px);
+  background: var(--accent-soft);
+}
+
+.program-import-ai p {
+  margin: 5px 0 0;
+}
+
+.program-import-ai small,
+.program-import-ai-evidence {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+}
+
 .program-import-issues ul,
 .program-import-row-issues {
   margin: 8px 0 0;

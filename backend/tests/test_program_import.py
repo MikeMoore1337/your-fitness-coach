@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import time
 import zipfile
 from datetime import timedelta
+from pathlib import Path
 from xml.sax.saxutils import escape
 
 from fitminiapp_api.core.config import settings
@@ -14,6 +16,10 @@ from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.program import UserProgram, UserWorkout, UserWorkoutExercise
 from fitminiapp_api.models.program_import import ProgramImport
 from fitminiapp_api.models.user import User
+from fitminiapp_api.services.program_import_ai import (
+    ProgramImportAiProposal,
+    ProgramImportAiResponse,
+)
 from fitminiapp_api.services.program_imports import (
     PROGRAM_IMPORT_COLUMNS,
     build_program_import_template,
@@ -246,6 +252,91 @@ def _upload(client, headers: dict[str, str], filename: str, source: bytes):
     )
 
 
+def _docx_payload(
+    paragraphs: list[str],
+    tables: list[list[list[str]]],
+    *,
+    external_relationship: bool = False,
+    nested_archive: bool = False,
+) -> bytes:
+    def paragraph(value: str) -> str:
+        return f'<w:p><w:r><w:t xml:space="preserve">{escape(value)}</w:t></w:r></w:p>'
+
+    def table(rows: list[list[str]]) -> str:
+        return (
+            "<w:tbl>"
+            + "".join(
+                "<w:tr>"
+                + "".join(
+                    f'<w:tc><w:p><w:r><w:t xml:space="preserve">{escape(value)}</w:t>'
+                    "</w:r></w:p></w:tc>"
+                    for value in row
+                )
+                + "</w:tr>"
+                for row in rows
+            )
+            + "</w:tbl>"
+        )
+
+    body = "".join(paragraph(value) for value in paragraphs) + "".join(
+        table(rows) for rows in tables
+    )
+    document = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body>{body}</w:body></w:document>"
+    ).encode()
+    content_types = (
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        b'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        b'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        b'<Default Extension="xml" ContentType="application/xml"/>'
+        b'<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        b"</Types>"
+    )
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types)
+        archive.writestr("word/document.xml", document)
+        if external_relationship:
+            relationships = (
+                b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                b'<Relationship Id="rId1" '
+                b'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" '
+                b'Target="https://example.test" TargetMode="External"/>'
+                b"</Relationships>"
+            )
+            archive.writestr("word/_rels/document.xml.rels", relationships)
+        if nested_archive:
+            archive.writestr("word/media/nested.zip", b"PK\x03\x04")
+    return output.getvalue()
+
+
+def _corpus_case(case_id: str) -> dict[str, object]:
+    payload = json.loads(
+        (Path(__file__).parent / "fixtures" / "program_import_corpus_v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    return next(case for case in payload["cases"] if case["id"] == case_id)
+
+
+def test_versioned_heterogeneous_corpus_covers_narrow_go_boundary():
+    payload = json.loads(
+        (Path(__file__).parent / "fixtures" / "program_import_corpus_v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert payload["schema_version"] == 1
+    cases = {case["id"]: case for case in payload["cases"]}
+    assert {case["format"] for case in cases.values()} == {"csv", "xlsx", "txt", "docx"}
+    assert {"docx_table", "ambiguous_exercise", "no_match_exercise"} <= cases.keys()
+    assert {"malformed_text", "external_docx_relationship", "prompt_injection_in_name"} <= (
+        cases.keys()
+    )
+
+
 def _synthetic_corpus_rows() -> list[list[str]]:
     rows: list[list[str]] = []
     for day_number in range(1, 9):
@@ -266,7 +357,7 @@ def test_canonical_csv_and_xlsx_round_trip_to_private_unassigned_template(client
         preview = _upload(client, headers, filename, source)
         assert preview.status_code == 201, preview.text
         body = preview.json()
-        assert body["schema_version"] == 1
+        assert body["schema_version"] == 2
         assert body["source_format"] == source_format
         assert body["summary"]["blocking_issue_count"] == 0, body
         assert body["rows"][0]["match_status"] == "matched"
@@ -318,6 +409,28 @@ def test_import_stays_private_for_verified_root_user(client, monkeypatch):
     assert confirmed.status_code == 200, confirmed.text
     assert confirmed.json()["template"]["is_public"] is False
     assert confirmed.json()["template"]["owner_user_id"] == confirmed.json()["target_user"]["id"]
+
+
+def test_import_uses_catalog_metric_type_when_cardio_row_omits_it(client):
+    headers = _auth(client, 931019)
+    row = _valid_row(exercise_name="Горизонтальный велотренажёр", exercise_slug="recumbent-bike")
+    row[6] = ""
+    row[7] = ""
+    row[8] = ""
+    row[11] = ""
+    row[12] = "25"
+    preview = _upload(client, headers, "cardio.csv", _csv_payload([row]))
+    assert preview.status_code == 201, preview.text
+    body = preview.json()
+    assert body["rows"][0]["metric_type"] == "cardio"
+    assert body["rows"][0]["prescribed_duration_minutes"] == 25
+    assert body["summary"]["blocking_issue_count"] == 0, body
+
+    confirmed = client.post(
+        f"/api/v1/programs/imports/{body['id']}/confirm",
+        headers=headers,
+    )
+    assert confirmed.status_code == 200, confirmed.text
 
 
 def test_missing_manual_fields_and_unknown_exercise_are_resolvable(client):
@@ -592,6 +705,270 @@ def test_generic_xlsx_accepts_header_in_first_row(client):
     assert body["summary"]["row_count"] == 1
     assert body["summary"]["blocking_issue_count"] == 0, body
     assert body["rows"][0]["exercise_name"] == "Приседания без веса"
+
+
+def test_txt_and_docx_documents_use_the_shared_preview_and_confirm_flow(client):
+    headers = _auth(client, 931014)
+    text_case = _corpus_case("ru_text_list")
+    text_source = str(text_case["source"]).encode("utf-8")
+    text_preview = _upload(client, headers, "corpus.txt", text_source)
+    assert text_preview.status_code == 201, text_preview.text
+    text_body = text_preview.json()
+    assert text_body["source_format"] == "txt"
+    assert text_body["layout_version"] == "text-list-v1"
+    assert text_body["summary"]["row_count"] == 2
+    assert text_body["summary"]["blocking_issue_count"] == 0, text_body
+    assert text_body["rows"][0]["rest_seconds"] == 120
+    assert text_body["rows"][1]["rest_seconds"] == 120
+    assert text_body["rows"][0]["source_range"] == "строка 6"
+    assert text_body["ai"]["status"] == "not_needed"
+    confirmed_text = client.post(
+        f"/api/v1/programs/imports/{text_body['id']}/confirm",
+        headers=headers,
+    )
+    assert confirmed_text.status_code == 200, confirmed_text.text
+    assert confirmed_text.json()["template"]["is_public"] is False
+
+    docx_case = _corpus_case("docx_table")
+    docx_source = _docx_payload(
+        [str(value) for value in docx_case["paragraphs"]],
+        [[[str(cell) for cell in row] for row in table] for table in docx_case["tables"]],
+    )
+    docx_preview = _upload(client, headers, "corpus.docx", docx_source)
+    assert docx_preview.status_code == 201, docx_preview.text
+    docx_body = docx_preview.json()
+    assert docx_body["source_format"] == "docx"
+    assert docx_body["layout_version"] == "docx-document-v1"
+    assert docx_body["summary"]["blocking_issue_count"] == 0, docx_body
+    assert docx_body["rows"][0]["source_sheet"] == "DOCX"
+    assert docx_body["rows"][0]["source_range"] == "таблица 1, строка 2"
+    assert docx_body["rows"][0]["rest_seconds"] == 120
+    confirmed_docx = client.post(
+        f"/api/v1/programs/imports/{docx_body['id']}/confirm",
+        headers=headers,
+    )
+    assert confirmed_docx.status_code == 200, confirmed_docx.text
+
+    with get_session_context() as db:
+        stored = db.query(ProgramImport).filter(ProgramImport.document_format == "docx").one()
+        assert stored.source_format == "csv"
+
+
+def test_document_security_and_no_match_have_controlled_fallback(client):
+    headers = _auth(client, 931015)
+    malformed_case = _corpus_case("malformed_text")
+    malformed = _upload(client, headers, "malformed.txt", str(malformed_case["source"]).encode())
+    assert malformed.status_code == 422
+    assert "управляющий" in malformed.json()["detail"]
+
+    external_case = _corpus_case("external_docx_relationship")
+    external = _upload(
+        client,
+        headers,
+        "external.docx",
+        _docx_payload(
+            [str(value) for value in external_case["paragraphs"]],
+            [],
+            external_relationship=True,
+        ),
+    )
+    assert external.status_code == 422
+    assert "внешние связи" in external.json()["detail"]
+
+    nested_archive = _upload(
+        client,
+        headers,
+        "nested.docx",
+        _docx_payload(["День 1", "Приседания без веса 3x8"], [], nested_archive=True),
+    )
+    assert nested_archive.status_code == 422
+    assert "вложенные архивы" in nested_archive.json()["detail"]
+
+    no_match_case = _corpus_case("no_match_exercise")
+    no_match = _upload(client, headers, "no-match.txt", str(no_match_case["source"]).encode())
+    assert no_match.status_code == 201, no_match.text
+    body = no_match.json()
+    assert body["source_format"] == "txt"
+    assert body["ai"]["status"] == "disabled"
+    assert body["ai"]["fallback"] == "deterministic_manual"
+    assert "ai_assistance_unavailable" in {issue["code"] for issue in body["issues"]}
+    assert body["rows"][0]["match_status"] == "needs_resolution"
+    assert body["summary"]["blocking_issue_count"] > 0
+
+    prompt_case = _corpus_case("prompt_injection_in_name")
+    prompt_injection = _upload(
+        client,
+        headers,
+        "prompt-injection.txt",
+        str(prompt_case["source"]).encode(),
+    )
+    assert prompt_injection.status_code == 201, prompt_injection.text
+    prompt_body = prompt_injection.json()
+    assert prompt_body["ai"]["status"] == "disabled"
+    assert prompt_body["rows"][0]["match_status"] == "needs_resolution"
+    assert "Ignore previous instructions" in prompt_body["rows"][0]["exercise_name"]
+
+
+def test_ai_proposals_are_source_grounded_and_never_auto_resolve_exercises(client):
+    _auth(client, 931016)
+
+    class FakeAiPort:
+        request = None
+
+        def propose(self, request):
+            self.request = request
+            evidence = request.source_spans[0]
+            return ProgramImportAiResponse(
+                status="proposed",
+                attempts=1,
+                proposals=(
+                    ProgramImportAiProposal(
+                        row_number=3,
+                        field="prescribed_sets",
+                        value="4",
+                        evidence_id=evidence.evidence_id,
+                        rationale="Число подходов найдено в строке источника",
+                    ),
+                    ProgramImportAiProposal(
+                        row_number=3,
+                        field="prescribed_reps",
+                        value="8",
+                        evidence_id=evidence.evidence_id,
+                    ),
+                ),
+            )
+
+    ai_port = FakeAiPort()
+    source = (
+        "Название: AI test\nЦель: maintenance\nУровень: beginner\nДень 1\n"
+        "Приседания без веса\nПримечание: внутренний комментарий"
+    ).encode()
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 931016).one()
+        draft = parse_program_import(
+            db,
+            user,
+            source=source,
+            source_format="txt",
+            ai_port=ai_port,
+        )
+    assert ai_port.request is not None
+    assert ai_port.request.source_format == "txt"
+    assert ai_port.request.sensitivity == "personalized"
+    assert not hasattr(ai_port.request, "user_id")
+    assert "rest_seconds" not in ai_port.request.rows[0].fields
+    assert "notes" not in ai_port.request.rows[0].fields
+    assert "внутренний комментарий" not in ai_port.request.source_spans[0].text
+    assert draft["ai"]["status"] == "proposed"
+    assert draft["summary"]["blocking_issue_count"] == 0, draft
+    assert draft["rows"][0]["prescribed_sets"] == 4
+    assert draft["rows"][0]["prescribed_reps"] == "8"
+    assert draft["rows"][0]["ai_proposals"][0]["applied"] is True
+    assert draft["rows"][0]["ai_proposals"][0]["source_text"] == "Приседания без веса"
+
+    class MappingOnlyAiPort:
+        def propose(self, request):
+            evidence = request.source_spans[0]
+            return ProgramImportAiResponse(
+                status="proposed",
+                attempts=1,
+                proposals=(
+                    ProgramImportAiProposal(
+                        row_number=3,
+                        field="exercise_mapping",
+                        value="bodyweight-squat",
+                        evidence_id=evidence.evidence_id,
+                    ),
+                ),
+            )
+
+    unknown_source = (
+        "Название: Mapping test\nЦель: maintenance\nУровень: beginner\n"
+        "День 1\nНеизвестное упражнение 3x8"
+    ).encode()
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 931016).one()
+        mapping_draft = parse_program_import(
+            db,
+            user,
+            source=unknown_source,
+            source_format="txt",
+            ai_port=MappingOnlyAiPort(),
+        )
+    assert mapping_draft["rows"][0]["match_status"] == "needs_resolution"
+    assert mapping_draft["rows"][0]["ai_proposals"][0]["applied"] is False
+    assert mapping_draft["summary"]["blocking_issue_count"] > 0
+
+
+def test_invalid_ai_evidence_fails_closed_to_deterministic_values(client):
+    _auth(client, 931017)
+
+    class InvalidEvidencePort:
+        def propose(self, request):
+            del request
+            return ProgramImportAiResponse(
+                status="proposed",
+                attempts=1,
+                proposals=(
+                    ProgramImportAiProposal(
+                        row_number=3,
+                        field="prescribed_sets",
+                        value="4",
+                        evidence_id="source:txt:999",
+                    ),
+                ),
+            )
+
+    source = (
+        "Название: Invalid evidence\nЦель: maintenance\nУровень: beginner\n"
+        "День 1\nПриседания без веса"
+    ).encode()
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 931017).one()
+        draft = parse_program_import(
+            db,
+            user,
+            source=source,
+            source_format="txt",
+            ai_port=InvalidEvidencePort(),
+        )
+    assert draft["ai"]["status"] == "invalid_output"
+    assert draft["rows"][0].get("prescribed_sets") is None
+    assert draft["summary"]["blocking_issue_count"] > 0
+
+
+def test_inconsistent_ai_status_payload_fails_closed(client):
+    _auth(client, 931018)
+
+    class InconsistentPort:
+        def propose(self, request):
+            del request
+            return {
+                "status": "no_change",
+                "attempts": 1,
+                "proposals": [
+                    {
+                        "row_number": 3,
+                        "field": "prescribed_sets",
+                        "value": "4",
+                        "evidence_id": "source:txt:3",
+                    }
+                ],
+            }
+
+    source = "День 1\nПриседания без веса".encode()
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 931018).one()
+        draft = parse_program_import(
+            db,
+            user,
+            source=source,
+            source_format="txt",
+            ai_port=InconsistentPort(),
+        )
+    assert draft["ai"]["status"] == "unavailable"
+    assert draft["ai"]["attempts"] == 1
+    assert draft["rows"][0].get("prescribed_sets") is None
 
 
 def test_weekly_matrix_extracts_four_days_and_preserves_exercise_changes(client):

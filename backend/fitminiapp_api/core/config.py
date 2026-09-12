@@ -134,6 +134,18 @@ class Settings(BaseSettings):
     program_import_parse_timeout_seconds: float = Field(default=5, ge=1, le=30)
     program_import_draft_ttl_minutes: int = Field(default=60, ge=15, le=24 * 60)
     program_import_cleanup_batch_size: int = Field(default=100, ge=10, le=1_000)
+    program_import_max_txt_lines: int = Field(default=2_000, ge=20, le=10_000)
+    program_import_max_docx_entries: int = Field(default=32, ge=8, le=128)
+    program_import_max_docx_paragraphs: int = Field(default=2_000, ge=20, le=10_000)
+    program_import_max_docx_table_cells: int = Field(default=4_000, ge=20, le=20_000)
+    program_import_max_docx_expanded_bytes: int = Field(
+        default=4_000_000, ge=512_000, le=20_000_000
+    )
+    program_import_max_docx_compression_ratio: int = Field(default=100, ge=10, le=1_000)
+    # The port is deliberately disabled for user-uploaded documents.  A future
+    # synthetic-only adapter can be exercised without adding provider settings here.
+    program_import_ai_enabled: bool = False
+    program_import_ai_data_policy: Literal["disabled", "synthetic_only"] = "disabled"
     web_push_enabled: bool = False
     web_push_vapid_subject: str = ""
     web_push_vapid_public_key: str = ""

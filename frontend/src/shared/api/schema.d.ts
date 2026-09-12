@@ -7245,6 +7245,58 @@ export interface components {
             /** Duration Weeks */
             duration_weeks: number;
         };
+        /** ProgramImportAiInfo */
+        ProgramImportAiInfo: {
+            /** Contract Version */
+            contract_version: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "disabled" | "policy_blocked" | "unavailable" | "no_change" | "proposed" | "invalid_output" | "not_needed";
+            /** Attempts */
+            attempts: number;
+            /** Proposal Count */
+            proposal_count: number;
+            /** Candidate Rerank Count */
+            candidate_rerank_count: number;
+            /** Conflict Count */
+            conflict_count: number;
+            /**
+             * Fallback
+             * @default deterministic_manual
+             * @constant
+             */
+            fallback: "deterministic_manual";
+        };
+        /** ProgramImportAiProposal */
+        ProgramImportAiProposal: {
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "program_title" | "goal" | "level" | "day_number" | "day_title" | "prescribed_sets" | "prescribed_reps" | "prescribed_duration_minutes" | "rest_seconds" | "notes" | "exercise_mapping";
+            /** Value */
+            value: string;
+            /** Evidence Id */
+            evidence_id: string;
+            /** Source Location */
+            source_location: string;
+            /** Source Text */
+            source_text: string;
+            /**
+             * Rationale
+             * @default
+             */
+            rationale: string;
+            /**
+             * Applied
+             * @default false
+             */
+            applied: boolean;
+        };
         /** ProgramImportCandidate */
         ProgramImportCandidate: {
             /** Exercise Id */
@@ -7324,7 +7376,7 @@ export interface components {
              * Source Format
              * @enum {string}
              */
-            source_format: "csv" | "xlsx";
+            source_format: "csv" | "xlsx" | "txt" | "docx";
             /** Schema Version */
             schema_version: number;
             /** Parser Version */
@@ -7349,6 +7401,7 @@ export interface components {
             /** Issues */
             issues: components["schemas"]["ProgramImportIssue"][];
             summary: components["schemas"]["ProgramImportSummary"];
+            ai?: components["schemas"]["ProgramImportAiInfo"] | null;
         };
         /** ProgramImportRow */
         ProgramImportRow: {
@@ -7405,6 +7458,10 @@ export interface components {
             match_type?: ("id" | "slug" | "title" | "alias" | "transliteration" | "manual") | null;
             /** Candidates */
             candidates?: components["schemas"]["ProgramImportCandidate"][];
+            /** Ai Proposals */
+            ai_proposals?: components["schemas"]["ProgramImportAiProposal"][];
+            /** Ai Rerank Reason */
+            ai_rerank_reason?: string | null;
             /** Issues */
             issues?: components["schemas"]["ProgramImportIssue"][];
         };
