@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 import re
@@ -25,7 +26,9 @@ from fitminiapp_api.models.news import WebArticle
 from fitminiapp_api.seo import (
     NOINDEX_ROBOTS,
     public_origin,
+    public_page_lastmod,
     public_page_paths,
+    public_sitemap_paths,
     render_frontend_document,
 )
 from fitminiapp_api.services.web_articles import published_articles
@@ -57,8 +60,6 @@ def _application_sensitive_values() -> tuple[str, ...]:
         settings.yandex_oauth_client_secret,
         settings.apple_oauth_client_secret,
         settings.database_url,
-        settings.google_site_verification,
-        settings.yandex_verification,
         settings.groq_api_key.get_secret_value(),
         settings.hermes_intake_shared_secret.get_secret_value(),
     )
@@ -182,6 +183,29 @@ def pwa_service_worker() -> FileResponse:
     return _frontend_pwa_asset("sw.js", "application/javascript")
 
 
+def _frontend_public_asset(filename: str, media_type: str) -> FileResponse:
+    candidates = (
+        FRONTEND_DIST_DIR / filename,
+        BACKEND_DIR.parent / "frontend" / "public" / filename,
+    )
+    asset = next((candidate for candidate in candidates if candidate.is_file()), None)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Frontend public asset unavailable")
+    return FileResponse(
+        asset,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Robots-Tag": NOINDEX_ROBOTS,
+        },
+    )
+
+
+@app.get("/yandex_bce1658cc6fe44e5.html", include_in_schema=False)
+def yandex_verification_file() -> FileResponse:
+    return _frontend_public_asset("yandex_bce1658cc6fe44e5.html", "text/html")
+
+
 def _frontend_index(
     path: str,
     *,
@@ -223,13 +247,20 @@ def robots_txt() -> PlainTextResponse:
 @app.get("/sitemap.xml", include_in_schema=False)
 def sitemap() -> Response:
     origin = public_origin()
-    urls = [f"{origin}/" if path == "/" else f"{origin}{path}" for path in public_page_paths()]
+    public_paths = public_sitemap_paths()
     with SessionLocal() as db:
         articles = published_articles(db)
-    entries = [f"  <url>\n    <loc>{url}</loc>\n  </url>" for url in urls]
+    entries: list[str] = []
+    for path in public_paths:
+        url = f"{origin}/" if path == "/" else f"{origin}{path}"
+        lastmod = public_page_lastmod(path)
+        lastmod_markup = f"\n    <lastmod>{lastmod}</lastmod>" if lastmod else ""
+        entries.append(
+            f"  <url>\n    <loc>{html.escape(url, quote=True)}</loc>{lastmod_markup}\n  </url>"
+        )
     entries.extend(
         "  <url>\n"
-        f"    <loc>{origin}/articles/{article.slug}</loc>\n"
+        f"    <loc>{html.escape(f'{origin}/articles/{article.slug}', quote=True)}</loc>\n"
         f"    <lastmod>{article.updated_at.date().isoformat()}</lastmod>\n"
         "  </url>"
         for article in articles
