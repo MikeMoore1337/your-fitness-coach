@@ -585,7 +585,15 @@ def search_foods(
     similarity = func.similarity(Food.search_text, normalized)
     match_condition: ColumnElement[bool] = Food.search_text.like(contains, escape="\\")
     if is_postgresql:
-        match_condition = or_(match_condition, Food.search_text.op("%")(normalized))
+        # ``%`` compares the whole search string, so a typo in one token can
+        # miss a longer ``name + brand`` value.  Compare the query to the best
+        # word extent instead; pg_trgm's default word-similarity threshold is
+        # deliberately retained here and the SQLite fallback below keeps the
+        # same one-edit-distance behavior in local tests.
+        match_condition = or_(
+            match_condition,
+            func.word_similarity(normalized, Food.search_text) >= 0.6,
+        )
     filtered = query.filter(match_condition)
     total = filtered.count()
     if total == 0 and not is_postgresql:
