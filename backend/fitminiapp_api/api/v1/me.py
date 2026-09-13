@@ -11,8 +11,10 @@ from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.rate_limit import limiter
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.account import AccountDataExport
+from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User, UserProfile
+from fitminiapp_api.schemas.acquisition import FirstTouchAttributionRequest
 from fitminiapp_api.schemas.invite import CoachInvitePreviewResponse, CoachInviteTokenRequest
 from fitminiapp_api.schemas.trainer_capability import (
     TrainerCapabilityActivateRequest,
@@ -63,6 +65,7 @@ from fitminiapp_api.services.account_linking import (
     create_telegram_link_url,
 )
 from fitminiapp_api.services.accounts import build_account_export, delete_user_cascade
+from fitminiapp_api.services.acquisition import save_first_touch_attribution
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.avatars import (
     AVATAR_UPLOAD_MAX_BYTES,
@@ -162,10 +165,12 @@ def _build_user_response(db: Session, user) -> UserResponse:
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .filter(UserProgram.user_id == user.id, UserWorkout.status == "completed")
     )
-    has_active_program, has_workout_history, profile = (
+    food_history_exists = db.query(FoodDiaryEntry.id).filter(FoodDiaryEntry.user_id == user.id)
+    has_active_program, has_workout_history, has_food_history, profile = (
         db.query(
             active_program_exists.exists(),
             workout_history_exists.exists(),
+            food_history_exists.exists(),
             UserProfile,
         )
         .select_from(User)
@@ -205,6 +210,7 @@ def _build_user_response(db: Session, user) -> UserResponse:
         is_root=has_verified_root_identity(db, user),
         has_active_program=has_active_program,
         has_workout_history=has_workout_history,
+        has_food_history=has_food_history,
         auth_providers=sorted(identity.provider for identity in user.auth_identities),
         onboarding=build_onboarding_state(user.profile),
         profile=UserProfileResponse(
@@ -259,6 +265,17 @@ def _build_user_response(db: Session, user) -> UserResponse:
 @router.get("", response_model=UserResponse)
 def read_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
     return _build_user_response(db, user)
+
+
+@router.post("/acquisition", status_code=status.HTTP_204_NO_CONTENT)
+def save_acquisition(
+    payload: FirstTouchAttributionRequest,
+    user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    save_first_touch_attribution(db, user, payload)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/avatar")

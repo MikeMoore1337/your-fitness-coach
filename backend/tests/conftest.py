@@ -35,7 +35,8 @@ _TEST_FRONTEND_BRAND_ASSETS = _TEST_FRONTEND_ASSETS / "brand"
 _TEST_FRONTEND_BRAND_ASSETS.mkdir(parents=True, exist_ok=True)
 (_TEST_FRONTEND_DIST / "index.html").write_text(
     '<!doctype html><html><head><link rel="stylesheet" href="/assets/test.css"></head>'
-    '<body><div id="root"></div><script src="/assets/test.js"></script></body></html>',
+    '<body><div id="root"></div><!-- yandex-metrica-noscript -->'
+    '<script src="/assets/test.js"></script></body></html>',
     encoding="utf-8",
 )
 (_TEST_FRONTEND_ASSETS / "test.css").write_text("#root { display: block; }", encoding="utf-8")

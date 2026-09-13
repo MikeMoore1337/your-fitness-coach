@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from fitminiapp_api.models.acquisition import FirstTouchAttribution
 from fitminiapp_api.models.ai_coach import AiCoachConsent, AiCoachMemory, AiCoachMemoryConsent
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthIdentity, LocalCredential
@@ -61,13 +62,14 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 12
+ACCOUNT_EXPORT_SCHEMA_VERSION = 13
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
 # domain cannot silently bypass an export/privacy decision.
 ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "users": "account",
+    "first_touch_attributions": "first_touch_attribution",
     "auth_identities": "auth_identities",
     "local_credentials": "local_credential",
     "user_profiles": "profile",
@@ -610,6 +612,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .all()
     )
     local_credential = db.query(LocalCredential).filter(LocalCredential.user_id == user.id).first()
+    first_touch_attribution = db.get(FirstTouchAttribution, user.id)
     private_foods = (
         db.query(Food)
         .filter(Food.owner_user_id == user.id)
@@ -856,6 +859,27 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ("username_normalized", "created_at", "password_changed_at"),
             )
             if local_credential
+            else None
+        ),
+        "first_touch_attribution": (
+            _fields(
+                first_touch_attribution,
+                (
+                    "first_touch_source",
+                    "first_touch_medium",
+                    "first_touch_campaign",
+                    "first_landing_path",
+                    "first_referrer",
+                    "first_touch_at",
+                    "utm_source",
+                    "utm_medium",
+                    "utm_campaign",
+                    "utm_content",
+                    "utm_term",
+                    "created_at",
+                ),
+            )
+            if first_touch_attribution
             else None
         ),
         "profile": (
