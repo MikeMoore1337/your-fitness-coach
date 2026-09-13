@@ -115,8 +115,10 @@ class Settings(BaseSettings):
     usda_fdc_api_key: SecretStr = SecretStr("")
     food_provider_timeout_seconds: float = Field(default=4, ge=1, le=15)
 
-    # Task 128B is deliberately local-only and owner-cohort-only. These
-    # settings do not configure a cloud Vision provider or a fallback route.
+    # Task 128C keeps recognition local-only. These settings do not configure
+    # a cloud Vision provider or an external fallback route. The internal user
+    # list remains accepted for backwards-compatible configuration parsing, but
+    # it no longer limits access when the feature is enabled.
     nutrition_label_scan_enabled: bool = False
     nutrition_label_scan_kill_switch: bool = False
     nutrition_label_scan_internal_user_ids: str = ""
@@ -308,15 +310,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_nutrition_label_scan(self) -> Settings:
-        if (
-            self.nutrition_label_scan_enabled
-            and self.app_env == "prod"
-            and not self.nutrition_label_scan_internal_user_id_set
-        ):
-            raise ValueError(
-                "NUTRITION_LABEL_SCAN_INTERNAL_USER_IDS must be configured when "
-                "NUTRITION_LABEL_SCAN_ENABLED is true in prod"
-            )
         languages = self.nutrition_label_scan_ocr_languages.strip()
         if not re.fullmatch(r"[a-z]{2,4}(?:\+[a-z]{2,4}){0,2}", languages):
             raise ValueError("NUTRITION_LABEL_SCAN_OCR_LANGUAGES is invalid")

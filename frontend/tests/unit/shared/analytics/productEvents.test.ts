@@ -184,6 +184,26 @@ describe('product event contract', () => {
       }),
     ).toBe(true);
     expect(
+      isProductEvent({ name: 'food_logged', surface: 'mobile_web', entry_method: 'label_scan' }),
+    ).toBe(true);
+    expect(isProductEvent({ name: 'nutrition_label_scan_started', surface: 'tma' })).toBe(true);
+    expect(isProductEvent({ name: 'nutrition_label_scan_result_success', surface: 'tma' })).toBe(
+      true,
+    );
+    expect(
+      isProductEvent({ name: 'nutrition_label_scan_barcode_miss', surface: 'mobile_web' }),
+    ).toBe(true);
+    expect(
+      isProductEvent({ name: 'nutrition_label_catalog_saved_shared', surface: 'mobile_web' }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_label_scan_confirmed',
+        surface: 'mobile_web',
+        barcode: '4006381333931',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
       isProductEvent({
         name: 'today_primary_action_selected',
         surface: 'tma',

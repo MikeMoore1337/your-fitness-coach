@@ -14,7 +14,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from fitminiapp_api.api.dependencies.auth import require_nutrition_label_scan_cohort, require_user
+from fitminiapp_api.api.dependencies.auth import require_nutrition_label_scan, require_user
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.food import (
@@ -218,7 +218,7 @@ OptionalIdempotencyKey = Annotated[
 def recognize_nutrition_label(
     idempotency_key: IdempotencyKey,
     image: UploadFile = File(...),
-    current_user: User = Depends(require_nutrition_label_scan_cohort),
+    current_user: User = Depends(require_nutrition_label_scan),
     db: Session = Depends(get_db),
 ):
     try:
@@ -237,7 +237,7 @@ def recognize_nutrition_label(
 @router.get("/label-scans/{draft_id}", response_model=NutritionLabelDraftResponse)
 def read_nutrition_label_draft(
     draft_id: str,
-    current_user: User = Depends(require_nutrition_label_scan_cohort),
+    current_user: User = Depends(require_nutrition_label_scan),
     db: Session = Depends(get_db),
 ):
     try:
@@ -254,7 +254,7 @@ def read_nutrition_label_draft(
 def confirm_nutrition_label_draft(
     draft_id: str,
     payload: NutritionLabelConfirmRequest,
-    current_user: User = Depends(require_nutrition_label_scan_cohort),
+    current_user: User = Depends(require_nutrition_label_scan),
     db: Session = Depends(get_db),
 ):
     try:
@@ -267,7 +267,7 @@ def confirm_nutrition_label_draft(
 def cancel_nutrition_label_draft(
     draft_id: str,
     revision: int = Query(gt=0),
-    current_user: User = Depends(require_nutrition_label_scan_cohort),
+    current_user: User = Depends(require_nutrition_label_scan),
     db: Session = Depends(get_db),
 ):
     try:
