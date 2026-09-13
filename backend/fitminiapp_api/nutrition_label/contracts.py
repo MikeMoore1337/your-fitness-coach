@@ -44,6 +44,7 @@ NUTRIENT_UNITS: dict[str, Literal["g", "mg", "kcal", "kJ"]] = {
 
 BasisKind = Literal["per_100_g", "per_100_ml", "per_serving"]
 SourceBasis = Literal["per_100_g", "per_100_ml", "per_serving", "ambiguous"]
+SourceBasisRef = Literal["per_100_g", "per_100_ml", "per_serving", "ambiguous"]
 BasisUnit = Literal["g", "ml", "serving"]
 FactUnit = Literal["g", "mg", "kcal", "kJ"]
 Evidence = Literal["read", "ambiguous", "unreadable", "absent", "derived"]
@@ -80,7 +81,7 @@ class CanonicalFact(StrictModel):
 class SourceFact(StrictModel):
     value: Decimal | None = Field(default=None, ge=0, allow_inf_nan=False)
     unit: FactUnit
-    basis_ref: BasisKind
+    basis_ref: SourceBasisRef
     column_ref: str = Field(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_]{0,63}$")
     evidence: SourceEvidence
 
@@ -262,6 +263,10 @@ class CanonicalDraft(StrictModel):
                 for cell in source_cells:
                     if cell.unit != expected_unit:
                         raise ValueError(f"{field_name} has an invalid source unit")
+                    if self.source_basis != "ambiguous" and cell.basis_ref == "ambiguous":
+                        raise ValueError(
+                            f"{field_name} has an ambiguous source basis in a resolved draft"
+                        )
         if self.source_basis == "ambiguous" and any(
             getattr(self.normalized_facts, field_name) is not None for field_name in NUTRIENT_FIELDS
         ):

@@ -26,8 +26,22 @@ from fitminiapp_api.nutrition_label.contracts import (
 _NUMBER = r"(?P<number>\d{1,6}(?:[\.,]\d{1,4})?)"
 _UNIT = r"(?P<unit>ккал|kcal|кдж|kj|мг|mg|мл|ml|г|g|%)?"
 _VALUE_PATTERN = re.compile(rf"(?<![\w])[-+]?{_NUMBER}\s*{_UNIT}(?![\w])", re.IGNORECASE)
+_BASIS_CONTEXT = (
+    r"(?:пищев\w*\s+ценност\w*|энергетическ\w*\s+ценност\w*|"
+    r"nutrition(?:al)?(?:\s+(?:facts?|information|value))?|food\s+value)"
+)
 _BASIS_PATTERN = re.compile(
-    r"(?<!\w)(?:на|per)\s*(?:100\s*(?P<mass>г|g|мл|ml)|(?P<serving>порц\w*|serving))(?!\w)",
+    rf"(?<!\w)(?:"
+    rf"(?:на|в)\s*(?:100\s*(?P<ru_mass>г|g|мл|ml)|(?P<ru_serving>порц\w*))"
+    rf"|100\s*(?P<product_mass>г|g|мл|ml)\s+(?:продукт\w*|product)"
+    rf"|per\s*(?:100\s*(?P<per_mass>g|ml)|(?P<per_serving>serving))"
+    rf"|{_BASIS_CONTEXT}\s*[:\-]?\s*(?:на|в)?\s*100\s*(?P<context_mass>г|g|мл|ml)"
+    rf")(?!\w)",
+    re.IGNORECASE,
+)
+_BARE_RU_BASIS_LINE = re.compile(
+    r"^\s*(?:на|в)\s*(?:100\s*(?:г|g|мл|ml)|порц\w*)"
+    r"(?:\s+продукт\w*)?\s*[.:;,!?-]*\s*$",
     re.IGNORECASE,
 )
 _SERVING_SIZE_PATTERN = re.compile(
@@ -84,17 +98,36 @@ def parse_decimal_token(value: str) -> Decimal:
     return result
 
 
+def _basis_match_has_context(text: str, match: re.Match[str]) -> bool:
+    if match.group("ru_mass") is None and match.group("ru_serving") is None:
+        return True
+    line_start = text.rfind("\n", 0, match.start()) + 1
+    line_end = text.find("\n", match.end())
+    line = text[line_start:] if line_end == -1 else text[line_start:line_end]
+    return bool(_BARE_RU_BASIS_LINE.fullmatch(line) or re.search(_BASIS_CONTEXT, line, re.I))
+
+
 def _basis_from_text(
     text: str,
 ) -> tuple[Literal["per_100_g", "per_100_ml", "per_serving", "ambiguous"], list[str]]:
-    matches = list(_BASIS_PATTERN.finditer(text))
+    matches = [
+        match for match in _BASIS_PATTERN.finditer(text) if _basis_match_has_context(text, match)
+    ]
     candidates: list[str] = []
     for match in matches:
-        if match.group("mass") in {"г", "g"}:
+        mass = next(
+            (
+                match.group(group_name)
+                for group_name in ("ru_mass", "product_mass", "per_mass", "context_mass")
+                if match.group(group_name) is not None
+            ),
+            None,
+        )
+        if mass is not None and mass.casefold() in {"г", "g"}:
             candidates.append("per_100_g")
-        elif match.group("mass") in {"мл", "ml"}:
+        elif mass is not None and mass.casefold() in {"мл", "ml"}:
             candidates.append("per_100_ml")
-        elif match.group("serving"):
+        elif match.group("ru_serving") or match.group("per_serving"):
             candidates.append("per_serving")
     unique = list(dict.fromkeys(candidates))
     if len(unique) == 1:
@@ -280,7 +313,7 @@ def build_draft_from_ocr(
                 SourceFact(
                     value=None,
                     unit=expected_unit,
-                    basis_ref=source_basis if source_basis != "ambiguous" else "per_serving",
+                    basis_ref=source_basis,
                     column_ref=column_ref,
                     evidence="ambiguous",
                 )
@@ -296,7 +329,7 @@ def build_draft_from_ocr(
                 SourceFact(
                     value=None,
                     unit=expected_unit,
-                    basis_ref=source_basis if source_basis != "ambiguous" else "per_serving",
+                    basis_ref=source_basis,
                     column_ref=column_ref,
                     evidence="ambiguous",
                 )
@@ -314,7 +347,7 @@ def build_draft_from_ocr(
             normalized[field_name] = None
             continue
         seen.add(field_name)
-        source_basis_for_cell = source_basis if source_basis != "ambiguous" else "per_serving"
+        source_basis_for_cell = source_basis
         source_facts[field_name] = [
             SourceFact(
                 value=value,
@@ -343,18 +376,6 @@ def build_draft_from_ocr(
         else:
             normalized[field_name] = None
 
-    if source_basis == "ambiguous":
-        for field_name in NUTRIENT_FIELDS:
-            cells = source_facts[field_name]
-            if cells is not None:
-                source_facts[field_name] = [
-                    cell.model_copy(update={"value": None, "evidence": "ambiguous"})
-                    for cell in cells
-                ]
-        evidence = {
-            field_name: ("ambiguous" if source_facts[field_name] is not None else "absent")
-            for field_name in NUTRIENT_FIELDS
-        }
     required_fields = ("energy_kcal", "protein_g", "fat_g", "carbohydrate_g")
     if any(normalized[field_name] is None for field_name in required_fields):
         warnings.append("missing_required_fact")

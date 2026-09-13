@@ -84,6 +84,18 @@ class _FakeOcr:
         return _label_text()
 
 
+class _FixedTextOcr:
+    name = "local_tesseract"
+    version = "synthetic-locked-v1"
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def extract_text(self, image_bytes: bytes) -> str:
+        assert image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+        return self.text
+
+
 def _confirm_payload(*, visibility: str = "private", barcode: str | None = None) -> dict:
     return {
         "revision": 1,
@@ -122,7 +134,78 @@ def test_parser_keeps_canonical_basis_units_and_separates_salt_from_sodium() -> 
     assert "dv_as_mass" not in draft.warnings
 
 
-def test_parser_refuses_ambiguous_basis_and_does_not_normalize() -> None:
+@pytest.mark.parametrize(
+    ("basis_line", "expected_basis"),
+    (
+        ("На 100 г", "per_100_g"),
+        ("В 100 г", "per_100_g"),
+        ("100 г продукта", "per_100_g"),
+        ("Пищевая ценность 100 г продукта", "per_100_g"),
+        ("Пищевая ценность в 100 г", "per_100_g"),
+        ("Пищевая ценность на 100 г", "per_100_g"),
+        ("На 100 мл", "per_100_ml"),
+        ("В 100 мл", "per_100_ml"),
+        ("100 мл продукта", "per_100_ml"),
+        ("Пищевая ценность 100 мл продукта", "per_100_ml"),
+        ("Пищевая ценность в 100 мл", "per_100_ml"),
+        ("Пищевая ценность на 100 мл", "per_100_ml"),
+        ("per 100 g", "per_100_g"),
+        ("per 100 ml", "per_100_ml"),
+    ),
+)
+def test_parser_recognizes_ru_and_eu_nutrition_basis_phrases(
+    basis_line: str, expected_basis: str
+) -> None:
+    draft = build_draft_from_ocr("\n".join((basis_line, "Energy 250 kcal", "Protein 10 g")))
+
+    assert draft.source_basis == expected_basis
+
+
+def test_parser_does_not_treat_package_weight_as_nutrition_basis() -> None:
+    draft = build_draft_from_ocr(
+        "\n".join(
+            (
+                "Масса нетто 100 г",
+                "Белки 8 г",
+                "Жиры 2 г",
+                "Углеводы 4,2 г",
+            )
+        )
+    )
+
+    assert draft.source_basis == "ambiguous"
+    assert draft.package_amount is not None
+    assert draft.package_amount.amount == 100
+    assert "ambiguous_basis" in draft.warnings
+
+
+def test_parser_handles_representative_ru_label_without_na_preposition() -> None:
+    draft = build_draft_from_ocr(
+        "\n".join(
+            (
+                "Пищевая ценность 100 г продукта (средние значения)",
+                "Энергетическая ценность 281,4 кДж / 66,8 ккал",
+                "Белки 8,0 г",
+                "Жиры 2,0 г",
+                "Углеводы 4,2 г",
+            )
+        )
+    )
+
+    assert draft.source_basis == "per_100_g"
+    assert draft.normalized_facts.energy_kcal is not None
+    assert draft.normalized_facts.energy_kcal.value == Decimal("66.8")
+    assert draft.normalized_facts.energy_kj is not None
+    assert draft.normalized_facts.energy_kj.value == Decimal("281.4")
+    assert draft.normalized_facts.protein_g is not None
+    assert draft.normalized_facts.protein_g.value == Decimal("8.0")
+    assert draft.normalized_facts.fat_g is not None
+    assert draft.normalized_facts.fat_g.value == Decimal("2.0")
+    assert draft.normalized_facts.carbohydrate_g is not None
+    assert draft.normalized_facts.carbohydrate_g.value == Decimal("4.2")
+
+
+def test_parser_preserves_readable_values_when_basis_is_ambiguous() -> None:
     draft = build_draft_from_ocr(
         "\n".join(
             (
@@ -139,8 +222,10 @@ def test_parser_refuses_ambiguous_basis_and_does_not_normalize() -> None:
     assert draft.normalized_facts.energy_kcal is None
     assert draft.normalized_facts.protein_g is None
     assert draft.source_facts.energy_kcal is not None
-    assert draft.source_facts.energy_kcal[0].value is None
-    assert draft.source_facts.energy_kcal[0].evidence == "ambiguous"
+    assert draft.source_facts.energy_kcal[0].value == 250
+    assert draft.source_facts.energy_kcal[0].basis_ref == "ambiguous"
+    assert draft.source_facts.energy_kcal[0].evidence == "read"
+    assert draft.field_evidence.energy_kcal == "read"
     assert "ambiguous_basis" in draft.warnings
 
 
@@ -322,6 +407,100 @@ def test_scan_creates_owner_draft_without_food_or_diary_write(client, monkeypatc
     )
     assert replay.status_code == 201
     assert replay.json()["draft_id"] == body["draft_id"]
+
+
+def test_ambiguous_basis_with_readable_facts_creates_review_draft(client, monkeypatch) -> None:
+    telegram_user_id = 128_116
+    headers = _auth(client, telegram_user_id)
+    _enable_scan(monkeypatch, _user_id(telegram_user_id))
+    monkeypatch.setattr(
+        nutrition_label_service,
+        "_build_ocr_engine",
+        lambda: _FixedTextOcr(
+            "\n".join(
+                (
+                    "Пищевая ценность",
+                    "Белки 10 г",
+                    "Жиры 5 г",
+                    "Углеводы 30 г",
+                )
+            )
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/nutrition/label-scans",
+        headers={**headers, "Idempotency-Key": "ambiguous-basis-128"},
+        files={"image": ("label.png", _label_image(), "image/png")},
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["nutrition"]["source_basis"] == "ambiguous"
+    assert body["nutrition"]["source_facts"]["protein_g"][0]["value"] == "10"
+    assert body["nutrition"]["source_facts"]["protein_g"][0]["basis_ref"] == "ambiguous"
+    assert body["nutrition"]["field_evidence"]["protein_g"] == "read"
+    assert body["nutrition"]["normalized_facts"]["protein_g"] is None
+    assert body["requires_user_review"] is True
+
+    with get_session_context() as db:
+        user_id = _user_id(telegram_user_id)
+        assert db.query(NutritionLabelDraft).filter_by(user_id=user_id).count() == 1
+        assert db.query(Food).filter_by(owner_user_id=user_id).count() == 0
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user_id).count() == 0
+        assert db.query(NutritionCatalogContribution).count() == 0
+
+    confirmed = client.post(
+        f"/api/v1/nutrition/label-scans/{body['draft_id']}/confirm",
+        headers=headers,
+        json=_confirm_payload(),
+    )
+    assert confirmed.status_code == 201, confirmed.text
+    with get_session_context() as db:
+        user_id = _user_id(telegram_user_id)
+        assert db.query(Food).filter_by(owner_user_id=user_id).count() == 1
+
+
+def test_partial_nutrition_ocr_creates_review_draft_instead_of_retake(client, monkeypatch) -> None:
+    telegram_user_id = 128_117
+    headers = _auth(client, telegram_user_id)
+    _enable_scan(monkeypatch, _user_id(telegram_user_id))
+    monkeypatch.setattr(
+        nutrition_label_service,
+        "_build_ocr_engine",
+        lambda: _FixedTextOcr("Per 100 g\nProtein 10 g"),
+    )
+
+    response = client.post(
+        "/api/v1/nutrition/label-scans",
+        headers={**headers, "Idempotency-Key": "partial-facts-128"},
+        files={"image": ("label.png", _label_image(), "image/png")},
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["nutrition"]["source_basis"] == "per_100_g"
+    assert body["nutrition"]["normalized_facts"]["protein_g"]["value"] == "10"
+    assert "missing_required_fact" in body["warnings"]
+
+
+def test_empty_ocr_remains_retake_required_without_creating_draft(client, monkeypatch) -> None:
+    telegram_user_id = 128_118
+    headers = _auth(client, telegram_user_id)
+    user_id = _user_id(telegram_user_id)
+    _enable_scan(monkeypatch, user_id)
+    monkeypatch.setattr(nutrition_label_service, "_build_ocr_engine", lambda: _FixedTextOcr(""))
+
+    response = client.post(
+        "/api/v1/nutrition/label-scans",
+        headers={**headers, "Idempotency-Key": "empty-ocr-128"},
+        files={"image": ("label.png", _label_image(), "image/png")},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "retake_required"
+    with get_session_context() as db:
+        assert db.query(NutritionLabelDraft).filter_by(user_id=user_id).count() == 0
 
 
 def test_draft_is_owner_scoped_and_confirmation_is_revision_bound(client, monkeypatch) -> None:
