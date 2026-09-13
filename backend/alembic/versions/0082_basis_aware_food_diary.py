@@ -57,6 +57,7 @@ def upgrade() -> None:
             "carbs_g_per_100g",
         ):
             batch_op.alter_column(column, nullable=True)
+        batch_op.drop_constraint("ck_food_diary_entries_serving_complete", type_="check")
         batch_op.drop_constraint("ck_food_diary_entries_amount_unit", type_="check")
         batch_op.drop_constraint("ck_food_diary_entries_weight_positive", type_="check")
         batch_op.drop_constraint("ck_food_diary_entries_gram_amount_weight", type_="check")
@@ -70,10 +71,19 @@ def upgrade() -> None:
             "ck_food_diary_entries_gram_amount_weight",
             "amount_unit <> 'g' OR (weight_g IS NOT NULL AND amount = weight_g)",
         )
+        batch_op.create_check_constraint(
+            "ck_food_diary_entries_serving_complete",
+            "(serving_amount IS NULL AND serving_unit IS NULL AND serving_weight_g IS NULL) OR "
+            "(serving_amount > 0 AND serving_unit IN ('g', 'ml', 'piece', 'serving') AND "
+            "((serving_unit = 'g' AND serving_weight_g > 0) OR "
+            "(serving_unit IN ('ml', 'piece', 'serving') AND "
+            "(serving_weight_g IS NULL OR serving_weight_g > 0))))",
+        )
 
 
 def downgrade() -> None:
     with op.batch_alter_table("food_diary_entries") as batch_op:
+        batch_op.drop_constraint("ck_food_diary_entries_serving_complete", type_="check")
         batch_op.drop_constraint("ck_food_diary_entries_gram_amount_weight", type_="check")
         batch_op.drop_constraint("ck_food_diary_entries_weight_positive", type_="check")
         batch_op.drop_constraint("ck_food_diary_entries_amount_unit", type_="check")
@@ -83,6 +93,12 @@ def downgrade() -> None:
         batch_op.create_check_constraint("ck_food_diary_entries_weight_positive", "weight_g > 0")
         batch_op.create_check_constraint(
             "ck_food_diary_entries_gram_amount_weight", "amount_unit <> 'g' OR amount = weight_g"
+        )
+        batch_op.create_check_constraint(
+            "ck_food_diary_entries_serving_complete",
+            "serving_amount IS NULL AND serving_unit IS NULL AND serving_weight_g IS NULL OR "
+            "serving_amount > 0 AND serving_unit IN ('g', 'ml', 'piece', 'serving') AND "
+            "serving_weight_g > 0",
         )
         batch_op.drop_column("nutrition_amount")
         batch_op.drop_column("nutrition_snapshot")

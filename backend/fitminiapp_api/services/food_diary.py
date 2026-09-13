@@ -19,7 +19,6 @@ from fitminiapp_api.models.food_diary import (
 )
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.user import User
-from fitminiapp_api.schemas.food import FoodNutrientsInput
 from fitminiapp_api.schemas.food_diary import (
     DiaryAmountUnit,
     FoodDiaryCopyDay,
@@ -37,11 +36,11 @@ from fitminiapp_api.schemas.food_diary import (
     FoodDiaryTargets,
     MealType,
 )
+from fitminiapp_api.services.diary_nutrition import diary_entry_nutrition
 from fitminiapp_api.services.foods import (
     FoodError,
     FoodNutrition,
     calculate_food_amount,
-    calculate_food_nutrition,
     get_visible_food,
 )
 from fitminiapp_api.services.nutrition import get_nutrition_target_for_user
@@ -184,56 +183,15 @@ def _copy_recipe_snapshot(
 
 
 def _entry_nutrition(entry: FoodDiaryEntry) -> FoodDiaryNutrition:
-    if entry.entry_kind == "quick_add":
-        return FoodDiaryNutrition(
-            energy_kcal=cast(Decimal, entry.quick_energy_kcal),
-            protein_g=entry.quick_protein_g,
-            fat_g=entry.quick_fat_g,
-            carbs_g=entry.quick_carbs_g,
-            fiber_g=None,
-        )
-    if entry.nutrition_amount is not None:
-        return FoodDiaryNutrition(
-            energy_kcal=Decimal(str(entry.nutrition_amount["energy_kcal"])),
-            protein_g=(
-                Decimal(str(entry.nutrition_amount["protein_g"]))
-                if entry.nutrition_amount.get("protein_g") is not None
-                else None
-            ),
-            fat_g=(
-                Decimal(str(entry.nutrition_amount["fat_g"]))
-                if entry.nutrition_amount.get("fat_g") is not None
-                else None
-            ),
-            carbs_g=(
-                Decimal(str(entry.nutrition_amount["carbs_g"]))
-                if entry.nutrition_amount.get("carbs_g") is not None
-                else None
-            ),
-            fiber_g=(
-                Decimal(str(entry.nutrition_amount["fiber_g"]))
-                if entry.nutrition_amount.get("fiber_g") is not None
-                else None
-            ),
-        )
-    if entry.weight_g is None:
+    values = diary_entry_nutrition(entry)
+    if values.energy_kcal is None:
         raise FoodDiaryError("historical entry has no nutrition snapshot")
-    calculated = calculate_food_nutrition(
-        FoodNutrientsInput(
-            energy_kcal_per_100g=entry.energy_kcal_per_100g,
-            protein_g_per_100g=entry.protein_g_per_100g,
-            fat_g_per_100g=entry.fat_g_per_100g,
-            carbs_g_per_100g=entry.carbs_g_per_100g,
-            fiber_g_per_100g=entry.fiber_g_per_100g,
-        ),
-        entry.weight_g,
-    )
     return FoodDiaryNutrition(
-        energy_kcal=cast(Decimal, calculated.energy_kcal),
-        protein_g=cast(Decimal, calculated.protein_g),
-        fat_g=cast(Decimal, calculated.fat_g),
-        carbs_g=cast(Decimal, calculated.carbs_g),
-        fiber_g=calculated.fiber_g,
+        energy_kcal=values.energy_kcal,
+        protein_g=values.protein_g,
+        fat_g=values.fat_g,
+        carbs_g=values.carbs_g,
+        fiber_g=values.fiber_g,
     )
 
 

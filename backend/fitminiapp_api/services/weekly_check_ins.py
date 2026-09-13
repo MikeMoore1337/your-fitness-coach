@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -16,6 +15,7 @@ from fitminiapp_api.models.check_in import WeeklyCheckIn
 from fitminiapp_api.models.food_diary import FoodDiaryDayStatus, FoodDiaryEntry
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.check_in import WeeklyCheckInSubmitRequest, WeeklyCheckInSummary
+from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries
 from fitminiapp_api.services.energy_calibration import (
     EnergyCalibrationNotFoundError,
     get_energy_calibration_snapshot,
@@ -47,38 +47,36 @@ def _suspicious_low_nutrition_days(
     period_start: date,
     period_end: date,
 ) -> list[dict]:
-    energy = case(
-        (
-            FoodDiaryEntry.entry_kind == "quick_add",
-            FoodDiaryEntry.quick_energy_kcal,
-        ),
-        else_=FoodDiaryEntry.energy_kcal_per_100g * FoodDiaryEntry.weight_g / Decimal("100"),
-    )
-    rows = (
-        db.query(
-            FoodDiaryDayStatus.diary_date,
-            func.coalesce(func.sum(energy), Decimal("0")),
-        )
-        .outerjoin(
-            FoodDiaryEntry,
-            (FoodDiaryDayStatus.user_id == FoodDiaryEntry.user_id)
-            & (FoodDiaryDayStatus.diary_date == FoodDiaryEntry.diary_date),
-        )
+    status_rows = (
+        db.query(FoodDiaryDayStatus.diary_date)
         .filter(
             FoodDiaryDayStatus.user_id == user.id,
             FoodDiaryDayStatus.diary_date.between(period_start, period_end),
             FoodDiaryDayStatus.status == "complete",
         )
-        .group_by(FoodDiaryDayStatus.diary_date)
         .order_by(FoodDiaryDayStatus.diary_date.asc())
         .all()
     )
+    entries = (
+        db.query(FoodDiaryEntry)
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.diary_date.between(period_start, period_end),
+        )
+        .order_by(FoodDiaryEntry.diary_date.asc(), FoodDiaryEntry.id.asc())
+        .all()
+    )
+    totals_by_key = aggregate_diary_entries(entries)
     result: list[dict] = []
-    for diary_date, total in rows:
+    for (diary_date,) in status_rows:
         target = get_nutrition_target_for_date(db, user.id, diary_date)
-        if target is None or total is None:
+        total = totals_by_key.get((user.id, diary_date))
+        calories_total = (
+            total.calories if total is not None and total.calories is not None else Decimal("0")
+        )
+        if target is None:
             continue
-        calories = max(0, int(float(total) + 0.5))
+        calories = max(0, int(float(calories_total) + 0.5))
         if calories >= target.calories / 2:
             continue
         result.append(

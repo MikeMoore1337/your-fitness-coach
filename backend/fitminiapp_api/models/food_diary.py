@@ -40,9 +40,11 @@ class FoodDiaryEntry(Base):
             name="ck_food_diary_entries_gram_amount_weight",
         ),
         CheckConstraint(
-            "serving_amount IS NULL AND serving_unit IS NULL AND serving_weight_g IS NULL OR "
-            "serving_amount > 0 AND serving_unit IN ('g', 'ml', 'piece', 'serving') AND "
-            "serving_weight_g > 0",
+            "(serving_amount IS NULL AND serving_unit IS NULL AND serving_weight_g IS NULL) OR "
+            "(serving_amount > 0 AND serving_unit IN ('g', 'ml', 'piece', 'serving') AND "
+            "((serving_unit = 'g' AND serving_weight_g > 0) OR "
+            "(serving_unit IN ('ml', 'piece', 'serving') AND "
+            "(serving_weight_g IS NULL OR serving_weight_g > 0))))",
             name="ck_food_diary_entries_serving_complete",
         ),
         CheckConstraint(

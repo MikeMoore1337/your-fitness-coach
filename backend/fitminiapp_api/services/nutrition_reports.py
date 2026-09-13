@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.timezone import today_for_user
@@ -15,6 +15,7 @@ from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal
 from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
+from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries
 from fitminiapp_api.services.period_bounds import (
     PeriodBoundsError,
     ReportBounds,
@@ -37,61 +38,31 @@ class AggregatedDiaryDay:
     has_entries: bool
 
 
-def _entry_value(quick_column, regular_column):
-    return case(
-        (FoodDiaryEntry.entry_kind == "quick_add", quick_column),
-        else_=FoodDiaryEntry.weight_g * regular_column / 100,
-    )
-
-
 def _aggregated_diary_days(
     db: Session,
     user_id: int,
     bounds: ReportBounds,
 ) -> dict[date, AggregatedDiaryDay]:
-    calories = _entry_value(
-        FoodDiaryEntry.quick_energy_kcal,
-        FoodDiaryEntry.energy_kcal_per_100g,
-    )
-    protein = _entry_value(FoodDiaryEntry.quick_protein_g, FoodDiaryEntry.protein_g_per_100g)
-    fat = _entry_value(FoodDiaryEntry.quick_fat_g, FoodDiaryEntry.fat_g_per_100g)
-    carbs = _entry_value(FoodDiaryEntry.quick_carbs_g, FoodDiaryEntry.carbs_g_per_100g)
-    missing_macros = case(
-        (
-            and_(
-                FoodDiaryEntry.entry_kind == "quick_add",
-                FoodDiaryEntry.quick_protein_g.is_(None),
-            ),
-            1,
-        ),
-        else_=0,
-    )
-    rows = (
-        db.query(
-            FoodDiaryEntry.diary_date,
-            func.sum(calories).label("calories"),
-            func.sum(protein).label("protein_g"),
-            func.sum(fat).label("fat_g"),
-            func.sum(carbs).label("carbs_g"),
-            func.sum(missing_macros).label("missing_macro_count"),
-        )
+    entries = (
+        db.query(FoodDiaryEntry)
         .filter(
             FoodDiaryEntry.user_id == user_id,
             FoodDiaryEntry.diary_date.between(bounds.start, bounds.end),
         )
-        .group_by(FoodDiaryEntry.diary_date)
-        .order_by(FoodDiaryEntry.diary_date)
+        .order_by(FoodDiaryEntry.diary_date.asc(), FoodDiaryEntry.id.asc())
         .all()
     )
+    totals_by_key = aggregate_diary_entries(entries)
     result: dict[date, AggregatedDiaryDay] = {}
-    for row in rows:
-        macros_missing = bool(row.missing_macro_count)
-        result[row.diary_date] = AggregatedDiaryDay(
-            diary_date=row.diary_date,
-            calories=Decimal(row.calories) if row.calories is not None else None,
-            protein_g=None if macros_missing else Decimal(row.protein_g),
-            fat_g=None if macros_missing else Decimal(row.fat_g),
-            carbs_g=None if macros_missing else Decimal(row.carbs_g),
+    for (entry_user_id, diary_date), totals in sorted(totals_by_key.items()):
+        if entry_user_id != user_id:
+            continue
+        result[diary_date] = AggregatedDiaryDay(
+            diary_date=diary_date,
+            calories=totals.calories,
+            protein_g=None if totals.missing_macros else totals.protein_g,
+            fat_g=None if totals.missing_macros else totals.fat_g,
+            carbs_g=None if totals.missing_macros else totals.carbs_g,
             has_entries=True,
         )
     return result
