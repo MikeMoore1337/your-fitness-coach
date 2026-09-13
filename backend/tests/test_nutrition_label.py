@@ -507,6 +507,10 @@ def test_shared_confirmation_is_community_unverified_and_visible_by_barcode(
     assert lookup.json()["local_item"]["catalog_quality"] == "community_unverified"
 
     with get_session_context() as db:
+        stored_food = db.get(Food, food_id)
+        assert stored_food is not None
+        assert stored_food.provenance == "user_confirmed_package"
+        assert stored_food.legacy_provenance == "internal"
         contribution = db.query(NutritionCatalogContribution).one()
         assert contribution.state == "accepted"
         assert contribution.visibility == "share_to_yfc_catalog"

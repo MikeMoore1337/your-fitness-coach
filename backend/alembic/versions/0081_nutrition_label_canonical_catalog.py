@@ -38,6 +38,7 @@ def upgrade() -> None:
     )
     op.add_column("foods", sa.Column("canonical_facts", sa.JSON(), nullable=True))
     op.add_column("foods", sa.Column("nutrition_provenance", sa.JSON(), nullable=True))
+    op.add_column("foods", sa.Column("canonical_provenance", sa.String(length=32), nullable=True))
     op.add_column(
         "foods",
         sa.Column("canonical_complete", sa.Boolean(), nullable=True),
@@ -171,6 +172,7 @@ def downgrade() -> None:
     op.drop_table("nutrition_label_drafts")
     op.drop_column("foods", "catalog_quality")
     op.drop_column("foods", "canonical_complete")
+    op.drop_column("foods", "canonical_provenance")
     op.drop_column("foods", "nutrition_provenance")
     op.drop_column("foods", "canonical_facts")
     op.drop_column("foods", "nutrition_basis_unit")

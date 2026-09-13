@@ -206,7 +206,13 @@ class Food(Base):
     owner_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True
     )
-    provenance: Mapped[str] = mapped_column(String(32), nullable=False)
+    # The applied food schema keeps the historical 16-character provenance column. The
+    # additive canonical_provenance column carries the expanded API/domain values; the
+    # legacy column is retained for old constraints and indexes during the online rollout.
+    provenance: Mapped[str | None] = mapped_column(
+        "canonical_provenance", String(32), nullable=True
+    )
+    legacy_provenance: Mapped[str] = mapped_column("provenance", String(16), nullable=False)
     source_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     source_license: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -259,3 +265,9 @@ class FoodFavorite(Base):
 @event.listens_for(Food, "before_update")
 def _set_food_search_text(_mapper: object, _connection: object, target: Food) -> None:
     target.search_text = normalize_food_search_text(target.name, target.brand)
+    if target.provenance is None:
+        target.legacy_provenance = target.legacy_provenance or "internal"
+    elif target.provenance == "user_confirmed_package":
+        target.legacy_provenance = "internal"
+    else:
+        target.legacy_provenance = target.provenance

@@ -25,8 +25,10 @@ def upgrade() -> None:
             nutrition_basis_amount = 100,
             nutrition_basis_unit = 'g',
             canonical_complete = TRUE,
+            canonical_provenance = provenance,
             catalog_quality = CASE WHEN food_type = 'user' THEN 'private' ELSE 'verified' END
-        WHERE nutrition_basis_kind IS NULL
+        WHERE canonical_provenance IS NULL
+           OR nutrition_basis_kind IS NULL
            OR nutrition_basis_amount IS NULL
            OR nutrition_basis_unit IS NULL
            OR canonical_complete IS NULL

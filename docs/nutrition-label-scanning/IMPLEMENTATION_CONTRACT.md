@@ -68,6 +68,13 @@ Legacy food columns `*_per_100g` остаются read-compatible projection. Ca
 snapshot и рассчитанную сумму на конкретное количество, чтобы последующее изменение каталога не
 переписывать историю.
 
+Для online-safe rollout исторический `foods.provenance` остаётся `VARCHAR(16)` и используется
+старыми ограничениями и индексами. Additive-поле `foods.canonical_provenance` хранит полный
+доменный provenance, включая `user_confirmed_package`; migration 0083 заполняет его из
+исторического значения. ORM синхронизирует compatibility-поле при записи, а API и catalog
+ranking читают только canonical provenance. Expand не изменяет тип или constraints уже
+заполненной таблицы.
+
 ## API и lifecycle
 
 | Метод | Endpoint | Назначение |

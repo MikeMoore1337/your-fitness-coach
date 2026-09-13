@@ -267,6 +267,7 @@ def test_food_migration_upgrades_from_previous_head(tmp_path: Path) -> None:
             "nutrition_basis_unit",
             "canonical_facts",
             "nutrition_provenance",
+            "canonical_provenance",
             "canonical_complete",
             "catalog_quality",
         }
