@@ -29,6 +29,10 @@ from fitminiapp_api.models.notification import (
     WebPushSubscription,
 )
 from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition_label import (
+    NutritionCatalogContribution,
+    NutritionLabelDraft,
+)
 from fitminiapp_api.models.program import (
     HiddenProgramTemplate,
     ProgramRevision,
@@ -370,6 +374,15 @@ def delete_user_cascade(db: Session, user: User) -> None:
     )
     db.query(AiCoachMemory).filter(AiCoachMemory.user_id == user.id).delete(
         synchronize_session=False
+    )
+    db.query(NutritionLabelDraft).filter(NutritionLabelDraft.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(NutritionCatalogContribution).filter(
+        NutritionCatalogContribution.contributor_user_id == user.id
+    ).update(
+        {NutritionCatalogContribution.contributor_user_id: None},
+        synchronize_session=False,
     )
     db.query(RefreshToken).filter(RefreshToken.user_id == user.id).delete(synchronize_session=False)
     db.query(AuthIdentity).filter(AuthIdentity.user_id == user.id).delete(synchronize_session=False)

@@ -2156,6 +2156,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/label-scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recognize Nutrition Label */
+        post: operations["recognize_nutrition_label_api_v1_nutrition_label_scans_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/label-scans/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Nutrition Label Draft */
+        get: operations["read_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/label-scans/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Nutrition Label Draft */
+        post: operations["confirm_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/label-scans/{draft_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Nutrition Label Draft */
+        post: operations["cancel_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/hydration": {
         parameters: {
             query?: never;
@@ -4457,6 +4525,11 @@ export interface components {
             /** Muscle Group Ids */
             muscle_group_ids?: string[];
         };
+        /** Body_recognize_nutrition_label_api_v1_nutrition_label_scans_post */
+        Body_recognize_nutrition_label_api_v1_nutrition_label_scans_post: {
+            /** Image */
+            image: string;
+        };
         /** Body_replace_avatar_api_v1_me_avatar_put */
         Body_replace_avatar_api_v1_me_avatar_put: {
             /** File */
@@ -4762,6 +4835,68 @@ export interface components {
             telegram_user_id: number;
             /** Timezone */
             timezone: string;
+        };
+        /** CanonicalDraft */
+        CanonicalDraft: {
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "nutrition-label-draft-v1";
+            /**
+             * Source Language
+             * @enum {string}
+             */
+            source_language: "ru" | "en" | "mixed" | "unknown";
+            /**
+             * Label Format
+             * @enum {string}
+             */
+            label_format: "ru_standard" | "eu_uk" | "us_nutrition_facts" | "unknown";
+            /**
+             * Source Basis
+             * @enum {string}
+             */
+            source_basis: "per_100_g" | "per_100_ml" | "per_serving" | "ambiguous";
+            serving_size?: components["schemas"]["ServingSize-Output"] | null;
+            /** Servings Per Container */
+            servings_per_container?: string | null;
+            package_amount?: components["schemas"]["PackageAmount-Output"] | null;
+            source_facts: components["schemas"]["SourceNutrientFacts"];
+            normalized_facts: components["schemas"]["NutrientFacts"];
+            derived_fields: components["schemas"]["DerivedNutrientFacts"];
+            displayed_daily_value_percent: components["schemas"]["DailyValuePercent"];
+            field_evidence: components["schemas"]["FieldEvidence"];
+            /**
+             * Confidence Kind
+             * @enum {string}
+             */
+            confidence_kind: "provider_native" | "calibrated_eval" | "none";
+            confidence: components["schemas"]["FieldConfidence"];
+            /** Warnings */
+            warnings?: string[];
+            /**
+             * Requires User Review
+             * @default true
+             * @constant
+             */
+            requires_user_review: true;
+            metadata: components["schemas"]["DraftMetadata"];
+        };
+        /** CanonicalFact */
+        CanonicalFact: {
+            /** Value */
+            value: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "mg" | "kcal" | "kJ";
+            /**
+             * Basis Ref
+             * @enum {string}
+             */
+            basis_ref: "per_100_g" | "per_100_ml" | "per_serving";
         };
         /** CardioPeriodSummary */
         CardioPeriodSummary: {
@@ -5079,6 +5214,33 @@ export interface components {
             superset_order?: number | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** DailyValuePercent */
+        DailyValuePercent: {
+            /** Energy Kcal */
+            energy_kcal?: string | null;
+            /** Protein G */
+            protein_g?: string | null;
+            /** Fat G */
+            fat_g?: string | null;
+            /** Saturated Fat G */
+            saturated_fat_g?: string | null;
+            /** Trans Fat G */
+            trans_fat_g?: string | null;
+            /** Carbohydrate G */
+            carbohydrate_g?: string | null;
+            /** Fiber G */
+            fiber_g?: string | null;
+            /** Sugars G */
+            sugars_g?: string | null;
+            /** Added Sugars G */
+            added_sugars_g?: string | null;
+            /** Salt G */
+            salt_g?: string | null;
+            /** Sodium Mg */
+            sodium_mg?: string | null;
+            /** Cholesterol Mg */
+            cholesterol_mg?: string | null;
         };
         /** DailyWellbeingCheckInResponse */
         DailyWellbeingCheckInResponse: {
@@ -5462,6 +5624,36 @@ export interface components {
             /** Comment */
             comment?: string | null;
         };
+        /** DerivedFact */
+        DerivedFact: {
+            /** Value */
+            value: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "mg" | "kcal" | "kJ";
+            /** Reason */
+            reason: string;
+            /** Source Fields */
+            source_fields: string[];
+        };
+        /** DerivedNutrientFacts */
+        DerivedNutrientFacts: {
+            energy_kcal?: components["schemas"]["DerivedFact"] | null;
+            energy_kj?: components["schemas"]["DerivedFact"] | null;
+            protein_g?: components["schemas"]["DerivedFact"] | null;
+            fat_g?: components["schemas"]["DerivedFact"] | null;
+            saturated_fat_g?: components["schemas"]["DerivedFact"] | null;
+            trans_fat_g?: components["schemas"]["DerivedFact"] | null;
+            carbohydrate_g?: components["schemas"]["DerivedFact"] | null;
+            sugars_g?: components["schemas"]["DerivedFact"] | null;
+            added_sugars_g?: components["schemas"]["DerivedFact"] | null;
+            fiber_g?: components["schemas"]["DerivedFact"] | null;
+            salt_g?: components["schemas"]["DerivedFact"] | null;
+            sodium_mg?: components["schemas"]["DerivedFact"] | null;
+            cholesterol_mg?: components["schemas"]["DerivedFact"] | null;
+        };
         /** DevLoginRequest */
         DevLoginRequest: {
             /** Telegram User Id */
@@ -5480,6 +5672,22 @@ export interface components {
             username?: string | null;
             /** Full Name */
             full_name?: string | null;
+        };
+        /** DraftMetadata */
+        DraftMetadata: {
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "nutrition-label-draft-v1";
+            /** Policy Revision */
+            policy_revision: string;
         };
         /** EmailLoginRequest */
         EmailLoginRequest: {
@@ -5950,6 +6158,116 @@ export interface components {
              */
             license_url: string;
         };
+        /** FieldConfidence */
+        FieldConfidence: {
+            /** Energy Kcal */
+            energy_kcal?: string | null;
+            /** Energy Kj */
+            energy_kj?: string | null;
+            /** Protein G */
+            protein_g?: string | null;
+            /** Fat G */
+            fat_g?: string | null;
+            /** Saturated Fat G */
+            saturated_fat_g?: string | null;
+            /** Trans Fat G */
+            trans_fat_g?: string | null;
+            /** Carbohydrate G */
+            carbohydrate_g?: string | null;
+            /** Sugars G */
+            sugars_g?: string | null;
+            /** Added Sugars G */
+            added_sugars_g?: string | null;
+            /** Fiber G */
+            fiber_g?: string | null;
+            /** Salt G */
+            salt_g?: string | null;
+            /** Sodium Mg */
+            sodium_mg?: string | null;
+            /** Cholesterol Mg */
+            cholesterol_mg?: string | null;
+        };
+        /** FieldEvidence */
+        FieldEvidence: {
+            /**
+             * Energy Kcal
+             * @default absent
+             * @enum {string}
+             */
+            energy_kcal: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Energy Kj
+             * @default absent
+             * @enum {string}
+             */
+            energy_kj: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Protein G
+             * @default absent
+             * @enum {string}
+             */
+            protein_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Fat G
+             * @default absent
+             * @enum {string}
+             */
+            fat_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Saturated Fat G
+             * @default absent
+             * @enum {string}
+             */
+            saturated_fat_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Trans Fat G
+             * @default absent
+             * @enum {string}
+             */
+            trans_fat_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Carbohydrate G
+             * @default absent
+             * @enum {string}
+             */
+            carbohydrate_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Sugars G
+             * @default absent
+             * @enum {string}
+             */
+            sugars_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Added Sugars G
+             * @default absent
+             * @enum {string}
+             */
+            added_sugars_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Fiber G
+             * @default absent
+             * @enum {string}
+             */
+            fiber_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Salt G
+             * @default absent
+             * @enum {string}
+             */
+            salt_g: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Sodium Mg
+             * @default absent
+             * @enum {string}
+             */
+            sodium_mg: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+            /**
+             * Cholesterol Mg
+             * @default absent
+             * @enum {string}
+             */
+            cholesterol_mg: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
+        };
         /** FoodBarcodeLookupResponse */
         FoodBarcodeLookupResponse: {
             /** Barcode */
@@ -6119,7 +6437,7 @@ export interface components {
              * @default g
              * @enum {string}
              */
-            amount_unit: "g" | "serving";
+            amount_unit: "g" | "ml" | "serving";
         };
         /** FoodDiaryEntryResponse */
         FoodDiaryEntryResponse: {
@@ -6156,9 +6474,15 @@ export interface components {
              * Amount Unit
              * @enum {string}
              */
-            amount_unit: "g" | "serving";
+            amount_unit: "g" | "ml" | "serving";
             /** Weight G */
-            weight_g: string;
+            weight_g: string | null;
+            /** Nutrition Basis Kind */
+            nutrition_basis_kind?: ("per_100_g" | "per_100_ml" | "per_serving") | null;
+            /** Nutrition Basis Amount */
+            nutrition_basis_amount?: string | null;
+            /** Nutrition Basis Unit */
+            nutrition_basis_unit?: ("g" | "ml" | "serving") | null;
             /** Serving Amount */
             serving_amount: string | null;
             /** Serving Unit */
@@ -6192,7 +6516,7 @@ export interface components {
             /** Amount */
             amount?: number | string | null;
             /** Amount Unit */
-            amount_unit?: ("g" | "serving") | null;
+            amount_unit?: ("g" | "ml" | "serving") | null;
         };
         /** FoodDiaryMeal */
         FoodDiaryMeal: {
@@ -6279,15 +6603,61 @@ export interface components {
             /** Barcode */
             barcode: string | null;
             /** Energy Kcal Per 100G */
-            energy_kcal_per_100g: string;
+            energy_kcal_per_100g: string | null;
             /** Protein G Per 100G */
-            protein_g_per_100g: string;
+            protein_g_per_100g: string | null;
             /** Fat G Per 100G */
-            fat_g_per_100g: string;
+            fat_g_per_100g: string | null;
             /** Carbs G Per 100G */
-            carbs_g_per_100g: string;
+            carbs_g_per_100g: string | null;
             /** Fiber G Per 100G */
             fiber_g_per_100g: string | null;
+            /**
+             * Nutrition Basis Kind
+             * @default per_100_g
+             * @enum {string}
+             */
+            nutrition_basis_kind: "per_100_g" | "per_100_ml" | "per_serving";
+            /**
+             * Nutrition Basis Amount
+             * @default 100
+             */
+            nutrition_basis_amount: string;
+            /**
+             * Nutrition Basis Unit
+             * @default g
+             * @enum {string}
+             */
+            nutrition_basis_unit: "g" | "ml" | "serving";
+            /** Canonical Facts */
+            canonical_facts?: {
+                [key: string]: unknown;
+            } | null;
+            /** Nutrition Provenance */
+            nutrition_provenance?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Quality
+             * @default verified
+             * @enum {string}
+             */
+            catalog_quality: "private" | "verified" | "community_unverified";
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "internal" | "external" | "user" | "user_confirmed_package";
+            /**
+             * Trust Level
+             * @enum {string}
+             */
+            trust_level: "verified" | "unverified";
+            /**
+             * Canonical Complete
+             * @default true
+             */
+            canonical_complete: boolean;
             /** Standard Serving Amount */
             standard_serving_amount: string | null;
             /** Standard Serving Unit */
@@ -6815,6 +7185,22 @@ export interface components {
             /** Quiet Hours End */
             quiet_hours_end?: string | null;
         };
+        /** NutrientFacts */
+        NutrientFacts: {
+            energy_kcal?: components["schemas"]["CanonicalFact"] | null;
+            energy_kj?: components["schemas"]["CanonicalFact"] | null;
+            protein_g?: components["schemas"]["CanonicalFact"] | null;
+            fat_g?: components["schemas"]["CanonicalFact"] | null;
+            saturated_fat_g?: components["schemas"]["CanonicalFact"] | null;
+            trans_fat_g?: components["schemas"]["CanonicalFact"] | null;
+            carbohydrate_g?: components["schemas"]["CanonicalFact"] | null;
+            sugars_g?: components["schemas"]["CanonicalFact"] | null;
+            added_sugars_g?: components["schemas"]["CanonicalFact"] | null;
+            fiber_g?: components["schemas"]["CanonicalFact"] | null;
+            salt_g?: components["schemas"]["CanonicalFact"] | null;
+            sodium_mg?: components["schemas"]["CanonicalFact"] | null;
+            cholesterol_mg?: components["schemas"]["CanonicalFact"] | null;
+        };
         /** NutritionAssignedByResponse */
         NutritionAssignedByResponse: {
             /** Id */
@@ -6825,6 +7211,119 @@ export interface components {
             username?: string | null;
             /** Full Name */
             full_name?: string | null;
+        };
+        /** NutritionLabelConfirmRequest */
+        NutritionLabelConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand?: string | null;
+            /** Barcode */
+            barcode?: string | null;
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "private" | "share_to_yfc_catalog";
+            nutrition: components["schemas"]["NutritionLabelFactsEdit"];
+        };
+        /** NutritionLabelConfirmResponse */
+        NutritionLabelConfirmResponse: {
+            food: components["schemas"]["FoodResponse"];
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "private" | "share_to_yfc_catalog";
+            /**
+             * Contribution State
+             * @enum {string}
+             */
+            contribution_state: "private" | "accepted" | "duplicate" | "conflict";
+            /**
+             * Catalog Quality
+             * @enum {string}
+             */
+            catalog_quality: "private" | "verified" | "community_unverified";
+            /** Provenance */
+            provenance: string;
+            /**
+             * Diary Entry Created
+             * @default false
+             * @constant
+             */
+            diary_entry_created: false;
+        };
+        /** NutritionLabelDraftResponse */
+        NutritionLabelDraftResponse: {
+            /** Draft Id */
+            draft_id: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed" | "cancelled" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Product Name */
+            product_name: string | null;
+            /** Product Brand */
+            product_brand: string | null;
+            /** Product Barcode */
+            product_barcode: string | null;
+            nutrition: components["schemas"]["CanonicalDraft"];
+            /** Warnings */
+            warnings: string[];
+            /**
+             * Requires User Review
+             * @constant
+             */
+            requires_user_review: true;
+        };
+        /** NutritionLabelFactsEdit */
+        NutritionLabelFactsEdit: {
+            /**
+             * Source Basis
+             * @enum {string}
+             */
+            source_basis: "per_100_g" | "per_100_ml" | "per_serving" | "ambiguous";
+            serving_size?: components["schemas"]["ServingSize-Input"] | null;
+            /** Servings Per Container */
+            servings_per_container?: number | string | null;
+            package_amount?: components["schemas"]["PackageAmount-Input"] | null;
+            /** Energy Kcal */
+            energy_kcal?: number | string | null;
+            /** Energy Kj */
+            energy_kj?: number | string | null;
+            /** Protein G */
+            protein_g?: number | string | null;
+            /** Fat G */
+            fat_g?: number | string | null;
+            /** Saturated Fat G */
+            saturated_fat_g?: number | string | null;
+            /** Trans Fat G */
+            trans_fat_g?: number | string | null;
+            /** Carbohydrate G */
+            carbohydrate_g?: number | string | null;
+            /** Sugars G */
+            sugars_g?: number | string | null;
+            /** Added Sugars G */
+            added_sugars_g?: number | string | null;
+            /** Fiber G */
+            fiber_g?: number | string | null;
+            /** Salt G */
+            salt_g?: number | string | null;
+            /** Sodium Mg */
+            sodium_mg?: number | string | null;
+            /** Cholesterol Mg */
+            cholesterol_mg?: number | string | null;
         };
         /** NutritionManualTargetSave */
         NutritionManualTargetSave: {
@@ -7218,6 +7717,26 @@ export interface components {
             required_fields: "goal"[];
             /** Missing Fields */
             missing_fields: "goal"[];
+        };
+        /** PackageAmount */
+        "PackageAmount-Input": {
+            /** Amount */
+            amount: number | string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
+        /** PackageAmount */
+        "PackageAmount-Output": {
+            /** Amount */
+            amount: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
         };
         /** PasswordResetConfirmRequest */
         PasswordResetConfirmRequest: {
@@ -8560,6 +9079,77 @@ export interface components {
             missing_set_count: number;
             /** Distribution */
             distribution: components["schemas"]["RirDistributionBucket"][];
+        };
+        /** ServingSize */
+        "ServingSize-Input": {
+            /** Amount */
+            amount: number | string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
+        /** ServingSize */
+        "ServingSize-Output": {
+            /** Amount */
+            amount: string;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "ml";
+        };
+        /** SourceFact */
+        SourceFact: {
+            /** Value */
+            value?: string | null;
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "g" | "mg" | "kcal" | "kJ";
+            /**
+             * Basis Ref
+             * @enum {string}
+             */
+            basis_ref: "per_100_g" | "per_100_ml" | "per_serving";
+            /** Column Ref */
+            column_ref: string;
+            /**
+             * Evidence
+             * @enum {string}
+             */
+            evidence: "read" | "ambiguous" | "unreadable";
+        };
+        /** SourceNutrientFacts */
+        SourceNutrientFacts: {
+            /** Energy Kcal */
+            energy_kcal?: components["schemas"]["SourceFact"][] | null;
+            /** Energy Kj */
+            energy_kj?: components["schemas"]["SourceFact"][] | null;
+            /** Protein G */
+            protein_g?: components["schemas"]["SourceFact"][] | null;
+            /** Fat G */
+            fat_g?: components["schemas"]["SourceFact"][] | null;
+            /** Saturated Fat G */
+            saturated_fat_g?: components["schemas"]["SourceFact"][] | null;
+            /** Trans Fat G */
+            trans_fat_g?: components["schemas"]["SourceFact"][] | null;
+            /** Carbohydrate G */
+            carbohydrate_g?: components["schemas"]["SourceFact"][] | null;
+            /** Sugars G */
+            sugars_g?: components["schemas"]["SourceFact"][] | null;
+            /** Added Sugars G */
+            added_sugars_g?: components["schemas"]["SourceFact"][] | null;
+            /** Fiber G */
+            fiber_g?: components["schemas"]["SourceFact"][] | null;
+            /** Salt G */
+            salt_g?: components["schemas"]["SourceFact"][] | null;
+            /** Sodium Mg */
+            sodium_mg?: components["schemas"]["SourceFact"][] | null;
+            /** Cholesterol Mg */
+            cholesterol_mg?: components["schemas"]["SourceFact"][] | null;
         };
         /** TelegramInitRequest */
         TelegramInitRequest: {
@@ -14536,6 +15126,138 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WeeklyCheckInResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recognize_nutrition_label_api_v1_nutrition_label_scans_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_recognize_nutrition_label_api_v1_nutrition_label_scans_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionLabelDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionLabelDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionLabelConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionLabelConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__cancel_post: {
+        parameters: {
+            query: {
+                revision: number;
+            };
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

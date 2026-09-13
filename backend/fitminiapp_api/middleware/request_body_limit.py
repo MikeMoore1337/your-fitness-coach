@@ -14,6 +14,7 @@ DEFAULT_BODY_LIMIT_BYTES: Final = 1024 * 1024
 AUTH_BODY_LIMIT_BYTES: Final = 64 * 1024
 AVATAR_BODY_LIMIT_BYTES: Final = 6 * 1024 * 1024
 PROGRAM_IMPORT_PATH_PREFIX: Final = "/api/v1/programs/imports"
+NUTRITION_LABEL_SCAN_PATH_PREFIX: Final = "/api/v1/nutrition/label-scans"
 AUTH_PATH_PREFIX: Final = "/api/v1/auth/"
 AVATAR_PATH: Final = "/api/v1/me/avatar"
 REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
@@ -28,6 +29,10 @@ def _body_limit(path: str) -> int:
         return AVATAR_BODY_LIMIT_BYTES
     if path == PROGRAM_IMPORT_PATH_PREFIX or path.startswith(f"{PROGRAM_IMPORT_PATH_PREFIX}/"):
         return settings.program_import_max_request_bytes
+    if path == NUTRITION_LABEL_SCAN_PATH_PREFIX or path.startswith(
+        f"{NUTRITION_LABEL_SCAN_PATH_PREFIX}/"
+    ):
+        return settings.nutrition_label_scan_max_request_bytes
     return DEFAULT_BODY_LIMIT_BYTES
 
 

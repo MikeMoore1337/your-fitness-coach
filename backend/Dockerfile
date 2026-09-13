@@ -16,7 +16,11 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 RUN apt-get update \
     && apt-get upgrade --yes \
-    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && apt-get install -y --no-install-recommends \
+        fonts-dejavu-core \
+        tesseract-ocr \
+        tesseract-ocr-eng \
+        tesseract-ocr-rus \
     && rm -rf /var/lib/apt/lists/*
 COPY backend/requirements-runtime.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \

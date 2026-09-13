@@ -29,6 +29,28 @@ def require_ai_coach_cohort(user: User = Depends(require_user)) -> User:
     return user
 
 
+def is_nutrition_label_scan_cohort_user(user: User) -> bool:
+    """Keep the local OCR route unavailable to ordinary accounts until 128C."""
+
+    return bool(
+        settings.nutrition_label_scan_enabled
+        and not settings.nutrition_label_scan_kill_switch
+        and user.id in settings.nutrition_label_scan_internal_user_id_set
+    )
+
+
+def require_nutrition_label_scan_cohort(user: User = Depends(require_user)) -> User:
+    if not is_nutrition_label_scan_cohort_user(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "feature_disabled",
+                "message": "Сканирование этикетки пока недоступно",
+            },
+        )
+    return user
+
+
 def require_coach(user: User = Depends(require_user)) -> User:
     if not user.is_coach:
         raise HTTPException(

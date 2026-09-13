@@ -2,6 +2,7 @@ from datetime import date, datetime, time
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     Date,
     DateTime,
@@ -27,13 +28,15 @@ class FoodDiaryEntry(Base):
             name="ck_food_diary_entries_meal_type",
         ),
         CheckConstraint(
-            "amount_unit IN ('g', 'serving')",
+            "amount_unit IN ('g', 'ml', 'serving')",
             name="ck_food_diary_entries_amount_unit",
         ),
         CheckConstraint("amount > 0", name="ck_food_diary_entries_amount_positive"),
-        CheckConstraint("weight_g > 0", name="ck_food_diary_entries_weight_positive"),
         CheckConstraint(
-            "amount_unit <> 'g' OR amount = weight_g",
+            "weight_g IS NULL OR weight_g > 0", name="ck_food_diary_entries_weight_positive"
+        ),
+        CheckConstraint(
+            "amount_unit <> 'g' OR (weight_g IS NOT NULL AND amount = weight_g)",
             name="ck_food_diary_entries_gram_amount_weight",
         ),
         CheckConstraint(
@@ -149,15 +152,21 @@ class FoodDiaryEntry(Base):
 
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
     amount_unit: Mapped[str] = mapped_column(String(16), nullable=False)
-    weight_g: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
+    weight_g: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
 
     food_name: Mapped[str] = mapped_column(String(256), nullable=False)
     food_brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    energy_kcal_per_100g: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    protein_g_per_100g: Mapped[Decimal] = mapped_column(Numeric(8, 3), nullable=False)
-    fat_g_per_100g: Mapped[Decimal] = mapped_column(Numeric(8, 3), nullable=False)
-    carbs_g_per_100g: Mapped[Decimal] = mapped_column(Numeric(8, 3), nullable=False)
+    energy_kcal_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
+    protein_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
+    fat_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
+    carbs_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
     fiber_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
+
+    nutrition_basis_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    nutrition_basis_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    nutrition_basis_unit: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    nutrition_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    nutrition_amount: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     quick_energy_kcal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     quick_protein_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
     quick_fat_g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)

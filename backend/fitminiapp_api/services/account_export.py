@@ -33,6 +33,7 @@ from fitminiapp_api.models.notification import (
     WebPushSubscription,
 )
 from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.program import (
     HiddenProgramTemplate,
     ProgramTemplate,
@@ -60,7 +61,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 11
+ACCOUNT_EXPORT_SCHEMA_VERSION = 12
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -121,6 +122,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "ai_coach_consents": "ai_coach_consent",
     "ai_coach_memory_consents": "ai_coach_memory_consent",
     "ai_coach_memories": "ai_coach_memories",
+    "nutrition_catalog_contributions": "nutrition_catalog_contributions",
 }
 
 ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
@@ -135,6 +137,9 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "program_imports": (
         "short-lived owner-scoped import drafts; source is never persisted and normalized content "
         "is cleared on terminal state"
+    ),
+    "nutrition_label_drafts": (
+        "short-lived owner-scoped nutrition drafts; the source image and raw OCR are never persisted"
     ),
 }
 
@@ -156,6 +161,13 @@ FOOD_FIELDS = (
     "standard_serving_amount",
     "standard_serving_unit",
     "standard_serving_weight_g",
+    "nutrition_basis_kind",
+    "nutrition_basis_amount",
+    "nutrition_basis_unit",
+    "canonical_facts",
+    "nutrition_provenance",
+    "canonical_complete",
+    "catalog_quality",
     "food_type",
     "provenance",
     "source_name",
@@ -181,6 +193,15 @@ SNAPSHOT_NUTRIENT_FIELDS = (
     "serving_amount",
     "serving_unit",
     "serving_weight_g",
+)
+
+DIARY_SNAPSHOT_NUTRIENT_FIELDS = (
+    *SNAPSHOT_NUTRIENT_FIELDS,
+    "nutrition_basis_kind",
+    "nutrition_basis_amount",
+    "nutrition_basis_unit",
+    "nutrition_snapshot",
+    "nutrition_amount",
 )
 
 NUTRITION_FIELDS = (
@@ -595,6 +616,15 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(Food.created_at.asc(), Food.id.asc())
         .all()
     )
+    nutrition_catalog_contributions = (
+        db.query(NutritionCatalogContribution)
+        .filter(NutritionCatalogContribution.contributor_user_id == user.id)
+        .order_by(
+            NutritionCatalogContribution.created_at.asc(),
+            NutritionCatalogContribution.id.asc(),
+        )
+        .all()
+    )
     favorite_foods = (
         db.query(FoodFavorite, Food)
         .join(Food, Food.id == FoodFavorite.food_id)
@@ -941,6 +971,23 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             {"created_at": favorite.created_at, "food": _serialize_food(food)}
             for favorite, food in favorite_foods
         ],
+        "nutrition_catalog_contributions": [
+            _fields(
+                contribution,
+                (
+                    "id",
+                    "food_id",
+                    "visibility",
+                    "state",
+                    "payload_digest",
+                    "canonical_payload",
+                    "source_version",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for contribution in nutrition_catalog_contributions
+        ],
         "recipes": [
             {
                 **_fields(recipe, ("id", "name", "final_weight_g", "created_at", "updated_at")),
@@ -973,7 +1020,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                         "quick_carbs_g",
                     ),
                 ),
-                **_fields(row, SNAPSHOT_NUTRIENT_FIELDS),
+                **_fields(row, DIARY_SNAPSHOT_NUTRIENT_FIELDS),
                 "created_at": row.created_at,
                 "updated_at": row.updated_at,
             }

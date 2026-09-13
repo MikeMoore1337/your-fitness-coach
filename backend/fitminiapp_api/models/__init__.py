@@ -46,6 +46,10 @@ from fitminiapp_api.models.notification import (
     WebPushSubscription,
 )
 from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
+from fitminiapp_api.models.nutrition_label import (
+    NutritionCatalogContribution,
+    NutritionLabelDraft,
+)
 from fitminiapp_api.models.oauth_transaction import OAuthTransaction
 from fitminiapp_api.models.program import (
     HiddenProgramTemplate,
@@ -132,6 +136,8 @@ __all__ = [
     "Notification",
     "NotificationDelivery",
     "NotificationSetting",
+    "NutritionCatalogContribution",
+    "NutritionLabelDraft",
     "NutritionTarget",
     "OAuthTransaction",
     "Payment",

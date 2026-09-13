@@ -68,13 +68,17 @@ type FoodDraftSelection = Pick<
   | 'protein_g_per_100g'
   | 'fat_g_per_100g'
   | 'carbs_g_per_100g'
+  | 'nutrition_basis_kind'
+  | 'nutrition_basis_unit'
   | 'standard_serving_weight_g'
 >;
+
+type FoodAmountUnit = FoodDiaryEntry['amount_unit'];
 
 interface AddDraft {
   food: FoodDraftSelection | null;
   amount: string;
-  amountUnit: 'g' | 'serving';
+  amountUnit: FoodAmountUnit;
   quick?: QuickAddDraft;
   requestId?: string;
 }
@@ -111,12 +115,33 @@ function foodDraftSelection(food: Food): FoodDraftSelection {
     protein_g_per_100g: food.protein_g_per_100g,
     fat_g_per_100g: food.fat_g_per_100g,
     carbs_g_per_100g: food.carbs_g_per_100g,
+    nutrition_basis_kind: food.nutrition_basis_kind,
+    nutrition_basis_unit: food.nutrition_basis_unit,
     standard_serving_weight_g: food.standard_serving_weight_g,
   };
 }
 
-function formatNumber(value: string): string {
+function formatNumber(value: string | null): string {
+  if (value === null) return '—';
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(Number(value));
+}
+
+function foodAmountUnit(
+  food: Pick<Food, 'nutrition_basis_kind' | 'standard_serving_weight_g'>,
+): FoodAmountUnit {
+  if (food.nutrition_basis_kind === 'per_100_ml') return 'ml';
+  if (food.nutrition_basis_kind === 'per_serving') return 'serving';
+  return food.standard_serving_weight_g ? 'serving' : 'g';
+}
+
+function foodBasisLabel(food: Pick<Food, 'nutrition_basis_kind' | 'energy_kcal_per_100g'>): string {
+  const basis =
+    food.nutrition_basis_kind === 'per_100_ml'
+      ? '100 мл'
+      : food.nutrition_basis_kind === 'per_serving'
+        ? 'порцию'
+        : '100 г';
+  return `${formatNumber(food.energy_kcal_per_100g)} ккал / ${basis}`;
 }
 
 function providerMessage(status: FoodSearch['provider_status']): string | null {
@@ -164,7 +189,7 @@ function FoodResults({
               <strong>{food.name}</strong>
               <span>
                 {food.brand ? `${food.brand} · ` : ''}
-                {formatNumber(food.energy_kcal_per_100g)} ккал на 100 г
+                {foodBasisLabel(food)}
               </span>
             </span>
             <Badge>{foodSourceLabel(food)}</Badge>
@@ -552,10 +577,11 @@ export function FoodPickerDialog({
       entry_method: entryMethod,
     });
     setSelectedRecipe(null);
+    const amountUnit = foodAmountUnit(food);
     updateDraft({
       food: foodDraftSelection(food),
-      amount: food.standard_serving_weight_g ? '1' : '100',
-      amountUnit: food.standard_serving_weight_g ? 'serving' : 'g',
+      amount: amountUnit === 'serving' ? '1' : '100',
+      amountUnit,
     });
   };
   const selectExternalFood = (food: ExternalFood) => {
@@ -636,7 +662,7 @@ export function FoodPickerDialog({
               <>
                 <div className="nutrition-picker__selected">
                   <span>{draft.food.brand || foodSourceLabel(draft.food)}</span>
-                  <strong>{formatNumber(draft.food.energy_kcal_per_100g)} ккал / 100 г</strong>
+                  <strong>{foodBasisLabel(draft.food)}</strong>
                   <small>
                     Б {formatNumber(draft.food.protein_g_per_100g)} · Ж{' '}
                     {formatNumber(draft.food.fat_g_per_100g)} · У{' '}
@@ -662,11 +688,17 @@ export function FoodPickerDialog({
                       id="nutrition-food-unit"
                       value={draft.amountUnit}
                       onChange={(event) =>
-                        updateDraft({ amountUnit: event.target.value as 'g' | 'serving' })
+                        updateDraft({ amountUnit: event.target.value as FoodAmountUnit })
                       }
                     >
-                      <option value="g">граммы</option>
-                      {draft.food.standard_serving_weight_g && (
+                      {draft.food.nutrition_basis_kind === 'per_100_g' && (
+                        <option value="g">граммы</option>
+                      )}
+                      {draft.food.nutrition_basis_kind === 'per_100_ml' && (
+                        <option value="ml">миллилитры</option>
+                      )}
+                      {(draft.food.nutrition_basis_kind === 'per_serving' ||
+                        draft.food.standard_serving_weight_g) && (
                         <option value="serving">порции</option>
                       )}
                     </Select>

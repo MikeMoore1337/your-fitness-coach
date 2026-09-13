@@ -40,8 +40,8 @@ from fitminiapp_api.schemas.food_diary import (
 from fitminiapp_api.services.foods import (
     FoodError,
     FoodNutrition,
+    calculate_food_amount,
     calculate_food_nutrition,
-    calculate_food_servings,
     get_visible_food,
 )
 from fitminiapp_api.services.nutrition import get_nutrition_target_for_user
@@ -107,16 +107,7 @@ def _calculate_amount(
     amount_unit: DiaryAmountUnit,
 ) -> FoodNutrition:
     try:
-        if amount_unit == "g":
-            nutrients = FoodNutrientsInput(
-                energy_kcal_per_100g=food.energy_kcal_per_100g,
-                protein_g_per_100g=food.protein_g_per_100g,
-                fat_g_per_100g=food.fat_g_per_100g,
-                carbs_g_per_100g=food.carbs_g_per_100g,
-                fiber_g_per_100g=food.fiber_g_per_100g,
-            )
-            return calculate_food_nutrition(nutrients, amount)
-        return calculate_food_servings(food, amount)
+        return calculate_food_amount(food, amount, amount_unit)
     except FoodError as exc:
         raise FoodDiaryError(str(exc)) from exc
 
@@ -140,6 +131,10 @@ def _entry_snapshot_as_food(entry: FoodDiaryEntry) -> Food:
         carbs_g_per_100g=entry.carbs_g_per_100g,
         fiber_g_per_100g=entry.fiber_g_per_100g,
         standard_serving_weight_g=entry.serving_weight_g,
+        nutrition_basis_kind=entry.nutrition_basis_kind or "per_100_g",
+        nutrition_basis_amount=entry.nutrition_basis_amount or Decimal("100"),
+        nutrition_basis_unit=entry.nutrition_basis_unit or "g",
+        canonical_facts=entry.nutrition_snapshot,
     )
 
 
@@ -149,11 +144,15 @@ def _copy_food_snapshot(entry: FoodDiaryEntry, food: Food) -> None:
     entry.recipe_id = None
     entry.food_name = food.name
     entry.food_brand = food.brand
-    entry.energy_kcal_per_100g = cast(Decimal, food.energy_kcal_per_100g)
-    entry.protein_g_per_100g = cast(Decimal, food.protein_g_per_100g)
-    entry.fat_g_per_100g = cast(Decimal, food.fat_g_per_100g)
-    entry.carbs_g_per_100g = cast(Decimal, food.carbs_g_per_100g)
+    entry.energy_kcal_per_100g = food.energy_kcal_per_100g
+    entry.protein_g_per_100g = food.protein_g_per_100g
+    entry.fat_g_per_100g = food.fat_g_per_100g
+    entry.carbs_g_per_100g = food.carbs_g_per_100g
     entry.fiber_g_per_100g = food.fiber_g_per_100g
+    entry.nutrition_basis_kind = food.nutrition_basis_kind
+    entry.nutrition_basis_amount = food.nutrition_basis_amount
+    entry.nutrition_basis_unit = food.nutrition_basis_unit
+    entry.nutrition_snapshot = food.canonical_facts
     entry.serving_amount = food.standard_serving_amount
     entry.serving_unit = food.standard_serving_unit
     entry.serving_weight_g = food.standard_serving_weight_g
@@ -178,6 +177,10 @@ def _copy_recipe_snapshot(
     entry.serving_amount = None
     entry.serving_unit = None
     entry.serving_weight_g = None
+    entry.nutrition_basis_kind = "per_100_g"
+    entry.nutrition_basis_amount = Decimal("100")
+    entry.nutrition_basis_unit = "g"
+    entry.nutrition_snapshot = None
 
 
 def _entry_nutrition(entry: FoodDiaryEntry) -> FoodDiaryNutrition:
@@ -189,6 +192,32 @@ def _entry_nutrition(entry: FoodDiaryEntry) -> FoodDiaryNutrition:
             carbs_g=entry.quick_carbs_g,
             fiber_g=None,
         )
+    if entry.nutrition_amount is not None:
+        return FoodDiaryNutrition(
+            energy_kcal=Decimal(str(entry.nutrition_amount["energy_kcal"])),
+            protein_g=(
+                Decimal(str(entry.nutrition_amount["protein_g"]))
+                if entry.nutrition_amount.get("protein_g") is not None
+                else None
+            ),
+            fat_g=(
+                Decimal(str(entry.nutrition_amount["fat_g"]))
+                if entry.nutrition_amount.get("fat_g") is not None
+                else None
+            ),
+            carbs_g=(
+                Decimal(str(entry.nutrition_amount["carbs_g"]))
+                if entry.nutrition_amount.get("carbs_g") is not None
+                else None
+            ),
+            fiber_g=(
+                Decimal(str(entry.nutrition_amount["fiber_g"]))
+                if entry.nutrition_amount.get("fiber_g") is not None
+                else None
+            ),
+        )
+    if entry.weight_g is None:
+        raise FoodDiaryError("historical entry has no nutrition snapshot")
     calculated = calculate_food_nutrition(
         FoodNutrientsInput(
             energy_kcal_per_100g=entry.energy_kcal_per_100g,
@@ -208,6 +237,18 @@ def _entry_nutrition(entry: FoodDiaryEntry) -> FoodDiaryNutrition:
     )
 
 
+def _set_nutrition_amount(entry: FoodDiaryEntry, calculation: FoodNutrition) -> None:
+    entry.nutrition_amount = {
+        "energy_kcal": str(calculation.energy_kcal)
+        if calculation.energy_kcal is not None
+        else None,
+        "protein_g": str(calculation.protein_g) if calculation.protein_g is not None else None,
+        "fat_g": str(calculation.fat_g) if calculation.fat_g is not None else None,
+        "carbs_g": str(calculation.carbs_g) if calculation.carbs_g is not None else None,
+        "fiber_g": str(calculation.fiber_g) if calculation.fiber_g is not None else None,
+    }
+
+
 def _serialize_entry(entry: FoodDiaryEntry) -> FoodDiaryEntryResponse:
     return FoodDiaryEntryResponse(
         id=entry.id,
@@ -222,6 +263,12 @@ def _serialize_entry(entry: FoodDiaryEntry) -> FoodDiaryEntryResponse:
         amount=entry.amount,
         amount_unit=cast(DiaryAmountUnit, entry.amount_unit),
         weight_g=entry.weight_g,
+        nutrition_basis_kind=cast(
+            Literal["per_100_g", "per_100_ml", "per_serving"] | None,
+            entry.nutrition_basis_kind,
+        ),
+        nutrition_basis_amount=entry.nutrition_basis_amount,
+        nutrition_basis_unit=cast(Literal["g", "ml", "serving"] | None, entry.nutrition_basis_unit),
         serving_amount=entry.serving_amount,
         serving_unit=entry.serving_unit,
         serving_weight_g=entry.serving_weight_g,
@@ -290,6 +337,7 @@ def create_food_diary_entry(
         _copy_food_snapshot(entry, food)
         entry.entry_kind = "food"
         entry.weight_g = calculation.weight_g
+        _set_nutrition_amount(entry, calculation)
     elif payload.recipe_id is not None:
         recipe = _owned_recipe(db, user, payload.recipe_id)
         try:
@@ -300,6 +348,7 @@ def create_food_diary_entry(
         _copy_recipe_snapshot(entry, recipe, recipe_calculation)
         entry.entry_kind = "recipe"
         entry.weight_g = calculation.weight_g
+        _set_nutrition_amount(entry, calculation)
     else:
         quick_add = cast(FoodDiaryQuickAdd, payload.quick_add)
         entry.entry_kind = "quick_add"
@@ -314,6 +363,17 @@ def create_food_diary_entry(
         entry.serving_amount = Decimal("1")
         entry.serving_unit = "serving"
         entry.serving_weight_g = Decimal("1")
+        entry.nutrition_basis_kind = "per_serving"
+        entry.nutrition_basis_amount = Decimal("1")
+        entry.nutrition_basis_unit = "serving"
+        entry.nutrition_snapshot = None
+        entry.nutrition_amount = {
+            "energy_kcal": str(quick_add.energy_kcal),
+            "protein_g": str(quick_add.protein_g) if quick_add.protein_g is not None else None,
+            "fat_g": str(quick_add.fat_g) if quick_add.fat_g is not None else None,
+            "carbs_g": str(quick_add.carbs_g) if quick_add.carbs_g is not None else None,
+            "fiber_g": None,
+        }
         entry.quick_energy_kcal = quick_add.energy_kcal
         entry.quick_protein_g = quick_add.protein_g
         entry.quick_fat_g = quick_add.fat_g
@@ -409,6 +469,7 @@ def update_food_diary_entry(
     entry.amount = amount
     entry.amount_unit = amount_unit
     entry.weight_g = calculation.weight_g
+    _set_nutrition_amount(entry, calculation)
     db.commit()
     db.refresh(entry)
     return _serialize_entry(entry)
@@ -645,6 +706,11 @@ def _clone_entry(
         serving_amount=source.serving_amount,
         serving_unit=source.serving_unit,
         serving_weight_g=source.serving_weight_g,
+        nutrition_basis_kind=source.nutrition_basis_kind,
+        nutrition_basis_amount=source.nutrition_basis_amount,
+        nutrition_basis_unit=source.nutrition_basis_unit,
+        nutrition_snapshot=source.nutrition_snapshot,
+        nutrition_amount=source.nutrition_amount,
     )
 
 

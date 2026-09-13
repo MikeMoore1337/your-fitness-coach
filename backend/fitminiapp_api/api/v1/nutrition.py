@@ -1,10 +1,20 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
-from fitminiapp_api.api.dependencies.auth import require_user
+from fitminiapp_api.api.dependencies.auth import require_nutrition_label_scan_cohort, require_user
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.food import (
@@ -45,6 +55,11 @@ from fitminiapp_api.schemas.nutrition import (
     NutritionTargetHistoryResponse,
     NutritionTargetResponse,
     NutritionTargetSave,
+)
+from fitminiapp_api.schemas.nutrition_label import (
+    NutritionLabelConfirmRequest,
+    NutritionLabelConfirmResponse,
+    NutritionLabelDraftResponse,
 )
 from fitminiapp_api.schemas.recipe import (
     RecipeCreate,
@@ -113,6 +128,13 @@ from fitminiapp_api.services.nutrition import (
     save_manual_nutrition_target,
     save_nutrition_target,
 )
+from fitminiapp_api.services.nutrition_label import (
+    NutritionLabelError,
+    cancel_label_draft,
+    confirm_label_draft,
+    create_label_draft,
+    get_label_draft,
+)
 from fitminiapp_api.services.recipes import (
     RecipeError,
     RecipeNotFoundError,
@@ -148,6 +170,36 @@ def _raise_recipe_http_error(exc: RecipeError) -> None:
     raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+def _raise_nutrition_label_http_error(exc: NutritionLabelError) -> None:
+    messages = {
+        "feature_disabled": "Сканирование этикетки пока недоступно",
+        "unsupported_mime": "Поддерживаются только JPEG, PNG и WebP",
+        "invalid_image": "Файл не является допустимым изображением",
+        "decode_failed": "Изображение не удалось безопасно прочитать",
+        "oversized_image": "Изображение слишком большое",
+        "retake_required": "Нужен более чёткий снимок этикетки",
+        "local_ocr_unavailable": "Локальный OCR сейчас недоступен",
+        "local_ocr_timeout": "Локальный OCR не завершился вовремя",
+        "local_ocr_failed": "Локальный OCR не смог обработать изображение",
+        "local_ocr_output_too_large": "Локальный OCR вернул слишком большой результат",
+        "incomplete_required_facts": "Заполните обязательные значения перед подтверждением",
+        "ambiguous_basis": "Уточните основу расчёта: 100 г, 100 мл или порция",
+        "draft_expired": "Черновик истёк; начните сканирование заново",
+        "draft_not_active": "Черновик уже закрыт",
+        "stale_draft_revision": "Черновик изменился; обновите его перед подтверждением",
+        "contribution_conflict": "Найден конфликт фактов продукта; данные не перезаписаны",
+        "duplicate_barcode": "Продукт с этим штрихкодом уже существует",
+        "sharing_requires_valid_gtin": "Для общего каталога нужен корректный GTIN",
+    }
+    raise HTTPException(
+        status_code=exc.status_code,
+        detail={
+            "code": exc.code,
+            "message": messages.get(exc.code, "Не удалось обработать черновик"),
+        },
+    ) from exc
+
+
 IdempotencyKey = Annotated[
     str,
     Header(alias="Idempotency-Key", min_length=8, max_length=128),
@@ -156,6 +208,73 @@ OptionalIdempotencyKey = Annotated[
     str | None,
     Header(alias="Idempotency-Key", min_length=8, max_length=128),
 ]
+
+
+@router.post(
+    "/label-scans",
+    response_model=NutritionLabelDraftResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def recognize_nutrition_label(
+    idempotency_key: IdempotencyKey,
+    image: UploadFile = File(...),
+    current_user: User = Depends(require_nutrition_label_scan_cohort),
+    db: Session = Depends(get_db),
+):
+    try:
+        image_bytes = image.file.read()
+        return create_label_draft(
+            db,
+            current_user,
+            image_bytes=image_bytes,
+            content_type=image.content_type,
+            idempotency_key=idempotency_key,
+        )
+    except NutritionLabelError as exc:
+        _raise_nutrition_label_http_error(exc)
+
+
+@router.get("/label-scans/{draft_id}", response_model=NutritionLabelDraftResponse)
+def read_nutrition_label_draft(
+    draft_id: str,
+    current_user: User = Depends(require_nutrition_label_scan_cohort),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_label_draft(db, current_user, draft_id)
+    except NutritionLabelError as exc:
+        _raise_nutrition_label_http_error(exc)
+
+
+@router.post(
+    "/label-scans/{draft_id}/confirm",
+    response_model=NutritionLabelConfirmResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def confirm_nutrition_label_draft(
+    draft_id: str,
+    payload: NutritionLabelConfirmRequest,
+    current_user: User = Depends(require_nutrition_label_scan_cohort),
+    db: Session = Depends(get_db),
+):
+    try:
+        return confirm_label_draft(db, current_user, draft_id, payload)
+    except NutritionLabelError as exc:
+        _raise_nutrition_label_http_error(exc)
+
+
+@router.post("/label-scans/{draft_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_nutrition_label_draft(
+    draft_id: str,
+    revision: int = Query(gt=0),
+    current_user: User = Depends(require_nutrition_label_scan_cohort),
+    db: Session = Depends(get_db),
+):
+    try:
+        cancel_label_draft(db, current_user, draft_id, revision)
+    except NutritionLabelError as exc:
+        _raise_nutrition_label_http_error(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _raise_hydration_http_error(exc: HydrationError) -> None:

@@ -23,7 +23,8 @@ interface IngredientDraft {
   servingWeight: string | null;
 }
 
-function numberLabel(value: string, digits = 0): string {
+function numberLabel(value: string | null, digits = 0): string {
+  if (value === null) return '—';
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: digits }).format(Number(value));
 }
 
