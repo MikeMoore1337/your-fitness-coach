@@ -86,6 +86,8 @@ python3 scripts/configure_production_food_search.py .env
 echo "Normalizing the production news image provider"
 python3 scripts/normalize_production_news_image_provider.py .env
 
+echo "Enabling the production AI Coach runtime"
+python3 scripts/configure_production_ai_coach.py .env
 
 echo "Validating Compose configuration for $TARGET_SHA"
 docker compose config --quiet

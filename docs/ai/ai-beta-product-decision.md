@@ -1,5 +1,10 @@
 # AI Coach beta: продуктовый аудит, privacy-контракт и решение по провайдеру
 
+> Исторический baseline до production launch. Записанные здесь initial-beta No-Go решения
+> superseded явным owner decision Task 267 в части включения существующего Groq runtime и доступа
+> для 100% authenticated users; privacy, consent, safety и free-only ограничения остаются
+> обязательными.
+
 Статус документа: `CONDITIONAL_GO_GENERIC_FOUNDATION / PROVIDER_SMOKE_AND_EVAL_PASS`
 
 Дата проверки: 2026-09-07

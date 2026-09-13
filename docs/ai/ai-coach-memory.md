@@ -1,5 +1,9 @@
 # AI Coach: управляемая долгосрочная память
 
+> Privacy contract memory сохраняется. Cohort-only ограничение из исходного rollout больше не
+> является текущим доступом: authenticated AI Coach доступен всем пользователям, а memory остаётся
+> отдельным `enabled`/`paused`/`revoked` opt-in.
+
 Статус: Task 92A, узкий rollout по owner decision от 2026-09-11.
 
 ## Product contract

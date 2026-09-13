@@ -38,7 +38,7 @@ async function installAiCoachApi(page: Page, personalAvailable = false): Promise
             stable_non_medical_preferences: 'Стабильные немедицинские предпочтения',
             explicit_ai_context: 'Явный контекст для AI Coach',
           },
-          purpose: 'Внутренняя оценка AI Coach memory',
+          purpose: 'Помощь AI Coach с контролем памяти',
           retention_notice: 'Память выключена по умолчанию.',
           max_items: 20,
           consent_source: 'test',
@@ -58,7 +58,7 @@ async function installAiCoachApi(page: Page, personalAvailable = false): Promise
           categories: personalAvailable
             ? ['personal_progress', 'training_history', 'nutrition_summary']
             : [],
-          purpose: 'Внутренняя оценка AI Coach',
+          purpose: 'Персональная сводка AI Coach',
           provider_name: 'groq',
           provider_policy_revision: 'test',
           retention_notice: 'Без долгосрочной памяти',
@@ -124,9 +124,9 @@ async function installAiCoachApi(page: Page, personalAvailable = false): Promise
               source_type: 'canonical_yfc',
             },
           ],
-          limitations: ['Это автоматическая проверка без доступа к истории пользователя.'],
+          limitations: ['Ответ основан только на доступном проверенном материале.'],
           safety_category: 'clear',
-          prompt_version: 'ai-coach-beta-v2',
+          prompt_version: 'ai-coach-production-v1',
           request_id: 'ui-eval-request',
         },
       });
@@ -178,7 +178,7 @@ async function openAiCoachSurface(
   }
 }
 
-test('AI Coach internal beta keeps honest states and responsive boundaries', async ({
+test('AI Coach production surface keeps honest states and responsive boundaries', async ({
   browser,
 }) => {
   mkdirSync(evidenceDir, { recursive: true });
@@ -224,6 +224,8 @@ test('AI Coach internal beta keeps honest states and responsive boundaries', asy
     await openAiCoachSurface(page, surface.theme, surface.viewport, surface.tma ?? false);
 
     const experience = page.getByTestId('ai-coach-experience');
+    await expect(experience).toContainText('AI Coach');
+    await expect(experience).not.toContainText(/внутренняя beta|внутренняя проверка|beta-экран/i);
     await expect(experience.getByText('Что не передаётся')).toBeVisible();
     await expect(experience.getByRole('link', { name: 'Продолжить без AI' })).toHaveAttribute(
       'href',

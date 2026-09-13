@@ -46,15 +46,6 @@ def _login(client, telegram_user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-def _login_in_cohort(client, monkeypatch, telegram_user_id: int) -> dict[str, str]:
-    headers = _login(client, telegram_user_id)
-    current = client.get("/api/v1/me", headers=headers)
-    assert current.status_code == 200
-    monkeypatch.setattr(settings, "ai_coach_ui_enabled", True)
-    monkeypatch.setattr(settings, "ai_coach_internal_user_ids", str(current.json()["id"]))
-    return headers
-
-
 @dataclass
 class _CapturingProvider:
     memory_contexts: list[tuple[object, ...]]
@@ -107,7 +98,7 @@ def _personal_tool_result() -> PersonalToolResult:
 
 
 def test_memory_consent_and_user_controls_are_separate_and_bounded(client, monkeypatch) -> None:
-    headers = _login_in_cohort(client, monkeypatch, 992_001)
+    headers = _login(client, 992_001)
 
     initial = client.get("/api/v1/ai-coach/memory", headers=headers)
     assert initial.status_code == 200
@@ -184,8 +175,8 @@ def test_memory_consent_and_user_controls_are_separate_and_bounded(client, monke
     assert revoked.json()["items"] == []
 
 
-def test_memory_lifecycle_remains_available_after_cohort_removal(client, monkeypatch) -> None:
-    headers = _login_in_cohort(client, monkeypatch, 992_005)
+def test_memory_lifecycle_remains_available_without_rollout_settings(client, monkeypatch) -> None:
+    headers = _login(client, 992_005)
     assert (
         client.put(
             "/api/v1/ai-coach/memory/consent",
@@ -236,7 +227,7 @@ def test_memory_lifecycle_remains_available_after_cohort_removal(client, monkeyp
     assert deleted.status_code == 200
     assert deleted.json() == {"deleted_count": 1}
 
-    create_outside_cohort = client.post(
+    create_without_consent = client.post(
         "/api/v1/ai-coach/memory",
         headers=headers,
         json={
@@ -245,7 +236,7 @@ def test_memory_lifecycle_remains_available_after_cohort_removal(client, monkeyp
             "confirmation": True,
         },
     )
-    assert create_outside_cohort.status_code == 403
+    assert create_without_consent.status_code == 409
 
 
 @pytest.mark.parametrize(
@@ -265,7 +256,7 @@ def test_memory_lifecycle_remains_available_after_cohort_removal(client, monkeyp
 def test_memory_rejects_prohibited_categories_and_untrusted_text(
     client, monkeypatch, value
 ) -> None:
-    headers = _login_in_cohort(client, monkeypatch, 992_002)
+    headers = _login(client, 992_002)
     assert (
         client.put(
             "/api/v1/ai-coach/memory/consent",
@@ -289,7 +280,7 @@ def test_memory_rejects_prohibited_categories_and_untrusted_text(
 def test_memory_requires_explicit_confirmation_and_current_account_ownership(
     client, monkeypatch
 ) -> None:
-    headers = _login_in_cohort(client, monkeypatch, 992_003)
+    headers = _login(client, 992_003)
     assert (
         client.put(
             "/api/v1/ai-coach/memory/consent",
@@ -399,7 +390,7 @@ def test_personal_route_uses_memory_only_with_both_consents(client, monkeypatch)
         "fitminiapp_api.api.v1.ai_coach.run_personal_tool",
         lambda db, user, tool, period_days: _personal_tool_result(),
     )
-    headers = _login_in_cohort(client, monkeypatch, 992_004)
+    headers = _login(client, 992_004)
     assert (
         client.put(
             "/api/v1/ai-coach/consent",

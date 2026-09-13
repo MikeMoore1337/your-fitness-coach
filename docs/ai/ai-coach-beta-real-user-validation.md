@@ -1,5 +1,9 @@
 # AI Coach beta: real-user validation и limited rollout decision (Task 90B)
 
+> Исторический snapshot limited beta и его observation decision. Решение Task 267 supersedes
+> rollout-only conclusion для текущего запуска: после production release AI Coach предназначен для
+> 100% authenticated users, при этом consent, safety, free-only policy и safe degradation сохраняются.
+
 Статус решения: `CONTINUE_LIMITED_BETA`
 
 Дата решения: 2026-09-08

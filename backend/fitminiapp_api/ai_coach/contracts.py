@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AI_COACH_DATA_CLASS = "generic"
-AI_COACH_PROMPT_VERSION = "ai-coach-beta-v2"
+AI_COACH_PROMPT_VERSION = "ai-coach-production-v1"
 AI_COACH_PERSONAL_PROMPT_VERSION = "ai-coach-personal-v2"
 AI_COACH_SCHEMA_VERSION = "ai-coach-answer-v1"
 AI_COACH_PERIOD_REPORT_PROMPT_VERSION = "ai-coach-period-report-v2"

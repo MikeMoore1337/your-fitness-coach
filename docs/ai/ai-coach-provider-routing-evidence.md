@@ -1,5 +1,9 @@
 # AI Coach: evidence для provider routing (Task 92B)
 
+> Историческое multiprovider research решение Task 92B не отменяет текущий launch contract. Для
+> Task 267 используется существующий single-provider Groq route; новые providers, paid fallback и
+> router в scope не входят.
+
 Статус на 2026-09-11: `RESEARCH_FIRST`, multiprovider production implementation не одобрена.
 
 Этот документ фиксирует bounded evidence и следующий owner checkpoint. Он не выбирает второго

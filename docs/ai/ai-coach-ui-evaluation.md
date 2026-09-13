@@ -1,5 +1,9 @@
 # AI Coach: internal beta UI и evaluation gate (Task 90A)
 
+> Исторический evaluation gate Task 90A. После Task 267 этот документ не описывает текущий
+> user-facing state: production UI не является internal beta, а доступ определяется
+> аутентификацией и runtime capability. Synthetic evaluation evidence ниже сохранён без изменения.
+
 Task 90A добавляет только внутренний UI-контур AI Coach. Он не становится пунктом основной
 навигации Today/TMA и не является доказательством реальных пользовательских сессий.
 

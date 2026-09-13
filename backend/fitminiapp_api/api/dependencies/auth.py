@@ -12,20 +12,9 @@ def require_user(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-def is_ai_coach_cohort_user(user: User) -> bool:
-    """Return whether the server-side internal beta boundary admits this account."""
+def require_ai_coach_user(user: User = Depends(require_user)) -> User:
+    """Require authentication; AI Coach availability is controlled by runtime capability."""
 
-    return bool(settings.ai_coach_ui_enabled and user.id in settings.ai_coach_internal_user_id_set)
-
-
-def require_ai_coach_cohort(user: User = Depends(require_user)) -> User:
-    """Protect every AI Coach generation path, including direct API callers."""
-
-    if not is_ai_coach_cohort_user(user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="AI Coach beta доступна только ограниченной внутренней когорте",
-        )
     return user
 
 
