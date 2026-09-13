@@ -1,8 +1,8 @@
-# Task 128B: backend-контракт сканирования этикетки
+# Task 128C: backend-контракт сканирования этикетки и rollout
 
-Этот документ фиксирует production foundation, реализованный в Task 128B. Он не является
-разрешением публичного rollout: до следующего owner-only validation feature остаётся выключенной
-для обычных пользователей.
+Этот документ фиксирует production foundation Task 128B и mobile/TMA integration Task 128C.
+Значение `false` в коде и `.env.example` остаётся fail-closed sample default. После обязательной
+production validation владелец может включить feature для всех авторизованных пользователей.
 
 ## Граница выполнения
 
@@ -115,13 +115,16 @@ Local YFC catalog checked first. Exact local barcode lookup завершаетс
 
 - `NUTRITION_LABEL_SCAN_ENABLED=false` по умолчанию;
 - `NUTRITION_LABEL_SCAN_KILL_SWITCH=true` немедленно закрывает route;
-- `NUTRITION_LABEL_SCAN_INTERNAL_USER_IDS` — обязательный allowlist при включении в prod;
-- включение только конкретной owner/internal когорты, без public rollout.
+- `NUTRITION_LABEL_SCAN_INTERNAL_USER_IDS` принимается для обратной совместимости конфигурации,
+  но не ограничивает доступ при включённом feature flag;
+- production rollout после owner validation означает `NUTRITION_LABEL_SCAN_ENABLED=true` и
+  `NUTRITION_LABEL_SCAN_KILL_SWITCH=false` для всех авторизованных пользователей.
 
-Документированные изменения environment для кода по умолчанию: `env change required: no`.
-Для owner-only validation оператор может установить только перечисленные 128B keys в deployment
-contract, оставить kill switch выключенным и указать точные internal user IDs. Cloud Vision,
-paid Vision, local LLM и credentials для них не нужны и не добавляются.
+Для текущего кода environment change required: `no`; OCR limits и runtime contract не меняются.
+Для фактического public production rollout после прохождения gate потребуется операционная смена
+`NUTRITION_LABEL_SCAN_ENABLED=true` в deployment contract при сохранении
+`NUTRITION_LABEL_SCAN_KILL_SWITCH=false`; это rollout action, а не новая credential или provider
+настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны и не добавляются.
 
 ## Runtime OCR
 
@@ -135,5 +138,5 @@ Backend runtime устанавливает локальный Tesseract OCR и �
 - parser/image/API regression tests — deterministic local tests;
 - Alembic SQLite replay должен проходить от пустой базы до head;
 - `eval_harness.py --self-check` и locked synthetic fixture preflight запускаются без сети;
-- OCR recognition quality, p50/p95, correction baseline и public rollout — `NOT MEASURED`/`BLOCKED`
-  до отдельного owner-only validation.
+- OCR recognition quality, p50/p95 и correction baseline остаются `NOT MEASURED` до реальной
+  owner-authorized validation на production representative labels.

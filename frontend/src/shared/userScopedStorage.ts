@@ -23,6 +23,7 @@ export const USER_SCOPED_PERSISTENT_STORAGE_REGISTRY = [
     ],
   },
   { domain: 'food_draft', prefixes: ['fit_food_draft_'] },
+  { domain: 'nutrition_label_draft', prefixes: ['fit_nutrition_label_draft_v1_'] },
   { domain: 'measurement_draft', prefixes: ['fit_measurement_draft_'] },
   { domain: 'nutrition_draft', prefixes: ['fit_nutrition_draft_v2_', 'fit_nutrition_draft_'] },
   { domain: 'profile_draft', prefixes: ['fit_profile_draft_'] },
@@ -81,6 +82,10 @@ export function foodDraftStorageKey(
   mealType: string,
 ): string {
   return `fit_food_draft_${userId}_${diaryDate}_${mealType}`;
+}
+
+export function nutritionLabelDraftStorageKey(userId: number | 'anonymous'): string {
+  return `fit_nutrition_label_draft_v1_${userId}`;
 }
 
 export function measurementDraftStorageKey(scope: string): string {

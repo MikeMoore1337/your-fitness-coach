@@ -9,6 +9,7 @@ import type {
   FoodDiaryEntry,
   FoodList,
   FoodSearch,
+  NutritionLabelConfirmResponse,
   Recipe,
   UserFoodCreate,
 } from '../../shared/api/types';
@@ -36,6 +37,7 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { BarcodeLookup } from './BarcodeLookup';
 import { FoodEditor } from './FoodEditor';
+import { NutritionLabelScanner } from './NutritionLabelScanner';
 import { RecipeBrowser } from './RecipeBrowser';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -47,7 +49,7 @@ const mealLabels: Record<MealType, string> = {
   snacks: 'перекусы',
 };
 type PickerSource = 'recent' | 'favorites';
-type PickerView = 'browse' | 'quick-add' | 'food-editor' | 'recipes' | 'barcode';
+type PickerView = 'browse' | 'quick-add' | 'food-editor' | 'recipes' | 'barcode' | 'label-scan';
 
 interface QuickAddDraft {
   name: string;
@@ -71,6 +73,7 @@ type FoodDraftSelection = Pick<
   | 'nutrition_basis_kind'
   | 'nutrition_basis_unit'
   | 'standard_serving_weight_g'
+  | 'catalog_quality'
 >;
 
 type FoodAmountUnit = FoodDiaryEntry['amount_unit'];
@@ -99,7 +102,9 @@ function newEntryRequestId(): string {
   return `entry-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function foodSourceLabel(food: Pick<Food, 'food_type'>): string {
+function foodSourceLabel(food: Pick<Food, 'food_type' | 'catalog_quality'>): string {
+  if (food.catalog_quality === 'community_unverified') return 'Добавлено пользователем';
+  if (food.catalog_quality === 'verified') return 'Проверено YFC';
   if (food.food_type === 'user') return 'Мой продукт';
   if (food.food_type === 'branded') return 'Брендовый';
   return 'Каталог';
@@ -118,12 +123,26 @@ function foodDraftSelection(food: Food): FoodDraftSelection {
     nutrition_basis_kind: food.nutrition_basis_kind,
     nutrition_basis_unit: food.nutrition_basis_unit,
     standard_serving_weight_g: food.standard_serving_weight_g,
+    catalog_quality: food.catalog_quality,
   };
 }
 
 function formatNumber(value: string | null): string {
   if (value === null) return '—';
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(Number(value));
+}
+
+function normalizeFoodSearchValue(value: string): string {
+  return value.trim().toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
+}
+
+function hasExactLocalFoodHit(items: Food[], query: string): boolean {
+  const normalizedQuery = normalizeFoodSearchValue(query);
+  return items.some((item) => {
+    const searchableValues = [item.name, item.brand ?? ''];
+    if (item.brand) searchableValues.push(`${item.brand} ${item.name}`);
+    return searchableValues.some((value) => normalizeFoodSearchValue(value) === normalizedQuery);
+  });
 }
 
 function foodAmountUnit(
@@ -345,6 +364,7 @@ export function FoodPickerDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [editingFood, setEditingFood] = useState<Food | undefined>();
   const [editorBarcode, setEditorBarcode] = useState('');
+  const [scanBarcode, setScanBarcode] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [recipeAmount, setRecipeAmount] = useState('100');
   const [draft, setDraft, clearDraft] = usePersistentState<AddDraft>(
@@ -396,7 +416,9 @@ export function FoodPickerDialog({
     !search.isFetching &&
     !search.error &&
     search.data !== undefined &&
-    search.data.total < search.data.limit
+    (search.data.items.length === 0 ||
+      !hasExactLocalFoodHit(search.data.items, searchQuery) ||
+      search.data.items.some((item) => item.canonical_complete === false))
       ? searchQuery
       : '';
   const external = useQuery({
@@ -441,6 +463,22 @@ export function FoodPickerDialog({
   const activeError = searchQuery.length >= 2 ? search.error : activeCollection.error;
   const activeLoading = searchQuery.length >= 2 ? search.isFetching : activeCollection.isLoading;
   const quantityMode = Boolean(draft.food || selectedRecipe);
+
+  useEffect(() => {
+    if (!searchQuery || !search.data || search.data.total < 1) return;
+    trackProductEvent(
+      { name: 'yfc_food_catalog_local_hit', surface: productEventSurface() },
+      { dedupe: 'session', dedupeKey: `food-search-local:${searchQuery}` },
+    );
+  }, [search.data, searchQuery]);
+
+  useEffect(() => {
+    if (!externalQuery || !external.data) return;
+    trackProductEvent(
+      { name: 'yfc_food_catalog_external_fallback', surface: productEventSurface() },
+      { dedupe: 'session', dedupeKey: `food-search-external:${externalQuery}` },
+    );
+  }, [external.data, externalQuery]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -570,7 +608,13 @@ export function FoodPickerDialog({
   const updateQuick = (changes: Partial<QuickAddDraft>) => {
     updateDraft({ quick: { ...quick, ...changes } });
   };
-  const selectFood = (food: Food) => {
+  const selectFood = (food: Food, { trackCommunityReuse = true } = {}) => {
+    if (trackCommunityReuse && food.catalog_quality === 'community_unverified') {
+      trackProductEvent({
+        name: 'nutrition_label_community_product_reused',
+        surface: productEventSurface(),
+      });
+    }
     trackProductEvent({
       name: 'food_log_started',
       surface: productEventSurface(),
@@ -612,6 +656,7 @@ export function FoodPickerDialog({
         'food-editor': editingFood ? 'Изменить продукт' : 'Новый продукт',
         recipes: 'Рецепты',
         barcode: 'Штрихкод',
+        'label-scan': 'Сканирование этикетки',
       } as const
     )[view];
   return (
@@ -872,6 +917,7 @@ export function FoodPickerDialog({
         ) : view === 'food-editor' ? (
           <div className="nutrition-picker__browse">
             <FoodEditor
+              userId={user?.id ?? 'anonymous'}
               barcode={editorBarcode}
               food={editingFood}
               onCancel={() => setView('browse')}
@@ -880,6 +926,42 @@ export function FoodPickerDialog({
                 setEditingFood(undefined);
                 setEditorBarcode('');
                 selectFood(food);
+              }}
+            />
+          </div>
+        ) : view === 'label-scan' ? (
+          <div className="nutrition-picker__browse">
+            <button
+              className="nutrition-picker__back"
+              type="button"
+              onClick={() => setView('browse')}
+            >
+              <Icon name="arrow-left" size={16} /> К способам добавления
+            </button>
+            <NutritionLabelScanner
+              userId={user?.id ?? 'anonymous'}
+              initialBarcode={scanBarcode}
+              onCancel={() => {
+                setScanBarcode('');
+                setView('browse');
+              }}
+              onManualFallback={() => {
+                setEditorBarcode(scanBarcode);
+                setEditingFood(undefined);
+                setScanBarcode('');
+                setEntryMethod('custom');
+                setView('food-editor');
+              }}
+              onSaved={async (food, response: NutritionLabelConfirmResponse) => {
+                await queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] });
+                toast(
+                  response.visibility === 'share_to_yfc_catalog'
+                    ? 'Продукт добавлен в каталог YFC'
+                    : 'Продукт сохранён только для вас',
+                );
+                setEntryMethod('label_scan');
+                setScanBarcode('');
+                selectFood(food, { trackCommunityReuse: false });
               }}
             />
           </div>
@@ -910,13 +992,31 @@ export function FoodPickerDialog({
                 setEditingFood(undefined);
                 setView('food-editor');
               }}
+              onScanLabel={(barcode) => {
+                setEntryMethod('label_scan');
+                setScanBarcode(barcode);
+                setView('label-scan');
+              }}
             />
           </div>
         ) : (
           <div className="nutrition-picker__browse">
             <Button
+              id="nutrition-label-scan-entry"
+              fullWidth
+              type="button"
+              onClick={() => {
+                setEntryMethod('label_scan');
+                setScanBarcode('');
+                setView('label-scan');
+              }}
+            >
+              Сканировать пищевую ценность
+            </Button>
+            <Button
               id="nutrition-barcode-entry"
               fullWidth
+              variant="secondary"
               type="button"
               onClick={() => {
                 setEntryMethod('barcode');
@@ -944,6 +1044,7 @@ export function FoodPickerDialog({
             <div className="nutrition-picker__tools" aria-label="Другие способы добавления">
               <Button
                 type="button"
+                variant="secondary"
                 onClick={() => {
                   setEntryMethod('quick_add');
                   trackProductEvent({

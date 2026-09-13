@@ -46,9 +46,10 @@ def _user_id(telegram_user_id: int) -> int:
 
 
 def _enable_scan(monkeypatch: pytest.MonkeyPatch, user_id: int) -> None:
+    del user_id
     monkeypatch.setattr(settings, "nutrition_label_scan_enabled", True)
     monkeypatch.setattr(settings, "nutrition_label_scan_kill_switch", False)
-    monkeypatch.setattr(settings, "nutrition_label_scan_internal_user_ids", str(user_id))
+    monkeypatch.setattr(settings, "nutrition_label_scan_internal_user_ids", "")
 
 
 def _label_text() -> str:
@@ -272,6 +273,23 @@ def test_scan_is_disabled_by_default_and_does_not_invoke_ocr(client, monkeypatch
     assert response.json()["detail"]["code"] == "feature_disabled"
 
 
+def test_enabled_scan_is_available_to_accounts_without_internal_allowlist(
+    client, monkeypatch
+) -> None:
+    telegram_user_id = 128_115
+    headers = _auth(client, telegram_user_id)
+    _enable_scan(monkeypatch, _user_id(telegram_user_id))
+    monkeypatch.setattr(nutrition_label_service, "_build_ocr_engine", lambda: _FakeOcr())
+
+    response = client.post(
+        "/api/v1/nutrition/label-scans",
+        headers={**headers, "Idempotency-Key": "public-rollout-128"},
+        files={"image": ("label.png", _label_image(), "image/png")},
+    )
+
+    assert response.status_code == 201, response.text
+
+
 def test_scan_creates_owner_draft_without_food_or_diary_write(client, monkeypatch) -> None:
     telegram_user_id = 128_102
     headers = _auth(client, telegram_user_id)
@@ -384,6 +402,20 @@ def test_private_confirmation_creates_private_food_but_never_diary_entry(
     assert body["food"]["food_type"] == "user"
     assert body["food"]["provenance"] == "user"
     assert body["diary_entry_created"] is False
+    other_headers = _auth(client, 128_114)
+    assert (
+        client.get(
+            f"/api/v1/nutrition/foods/{body['food']['id']}", headers=other_headers
+        ).status_code
+        == 404
+    )
+    other_search = client.get(
+        "/api/v1/nutrition/foods/search",
+        headers=other_headers,
+        params={"q": "Тестовый батончик"},
+    )
+    assert other_search.status_code == 200, other_search.text
+    assert all(item["id"] != body["food"]["id"] for item in other_search.json()["items"])
 
     with get_session_context() as db:
         assert db.query(Food).filter_by(owner_user_id=user_id).count() == 1
@@ -505,6 +537,13 @@ def test_shared_confirmation_is_community_unverified_and_visible_by_barcode(
     assert lookup.status_code == 200
     assert lookup.json()["source"] == "local"
     assert lookup.json()["local_item"]["catalog_quality"] == "community_unverified"
+    name_search = client.get(
+        "/api/v1/nutrition/foods/search",
+        headers=other_headers,
+        params={"q": "Тестовый батончик"},
+    )
+    assert name_search.status_code == 200, name_search.text
+    assert any(item["id"] == food_id for item in name_search.json()["items"])
 
     with get_session_context() as db:
         stored_food = db.get(Food, food_id)

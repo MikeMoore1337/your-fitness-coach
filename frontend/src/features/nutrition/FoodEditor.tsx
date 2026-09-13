@@ -3,8 +3,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../shared/api/client';
 import type { Food, UserFoodCreate } from '../../shared/api/types';
 import { Button, Field, Input } from '../../shared/ui/common';
+import { NutritionLabelScanner } from './NutritionLabelScanner';
+import type { NutritionLabelPrefill } from './NutritionLabelReview';
+import { isValidGtin as isValidGtinValue } from './nutritionFoodUtils';
+
+export { isValidGtin } from './nutritionFoodUtils';
 
 interface FoodEditorProps {
+  userId?: number | 'anonymous';
   barcode?: string;
   food?: Food;
   onCancel: () => void;
@@ -25,6 +31,12 @@ interface FoodDraft {
 
 type FoodErrors = Partial<Record<keyof FoodDraft, string>>;
 
+type PhotoConflict = {
+  label: string;
+  current: string;
+  recognized: string;
+};
+
 function initialDraft(food?: Food, barcode = ''): FoodDraft {
   return {
     name: food?.name ?? '',
@@ -37,17 +49,6 @@ function initialDraft(food?: Food, barcode = ''): FoodDraft {
     fiber: food?.fiber_g_per_100g ?? '',
     servingWeight: food?.standard_serving_weight_g ?? '',
   };
-}
-
-export function isValidGtin(value: string): boolean {
-  if (![8, 12, 13, 14].includes(value.length) || !/^\d+$/.test(value)) return false;
-  const digits = [...value].map(Number);
-  const payload = digits.slice(0, -1);
-  const sum = payload.reduce(
-    (total, digit, index) => total + digit * ((payload.length - index) % 2 === 1 ? 3 : 1),
-    0,
-  );
-  return (10 - (sum % 10)) % 10 === digits.at(-1);
 }
 
 function parseRequiredNumber(
@@ -68,7 +69,7 @@ function validateFood(draft: FoodDraft): { errors: FoodErrors; payload?: UserFoo
   else if (name.length > 256) errors.name = 'Не больше 256 символов';
   if (draft.brand.trim().length > 128) errors.brand = 'Не больше 128 символов';
   const barcode = draft.barcode.replace(/\s+/g, '');
-  if (barcode && !isValidGtin(barcode))
+  if (barcode && !isValidGtinValue(barcode))
     errors.barcode = 'Проверьте цифры штрихкода GTIN-8, UPC-A, EAN-13 или GTIN-14';
 
   const energy = parseRequiredNumber(draft.energy, 'калорийность', 1000);
@@ -117,10 +118,22 @@ function saveError(error: unknown): string {
   return 'Не удалось сохранить продукт. Проверьте данные и попробуйте снова.';
 }
 
-export function FoodEditor({ barcode = '', food, onCancel, onSaved }: FoodEditorProps) {
+export function FoodEditor({
+  userId = 'anonymous',
+  barcode = '',
+  food,
+  onCancel,
+  onSaved,
+}: FoodEditorProps) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(() => initialDraft(food, barcode));
   const [errors, setErrors] = useState<FoodErrors>({});
+  const [photoScanOpen, setPhotoScanOpen] = useState(false);
+  const [photoConflicts, setPhotoConflicts] = useState<PhotoConflict[]>([]);
+  const [pendingPhotoPrefill, setPendingPhotoPrefill] = useState<NutritionLabelPrefill | null>(
+    null,
+  );
+  const [photoPrefillNotice, setPhotoPrefillNotice] = useState('');
   const title = food ? 'Изменить свой продукт' : 'Новый продукт';
   const mutation = useMutation({
     mutationFn: (payload: UserFoodCreate) =>
@@ -138,6 +151,77 @@ export function FoodEditor({ barcode = '', food, onCancel, onSaved }: FoodEditor
     setErrors((current) => ({ ...current, [key]: undefined }));
     setDraft((current) => ({ ...current, [key]: value }));
   };
+  const prefillUpdates = (prefill: NutritionLabelPrefill): Partial<FoodDraft> => ({
+    name: prefill.name,
+    brand: prefill.brand,
+    barcode: prefill.barcode,
+    ...(prefill.nutrientsCanPopulate100g
+      ? {
+          energy: prefill.nutrients.energy_kcal ?? '',
+          protein: prefill.nutrients.protein_g ?? '',
+          fat: prefill.nutrients.fat_g ?? '',
+          carbs: prefill.nutrients.carbohydrate_g ?? '',
+          fiber: prefill.nutrients.fiber_g ?? '',
+        }
+      : {}),
+    ...(prefill.servingSize?.unit === 'g' ? { servingWeight: prefill.servingSize.amount } : {}),
+  });
+
+  const valuesMatch = (left: string, right: string): boolean => {
+    if (!left.trim() || !right.trim()) return left.trim() === right.trim();
+    const leftNumber = Number(left.replace(',', '.'));
+    const rightNumber = Number(right.replace(',', '.'));
+    if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+      return leftNumber === rightNumber;
+    }
+    return left.trim().replace(/\s+/g, ' ') === right.trim().replace(/\s+/g, ' ');
+  };
+
+  const applyPhotoPrefill = (prefill: NutritionLabelPrefill, replaceConflicts = false) => {
+    const updates = prefillUpdates(prefill);
+    setPhotoPrefillNotice(
+      prefill.nutrientsCanPopulate100g
+        ? ''
+        : `Пищевая ценность указана ${prefill.sourceBasis === 'per_100_ml' ? 'на 100 мл' : 'на порцию без веса в граммах'}. Её нельзя безопасно перенести в форму «на 100 г» без плотности или массы порции.`,
+    );
+    const labels: Record<keyof FoodDraft, string> = {
+      name: 'названии',
+      brand: 'бренде',
+      barcode: 'штрихкоде',
+      energy: 'калорийности',
+      protein: 'белках',
+      fat: 'жирах',
+      carbs: 'углеводах',
+      fiber: 'клетчатке',
+      servingWeight: 'весе порции',
+    };
+    const conflicts = (Object.keys(updates) as Array<keyof FoodDraft>)
+      .filter(
+        (key) =>
+          draft[key].trim() && updates[key]?.trim() && !valuesMatch(draft[key], updates[key]!),
+      )
+      .map((key) => ({ label: labels[key], current: draft[key], recognized: updates[key]! }));
+    setDraft((current) => {
+      const next = { ...current };
+      for (const key of Object.keys(updates) as Array<keyof FoodDraft>) {
+        const recognized = updates[key];
+        if (!recognized?.trim()) continue;
+        if (replaceConflicts || !current[key].trim() || valuesMatch(current[key], recognized)) {
+          next[key] = recognized;
+        }
+      }
+      return next;
+    });
+    setPhotoScanOpen(false);
+    setErrors({});
+    if (replaceConflicts || conflicts.length === 0) {
+      setPhotoConflicts([]);
+      setPendingPhotoPrefill(null);
+    } else {
+      setPhotoConflicts(conflicts);
+      setPendingPhotoPrefill(prefill);
+    }
+  };
   const macroFields = useMemo(
     () =>
       [
@@ -148,6 +232,21 @@ export function FoodEditor({ barcode = '', food, onCancel, onSaved }: FoodEditor
       ] as const,
     [],
   );
+
+  if (photoScanOpen) {
+    return (
+      <NutritionLabelScanner
+        mode="prefill"
+        userId={userId}
+        initialBarcode={draft.barcode}
+        initialBrand={draft.brand}
+        initialName={draft.name}
+        onCancel={() => setPhotoScanOpen(false)}
+        onManualFallback={() => setPhotoScanOpen(false)}
+        onPrefilled={applyPhotoPrefill}
+      />
+    );
+  }
 
   return (
     <form
@@ -163,7 +262,51 @@ export function FoodEditor({ barcode = '', food, onCancel, onSaved }: FoodEditor
       <div className="nutrition-editor__intro">
         <h3>{title}</h3>
         <p>Значения указываются на 100 г. Обязательные поля отмечены звёздочкой.</p>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setPhotoScanOpen(true)}
+          disabled={mutation.isPending}
+        >
+          Заполнить по фото
+        </Button>
       </div>
+      {pendingPhotoPrefill && photoConflicts.length > 0 && (
+        <div className="nutrition-provider-fallback nutrition-editor__photo-conflict" role="alert">
+          <strong>Фото отличается от уже введённых данных</strong>
+          <span>
+            Выберите, какие значения оставить. Пустые поля уже заполнены распознанными данными.
+          </span>
+          <ul>
+            {photoConflicts.map((conflict) => (
+              <li key={conflict.label}>
+                {conflict.label}: {conflict.current} → {conflict.recognized}
+              </li>
+            ))}
+          </ul>
+          <div className="nutrition-editor__actions">
+            <Button type="button" onClick={() => applyPhotoPrefill(pendingPhotoPrefill, true)}>
+              Заменить распознанным
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setPhotoConflicts([]);
+                setPendingPhotoPrefill(null);
+              }}
+            >
+              Оставить введённое
+            </Button>
+          </div>
+        </div>
+      )}
+      {photoPrefillNotice && (
+        <p className="nutrition-provider-fallback" role="status">
+          {photoPrefillNotice} Введите значения на 100 г вручную или вернитесь к сканированию и
+          уточните основу.
+        </p>
+      )}
       <div className="nutrition-editor__grid">
         <Field label="Название *" labelFor="own-food-name" error={errors.name}>
           <Input

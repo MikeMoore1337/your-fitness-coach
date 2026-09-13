@@ -510,6 +510,7 @@ describe('NutritionDiary', () => {
       nutrition_basis_kind: 'per_100_g',
       nutrition_basis_unit: 'g',
       standard_serving_weight_g: '50.000',
+      catalog_quality: 'verified',
     });
     expect(storedDraft.food).not.toHaveProperty('barcode');
     expect(storedDraft.food).not.toHaveProperty('last_used_at');
@@ -863,6 +864,45 @@ describe('NutritionDiary', () => {
         name: 'Рис белый приготовленный, без добавления масла',
       }),
     ).toBeVisible();
+  });
+
+  it('does not query an external provider for an exact complete local name match', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    apiMock.mockImplementation((path: string) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+      if (path.startsWith('/api/v1/nutrition/foods/recent'))
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      if (path.startsWith('/api/v1/nutrition/foods/favorites'))
+        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+      const decoded = decodeURIComponent(path);
+      if (decoded.includes('q=овсяная каша') && decoded.includes('include_external=true')) {
+        throw new Error('External lookup must not run for an exact local hit');
+      }
+      if (decoded.includes('q=овсяная каша')) {
+        return Promise.resolve({
+          items: [food],
+          external_items: [],
+          total: 1,
+          limit: 20,
+          offset: 0,
+          provider_status: 'not_requested',
+          provider_statuses: [],
+        });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+    await screen.findAllByText('Пока без записей');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск по названию или бренду' }), {
+      target: { value: 'овсяная каша' },
+    });
+    await act(() => vi.advanceTimersByTimeAsync(250));
+
+    expect(await screen.findByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+    expect(
+      apiMock.mock.calls.some(([path]) => String(path).includes('include_external=true')),
+    ).toBe(false);
   });
 
   it('validates and creates an own food before selecting its serving', async () => {

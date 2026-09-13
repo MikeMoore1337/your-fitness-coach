@@ -5,7 +5,7 @@ export const PRODUCT_EVENT_SCHEMA_VERSION = 2 as const;
 export type ProductAnalyticsEnvironment = 'production' | 'staging' | 'development' | 'test';
 export type ProductSurface = 'desktop_web' | 'mobile_web' | 'tma';
 export type FoodEntryMethod =
-  'quick_add' | 'recent' | 'favorite' | 'search' | 'recipe' | 'barcode' | 'custom';
+  'quick_add' | 'recent' | 'favorite' | 'search' | 'recipe' | 'barcode' | 'custom' | 'label_scan';
 export type ProductCoreAction =
   | 'program_activated'
   | 'workout_started'
@@ -93,7 +93,26 @@ type ContextFreeProductEventName =
   | 'pwa_workout_resume_success'
   | 'pwa_workout_resume_failure'
   | 'pwa_update_available'
-  | 'pwa_update_applied';
+  | 'pwa_update_applied'
+  | 'nutrition_label_scan_started'
+  | 'nutrition_label_scan_capture_selected'
+  | 'nutrition_label_scan_recognition_succeeded'
+  | 'nutrition_label_scan_recognition_failed'
+  | 'nutrition_label_scan_result_success'
+  | 'nutrition_label_scan_result_retake'
+  | 'nutrition_label_scan_result_unavailable'
+  | 'nutrition_label_scan_retry'
+  | 'nutrition_label_scan_correction_occurred'
+  | 'nutrition_label_scan_barcode_hit'
+  | 'nutrition_label_scan_barcode_miss'
+  | 'nutrition_label_scan_reviewed'
+  | 'nutrition_label_scan_confirmed'
+  | 'nutrition_label_scan_cancelled'
+  | 'nutrition_label_catalog_saved_shared'
+  | 'nutrition_label_catalog_saved_private'
+  | 'nutrition_label_community_product_reused'
+  | 'yfc_food_catalog_local_hit'
+  | 'yfc_food_catalog_external_fallback';
 
 type ContextFreeProductEvent = {
   [Name in ContextFreeProductEventName]: {
@@ -285,6 +304,25 @@ const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'pwa_workout_resume_failure',
   'pwa_update_available',
   'pwa_update_applied',
+  'nutrition_label_scan_started',
+  'nutrition_label_scan_capture_selected',
+  'nutrition_label_scan_recognition_succeeded',
+  'nutrition_label_scan_recognition_failed',
+  'nutrition_label_scan_result_success',
+  'nutrition_label_scan_result_retake',
+  'nutrition_label_scan_result_unavailable',
+  'nutrition_label_scan_retry',
+  'nutrition_label_scan_correction_occurred',
+  'nutrition_label_scan_barcode_hit',
+  'nutrition_label_scan_barcode_miss',
+  'nutrition_label_scan_reviewed',
+  'nutrition_label_scan_confirmed',
+  'nutrition_label_scan_cancelled',
+  'nutrition_label_catalog_saved_shared',
+  'nutrition_label_catalog_saved_private',
+  'nutrition_label_community_product_reused',
+  'yfc_food_catalog_local_hit',
+  'yfc_food_catalog_external_fallback',
 ]);
 const PRODUCT_SURFACES = new Set<ProductSurface>(['desktop_web', 'mobile_web', 'tma']);
 const PRODUCT_ANALYTICS_ENVIRONMENTS = new Set<ProductAnalyticsEnvironment>([
@@ -310,6 +348,7 @@ const FOOD_ENTRY_METHODS = new Set<FoodEntryMethod>([
   'recipe',
   'barcode',
   'custom',
+  'label_scan',
 ]);
 const PRODUCT_CORE_ACTIONS = new Set<ProductCoreAction>([
   'program_activated',

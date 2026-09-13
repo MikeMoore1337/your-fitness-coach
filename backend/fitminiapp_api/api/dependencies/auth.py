@@ -29,18 +29,16 @@ def require_ai_coach_cohort(user: User = Depends(require_user)) -> User:
     return user
 
 
-def is_nutrition_label_scan_cohort_user(user: User) -> bool:
-    """Keep the local OCR route unavailable to ordinary accounts until 128C."""
+def is_nutrition_label_scan_available(user: User) -> bool:
+    """Apply the server-side feature flag and kill switch to every signed-in account."""
 
     return bool(
-        settings.nutrition_label_scan_enabled
-        and not settings.nutrition_label_scan_kill_switch
-        and user.id in settings.nutrition_label_scan_internal_user_id_set
+        settings.nutrition_label_scan_enabled and not settings.nutrition_label_scan_kill_switch
     )
 
 
-def require_nutrition_label_scan_cohort(user: User = Depends(require_user)) -> User:
-    if not is_nutrition_label_scan_cohort_user(user):
+def require_nutrition_label_scan(user: User = Depends(require_user)) -> User:
+    if not is_nutrition_label_scan_available(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
