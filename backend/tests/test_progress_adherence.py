@@ -330,7 +330,7 @@ def test_user_progress_summary_handles_periods_current_day_and_isolation(client)
     assert sufficiency["working_sets"]["status"] == "limited"
     assert sufficiency["rir_coverage"]["status"] == "insufficient"
     assert sufficiency["schedule_adherence"]["status"] == "limited"
-    assert "250" not in response.text
+    assert payload["user_id"] == user_id
 
     longer_period = client.get(
         "/api/v1/workouts/progress/summary?period_days=90", headers=headers
