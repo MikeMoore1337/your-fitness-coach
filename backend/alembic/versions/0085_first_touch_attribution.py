@@ -11,11 +11,26 @@ down_revision: str | None = "0084_nutrition_diary_backfill"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+online_rollout_phase = "expand"
+online_rollout_notes = (
+    "Creates one account-owned attribution table without rewriting existing rows, altering "
+    "existing tables, or running a backfill; the expand operation is bounded to one CREATE TABLE."
+)
+
 
 def upgrade() -> None:
     op.create_table(
         "first_touch_attributions",
-        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "users.id",
+                name="fk_first_touch_attributions_user_id_users",
+                ondelete="CASCADE",
+            ),
+            nullable=False,
+        ),
         sa.Column("first_touch_source", sa.String(length=16), nullable=False),
         sa.Column("first_touch_medium", sa.String(length=64), nullable=False),
         sa.Column("first_touch_campaign", sa.String(length=128), nullable=True),
@@ -31,12 +46,6 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "first_touch_source IN ('google', 'yandex', 'telegram', 'direct', 'referral', 'utm')",
             name="ck_first_touch_attributions_source",
-        ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-            name="fk_first_touch_attributions_user_id_users",
-            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("user_id", name="pk_first_touch_attributions"),
     )

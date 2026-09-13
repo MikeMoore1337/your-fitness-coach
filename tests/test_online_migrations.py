@@ -85,6 +85,14 @@ def test_nutrition_label_migration_satisfies_production_online_contract() -> Non
         validate_added_migration(root / "backend" / "alembic" / "versions" / name)
 
 
+def test_first_touch_attribution_migration_satisfies_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0085_first_touch_attribution.py"
+    )
+
+
 def test_online_migration_rejects_index_on_existing_table(tmp_path: Path) -> None:
     path = _migration(
         tmp_path / "0065_existing_index.py",
