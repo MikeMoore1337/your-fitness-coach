@@ -84,3 +84,16 @@ synthetic OCR seam в measured recognition quality.
 `128C`; для cloud по-прежнему нужны совместимый terms/privacy режим и approved credential.
 Пороговые значения не изменены и применяются строго по
 [`EVAL_CONTRACT.md`](EVAL_CONTRACT.md).
+
+## Addendum Task 128E (2026-09-13)
+
+В production-equivalent Docker image выполнен локальный synthetic-only runtime probe для
+нового bounded OCR pipeline. Tesseract 5.5.0 обработал 5 вариантов preprocessing в режимах
+PSM 6/4/11: всего 15 кандидатов, выбор стабилен. На десяти запусках end-to-end latency составила
+p50 6600 ms и p95 7389 ms, preprocessing — p95 118 ms, peak RSS — 81404 KiB, дочерний CPU
+Tesseract — p50 18.31 s и p95 20.71 s; configured hard timeout — 8 s.
+
+Это подтверждает только bounded resource behavior и parser safety на synthetic fixture. Это не
+измерение real-label accuracy, device/TMA latency или correction baseline. Production
+HUMAN_EVIDENCE по той же оригинальной фотографии остаётся обязательным; до него public rollout
+не считается подтверждённым.
