@@ -22,7 +22,7 @@ import { Badge, Button, Card, LoadingState } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import './ai-coach.css';
 
-export const AI_COACH_UI_EVAL_VERSION = 'ai-coach-ui-beta-v1';
+export const AI_COACH_UI_VERSION = 'ai-coach-ui-v1';
 
 type AiCoachJob =
   | 'app_help'
@@ -152,7 +152,7 @@ const OUTCOME_COPY: Record<AiCoachOutcome, { title: string; text: string }> = {
     text: 'Ответ сформирован только по разрешённому контексту и сопровождается его источниками.',
   },
   unavailable: {
-    title: 'AI Coach сейчас недоступен',
+    title: 'AI Coach временно недоступен',
     text: 'Основные функции приложения продолжают работать. Попробуйте позже.',
   },
   rate_limited: {
@@ -160,7 +160,7 @@ const OUTCOME_COPY: Record<AiCoachOutcome, { title: string; text: string }> = {
     text: 'Новые запросы временно ограничены. Попробуйте позже.',
   },
   safety_refusal: {
-    title: 'На этот запрос нельзя ответить в рамках beta',
+    title: 'На этот запрос нельзя ответить безопасно',
     text: 'AI Coach не ставит диагнозы, не назначает лечение и не помогает с опасными схемами.',
   },
   insufficient_data: {
@@ -440,8 +440,8 @@ function ConsentNotice({
       >
         <Badge tone="warning">Персональный режим</Badge>
         <p>
-          Персональные сводки пока недоступны в этом внутреннем окружении. Публичная помощь AI Coach
-          остаётся отдельным режимом и не получает доступ к вашему профилю.
+          Персональные сводки временно недоступны. Публичная помощь AI Coach не получает доступ к
+          вашему профилю.
         </p>
       </section>
     );
@@ -457,7 +457,7 @@ function ConsentNotice({
           </p>
           {consent.retention_notice && <small>{consent.retention_notice}</small>}
           <small>
-            Запрос запускается вручную, работает в бесплатной beta-квоте и не сохраняет текст.
+            Запрос запускается вручную, действует в рамках доступного лимита и не сохраняет текст.
           </small>
         </div>
         <Button
@@ -833,11 +833,9 @@ export function AiCoachEntry({
   return (
     <section className="ai-coach-entry" data-testid={`ai-coach-entry-${entryPoint}`}>
       <div>
-        <span className="eyebrow">Внутренняя beta</span>
+        <span className="eyebrow">AI Coach</span>
         <strong>Нужна короткая подсказка?</strong>
-        <p>
-          AI Coach объясняет опубликованные материалы и отдельно умеет читать ограниченные сводки.
-        </p>
+        <p>Объясняет проверенные материалы и помогает разобраться в разрешённых сводках.</p>
       </div>
       <AppLink
         className="button-link secondary-link"
@@ -874,7 +872,7 @@ export function AiCoachSettingsCard({
       id="profile-ai-coach"
       title={
         <>
-          <Icon name="ai-coach" size={20} /> AI Coach · внутренняя beta
+          <Icon name="ai-coach" size={20} /> AI Coach
         </>
       }
       description="Публичная помощь, отдельные сводки и необязательная user-controlled memory."
@@ -1054,10 +1052,10 @@ export function AiCoachExperience({
           citations: [],
           insights: [],
           limitations: [
-            'Публичная помощь AI Coach сейчас выключена для этого внутреннего окружения.',
+            'Публичная помощь AI Coach временно недоступна. Остальные функции приложения продолжают работать.',
           ],
           safety_category: 'clear',
-          prompt_version: AI_COACH_UI_EVAL_VERSION,
+          prompt_version: AI_COACH_UI_VERSION,
           request_id: null,
         });
         return;
@@ -1078,10 +1076,10 @@ export function AiCoachExperience({
         citations: [],
         insights: [],
         limitations: [
-          'Персональная сводка сейчас недоступна; публичная помощь остаётся отдельным режимом.',
+          'Персональная сводка временно недоступна. Публичная помощь работает отдельно.',
         ],
         safety_category: 'clear',
-        prompt_version: AI_COACH_UI_EVAL_VERSION,
+        prompt_version: AI_COACH_UI_VERSION,
         request_id: null,
       });
       return;
@@ -1094,7 +1092,7 @@ export function AiCoachExperience({
         insights: [],
         limitations: [],
         safety_category: 'clear',
-        prompt_version: AI_COACH_UI_EVAL_VERSION,
+        prompt_version: AI_COACH_UI_VERSION,
         request_id: null,
       });
       return;
@@ -1125,7 +1123,7 @@ export function AiCoachExperience({
   if (!status?.ui_enabled) {
     return (
       <section className="ai-coach-unavailable" data-testid="ai-coach-ui-disabled">
-        <p>AI Coach не включён для этой внутренней группы.</p>
+        <p>AI Coach пока не может загрузиться. Основные функции приложения доступны.</p>
       </section>
     );
   }
@@ -1134,13 +1132,13 @@ export function AiCoachExperience({
     <section className="ai-coach-experience" data-testid="ai-coach-experience">
       <header className="ai-coach-experience__intro">
         <div>
-          <span className="eyebrow">Внутренняя проверка</span>
-          <h3>Проверяем полезность маленькими шагами</h3>
+          <span className="eyebrow">Персональный помощник</span>
+          <h3>Разобраться в тренировках, питании и прогрессе</h3>
           <p>
             Память выключена по умолчанию и управляется отдельно. Публичный режим работает по
             опубликованному материалу, а личный — по одной готовой сводке за выбранный период и,
-            только при отдельном включении, по вашим разрешённым предпочтениям. Личный запрос
-            запускается вручную в бесплатной beta-квоте.
+            только после отдельного согласия, по вашим разрешённым предпочтениям. Личный запрос
+            запускается вручную в рамках доступного лимита.
           </p>
         </div>
         <Badge tone="warning">Не замена врачу или тренеру</Badge>
@@ -1308,10 +1306,7 @@ export function AiCoachExperience({
           data-testid="ai-coach-generic-unavailable"
         >
           <Badge tone="warning">Публичная помощь недоступна</Badge>
-          <p>
-            AI Coach выключен или временно не готов в этом внутреннем окружении. Остальные функции
-            YFC работают.
-          </p>
+          <p>AI Coach временно не готов. Остальные функции YFC работают.</p>
         </section>
       )}
 
@@ -1340,8 +1335,9 @@ export function AiCoachExperience({
 
       <footer className="ai-coach-experience__footer">
         <span>
-          Это внутренний beta-экран. Автоматическая проверка не является отзывом реального
-          пользователя.
+          AI Coach отвечает по разрешённому контексту и может ошибаться. Он не заменяет врача или
+          тренера. Публичный запрос не использует профиль; личные сводки передаются только после
+          отдельного согласия.
         </span>
         <AppLink to="/app?section=today">Продолжить без AI</AppLink>
         {entryPoint !== 'profile' && (

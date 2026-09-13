@@ -49,7 +49,9 @@ function renderSettingsCard(settingsStatus: AiCoachStatus) {
   return render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <AiCoachSettingsCard status={settingsStatus} />
+        <NavigationProvider>
+          <AiCoachSettingsCard status={settingsStatus} />
+        </NavigationProvider>
       </FeedbackProvider>
     </QueryClientProvider>,
   );
@@ -115,20 +117,56 @@ describe('AiCoachExperience', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Моя сводка' }));
     expect(screen.getByTestId('ai-coach-personal-unavailable')).toHaveTextContent(
-      'Публичная помощь AI Coach остаётся отдельным режимом',
+      'Публичная помощь AI Coach не получает доступ к вашему профилю',
     );
     expect(screen.getByRole('button', { name: 'Публичная помощь' })).toBeInTheDocument();
   });
 
-  it('does not expose the profile card outside the server-authorized cohort', () => {
+  it('renders the production card without internal beta labeling', () => {
     renderSettingsCard({
-      ui_enabled: false,
-      generic_available: false,
+      ui_enabled: true,
+      generic_available: true,
       personal_available: false,
     });
 
-    expect(screen.queryByTestId('ai-coach-experience')).not.toBeInTheDocument();
-    expect(screen.queryByText('AI Coach · внутренняя beta')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ai-coach-experience')).toBeInTheDocument();
+    expect(screen.getByText('AI Coach', { exact: true })).toBeInTheDocument();
+    expect(screen.queryByText(/внутренняя beta/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/внутренняя проверка/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a retryable provider failure without breaking the AI Coach surface', async () => {
+    let attempts = 0;
+    apiMock.mockImplementation(async (path) => {
+      if (path !== '/api/v1/ai-coach/generate') throw new Error(`unexpected path ${path}`);
+      attempts += 1;
+      if (attempts === 1) throw new TypeError('provider network failure');
+      return {
+        outcome: 'answer',
+        answer: 'Ответ после повторной попытки.',
+        citations: [],
+        limitations: [],
+        safety_category: 'clear',
+        prompt_version: 'ai-coach-production-v1',
+        request_id: 'retry-request',
+      };
+    });
+    renderExperience();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Разобраться с тренировкой' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Получить ответ' }));
+    await waitFor(() => expect(screen.getByTestId('ai-coach-request-error')).toBeInTheDocument());
+    expect(
+      screen.getByText(
+        'Не удалось связаться с AI Coach. Проверьте соединение и повторите попытку.',
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить' }));
+    await waitFor(() =>
+      expect(screen.getByText('Ответ после повторной попытки.')).toBeInTheDocument(),
+    );
+    expect(attempts).toBe(2);
   });
 
   it('renders a checked answer and citations without executing provider HTML or unknown links', async () => {
@@ -161,9 +199,9 @@ describe('AiCoachExperience', () => {
               source_type: 'canonical_yfc',
             },
           ],
-          limitations: ['Это автоматическая проверка beta-ответа.'],
+          limitations: ['Ответ может иметь ограничения по доступным данным.'],
           safety_category: 'clear',
-          prompt_version: 'ai-coach-beta-v2',
+          prompt_version: 'ai-coach-production-v1',
           request_id: 'request-test',
         };
       }

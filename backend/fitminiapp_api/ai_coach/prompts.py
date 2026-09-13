@@ -1,4 +1,4 @@
-"""Versioned prompt and structured-output contract for AI Coach beta."""
+"""Versioned prompt and structured-output contract for AI Coach production runtime."""
 
 from __future__ import annotations
 

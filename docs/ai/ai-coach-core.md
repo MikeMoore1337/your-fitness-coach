@@ -1,5 +1,9 @@
 # AI Coach: generic foundation and personal read-only boundary
 
+> Исторический foundation Tasks 88–89. Текущий production launch, authenticated access и
+> deployment contract описаны в [ai-coach-production-launch.md](ai-coach-production-launch.md);
+> local defaults остаются disabled, но production больше не является internal beta.
+
 Task 88 добавляет безопасный generic backend-контур для первой beta-версии AI Coach.
 Task 89 добавляет отдельный персональный read-only boundary с явным согласием и тремя
 allowlisted tools. Ни один контур не заменяет детерминированные расчёты и не включает

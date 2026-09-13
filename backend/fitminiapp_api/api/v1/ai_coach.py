@@ -33,8 +33,7 @@ from fitminiapp_api.ai_coach.safety import (
 )
 from fitminiapp_api.ai_coach.service import ai_coach_service
 from fitminiapp_api.api.dependencies.auth import (
-    is_ai_coach_cohort_user,
-    require_ai_coach_cohort,
+    require_ai_coach_user,
     require_user,
 )
 from fitminiapp_api.core.config import settings
@@ -102,8 +101,8 @@ def get_ai_coach_status(
     current_user: User = Depends(require_user),
 ) -> AiCoachStatusResponse:
     del request
-    ui_enabled = is_ai_coach_cohort_user(current_user)
-    generic_available = ui_enabled and _generic_runtime_available()
+    ui_enabled = True
+    generic_available = _generic_runtime_available()
     personal_available = bool(
         generic_available
         and settings.ai_coach_personal_enabled
@@ -242,7 +241,7 @@ def _period_report_insufficient_response(
 def generate_ai_coach_answer(
     request: Request,
     payload: AiCoachGenerateRequest,
-    current_user: User = Depends(require_ai_coach_cohort),
+    current_user: User = Depends(require_ai_coach_user),
     db: Session = Depends(get_db),
 ) -> AiCoachResponse:
     # This route is physically generic-only: no profile, diary, workout,
@@ -377,7 +376,7 @@ def update_ai_coach_memory_consent(
 def create_ai_coach_memory_item(
     payload: AiCoachMemoryCreateRequest,
     request: Request,
-    current_user: User = Depends(require_ai_coach_cohort),
+    current_user: User = Depends(require_ai_coach_user),
     db: Session = Depends(get_db),
 ) -> AiCoachMemoryItemResponse:
     del request
@@ -488,7 +487,7 @@ def delete_ai_coach_memory_item(
 def generate_personal_ai_coach_answer(
     payload: AiCoachPersonalGenerateRequest,
     request: Request,
-    current_user: User = Depends(require_ai_coach_cohort),
+    current_user: User = Depends(require_ai_coach_user),
     db: Session = Depends(get_db),
 ) -> AiCoachResponse:
     request_id = getattr(request.state, "request_id", None)

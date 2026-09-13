@@ -192,11 +192,11 @@ class Settings(BaseSettings):
     hermes_intake_clock_skew_seconds: int = Field(default=300, ge=30, le=900)
     hermes_intake_replay_ttl_seconds: int = Field(default=900, ge=60, le=86400)
     hermes_intake_rate_limit_per_minute: int = Field(default=30, ge=1, le=600)
-    # AI Coach is a separate generic-only boundary.
+    # AI Coach is a separate authenticated product capability. Local defaults remain safe-off.
     ai_coach_enabled: bool = False
     ai_coach_kill_switch: bool = False
-    # The UI is separately gated for a small internal cohort. A runtime provider
-    # flag must never implicitly expose a user-facing beta entry point.
+    # Deprecated compatibility settings for older bundles. Current AI Coach access is
+    # authenticated-user scoped; these values no longer gate the UI or API routes.
     ai_coach_ui_enabled: bool = False
     ai_coach_internal_user_ids: str = ""
     ai_coach_provider: Literal["disabled", "groq"] = "disabled"

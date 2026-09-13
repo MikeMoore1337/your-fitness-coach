@@ -1,4 +1,4 @@
-"""Application orchestration for the generic-only AI Coach beta core."""
+"""Application orchestration for the bounded production AI Coach."""
 
 from __future__ import annotations
 
