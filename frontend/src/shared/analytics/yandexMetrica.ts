@@ -13,6 +13,12 @@ const YANDEX_METRICA_SCRIPT_SRC =
   `https://mc.yandex.ru/metrika/tag.js?id=${YANDEX_METRICA_COUNTER_ID}` as const;
 const YANDEX_METRICA_DISABLED_CLASS = 'ym-hide-content';
 const MAX_SAFE_TITLE_LENGTH = 160;
+const YANDEX_METRICA_PRODUCTION_HOSTNAMES = new Set([
+  'your-fitness-coach.ru',
+  'www.your-fitness-coach.ru',
+  'app.your-fitness-coach.ru',
+  'www.app.your-fitness-coach.ru',
+]);
 
 type YandexMetricaMethod = 'init' | 'hit' | 'reachGoal' | 'params';
 type YandexMetricaCommand = [number, YandexMetricaMethod, ...unknown[]];
@@ -32,6 +38,16 @@ let lastTrackedUrl: string | null = null;
 
 function yandexEnvironment(): ProductAnalyticsEnvironment {
   return productAnalyticsEnvironment(import.meta.env.MODE);
+}
+
+export function isYandexMetricaProductionHost(hostname: string): boolean {
+  return YANDEX_METRICA_PRODUCTION_HOSTNAMES.has(hostname.trim().toLowerCase().replace(/\.$/, ''));
+}
+
+function isYandexMetricaRuntimeEnabled(): boolean {
+  return (
+    yandexEnvironment() === 'production' && isYandexMetricaProductionHost(window.location.hostname)
+  );
 }
 
 function safePath(path: string): string {
@@ -125,7 +141,7 @@ export function createYandexMetricaProvider(
 }
 
 export function initializeYandexMetrica(): void {
-  if (initialized || yandexEnvironment() !== 'production') return;
+  if (initialized || !isYandexMetricaRuntimeEnabled()) return;
   initialized = true;
   ensureYandexFunction();
   invokeYandex('init', {
@@ -145,7 +161,7 @@ export function initializeYandexMetrica(): void {
 }
 
 export function trackYandexPageView(path: string, title?: string): void {
-  if (yandexEnvironment() !== 'production') return;
+  if (!isYandexMetricaRuntimeEnabled()) return;
   initializeYandexMetrica();
   const url = safeYandexUrl(path);
   if (url === lastTrackedUrl) return;

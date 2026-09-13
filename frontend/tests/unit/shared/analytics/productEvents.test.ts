@@ -53,13 +53,9 @@ describe('product event contract', () => {
       ...IMPLEMENTED_GROWTH_EVENT_NAMES,
       ...FUTURE_GROWTH_EVENT_NAMES,
     ]);
-    expect(
-      isProductEvent({ name: 'registration_completed', surface: 'desktop_web' }),
-    ).toBe(true);
+    expect(isProductEvent({ name: 'registration_completed', surface: 'desktop_web' })).toBe(true);
     expect(trackGrowthEvent('registration_completed')).toBe(true);
-    expect(
-      isProductEvent({ name: 'calculator_result', surface: 'desktop_web' }),
-    ).toBe(true);
+    expect(isProductEvent({ name: 'calculator_result', surface: 'desktop_web' })).toBe(true);
   });
 
   it('emits a versioned provider-neutral envelope with a privacy-safe surface', () => {

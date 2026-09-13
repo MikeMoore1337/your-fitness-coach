@@ -57,8 +57,7 @@ export const FUTURE_GROWTH_EVENT_NAMES = [
 
 export type ImplementedGrowthEventName = (typeof IMPLEMENTED_GROWTH_EVENT_NAMES)[number];
 export type GrowthEventName =
-  | ImplementedGrowthEventName
-  | (typeof FUTURE_GROWTH_EVENT_NAMES)[number];
+  ImplementedGrowthEventName | (typeof FUTURE_GROWTH_EVENT_NAMES)[number];
 
 export const GROWTH_GOAL_IDS: Readonly<Record<GrowthEventName, GrowthEventName>> = {
   registration_started: 'registration_started',

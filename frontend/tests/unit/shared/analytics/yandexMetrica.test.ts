@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   createYandexMetricaProvider,
+  isYandexMetricaProductionHost,
   safeYandexReferrer,
   safeYandexUrl,
 } from '../../../../src/shared/analytics/yandexMetrica';
 
 describe('Yandex Metrica privacy boundary', () => {
+  it('allows delivery only on the canonical production hostnames', () => {
+    expect(isYandexMetricaProductionHost('your-fitness-coach.ru')).toBe(true);
+    expect(isYandexMetricaProductionHost('APP.YOUR-FITNESS-COACH.RU.')).toBe(true);
+    expect(isYandexMetricaProductionHost('localhost')).toBe(false);
+    expect(isYandexMetricaProductionHost('preview.your-fitness-coach.ru')).toBe(false);
+  });
+
   it('removes query and hash values from route and referrer URLs', () => {
     expect(safeYandexUrl('/app?token=private#profile')).toBe('http://localhost:3000/app');
     expect(safeYandexReferrer('https://example.com/article?email=private#comment')).toBe(
