@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
+from threading import Event, Lock
 
 import pytest
 from PIL import Image
 
 from fitminiapp_api.core.config import settings
-from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.db.session import SessionLocal, engine, get_session_context
 from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.nutrition_label import (
@@ -18,6 +20,7 @@ from fitminiapp_api.models.nutrition_label import (
 from fitminiapp_api.models.user import User
 from fitminiapp_api.nutrition_label.image import ImageIngressError, normalize_uploaded_image
 from fitminiapp_api.nutrition_label.parser import build_draft_from_ocr
+from fitminiapp_api.schemas.nutrition_label import NutritionLabelConfirmRequest
 from fitminiapp_api.services import nutrition_label as nutrition_label_service
 from fitminiapp_api.services.accounts import delete_user_cascade
 from fitminiapp_api.services.foods import FoodError, calculate_food_amount, search_foods
@@ -396,6 +399,72 @@ def test_private_confirmation_creates_private_food_but_never_diary_entry(
     )
     assert confirmed_draft.status_code == 200
     assert confirmed_draft.json()["status"] == "confirmed"
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL concurrency")
+def test_concurrent_private_confirmations_create_one_food(client, monkeypatch) -> None:
+    telegram_user_id = 128_113
+    headers = _auth(client, telegram_user_id)
+    user_id = _user_id(telegram_user_id)
+    _enable_scan(monkeypatch, user_id)
+    monkeypatch.setattr(nutrition_label_service, "_build_ocr_engine", lambda: _FakeOcr())
+
+    draft = client.post(
+        "/api/v1/nutrition/label-scans",
+        headers={**headers, "Idempotency-Key": "concurrent-private-scan-128"},
+        files={"image": ("label.png", _label_image(), "image/png")},
+    ).json()
+    draft_id = draft["draft_id"]
+
+    original_canonical_from_confirmation = nutrition_label_service._canonical_from_confirmation
+    first_confirmation_has_lock = Event()
+    release_first_confirmation = Event()
+    call_count = 0
+    call_count_lock = Lock()
+
+    def pause_after_first_lock(*args, **kwargs):
+        nonlocal call_count
+        with call_count_lock:
+            call_count += 1
+            is_first = call_count == 1
+        if is_first:
+            first_confirmation_has_lock.set()
+            assert release_first_confirmation.wait(timeout=5)
+        return original_canonical_from_confirmation(*args, **kwargs)
+
+    monkeypatch.setattr(
+        nutrition_label_service,
+        "_canonical_from_confirmation",
+        pause_after_first_lock,
+    )
+
+    def confirm_in_session() -> str:
+        db = SessionLocal()
+        try:
+            user = db.get(User, user_id)
+            assert user is not None
+            request = NutritionLabelConfirmRequest.model_validate(_confirm_payload())
+            try:
+                nutrition_label_service.confirm_label_draft(db, user, draft_id, request)
+            except nutrition_label_service.NutritionLabelConflictError as exc:
+                db.rollback()
+                return str(exc)
+            return "confirmed"
+        finally:
+            db.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(confirm_in_session)
+        assert first_confirmation_has_lock.wait(timeout=5)
+        second = executor.submit(confirm_in_session)
+        release_first_confirmation.set()
+        assert first.result(timeout=5) == "confirmed"
+        assert second.result(timeout=5) == "draft_not_active"
+
+    with get_session_context() as db:
+        assert db.query(Food).filter_by(owner_user_id=user_id).count() == 1
+        stored = db.get(NutritionLabelDraft, draft_id)
+        assert stored is not None and stored.status == "confirmed"
 
 
 def test_shared_confirmation_is_community_unverified_and_visible_by_barcode(

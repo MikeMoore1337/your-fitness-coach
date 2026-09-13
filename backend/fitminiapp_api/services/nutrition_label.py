@@ -108,12 +108,20 @@ def _mark_expired(row: NutritionLabelDraft) -> None:
     row.status = "expired"
 
 
-def _get_owned_draft(db: Session, user: User, draft_id: str) -> NutritionLabelDraft:
-    row = (
-        db.query(NutritionLabelDraft)
-        .filter(NutritionLabelDraft.id == draft_id, NutritionLabelDraft.user_id == user.id)
-        .first()
+def _get_owned_draft(
+    db: Session,
+    user: User,
+    draft_id: str,
+    *,
+    lock_for_update: bool = False,
+) -> NutritionLabelDraft:
+    query = db.query(NutritionLabelDraft).filter(
+        NutritionLabelDraft.id == draft_id,
+        NutritionLabelDraft.user_id == user.id,
     )
+    if lock_for_update:
+        query = query.with_for_update()
+    row = query.first()
     if row is None:
         raise NutritionLabelNotFoundError()
     if row.status == "draft" and row.expires_at <= _now():
@@ -509,7 +517,7 @@ def confirm_label_draft(
     draft_id: str,
     request: NutritionLabelConfirmRequest,
 ) -> NutritionLabelConfirmResponse:
-    row = _get_owned_draft(db, user, draft_id)
+    row = _get_owned_draft(db, user, draft_id, lock_for_update=True)
     if row.status != "draft":
         raise NutritionLabelConflictError("draft_not_active")
     if row.revision != request.revision:
