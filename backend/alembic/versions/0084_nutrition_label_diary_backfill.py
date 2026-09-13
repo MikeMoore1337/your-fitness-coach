@@ -4,8 +4,8 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0084_nutrition_label_diary_backfill"
-down_revision: str | None = "0083_nutrition_label_food_backfill"
+revision: str = "0084_nutrition_diary_backfill"
+down_revision: str | None = "0083_nutrition_food_backfill"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
