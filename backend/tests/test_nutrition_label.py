@@ -507,6 +507,10 @@ def test_shared_confirmation_is_community_unverified_and_visible_by_barcode(
     assert lookup.json()["local_item"]["catalog_quality"] == "community_unverified"
 
     with get_session_context() as db:
+        stored_food = db.get(Food, food_id)
+        assert stored_food is not None
+        assert stored_food.provenance == "user_confirmed_package"
+        assert stored_food.legacy_provenance == "internal"
         contribution = db.query(NutritionCatalogContribution).one()
         assert contribution.state == "accepted"
         assert contribution.visibility == "share_to_yfc_catalog"
@@ -649,6 +653,11 @@ def test_diary_uses_per_100_ml_snapshot_without_fabricating_grams(client) -> Non
     assert body["nutrition_basis_unit"] == "ml"
     assert body["nutrition"]["energy_kcal"] == "100.00"
     assert body["nutrition"]["protein_g"] == "5.000"
+    with get_session_context() as db:
+        entry = db.query(FoodDiaryEntry).filter(FoodDiaryEntry.id == body["id"]).one()
+        assert entry.legacy_weight_g == Decimal("1.000")
+        assert entry.legacy_energy_kcal_per_100g == Decimal("0.00")
+        assert entry.legacy_protein_g_per_100g == Decimal("0.000")
 
 
 def test_account_deletion_removes_draft_and_anonymizes_shared_contribution(

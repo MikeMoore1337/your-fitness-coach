@@ -73,6 +73,18 @@ def test_contextual_reminder_migrations_satisfy_production_online_contract() -> 
     )
 
 
+def test_nutrition_label_migration_satisfies_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    for name in (
+        "0081_nutrition_label_canonical_catalog.py",
+        "0082_basis_aware_food_diary.py",
+        "0083_nutrition_label_food_backfill.py",
+        "0084_nutrition_label_diary_backfill.py",
+    ):
+        validate_added_migration(root / "backend" / "alembic" / "versions" / name)
+
+
 def test_online_migration_rejects_index_on_existing_table(tmp_path: Path) -> None:
     path = _migration(
         tmp_path / "0065_existing_index.py",
