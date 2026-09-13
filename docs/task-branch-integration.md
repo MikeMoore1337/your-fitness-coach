@@ -3,28 +3,26 @@
 ## Постоянная политика quality gates
 
 Deterministic CI/tests/static-analysis checks и специальные human/external gates остаются
-обязательными. Automatic Codex Code Review не включается; bounded review запрашивается только
-после GREEN exact-head `checks` как финальный semantic gate. Разрешены round 1 и максимум один
-re-review после одного batch fix blocking P0/P1 на изменившемся head SHA. MEDIUM/LOW/NIT не
-запускают re-review, clean verdict не повторяется, третий request запрещён.
-Implementer делает один bounded self-review до commit; отдельный reviewer-agent/subagent не создаётся.
-Controller-команды `request-codex-review` и `validate-codex-review` проверяют PR/status/comments/
-reviews/threads, переиспользуют pending/completed review текущего SHA и возвращают `HUMAN_REQUIRED`
-после второго blocking P0/P1.
+обязательными. Codex Code Review полностью отключён в active delivery lifecycle: controller не
+хранит и не читает его state, не публикует `@codex review` или `@codex security review`, не
+вызывает review-команды и не ждёт LLM-вердикта. Исторические review-комментарии не являются gate.
+Единственное исключение — прямое указание владельца в отдельном сообщении для конкретного PR; оно
+не является частью normal lifecycle и не генерируется controller.
+Implementer делает один bounded local self-review до commit; отдельный reviewer-agent/subagent не
+создаётся.
 
-Normal path: implementation → targeted verification → final deterministic verification → bounded
-self-review → commit/push → PR → exact-head CI GREEN → Codex review → merge → post-merge cleanup
+Normal path: implementation → targeted verification → final deterministic verification → local
+self-review → commit/push → PR → exact-head CI GREEN → merge → post-merge cleanup
 → product-task deploy/production closeout.
 Для PR-triggered CI PR открывается перед ожиданием его required checks.
 Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved до bounded review. Review не запускается до GREEN CI,
-повторно на том же SHA или после clean verdict.
+нужно фактически исправить и resolved до merge. LLM review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-Codex review их не заменяет. Automatic Security Review не запускается для обычного PR и не
+отсутствие Codex Code Review их не заменяет. Automatic Security Review не запускается для обычного PR и не
 сцепляется с Code Review; это отдельный manual/conditional gate только при фактическом security
 trigger. Deterministic security scanners остаются в CI.
 Следующую product task автоматически не запускать.
@@ -52,7 +50,7 @@ Task A/B/C: implementation -> relevant fast checks -> self-review -> приме�
 worktree используется для координации и closeout, но не для feature implementation. Legacy `dev`
 refs могут оставаться в repository для recovery/inventory, но не являются частью normal delivery.
 
-Несколько task могут одновременно иметь отдельные writer leases и worktrees. Legacy
+Несколько `independent-write` task могут одновременно иметь отдельные writer leases и worktrees. Legacy
 `exclusive-write` metadata не создаёт repository-wide implementation barrier: отдельные worktree
 позволяют независимым task идти параллельно, а реальный конфликт файлов обнаруживается при serial
 delivery refresh/rebase. Очередь, delivery, GitHub CI и active production deploy не блокируют
@@ -116,8 +114,8 @@ snapshot.
 
 PR CI не выполняет отдельный LLM review job и не запускается на `pull_request_review` event.
 Merge-ready определяется exact-head `checks`, deterministic quality/policy checks, актуальной
-provenance, mergeability, resolved threads и `CLEAN` bounded Codex result. Review request не
-создаётся до GREEN CI; rate-limit/skip не ретраятся автоматически и дают `HUMAN_REQUIRED`.
+provenance, mergeability и resolved threads. Codex review request не создаётся controller; любые
+исторические review comments не меняют merge decision.
 
 ## Leases и безопасный closeout
 
@@ -129,11 +127,11 @@ Controller хранит machine-local coordination state в shared Git common di
 ├── state.lock
 ├── delivery.json
 ├── leases/task-<ID>.json
-├── reviews/pr-<N>.json
 └── history/task-<ID>.json
 ```
 
-State не коммитится. Create использует `O_EXCL`, update — temporary file + atomic replace под
+State не коммитится. Legacy `reviews/` files, если они существуют, не читаются и не являются
+частью active contract. Create использует `O_EXCL`, update — temporary file + atomic replace под
 `state.lock`. Corrupted JSON, malformed/active lock, duplicate branch/worktree, dirty/interrupted
 state и неизвестная lease являются blocker; stale state lock reclaim-ится только по валидному owner
 metadata, достаточному возрасту и однозначно мёртвому PID. Controller не удаляет active чужой
@@ -253,13 +251,13 @@ bootstrap, infrastructure recovery или deployment SHA вне current merged `
 отдельного owner authorization, backup и operator preflight.
 
 `--quality-verdict PASS` подтверждает выполненные targeted tests и применимый static analysis,
-а не bounded Codex semantic verdict. `--qa-verdict PASS` подтверждает фактические проверки поведения;
+а не LLM semantic verdict. `--qa-verdict PASS` подтверждает фактические проверки поведения;
 `--qa-verdict NOT_REQUIRED` используется, когда task не объявляет QA-проверку;
 отдельная QA-роль запускается только по task. Readiness не заменяет final exact-head CI gate.
 Legacy имя recovery-команды `reopen-for-review` означает возврат к исправлению и повторной
 проверке изменённых сценариев; отдельного reviewer оно не запускает.
 
-Automatic Codex GitHub review не включается изменениями репозитория и настраивается только вне
-репозитория в Codex Cloud settings. Если владелец не меняет внешнюю настройку, это фиксируется как
-`MANUAL_EXTERNAL_SETTING`, но не блокирует repository changes. GitHub ruleset допускает ноль
-approving reviews; его deterministic protections сохраняются.
+Внешние Codex/GitHub settings не меняются изменениями репозитория. Если владелец отдельно требует
+конкретный review для PR, это manual исключение вне normal lifecycle; недоступная внешняя настройка
+фиксируется как `MANUAL_EXTERNAL_SETTING_REQUIRED`. GitHub ruleset допускает ноль approving
+reviews; его deterministic protections сохраняются.

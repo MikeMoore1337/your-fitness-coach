@@ -14,8 +14,8 @@
 - [ ] For client-facing scope, followed applicable mobile/TMA contract/matrix.
 - [ ] Выполнены targeted checks; записаны точные команды и результаты.
 - [ ] Self-review выполнен primary writer в текущей сессии; отдельный reviewer-agent/subagent не создавался.
-- [ ] Перед merge exact-head CI и aggregate `checks` GREEN; bounded Codex review CLEAN, PR mergeable,
-      существующие threads resolved; максимум round 1 + один re-review после blocking P0/P1.
+- [ ] Перед merge exact-head CI и aggregate `checks` GREEN; Codex Code Review не запускается,
+      PR mergeable, существующие threads resolved.
 - [ ] Only `BLOCKER/HIGH` blocked completion.
 - [ ] `MEDIUM/LOW/NIT/OUT_OF_SCOPE` did not create new schema/API/platform/product scope.
 - [ ] Added or updated every `MEDIUM/LOW` in `codex-backlog/bugs/FINDINGS.md`, including findings

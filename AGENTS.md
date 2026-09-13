@@ -96,28 +96,26 @@ in normal layout flow and verify relevant desktop/mobile geometry.
 ## Постоянная политика quality gates
 
 Качество подтверждают deterministic CI/tests/static-analysis checks и явно требуемые для конкретной
-task human/external gates. Codex Code Review не включается автоматически и используется только как
-bounded final semantic gate после GREEN exact-head CI: максимум round 1 плюс один re-review для
-подтверждённых blocking P0/P1 после изменившегося head SHA. MEDIUM/LOW/NIT не запускают re-review.
+task human/external gates. Codex Code Review полностью отключён в active delivery lifecycle:
+controller не хранит и не читает его state, не публикует `@codex review` или `@codex security review`,
+не вызывает review-команды и не ждёт LLM-вердикта. Исторические review-комментарии не являются
+gate. Единственное исключение — прямое указание владельца в отдельном сообщении для конкретного PR;
+это не часть normal lifecycle и не генерируется controller.
 Не создавать отдельную review-задачу, reviewer role/subagent или adversarial LLM audit; implementer
-выполняет один ограниченный self-review до commit и после fix повторяет только affected checks.
-Controller-команды `request-codex-review` и `validate-codex-review` идемпотентны для одного SHA,
-запрещают третий review и возвращают `HUMAN_REQUIRED` после повторного P0/P1 на round 2.
+выполняет один ограниченный local self-review до commit и после fix повторяет только affected checks.
 
-Normal path: implementation → targeted verification → final deterministic verification → bounded
-self-review → commit/push → PR → exact-head required CI GREEN → Codex review round 1 → merge;
-при blocking P0/P1: one batch fix → affected checks → push → exact-head CI → round 2 → merge или
-`HUMAN_REQUIRED` → post-merge cleanup → deploy/production closeout только по contract product task.
+Normal path: implementation → targeted verification → final deterministic verification → local
+self-review → commit/push → PR → exact-head required CI GREEN → merge → post-merge cleanup →
+deploy/production closeout только по contract product task.
 Для PR-triggered CI PR открывается перед ожиданием его required checks.
 Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved до bounded review. Review не запускается до implementation,
-до GREEN CI, повторно на том же SHA или после clean verdict.
+нужно фактически исправить и resolved до merge. LLM review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-Codex review их не заменяет. Automatic Security Review не является частью normal path обычного PR и
+отсутствие Codex Code Review их не заменяет. Automatic Security Review не является частью normal path обычного PR и
 не должен запускаться при PR opened, push, mark-ready или каждом Code Review. Security Review -
 отдельный manual/conditional gate для фактических security-sensitive surfaces: auth/authz, secrets,
 untrusted network, uploads/parsers, user-controlled URLs, sensitive data, payments, admin actions,
@@ -312,7 +310,7 @@ its own lease. An ordinary executable task without `concurrency` metadata defaul
 `independent-write`; legacy `exclusive-write` metadata is accepted for compatibility but never
 blocks another task's separate worktree. Task/worktree ownership is scoped, while the delivery
 critical section remains single-owner and serializes refresh/rebase, final deterministic gate,
-PR, exact-head CI, bounded review, merge, deploy and smoke; dirty, interrupted, corrupt, missing,
+PR, exact-head CI, merge, deploy and smoke; dirty, interrupted, corrupt, missing,
 duplicate or ambiguous state remains fail-closed. Merge into `master` remains protected and
 serialized.
 

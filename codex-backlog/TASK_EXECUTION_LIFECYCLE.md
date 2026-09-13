@@ -13,29 +13,26 @@ authorization на весь normal path этой task. Launcher/controller ав�
 ## Постоянная политика quality gates
 
 Deterministic CI/tests/static-analysis checks и специальные human/legal/external/destructive gates
-остаются обязательными. Automatic Codex Code Review не включается; controller запрашивает bounded
-final semantic review только после GREEN exact-head `checks`: round 1, затем максимум один
-re-review после одного batch fix подтверждённых blocking P0/P1 на изменившемся head SHA. MEDIUM/LOW/NIT
-не запускают re-review, а clean result не перепроверяется «для уверенности».
-Перед request controller проверяет PR, current head, checks, mergeability, comments/reviews и
-resolved threads; duplicate для одного SHA переиспользуется. Третий request запрещён; повторный
-P0/P1 после round 2 возвращает `HUMAN_REQUIRED`. Отдельный reviewer-agent/subagent не создаётся,
-implementer делает один bounded self-review до commit и после fix повторяет только affected checks.
+остаются обязательными. Codex Code Review полностью отключён в active delivery lifecycle:
+controller не хранит и не читает его state, не публикует `@codex review` или `@codex security review`,
+не вызывает review-команды и не ждёт LLM-вердикта. Исторические review-комментарии не являются
+gate. Единственное исключение — прямое указание владельца в отдельном сообщении для конкретного PR;
+оно не является частью normal lifecycle и не генерируется controller. Отдельный reviewer-agent/
+subagent не создаётся, implementer делает один bounded local self-review до commit и после fix
+повторяет только affected checks.
 
-Normal path: implementation → targeted verification → final deterministic verification → bounded
-self-review → commit/push → PR → exact-head required CI GREEN → Codex review round 1 → merge;
-если есть blocking P0/P1: batch fix → affected checks → push → exact-head CI GREEN → round 2 →
-merge или `HUMAN_REQUIRED` → post-merge cleanup → product-task deploy/closeout.
+Normal path: implementation → targeted verification → final deterministic verification → local
+self-review → commit/push → PR → exact-head required CI GREEN → merge → post-merge cleanup →
+product-task deploy/closeout.
 Для PR-triggered CI PR открывается перед ожиданием его required checks.
 Обязательны relevant targeted tests PASS, применимые lint/format/typecheck PASS,
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved до bounded review. Review не запускается до implementation,
-до GREEN CI, повторно на том же SHA или после clean verdict.
+нужно фактически исправить и resolved до merge. LLM review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-Codex review их не заменяет. Automatic Security Review не является частью normal path обычного PR:
+отсутствие Codex Code Review их не заменяет. Automatic Security Review не является частью normal path обычного PR:
 он не запускается при PR opened, push, mark-ready или каждом Code Review. Security Review остаётся
 отдельным manual/conditional gate для фактических security-sensitive surfaces; Code Review и Security
 Review не сцепляются автоматически, а deterministic security scanners остаются в CI. Отсутствие
@@ -62,7 +59,7 @@ Lifecycle разделён на две coordination boundary:
   `production-success`; такой task нельзя закрывать через `finish` или выпускать в production.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
   может выполнить `refresh/rebase` относительно latest `origin/master`, current-base/provenance
-  check, PR/CI, bounded Codex review, merge, product-task production deploy, smoke и terminal closeout. Owner сохраняется до завершения
+  check, PR/CI, merge, product-task production deploy, smoke и terminal closeout. Owner сохраняется до завершения
   `finish`, после чего lane передаётся следующему FIFO candidate. Busy delivery/CI/production не
   блокирует запуск отдельной implementation task.
 
@@ -211,8 +208,8 @@ Full repository suite, полный visual audit и полный security audit 
 ## 5. Детерминированная проверка
 
 Использовать результаты targeted tests, static analysis и применимой QA.
-Self-review из раздела 4 не является отдельной ролью; bounded Codex review выполняется только по
-контракту round 1/round 2 после GREEN exact-head CI.
+Self-review из раздела 4 не является отдельной ролью; Codex Code Review не входит в lifecycle и
+не создаёт отдельного controller gate.
 
 ### Severity и blocking policy
 
@@ -361,8 +358,8 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 5. task не содержит незавершённый явно обязательный owner checkpoint/approve, human/device evidence,
    legal-counsel gate или manual visual gate;
 6. нет unresolved production/recovery blocker;
-7. до merge task PR прошёл exact-head required `checks` и bounded Codex review с итогом `CLEAN`
-   (round 1 либо round 2); blocking P0/P1 после round 2 переводят задачу в `HUMAN_REQUIRED`.
+7. до merge task PR прошёл exact-head required `checks`, PR mergeable, а существующие review
+   threads resolved; Codex Code Review не является release gate.
 8. task PR уже merged в `master`, exact PR head прошёл required `checks`, post-merge provenance
    подтвердил merge SHA, а task worktree чист от accidental scope, secrets и debug artifacts.
 
@@ -377,12 +374,11 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 2. проверить expected PR head SHA и required check `checks`. PR-triggered CI выполняет полный
    regression profile, а post-merge `master` CI выполняет только provenance, immutable image
    publication и deployment-source checks для того же exact tree;
-3. после GREEN exact-head checks выполнить `request-codex-review --round 1` и дождаться
-   `validate-codex-review`. При `BLOCKING_P0_P1` исправить подтверждённые findings одним batch,
-   повторить affected checks, push, exact-head CI и не более одного `--round 2` на новом SHA.
-   `CLEAN` разрешает merge; второй blocking P0/P1 возвращает `HUMAN_REQUIRED`, без третьего request;
-4. включить GitHub auto-merge только если это не запускает review до green CI, либо после bounded
-   review выполнить эквивалентный обычный PR merge только для ожидаемого head SHA;
+3. после GREEN exact-head checks выполнить обычный PR merge только для ожидаемого head SHA;
+   Codex Code Review не запрашивать, не валидировать и не ожидать; исторические review comments
+   не влияют на решение;
+4. не включать автоматические LLM review-триггеры в normal lifecycle; профильные security,
+   legal, human, external и destructive gates проходят только по фактическому trigger;
 5. проверить post-merge CI exact merged `master` SHA и затем автоматически запущенный production
    deploy того же SHA до terminal success. Deploy обязан передать immutable bundle, image refs и
    migration manifest, а host не должен требовать Git checkout. Failure/rollback/manual-intervention
@@ -404,8 +400,7 @@ Canonical sequencing для нового release candidate:
 implementation/self-review/QA -> logical commit -> PR master
   -> current-base/provenance delivery check
   -> exact-head required checks in GitHub CI
-  -> bounded Codex review round 1 (optional one round 2 only after blocking P0/P1 + changed SHA)
-  -> merge exact PR head
+  -> merge exact PR head (Codex Code Review disabled)
   -> WAIT post-merge master provenance/image publication: success
   -> immutable bundle deploy exact master SHA
   -> production smoke and terminal deployment evidence
