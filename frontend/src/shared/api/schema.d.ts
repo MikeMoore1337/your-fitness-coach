@@ -519,6 +519,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/acquisition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Acquisition */
+        post: operations["save_acquisition_api_v1_me_acquisition_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/avatar": {
         parameters: {
             query?: never;
@@ -6268,6 +6285,37 @@ export interface components {
              */
             cholesterol_mg: "read" | "ambiguous" | "unreadable" | "absent" | "derived";
         };
+        /** FirstTouchAttributionRequest */
+        FirstTouchAttributionRequest: {
+            /**
+             * First Touch Source
+             * @enum {string}
+             */
+            first_touch_source: "google" | "yandex" | "telegram" | "direct" | "referral" | "utm";
+            /** First Touch Medium */
+            first_touch_medium: string;
+            /** First Touch Campaign */
+            first_touch_campaign?: string | null;
+            /** First Landing Path */
+            first_landing_path: string;
+            /** First Referrer */
+            first_referrer?: string | null;
+            /**
+             * First Touch At
+             * Format: date-time
+             */
+            first_touch_at: string;
+            /** Utm Source */
+            utm_source?: string | null;
+            /** Utm Medium */
+            utm_medium?: string | null;
+            /** Utm Campaign */
+            utm_campaign?: string | null;
+            /** Utm Content */
+            utm_content?: string | null;
+            /** Utm Term */
+            utm_term?: string | null;
+        };
         /** FoodBarcodeLookupResponse */
         FoodBarcodeLookupResponse: {
             /** Barcode */
@@ -9678,6 +9726,8 @@ export interface components {
              * @default false
              */
             has_workout_history: boolean;
+            /** Has Food History */
+            has_food_history?: boolean | null;
             /** Auth Providers */
             auth_providers?: string[];
             onboarding: components["schemas"]["OnboardingStateResponse"];
@@ -11732,6 +11782,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    save_acquisition_api_v1_me_acquisition_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FirstTouchAttributionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

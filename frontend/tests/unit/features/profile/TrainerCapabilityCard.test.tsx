@@ -8,10 +8,12 @@ import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 const apiMock = vi.hoisted(() => vi.fn());
 const reloadUserMock = vi.hoisted(() => vi.fn());
 const trackProductEventMock = vi.hoisted(() => vi.fn());
+const trackGrowthEventMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../src/shared/api/client', () => ({ api: apiMock }));
 vi.mock('../../../../src/shared/analytics/productEvents', () => ({
   productEventSurface: () => 'tma',
+  trackGrowthEvent: trackGrowthEventMock,
   trackProductEvent: trackProductEventMock,
 }));
 vi.mock('../../../../src/app/AuthProvider', () => ({
@@ -52,6 +54,7 @@ describe('TrainerCapabilityCard', () => {
   beforeEach(() => {
     apiMock.mockReset();
     reloadUserMock.mockReset().mockResolvedValue(null);
+    trackGrowthEventMock.mockReset();
     trackProductEventMock.mockReset();
   });
 
@@ -83,6 +86,8 @@ describe('TrainerCapabilityCard', () => {
       await screen.findByText('Режим тренера включён', { selector: 'strong' }),
     ).toBeInTheDocument();
     expect(reloadUserMock).toHaveBeenCalled();
+    expect(trackGrowthEventMock).toHaveBeenNthCalledWith(1, 'trainer_application_started');
+    expect(trackGrowthEventMock).toHaveBeenNthCalledWith(2, 'trainer_application_completed');
     expect(trackProductEventMock).toHaveBeenCalledWith({
       name: 'trainer_mode_activated',
       surface: 'tma',
@@ -106,6 +111,8 @@ describe('TrainerCapabilityCard', () => {
     expect(
       await screen.findByText('Режим тренера включён', { selector: 'strong' }),
     ).toBeInTheDocument();
+    expect(trackGrowthEventMock).toHaveBeenCalledWith('trainer_application_started');
+    expect(trackGrowthEventMock).not.toHaveBeenCalledWith('trainer_application_completed');
     expect(trackProductEventMock).not.toHaveBeenCalled();
   });
 

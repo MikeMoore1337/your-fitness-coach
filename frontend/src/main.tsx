@@ -24,6 +24,7 @@ import {
   setYandexPrivateContentMask,
   trackYandexPageView,
 } from './shared/analytics/yandexMetrica';
+import { captureFirstTouchAttribution } from './shared/analytics/attribution';
 import './styles/legacy.css';
 import './styles/fonts.css';
 import './styles/design-system.css';
@@ -238,6 +239,7 @@ async function bootstrap(): Promise<void> {
   if (isTelegramLaunch(window.location)) {
     await loadTelegramSdk();
   }
+  captureFirstTouchAttribution();
   initializeYandexMetrica();
   if (window.location.pathname === '/demo' && isTelegramLaunch(window.location)) {
     clearAllDemoSessions();

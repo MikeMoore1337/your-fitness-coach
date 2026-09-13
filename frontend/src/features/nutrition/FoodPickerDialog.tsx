@@ -19,6 +19,7 @@ import { foodDraftStorageKey } from '../../shared/userScopedStorage';
 import { invalidateNutritionSummaries } from '../../shared/queryKeys';
 import {
   trackCoreProductEvent,
+  trackGrowthEvent,
   trackProductEvent,
   productEventSurface,
   type FoodEntryMethod,
@@ -592,6 +593,9 @@ export function FoodPickerDialog({
         { name: 'food_logged', surface: productEventSurface(), entry_method: entryMethod },
         'food_logged',
       );
+      if (user?.has_food_history === false) {
+        trackGrowthEvent('first_food_entry_added', { dedupe: 'session' });
+      }
       toast(`Добавлено в ${mealLabels[mealType]}`);
       if (variables.closeAfter) onClose();
       else {

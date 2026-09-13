@@ -30,7 +30,11 @@ import { WorkoutAdaptation } from './WorkoutAdaptation';
 import { WorkoutCompletionSummary } from './WorkoutCompletionSummary';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
-import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
+import {
+  productEventSurface,
+  trackCoreProductEvent,
+  trackGrowthEvent,
+} from '../../shared/analytics/productEvents';
 import { PWA_SAFE_UPDATE_EVENT } from '../../shared/pwa/pwaRuntime';
 import { ProgressionGuidance } from './ProgressionGuidance';
 
@@ -781,6 +785,9 @@ export function TodayWorkout({
           { name: 'workout_completed', surface: productEventSurface() },
           'workout_completed',
         );
+        if (user?.has_workout_history === false) {
+          trackGrowthEvent('first_workout_completed', { dedupe: 'session' });
+        }
         if (result) await reconcileFinishedWorkout(queryClient, result, activeSync.clear);
         else {
           await activeSync.clear();
@@ -794,6 +801,9 @@ export function TodayWorkout({
             { name: 'workout_started', surface: productEventSurface() },
             'workout_started',
           );
+          if (user?.has_workout_history === false) {
+            trackGrowthEvent('first_workout_started', { dedupe: 'session' });
+          }
         }
         await queryClient.invalidateQueries({ queryKey: ['workout'] });
       }

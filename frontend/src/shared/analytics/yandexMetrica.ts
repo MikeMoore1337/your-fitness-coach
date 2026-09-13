@@ -77,7 +77,7 @@ function safeTitle(value: string | undefined): string | undefined {
 
 function ensureYandexFunction(): YandexMetricaFunction {
   const target = window as YandexWindow;
-  if (target.ym) return target.ym;
+  if (typeof target.ym === 'function') return target.ym;
   const queued: YandexMetricaFunction = (...args) => {
     queued.a = queued.a ?? [];
     queued.a.push(args as YandexMetricaCommand);
@@ -141,9 +141,7 @@ export function initializeYandexMetrica(): void {
     sendTitle: false,
   });
   ensureYandexScript();
-  subscribeProductAnalyticsProvider(
-    createYandexMetricaProvider(invokeYandex, 'production'),
-  );
+  subscribeProductAnalyticsProvider(createYandexMetricaProvider(invokeYandex, 'production'));
 }
 
 export function trackYandexPageView(path: string, title?: string): void {
