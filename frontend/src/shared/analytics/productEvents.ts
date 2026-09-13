@@ -32,6 +32,53 @@ export type AiCoachOutcome =
 export type AiCoachFailureClass = 'network' | 'timeout' | 'validation' | 'unknown';
 export type AiCoachHelpfulness = 'helpful' | 'not_helpful';
 
+export const IMPLEMENTED_GROWTH_EVENT_NAMES = [
+  'registration_started',
+  'registration_completed',
+  'onboarding_completed',
+  'first_workout_started',
+  'first_workout_completed',
+  'first_food_entry_added',
+  'program_added',
+  'trainer_application_started',
+  'trainer_application_completed',
+  'client_invited',
+  'share_created',
+] as const;
+
+export const FUTURE_GROWTH_EVENT_NAMES = [
+  'calculator_started',
+  'calculator_result',
+  'calculator_saved',
+  'public_program_opened',
+  'public_program_saved',
+  'exercise_added_from_public_page',
+] as const;
+
+export type ImplementedGrowthEventName = (typeof IMPLEMENTED_GROWTH_EVENT_NAMES)[number];
+export type GrowthEventName =
+  ImplementedGrowthEventName | (typeof FUTURE_GROWTH_EVENT_NAMES)[number];
+
+export const GROWTH_GOAL_IDS: Readonly<Record<GrowthEventName, GrowthEventName>> = {
+  registration_started: 'registration_started',
+  registration_completed: 'registration_completed',
+  onboarding_completed: 'onboarding_completed',
+  first_workout_started: 'first_workout_started',
+  first_workout_completed: 'first_workout_completed',
+  first_food_entry_added: 'first_food_entry_added',
+  program_added: 'program_added',
+  trainer_application_started: 'trainer_application_started',
+  trainer_application_completed: 'trainer_application_completed',
+  client_invited: 'client_invited',
+  share_created: 'share_created',
+  calculator_started: 'calculator_started',
+  calculator_result: 'calculator_result',
+  calculator_saved: 'calculator_saved',
+  public_program_opened: 'public_program_opened',
+  public_program_saved: 'public_program_saved',
+  exercise_added_from_public_page: 'exercise_added_from_public_page',
+};
+
 type ContextFreeProductEventName =
   | 'landing_viewed'
   | 'landing_app_selected'
@@ -115,14 +162,18 @@ type ContextFreeProductEventName =
   | 'yfc_food_catalog_external_fallback';
 
 type ContextFreeProductEvent = {
-  [Name in ContextFreeProductEventName]: {
-    name: Name;
-    surface: ProductSurface;
-  };
-}[ContextFreeProductEventName];
+  name: ContextFreeProductEventName;
+  surface: ProductSurface;
+};
+
+type GrowthProductEvent = {
+  name: GrowthEventName;
+  surface: ProductSurface;
+};
 
 export type ProductEvent =
   | ContextFreeProductEvent
+  | GrowthProductEvent
   | {
       name: 'landing_telegram_selected';
       surface: ProductSurface;
@@ -323,6 +374,8 @@ const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'nutrition_label_community_product_reused',
   'yfc_food_catalog_local_hit',
   'yfc_food_catalog_external_fallback',
+  ...IMPLEMENTED_GROWTH_EVENT_NAMES,
+  ...FUTURE_GROWTH_EVENT_NAMES,
 ]);
 const PRODUCT_SURFACES = new Set<ProductSurface>(['desktop_web', 'mobile_web', 'tma']);
 const PRODUCT_ANALYTICS_ENVIRONMENTS = new Set<ProductAnalyticsEnvironment>([
@@ -617,6 +670,17 @@ export function trackProductEvent(
   options?: ProductEventTrackOptions,
 ): boolean {
   return browserProductAnalytics.track(event, options);
+}
+
+export function trackGrowthEvent(
+  name: ImplementedGrowthEventName,
+  options?: ProductEventTrackOptions,
+): boolean {
+  return trackProductEvent({ name, surface: productEventSurface() }, options);
+}
+
+export function isGrowthGoalEvent(name: ProductEventName): name is GrowthEventName {
+  return Object.prototype.hasOwnProperty.call(GROWTH_GOAL_IDS, name);
 }
 
 export function markProductLoginStarted(): void {

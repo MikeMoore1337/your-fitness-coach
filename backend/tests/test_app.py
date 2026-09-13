@@ -3558,6 +3558,10 @@ def test_public_seo_response_uses_canonical_metadata_and_truthful_structured_dat
     assert '<link rel="canonical" href="https://your-fitness-coach.ru/" />' in response.text
     assert '<meta property="og:url" content="https://your-fitness-coach.ru/" />' in response.text
     assert (
+        '<noscript><div><img src="https://mc.yandex.ru/watch/112530718" '
+        'style="position:absolute; left:-9999px;" alt="" /></div></noscript>' in response.text
+    )
+    assert (
         '<meta property="og:image" '
         'content="https://your-fitness-coach.ru/assets/brand/yfc-social-preview.png" />'
         in response.text
@@ -3579,20 +3583,37 @@ def test_public_seo_response_uses_canonical_metadata_and_truthful_structured_dat
     assert "offers" not in structured_data.group(1)
 
 
-def test_public_seo_response_injects_optional_webmaster_verification_tags(client, monkeypatch):
+def test_public_seo_response_does_not_inject_webmaster_verification_tags(client, monkeypatch):
     from fitminiapp_api.core.config import settings
 
     monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
-    monkeypatch.setattr(settings, "google_site_verification", "google-token-123")
-    monkeypatch.setattr(settings, "yandex_verification", "yandex-token-456")
 
     landing = client.get("/", headers={"Host": "your-fitness-coach.ru"})
     private = client.get("/app")
 
-    assert '<meta name="google-site-verification" content="google-token-123" />' in landing.text
-    assert '<meta name="yandex-verification" content="yandex-token-456" />' in landing.text
+    assert "google-site-verification" not in landing.text
+    assert "yandex-verification" not in landing.text
     assert "google-site-verification" not in private.text
     assert "yandex-verification" not in private.text
+    assert "mc.yandex.ru/watch/112530718" not in private.text
+
+
+def test_yandex_verification_file_is_served_directly(client):
+    response = client.get("/yandex_bce1658cc6fe44e5.html")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["x-robots-tag"] == "noindex, nofollow"
+    assert (
+        response.text
+        == """<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    </head>
+    <body>Verification: bce1658cc6fe44e5</body>
+</html>
+"""
+    )
 
 
 def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypatch):
@@ -3615,10 +3636,11 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
         for element in root.findall("{http://www.sitemaps.org/schemas/sitemap/0.9}url")
         for element in element.findall("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
     ]
-    assert len(urls) == 24
+    assert len(urls) == 25
     assert len(urls) == len(set(urls))
     assert {
         "https://your-fitness-coach.ru/",
+        "https://your-fitness-coach.ru/articles",
         "https://your-fitness-coach.ru/knowledge",
         "https://your-fitness-coach.ru/knowledge/training/repetitions-in-reserve",
         "https://your-fitness-coach.ru/knowledge/nutrition/creatine-monohydrate",

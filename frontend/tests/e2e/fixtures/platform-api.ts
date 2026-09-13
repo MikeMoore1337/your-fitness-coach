@@ -1256,6 +1256,9 @@ export async function installPlatformApi(
         json: { ui_enabled: false, generic_available: false, personal_available: false },
       });
     }
+    if (path.endsWith('/me/acquisition') && request.method() === 'POST') {
+      return route.fulfill({ status: 204 });
+    }
     if (path.endsWith('/me/trainer-capability')) {
       if (request.method() === 'POST') {
         trainerActivationCalls += 1;

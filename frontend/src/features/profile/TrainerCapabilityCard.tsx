@@ -3,7 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../shared/api/client';
 import type { TrainerCapability } from '../../shared/api/types';
-import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import {
+  productEventSurface,
+  trackGrowthEvent,
+  trackProductEvent,
+} from '../../shared/analytics/productEvents';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Card, ErrorState, LoadingState } from '../../shared/ui/common';
 import { TrainerModeSwitch } from '../trainer/TrainerModeSwitch';
@@ -32,6 +36,7 @@ export function TrainerCapabilityCard() {
       }),
     onSuccess: async (result) => {
       if (result.activated_now) {
+        trackGrowthEvent('trainer_application_completed');
         trackProductEvent({ name: 'trainer_mode_activated', surface: productEventSurface() });
       }
       await refresh();
@@ -158,7 +163,10 @@ export function TrainerCapabilityCard() {
             type="button"
             className="trainer-capability__activate"
             disabled={!acceptedTerms || activate.isPending}
-            onClick={() => activate.mutate()}
+            onClick={() => {
+              trackGrowthEvent('trainer_application_started');
+              activate.mutate();
+            }}
           >
             {activate.isPending ? 'Включаем…' : 'Включить режим тренера'}
           </button>

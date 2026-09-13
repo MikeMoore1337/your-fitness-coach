@@ -5,6 +5,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import cast
@@ -26,6 +27,10 @@ ARTICLE_INDEX_DESCRIPTION = (
 _PUBLIC_FALLBACK_PATTERN = re.compile(
     r"<!-- public-fallback-start -->.*?<!-- public-fallback-end -->",
     re.DOTALL,
+)
+_YANDEX_METRICA_NOSCRIPT = (
+    '<noscript><div><img src="https://mc.yandex.ru/watch/112530718" '
+    'style="position:absolute; left:-9999px;" alt="" /></div></noscript>'
 )
 
 
@@ -131,6 +136,25 @@ def public_page_paths() -> tuple[str, ...]:
         for page in public_pages()
         if page.get("status", "published") == "published"
     )
+
+
+def public_sitemap_paths() -> tuple[str, ...]:
+    """Return the published manifest paths plus the published article index."""
+
+    return tuple(dict.fromkeys((*public_page_paths(), "/articles")))
+
+
+def public_page_lastmod(path: str) -> str | None:
+    """Return a source-controlled last modification date when the manifest has one."""
+
+    page = public_page_for_path(path)
+    raw_updated = page.get("updated") if page else None
+    if not isinstance(raw_updated, str):
+        return None
+    try:
+        return date.fromisoformat(raw_updated).isoformat()
+    except ValueError:
+        return None
 
 
 def canonical_landing_domain() -> str:
@@ -388,16 +412,6 @@ def render_metadata(metadata: SeoMetadata) -> str:
         f'<meta name="robots" content="{metadata.robots}" />',
         f'<meta name="yandex" content="{metadata.robots}" />',
     ]
-    if metadata.canonical_url and settings.google_site_verification.strip():
-        tags.append(
-            '<meta name="google-site-verification" content="'
-            f'{html.escape(settings.google_site_verification.strip(), quote=True)}" />'
-        )
-    if metadata.canonical_url and settings.yandex_verification.strip():
-        tags.append(
-            '<meta name="yandex-verification" content="'
-            f'{html.escape(settings.yandex_verification.strip(), quote=True)}" />'
-        )
     if metadata.canonical_url:
         canonical = html.escape(metadata.canonical_url, quote=True)
         social_image = html.escape(_absolute_public_url(SOCIAL_IMAGE_PATH), quote=True)
@@ -734,4 +748,8 @@ def render_frontend_document(
         rendered = _PUBLIC_FALLBACK_PATTERN.sub(marked_fallback, rendered, count=1)
     elif fallback:
         rendered = rendered.replace('<div id="root"></div>', f'<div id="root">{fallback}</div>')
+    rendered = rendered.replace(
+        "<!-- yandex-metrica-noscript -->",
+        _YANDEX_METRICA_NOSCRIPT if metadata.canonical_url else "",
+    )
     return rendered, metadata

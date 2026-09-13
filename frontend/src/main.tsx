@@ -1,4 +1,4 @@
-import { StrictMode, lazy, Suspense, useEffect } from 'react';
+import { StrictMode, lazy, Suspense, useEffect, useLayoutEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './app/AuthProvider';
@@ -19,6 +19,12 @@ import {
 import { applyRouteMetadata } from './shared/seo/metadata';
 import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
+import {
+  initializeYandexMetrica,
+  setYandexPrivateContentMask,
+  trackYandexPageView,
+} from './shared/analytics/yandexMetrica';
+import { captureFirstTouchAttribution } from './shared/analytics/attribution';
 import './styles/legacy.css';
 import './styles/fonts.css';
 import './styles/design-system.css';
@@ -177,6 +183,21 @@ function AppRoutes() {
   return <NotFoundPage />;
 }
 
+function AnalyticsRuntime() {
+  const { path } = useNavigation();
+  const publicRoute = path === '/' || isPublicContentRoute(path) || isArticleRoute(path);
+
+  useLayoutEffect(() => {
+    setYandexPrivateContentMask(!publicRoute);
+  }, [publicRoute]);
+
+  useEffect(() => {
+    trackYandexPageView(path, publicRoute ? document.title : undefined);
+  }, [path, publicRoute]);
+
+  return null;
+}
+
 function Root() {
   useTelegram();
   return (
@@ -187,6 +208,7 @@ function Root() {
             <GlassInteractions />
             <NavigationProvider>
               <OnlineStatus />
+              <AnalyticsRuntime />
               <Suspense
                 fallback={
                   <main className="container">
@@ -217,6 +239,8 @@ async function bootstrap(): Promise<void> {
   if (isTelegramLaunch(window.location)) {
     await loadTelegramSdk();
   }
+  captureFirstTouchAttribution();
+  initializeYandexMetrica();
   if (window.location.pathname === '/demo' && isTelegramLaunch(window.location)) {
     clearAllDemoSessions();
   }

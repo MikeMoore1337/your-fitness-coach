@@ -282,6 +282,7 @@ class UserResponse(BaseModel):
     is_root: bool = False
     has_active_program: bool = False
     has_workout_history: bool = False
+    has_food_history: bool | None = None
     auth_providers: list[str] = Field(default_factory=list)
     onboarding: OnboardingStateResponse
     profile: UserProfileResponse | None = None

@@ -7,6 +7,7 @@ import type {
   ReportHandoff,
   User,
 } from '../../shared/api/types';
+import { trackGrowthEvent } from '../../shared/analytics/productEvents';
 import { Button, EmptyState } from '../../shared/ui/common';
 
 type CurrentTrainer = NonNullable<User['trainer']>;
@@ -123,6 +124,7 @@ function ReportHandoffPanelContent({
     onSuccess: (result) => {
       setLastHandoff(result);
       setRetryKey(null);
+      trackGrowthEvent('share_created');
       void queryClient.invalidateQueries({ queryKey: ['report-handoffs'] });
     },
   });

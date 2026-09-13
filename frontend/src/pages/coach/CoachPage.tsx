@@ -37,7 +37,11 @@ import { LIVE_DATA_REFETCH_INTERVAL_MS } from '../../shared/sync';
 import { coachClientProfileDraftStorageKey } from '../../shared/userScopedStorage';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
 import { DateInput } from '../../shared/ui/PickerInput';
-import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import {
+  productEventSurface,
+  trackGrowthEvent,
+  trackProductEvent,
+} from '../../shared/analytics/productEvents';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import {
   BodyPriorityPicker,
@@ -880,6 +884,7 @@ export default function CoachPage() {
         method: 'POST',
       });
       setInviteLink(result);
+      trackGrowthEvent('client_invited');
       await queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clients });
       if (result.web_url || result.url) await copyInvite(result.web_url || result.url || '');
       else toast('Приглашение создано');

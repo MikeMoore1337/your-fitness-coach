@@ -79,8 +79,6 @@ class Settings(BaseSettings):
     app_domain: str = ""
     landing_domain: str = ""
     frontend_base_url: str = "https://app.your-fitness-coach.ru"
-    google_site_verification: str = ""
-    yandex_verification: str = ""
     telegram_bot_token: str
     telegram_bot_username: str = ""
     telegram_init_data_max_age_seconds: int = Field(default=300, ge=60, le=3600)

@@ -25,6 +25,7 @@ import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   clearSensitiveUserScopedStorage,
 } from '../shared/userScopedStorage';
+import { syncFirstTouchAttribution } from '../shared/analytics/attribution';
 import { trackProductLoginCompletedIfStarted } from '../shared/analytics/productEvents';
 import { YFC_PLATFORM_ACTIVATED_EVENT } from '../shared/telegram/layout';
 import { revokeWebPushSubscription } from '../shared/notifications/webPush';
@@ -41,6 +42,7 @@ function offlineWorkoutUser(): User | null {
     is_root: false,
     has_active_program: true,
     has_workout_history: false,
+    has_food_history: false,
     onboarding: { status: 'complete', required_fields: [], missing_fields: [] },
     profile: null,
     trainer: null,
@@ -151,7 +153,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const userId = user?.id;
   useEffect(() => {
-    if (userId) trackProductLoginCompletedIfStarted();
+    if (!userId) return;
+    trackProductLoginCompletedIfStarted();
+    void syncFirstTouchAttribution(userId);
   }, [userId]);
 
   useEffect(() => {

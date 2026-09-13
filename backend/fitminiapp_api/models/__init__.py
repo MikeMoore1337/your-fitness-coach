@@ -1,4 +1,5 @@
 from fitminiapp_api.models.account import AccountDataExport
+from fitminiapp_api.models.acquisition import FirstTouchAttribution
 from fitminiapp_api.models.ai_coach import AiCoachConsent, AiCoachMemory, AiCoachMemoryConsent
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity, LocalCredential
@@ -111,6 +112,7 @@ __all__ = [
     "ExerciseEquipment",
     "ExerciseGuideMetadata",
     "ExerciseMuscle",
+    "FirstTouchAttribution",
     "Food",
     "FoodDiaryCopyOperation",
     "FoodDiaryDayStatus",

@@ -20,6 +20,7 @@ import { Icon } from '../../shared/ui/Icon';
 import {
   productEventSurface,
   trackCoreProductEvent,
+  trackGrowthEvent,
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
 import { isPairedWithPrevious, moveItem, removeExercise, toggleSuperset } from './programDraft';
@@ -333,6 +334,7 @@ export function ProgramBuilder({
       }),
     onSuccess: async () => {
       if (!editingTemplate) {
+        trackGrowthEvent('program_added');
         if (targetTelegramId) {
           trackProductEvent({
             name: 'trainer_program_assigned',
