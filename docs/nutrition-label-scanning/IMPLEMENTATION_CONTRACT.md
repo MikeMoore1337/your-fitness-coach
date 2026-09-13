@@ -107,6 +107,13 @@ Local YFC catalog checked first. Exact local barcode lookup завершаетс
 contract, оставить kill switch выключенным и указать точные internal user IDs. Cloud Vision,
 paid Vision, local LLM и credentials для них не нужны и не добавляются.
 
+## Runtime OCR
+
+Backend runtime устанавливает локальный Tesseract OCR и языковые данные `eng`, `rus`, `osd`;
+проверенная container-сборка использует Tesseract 5.5.0. Вызов выполняется через явный `argv`
+с `shell=False`, timeout и ограничением вывода. Tesseract и официальный `tessdata` распространяются
+под Apache-2.0; cloud/paid Vision и локальная LLM в этом pipeline не используются.
+
 ## Verification status
 
 - parser/image/API regression tests — deterministic local tests;
