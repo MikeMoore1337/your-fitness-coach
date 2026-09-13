@@ -180,22 +180,22 @@ class Food(Base):
     # The legacy columns above remain the read-compatible 100 g projection.  The
     # canonical JSON keeps source/normalized/derived values and makes 100 ml and
     # serving-only labels first-class without pretending they are per-100-g facts.
-    nutrition_basis_kind: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="per_100_g", server_default="per_100_g"
+    nutrition_basis_kind: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, default="per_100_g", server_default="per_100_g"
     )
-    nutrition_basis_amount: Mapped[Decimal] = mapped_column(
-        Numeric(10, 3), nullable=False, default=Decimal("100"), server_default="100"
+    nutrition_basis_amount: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 3), nullable=True, default=Decimal("100"), server_default="100"
     )
-    nutrition_basis_unit: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="g", server_default="g"
+    nutrition_basis_unit: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, default="g", server_default="g"
     )
     canonical_facts: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     nutrition_provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    canonical_complete: Mapped[bool] = mapped_column(
-        nullable=False, default=True, server_default="true"
+    canonical_complete: Mapped[bool | None] = mapped_column(
+        nullable=True, default=True, server_default="true"
     )
-    catalog_quality: Mapped[str] = mapped_column(
-        String(24), nullable=False, default="verified", server_default="verified"
+    catalog_quality: Mapped[str | None] = mapped_column(
+        String(24), nullable=True, default="verified", server_default="verified"
     )
 
     standard_serving_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)

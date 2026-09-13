@@ -653,6 +653,11 @@ def test_diary_uses_per_100_ml_snapshot_without_fabricating_grams(client) -> Non
     assert body["nutrition_basis_unit"] == "ml"
     assert body["nutrition"]["energy_kcal"] == "100.00"
     assert body["nutrition"]["protein_g"] == "5.000"
+    with get_session_context() as db:
+        entry = db.query(FoodDiaryEntry).filter(FoodDiaryEntry.id == body["id"]).one()
+        assert entry.legacy_weight_g == Decimal("1.000")
+        assert entry.legacy_energy_kcal_per_100g == Decimal("0.00")
+        assert entry.legacy_protein_g_per_100g == Decimal("0.000")
 
 
 def test_account_deletion_removes_draft_and_anonymizes_shared_contribution(

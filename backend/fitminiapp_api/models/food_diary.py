@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Time,
     UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -154,14 +155,40 @@ class FoodDiaryEntry(Base):
 
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
     amount_unit: Mapped[str] = mapped_column(String(16), nullable=False)
-    weight_g: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    # The historical weight_g column is NOT NULL and cannot be relaxed in the
+    # online expand phase.  Keep it as a compatibility-only column while the
+    # canonical/API value lives in the additive nullable nutrition_weight_g.
+    weight_g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_weight_g", Numeric(10, 3), nullable=True
+    )
+    legacy_weight_g: Mapped[Decimal] = mapped_column("weight_g", Numeric(10, 3), nullable=False)
 
     food_name: Mapped[str] = mapped_column(String(256), nullable=False)
     food_brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    energy_kcal_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
-    protein_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
-    fat_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
-    carbs_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
+    energy_kcal_per_100g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_energy_kcal_per_100g", Numeric(10, 2), nullable=True
+    )
+    protein_g_per_100g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_protein_g_per_100g", Numeric(8, 3), nullable=True
+    )
+    fat_g_per_100g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_fat_g_per_100g", Numeric(8, 3), nullable=True
+    )
+    carbs_g_per_100g: Mapped[Decimal | None] = mapped_column(
+        "nutrition_carbs_g_per_100g", Numeric(8, 3), nullable=True
+    )
+    legacy_energy_kcal_per_100g: Mapped[Decimal] = mapped_column(
+        "energy_kcal_per_100g", Numeric(10, 2), nullable=False
+    )
+    legacy_protein_g_per_100g: Mapped[Decimal] = mapped_column(
+        "protein_g_per_100g", Numeric(8, 3), nullable=False
+    )
+    legacy_fat_g_per_100g: Mapped[Decimal] = mapped_column(
+        "fat_g_per_100g", Numeric(8, 3), nullable=False
+    )
+    legacy_carbs_g_per_100g: Mapped[Decimal] = mapped_column(
+        "carbs_g_per_100g", Numeric(8, 3), nullable=False
+    )
     fiber_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
 
     nutrition_basis_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
@@ -191,6 +218,33 @@ class FoodDiaryEntry(Base):
         default=now_msk_naive,
         onupdate=now_msk_naive,
     )
+
+
+_LEGACY_UNKNOWN_WEIGHT_G = Decimal("1")
+
+
+@event.listens_for(FoodDiaryEntry, "before_insert")
+@event.listens_for(FoodDiaryEntry, "before_update")
+def _sync_legacy_weight_g(_mapper, _connection, target: FoodDiaryEntry) -> None:
+    if target.amount_unit == "g" and target.weight_g is None:
+        target.weight_g = target.amount
+    if target.weight_g is not None:
+        target.legacy_weight_g = target.weight_g
+    elif target.legacy_weight_g is None:
+        # Existing constraints require a positive legacy value.  This marker is
+        # never used for nutrition calculations; all application reads use the
+        # nullable canonical column above.
+        target.legacy_weight_g = _LEGACY_UNKNOWN_WEIGHT_G
+    for canonical_name, legacy_name in (
+        ("energy_kcal_per_100g", "legacy_energy_kcal_per_100g"),
+        ("protein_g_per_100g", "legacy_protein_g_per_100g"),
+        ("fat_g_per_100g", "legacy_fat_g_per_100g"),
+        ("carbs_g_per_100g", "legacy_carbs_g_per_100g"),
+    ):
+        canonical_value = getattr(target, canonical_name)
+        setattr(
+            target, legacy_name, canonical_value if canonical_value is not None else Decimal("0")
+        )
 
 
 class FoodDiaryDayStatus(Base):

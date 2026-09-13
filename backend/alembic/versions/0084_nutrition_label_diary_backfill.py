@@ -21,10 +21,20 @@ online_rollout_idempotent = True
 def upgrade() -> None:
     op.execute(
         """UPDATE food_diary_entries
-        SET nutrition_basis_kind = 'per_100_g',
+        SET nutrition_weight_g = weight_g,
+            nutrition_energy_kcal_per_100g = energy_kcal_per_100g,
+            nutrition_protein_g_per_100g = protein_g_per_100g,
+            nutrition_fat_g_per_100g = fat_g_per_100g,
+            nutrition_carbs_g_per_100g = carbs_g_per_100g,
+            nutrition_basis_kind = 'per_100_g',
             nutrition_basis_amount = 100,
             nutrition_basis_unit = 'g'
-        WHERE nutrition_basis_kind IS NULL
+        WHERE nutrition_weight_g IS NULL
+           OR nutrition_energy_kcal_per_100g IS NULL
+           OR nutrition_protein_g_per_100g IS NULL
+           OR nutrition_fat_g_per_100g IS NULL
+           OR nutrition_carbs_g_per_100g IS NULL
+           OR nutrition_basis_kind IS NULL
            OR nutrition_basis_amount IS NULL
            OR nutrition_basis_unit IS NULL"""
     )
