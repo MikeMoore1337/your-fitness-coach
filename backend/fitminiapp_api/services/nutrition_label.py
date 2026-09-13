@@ -34,10 +34,17 @@ from fitminiapp_api.nutrition_label.contracts import (
     validate_canonical_draft,
 )
 from fitminiapp_api.nutrition_label.image import ImageIngressError, normalize_uploaded_image
-from fitminiapp_api.nutrition_label.ocr import LocalOcrError, OcrEngine, TesseractOcr
+from fitminiapp_api.nutrition_label.ocr import (
+    OCR_PIPELINE_VERSION,
+    LocalOcrError,
+    OcrCandidate,
+    OcrEngine,
+    TesseractOcr,
+)
 from fitminiapp_api.nutrition_label.parser import (
     CanonicalNormalizationError,
     build_draft_from_ocr,
+    score_nutrition_candidate,
 )
 from fitminiapp_api.schemas.food import FoodResponse, validate_gtin
 from fitminiapp_api.schemas.nutrition_label import (
@@ -48,8 +55,8 @@ from fitminiapp_api.schemas.nutrition_label import (
 )
 from fitminiapp_api.services.foods import get_food_response
 
-NUTRITION_LABEL_SOURCE_VERSION = "nutrition-label-local-v1"
-NUTRITION_LABEL_PROMPT_VERSION = "ocr-text-v1"
+NUTRITION_LABEL_SOURCE_VERSION = "nutrition-label-local-v2"
+NUTRITION_LABEL_PROMPT_VERSION = "ocr-structured-multipass-v2"
 logger = logging.getLogger("app")
 
 
@@ -139,8 +146,44 @@ def _build_ocr_engine() -> OcrEngine:
         languages=settings.nutrition_label_scan_ocr_languages,
         timeout_seconds=settings.nutrition_label_scan_ocr_timeout_seconds,
         max_output_chars=settings.nutrition_label_scan_ocr_max_output_chars,
-        version="tesseract-text-v1",
+        version=OCR_PIPELINE_VERSION,
     )
+
+
+def _parse_ocr_candidates(
+    engine: OcrEngine,
+    normalized_png: bytes,
+) -> CanonicalDraft:
+    extract_candidates = getattr(engine, "extract_candidates", None)
+    if not callable(extract_candidates):
+        return build_draft_from_ocr(
+            engine.extract_text(normalized_png),
+            provider=engine.name,
+            model=engine.version,
+            prompt_version=NUTRITION_LABEL_PROMPT_VERSION,
+        )
+
+    raw_candidates = tuple(extract_candidates(normalized_png))
+    parsed_candidates: list[tuple[tuple[int, ...], int, CanonicalDraft]] = []
+    for index, candidate in enumerate(raw_candidates):
+        if not isinstance(candidate, OcrCandidate):
+            continue
+        try:
+            canonical = build_draft_from_ocr(
+                candidate.text,
+                structured_tokens=candidate.tokens or None,
+                provider=engine.name,
+                model=engine.version,
+                prompt_version=NUTRITION_LABEL_PROMPT_VERSION,
+            )
+        except CanonicalNormalizationError:
+            continue
+        score = score_nutrition_candidate(canonical, candidate.tokens)
+        parsed_candidates.append((score.rank, index, canonical))
+    if not parsed_candidates:
+        raise CanonicalNormalizationError("ocr_candidates_unusable")
+    _, _, selected = max(parsed_candidates, key=lambda item: (item[0], -item[1]))
+    return selected
 
 
 def _usable_read_fact_count(canonical: CanonicalDraft) -> int:
@@ -200,13 +243,7 @@ def create_label_draft(
             max_pixels=settings.nutrition_label_scan_max_pixels,
         )
         engine = ocr_engine or _build_ocr_engine()
-        ocr_text = engine.extract_text(normalized_image.data)
-        canonical = build_draft_from_ocr(
-            ocr_text,
-            provider=engine.name,
-            model=engine.version,
-            prompt_version=NUTRITION_LABEL_PROMPT_VERSION,
-        )
+        canonical = _parse_ocr_candidates(engine, normalized_image.data)
     except ImageIngressError as exc:
         logger.info("nutrition_scan_failed", extra={"error_code": exc.code})
         raise NutritionLabelError(exc.code) from exc

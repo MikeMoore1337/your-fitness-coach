@@ -155,6 +155,36 @@ describe('NutritionLabelReview', () => {
     expect(fiber).toHaveAttribute('placeholder', 'Не распознано');
   });
 
+  it('does not prefill an energy outlier and explains the manual check', () => {
+    const draft = buildDraft();
+    draft.nutrition.normalized_facts.energy_kcal = null;
+    draft.nutrition.source_facts.energy_kcal = [
+      {
+        value: null,
+        unit: 'kcal',
+        basis_ref: 'per_100_g',
+        column_ref: 'outlier-energy-kcal',
+        evidence: 'ambiguous',
+      },
+    ];
+    draft.nutrition.field_evidence.energy_kcal = 'ambiguous';
+    draft.nutrition.warnings = ['energy_outlier'];
+    draft.warnings = ['energy_outlier'];
+
+    renderReview(draft);
+
+    expect(screen.getByRole('textbox', { name: /Калории/ })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: /Калории/ })).toHaveAttribute(
+      'placeholder',
+      'Не распознано',
+    );
+    expect(
+      screen.getByText(
+        'Калорийность выглядит нереалистично для указанной основы — проверьте упаковку.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('shows a derived nutrient separately from the editable source value', () => {
     const draft = buildDraft();
     draft.nutrition.derived_fields.sodium_mg = {

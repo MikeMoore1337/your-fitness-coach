@@ -8,8 +8,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 CANONICAL_DRAFT_SCHEMA_VERSION: Final[Literal["nutrition-label-draft-v1"]] = (
     "nutrition-label-draft-v1"
 )
-CANONICAL_POLICY_REVISION: Final[str] = "nutrition-label-local-v1"
-LOCAL_OCR_ENGINE_VERSION: Final[str] = "tesseract-text-v1"
+CANONICAL_POLICY_REVISION: Final[str] = "nutrition-label-local-v2"
+LOCAL_OCR_ENGINE_VERSION: Final[str] = "tesseract-structured-multipass-v2"
 
 NUTRIENT_FIELDS = (
     "energy_kcal",

@@ -23,7 +23,19 @@ Pipeline состоит из четырёх явно разделённых ша
 В production image добавлены Debian-пакеты `tesseract-ocr`, `tesseract-ocr-eng` и
 `tesseract-ocr-rus`. Python-код запускает только allowlisted executable `tesseract` через явный
 `argv`, `shell=False`, `stdin=DEVNULL`, timeout и bounded stdout. Поддерживаемые языки —
-`rus+eng`; текущая адаптерная версия — `tesseract-text-v1`.
+`rus+eng`; текущая адаптерная версия — `tesseract-structured-multipass-v2`.
+
+Task 128E запускает bounded набор из пяти вариантов изображения (консервативный ROI, grayscale,
+локальный контраст с denoise, adaptive threshold, inversion и один фиксированный малый deskew)
+и три фиксированных PSM: `6`, `4`, `11`. Каждый pass использует явный `argv`, TSV word-level
+output и общий timeout; число токенов, размер TSV, pixels preprocessing и суммарное число pass
+ограничены. Надёжная perspective correction и удаление table lines в production pipeline не
+включены: локальный synthetic probe не доказал устойчивого улучшения.
+
+Parser использует token text + `left/top/width/height`, block/paragraph/line/word и confidence
+для детерминированной строковой/колоночной association. Кандидат выбирается по basis,
+unit-qualified value adjacency, required-field completeness, pair consistency, impossible-value
+и column-collision checks; длина распознанного текста не является критерием.
 
 Tesseract core распространяется под Apache License 2.0; репозиторий официальных `tessdata`
 указывает Apache-2.0 для training data. В образе нужно сохранять package/license manifest
@@ -53,12 +65,15 @@ Leptonica). Источники: [Tesseract license](https://github.com/tesseract
 `canonical_draft.schema.json`. Для каждого nutrient отдельно хранятся source cells,
 normalized facts, evidence и confidence. Обязательная основа — `per_100_g`, `per_100_ml`,
 `per_serving` либо явная `ambiguous`; двусмысленная основа не нормализуется и не подтверждается.
+Текущая safety policy revision — `nutrition-label-local-v2`.
 
 Правила parser:
 
 - `%DV` не является массой и не конвертируется в `g`/`mg`;
 - salt и sodium — разные поля;
-- manufacturer kcal сохраняются как прочитаны; `4P + 9F + 4C` даёт только warning;
+- manufacturer kcal никогда не заменяются расчётом; unitless energy, mismatch пары kJ/kcal,
+  outlier и несогласованность с `4P + 9F + 4C` переводят подозрительное поле в `null`/`ambiguous`
+  с warning, а не в обычный prefill;
 - отсутствующее или нечитаемое значение остаётся `null`;
 - serving переводится в per-100 только при известной matching mass/volume;
 - плотность и неизвестная масса порции не угадываются.
@@ -130,7 +145,7 @@ Local YFC catalog checked first. Exact local barcode lookup завершаетс
 
 Backend runtime устанавливает локальный Tesseract OCR и языковые данные `eng`, `rus`, `osd`;
 проверенная container-сборка использует Tesseract 5.5.0. Вызов выполняется через явный `argv`
-с `shell=False`, timeout и ограничением вывода. Tesseract и официальный `tessdata` распространяются
+с `shell=False`, явным `--dpi 300`, timeout и ограничением вывода. Tesseract и официальный `tessdata` распространяются
 под Apache-2.0; cloud/paid Vision и локальная LLM в этом pipeline не используются.
 
 ## Verification status
@@ -138,5 +153,11 @@ Backend runtime устанавливает локальный Tesseract OCR и �
 - parser/image/API regression tests — deterministic local tests;
 - Alembic SQLite replay должен проходить от пустой базы до head;
 - `eval_harness.py --self-check` и locked synthetic fixture preflight запускаются без сети;
-- OCR recognition quality, p50/p95 и correction baseline остаются `NOT MEASURED` до реальной
-  owner-authorized validation на production representative labels.
+- Task 128E synthetic-only runtime probe в production-equivalent image: 15 кандидатов (5 × 3),
+  стабильный выбор deskew/PSM 11 с `per_100_g`, energy `281.4 kJ`/`66.8 kcal` и P/F/C
+  `8/2/4.2`; end-to-end p50 `6600 ms`, p95 `7389 ms`, preprocessing p95 `118 ms`,
+  peak RSS `81404 KiB`, Tesseract CPU p50 `18.31 s` и p95 `20.71 s` на десять запусков;
+  configured hard timeout — `8 s`. Эти цифры не являются real-label accuracy или device/TMA
+  benchmark: production same-photo HUMAN_EVIDENCE остаётся обязательным.
+- OCR recognition quality по реальным этикеткам, correction baseline и full corpus metrics
+  остаются `NOT MEASURED` до owner-authorized validation на production representative labels.
