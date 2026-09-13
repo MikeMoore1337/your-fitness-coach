@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
-from typing import cast
+from typing import Literal, cast
 
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.exc import IntegrityError
@@ -14,11 +14,16 @@ from sqlalchemy.sql.elements import ColumnElement
 from fitminiapp_api.models.food import Food, FoodFavorite
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.user import User
+from fitminiapp_api.nutrition_label.contracts import CanonicalDraft, validate_canonical_draft
 from fitminiapp_api.schemas.food import (
+    FoodCatalogQuality,
     FoodListResponse,
     FoodNutrientsInput,
+    FoodProvenance,
     FoodResponse,
+    FoodTrustLevel,
     FoodType,
+    NutritionBasisKind,
     ServingUnit,
     UserFoodCreate,
     UserFoodUpdate,
@@ -78,7 +83,7 @@ def _simple_typo_match(search_text: str, normalized_query: str) -> bool:
 
 @dataclass(frozen=True)
 class FoodNutrition:
-    weight_g: Decimal
+    weight_g: Decimal | None
     energy_kcal: Decimal | None
     protein_g: Decimal | None
     fat_g: Decimal | None
@@ -125,6 +130,128 @@ def calculate_food_servings(food: Food, servings: Decimal) -> FoodNutrition:
         fiber_g_per_100g=food.fiber_g_per_100g,
     )
     return calculate_food_nutrition(nutrients, food.standard_serving_weight_g * servings)
+
+
+def _canonical_fact_value(canonical: CanonicalDraft, field_name: str, basis: str) -> Decimal | None:
+    normalized = getattr(canonical.normalized_facts, field_name)
+    if normalized is not None and normalized.basis_ref == basis:
+        return normalized.value
+    if basis == "per_serving":
+        source_cells = getattr(canonical.source_facts, field_name)
+        if source_cells:
+            for cell in source_cells:
+                if cell.evidence == "read" and cell.basis_ref == "per_serving":
+                    return cell.value
+    return None
+
+
+def calculate_food_amount(
+    food: Food,
+    amount: Decimal,
+    amount_unit: str,
+) -> FoodNutrition:
+    """Calculate a food quantity without crossing g/ml or guessing density."""
+
+    if not amount.is_finite() or amount <= 0:
+        raise FoodError("amount must be a positive finite decimal")
+    if not food.canonical_facts:
+        if amount_unit == "g":
+            nutrients = FoodNutrientsInput(
+                energy_kcal_per_100g=food.energy_kcal_per_100g,
+                protein_g_per_100g=food.protein_g_per_100g,
+                fat_g_per_100g=food.fat_g_per_100g,
+                carbs_g_per_100g=food.carbs_g_per_100g,
+                fiber_g_per_100g=food.fiber_g_per_100g,
+            )
+            return calculate_food_nutrition(nutrients, amount)
+        if amount_unit == "serving":
+            return calculate_food_servings(food, amount)
+        raise FoodError("food cannot be measured in millilitres")
+    try:
+        canonical = validate_canonical_draft(food.canonical_facts)
+    except ValueError as exc:
+        raise FoodError("food has invalid canonical nutrition facts") from exc
+
+    if amount_unit == "g":
+        target_basis = "per_100_g"
+    elif amount_unit == "ml":
+        target_basis = "per_100_ml"
+    elif amount_unit == "serving":
+        target_basis = "per_serving"
+    else:
+        raise FoodError("unsupported food amount unit")
+
+    factor: Decimal
+    weight_g: Decimal | None
+    if target_basis == "per_serving":
+        if canonical.source_basis == "per_serving":
+            if canonical.serving_size is not None:
+                serving_basis = "per_100_g" if canonical.serving_size.unit == "g" else "per_100_ml"
+                has_normalized_value = any(
+                    _canonical_fact_value(canonical, field_name, serving_basis) is not None
+                    for field_name in ("energy_kcal", "protein_g", "fat_g", "carbohydrate_g")
+                )
+                if has_normalized_value:
+                    factor = amount * canonical.serving_size.amount / Decimal(100)
+                    target_basis = serving_basis
+                else:
+                    factor = amount
+            else:
+                factor = amount
+        elif (
+            canonical.source_basis == "per_100_g"
+            and canonical.serving_size is not None
+            and canonical.serving_size.unit == "g"
+        ):
+            factor = amount * canonical.serving_size.amount / Decimal(100)
+            target_basis = "per_100_g"
+        elif (
+            canonical.source_basis == "per_100_ml"
+            and canonical.serving_size is not None
+            and canonical.serving_size.unit == "ml"
+        ):
+            factor = amount * canonical.serving_size.amount / Decimal(100)
+            target_basis = "per_100_ml"
+        elif canonical.source_basis == "per_100_g" and food.standard_serving_weight_g is not None:
+            factor = amount * food.standard_serving_weight_g / Decimal(100)
+            target_basis = "per_100_g"
+        else:
+            raise FoodError("food has no compatible serving basis")
+        weight_g = (
+            amount * canonical.serving_size.amount
+            if canonical.serving_size is not None and canonical.serving_size.unit == "g"
+            else amount * food.standard_serving_weight_g
+            if (
+                canonical.source_basis == "per_100_g" and food.standard_serving_weight_g is not None
+            )
+            else None
+        )
+    else:
+        source_basis = canonical.source_basis
+        if source_basis == "per_serving":
+            if canonical.serving_size is None:
+                raise FoodError("food has no serving mass or volume for this amount unit")
+            expected_basis = "per_100_g" if canonical.serving_size.unit == "g" else "per_100_ml"
+            if target_basis != expected_basis:
+                raise FoodError("food cannot be converted between grams and millilitres")
+        elif source_basis != target_basis:
+            raise FoodError("food cannot be converted between grams and millilitres")
+        factor = amount / Decimal(100)
+        weight_g = amount if target_basis == "per_100_g" else None
+
+    def value(field_name: str) -> Decimal | None:
+        return _canonical_fact_value(canonical, field_name, target_basis)
+
+    return FoodNutrition(
+        weight_g=weight_g.quantize(WEIGHT_QUANTUM, rounding=ROUND_HALF_UP)
+        if weight_g is not None
+        else None,
+        energy_kcal=_scale(value("energy_kcal"), factor, ENERGY_QUANTUM),
+        protein_g=_scale(value("protein_g"), factor, MACRO_QUANTUM),
+        fat_g=_scale(value("fat_g"), factor, MACRO_QUANTUM),
+        carbs_g=_scale(value("carbohydrate_g"), factor, MACRO_QUANTUM),
+        fiber_g=_scale(value("fiber_g"), factor, MACRO_QUANTUM),
+    )
 
 
 def create_user_food(db: Session, owner: User, payload: UserFoodCreate) -> Food:
@@ -208,6 +335,15 @@ def _serialize_food(
         fat_g_per_100g=cast(Decimal, food.fat_g_per_100g),
         carbs_g_per_100g=cast(Decimal, food.carbs_g_per_100g),
         fiber_g_per_100g=food.fiber_g_per_100g,
+        nutrition_basis_kind=cast(NutritionBasisKind, food.nutrition_basis_kind),
+        nutrition_basis_amount=food.nutrition_basis_amount,
+        nutrition_basis_unit=cast(Literal["g", "ml", "serving"], food.nutrition_basis_unit),
+        canonical_facts=food.canonical_facts,
+        nutrition_provenance=food.nutrition_provenance,
+        catalog_quality=cast(FoodCatalogQuality, food.catalog_quality),
+        provenance=cast(FoodProvenance, food.provenance),
+        trust_level=cast(FoodTrustLevel, food.trust_level),
+        canonical_complete=food.canonical_complete,
         standard_serving_amount=food.standard_serving_amount,
         standard_serving_unit=cast(ServingUnit | None, food.standard_serving_unit),
         standard_serving_weight_g=food.standard_serving_weight_g,
@@ -449,7 +585,15 @@ def search_foods(
     similarity = func.similarity(Food.search_text, normalized)
     match_condition: ColumnElement[bool] = Food.search_text.like(contains, escape="\\")
     if is_postgresql:
-        match_condition = or_(match_condition, Food.search_text.op("%")(normalized))
+        # ``%`` compares the whole search string, so a typo in one token can
+        # miss a longer ``name + brand`` value.  Compare the query to the best
+        # word extent instead; pg_trgm's default word-similarity threshold is
+        # deliberately retained here and the SQLite fallback below keeps the
+        # same one-edit-distance behavior in local tests.
+        match_condition = or_(
+            match_condition,
+            func.word_similarity(normalized, Food.search_text) >= 0.6,
+        )
     filtered = query.filter(match_condition)
     total = filtered.count()
     if total == 0 and not is_postgresql:
@@ -471,8 +615,16 @@ def search_foods(
                 if food.food_type == "system"
                 else 4
             )
+            quality_rank = (
+                0
+                if food.catalog_quality == "verified"
+                else 1
+                if food.catalog_quality == "community_unverified"
+                else 2
+            )
             return (
                 category,
+                quality_rank,
                 -(last_used_at.timestamp() if last_used_at is not None else 0),
                 -(favorite_created_at.timestamp() if favorite_created_at is not None else 0),
                 food.name,
@@ -494,8 +646,9 @@ def search_foods(
         (exact_name, 3),
         (Food.search_text.like(prefix, escape="\\"), 4),
         (Food.food_type == "user", 5),
-        (Food.food_type == "system", 6),
-        else_=7,
+        (Food.catalog_quality == "verified", 6),
+        (Food.food_type == "system", 7),
+        else_=8,
     )
     rows = (
         filtered.order_by(

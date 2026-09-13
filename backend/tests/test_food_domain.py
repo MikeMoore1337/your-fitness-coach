@@ -261,13 +261,31 @@ def test_food_migration_upgrades_from_previous_head(tmp_path: Path) -> None:
         migration.upgrade()
         schema = inspect(connection)
         assert "foods" in schema.get_table_names()
+        legacy_food_columns = {
+            "nutrition_basis_kind",
+            "nutrition_basis_amount",
+            "nutrition_basis_unit",
+            "canonical_facts",
+            "nutrition_provenance",
+            "canonical_complete",
+            "catalog_quality",
+        }
         assert {column["name"] for column in schema.get_columns("foods")} == {
-            column.name for column in Food.__table__.columns if column.name != "search_text"
+            column.name
+            for column in Food.__table__.columns
+            if column.name != "search_text" and column.name not in legacy_food_columns
         }
         assert {constraint["name"] for constraint in schema.get_check_constraints("foods")} == {
             constraint.name
             for constraint in Food.__table__.constraints
             if isinstance(constraint, CheckConstraint)
+            and constraint.name
+            not in {
+                "ck_foods_catalog_quality",
+                "ck_foods_nutrition_basis_kind",
+                "ck_foods_nutrition_basis_unit",
+                "ck_foods_nutrition_basis_shape",
+            }
         }
         assert {index["name"] for index in schema.get_indexes("foods")} == {
             "ix_foods_owner_status",

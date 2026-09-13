@@ -8,7 +8,7 @@ from decimal import Decimal
 from math import floor
 from typing import Literal, cast
 
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.core.timezone import (
@@ -41,6 +41,7 @@ from fitminiapp_api.services.data_quality import (
     build_training_data_sufficiency,
     collect_training_data_counts,
 )
+from fitminiapp_api.services.diary_nutrition import DiaryDayNutrition, aggregate_diary_entries
 from fitminiapp_api.services.period_bounds import (
     MAX_REPORT_DAYS,
     resolve_progress_bounds,
@@ -558,41 +559,11 @@ def build_progress_summaries(
         user_id: min(current_day, actual_today_by_user[user_id] - timedelta(days=1))
         for user_id, current_day in today_by_user.items()
     }
-    diary_rows = []
     diary_status_rows = []
+    diary_totals: dict[tuple[int, date], DiaryDayNutrition] = {}
     if visible_nutrition_ids:
-        energy_value = case(
-            (
-                FoodDiaryEntry.entry_kind == "quick_add",
-                FoodDiaryEntry.quick_energy_kcal,
-            ),
-            else_=FoodDiaryEntry.weight_g * FoodDiaryEntry.energy_kcal_per_100g / 100,
-        )
-        protein_value = case(
-            (
-                FoodDiaryEntry.entry_kind == "quick_add",
-                FoodDiaryEntry.quick_protein_g,
-            ),
-            else_=FoodDiaryEntry.weight_g * FoodDiaryEntry.protein_g_per_100g / 100,
-        )
-        missing_protein = case(
-            (
-                and_(
-                    FoodDiaryEntry.entry_kind == "quick_add",
-                    FoodDiaryEntry.quick_protein_g.is_(None),
-                ),
-                1,
-            ),
-            else_=0,
-        )
-        diary_rows = (
-            db.query(
-                FoodDiaryEntry.user_id,
-                FoodDiaryEntry.diary_date,
-                func.sum(energy_value).label("calories"),
-                func.sum(protein_value).label("protein_g"),
-                func.sum(missing_protein).label("missing_protein_count"),
-            )
+        diary_entries = (
+            db.query(FoodDiaryEntry)
             .filter(
                 _user_date_filter(
                     visible_nutrition_ids,
@@ -602,10 +573,10 @@ def build_progress_summaries(
                     FoodDiaryEntry.diary_date,
                 )
             )
-            .group_by(FoodDiaryEntry.user_id, FoodDiaryEntry.diary_date)
             .order_by(FoodDiaryEntry.user_id, FoodDiaryEntry.diary_date)
             .all()
         )
+        diary_totals = aggregate_diary_entries(diary_entries)
         diary_status_rows = (
             db.query(FoodDiaryDayStatus)
             .filter(
@@ -621,23 +592,21 @@ def build_progress_summaries(
         )
     statuses_by_key = {(row.user_id, row.diary_date): row.status for row in diary_status_rows}
     diary_by_user: dict[int, list[NutritionDiaryDay]] = defaultdict(list)
-    for diary_row in diary_rows:
-        diary_by_user[diary_row.user_id].append(
+    for (diary_user_id, diary_date), totals in sorted(diary_totals.items()):
+        diary_by_user[diary_user_id].append(
             NutritionDiaryDay(
-                user_id=diary_row.user_id,
-                diary_date=diary_row.diary_date,
-                calories=Decimal(diary_row.calories),
-                protein_g=(
-                    None if diary_row.missing_protein_count else Decimal(diary_row.protein_g)
-                ),
+                user_id=diary_user_id,
+                diary_date=diary_date,
+                calories=totals.calories,
+                protein_g=None if totals.missing_macros else totals.protein_g,
                 status=cast(
                     NutritionDiaryStatus,
-                    statuses_by_key.get((diary_row.user_id, diary_row.diary_date), "incomplete"),
+                    statuses_by_key.get((diary_user_id, diary_date), "incomplete"),
                 ),
                 has_entries=True,
             )
         )
-    populated_keys = {(row.user_id, row.diary_date) for row in diary_rows}
+    populated_keys = set(diary_totals)
     for status_row in diary_status_rows:
         key = (status_row.user_id, status_row.diary_date)
         if key in populated_keys:

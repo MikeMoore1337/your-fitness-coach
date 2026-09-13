@@ -5,10 +5,8 @@ import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from decimal import Decimal
 from typing import Literal, cast
 
-from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.timezone import now_for_user_naive, today_for_user
@@ -20,6 +18,7 @@ from fitminiapp_api.schemas.nutrition import (
     EnergyCalibrationStatus,
     EnergyCalibrationSufficiency,
 )
+from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries
 from fitminiapp_api.services.nutrition import (
     NutritionMacros,
     calculate_macros,
@@ -554,15 +553,8 @@ def _load_inputs(
     period_start: date,
     period_end: date,
 ) -> tuple[dict[date, float], list[tuple[date, float]]]:
-    energy = case(
-        (
-            FoodDiaryEntry.entry_kind == "quick_add",
-            FoodDiaryEntry.quick_energy_kcal,
-        ),
-        else_=FoodDiaryEntry.energy_kcal_per_100g * FoodDiaryEntry.weight_g / Decimal("100"),
-    )
-    diary_rows = (
-        db.query(FoodDiaryEntry.diary_date, func.sum(energy))
+    diary_entries = (
+        db.query(FoodDiaryEntry)
         .join(
             FoodDiaryDayStatus,
             (FoodDiaryDayStatus.user_id == FoodDiaryEntry.user_id)
@@ -573,9 +565,10 @@ def _load_inputs(
             FoodDiaryEntry.diary_date.between(period_start, period_end),
             FoodDiaryDayStatus.status == "complete",
         )
-        .group_by(FoodDiaryEntry.diary_date)
+        .order_by(FoodDiaryEntry.diary_date.asc(), FoodDiaryEntry.id.asc())
         .all()
     )
+    diary_totals = aggregate_diary_entries(diary_entries)
     fasted_dates = (
         db.query(FoodDiaryDayStatus.diary_date)
         .filter(
@@ -597,7 +590,11 @@ def _load_inputs(
     )
     return (
         {
-            **{logged_on: float(total) for logged_on, total in diary_rows if total is not None},
+            **{
+                diary_date: float(total.calories)
+                for (entry_user_id, diary_date), total in diary_totals.items()
+                if entry_user_id == user.id and total.calories is not None
+            },
             **{logged_on: 0.0 for (logged_on,) in fasted_dates},
         },
         [(measured_on, float(weight)) for measured_on, weight in weight_rows if weight is not None],

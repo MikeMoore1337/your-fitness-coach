@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 MealType = Literal["breakfast", "lunch", "dinner", "snacks"]
-DiaryAmountUnit = Literal["g", "serving"]
+DiaryAmountUnit = Literal["g", "ml", "serving"]
 DiaryDayStatus = Literal["complete", "incomplete", "unlogged", "fasted"]
 
 
@@ -131,7 +131,10 @@ class FoodDiaryEntryResponse(BaseModel):
     food_brand: str | None
     amount: Decimal
     amount_unit: DiaryAmountUnit
-    weight_g: Decimal
+    weight_g: Decimal | None
+    nutrition_basis_kind: Literal["per_100_g", "per_100_ml", "per_serving"] | None = None
+    nutrition_basis_amount: Decimal | None = None
+    nutrition_basis_unit: Literal["g", "ml", "serving"] | None = None
     serving_amount: Decimal | None
     serving_unit: str | None
     serving_weight_g: Decimal | None

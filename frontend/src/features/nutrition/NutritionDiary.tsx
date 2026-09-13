@@ -80,8 +80,10 @@ function formatDate(value: string, today: string): { title: string; subtitle: st
 
 function amountLabel(entry: FoodDiaryEntry): string {
   if (entry.amount_unit === 'serving') {
-    return `${formatNumber(entry.amount, 2)} ${Number(entry.amount) === 1 ? 'порция' : 'порции'} · ${formatNumber(entry.weight_g)} г`;
+    const weight = entry.weight_g === null ? '' : ` · ${formatNumber(entry.weight_g)} г`;
+    return `${formatNumber(entry.amount, 2)} ${Number(entry.amount) === 1 ? 'порция' : 'порции'}${weight}`;
   }
+  if (entry.amount_unit === 'ml') return `${formatNumber(entry.amount, 1)} мл`;
   return `${formatNumber(entry.weight_g, 1)} г`;
 }
 
@@ -297,7 +299,7 @@ function EntryRow({
   const { confirm, toast } = useFeedback();
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState(entry.amount);
-  const [amountUnit, setAmountUnit] = useState<'g' | 'serving'>(entry.amount_unit);
+  const [amountUnit, setAmountUnit] = useState<FoodDiaryEntry['amount_unit']>(entry.amount_unit);
   const motion = useSemanticMotion<HTMLLIElement>(
     JSON.stringify([entry.amount, entry.amount_unit, entry.nutrition]),
     { animateInitial: isNew },
@@ -424,10 +426,13 @@ function EntryRow({
               value={amountUnit}
               onChange={(event) => {
                 update.reset();
-                setAmountUnit(event.target.value as 'g' | 'serving');
+                setAmountUnit(event.target.value as FoodDiaryEntry['amount_unit']);
               }}
             >
               <option value="g">граммы</option>
+              {(entry.amount_unit === 'ml' || entry.nutrition_basis_unit === 'ml') && (
+                <option value="ml">миллилитры</option>
+              )}
               {entry.serving_weight_g && <option value="serving">порции</option>}
             </Select>
           </Field>

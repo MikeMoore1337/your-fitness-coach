@@ -637,6 +637,11 @@ def test_food_diary_migration_upgrades_from_food_domain_head(tmp_path: Path) -> 
             "quick_carbs_g",
             "idempotency_key",
             "request_fingerprint",
+            "nutrition_basis_kind",
+            "nutrition_basis_amount",
+            "nutrition_basis_unit",
+            "nutrition_snapshot",
+            "nutrition_amount",
         }
         assert {column["name"] for column in schema.get_columns("food_diary_entries")} == {
             column.name

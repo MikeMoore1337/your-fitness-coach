@@ -115,6 +115,20 @@ class Settings(BaseSettings):
     usda_fdc_api_key: SecretStr = SecretStr("")
     food_provider_timeout_seconds: float = Field(default=4, ge=1, le=15)
 
+    # Task 128B is deliberately local-only and owner-cohort-only. These
+    # settings do not configure a cloud Vision provider or a fallback route.
+    nutrition_label_scan_enabled: bool = False
+    nutrition_label_scan_kill_switch: bool = False
+    nutrition_label_scan_internal_user_ids: str = ""
+    nutrition_label_scan_ocr_engine: Literal["tesseract"] = "tesseract"
+    nutrition_label_scan_ocr_languages: str = "rus+eng"
+    nutrition_label_scan_max_image_bytes: int = Field(default=8_388_608, ge=256_000, le=8_388_608)
+    nutrition_label_scan_max_request_bytes: int = Field(default=8_650_000, ge=300_000, le=9_000_000)
+    nutrition_label_scan_max_pixels: int = Field(default=20_000_000, ge=1_000_000, le=40_000_000)
+    nutrition_label_scan_ocr_timeout_seconds: float = Field(default=8, ge=1, le=15)
+    nutrition_label_scan_ocr_max_output_chars: int = Field(default=50_000, ge=4_096, le=100_000)
+    nutrition_label_scan_draft_ttl_minutes: int = Field(default=15, ge=5, le=60)
+
     worker_poll_seconds: int = Field(default=10, ge=1, le=3600)
     reminder_sync_seconds: int = Field(default=60, ge=10, le=3600)
     notification_delivery_concurrency: int = Field(default=8, ge=1, le=30)
@@ -290,6 +304,23 @@ class Settings(BaseSettings):
                 )
         if self.food_usda_enabled and not self.usda_fdc_api_key.get_secret_value().strip():
             raise ValueError("USDA_FDC_API_KEY must be configured when FOOD_USDA_ENABLED is true")
+        return self
+
+    @model_validator(mode="after")
+    def validate_nutrition_label_scan(self) -> Settings:
+        if (
+            self.nutrition_label_scan_enabled
+            and self.app_env == "prod"
+            and not self.nutrition_label_scan_internal_user_id_set
+        ):
+            raise ValueError(
+                "NUTRITION_LABEL_SCAN_INTERNAL_USER_IDS must be configured when "
+                "NUTRITION_LABEL_SCAN_ENABLED is true in prod"
+            )
+        languages = self.nutrition_label_scan_ocr_languages.strip()
+        if not re.fullmatch(r"[a-z]{2,4}(?:\+[a-z]{2,4}){0,2}", languages):
+            raise ValueError("NUTRITION_LABEL_SCAN_OCR_LANGUAGES is invalid")
+        self.nutrition_label_scan_ocr_languages = languages
         return self
 
     @model_validator(mode="after")
@@ -549,6 +580,21 @@ class Settings(BaseSettings):
                 result.add(int(value))
             except ValueError as exc:
                 raise ValueError(f"Invalid AI_COACH_INTERNAL_USER_IDS value: {value}") from exc
+        return result
+
+    @property
+    def nutrition_label_scan_internal_user_id_set(self) -> set[int]:
+        result: set[int] = set()
+        for item in self.nutrition_label_scan_internal_user_ids.replace(";", ",").split(","):
+            value = item.strip()
+            if not value:
+                continue
+            try:
+                result.add(int(value))
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid NUTRITION_LABEL_SCAN_INTERNAL_USER_IDS value: {value}"
+                ) from exc
         return result
 
     @property

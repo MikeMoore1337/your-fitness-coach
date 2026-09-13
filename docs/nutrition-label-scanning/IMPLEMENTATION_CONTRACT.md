@@ -1,0 +1,116 @@
+# Task 128B: backend-контракт сканирования этикетки
+
+Этот документ фиксирует production foundation, реализованный в Task 128B. Он не является
+разрешением публичного rollout: до следующего owner-only validation feature остаётся выключенной
+для обычных пользователей.
+
+## Граница выполнения
+
+Pipeline состоит из четырёх явно разделённых шагов:
+
+1. server-side cohort gate и bounded multipart ingress;
+2. локальная нормализация изображения и локальный OCR;
+3. детерминированный parser OCR-текста в `nutrition-label-draft-v1`;
+4. owner-reviewed `draft -> confirm`, после которого создаётся private food или отдельная
+   community contribution.
+
+До `confirm` не создаются `foods`, `nutrition_catalog_contributions` и записи diary. Confirm не
+создаёт diary entry автоматически. Пользователь должен отдельно выбрать продукт и явно добавить
+его в дневник существующим endpoint.
+
+## Local-only OCR runtime
+
+В production image добавлены Debian-пакеты `tesseract-ocr`, `tesseract-ocr-eng` и
+`tesseract-ocr-rus`. Python-код запускает только allowlisted executable `tesseract` через явный
+`argv`, `shell=False`, `stdin=DEVNULL`, timeout и bounded stdout. Поддерживаемые языки —
+`rus+eng`; текущая адаптерная версия — `tesseract-text-v1`.
+
+Tesseract core распространяется под Apache License 2.0; репозиторий официальных `tessdata`
+указывает Apache-2.0 для training data. В образе нужно сохранять package/license manifest
+конкретного Debian release и отдельно учитывать лицензии транзитивных библиотек (в частности
+Leptonica). Источники: [Tesseract license](https://github.com/tesseract-ocr/tesseract/blob/main/LICENSE)
+и [tessdata README](https://github.com/tesseract-ocr/tessdata/blob/main/README.md).
+
+В Windows-разработке наличие CLI не предполагается: unit и integration tests подменяют OCR
+детерминированным synthetic engine. Это не является quality run. Результаты качества OCR остаются
+`NOT MEASURED` до owner-authorized runtime validation на locked corpus.
+
+## Image ingress и privacy
+
+- Принимаются только JPEG, PNG и WebP с совпадающими MIME и magic bytes.
+- Максимум одного файла — 8 MiB, максимум изображения — 20 megapixels, весь multipart request
+  ограничен отдельным body limit.
+- Pillow делает `verify`, проверяет decompression-bomb bounds, применяет EXIF orientation и
+  пересохраняет только RGB PNG без EXIF/ICC/user metadata.
+- Изображение передаётся только локальному OCR subprocess. Raw image, raw OCR и внешние
+  provider payload не сохраняются в БД и не попадают в обычные логи.
+- Draft имеет короткий TTL (по умолчанию 15 минут) и scope по владельцу. После expiry новый scan
+  требует нового idempotency key.
+
+## Canonical facts
+
+`CanonicalDraft` — strict `extra=forbid` DTO, совместимый с
+`canonical_draft.schema.json`. Для каждого nutrient отдельно хранятся source cells,
+normalized facts, evidence и confidence. Обязательная основа — `per_100_g`, `per_100_ml`,
+`per_serving` либо явная `ambiguous`; двусмысленная основа не нормализуется и не подтверждается.
+
+Правила parser:
+
+- `%DV` не является массой и не конвертируется в `g`/`mg`;
+- salt и sodium — разные поля;
+- manufacturer kcal сохраняются как прочитаны; `4P + 9F + 4C` даёт только warning;
+- отсутствующее или нечитаемое значение остаётся `null`;
+- serving переводится в per-100 только при известной matching mass/volume;
+- плотность и неизвестная масса порции не угадываются.
+
+Legacy food columns `*_per_100g` остаются read-compatible projection. Canonical JSON и поля
+`nutrition_basis_*` являются источником истины для новых 100 ml/serving продуктов. Diary хранит
+snapshot и рассчитанную сумму на конкретное количество, чтобы последующее изменение каталога не
+переписывать историю.
+
+## API и lifecycle
+
+| Метод | Endpoint | Назначение |
+|---|---|---|
+| `POST` | `/api/v1/nutrition/label-scans` | multipart image -> owner draft; обязателен `Idempotency-Key` |
+| `GET` | `/api/v1/nutrition/label-scans/{draft_id}` | получить собственный draft |
+| `POST` | `/api/v1/nutrition/label-scans/{draft_id}/confirm` | explicit revision-bound confirmation |
+| `POST` | `/api/v1/nutrition/label-scans/{draft_id}/cancel?revision=N` | закрыть draft без записи продукта |
+
+Confirm повторно валидирует ownership, revision, TTL, basis и четыре обязательных факта:
+`energy_kcal`, `protein_g`, `fat_g`, `carbohydrate_g`.
+
+`visibility=private` создаёт user-owned `food`, невидимый другим пользователям. Его
+`catalog_quality=private`, provenance — `user`.
+
+`visibility=share_to_yfc_catalog` допускается только с валидным GTIN. Новый продукт получает
+`food_type=branded`, `provenance=user_confirmed_package`, `catalog_quality=community_unverified`,
+`trust_level=unverified`. Contributor identity не возвращается в public `FoodResponse`; отдельная
+`nutrition_catalog_contributions` хранит state `accepted|duplicate|conflict`. Existing exact
+barcode/facts не перезаписываются; mismatch возвращает conflict.
+
+Local YFC catalog checked first. Exact local barcode lookup завершается без external provider call;
+внешний food provider остаётся отдельным opt-in fallback существующего каталога и не используется
+для label scan/OCR.
+
+## Feature flag и эксплуатация
+
+Доступ определяется только сервером:
+
+- `NUTRITION_LABEL_SCAN_ENABLED=false` по умолчанию;
+- `NUTRITION_LABEL_SCAN_KILL_SWITCH=true` немедленно закрывает route;
+- `NUTRITION_LABEL_SCAN_INTERNAL_USER_IDS` — обязательный allowlist при включении в prod;
+- включение только конкретной owner/internal когорты, без public rollout.
+
+Документированные изменения environment для кода по умолчанию: `env change required: no`.
+Для owner-only validation оператор может установить только перечисленные 128B keys в deployment
+contract, оставить kill switch выключенным и указать точные internal user IDs. Cloud Vision,
+paid Vision, local LLM и credentials для них не нужны и не добавляются.
+
+## Verification status
+
+- parser/image/API regression tests — deterministic local tests;
+- Alembic SQLite replay должен проходить от пустой базы до head;
+- `eval_harness.py --self-check` и locked synthetic fixture preflight запускаются без сети;
+- OCR recognition quality, p50/p95, correction baseline и public rollout — `NOT MEASURED`/`BLOCKED`
+  до отдельного owner-only validation.

@@ -7,10 +7,12 @@ from typing import Literal
 from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 
 FoodType = Literal["system", "branded", "user"]
-FoodProvenance = Literal["internal", "external", "user"]
+FoodProvenance = Literal["internal", "external", "user", "user_confirmed_package"]
 FoodTrustLevel = Literal["verified", "unverified"]
 FoodStatus = Literal["draft", "active", "disabled"]
 ServingUnit = Literal["g", "ml", "piece", "serving"]
+NutritionBasisKind = Literal["per_100_g", "per_100_ml", "per_serving"]
+FoodCatalogQuality = Literal["private", "verified", "community_unverified"]
 FoodProviderStatus = Literal[
     "not_requested",
     "not_needed",
@@ -154,11 +156,20 @@ class FoodResponse(BaseModel):
     name: str
     brand: str | None
     barcode: str | None
-    energy_kcal_per_100g: Decimal
-    protein_g_per_100g: Decimal
-    fat_g_per_100g: Decimal
-    carbs_g_per_100g: Decimal
+    energy_kcal_per_100g: Decimal | None
+    protein_g_per_100g: Decimal | None
+    fat_g_per_100g: Decimal | None
+    carbs_g_per_100g: Decimal | None
     fiber_g_per_100g: Decimal | None
+    nutrition_basis_kind: NutritionBasisKind = "per_100_g"
+    nutrition_basis_amount: Decimal = Decimal("100")
+    nutrition_basis_unit: Literal["g", "ml", "serving"] = "g"
+    canonical_facts: dict | None = None
+    nutrition_provenance: dict | None = None
+    catalog_quality: FoodCatalogQuality = "verified"
+    provenance: FoodProvenance
+    trust_level: FoodTrustLevel
+    canonical_complete: bool = True
     standard_serving_amount: Decimal | None
     standard_serving_unit: ServingUnit | None
     standard_serving_weight_g: Decimal | None

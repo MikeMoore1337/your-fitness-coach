@@ -5,7 +5,8 @@
 **Итог:** `PARTIAL_PRE_PROVIDER_RUN`
 **Recommendation:** `NARROW GO - IMPLEMENTATION + OWNER-ONLY PRODUCTION VALIDATION`
 **Owner decision (2026-09-13):** `NARROW GO`; pre-production quality remains `NOT MEASURED`.
-**Public rollout:** `BLOCKED`; next task `128B` permitted but not launched.
+**Public rollout:** `BLOCKED`; Task `128B` implementation is now present, but owner-only validation
+and a separate quality run are still required before any rollout decision.
 
 ## Что реально проверено
 
@@ -20,6 +21,8 @@
 | Fixture/input-safety preflight | PASS | 32 manifest entries; 31 accepted images; 4 malformed/oversized boundaries rejected |
 | Provider quality run | NOT RUN | exact blocker: `NO_APPROVED_VISION_CREDENTIAL`; no provider request was made |
 | Local OCR quality run | NOT RUN | exact blocker: `LOCAL_OCR_RUNTIME_UNAVAILABLE`; PaddleOCR/Tesseract/alternative runtimes absent |
+| Task 128B parser/image/API regression suite | PASS | synthetic OCR seam, strict canonical parser, local image bounds, draft/confirm/privacy/diary boundaries |
+| Task 128B local OCR runtime quality | NOT MEASURED | production image contains Tesseract, but unit tests do not make a recognition-quality claim |
 | p50/p95 latency, quota and cost | NOT MEASURED | no live requests |
 | Manual correction baseline | NOT MEASURED | no user study/instrumentation authorized |
 | Production/provider activation | NOT PERFORMED | outside scope |
@@ -61,7 +64,7 @@
 | Local fixture generator | `build_synthetic_fixtures.py`, Python 3.14 + Pillow 12.3.0; synthetic-owned only |
 | Fixture preflight limit | max 8 MiB, max 20 megapixels; observed local preflight `elapsed_ms=7.489` in the latest recorded run |
 | Cloud live blocker | `NO_APPROVED_VISION_CREDENTIAL`; current YFC AI Coach policy is disabled/generic/free-only and no Vision key is available |
-| Local live blocker | `LOCAL_OCR_RUNTIME_UNAVAILABLE`; no approved OCR runtime is installed in the task environment |
+| Local live blocker | `LOCAL_OCR_RUNTIME_UNAVAILABLE` on the development host; the Task 128B production image contains bounded Tesseract, but no quality run was authorized or completed |
 
 The preflight latency is input-boundary latency, not provider end-to-end latency and not a
 production SLO measurement. `NOT_RUN` is intentionally distinct from `FAIL`: no candidate was
@@ -75,6 +78,8 @@ Self-check и fixture preflight запускаются без сети; self-che
 eval environment.
 
 Любой recognition-quality или public-rollout claim на основании этого отчёта был бы недоказанным.
+Task 128B добавляет production-equivalent parser, ingress и confirm boundaries, но это не превращает
+synthetic OCR seam в measured recognition quality.
 Следующая validation run разрешена только в owner/internal allowlist после реализации `128B` и
 `128C`; для cloud по-прежнему нужны совместимый terms/privacy режим и approved credential.
 Пороговые значения не изменены и применяются строго по

@@ -63,6 +63,13 @@ const food: Food = {
   fat_g_per_100g: '12.000',
   carbs_g_per_100g: '54.000',
   fiber_g_per_100g: '7.000',
+  nutrition_basis_kind: 'per_100_g',
+  nutrition_basis_amount: '100.000',
+  nutrition_basis_unit: 'g',
+  catalog_quality: 'verified',
+  provenance: 'internal',
+  trust_level: 'verified',
+  canonical_complete: true,
   standard_serving_amount: '1.000',
   standard_serving_unit: 'serving',
   standard_serving_weight_g: '50.000',
@@ -500,6 +507,8 @@ describe('NutritionDiary', () => {
       protein_g_per_100g: '18.500',
       fat_g_per_100g: '12.000',
       carbs_g_per_100g: '54.000',
+      nutrition_basis_kind: 'per_100_g',
+      nutrition_basis_unit: 'g',
       standard_serving_weight_g: '50.000',
     });
     expect(storedDraft.food).not.toHaveProperty('barcode');
