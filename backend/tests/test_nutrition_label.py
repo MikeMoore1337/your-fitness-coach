@@ -140,6 +140,26 @@ def test_parser_refuses_ambiguous_basis_and_does_not_normalize() -> None:
     assert "ambiguous_basis" in draft.warnings
 
 
+def test_parser_ignores_zero_serving_size_without_dividing_by_zero() -> None:
+    draft = build_draft_from_ocr(
+        "\n".join(
+            (
+                "Per serving",
+                "Serving size 0 g",
+                "Energy 250 kcal",
+                "Protein 10 g",
+                "Fat 5 g",
+                "Carbohydrate 30 g",
+            )
+        )
+    )
+
+    assert draft.serving_size is None
+    assert draft.normalized_facts.energy_kcal is not None
+    assert draft.normalized_facts.energy_kcal.value == 250
+    assert "serving_size_required_for_normalization" in draft.warnings
+
+
 def test_basis_aware_food_amount_does_not_guess_density_or_serving_mass() -> None:
     per_ml = build_draft_from_ocr(
         "\n".join(

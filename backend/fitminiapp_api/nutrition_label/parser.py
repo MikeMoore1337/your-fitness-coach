@@ -187,21 +187,27 @@ def _numeric_metadata(text: str):
     serving_size = None
     match = _SERVING_SIZE_PATTERN.search(text)
     if match:
-        serving_size = {
-            "amount": parse_decimal_token(match.group("number")),
-            "unit": "g" if match.group("unit") in {"г", "g"} else "ml",
-        }
+        amount = parse_decimal_token(match.group("number"))
+        if amount > 0:
+            serving_size = {
+                "amount": amount,
+                "unit": "g" if match.group("unit") in {"г", "g"} else "ml",
+            }
     servings = None
     match = _SERVINGS_PATTERN.search(text)
     if match:
-        servings = parse_decimal_token(match.group("number"))
+        amount = parse_decimal_token(match.group("number"))
+        if amount > 0:
+            servings = amount
     package = None
     match = _PACKAGE_PATTERN.search(text)
     if match:
-        package = {
-            "amount": parse_decimal_token(match.group("number")),
-            "unit": "g" if match.group("unit") in {"г", "g"} else "ml",
-        }
+        amount = parse_decimal_token(match.group("number"))
+        if amount > 0:
+            package = {
+                "amount": amount,
+                "unit": "g" if match.group("unit") in {"г", "g"} else "ml",
+            }
     return serving_size, servings, package
 
 

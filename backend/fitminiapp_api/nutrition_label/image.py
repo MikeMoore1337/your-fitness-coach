@@ -76,9 +76,15 @@ def normalize_uploaded_image(
                 converted.save(output, format="PNG", optimize=False)
     except ImageIngressError:
         raise
-    except Image.DecompressionBombError, Image.DecompressionBombWarning:
+    except Image.DecompressionBombError:
         raise ImageIngressError("oversized_image") from None
-    except UnidentifiedImageError, OSError, ValueError:
+    except Image.DecompressionBombWarning:
+        raise ImageIngressError("oversized_image") from None
+    except UnidentifiedImageError:
+        raise ImageIngressError("decode_failed") from None
+    except OSError:
+        raise ImageIngressError("decode_failed") from None
+    except ValueError:
         raise ImageIngressError("decode_failed") from None
     return NormalizedImage(
         data=output.getvalue(),
