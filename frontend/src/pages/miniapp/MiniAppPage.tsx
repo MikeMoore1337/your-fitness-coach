@@ -661,7 +661,7 @@ export default function MiniAppPage() {
                   >
                     <div>
                       <span className="eyebrow">AI Coach</span>
-                      <h2 id="profile-ai-coach-title">AI Coach временно недоступен</h2>
+                      <h2 id="profile-ai-coach-title">AI Coach сейчас недоступен</h2>
                       <p>
                         Основные функции приложения продолжают работать. Доступность можно проверить
                         позже.
