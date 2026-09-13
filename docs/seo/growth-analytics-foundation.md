@@ -56,6 +56,24 @@ Production counter: `112530718`. Единственный runtime boundary —
 Telegram ID, имя, workout/food values, body measurements, report text, tokens или произвольный
 URL/query payload.
 
+### CSP boundary
+
+Единственный production source of truth для response header —
+`backend/fitminiapp_api/middleware/request_context.py`, константа
+`CONTENT_SECURITY_POLICY`. Для внешнего `tag.js` разрешены только `https://mc.yandex.ru` и
+`https://yastatic.net` в `script-src`; для noscript/telemetry — `https://mc.yandex.ru`, а для
+Chrome-specific consent/iframe runtime tag — `https://mc.yandex.md`. `connect-src` также содержит
+только canonical API origin `https://app.your-fitness-coach.ru` и `wss://mc.yandex.ru`; `blob:` и
+эти exact Yandex origins разрешены в `child-src`/`frame-src` для текущего `webvisor: true`.
+`worker-src 'self'` явно сохраняет service-worker/worker boundary приложения.
+Существующие Telegram origins и security directives (`object-src 'none'`, `base-uri 'self'`,
+`form-action 'self'`, private-safe `frame-ancestors`) сохраняются. Для Yandex не используются
+wildcard, общий `https:`, `unsafe-eval` или `script-src 'unsafe-inline'`.
+
+Детали официального CSP-контракта сверяются с
+[инструкцией Yandex Metrica для CSP](https://yandex.com/support/metrica/en/code/install-counter-csp);
+региональные и Webvisor origins не добавляются без фактического runtime-требования.
+
 ## Growth event registry
 
 Registry и goal IDs находятся в `frontend/src/shared/analytics/productEvents.ts`. Все implemented

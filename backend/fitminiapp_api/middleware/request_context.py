@@ -19,6 +19,22 @@ from fitminiapp_api.middleware.request_body_limit import REQUEST_ID_PATTERN
 
 logger = logging.getLogger("app.http")
 
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' https://telegram.org https://mc.yandex.ru https://yastatic.net; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob: https://t.me https://*.telegram.org "
+    "https://*.cdn-telegram.org https://mc.yandex.ru; "
+    "connect-src 'self' https://app.your-fitness-coach.ru https://mc.yandex.ru "
+    "https://mc.yandex.md wss://mc.yandex.ru; "
+    "font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; "
+    "child-src blob: https://mc.yandex.ru https://mc.yandex.md; "
+    "worker-src 'self'; "
+    "frame-src blob: https://mc.yandex.ru https://mc.yandex.md; "
+    "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org "
+    "https://metrika.yandex.ru https://metrica.yandex.ru"
+)
+
 
 def _request_id(request: Request) -> str:
     current = getattr(request.state, "request_id", "")
@@ -88,14 +104,7 @@ class RequestContextMiddleware:
                     "Permissions-Policy",
                     "camera=(self), microphone=(), geolocation=()",
                 )
-                headers.setdefault(
-                    "Content-Security-Policy",
-                    "default-src 'self'; script-src 'self' https://telegram.org; "
-                    "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://t.me "
-                    "https://*.telegram.org https://*.cdn-telegram.org; connect-src 'self'; "
-                    "font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; "
-                    "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org",
-                )
+                headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
 
                 path = request.url.path
                 if path.startswith("/assets/"):
