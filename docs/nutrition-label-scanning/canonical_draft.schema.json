@@ -155,7 +155,7 @@
         },
         "unit": { "enum": ["g", "mg", "kcal", "kJ"] },
         "basis_ref": {
-          "enum": ["per_100_g", "per_100_ml", "per_serving"]
+          "enum": ["per_100_g", "per_100_ml", "per_serving", "ambiguous"]
         },
         "column_ref": {
           "type": "string",

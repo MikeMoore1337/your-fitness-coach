@@ -166,7 +166,8 @@ def _fact(
     elif unit != EXPECTED_FACT_UNITS[field]:
         errors.append(f"{label}.unit must be {EXPECTED_FACT_UNITS[field]} for {field}")
     basis_ref = fact.get("basis_ref")
-    if not isinstance(basis_ref, str) or basis_ref not in BASIS_VALUES - {"ambiguous"}:
+    allowed_basis = BASIS_VALUES if source else BASIS_VALUES - {"ambiguous"}
+    if not isinstance(basis_ref, str) or basis_ref not in allowed_basis:
         errors.append(f"{label}.basis_ref must identify a known basis")
 
 
@@ -682,6 +683,20 @@ def run_self_check(schema: dict[str, object]) -> None:
     valid = _synthetic_valid_draft()
     _expect_valid("synthetic valid RU per-100-g draft", valid, schema)
 
+    ambiguous_review = copy.deepcopy(valid)
+    ambiguous_review["source_basis"] = "ambiguous"
+    ambiguous_normalized = cast(dict[str, object], ambiguous_review["normalized_facts"])
+    for field in NUTRIENT_FIELDS:
+        ambiguous_normalized[field] = None
+    ambiguous_source = cast(dict[str, object], ambiguous_review["source_facts"])
+    for field in NUTRIENT_FIELDS:
+        cells = ambiguous_source.get(field)
+        if isinstance(cells, list):
+            for cell in cells:
+                if isinstance(cell, dict):
+                    cell["basis_ref"] = "ambiguous"
+    _expect_valid("ambiguous-basis readable review draft", ambiguous_review, schema)
+
     extra_key = copy.deepcopy(valid)
     extra_key["unexpected"] = "reject"
     _expect_rejected("unknown top-level key", extra_key, schema)
@@ -807,11 +822,10 @@ def run_self_check(schema: dict[str, object]) -> None:
     _expect_rejected("percent daily value presented as mass", percent_as_mass, schema)
 
     ambiguous_basis = copy.deepcopy(valid)
-    ambiguous_facts = cast(dict[str, object], ambiguous_basis["source_facts"])
-    ambiguous_items = cast(list[object], ambiguous_facts["protein_g"])
-    ambiguous_protein = cast(dict[str, object], ambiguous_items[0])
+    ambiguous_facts = cast(dict[str, object], ambiguous_basis["normalized_facts"])
+    ambiguous_protein = cast(dict[str, object], ambiguous_facts["protein_g"])
     ambiguous_protein["basis_ref"] = "ambiguous"
-    _expect_rejected("ambiguous fact basis", ambiguous_basis, schema)
+    _expect_rejected("ambiguous normalized fact basis", ambiguous_basis, schema)
 
     confidence_without_semantics = copy.deepcopy(valid)
     confidence_values = cast(dict[str, object], confidence_without_semantics["confidence"])

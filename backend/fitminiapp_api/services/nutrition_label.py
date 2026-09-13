@@ -30,6 +30,7 @@ from fitminiapp_api.nutrition_label.contracts import (
     FieldEvidence,
     NutrientFacts,
     ServingSize,
+    SourceNutrientFacts,
     validate_canonical_draft,
 )
 from fitminiapp_api.nutrition_label.image import ImageIngressError, normalize_uploaded_image
@@ -148,6 +149,18 @@ def _usable_read_fact_count(canonical: CanonicalDraft) -> int:
     )
 
 
+def _has_reviewable_source_signal(canonical: CanonicalDraft) -> bool:
+    """Return true when OCR found a nutrition row that belongs in manual review.
+
+    A parser/layout ambiguity is recoverable in the existing editable draft flow. An empty OCR
+    result, or text without any recognized nutrient row, remains a fail-closed retake case.
+    """
+
+    return any(
+        getattr(canonical.source_facts, field_name) is not None for field_name in NUTRIENT_FIELDS
+    )
+
+
 def create_label_draft(
     db: Session,
     user: User,
@@ -204,7 +217,7 @@ def create_label_draft(
         logger.info("nutrition_scan_failed", extra={"error_code": str(exc)})
         raise NutritionLabelError(str(exc)) from exc
 
-    if _usable_read_fact_count(canonical) == 0:
+    if _usable_read_fact_count(canonical) == 0 and not _has_reviewable_source_signal(canonical):
         logger.info("nutrition_scan_failed", extra={"error_code": "retake_required"})
         raise NutritionLabelError("retake_required")
 
@@ -305,6 +318,17 @@ def _canonical_from_confirmation(
             evidence_values[field_name] = "read"
         elif evidence_values[field_name] == "read":
             evidence_values[field_name] = "absent"
+    source_facts = stored.source_facts
+    if stored.source_basis == "ambiguous":
+        source_values = source_facts.model_dump()
+        for field_name in NUTRIENT_FIELDS:
+            cells = source_values[field_name]
+            if cells is None:
+                continue
+            for cell in cells:
+                if cell["basis_ref"] == "ambiguous":
+                    cell["basis_ref"] = edit.source_basis
+        source_facts = SourceNutrientFacts.model_validate(source_values)
     warnings = list(stored.warnings)
     if "user_corrected_fields" not in warnings:
         warnings.append("user_corrected_fields")
@@ -316,7 +340,7 @@ def _canonical_from_confirmation(
         serving_size=edit.serving_size,
         servings_per_container=edit.servings_per_container,
         package_amount=edit.package_amount,
-        source_facts=stored.source_facts,
+        source_facts=source_facts,
         normalized_facts=NutrientFacts.model_validate(normalized),
         derived_fields=stored.derived_fields,
         displayed_daily_value_percent=stored.displayed_daily_value_percent,

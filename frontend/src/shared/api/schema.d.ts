@@ -9161,7 +9161,7 @@ export interface components {
              * Basis Ref
              * @enum {string}
              */
-            basis_ref: "per_100_g" | "per_100_ml" | "per_serving";
+            basis_ref: "per_100_g" | "per_100_ml" | "per_serving" | "ambiguous";
             /** Column Ref */
             column_ref: string;
             /**
