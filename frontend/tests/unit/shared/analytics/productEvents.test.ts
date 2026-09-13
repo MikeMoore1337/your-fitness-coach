@@ -2,6 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createProductAnalytics,
   clearProductLoginAttempt,
+  FUTURE_GROWTH_EVENT_NAMES,
+  GROWTH_GOAL_IDS,
+  IMPLEMENTED_GROWTH_EVENT_NAMES,
   isProductEvent,
   isProductEventEnvelope,
   markProductLoginStarted,
@@ -10,6 +13,7 @@ import {
   PRODUCT_EVENT_SCHEMA_VERSION,
   productAnalyticsEnvironment,
   productEventSurface,
+  trackGrowthEvent,
   trackProductLoginCompletedIfStarted,
   type ProductAnalyticsStatus,
   type ProductAnalyticsProvider,
@@ -44,6 +48,20 @@ afterEach(() => {
 });
 
 describe('product event contract', () => {
+  it('keeps the growth goal registry typed and action-only', () => {
+    expect(Object.keys(GROWTH_GOAL_IDS)).toEqual([
+      ...IMPLEMENTED_GROWTH_EVENT_NAMES,
+      ...FUTURE_GROWTH_EVENT_NAMES,
+    ]);
+    expect(
+      isProductEvent({ name: 'registration_completed', surface: 'desktop_web' }),
+    ).toBe(true);
+    expect(trackGrowthEvent('registration_completed')).toBe(true);
+    expect(
+      isProductEvent({ name: 'calculator_result', surface: 'desktop_web' }),
+    ).toBe(true);
+  });
+
   it('emits a versioned provider-neutral envelope with a privacy-safe surface', () => {
     const { target, analytics } = testAnalytics();
     const events: ProductEventEnvelope[] = [];

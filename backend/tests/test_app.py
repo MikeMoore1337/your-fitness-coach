@@ -3557,6 +3557,7 @@ def test_public_seo_response_uses_canonical_metadata_and_truthful_structured_dat
     assert '<meta name="robots" content="index, follow" />' in response.text
     assert '<link rel="canonical" href="https://your-fitness-coach.ru/" />' in response.text
     assert '<meta property="og:url" content="https://your-fitness-coach.ru/" />' in response.text
+    assert '<noscript><div><img src="https://mc.yandex.ru/watch/112530718"' in response.text
     assert (
         '<meta property="og:image" '
         'content="https://your-fitness-coach.ru/assets/brand/yfc-social-preview.png" />'
@@ -3591,6 +3592,7 @@ def test_public_seo_response_does_not_inject_webmaster_verification_tags(client,
     assert "yandex-verification" not in landing.text
     assert "google-site-verification" not in private.text
     assert "yandex-verification" not in private.text
+    assert "mc.yandex.ru/watch/112530718" not in private.text
 
 
 def test_yandex_verification_file_is_served_directly(client):

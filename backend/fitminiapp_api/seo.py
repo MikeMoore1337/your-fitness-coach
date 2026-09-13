@@ -28,6 +28,10 @@ _PUBLIC_FALLBACK_PATTERN = re.compile(
     r"<!-- public-fallback-start -->.*?<!-- public-fallback-end -->",
     re.DOTALL,
 )
+_YANDEX_METRICA_NOSCRIPT = (
+    '<noscript><div><img src="https://mc.yandex.ru/watch/112530718" '
+    'style="position:absolute; left:-9999px;" alt="" /></div></noscript>'
+)
 
 
 @dataclass(frozen=True)
@@ -744,4 +748,8 @@ def render_frontend_document(
         rendered = _PUBLIC_FALLBACK_PATTERN.sub(marked_fallback, rendered, count=1)
     elif fallback:
         rendered = rendered.replace('<div id="root"></div>', f'<div id="root">{fallback}</div>')
+    rendered = rendered.replace(
+        "<!-- yandex-metrica-noscript -->",
+        _YANDEX_METRICA_NOSCRIPT if metadata.canonical_url else "",
+    )
     return rendered, metadata
