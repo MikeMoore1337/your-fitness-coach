@@ -25,12 +25,11 @@ PR`; implementation остаётся в task worktree, а refresh, merge, deploy
 - отсутствие актуальных blocking P0/P1 findings из применимой проверки;
 - clean/mergeable PR.
 
-После GREEN exact-head `checks` controller запрашивает один bounded Codex semantic review. CLEAN
-разрешает merge; только подтверждённые blocking P0/P1 разрешают один batch fix и re-review на новом
-SHA. MEDIUM/LOW/NIT не запускают повторный review, clean result не повторяется, а второй blocking
-result возвращает `HUMAN_REQUIRED`. CI не включает отдельный LLM job, automatic Code Review не
-включается, а review не заменяет security/legal/human/destructive gates. Automatic Security Review
-для обычного PR выключен и не сцепляется с Code Review; это отдельный manual/conditional gate,
+После GREEN exact-head `checks` controller сразу продолжает merge по deterministic gates. Codex Code
+Review полностью отключён в delivery lifecycle: controller не публикует `@codex review` или
+`@codex security review`, не вызывает review-команды и не ждёт LLM-вердикта; исторические review
+comments не являются gate. CI не включает отдельный LLM job, а отсутствие review не заменяет
+security/legal/human/destructive gates. Security Review — отдельный manual/conditional gate,
 запускаемый только при фактическом security trigger. Deterministic security scanners остаются в CI.
 
 ## Непрерывная очередь

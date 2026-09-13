@@ -3,14 +3,14 @@
 ## Постоянная политика quality gates
 
 Deterministic CI/tests/static-analysis checks и специальные human/external gates остаются
-источником release quality. Automatic Codex Code Review не включается; bounded Codex review
-используется только после GREEN exact-head `checks` как финальный semantic gate: round 1 плюс не
-более одного re-review после batch fix подтверждённых P0/P1 на изменившемся head SHA. MEDIUM/LOW/NIT
-не запускают re-review. Controller проверяет PR/status/comments/reviews перед запросом, не повторяет
-review для того же SHA, запрещает третий запрос и возвращает `HUMAN_REQUIRED` после второго blocking
-P0/P1. Отдельный reviewer-agent/subagent или adversarial audit не создаётся; implementer делает один
-bounded self-review до commit и после fix запускает только affected checks. PR-only master,
-required checks, non-fast-forward protection и thread resolution сохраняются.
+источником release quality. Codex Code Review полностью отключён в active delivery lifecycle:
+controller не хранит и не читает его state, не публикует `@codex review` или `@codex security review`,
+не вызывает review-команды и не ждёт LLM-вердикта. Исторические review-комментарии не являются
+gate. Единственное исключение — прямое указание владельца в отдельном сообщении для конкретного PR;
+оно не является частью normal lifecycle и не генерируется controller. Отдельный reviewer-agent/
+subagent или adversarial audit не создаётся; implementer делает один bounded local self-review до
+commit и после fix запускает только affected checks. PR-only master, required checks,
+non-fast-forward protection и thread resolution сохраняются.
 Automatic Security Review выключен для обычного PR и не сцепляется с Code Review, push, PR opened или
 mark-ready. Security Review запускается только отдельным manual/conditional gate при фактическом
 security trigger; отсутствие такого review не блокирует ordinary task. Deterministic security
@@ -118,8 +118,8 @@ gate, evidence и точки остановки в task-файле.
   префиксом `[Controller]`, только allowlisted governance-файлы, exact required checks и тот же
   protected-master merge provenance.
 - Внутри текущей task после terminal success автоматически выполняются bounded self-review,
-  применимую QA, commit, PR в `master`, exact-head CI и bounded Codex review (round 1 плюс максимум
-  один re-review только после blocking P0/P1 и изменившегося head), затем normal release шаги, если
+  применимую QA, commit, PR в `master`, exact-head CI и merge без Codex Code Review, затем normal
+  release шаги, если
   task явно не объявляет checkpoint или blocker. Следующая product task автоматически не запускается.
 - Явный выбор task владельцем или `scripts/run_task_delivery.py <ID>` является одним standing
   authorization на normal path этой task. Низкоуровневые controller stages не являются действиями

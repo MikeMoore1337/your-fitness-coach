@@ -193,11 +193,9 @@ def _github_slug() -> str:
 
 
 def _trusted_issue_logins(issue: Mapping[str, Any]) -> tuple[str, ...]:
+    del issue
     owner = normalize_github_login(_github_slug().split("/", maxsplit=1)[0])
-    user = issue.get("user")
-    author = user.get("login") if isinstance(user, Mapping) else None
-    normalized_author = normalize_github_login(str(author)) if author else ""
-    return tuple(login for login in {owner, normalized_author, "chatgpt-codex-connector"} if login)
+    return (owner,) if owner else ()
 
 
 def _issue_authorized(issue: Mapping[str, Any]) -> bool:
@@ -206,7 +204,7 @@ def _issue_authorized(issue: Mapping[str, Any]) -> bool:
     if not author:
         return False
     owner = normalize_github_login(_github_slug().split("/", maxsplit=1)[0])
-    return normalize_github_login(str(author)) in {owner, "chatgpt-codex-connector"}
+    return normalize_github_login(str(author)) == owner
 
 
 def _github_json(endpoint: str) -> Any:
@@ -242,8 +240,7 @@ def _post_control_state(issue_number: int, payload: Mapping[str, Any]) -> dict[s
     issue, comments = _control_issue_snapshot(issue_number)
     if not _issue_authorized(issue):
         raise DeliveryError(
-            "HUMAN_REQUIRED: task control Issue must be authored by the repository owner "
-            "or the trusted ChatGPT connector"
+            "HUMAN_REQUIRED: task control Issue must be authored by the repository owner"
         )
     previous = latest_control_state(
         comments,
@@ -335,8 +332,7 @@ def _queue_authorization_snapshot(
     issue, comments = _control_issue_snapshot(issue_number)
     if not _issue_authorized(issue):
         raise DeliveryError(
-            "HUMAN_REQUIRED: control Issue must be authored by the repository owner "
-            "or the trusted ChatGPT connector"
+            "HUMAN_REQUIRED: control Issue must be authored by the repository owner"
         )
     allowed_logins = _trusted_issue_logins(issue)
     try:
@@ -1356,19 +1352,16 @@ def _worker_prompt(
         "branch/base anchor; GitHub required checks принимают release-решение. Merge master и "
         "production deploy строго serial.\n"
         "После rebase/conflict resolution выполни только targeted recheck изменённой поверхности.\n"
-        "PR создай до ожидания PR-triggered CI. Только после GREEN exact-head required `checks` "
-        "и aggregate checks GREEN "
-        "вызови `python scripts/task_session.py request-codex-review --pr <N> --head-sha <SHA> "
-        "--round 1`, затем периодически проверяй `validate-codex-review`. Existing pending или "
-        "completed result для того же SHA переиспользуй; duplicate request запрещён.\n"
-        "Если review вернул CLEAN, merge разрешён без повторной проверки. Если есть подтверждённые "
-        "blocking P0/P1, одним batch исправь findings, выполни affected checks, push и дождись "
-        "нового exact-head CI GREEN, затем вызови максимум `--round 2` на новом SHA. MEDIUM/LOW/NIT "
-        "не запускают re-review; после второго blocking P0/P1 controller возвращает HUMAN_REQUIRED, "
-        "третья проверка запрещена. Не включай automatic Codex review и не создавай отдельного "
-        "reviewer/subagent/adversarial audit. Security Review не сцепляй автоматически с Code Review "
-        "или обычным PR; запрашивай его отдельно только при фактическом security trigger. "
-        "Deterministic security scanners остаются в CI. Self-review выполняй один раз в текущей сессии.\n"
+        "PR создай до ожидания PR-triggered CI. После GREEN exact-head required `checks` и "
+        "aggregate checks GREEN controller сразу продолжает merge; Codex Code Review отключён в "
+        "delivery lifecycle, поэтому не публикуй `@codex review` или `@codex security review`, "
+        "не вызывай review-команды и не жди внешнего LLM-вердикта. Исторические review-комментарии "
+        "не являются gate. Self-review выполняй один раз локально в текущей сессии.\n"
+        "Если после изменений появились подтверждённые BLOCKER/HIGH/MEDIUM, одним batch исправь "
+        "findings, выполни affected checks, push и дождись нового exact-head CI GREEN. MEDIUM/LOW/NIT "
+        "не создают отдельного reviewer/subagent/adversarial audit. Security Review не сцепляй "
+        "автоматически с обычным PR; запрашивай его отдельно только при фактическом security trigger. "
+        "Deterministic security scanners остаются в CI.\n"
         "Для continuous queue максимум 3 review-fix cycles и 3 CI-fix cycles на task, scope "
         "expansion не допускается; превышение означает HUMAN_REQUIRED.\n"
         "Не запускай следующую product task.\n\n"

@@ -24,13 +24,11 @@ dependencies/concurrency и recovery command. Не меняй другой workt
 создаёт repository-wide implementation barrier. Task PR открывай только в `master`, сохраняя
 `[Task <ID>]`; implementation/self-review/QA task могут идти параллельно в отдельных worktree, а
 delivery owner единолично сериализует refresh, current-base/provenance check, PR, exact-head CI,
-bounded Codex review, merge и product delivery. После GREEN `checks` один раз вызови
-`request-codex-review --round 1`; при blocking P0/P1 сделай один batch fix, affected checks, новый
-exact-head CI и максимум `--round 2`. CLEAN разрешает merge, второй blocking result даёт
-`HUMAN_REQUIRED`, третья проверка запрещена. Не deploy production вне task release contract. Не
-переходи к следующей task. Automatic Security Review не запускай автоматически для обычной task
-и не сцепляй с Code Review; это отдельный manual/conditional gate только при фактическом
-security trigger. Deterministic security scanners остаются в CI.
+merge и product delivery. Codex Code Review отключён в delivery lifecycle: не публикуй
+`@codex review` или `@codex security review`, не вызывай review-команды и не жди LLM-вердикта;
+исторические review-комментарии не являются gate. Не deploy production вне task release contract.
+Не переходи к следующей task. Security Review - отдельный manual/conditional gate только при
+фактическом security trigger. Deterministic security scanners остаются в CI.
 ```
 
 ## Current start
@@ -44,11 +42,11 @@ security trigger. Deterministic security scanners остаются в CI.
 После успешного завершения `58` следующая task — `59`. Не переходить к ней в той же сессии.
 
 
-Automatic Codex Code Review не включается. Bounded review запускается только после exact-head CI
-GREEN; отдельный reviewer/subagent не создаётся. Self-review выполняется один раз implementer в
-текущей сессии. Release требует targeted tests, применимых static analysis/integration/e2e,
-exact-head CI и aggregate `checks` GREEN, CLEAN review, отсутствия unresolved BLOCKER/HIGH,
-mergeable PR и resolution существующих threads.
+Codex Code Review полностью отключён в delivery lifecycle; controller не хранит review state,
+не публикует review-комментарии и не имеет review gate. Self-review выполняется один раз
+implementer в текущей сессии. Release требует targeted tests, применимых static
+analysis/integration/e2e, exact-head CI и aggregate `checks` GREEN, отсутствия unresolved
+BLOCKER/HIGH, mergeable PR и resolution существующих threads.
 Явные task-specific human/external/security/legal/destructive gates сохраняются. Без security
 trigger отсутствие Security Review не блокирует обычную task; при наличии trigger его запрашивай
 отдельно и явно, не выдавая Code Review за Security Review.
