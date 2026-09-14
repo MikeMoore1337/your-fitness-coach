@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkoutHistory } from '../../../../src/features/workouts/WorkoutHistory';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
@@ -75,18 +76,41 @@ const history = [
   },
 ];
 
-function renderHistory(onWorkoutSelect = vi.fn()) {
+function renderHistory(
+  onWorkoutSelect = vi.fn(),
+  focus: Pick<
+    React.ComponentProps<typeof WorkoutHistory>,
+    'focusedWorkoutId' | 'focusedCommentId' | 'focusedExerciseId'
+  > = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <WorkoutHistory onWorkoutSelect={onWorkoutSelect} />
+        <WorkoutHistory onWorkoutSelect={onWorkoutSelect} {...focus} />
       </FeedbackProvider>
     </QueryClientProvider>,
   );
   return onWorkoutSelect;
+}
+
+function DelayedFocusHistoryHarness() {
+  const [focusedWorkoutId, setFocusedWorkoutId] = useState<number | null>(null);
+
+  return (
+    <>
+      <button type="button" onClick={() => setFocusedWorkoutId(43)}>
+        Открыть deep-link истории
+      </button>
+      <WorkoutHistory
+        focusedCommentId={1}
+        focusedExerciseId={55}
+        focusedWorkoutId={focusedWorkoutId}
+      />
+    </>
+  );
 }
 
 describe('WorkoutHistory', () => {
@@ -132,6 +156,7 @@ describe('WorkoutHistory', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -166,5 +191,31 @@ describe('WorkoutHistory', () => {
 
     fireEvent.click(exerciseDetails);
     expect(await screen.findByRole('heading', { name: 'Техника пока не добавлена' })).toBeVisible();
+  });
+
+  it('открывает историю для deep-link тренировки до прокрутки к строке', async () => {
+    renderHistory(vi.fn(), { focusedWorkoutId: 43, focusedCommentId: 1, focusedExerciseId: 55 });
+
+    const historyHeading = await screen.findByRole('heading', { name: 'История' });
+    await waitFor(() => expect(historyHeading.closest('details')).toHaveAttribute('open', ''));
+  });
+
+  it('открывает историю, если deep-link приходит после первого mount', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <FeedbackProvider>
+          <DelayedFocusHistoryHarness />
+        </FeedbackProvider>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByRole('heading', { name: 'История' });
+    expect(document.querySelector('.workout-history-card')).not.toHaveAttribute('open', '');
+    fireEvent.click(screen.getByRole('button', { name: 'Открыть deep-link истории' }));
+
+    expect(document.querySelector('.workout-history-card')).toHaveAttribute('open', '');
   });
 });

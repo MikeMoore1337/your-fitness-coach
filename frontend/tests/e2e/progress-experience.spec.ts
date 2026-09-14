@@ -1317,6 +1317,8 @@ test('notification deep-link opens exact workout feedback and preserves back nav
   await page.goto('/app?workout_id=43&comment_id=7&workout_exercise_id=55');
 
   await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+  const historyCard = page.locator('.workout-history-card');
+  await expect(historyCard).toHaveAttribute('open', '');
   const feedbackDisclosure = page.locator('#workout-history-43 .workout-feedback-disclosure');
   await expect(feedbackDisclosure).toHaveAttribute('open', '');
   await expect(feedbackDisclosure.locator('.workout-feedback__body')).toContainText(
@@ -1324,11 +1326,10 @@ test('notification deep-link opens exact workout feedback and preserves back nav
   );
   await expect(page.locator('#workout-comment-7')).toHaveClass(/is-focused/);
   await expect(page.locator('#workout-comment-7')).toHaveCount(1);
-  await expect(page.getByText('Упражнение · Присед со штангой')).toBeVisible();
-  await expect(page.getByText('Изменено')).toBeVisible();
+  await expect(feedbackDisclosure.getByText('Упражнение · Присед со штангой')).toBeVisible();
+  await expect(feedbackDisclosure.getByText('Изменено')).toBeVisible();
   await expect(page.locator('.workout-feedback script')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
-  const historyCard = page.locator('.workout-history-card');
   const clearHistory = historyCard.getByRole('button', { name: 'Очистить историю' });
   const clearHistoryBox = await clearHistory.boundingBox();
   const historyFeedbackBox = await historyCard.locator('.workout-feedback').boundingBox();

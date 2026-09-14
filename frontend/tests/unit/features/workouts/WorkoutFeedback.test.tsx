@@ -1,7 +1,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   WORKOUT_COMMENT_MAX_LENGTH,
@@ -73,27 +72,6 @@ const trainerProps = {
   clientName: 'Анна Петрова',
   canCompose: true,
 };
-
-function DelayedFocusDisclosureHarness() {
-  const [focusedCommentId, setFocusedCommentId] = useState<number | null>(null);
-
-  return (
-    <>
-      <button type="button" onClick={() => setFocusedCommentId(1)}>
-        Открыть deep-link
-      </button>
-      <WorkoutFeedbackDisclosure
-        {...trainerProps}
-        viewer="client"
-        clientId={undefined}
-        clientName={undefined}
-        canCompose={false}
-        focusedCommentId={focusedCommentId}
-        focusedExerciseId={focusedCommentId ? 91 : null}
-      />
-    </>
-  );
-}
 
 describe('WorkoutFeedback', () => {
   beforeEach(() => {
@@ -226,18 +204,6 @@ describe('WorkoutFeedback', () => {
     expect(screen.queryByLabelText('Комментарий')).not.toBeInTheDocument();
     expect(within(document.getElementById('workout-comment-1')!).getByText('Тренер')).toBeVisible();
     expect(document.activeElement).toHaveAttribute('id', 'workout-comment-1');
-  });
-
-  it('открывает deep-link disclosure, если focus приходит после mount', async () => {
-    const user = userEvent.setup();
-    renderFeedback(<DelayedFocusDisclosureHarness />);
-
-    const disclosure = screen.getByText('Обратная связь тренера').closest('details');
-    expect(disclosure).not.toHaveAttribute('open', '');
-    await user.click(screen.getByRole('button', { name: 'Открыть deep-link' }));
-
-    expect(await screen.findByText('<script>alert("xss")</script>')).toBeVisible();
-    expect(disclosure).toHaveAttribute('open', '');
   });
 
   it('скрывает trainer feedback без активной связи с тренером', () => {

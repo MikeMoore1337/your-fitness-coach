@@ -71,8 +71,6 @@ export function WorkoutHistory({
   useEffect(() => {
     if (!focusedWorkoutId || !rows.some((item) => item.id === focusedWorkoutId)) return;
     const row = document.getElementById(`workout-history-${focusedWorkoutId}`);
-    const disclosure = row?.closest<HTMLDetailsElement>('details.card-disclosure');
-    if (disclosure) disclosure.open = true;
     row?.focus({ preventScroll: true });
     row?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   }, [focusedWorkoutId, rows]);
@@ -129,7 +127,12 @@ export function WorkoutHistory({
           </div>
         )}
       </Card>
-      <Card className="workout-history-card" title="История">
+      <Card
+        className="workout-history-card"
+        defaultOpen={Boolean(focusedWorkoutId)}
+        key={focusedWorkoutId ?? 'history'}
+        title="История"
+      >
         {history.isLoading || summary.isLoading ? (
           <LoadingState />
         ) : history.error || summary.error ? (
