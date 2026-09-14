@@ -3512,10 +3512,9 @@ def test_root_serves_public_landing_spa(client):
         ("GET", "/app"),
         ("GET", "/login"),
         ("GET", "/join/abcdefghijklmnopqrstuvwxyz"),
-        ("POST", "/api/v1/auth/refresh"),
     ],
 )
-def test_landing_host_redirects_application_requests_to_canonical_origin(
+def test_landing_host_redirects_browser_application_requests_to_canonical_origin(
     client, monkeypatch, method, path
 ):
     from fitminiapp_api.core.config import settings
@@ -3532,6 +3531,36 @@ def test_landing_host_redirects_application_requests_to_canonical_origin(
 
     assert response.status_code == 308
     assert response.headers["location"] == f"https://app.your-fitness-coach.ru{path}"
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "expected_status"),
+    [
+        ("GET", "/api/v1/public/articles", 200),
+        ("GET", "/api/v1/public/config", 200),
+        ("GET", "/api/v1/public/exercises", 200),
+        ("GET", "/api/v1/me", 401),
+        ("POST", "/api/v1/auth/refresh", 401),
+    ],
+)
+def test_landing_host_keeps_api_requests_same_origin(
+    client, monkeypatch, method, path, expected_status
+):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    monkeypatch.setattr(settings, "frontend_base_url", "https://app.your-fitness-coach.ru")
+
+    response = client.request(
+        method,
+        path,
+        headers={"Host": "your-fitness-coach.ru", "Origin": "https://evil.example"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == expected_status
+    assert "location" not in response.headers
+    assert "access-control-allow-origin" not in response.headers
 
 
 def test_landing_host_keeps_public_home_on_landing_domain(client, monkeypatch):
