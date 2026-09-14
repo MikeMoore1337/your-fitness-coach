@@ -4470,7 +4470,7 @@ export interface components {
         };
         /**
          * AiCoachStatusResponse
-         * @description Safe server-authoritative state for the internal beta UI.
+         * @description Safe server-authoritative state for the AI Coach runtime and UI.
          */
         AiCoachStatusResponse: {
             /** Ui Enabled */
