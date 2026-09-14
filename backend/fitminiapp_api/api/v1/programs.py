@@ -57,6 +57,7 @@ from fitminiapp_api.services.programs import (
     build_template_response,
     build_template_responses,
     create_and_optionally_assign_program,
+    delete_assigned_program_for_user,
     delete_template_for_user,
     get_template_for_user,
     list_clients,
@@ -77,6 +78,7 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
     if detail in {
         "Program revision conflict",
         "Assigned program is not editable",
+        "Cannot delete a program while a workout is in progress",
         "Training blocks must not overlap",
         "Invalid training block status transition",
         "Complete the previous training block first",
@@ -483,6 +485,18 @@ def delete_template(
         if detail == "Template not found":
             raise HTTPException(status_code=404, detail=detail)
         raise HTTPException(status_code=403, detail=detail)
+
+
+@router.delete("/assigned/{program_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_assigned_program(
+    program_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        delete_assigned_program_for_user(db, current_user, program_id)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
 
 
 @router.get(

@@ -359,6 +359,39 @@ def create_template(
     return template
 
 
+def _archive_active_program(
+    db: Session,
+    program: UserProgram,
+    actor: User,
+    *,
+    changed_fields: dict[str, bool],
+    reason: str,
+    in_progress_error: str,
+) -> None:
+    if not program.is_active:
+        raise ProgramError("Assigned program not found")
+    if any(workout.status == "in_progress" for workout in program.workouts):
+        raise ProgramError(in_progress_error)
+
+    for workout in program.workouts:
+        if workout.status == "planned":
+            workout.status = "cancelled"
+            cancel_workout_reminder(db, workout.id)
+
+    program.is_active = False
+    program.status = "archived"
+    program.archived_at = now_msk_naive()
+    db.flush()
+    record_program_revision(
+        db,
+        program,
+        actor=actor,
+        change_kind="program_archived",
+        changed_fields=changed_fields,
+        reason=reason,
+    )
+
+
 def assign_template_to_user(
     db: Session,
     template: ProgramTemplate,
@@ -382,29 +415,20 @@ def assign_template_to_user(
             UserProgram.user_id == target_user.id,
             UserProgram.is_active.is_(True),
         )
+        .populate_existing()
         .with_for_update()
         .first()
     )
     if active_program is not None:
         if not replace_active:
             raise ProgramError("Active program replacement requires confirmation")
-        if any(workout.status == "in_progress" for workout in active_program.workouts):
-            raise ProgramError("Cannot replace a program while a workout is in progress")
-        for workout in active_program.workouts:
-            if workout.status == "planned":
-                workout.status = "cancelled"
-                cancel_workout_reminder(db, workout.id)
-        active_program.is_active = False
-        active_program.status = "archived"
-        active_program.archived_at = now_msk_naive()
-        db.flush()
-        record_program_revision(
+        _archive_active_program(
             db,
             active_program,
             actor=assigned_by,
-            change_kind="program_archived",
             changed_fields={"replacement": True, "cancelled_future_workouts": True},
             reason="Программа заменена новым назначением",
+            in_progress_error="Cannot replace a program while a workout is in progress",
         )
 
     # A fresh coach assignment should put a previously hidden example back into
@@ -1253,6 +1277,39 @@ def assign_template_to_self(
     db.commit()
     db.refresh(program)
     return program, created
+
+
+def delete_assigned_program_for_user(
+    db: Session,
+    current_user: User,
+    program_id: int,
+) -> None:
+    # Serialise deletion with assignment for this user. The program lock then
+    # serialises the operation with workout start/finish mutations.
+    db.query(User).filter(User.id == current_user.id).with_for_update().one()
+    program = (
+        db.query(UserProgram)
+        .filter(
+            UserProgram.id == program_id,
+            UserProgram.user_id == current_user.id,
+            UserProgram.is_active.is_(True),
+        )
+        .populate_existing()
+        .with_for_update()
+        .first()
+    )
+    if program is None:
+        raise ProgramError("Assigned program not found")
+
+    _archive_active_program(
+        db,
+        program,
+        actor=current_user,
+        changed_fields={"removed_by_user": True, "cancelled_future_workouts": True},
+        reason="Программа удалена пользователем",
+        in_progress_error="Cannot delete a program while a workout is in progress",
+    )
+    db.commit()
 
 
 def delete_template_cascade(db: Session, template: ProgramTemplate) -> None:
