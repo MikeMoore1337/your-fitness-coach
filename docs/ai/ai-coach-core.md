@@ -1,88 +1,91 @@
-# AI Coach: generic foundation and personal read-only boundary
+# AI Coach: conversational foundation and personal read-only boundary
 
-> Исторический foundation Tasks 88–89. Текущий production launch, authenticated access и
-> deployment contract описаны в [ai-coach-production-launch.md](ai-coach-production-launch.md);
-> local defaults остаются disabled, но production больше не является internal beta.
+> Historical foundation Tasks 88–89 описывал ограниченный generic/personal rollout. Текущий
+> conversational product contract находится в [ai-coach-conversations.md](ai-coach-conversations.md).
+> Local defaults остаются disabled; production-доступ определяется server-side policy и
+> authenticated user boundary.
 
-Task 88 добавляет безопасный generic backend-контур для первой beta-версии AI Coach.
-Task 89 добавляет отдельный персональный read-only boundary с явным согласием и тремя
-allowlisted tools. Ни один контур не заменяет детерминированные расчёты и не включает
-публичный chat-интерфейс.
+В YFC есть два совместимых слоя:
+
+- новый обычный текстовый диалог `POST /api/v1/ai-coach/conversations/{id}/messages`;
+- сохранённые legacy endpoints `/generate` и `/personal/generate`, которые нужны для обратной
+  совместимости и внутреннего period-report сценария.
+
+Новый пользовательский экран не требует period-report JSON и не показывает внутренние версии,
+debug-поля или служебные citation metadata в основном потоке.
 
 ## Разрешённый контур
 
-Аутентифицированный endpoint принимает одну bounded-задачу, короткий запрос и
-`context_id`, который сервер уже знает как опубликованный публичный материал:
-
-`POST /api/v1/ai-coach/generate`
-
-Тело запроса имеет только поля `job`, `context_id` и `message`. Клиент не может выбрать
-provider, model, system prompt, URL, файл или персональные данные. Backend сам выставляет
-trust class `generic`; идентификатор пользователя используется только для серверного
-квотирования и не передаётся провайдеру.
+Обычный чат принимает короткое сообщение. Conversation принадлежит текущему account, а backend
+сам выбирает `job`, `context_id`, trust class и bounded context. Клиент не может передать provider,
+model, system prompt, URL, файл, SQL, user ID или персональный payload. В provider уходят только
+последние bounded turns, выбранные server-known references и текущая задача.
 
 Разрешены `app_help`, `public_knowledge`, `metric_explanation`, `fitness_knowledge`,
-`nutrition_knowledge` и `progression_explanation`. В context попадает ровно один
-опубликованный и актуальный item: reviewed Web Article, статическая публичная guide
-страница или allowlisted карточка упражнения. Черновики, архив, retracted-контент,
+`nutrition_knowledge` и `progression_explanation`. Для generic-вопроса используются опубликованные
+актуальные Web Article или статические YFC guide pages; черновики, архив, retracted-контент,
 пользовательские упражнения и произвольные URL исключены.
+
+Персональный вопрос сначала проходит отдельную проверку consent. Затем один allowlisted read-only
+tool возвращает минимальную сводку текущего пользователя: факты, даты, sufficiency, limitations
+и fallback path. Tool не меняет canonical data и не получает право выбирать другой пользовательский
+контекст. При отсутствии подходящей сводки provider не вызывается.
 
 ## Provider boundary
 
-Внутренний контракт `LlmPort.generate(request, policy, context_refs)` отделяет доменную
-политику от adapter. Текущий candidate — прямой Groq adapter с fixed HTTPS endpoint и
-allowlisted `openai/gpt-oss-120b`. Provider SDK types не выходят из adapter; tools,
-streaming, fallback и conversation history отсутствуют.
+Внутренний legacy-контракт `LlmPort.generate(request, policy, context_refs)` отделяет доменную
+политику от adapter. Новый чат использует отдельный `ChatLlmPort.generate_text(request,
+context_refs)`: plain-text answer без `response_format`, JSON Schema или model-controlled tools.
+Legacy period-report path по-прежнему использует строгий структурированный JSON, потому что это
+внутренний формат отчёта, а не контракт обычного диалога.
 
-Каждый prompt и JSON Schema имеют версию в коде. В provider передаются только русский
-system policy, bounded request и маркированный как недоверенный public evidence. Strict
-structured output проверяется повторно на стороне YFC. В ответе используются только
-server-known citations; ссылки из model output не принимаются.
+Текущий adapter — прямой Groq adapter с fixed HTTPS endpoint и allowlisted
+`openai/gpt-oss-120b`. Provider SDK types не выходят из adapter. Prompt versions, output limits,
+single-call personal policy и bounded retry задаются server-side. Blind failover и новый платный
+provider не добавляются.
 
-Personal route может дополнительно получить отдельный `durable_memory` только при
-включённом memory consent. Это недоверенный continuity context для стиля объяснения,
-не evidence и не conversation history; канонические данные всегда важнее.
+История диалога хранится отдельно от durable memory в account-owned таблицах. В provider попадают
+только последние ограниченные сообщения текущего разговора; memory добавляется только для
+персонального режима и только при отдельном memory consent. Memory не является evidence и не
+может переопределить canonical tool.
 
 ## Safety и состояния
 
-До provider выполняется классификация медицинских, лекарственных/AAS, unsafe,
-privacy/exfiltration, action и prompt-injection запросов. После provider проверяются
-schema, язык, ссылки, допустимые ref ids и запрещённые фрагменты. При отсутствии
-доказательств AI не вызывается.
+До provider выполняется классификация медицинских, лекарственных/AAS, unsafe, privacy/exfiltration,
+action и prompt-injection запросов. После provider проверяются язык, длина, запрещённые фрагменты,
+ссылки и безопасный plain-text контракт. `safety_category=clear` не превращается в safety error:
+ошибка провайдера и `invalid_output` отображаются как отдельные технические состояния. Если ответ
+не прошёл валидацию только из-за удалимого URL/markdown link noise, безопасная русская часть
+сохраняется; иначе answer не показывается.
 
-Endpoint возвращает структурированные состояния:
+Основные состояния чата:
 
-- `answer` — проверенный ответ с canonical YFC и/или reviewed primary citations;
-- `insufficient_data` — подходящего опубликованного контекста нет;
+- `answer` — проверенный ответ;
+- `insufficient_data` — подходящего проверенного контекста нет;
 - `safety_refusal` — запрос выходит за безопасную границу;
+- `consent_required` — для персонального вопроса нужно отдельное согласие;
 - `rate_limited` — сработала per-user или global quota;
-- `unavailable` — feature flag, kill switch, cost/data policy, cooldown или provider
-  недоступны;
-- `invalid_output` — ответ провайдера не прошёл валидацию.
+- `unavailable` — feature flag, policy, cooldown или provider недоступны;
+- `invalid_output` — текст провайдера не прошёл валидацию.
 
-Ни одно состояние не раскрывает ключ, raw provider response, prompt, stack trace или
-внутреннюю topology. Отказы и ограничения сформулированы по-русски и не маскируются
-универсальным медицинским disclaimer.
+Для технических состояний API использует отдельные `failure_category`: `provider_failure`,
+`structured_validation`, `timeout`, `context_failure`, `generation_failure` и `rate_limited`.
+Raw provider errors, stack trace, ключи, prompt и внутренние topology пользователю не выдаются.
 
 ## Конфигурация и эксплуатационные ограничения
 
-AI Coach выключен по умолчанию. Одного `GROQ_API_KEY` недостаточно для запуска: нужны
-отдельно разрешённые `AI_COACH_PROVIDER`, `AI_COACH_ENABLED`, free cost class и
-`AI_COACH_DATA_POLICY=verified_generic_only`. Персональный route дополнительно требует
-`AI_COACH_PERSONAL_ENABLED=true` и `AI_COACH_PERSONAL_DATA_POLICY=verified_personal_user`;
-эти флаги не включаются вместе с generic route автоматически. Отсутствие отдельной
-provider/data policy возвращает controlled-unavailable path, а отсутствие или отзыв
-согласия — `consent_required`.
+AI Coach выключен по умолчанию. Одного `GROQ_API_KEY` недостаточно: нужны `AI_COACH_PROVIDER`,
+`AI_COACH_ENABLED`, free cost class и `AI_COACH_DATA_POLICY=verified_generic_only`. Персональный
+режим дополнительно требует `AI_COACH_PERSONAL_ENABLED=true` и
+`AI_COACH_PERSONAL_DATA_POLICY=verified_personal_user`; эти флаги не включаются автоматически.
 
-`AI_COACH_MAX_ATTEMPTS=1` сохраняет решение initial beta не повторять user-visible
-generation и не удваивать стоимость. Контур поддерживает bounded retry для retryable
-ошибок при отдельной тестовой/операционной конфигурации; blind failover отсутствует и
-остаётся областью Task 92B. 429, timeout, network/5xx и misconfiguration получают
-разные внутренние reason codes и cooldown.
+Quota и cooldown в текущем сервисе process-local и не требуют shared storage. Для горизонтального
+масштабирования перед отдельным rollout потребуется подтверждённый shared counter. Логи
+`ai_coach_chat_generation` metadata-only: request/job/trust class, версии, provider/model,
+outcome, safety/failure category, latency, attempts, context/history counts и nullable usage.
+Текст запроса, answer, memory, personal facts и raw provider payload в логи не записываются.
 
-Quota и circuit breaker в этой задаче process-local и не требуют миграции или хранения
-conversation. Поэтому они являются защитой одного backend process; для горизонтального
-масштабирования перед rollout потребуется отдельный подтверждённый shared counter.
-Prompt/output не записываются в логи. Логи содержат только request id, job, trust class,
-версии, provider/model metadata, outcome, latency, attempts, nullable usage, tool name и
-safe error code.
+Миграция `0086_ai_coach_conversations` добавляет только account-owned history. Account export
+включает историю и безопасные display metadata; удаление account удаляет messages перед
+conversation shell. Новых environment keys или обязательных credentials для изменения не нужно:
+`env change required: no`.

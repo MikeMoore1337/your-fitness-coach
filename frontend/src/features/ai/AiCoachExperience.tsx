@@ -1,192 +1,80 @@
-import { Icon } from '../../shared/ui/Icon';
-import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { api } from '../../shared/api/client';
 import type {
   AiCoachConsentResponse,
+  AiCoachConversation,
+  AiCoachConversationMessage,
+  AiCoachConversationSendResponse,
+  AiCoachConversationSummary,
   AiCoachMemoryItemResponse,
   AiCoachMemoryResponse,
   AiCoachResponse,
   AiCoachStatus,
 } from '../../shared/api/types';
-import { AppLink } from '../../shared/navigation/router';
 import {
   productEventSurface,
   trackProductEvent,
   type AiCoachEntryPoint,
-  type AiCoachFailureClass,
   type AiCoachHelpfulness,
-  type AiCoachMode,
 } from '../../shared/analytics/productEvents';
+import { AppLink } from '../../shared/navigation/router';
 import { Badge, Button, Card, LoadingState } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import './ai-coach.css';
 
-export const AI_COACH_UI_VERSION = 'ai-coach-ui-v1';
-
-type AiCoachJob =
-  | 'app_help'
-  | 'public_knowledge'
-  | 'metric_explanation'
-  | 'fitness_knowledge'
-  | 'nutrition_knowledge'
-  | 'progression_explanation';
-type AiCoachPersonalTool =
-  | 'get_progress_summary'
-  | 'get_recent_training_summary'
-  | 'get_nutrition_summary'
-  | 'get_period_report_insights';
-type AiCoachOutcome =
-  | 'answer'
-  | 'unavailable'
-  | 'rate_limited'
-  | 'safety_refusal'
-  | 'insufficient_data'
-  | 'invalid_output'
-  | 'consent_required';
-type AiCoachPeriod = 7 | 30 | 90;
-type AiCoachPeriodSelection = 'days_7' | 'days_30' | 'days_90' | 'custom';
-
-type GenericPrompt = {
-  id: string;
-  label: string;
-  message: string;
-  job: AiCoachJob;
-  context_id: string;
-};
-
-type PersonalPrompt = {
-  id: string;
-  label: string;
-  message: string;
-  tool: AiCoachPersonalTool;
-};
-
-type AiCoachRequest =
-  | {
-      mode: 'generic';
-      job: AiCoachJob;
-      context_id: string;
-      message: string;
-    }
-  | {
-      mode: 'personal';
-      tool: AiCoachPersonalTool;
-      period_days: AiCoachPeriod;
-      period: AiCoachPeriodSelection;
-      date_from?: string;
-      date_to?: string;
-      message: string;
-    };
-
-const GENERIC_PROMPTS: readonly GenericPrompt[] = [
-  {
-    id: 'training',
-    label: 'Разобраться с тренировкой',
-    message:
-      'Объясни простыми словами, как в YFC устроен план тренировки и что делать на экране «Сегодня».',
-    job: 'app_help',
-    context_id: '/training',
-  },
-  {
-    id: 'nutrition',
-    label: 'Понять дневник питания',
-    message: 'Объясни, как в YFC вести дневник питания и как читать сохранённые ориентиры.',
-    job: 'app_help',
-    context_id: '/nutrition',
-  },
-  {
-    id: 'progress',
-    label: 'Прочитать прогресс',
-    message:
-      'Объясни, как читать раздел прогресса в YFC и почему одной записи недостаточно для вывода.',
-    job: 'app_help',
-    context_id: '/progress',
-  },
-];
-
-const PERSONAL_PROMPTS: readonly PersonalPrompt[] = [
-  {
-    id: 'period-report',
-    label: 'Итог периода',
-    message:
-      'Сделай краткий итог моего канонического отчёта за выбранный период: факты, ограничения данных и 1–3 обратимых следующих шага.',
-    tool: 'get_period_report_insights',
-  },
-  {
-    id: 'progress-summary',
-    label: 'Мой прогресс',
-    message:
-      'Коротко объясни мою сводку прогресса за выбранный период и укажи, каких данных не хватает.',
-    tool: 'get_progress_summary',
-  },
-  {
-    id: 'training-summary',
-    label: 'Мои тренировки',
-    message: 'Коротко объясни мою сводку тренировок за выбранный период, не добавляя новых фактов.',
-    tool: 'get_recent_training_summary',
-  },
-  {
-    id: 'nutrition-summary',
-    label: 'Моё питание',
-    message: 'Коротко объясни мою сводку питания за выбранный период и обозначь её ограничения.',
-    tool: 'get_nutrition_summary',
-  },
-];
-const DEFAULT_GENERIC_PROMPT = GENERIC_PROMPTS[0]!;
-const DEFAULT_PERSONAL_PROMPT = PERSONAL_PROMPTS[0]!;
-
-const PERIOD_REASON_COPY: Record<string, string> = {
-  nutrition_missing_days: 'пропущенные дни питания отделены от нулевых значений',
-  nutrition_target_changed: 'учтены исторические версии целей питания',
-  hydration_unavailable: 'гидратация не была доступна в источнике отчёта',
-  hydration_no_logged_days: 'за период нет записанных значений гидратации',
-  body_trend_limited: 'тренд замеров тела ограничен качеством наблюдений',
-  body_trend_unavailable: 'для тренда замеров тела недостаточно наблюдений',
-  report_data_insufficient: 'канонический отчёт пометил данные как недостаточные',
-};
-
-const OUTCOME_COPY: Record<AiCoachOutcome, { title: string; text: string }> = {
-  answer: {
-    title: 'Ответ готов',
-    text: 'Ответ сформирован только по разрешённому контексту и сопровождается его источниками.',
-  },
-  unavailable: {
-    title: 'AI Coach временно недоступен',
-    text: 'Основные функции приложения продолжают работать. Попробуйте позже.',
-  },
-  rate_limited: {
-    title: 'Лимит AI Coach исчерпан',
-    text: 'Новые запросы временно ограничены. Попробуйте позже.',
-  },
-  safety_refusal: {
-    title: 'На этот запрос нельзя ответить безопасно',
-    text: 'AI Coach не ставит диагнозы, не назначает лечение и не помогает с опасными схемами.',
-  },
-  insufficient_data: {
-    title: 'Проверенных данных пока недостаточно',
-    text: 'Откройте соответствующий раздел приложения, дополните данные и повторите запрос.',
-  },
-  invalid_output: {
-    title: 'Ответ не прошёл проверку',
-    text: 'Мы не показываем непроверенный результат. Попробуйте ещё раз позже.',
-  },
-  consent_required: {
-    title: 'Нужно отдельное согласие',
-    text: 'Персональная сводка не передаётся без явного согласия на этот режим.',
-  },
-};
-
-const SAFE_FAILURE_COPY: Record<AiCoachFailureClass, string> = {
-  network: 'Не удалось связаться с AI Coach. Проверьте соединение и повторите попытку.',
-  timeout: 'Ответ занял слишком много времени. Попробуйте ещё раз.',
-  validation: 'Запрос не прошёл проверку. Измените вопрос и повторите.',
-  unknown: 'Не удалось получить проверенный ответ. Попробуйте ещё раз позже.',
-};
+export const AI_COACH_UI_VERSION = 'ai-coach-ui-v2';
 
 export const aiCoachStatusQueryKey = ['ai-coach', 'status'] as const;
 export const aiCoachConsentQueryKey = ['ai-coach', 'consent'] as const;
 export const aiCoachMemoryQueryKey = ['ai-coach', 'memory'] as const;
+export const aiCoachConversationsQueryKey = ['ai-coach', 'conversations'] as const;
+
+const ACTIVE_CONVERSATION_KEY = 'yfc:ai-coach:active-conversation';
+
+const QUICK_PROMPTS = [
+  { id: 'today', label: 'Что делать сегодня?', message: 'Что мне делать сегодня?' },
+  {
+    id: 'period',
+    label: 'Итог за 30 дней',
+    message: 'Дай краткий итог моего прогресса за 30 дней.',
+  },
+  { id: 'progress', label: 'Как читать прогресс?', message: 'Как читать прогресс в YFC?' },
+  {
+    id: 'rest',
+    label: 'Отдых между подходами',
+    message: 'Сколько отдыхать между подходами и почему?',
+  },
+  {
+    id: 'diary',
+    label: 'Как вести дневник?',
+    message: 'Как вести дневник питания и тренировок в YFC?',
+  },
+] as const;
+
+const MEMORY_CATEGORY_LABELS: Record<string, string> = {
+  preferred_explanation_style: 'Стиль объяснений',
+  ai_interaction_preferences: 'Предпочтения общения',
+  stable_non_medical_preferences: 'Стабильные немедицинские предпочтения',
+  explicit_ai_context: 'Явный контекст для AI Coach',
+};
+
+const CHAT_FAILURE_COPY: Record<string, string> = {
+  provider_failure: 'AI Coach временно недоступен. Попробуйте ещё раз позже.',
+  structured_validation: 'Не удалось безопасно проверить ответ. Попробуйте ещё раз.',
+  timeout: 'Ответ занял слишком много времени. Попробуйте ещё раз.',
+  context_failure: 'Для этого вопроса пока нет подходящего проверенного контекста YFC.',
+  generation_failure: 'Не удалось получить проверенный ответ. Попробуйте ещё раз.',
+  rate_limited: 'Лимит AI Coach исчерпан. Попробуйте позже.',
+};
 
 export function useAiCoachStatus(enabled = true) {
   return useQuery<AiCoachStatus>({
@@ -196,17 +84,6 @@ export function useAiCoachStatus(enabled = true) {
     staleTime: 30_000,
     retry: false,
   });
-}
-
-function normalizeFailure(reason: unknown): AiCoachFailureClass {
-  if (reason instanceof DOMException && reason.name === 'AbortError') return 'timeout';
-  if (reason instanceof TypeError) return 'network';
-  if (reason && typeof reason === 'object' && 'status' in reason) {
-    const status = Number((reason as { status?: unknown }).status);
-    if (status === 408 || status === 504) return 'timeout';
-    if (status === 422) return 'validation';
-  }
-  return 'unknown';
 }
 
 export function safeCoachUrl(value: string): string | null {
@@ -229,15 +106,15 @@ function safeInlineNodes(text: string, allowedUrls: ReadonlySet<string>): ReactN
     if (match.index > cursor) nodes.push(text.slice(cursor, match.index));
     const label = match[1] ?? '';
     const url = safeCoachUrl(match[2] ?? '');
-    if (url && allowedUrls.has(url)) {
-      nodes.push(
+    nodes.push(
+      url && allowedUrls.has(url) ? (
         <a href={url} key={`link-${index}`} rel="noreferrer noopener" target="_blank">
           {label}
-        </a>,
-      );
-    } else {
-      nodes.push(label);
-    }
+        </a>
+      ) : (
+        label
+      ),
+    );
     cursor = match.index + match[0].length;
     index += 1;
   }
@@ -261,8 +138,7 @@ export function SafeCoachAnswer({
       ),
     [citations],
   );
-  const normalized = answer.replace(/\r\n?/g, '\n').slice(0, 1_600);
-  const lines = normalized.split('\n');
+  const lines = answer.replace(/\r\n?/g, '\n').slice(0, 1_600).split('\n');
   const blocks: ReactNode[] = [];
   let listItems: ReactNode[] = [];
   const flushList = () => {
@@ -290,217 +166,125 @@ export function SafeCoachAnswer({
   return <div className="ai-coach-answer__body">{blocks}</div>;
 }
 
-type AiCoachInsight = AiCoachResponse['insights'][number];
+function readActiveConversationId(): number | null {
+  try {
+    const raw = window.sessionStorage.getItem(ACTIVE_CONVERSATION_KEY);
+    const value = raw ? Number(raw) : NaN;
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
 
-function PeriodReportInsights({ response }: { response: AiCoachResponse }) {
-  const insights = response.insights ?? [];
-  if (!insights.length) return null;
+function storeActiveConversationId(value: number | null): void {
+  try {
+    if (value === null) window.sessionStorage.removeItem(ACTIVE_CONVERSATION_KEY);
+    else window.sessionStorage.setItem(ACTIVE_CONVERSATION_KEY, String(value));
+  } catch {
+    // A restrictive WebView should still keep the current in-memory conversation usable.
+  }
+}
 
-  const facts = insights.filter((insight) => insight.kind === 'fact');
-  const inferences = insights.filter((insight) => insight.kind === 'inference');
-  const suggestions = insights.filter((insight) => insight.kind === 'suggestion');
-  const reasonText = (insight: AiCoachInsight) => {
-    const labels = insight.reason_keys
-      .map((key) => PERIOD_REASON_COPY[key])
-      .filter((label): label is string => Boolean(label));
-    return labels.length ? labels.join('; ') : null;
-  };
-  const claimList = (items: AiCoachInsight[], title: string, className: string) => {
-    if (!items.length) return null;
-    return (
-      <section className={`ai-coach-response__insight-group ${className}`}>
-        <h4>{title}</h4>
-        <ul>
-          {items.map((insight, index) => {
-            const reason = reasonText(insight);
-            return (
-              <li
-                data-evidence-ids={insight.evidence_ids.join(' ')}
-                key={`${insight.kind}-${insight.evidence_ids.join('.')}-${index}`}
-              >
-                <span>{insight.text}</span>
-                {reason && <small>Основание: {reason}.</small>}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-    );
-  };
+function failureCopy(response: AiCoachConversationSendResponse): string {
+  if (response.failure_category && CHAT_FAILURE_COPY[response.failure_category]) {
+    return CHAT_FAILURE_COPY[response.failure_category] ?? 'Не удалось получить проверенный ответ.';
+  }
+  return response.limitations[0] ?? 'Не удалось получить проверенный ответ. Попробуйте ещё раз.';
+}
 
+function networkFailureCopy(reason: unknown): string {
+  if (
+    reason &&
+    typeof reason === 'object' &&
+    'status' in reason &&
+    Number((reason as { status?: unknown }).status) === 0 &&
+    'message' in reason &&
+    typeof (reason as { message?: unknown }).message === 'string'
+  ) {
+    return (reason as { message: string }).message;
+  }
+  if (reason instanceof DOMException && reason.name === 'AbortError') {
+    return 'Ответ занял слишком много времени. Попробуйте ещё раз.';
+  }
+  return 'Не удалось отправить вопрос. Проверьте соединение и попробуйте снова.';
+}
+
+function MessageSources({ message }: { message: AiCoachConversationMessage }) {
+  const citations = message.citations.filter((citation) => safeCoachUrl(citation.url));
+  if (!citations.length) return null;
   return (
-    <div className="ai-coach-response__insights" data-testid="ai-coach-period-insights">
-      {claimList(facts, 'Главное за период', 'ai-coach-response__insight-group--facts')}
-      {claimList(inferences, 'Почему', 'ai-coach-response__insight-group--inferences')}
-      {claimList(
-        suggestions,
-        'Что можно сделать дальше',
-        'ai-coach-response__insight-group--suggestions',
-      )}
-    </div>
+    <details className="ai-coach-message__sources">
+      <summary>Материалы ответа</summary>
+      <ul>
+        {citations.map((citation) => {
+          const url = safeCoachUrl(citation.url);
+          if (!url) return null;
+          return (
+            <li key={url}>
+              <a href={url} rel="noreferrer noopener" target="_blank">
+                {citation.title}
+              </a>
+              <small>{citation.publisher}</small>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }
 
-function ResponseState({
-  mode,
+function ChatMessage({
+  feedback,
+  message,
   onFeedback,
-  response,
 }: {
-  mode: AiCoachMode;
-  onFeedback(value: AiCoachHelpfulness): void;
-  response: AiCoachResponse;
+  feedback: AiCoachHelpfulness | null;
+  message: AiCoachConversationMessage;
+  onFeedback: (messageId: number, value: AiCoachHelpfulness) => void;
 }) {
-  const copy = OUTCOME_COPY[response.outcome];
-  const citations = (response.citations ?? []).filter((citation) => safeCoachUrl(citation.url));
-  const isPeriodReport = response.output_version === 'ai-coach-period-report-output-v1';
+  const isAssistant = message.role === 'assistant';
   return (
-    <section
-      aria-live="polite"
-      className={`ai-coach-response ai-coach-response--${response.outcome}`}
-      data-testid="ai-coach-response"
+    <article
+      className={`ai-coach-message ai-coach-message--${message.role}`}
+      data-message-id={message.id}
+      data-testid={`ai-coach-message-${message.role}`}
     >
-      <div className="ai-coach-response__heading">
-        <div>
-          <Badge tone={response.outcome === 'answer' ? 'success' : 'warning'}>{copy.title}</Badge>
-          <p>{copy.text}</p>
-        </div>
-        {response.request_id && <span className="ai-coach-response__request-mark">Проверено</span>}
-      </div>
-      {response.answer && response.outcome !== 'unavailable' && (
-        <SafeCoachAnswer answer={response.answer} citations={citations} />
+      <div className="ai-coach-message__author">{isAssistant ? 'AI Coach' : 'Вы'}</div>
+      {isAssistant ? (
+        <SafeCoachAnswer answer={message.content} citations={message.citations} />
+      ) : (
+        <p className="ai-coach-message__text">{message.content}</p>
       )}
-      {isPeriodReport && <PeriodReportInsights response={response} />}
-      {response.limitations.length > 0 && (
-        <div className="ai-coach-response__limitations">
-          <strong>{isPeriodReport ? 'Ограничения данных' : 'Границы ответа'}</strong>
-          <ul>
-            {response.limitations.map((limitation) => (
-              <li key={limitation}>{limitation}</li>
-            ))}
-          </ul>
-        </div>
+      {message.status === 'failed' && message.limitations.length > 0 && (
+        <p className="ai-coach-message__failure" role="alert">
+          {message.limitations[0]}
+        </p>
       )}
-      {citations.length > 0 && (
-        <div className="ai-coach-response__sources">
-          <strong>Источники</strong>
-          <ul>
-            {citations.map((citation) => {
-              const url = safeCoachUrl(citation.url);
-              if (!url) return null;
-              return (
-                <li key={`${citation.title}-${url}`}>
-                  <a href={url} rel="noreferrer noopener" target="_blank">
-                    {citation.title}
-                  </a>
-                  <small>{citation.publisher}</small>
-                </li>
-              );
-            })}
-          </ul>
+      {isAssistant && <MessageSources message={message} />}
+      {isAssistant && message.outcome === 'answer' && (
+        <div className="ai-coach-message__feedback" aria-label="Оценка ответа">
+          <span>Полезно?</span>
+          <button
+            aria-pressed={feedback === 'helpful'}
+            className={feedback === 'helpful' ? 'is-selected' : ''}
+            type="button"
+            onClick={() => onFeedback(message.id, 'helpful')}
+          >
+            👍
+          </button>
+          <button
+            aria-pressed={feedback === 'not_helpful'}
+            className={feedback === 'not_helpful' ? 'is-selected' : ''}
+            type="button"
+            onClick={() => onFeedback(message.id, 'not_helpful')}
+          >
+            👎
+          </button>
         </div>
       )}
-      {isPeriodReport && response.report_version && (
-        <small className="ai-coach-response__report-meta">
-          Канонический отчёт {response.report_version}; период {response.period_start} —{' '}
-          {response.period_end} ({response.timezone}).
-        </small>
-      )}
-      <div className="ai-coach-response__feedback" aria-label="Оценка ответа">
-        <span>Ответ был полезен?</span>
-        <button type="button" onClick={() => onFeedback('helpful')}>
-          Да
-        </button>
-        <button type="button" onClick={() => onFeedback('not_helpful')}>
-          Пока нет
-        </button>
-      </div>
-      <span className="sr-only">
-        Режим ответа: {mode === 'personal' ? 'личная сводка' : 'публичная помощь'}.
-      </span>
-    </section>
+    </article>
   );
 }
-
-function ConsentNotice({
-  consent,
-  onChange,
-  pending,
-  unavailable,
-}: {
-  consent: AiCoachConsentResponse | undefined;
-  onChange(enabled: boolean): void;
-  pending: boolean;
-  unavailable: boolean;
-}) {
-  if (unavailable) {
-    return (
-      <section
-        className="ai-coach-consent ai-coach-consent--unavailable"
-        data-testid="ai-coach-personal-unavailable"
-      >
-        <Badge tone="warning">Персональный режим</Badge>
-        <p>
-          Персональные сводки временно недоступны. Публичная помощь AI Coach не получает доступ к
-          вашему профилю.
-        </p>
-      </section>
-    );
-  }
-  if (consent?.status === 'granted') {
-    return (
-      <section className="ai-coach-consent" data-testid="ai-coach-consent-granted">
-        <div>
-          <Badge tone="success">Согласие включено</Badge>
-          <p>
-            AI Coach получает только ограниченную сводку за выбранный период. План, цели, калории и
-            расписание не изменяются.
-          </p>
-          {consent.retention_notice && <small>{consent.retention_notice}</small>}
-          <small>
-            Запрос запускается вручную, действует в рамках доступного лимита и не сохраняет текст.
-          </small>
-        </div>
-        <Button
-          disabled={pending}
-          type="button"
-          variant="secondary"
-          onClick={() => onChange(false)}
-        >
-          {pending ? 'Сохраняем…' : 'Отозвать согласие'}
-        </Button>
-      </section>
-    );
-  }
-  return (
-    <section className="ai-coach-consent" data-testid="ai-coach-consent-required">
-      <div>
-        <Badge tone="warning">Отдельное согласие</Badge>
-        <p>
-          Передача ограниченной персональной сводки включается отдельно. Сырые записи дневника,
-          заметки тренера и история чата не передаются. Отдельная memory включается только вами и
-          хранит лишь разрешённые предпочтения.
-        </p>
-        <ul>
-          <li>
-            Только готовая сводка прогресса, тренировок или питания без возможности что-либо менять.
-          </li>
-          <li>Период выбираете вы: 7, 30, 90 или до 366 дней для итога отчёта.</li>
-          <li>Согласие можно отозвать в любой момент.</li>
-        </ul>
-      </div>
-      <Button disabled={pending} type="button" onClick={() => onChange(true)}>
-        {pending ? 'Сохраняем…' : 'Разрешить сводку'}
-      </Button>
-    </section>
-  );
-}
-
-const MEMORY_CATEGORY_LABELS: Record<string, string> = {
-  preferred_explanation_style: 'Стиль объяснений',
-  ai_interaction_preferences: 'Предпочтения общения',
-  stable_non_medical_preferences: 'Стабильные немедицинские предпочтения',
-  explicit_ai_context: 'Явный контекст для AI Coach',
-};
 
 function MemoryPanel() {
   const { confirm, toast } = useFeedback();
@@ -515,7 +299,6 @@ function MemoryPanel() {
     staleTime: 30_000,
     retry: false,
   });
-
   const invalidateMemory = () => queryClient.invalidateQueries({ queryKey: aiCoachMemoryQueryKey });
   const consentMutation = useMutation({
     mutationFn: (status: 'enabled' | 'paused' | 'revoked') =>
@@ -527,13 +310,13 @@ function MemoryPanel() {
       queryClient.setQueryData(aiCoachMemoryQueryKey, next);
       toast(
         next.status === 'enabled'
-          ? 'AI Coach memory включена.'
+          ? 'Память AI Coach включена.'
           : next.status === 'paused'
-            ? 'AI Coach memory поставлена на паузу.'
-            : 'AI Coach memory отозвана.',
+            ? 'Память AI Coach поставлена на паузу.'
+            : 'Память AI Coach отозвана.',
       );
     },
-    onError: () => toast('Не удалось изменить настройку AI Coach memory.', 'error'),
+    onError: () => toast('Не удалось изменить настройку памяти AI Coach.', 'error'),
   });
   const createMutation = useMutation({
     mutationFn: () =>
@@ -545,9 +328,9 @@ function MemoryPanel() {
       setValue('');
       setConfirmed(false);
       invalidateMemory();
-      toast('Предпочтение сохранено в AI Coach memory.');
+      toast('Предпочтение сохранено.');
     },
-    onError: () => toast('Это значение нельзя сохранить в AI Coach memory.', 'error'),
+    onError: () => toast('Это значение нельзя сохранить в памяти AI Coach.', 'error'),
   });
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -562,7 +345,7 @@ function MemoryPanel() {
       invalidateMemory();
       toast('Предпочтение обновлено.');
     },
-    onError: () => toast('Не удалось обновить это предпочтение.', 'error'),
+    onError: () => toast('Не удалось обновить предпочтение.', 'error'),
   });
   const deleteMutation = useMutation({
     mutationFn: (memoryId: number) =>
@@ -583,19 +366,17 @@ function MemoryPanel() {
       setValue('');
       setConfirmed(false);
       invalidateMemory();
-      toast('AI Coach memory очищена.');
+      toast('Память AI Coach очищена.');
     },
-    onError: () => toast('Не удалось очистить AI Coach memory.', 'error'),
+    onError: () => toast('Не удалось очистить память AI Coach.', 'error'),
   });
 
-  if (memory.isLoading) return <LoadingState label="Загружаем настройки AI Coach memory…" />;
+  if (memory.isLoading) return <LoadingState label="Загружаем настройки памяти…" />;
   if (memory.isError || !memory.data) {
     return (
       <section className="ai-coach-memory ai-coach-memory--error" role="alert">
-        <strong>Настройки memory недоступны</strong>
-        <p>
-          Попробуйте обновить экран. Публичная помощь и личная сводка остаются отдельными режимами.
-        </p>
+        <strong>Настройки памяти недоступны</strong>
+        <p>Попробуйте обновить экран. История диалога от этого не изменится.</p>
       </section>
     );
   }
@@ -630,7 +411,7 @@ function MemoryPanel() {
     if (
       await confirm({
         title: 'Удалить это предпочтение?',
-        message: 'Оно будет сразу исключено из будущих запросов и удалено из memory.',
+        message: 'Оно сразу перестанет использоваться и будет удалено из памяти.',
         confirmText: 'Удалить',
       })
     ) {
@@ -640,24 +421,12 @@ function MemoryPanel() {
   const clearAll = async () => {
     if (
       await confirm({
-        title: 'Очистить AI Coach memory?',
+        title: 'Очистить память AI Coach?',
         message: 'Все сохранённые предпочтения будут удалены без возможности восстановления.',
         confirmText: 'Очистить',
       })
     ) {
       clearMutation.mutate();
-    }
-  };
-  const revoke = async () => {
-    if (
-      await confirm({
-        title: 'Отозвать использование memory?',
-        message:
-          'Записи останутся доступными для просмотра и удаления, но сразу перестанут передаваться AI Coach.',
-        confirmText: 'Отозвать',
-      })
-    ) {
-      consentMutation.mutate('revoked');
     }
   };
 
@@ -668,10 +437,10 @@ function MemoryPanel() {
           <div className="ai-coach-memory__title">
             <Badge tone={current.status === 'enabled' ? 'success' : 'warning'}>
               {current.status === 'enabled'
-                ? 'Memory включена'
+                ? 'Память включена'
                 : current.status === 'paused'
-                  ? 'Memory на паузе'
-                  : 'Memory выключена'}
+                  ? 'Память на паузе'
+                  : 'Память выключена'}
             </Badge>
             <strong>Отдельная память AI Coach</strong>
           </div>
@@ -686,7 +455,7 @@ function MemoryPanel() {
               variant="secondary"
               onClick={() => consentMutation.mutate('paused')}
             >
-              Поставить на паузу
+              Пауза
             </Button>
           )}
           {current.status === 'paused' && (
@@ -695,7 +464,7 @@ function MemoryPanel() {
               type="button"
               onClick={() => consentMutation.mutate('enabled')}
             >
-              Возобновить memory
+              Возобновить
             </Button>
           )}
           {current.status === 'revoked' && (
@@ -704,11 +473,16 @@ function MemoryPanel() {
               type="button"
               onClick={() => consentMutation.mutate('enabled')}
             >
-              Включить memory
+              Включить
             </Button>
           )}
           {current.status !== 'revoked' && (
-            <Button disabled={pending} type="button" variant="secondary" onClick={revoke}>
+            <Button
+              disabled={pending}
+              type="button"
+              variant="secondary"
+              onClick={() => consentMutation.mutate('revoked')}
+            >
               Отозвать
             </Button>
           )}
@@ -716,11 +490,10 @@ function MemoryPanel() {
       </div>
 
       <div className="ai-coach-memory__notice">
-        <strong>Что разрешено сохранять</strong>
+        <strong>Что можно сохранять</strong>
         <span>
-          Только четыре категории ниже. Канонические данные профиля, цели, питание, вода,
-          тренировки, прогресс, оборудование, медицинские сведения и история диалога всегда имеют
-          приоритет или не сохраняются.
+          Только немедицинские предпочтения и явный контекст. Канонические данные приложения и
+          история диалога не превращаются в память автоматически.
         </span>
       </div>
       <div className="ai-coach-memory__categories">
@@ -736,8 +509,8 @@ function MemoryPanel() {
           <strong>{editing ? 'Изменить предпочтение' : 'Добавить предпочтение'}</strong>
           <small>
             {memoryEnabled
-              ? 'Не более 240 символов, одной строкой.'
-              : 'Включите memory, чтобы добавлять или изменять записи.'}
+              ? 'Не более 240 символов.'
+              : 'Включите память, чтобы добавлять или изменять записи.'}
           </small>
         </div>
         {!editing && (
@@ -773,11 +546,11 @@ function MemoryPanel() {
             type="checkbox"
             onChange={(event) => setConfirmed(event.target.checked)}
           />
-          <span>Подтверждаю, что это только моё немедицинское предпочтение или контекст.</span>
+          <span>Подтверждаю, что это моё немедицинское предпочтение или контекст.</span>
         </label>
         <div className="ai-coach-memory__form-actions">
           <Button disabled={!memoryEnabled || !value.trim() || !confirmed || pending} type="submit">
-            {editing ? 'Сохранить изменение' : 'Сохранить в memory'}
+            {editing ? 'Сохранить изменение' : 'Сохранить в память'}
           </Button>
           {editing && (
             <Button disabled={pending} type="button" variant="secondary" onClick={cancelEditing}>
@@ -788,20 +561,16 @@ function MemoryPanel() {
       </form>
 
       {items.length > 0 ? (
-        <div className="ai-coach-memory__list" aria-label="Сохранённые элементы memory">
+        <div className="ai-coach-memory__list" aria-label="Сохранённые элементы памяти">
           {items.map((item) => (
             <article className="ai-coach-memory__item" key={item.id}>
               <div>
                 <Badge tone="neutral">{item.category_label}</Badge>
                 <p>{item.value}</p>
-                <small>Добавлено вами; canonical data остаётся источником истины.</small>
+                <small>Добавлено вами; канонические данные остаются источником истины.</small>
               </div>
               <div className="ai-coach-memory__item-actions">
-                <button
-                  disabled={!memoryEnabled || pending}
-                  type="button"
-                  onClick={() => startEditing(item)}
-                >
+                <button type="button" onClick={() => startEditing(item)}>
                   Изменить
                 </button>
                 <button type="button" onClick={() => removeOne(item)}>
@@ -816,10 +585,374 @@ function MemoryPanel() {
       )}
       {items.length > 0 && (
         <Button disabled={pending} type="button" variant="danger" onClick={clearAll}>
-          Очистить всю memory
+          Очистить всю память
         </Button>
       )}
     </section>
+  );
+}
+
+function AiCoachChat({ status }: { status: AiCoachStatus }) {
+  const { toast } = useFeedback();
+  const queryClient = useQueryClient();
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(() =>
+    readActiveConversationId(),
+  );
+  const [isNewConversation, setIsNewConversation] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, AiCoachHelpfulness>>(
+    {},
+  );
+
+  const conversations = useQuery<{ items: AiCoachConversationSummary[] }>({
+    queryKey: aiCoachConversationsQueryKey,
+    queryFn: () => api<{ items: AiCoachConversationSummary[] }>('/api/v1/ai-coach/conversations'),
+    staleTime: 15_000,
+    retry: false,
+  });
+  const conversationItems = conversations.data?.items ?? [];
+  const currentConversationId = isNewConversation
+    ? null
+    : activeConversationId !== null &&
+        conversationItems.some((item) => item.id === activeConversationId)
+      ? activeConversationId
+      : (conversationItems[0]?.id ?? null);
+  const conversation = useQuery<AiCoachConversation>({
+    queryKey: ['ai-coach', 'conversation', currentConversationId],
+    queryFn: () =>
+      api<AiCoachConversation>(`/api/v1/ai-coach/conversations/${currentConversationId}`),
+    enabled: currentConversationId !== null,
+    staleTime: 0,
+    retry: false,
+  });
+  const consent = useQuery<AiCoachConsentResponse>({
+    queryKey: aiCoachConsentQueryKey,
+    queryFn: () => api<AiCoachConsentResponse>('/api/v1/ai-coach/consent'),
+    enabled: status.personal_available,
+    staleTime: 30_000,
+    retry: false,
+  });
+  const consentMutation = useMutation({
+    mutationFn: (enabled: boolean) =>
+      api<AiCoachConsentResponse>('/api/v1/ai-coach/consent', {
+        method: 'PUT',
+        body: { enabled },
+      }),
+    onSuccess: (next) => {
+      queryClient.setQueryData(aiCoachConsentQueryKey, next);
+      trackProductEvent({
+        name: 'ai_coach_consent_changed',
+        surface: productEventSurface(),
+        enabled: next.status === 'granted',
+      });
+    },
+    onError: () => toast('Не удалось изменить согласие на персональный режим.', 'error'),
+  });
+  const sendMutation = useMutation({
+    mutationFn: async ({
+      conversationId,
+      message,
+    }: {
+      conversationId: number | null;
+      message: string;
+    }) => {
+      const conversationToUse =
+        conversationId === null
+          ? await api<AiCoachConversation>('/api/v1/ai-coach/conversations', {
+              method: 'POST',
+            })
+          : { id: conversationId };
+      const response = await api<AiCoachConversationSendResponse>(
+        `/api/v1/ai-coach/conversations/${conversationToUse.id}/messages`,
+        {
+          method: 'POST',
+          body: { message },
+        },
+      );
+      return { conversationId: conversationToUse.id, response };
+    },
+    onMutate: ({ message }) => {
+      setPendingMessage(message);
+      setDraft('');
+      setFailure(null);
+      trackProductEvent({
+        name: 'ai_coach_request_started',
+        surface: productEventSurface(),
+        mode: 'generic',
+      });
+    },
+    onSuccess: ({ conversationId, response }, variables) => {
+      setPendingMessage(null);
+      setIsNewConversation(false);
+      setActiveConversationId(conversationId);
+      storeActiveConversationId(conversationId);
+      queryClient.invalidateQueries({ queryKey: aiCoachConversationsQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['ai-coach', 'conversation', conversationId] });
+      trackProductEvent({
+        name: 'ai_coach_response_received',
+        surface: productEventSurface(),
+        mode: response.data_class === 'personalized' ? 'personal' : 'generic',
+        outcome: response.outcome,
+      });
+      if (response.answer === null && response.outcome !== 'safety_refusal') {
+        setDraft(variables.message);
+        setFailure(failureCopy(response));
+        return;
+      }
+      setFailure(null);
+    },
+    onError: (reason, variables) => {
+      setPendingMessage(null);
+      setDraft(variables.message);
+      const message = networkFailureCopy(reason);
+      setFailure(message);
+      trackProductEvent({
+        name: 'ai_coach_request_failed',
+        surface: productEventSurface(),
+        mode: 'generic',
+        failure:
+          reason &&
+          typeof reason === 'object' &&
+          'status' in reason &&
+          Number((reason as { status?: unknown }).status) === 0
+            ? 'network'
+            : 'unknown',
+      });
+    },
+  });
+  const feedbackMutation = useMutation({
+    mutationFn: ({
+      conversationId,
+      messageId,
+      value,
+    }: {
+      conversationId: number;
+      messageId: number;
+      value: AiCoachHelpfulness;
+    }) =>
+      api<void>(`/api/v1/ai-coach/conversations/${conversationId}/messages/${messageId}/feedback`, {
+        method: 'POST',
+        body: { value },
+      }),
+    onSuccess: (_data, variables) => {
+      setFeedbackByMessage((current) => ({ ...current, [variables.messageId]: variables.value }));
+      trackProductEvent({
+        name: 'ai_coach_helpfulness_submitted',
+        surface: productEventSurface(),
+        value: variables.value,
+      });
+    },
+    onError: () => toast('Не удалось сохранить оценку ответа.', 'error'),
+  });
+
+  const currentMessages = conversation.data?.messages ?? [];
+  const pending = sendMutation.isPending;
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = draft.trim();
+    if (!message || pending) return;
+    sendMutation.mutate({ conversationId: currentConversationId, message });
+  };
+  const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
+  };
+  const chooseQuickPrompt = (message: string) => {
+    setDraft(message);
+    setFailure(null);
+    window.requestAnimationFrame(() => composerRef.current?.focus());
+  };
+  const startNewConversation = () => {
+    if (pending) return;
+    setIsNewConversation(true);
+    setActiveConversationId(null);
+    storeActiveConversationId(null);
+    setDraft('');
+    setFailure(null);
+  };
+  const sendFeedback = (messageId: number, value: AiCoachHelpfulness) => {
+    if (currentConversationId === null || feedbackMutation.isPending) return;
+    feedbackMutation.mutate({ conversationId: currentConversationId, messageId, value });
+  };
+
+  if (conversations.isLoading) return <LoadingState label="Загружаем историю AI Coach…" />;
+  if (conversations.isError) {
+    return (
+      <section className="ai-coach-state ai-coach-state--error" role="alert">
+        <strong>История AI Coach недоступна</strong>
+        <p>Обновите экран и попробуйте снова. Ваши данные приложения не изменились.</p>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => queryClient.invalidateQueries({ queryKey: aiCoachConversationsQueryKey })}
+        >
+          Повторить
+        </Button>
+      </section>
+    );
+  }
+
+  return (
+    <div className="ai-coach-chat" data-testid="ai-coach-chat">
+      <div className="ai-coach-chat__toolbar">
+        <div>
+          <span className="eyebrow">Диалог</span>
+          <strong>{conversation.data?.title ?? 'Новый разговор'}</strong>
+        </div>
+        <div className="ai-coach-chat__toolbar-actions">
+          {(conversations.data?.items.length ?? 0) > 0 && (
+            <label className="ai-coach-chat__history-select">
+              <span className="sr-only">Выбрать разговор</span>
+              <select
+                aria-label="Выбрать разговор"
+                value={currentConversationId ?? ''}
+                onChange={(event) => {
+                  const next = Number(event.target.value);
+                  if (!Number.isSafeInteger(next) || next < 1) return;
+                  setIsNewConversation(false);
+                  setActiveConversationId(next);
+                  storeActiveConversationId(next);
+                  setFailure(null);
+                }}
+              >
+                {conversations.data?.items.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title || 'Новый разговор'}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <Button
+            disabled={pending}
+            type="button"
+            variant="secondary"
+            onClick={startNewConversation}
+          >
+            Новый чат
+          </Button>
+        </div>
+      </div>
+
+      <div className="ai-coach-chat__welcome">
+        <div>
+          <h3>Чем помочь?</h3>
+          <p>
+            Задайте любой вопрос о тренировках, питании, прогрессе или работе YFC. Для личного
+            ответа AI Coach возьмёт только минимальную разрешённую сводку.
+          </p>
+        </div>
+        <span className="ai-coach-chat__disclaimer">Не заменяет врача или тренера.</span>
+      </div>
+
+      {currentConversationId !== null && conversation.isError && (
+        <p className="ai-coach-inline-error" role="alert">
+          Не удалось загрузить историю этого разговора. Попробуйте обновить экран; поле вопроса
+          остаётся доступным.
+        </p>
+      )}
+
+      {currentMessages.length === 0 && !pendingMessage && (
+        <div className="ai-coach-chat__empty" data-testid="ai-coach-chat-empty">
+          <p>Начните с вопроса или выберите подсказку ниже.</p>
+        </div>
+      )}
+      <div className="ai-coach-chat__messages" aria-live="polite">
+        {currentMessages.map((message) => (
+          <ChatMessage
+            feedback={feedbackByMessage[message.id] ?? null}
+            key={message.id}
+            message={message}
+            onFeedback={sendFeedback}
+          />
+        ))}
+        {pendingMessage && (
+          <>
+            <article className="ai-coach-message ai-coach-message--user ai-coach-message--pending">
+              <div className="ai-coach-message__author">Вы</div>
+              <p className="ai-coach-message__text">{pendingMessage}</p>
+            </article>
+            <div className="ai-coach-chat__loading" role="status">
+              AI Coach готовит ответ…
+            </div>
+          </>
+        )}
+      </div>
+
+      {failure && (
+        <section
+          className="ai-coach-chat__failure"
+          data-testid="ai-coach-chat-failure"
+          role="alert"
+        >
+          <span>{failure}</span>
+          <button type="button" onClick={() => setFailure(null)}>
+            Понятно
+          </button>
+        </section>
+      )}
+
+      {consent.isError && status.personal_available && (
+        <p className="ai-coach-inline-error" role="alert">
+          Не удалось проверить персональный доступ. Обычный чат остаётся доступным отдельно.
+        </p>
+      )}
+
+      {consent.data?.status !== 'granted' && !consent.isError && status.personal_available && (
+        <details className="ai-coach-chat__consent">
+          <summary>Персональные ответы</summary>
+          <p>
+            Для вопросов о ваших тренировках, прогрессе и питании нужно отдельное согласие. Без него
+            личные данные не открываются AI Coach.
+          </p>
+          <Button
+            disabled={consentMutation.isPending}
+            type="button"
+            onClick={() => consentMutation.mutate(true)}
+          >
+            {consentMutation.isPending ? 'Сохраняем…' : 'Разрешить персональные ответы'}
+          </Button>
+        </details>
+      )}
+
+      <div className="ai-coach-chat__quick-prompts" aria-label="Быстрые вопросы">
+        {QUICK_PROMPTS.map((prompt) => (
+          <button key={prompt.id} type="button" onClick={() => chooseQuickPrompt(prompt.message)}>
+            {prompt.label}
+          </button>
+        ))}
+      </div>
+
+      <form className="ai-coach-chat__composer" onSubmit={submit}>
+        <label className="sr-only" htmlFor="ai-coach-chat-message">
+          Сообщение AI Coach
+        </label>
+        <textarea
+          ref={composerRef}
+          id="ai-coach-chat-message"
+          maxLength={320}
+          placeholder="Напишите вопрос…"
+          rows={3}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={onComposerKeyDown}
+        />
+        <div className="ai-coach-chat__composer-meta">
+          <span>Enter — отправить, Shift+Enter — новая строка</span>
+          <span>{draft.length}/320</span>
+        </div>
+        <div className="ai-coach-chat__composer-actions">
+          <Button disabled={!draft.trim() || pending} type="submit">
+            {pending ? 'Отправляем…' : 'Отправить'}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -835,7 +968,7 @@ export function AiCoachEntry({
       <div>
         <span className="eyebrow">AI Coach</span>
         <strong>Нужна короткая подсказка?</strong>
-        <p>Объясняет проверенные материалы и помогает разобраться в разрешённых сводках.</p>
+        <p>Задайте вопрос о тренировках, питании, прогрессе или YFC.</p>
       </div>
       <AppLink
         className="button-link secondary-link"
@@ -875,7 +1008,7 @@ export function AiCoachSettingsCard({
           <Icon name="ai-coach" size={20} /> AI Coach
         </>
       }
-      description="Публичная помощь, отдельные сводки и необязательная user-controlled memory."
+      description="Чат, помощь по приложению и разрешённые персональные сводки."
     >
       <AiCoachExperience status={status} entryPoint="profile" />
     </Card>
@@ -883,7 +1016,6 @@ export function AiCoachSettingsCard({
 }
 
 export function AiCoachExperience({
-  entryPoint,
   status: providedStatus,
 }: {
   entryPoint: AiCoachEntryPoint;
@@ -891,235 +1023,6 @@ export function AiCoachExperience({
 }) {
   const statusQuery = useAiCoachStatus(!providedStatus);
   const status = providedStatus ?? statusQuery.data;
-  const queryClient = useQueryClient();
-  const [mode, setMode] = useState<AiCoachMode>('generic');
-  const [genericPromptId, setGenericPromptId] = useState(DEFAULT_GENERIC_PROMPT.id);
-  const [personalPromptId, setPersonalPromptId] = useState(DEFAULT_PERSONAL_PROMPT.id);
-  const [periodSelection, setPeriodSelection] = useState<AiCoachPeriodSelection>('days_30');
-  const [customDateFrom, setCustomDateFrom] = useState('');
-  const [customDateTo, setCustomDateTo] = useState('');
-  const [draft, setDraft] = useState('');
-  const [response, setResponse] = useState<AiCoachResponse | null>(null);
-  const [failure, setFailure] = useState<AiCoachFailureClass | null>(null);
-  const [lastRequest, setLastRequest] = useState<AiCoachRequest | null>(null);
-  const requestAbortController = useRef<AbortController | null>(null);
-  const cancelRequested = useRef(false);
-
-  const consent = useQuery<AiCoachConsentResponse>({
-    queryKey: aiCoachConsentQueryKey,
-    queryFn: () => api<AiCoachConsentResponse>('/api/v1/ai-coach/consent'),
-    enabled: status?.personal_available === true,
-    staleTime: 30_000,
-    retry: false,
-  });
-  const consentMutation = useMutation({
-    mutationFn: (enabled: boolean) =>
-      api<AiCoachConsentResponse>('/api/v1/ai-coach/consent', {
-        method: 'PUT',
-        body: { enabled },
-      }),
-    onSuccess: (next) => {
-      queryClient.setQueryData(aiCoachConsentQueryKey, next);
-      trackProductEvent({
-        name: 'ai_coach_consent_changed',
-        surface: productEventSurface(),
-        enabled: next.status === 'granted',
-      });
-    },
-  });
-
-  const selectedGenericPrompt =
-    GENERIC_PROMPTS.find((prompt) => prompt.id === genericPromptId) ?? DEFAULT_GENERIC_PROMPT;
-  const selectedPersonalPrompt =
-    PERSONAL_PROMPTS.find((prompt) => prompt.id === personalPromptId) ?? DEFAULT_PERSONAL_PROMPT;
-  const personalConsentGranted = consent.data?.status === 'granted';
-  const customPeriodSelected =
-    periodSelection === 'custom' && selectedPersonalPrompt.tool === 'get_period_report_insights';
-  const selectedPeriodDays: AiCoachPeriod =
-    periodSelection === 'days_7' ? 7 : periodSelection === 'days_90' ? 90 : 30;
-  const today = new Date().toISOString().slice(0, 10);
-  const customPeriodTooLong =
-    Boolean(customDateFrom && customDateTo) &&
-    (Date.parse(customDateTo) - Date.parse(customDateFrom)) / 86_400_000 + 1 > 366;
-  const customPeriodInvalid =
-    customPeriodSelected &&
-    (!customDateFrom ||
-      !customDateTo ||
-      customDateFrom > customDateTo ||
-      customDateTo > today ||
-      customPeriodTooLong);
-
-  const requestMutation = useMutation({
-    mutationFn: async (request: AiCoachRequest) => {
-      const controller = new AbortController();
-      requestAbortController.current = controller;
-      try {
-        return request.mode === 'generic'
-          ? await api<AiCoachResponse>('/api/v1/ai-coach/generate', {
-              method: 'POST',
-              body: {
-                job: request.job,
-                context_id: request.context_id,
-                message: request.message,
-              },
-              signal: controller.signal,
-            })
-          : await api<AiCoachResponse>('/api/v1/ai-coach/personal/generate', {
-              method: 'POST',
-              body: {
-                tool: request.tool,
-                period_days: request.period_days,
-                period: request.period,
-                date_from: request.date_from,
-                date_to: request.date_to,
-                message: request.message,
-              },
-              signal: controller.signal,
-            });
-      } finally {
-        if (requestAbortController.current === controller) requestAbortController.current = null;
-      }
-    },
-    onMutate: (request) => {
-      cancelRequested.current = false;
-      setLastRequest(request);
-      setResponse(null);
-      setFailure(null);
-      trackProductEvent({
-        name: 'ai_coach_request_started',
-        surface: productEventSurface(),
-        mode: request.mode,
-      });
-    },
-    onSuccess: (next, request) => {
-      setResponse(next);
-      trackProductEvent({
-        name: 'ai_coach_response_received',
-        surface: productEventSurface(),
-        mode: request.mode,
-        outcome: next.outcome,
-      });
-    },
-    onError: (reason, request) => {
-      if (cancelRequested.current) {
-        setFailure(null);
-        return;
-      }
-      const failureClass = normalizeFailure(reason);
-      setFailure(failureClass);
-      trackProductEvent({
-        name: 'ai_coach_request_failed',
-        surface: productEventSurface(),
-        mode: request.mode,
-        failure: failureClass,
-      });
-    },
-  });
-
-  const reset = () => {
-    if (requestMutation.isPending) {
-      cancelRequested.current = true;
-      requestAbortController.current?.abort();
-      requestMutation.reset();
-    }
-    setResponse(null);
-    setFailure(null);
-    setDraft('');
-  };
-
-  const cancelRequest = () => {
-    cancelRequested.current = true;
-    requestAbortController.current?.abort();
-    requestMutation.reset();
-    setResponse(null);
-    setFailure(null);
-  };
-
-  const retryLastRequest = () => {
-    if (!lastRequest || requestMutation.isPending) return;
-    requestMutation.mutate(lastRequest);
-  };
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const message = draft.trim();
-    if (!message || requestMutation.isPending) return;
-    if (mode === 'generic') {
-      if (!status?.generic_available) {
-        setResponse({
-          outcome: 'unavailable',
-          answer: null,
-          citations: [],
-          insights: [],
-          limitations: [
-            'Публичная помощь AI Coach временно недоступна. Остальные функции приложения продолжают работать.',
-          ],
-          safety_category: 'clear',
-          prompt_version: AI_COACH_UI_VERSION,
-          request_id: null,
-        });
-        return;
-      }
-      const nextRequest: AiCoachRequest = {
-        mode,
-        job: selectedGenericPrompt.job,
-        context_id: selectedGenericPrompt.context_id,
-        message,
-      };
-      requestMutation.mutate(nextRequest);
-      return;
-    }
-    if (!status?.personal_available) {
-      setResponse({
-        outcome: 'unavailable',
-        answer: null,
-        citations: [],
-        insights: [],
-        limitations: [
-          'Персональная сводка временно недоступна. Публичная помощь работает отдельно.',
-        ],
-        safety_category: 'clear',
-        prompt_version: AI_COACH_UI_VERSION,
-        request_id: null,
-      });
-      return;
-    }
-    if (!personalConsentGranted) {
-      setResponse({
-        outcome: 'consent_required',
-        answer: null,
-        citations: [],
-        insights: [],
-        limitations: [],
-        safety_category: 'clear',
-        prompt_version: AI_COACH_UI_VERSION,
-        request_id: null,
-      });
-      return;
-    }
-    if (customPeriodInvalid) {
-      setFailure('validation');
-      return;
-    }
-    const nextRequest: AiCoachRequest = {
-      mode,
-      tool: selectedPersonalPrompt.tool,
-      period_days: selectedPeriodDays,
-      period: periodSelection,
-      ...(customPeriodSelected ? { date_from: customDateFrom, date_to: customDateTo } : {}),
-      message,
-    };
-    requestMutation.mutate(nextRequest);
-  };
-
-  const sendFeedback = (value: AiCoachHelpfulness) => {
-    trackProductEvent({
-      name: 'ai_coach_helpfulness_submitted',
-      surface: productEventSurface(),
-      value,
-    });
-  };
-
   if (!status?.ui_enabled) {
     return (
       <section className="ai-coach-unavailable" data-testid="ai-coach-ui-disabled">
@@ -1127,223 +1030,16 @@ export function AiCoachExperience({
       </section>
     );
   }
-
   return (
     <section className="ai-coach-experience" data-testid="ai-coach-experience">
-      <header className="ai-coach-experience__intro">
-        <div>
-          <span className="eyebrow">Персональный помощник</span>
-          <h3>Разобраться в тренировках, питании и прогрессе</h3>
-          <p>
-            Память выключена по умолчанию и управляется отдельно. Публичный режим работает по
-            опубликованному материалу, а личный — по одной готовой сводке за выбранный период и,
-            только после отдельного согласия, по вашим разрешённым предпочтениям. Личный запрос
-            запускается вручную в рамках доступного лимита.
-          </p>
-        </div>
-        <Badge tone="warning">Не замена врачу или тренеру</Badge>
-      </header>
-
-      <div className="ai-coach-boundary">
-        <strong>Что не передаётся</strong>
-        <span>
-          Сырые записи дневника, заметки тренера, сон, настроение, идентификаторы аккаунта и история
-          диалога.
-        </span>
-      </div>
-
-      <div className="ai-coach-modes" aria-label="Режим AI Coach" role="group">
-        <button
-          aria-pressed={mode === 'generic'}
-          className={mode === 'generic' ? 'is-active' : ''}
-          type="button"
-          onClick={() => {
-            setMode('generic');
-            setResponse(null);
-            setFailure(null);
-          }}
-        >
-          Публичная помощь
-        </button>
-        <button
-          aria-pressed={mode === 'personal'}
-          className={mode === 'personal' ? 'is-active' : ''}
-          type="button"
-          onClick={() => {
-            setMode('personal');
-            setResponse(null);
-            setFailure(null);
-          }}
-        >
-          Моя сводка
-        </button>
-      </div>
-
-      {mode === 'personal' && (
-        <ConsentNotice
-          consent={consent.data}
-          onChange={(enabled) => consentMutation.mutate(enabled)}
-          pending={consentMutation.isPending}
-          unavailable={!status.personal_available}
-        />
-      )}
-      {mode === 'personal' && <MemoryPanel />}
-      {consent.isError && mode === 'personal' && status.personal_available && (
-        <p className="ai-coach-inline-error" role="alert">
-          Не удалось проверить согласие. Публичная помощь остаётся доступной отдельно.
+      <AiCoachChat status={status} />
+      <details className="ai-coach-memory-disclosure">
+        <summary>Настройки отдельной памяти</summary>
+        <p className="ai-coach-memory-disclosure__hint">
+          История этого чата хранится отдельно и не становится долговременной памятью автоматически.
         </p>
-      )}
-
-      <div className="ai-coach-prompt-grid" aria-label="Быстрые вопросы">
-        {(mode === 'generic' ? GENERIC_PROMPTS : PERSONAL_PROMPTS).map((prompt) => {
-          const selected =
-            mode === 'generic' ? prompt.id === genericPromptId : prompt.id === personalPromptId;
-          return (
-            <button
-              className={selected ? 'is-selected' : ''}
-              key={prompt.id}
-              type="button"
-              onClick={() => {
-                if (mode === 'generic') setGenericPromptId(prompt.id);
-                else {
-                  setPersonalPromptId(prompt.id);
-                  if (
-                    'tool' in prompt &&
-                    prompt.tool !== 'get_period_report_insights' &&
-                    periodSelection === 'custom'
-                  ) {
-                    setPeriodSelection('days_30');
-                  }
-                }
-                setDraft(prompt.message);
-                setResponse(null);
-                setFailure(null);
-              }}
-            >
-              {prompt.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {mode === 'personal' && (
-        <div className="ai-coach-period-controls">
-          <label className="ai-coach-period">
-            <span>Период сводки</span>
-            <select
-              value={periodSelection}
-              onChange={(event) => setPeriodSelection(event.target.value as AiCoachPeriodSelection)}
-            >
-              <option value="days_7">7 дней</option>
-              <option value="days_30">30 дней</option>
-              <option value="days_90">90 дней</option>
-              {selectedPersonalPrompt.tool === 'get_period_report_insights' && (
-                <option value="custom">Произвольный период</option>
-              )}
-            </select>
-          </label>
-          {customPeriodSelected && (
-            <div className="ai-coach-custom-period">
-              <label>
-                <span>Начало</span>
-                <input
-                  aria-label="Начало периода"
-                  max={customDateTo || today}
-                  type="date"
-                  value={customDateFrom}
-                  onChange={(event) => setCustomDateFrom(event.target.value)}
-                />
-              </label>
-              <label>
-                <span>Окончание</span>
-                <input
-                  aria-label="Окончание периода"
-                  max={today}
-                  min={customDateFrom || undefined}
-                  type="date"
-                  value={customDateTo}
-                  onChange={(event) => setCustomDateTo(event.target.value)}
-                />
-              </label>
-              <small>Не более 366 дней; будущие даты недоступны.</small>
-            </div>
-          )}
-        </div>
-      )}
-
-      <form className="ai-coach-form" onSubmit={submit}>
-        <label htmlFor="ai-coach-question">Ваш вопрос</label>
-        <textarea
-          id="ai-coach-question"
-          maxLength={320}
-          minLength={1}
-          placeholder="Например: с чего начать чтение этого раздела?"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-        />
-        <div className="ai-coach-form__meta">
-          <small>До 320 символов. Один вопрос без истории диалога.</small>
-          <small>{draft.length}/320</small>
-        </div>
-        <div className="ai-coach-form__actions">
-          <Button disabled={!draft.trim() || requestMutation.isPending} type="submit">
-            {requestMutation.isPending ? 'Проверяем…' : 'Получить ответ'}
-          </Button>
-          <Button type="button" variant="secondary" onClick={reset}>
-            Новый вопрос
-          </Button>
-          {requestMutation.isPending && (
-            <Button type="button" variant="secondary" onClick={cancelRequest}>
-              Отменить
-            </Button>
-          )}
-        </div>
-      </form>
-
-      {!status.generic_available && mode === 'generic' && (
-        <section
-          className="ai-coach-state ai-coach-state--unavailable"
-          data-testid="ai-coach-generic-unavailable"
-        >
-          <Badge tone="warning">Публичная помощь недоступна</Badge>
-          <p>AI Coach временно не готов. Остальные функции YFC работают.</p>
-        </section>
-      )}
-
-      {failure && (
-        <section
-          className="ai-coach-state ai-coach-state--error"
-          role="alert"
-          data-testid="ai-coach-request-error"
-        >
-          <strong>Ответ не получен</strong>
-          <p>{SAFE_FAILURE_COPY[failure]}</p>
-          <div className="ai-coach-state__actions">
-            <button type="button" onClick={retryLastRequest}>
-              Повторить
-            </button>
-            <button type="button" onClick={() => setFailure(null)}>
-              Понятно
-            </button>
-          </div>
-        </section>
-      )}
-      {requestMutation.isPending && <LoadingState label="Проверяем разрешённый контекст…" />}
-      {response && !requestMutation.isPending && (
-        <ResponseState mode={mode} onFeedback={sendFeedback} response={response} />
-      )}
-
-      <footer className="ai-coach-experience__footer">
-        <span>
-          AI Coach отвечает по разрешённому контексту и может ошибаться. Он не заменяет врача или
-          тренера. Публичный запрос не использует профиль; личные сводки передаются только после
-          отдельного согласия.
-        </span>
-        <AppLink to="/app?section=today">Продолжить без AI</AppLink>
-        {entryPoint !== 'profile' && (
-          <AppLink to="/app?section=profile#profile-ai-coach">Открыть настройки AI Coach</AppLink>
-        )}
-      </footer>
+        <MemoryPanel />
+      </details>
     </section>
   );
 }

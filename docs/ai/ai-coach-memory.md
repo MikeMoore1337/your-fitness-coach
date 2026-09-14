@@ -82,9 +82,11 @@ Memory маркируется как недоверенный continuity context
 ## Privacy, export и rollout
 
 Схема добавлена миграцией `0079_ai_coach_memory`. В account export входят consent и
-структурированные memory items, но не prompt/answer/provider payload. Удаление аккаунта
-удаляет обе memory-таблицы вместе с account-owned данными. Новые environment keys,
-provider и multiprovider fallback не добавляются; operational env change required: no.
+структурированные memory items; отдельный conversational export содержит account-owned историю,
+но не raw provider payload. Memory не получает prompt/answer и не смешивается с history. Удаление
+аккаунта удаляет обе memory-таблицы и conversation history вместе с account-owned данными. Новые
+environment keys, provider и multiprovider fallback не добавляются; operational env change required:
+no.
 
 Rollout использует существующую AI Coach cohort/personal policy. Логи остаются
 metadata-only: request ID, job, trust class, provider/model metadata, outcome, latency,

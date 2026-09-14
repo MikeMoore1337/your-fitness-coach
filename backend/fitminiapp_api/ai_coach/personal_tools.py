@@ -6,7 +6,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -21,10 +21,11 @@ from fitminiapp_api.ai_coach.contracts import (
 )
 from fitminiapp_api.ai_coach.safety import SafetyCategory, classify_message
 from fitminiapp_api.core.config import settings
+from fitminiapp_api.core.timezone import today_for_user
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.seo import public_origin
-from fitminiapp_api.services.analytics import build_training_analytics
+from fitminiapp_api.services.analytics import build_training_analytics, build_workout_timeline
 from fitminiapp_api.services.nutrition_reports import build_nutrition_report
 from fitminiapp_api.services.period_bounds import (
     PeriodBoundsError,
@@ -776,6 +777,111 @@ def get_recent_training_summary_tool(
     )
 
 
+def _get_workout_context_tool(
+    db: Session,
+    user: User,
+    *,
+    focus: str,
+) -> PersonalToolResult:
+    """Return a small, read-only slice for today or the latest recorded workout."""
+
+    today = today_for_user(user)
+    timeline = build_workout_timeline(db, user, limit=12)
+    nearby: list[dict[str, object]] = []
+    for workout in timeline:
+        scheduled_date = workout.get("scheduled_date")
+        if not isinstance(scheduled_date, date):
+            continue
+        if scheduled_date < today - timedelta(days=31) or scheduled_date > today + timedelta(
+            days=7
+        ):
+            continue
+        exercises: list[dict[str, object]] = []
+        raw_exercises = workout.get("exercises")
+        if isinstance(raw_exercises, list):
+            for exercise in raw_exercises[:8]:
+                if not isinstance(exercise, dict):
+                    continue
+                sets: list[dict[str, object]] = []
+                raw_sets = exercise.get("sets")
+                if isinstance(raw_sets, list):
+                    for workout_set in raw_sets[:8]:
+                        if not isinstance(workout_set, dict):
+                            continue
+                        sets.append(
+                            {
+                                key: workout_set.get(key)
+                                for key in (
+                                    "set_number",
+                                    "actual_reps",
+                                    "actual_weight",
+                                    "rir",
+                                    "is_completed",
+                                )
+                            }
+                        )
+                exercises.append(
+                    {
+                        "title": exercise.get("exercise_title"),
+                        "sets": sets,
+                    }
+                )
+        nearby.append(
+            {
+                "date": scheduled_date,
+                "title": workout.get("title"),
+                "status": workout.get("status"),
+                "completed_sets": workout.get("completed_sets"),
+                "exercises": exercises,
+            }
+        )
+        if len(nearby) >= 6:
+            break
+
+    today_workouts = [item for item in nearby if item.get("date") == today]
+    facts = {
+        "today": today,
+        "today_workouts": today_workouts[:2],
+        "nearby_workouts": nearby[:6],
+        "focus": focus,
+    }
+    limitations = (
+        "Показаны только записи расписания и выполненные подходы, которые есть в приложении.",
+        "Пропущенная или незаполненная запись не превращается в нулевое значение.",
+    )
+    return _result(
+        tool=AiCoachPersonalTool.GET_RECENT_TRAINING_SUMMARY,
+        purpose="Ответить по ограниченному срезу расписания или последних тренировок.",
+        facts=facts,
+        period_start=today - timedelta(days=31),
+        period_end=today,
+        sufficiency="sufficient" if nearby else "insufficient",
+        limitations=limitations,
+        fallback_path="/today" if focus == "today" else "/progress",
+        title="Расписание и записи тренировок",
+        screen_path="/today" if focus == "today" else "/progress",
+        context_version="ai-coach-chat-personal-context-v1",
+    )
+
+
+def get_workout_context_tool(
+    db: Session,
+    user: User,
+    *,
+    focus: str,
+) -> PersonalToolResult:
+    """Return a bounded workout slice or a safe context-unavailable result."""
+
+    try:
+        return _get_workout_context_tool(db, user, focus=focus)
+    except PersonalToolUnsafe:
+        raise
+    except PersonalToolUnavailable:
+        raise
+    except (ValueError, KeyError, TypeError, AttributeError, SQLAlchemyError) as exc:
+        raise PersonalToolUnavailable("workout_context_unavailable") from exc
+
+
 def get_nutrition_summary_tool(db: Session, user: User, period_days: int) -> PersonalToolResult:
     period = progress_period_for_days(period_days)
     report = build_nutrition_report(db, user, NutritionReportPeriod(period))
@@ -834,6 +940,7 @@ __all__ = [
     "get_nutrition_summary_tool",
     "get_progress_summary_tool",
     "get_recent_training_summary_tool",
+    "get_workout_context_tool",
     "run_period_report_tool",
     "run_personal_tool",
 ]

@@ -12,6 +12,7 @@ from fitminiapp_api.ai_coach.contracts import (
     AI_COACH_PERSONAL_PROMPT_VERSION,
     AiCoachDataClass,
     AiCoachJob,
+    AiCoachOutcome,
     AiCoachPersonalTool,
     AiCoachPolicy,
     AiCoachRequest,
@@ -25,10 +26,19 @@ from fitminiapp_api.ai_coach.prompts import build_messages
 from fitminiapp_api.ai_coach.service import ai_coach_service
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import get_session_context
-from fitminiapp_api.models.ai_coach import AiCoachMemory, AiCoachMemoryConsent
+from fitminiapp_api.models.ai_coach import (
+    AiCoachConversationMessage,
+    AiCoachMemory,
+    AiCoachMemoryConsent,
+)
 from fitminiapp_api.models.user import User
 from fitminiapp_api.services.account_export import build_account_export
 from fitminiapp_api.services.accounts import delete_user_cascade
+from fitminiapp_api.services.ai_coach_conversations import (
+    add_assistant_message,
+    add_user_message,
+    create_conversation,
+)
 from fitminiapp_api.services.ai_coach_memory import (
     AI_COACH_MEMORY_CONSENT_VERSION,
     create_ai_coach_memory,
@@ -456,7 +466,7 @@ def test_personal_route_uses_memory_only_with_both_consents(client, monkeypatch)
     assert provider.memory_contexts[1] == ()
 
 
-def test_memory_is_exported_without_prompt_or_answer_and_deleted_with_account() -> None:
+def test_memory_and_conversation_history_are_exported_and_deleted_with_account() -> None:
     with get_session_context() as db:
         user = db.query(User).filter(User.telegram_user_id == 2001).one()
         set_ai_coach_memory_consent(db, user_id=user.id, status="enabled")
@@ -466,13 +476,28 @@ def test_memory_is_exported_without_prompt_or_answer_and_deleted_with_account() 
             category="ai_interaction_preferences",
             value="Не добавляй лишние вступления",
         )
+        conversation = create_conversation(db, user_id=user.id)
+        conversation_id = conversation.id
+        add_user_message(db, conversation=conversation, content="Как читать прогресс?")
+        add_assistant_message(
+            db,
+            conversation=conversation,
+            content="Смотрите на динамику записанных тренировок.",
+            outcome=AiCoachOutcome.ANSWER,
+            safety_category="clear",
+            failure_category=None,
+            request_id="request-export-test",
+        )
         db.flush()
         export = build_account_export(db, user)
         encoded = json.dumps(jsonable_encoder(export), ensure_ascii=False)
         assert export["ai_coach_memory_consent"]["status"] == "enabled"
         assert export["ai_coach_memories"][0]["value_text"] == "Не добавляй лишние вступления"
+        assert export["ai_coach_conversations"][0]["id"] == conversation_id
+        assert export["ai_coach_conversation_messages"][0]["content"] == "Как читать прогресс?"
         assert "raw_prompt" not in encoded
-        assert "provider_answer" not in encoded
+        assert "provider_payload" not in encoded
+        assert "api_key" not in encoded
         user_id = user.id
     with get_session_context() as db:
         user = db.query(User).filter(User.id == user_id).one()
@@ -483,3 +508,9 @@ def test_memory_is_exported_without_prompt_or_answer_and_deleted_with_account() 
             == 0
         )
         assert db.query(AiCoachMemory).filter(AiCoachMemory.user_id == user_id).count() == 0
+        assert (
+            db.query(AiCoachConversationMessage)
+            .filter(AiCoachConversationMessage.conversation_id == conversation_id)
+            .count()
+            == 0
+        )

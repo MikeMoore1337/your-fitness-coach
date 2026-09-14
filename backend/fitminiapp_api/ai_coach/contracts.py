@@ -24,6 +24,8 @@ AI_COACH_SCHEMA_VERSION = "ai-coach-answer-v1"
 AI_COACH_PERIOD_REPORT_PROMPT_VERSION = "ai-coach-period-report-v2"
 AI_COACH_PERIOD_REPORT_INPUT_VERSION = "ai-coach-period-report-input-v1"
 AI_COACH_PERIOD_REPORT_OUTPUT_VERSION = "ai-coach-period-report-output-v1"
+AI_COACH_CHAT_PROMPT_VERSION = "ai-coach-chat-v1"
+AI_COACH_CHAT_OUTPUT_VERSION = "ai-coach-chat-text-v1"
 _BoundedLimitation = Annotated[str, Field(max_length=240)]
 _BoundedAnchor = Annotated[str, Field(min_length=1, max_length=128)]
 AiCoachMemoryCategory = Literal[
@@ -139,6 +141,53 @@ class AiCoachRequest(BaseModel):
         if len(normalized) > 320 or any(
             ord(char) < 0x20 and char not in "\t" for char in normalized
         ):
+            raise ValueError("message must be a single safe text value")
+        return normalized
+
+
+class AiCoachConversationTurn(BaseModel):
+    """One bounded turn supplied to the text-generation adapter."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=1_600)
+
+    @field_validator("content")
+    @classmethod
+    def normalize_content(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
+            raise ValueError("conversation content must be a single safe text value")
+        return normalized
+
+
+class AiCoachChatRequest(BaseModel):
+    """Provider-neutral request for the ordinary conversational AI Coach path."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    job: AiCoachJob
+    context_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:/-]+$")
+    message: str = Field(..., min_length=1, max_length=320)
+    data_class: AiCoachDataClass
+    locale: Literal["ru"] = "ru"
+    conversation_history: tuple[AiCoachConversationTurn, ...] = Field(default=(), max_length=8)
+    memory_context: tuple[AiCoachMemoryContext, ...] = Field(default=(), max_length=20)
+
+    @field_validator("context_id")
+    @classmethod
+    def validate_context_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if "://" in normalized or "?" in normalized or "#" in normalized:
+            raise ValueError("context_id must be a server-known context id, not a URL")
+        return normalized
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
             raise ValueError("message must be a single safe text value")
         return normalized
 
@@ -273,6 +322,25 @@ class ProviderResult(BaseModel):
     latency_ms: int = Field(..., ge=0)
 
 
+class ProviderTextResponse(BaseModel):
+    """Plain text output for chat; no period-report JSON schema is involved."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    answer: str = Field(..., min_length=1, max_length=1_600)
+
+
+class ProviderTextResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(..., min_length=1, max_length=64)
+    configured_model: str = Field(..., min_length=1, max_length=128)
+    actual_model: str | None = Field(default=None, max_length=128)
+    response: ProviderTextResponse
+    usage: ProviderUsage | None = None
+    latency_ms: int = Field(..., ge=0)
+
+
 class AiCoachCitation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -328,3 +396,13 @@ class LlmPort(Protocol):
         policy: AiCoachPolicy,
         context_refs: tuple[ContextRef, ...],
     ) -> ProviderResult: ...
+
+
+class ChatLlmPort(Protocol):
+    provider_name: str
+
+    def generate_text(
+        self,
+        request: AiCoachChatRequest,
+        context_refs: tuple[ContextRef, ...],
+    ) -> ProviderTextResult: ...

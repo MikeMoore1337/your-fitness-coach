@@ -2,13 +2,27 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
+from fitminiapp_api.ai_coach.chat_service import (
+    CHAT_FAILURE_CONTEXT,
+    CHAT_FAILURE_PROVIDER,
+    AiCoachChatGeneration,
+    ai_coach_chat_service,
+)
+from fitminiapp_api.ai_coach.context_selection import (
+    ChatContextSelection,
+    message_requires_personal_context,
+    select_chat_context,
+)
 from fitminiapp_api.ai_coach.contracts import (
+    AI_COACH_CHAT_PROMPT_VERSION,
     AI_COACH_PERIOD_REPORT_PROMPT_VERSION,
     AI_COACH_PERSONAL_PROMPT_VERSION,
+    AiCoachChatRequest,
     AiCoachCitation,
+    AiCoachConversationTurn,
     AiCoachDataClass,
     AiCoachInsight,
     AiCoachInsightKind,
@@ -25,6 +39,7 @@ from fitminiapp_api.ai_coach.personal_tools import (
     run_period_report_tool,
     run_personal_tool,
 )
+from fitminiapp_api.ai_coach.retrieval import ContextUnavailable
 from fitminiapp_api.ai_coach.safety import (
     SafetyCategory,
     classify_message,
@@ -43,6 +58,11 @@ from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.ai_coach import (
     AiCoachConsentResponse,
     AiCoachConsentUpdateRequest,
+    AiCoachConversationFeedbackRequest,
+    AiCoachConversationListResponse,
+    AiCoachConversationResponse,
+    AiCoachConversationSendRequest,
+    AiCoachConversationSendResponse,
     AiCoachGenerateRequest,
     AiCoachMemoryClearResponse,
     AiCoachMemoryConsentUpdateRequest,
@@ -59,6 +79,19 @@ from fitminiapp_api.services.ai_coach_consent import (
     has_active_ai_coach_consent,
     serialize_ai_coach_consent,
     set_ai_coach_consent,
+)
+from fitminiapp_api.services.ai_coach_conversations import (
+    add_assistant_message,
+    add_user_message,
+    conversation_response,
+    create_conversation,
+    get_conversation_message,
+    get_owned_conversation,
+    history_turns,
+    list_conversations,
+    mark_user_message_result,
+    serialize_message,
+    update_title_from_message,
 )
 from fitminiapp_api.services.ai_coach_memory import (
     AiCoachMemoryValidationError,
@@ -81,7 +114,9 @@ from fitminiapp_api.services.period_bounds import PeriodBoundsError, progress_pe
 router = APIRouter()
 
 
-def _generic_runtime_available() -> bool:
+def _chat_runtime_available() -> bool:
+    """Check the plain-text chat gate without requiring report JSON support."""
+
     return bool(
         settings.ai_coach_enabled
         and not settings.ai_coach_kill_switch
@@ -90,7 +125,6 @@ def _generic_runtime_available() -> bool:
         and settings.ai_coach_cost_policy == "free_only"
         and settings.ai_coach_cost_class == "free"
         and settings.ai_coach_data_policy == "verified_generic_only"
-        and settings.ai_coach_structured_output
     )
 
 
@@ -102,7 +136,7 @@ def get_ai_coach_status(
 ) -> AiCoachStatusResponse:
     del request
     ui_enabled = True
-    generic_available = _generic_runtime_available()
+    generic_available = _chat_runtime_available()
     personal_available = bool(
         generic_available
         and settings.ai_coach_personal_enabled
@@ -113,6 +147,413 @@ def get_ai_coach_status(
         generic_available=generic_available,
         personal_available=personal_available,
     )
+
+
+def _chat_citations(selection: ChatContextSelection) -> tuple[AiCoachCitation, ...]:
+    citations: list[AiCoachCitation] = []
+    seen: set[str] = set()
+    for ref in selection.context_refs:
+        for citation in ref.citations:
+            url = str(citation.url)
+            if url in seen:
+                continue
+            seen.add(url)
+            citations.append(AiCoachCitation.model_validate(citation.model_dump()))
+            if len(citations) == 12:
+                return tuple(citations)
+    return tuple(citations)
+
+
+def _chat_state_generation(
+    *,
+    outcome: AiCoachOutcome,
+    data_class: AiCoachDataClass,
+    answer: str | None = None,
+    limitations: tuple[str, ...] = (),
+    safety_category: SafetyCategory = SafetyCategory.CLEAR,
+    failure_category: str | None = None,
+    citations: tuple[AiCoachCitation, ...] = (),
+) -> AiCoachChatGeneration:
+    return AiCoachChatGeneration(
+        outcome=outcome,
+        answer=answer,
+        citations=citations,
+        limitations=limitations,
+        safety_category=safety_category,
+        failure_category=failure_category,
+        prompt_version=AI_COACH_CHAT_PROMPT_VERSION,
+        data_class=data_class,
+    )
+
+
+def _chat_consent_generation() -> AiCoachChatGeneration:
+    return _chat_state_generation(
+        outcome=AiCoachOutcome.CONSENT_REQUIRED,
+        data_class=AiCoachDataClass.PERSONALIZED,
+        answer=(
+            "Чтобы ответить по вашим тренировкам, прогрессу или питанию, сначала "
+            "включите отдельное согласие на персональный режим AI Coach. "
+            "Без него я не открываю ваши данные."
+        ),
+    )
+
+
+def _chat_personal_unavailable_generation() -> AiCoachChatGeneration:
+    return _chat_state_generation(
+        outcome=AiCoachOutcome.UNAVAILABLE,
+        data_class=AiCoachDataClass.PERSONALIZED,
+        limitations=(
+            "Персональный режим AI Coach сейчас недоступен; основные функции приложения "
+            "продолжают работать.",
+        ),
+        failure_category=CHAT_FAILURE_PROVIDER,
+    )
+
+
+def _chat_context_failure_generation(
+    *,
+    data_class: AiCoachDataClass,
+    fallback_path: str | None = None,
+    citations: tuple[AiCoachCitation, ...] = (),
+) -> AiCoachChatGeneration:
+    suffix = (
+        f" Откройте раздел {fallback_path} и повторите вопрос."
+        if fallback_path
+        else " Откройте соответствующий раздел приложения и повторите вопрос."
+    )
+    return _chat_state_generation(
+        outcome=AiCoachOutcome.INSUFFICIENT_DATA,
+        data_class=data_class,
+        answer=("Пока недостаточно проверенных данных, чтобы ответить по вашей ситуации." + suffix),
+        citations=citations,
+        failure_category=CHAT_FAILURE_CONTEXT,
+    )
+
+
+def _chat_request_for_selection(
+    *,
+    message: str,
+    history: tuple[AiCoachConversationTurn, ...],
+    selection: ChatContextSelection,
+    memory_context=(),
+) -> AiCoachChatRequest:
+    return AiCoachChatRequest(
+        job=selection.job,
+        context_id=selection.context_id,
+        message=message,
+        data_class=selection.data_class,
+        conversation_history=history,
+        memory_context=memory_context,
+    )
+
+
+def _generate_chat(
+    *,
+    db: Session,
+    current_user: User,
+    message: str,
+    history: tuple[AiCoachConversationTurn, ...],
+    request_id: str | None,
+) -> AiCoachChatGeneration:
+    safety_category = classify_message(message)
+    personal_needed = message_requires_personal_context(message, history) or (
+        safety_category == SafetyCategory.PERSONAL_DATA
+    )
+
+    if safety_category not in {SafetyCategory.CLEAR, SafetyCategory.PERSONAL_DATA}:
+        request = AiCoachChatRequest(
+            job=AiCoachJob.FITNESS_KNOWLEDGE,
+            context_id="public:safety",
+            message=message,
+            data_class=AiCoachDataClass.UNKNOWN,
+            conversation_history=history,
+        )
+        return ai_coach_chat_service.generate(
+            request=request,
+            user_key=str(current_user.id),
+            request_id=request_id,
+            context_refs=(),
+        )
+
+    if personal_needed:
+        if not has_active_ai_coach_consent(get_ai_coach_consent(db, current_user.id)):
+            return _chat_consent_generation()
+        if not (
+            _chat_runtime_available()
+            and settings.ai_coach_personal_enabled
+            and settings.ai_coach_personal_data_policy == "verified_personal_user"
+        ):
+            return _chat_personal_unavailable_generation()
+        selection = select_chat_context(
+            db,
+            current_user,
+            message=message,
+            history=history,
+        )
+        if selection.data_sufficiency == "insufficient":
+            return _chat_context_failure_generation(
+                data_class=selection.data_class,
+                fallback_path=selection.fallback_path,
+                citations=_chat_citations(selection),
+            )
+        request = _chat_request_for_selection(
+            message=message,
+            history=history,
+            selection=selection,
+            memory_context=get_ai_coach_memory_context(db, user_id=current_user.id),
+        )
+    else:
+        selection = select_chat_context(
+            db,
+            current_user,
+            message=message,
+            history=history,
+        )
+        request = _chat_request_for_selection(
+            message=message,
+            history=history,
+            selection=selection,
+        )
+
+    return ai_coach_chat_service.generate(
+        request=request,
+        user_key=str(current_user.id),
+        request_id=request_id,
+        context_refs=selection.context_refs,
+    )
+
+
+def _conversation_or_404(
+    db: Session,
+    *,
+    user_id: int,
+    conversation_id: int,
+):
+    conversation = get_owned_conversation(
+        db,
+        user_id=user_id,
+        conversation_id=conversation_id,
+    )
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Разговор AI Coach не найден")
+    return conversation
+
+
+@router.get("/conversations", response_model=AiCoachConversationListResponse)
+@limiter.limit("60/hour")
+def get_ai_coach_conversations(
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachConversationListResponse:
+    del request
+    return AiCoachConversationListResponse(items=list_conversations(db, user_id=current_user.id))
+
+
+@router.post(
+    "/conversations",
+    response_model=AiCoachConversationResponse,
+    status_code=201,
+)
+@limiter.limit("20/hour")
+def create_ai_coach_conversation(
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachConversationResponse:
+    del request
+    try:
+        conversation = create_conversation(db, user_id=current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    record_audit_event(
+        db,
+        action="ai_coach.conversation_created",
+        resource_type="ai_coach_conversation",
+        resource_id=conversation.id,
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+    )
+    db.commit()
+    return conversation_response(db, conversation)
+
+
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=AiCoachConversationResponse,
+)
+@limiter.limit("60/hour")
+def get_ai_coach_conversation(
+    conversation_id: int,
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachConversationResponse:
+    del request
+    conversation = _conversation_or_404(
+        db,
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    return conversation_response(db, conversation)
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+@limiter.limit("10/hour")
+def delete_ai_coach_conversation(
+    conversation_id: int,
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    del request
+    conversation = _conversation_or_404(
+        db,
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    db.delete(conversation)
+    record_audit_event(
+        db,
+        action="ai_coach.conversation_deleted",
+        resource_type="ai_coach_conversation",
+        resource_id=conversation_id,
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+    )
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=AiCoachConversationSendResponse,
+)
+@limiter.limit("10/minute")
+def send_ai_coach_conversation_message(
+    conversation_id: int,
+    payload: AiCoachConversationSendRequest,
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachConversationSendResponse:
+    conversation = _conversation_or_404(
+        db,
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    request_id = getattr(request.state, "request_id", None)
+    history = tuple(
+        AiCoachConversationTurn.model_validate(item)
+        for item in history_turns(db, conversation_id=conversation.id)
+    )
+    user_message = add_user_message(
+        db,
+        conversation=conversation,
+        content=payload.message,
+    )
+    update_title_from_message(conversation, content=payload.message)
+    try:
+        generation = _generate_chat(
+            db=db,
+            current_user=current_user,
+            message=payload.message,
+            history=history,
+            request_id=request_id,
+        )
+    except PersonalToolUnsafe:
+        generation = _chat_state_generation(
+            outcome=AiCoachOutcome.SAFETY_REFUSAL,
+            data_class=AiCoachDataClass.PERSONALIZED,
+            answer=(
+                "Я могу отвечать только по безопасной структурированной сводке "
+                "и не меняю эти ограничения."
+            ),
+            safety_category=SafetyCategory.PROMPT_INJECTION,
+        )
+    except PersonalToolUnavailable:
+        generation = _chat_context_failure_generation(
+            data_class=AiCoachDataClass.PERSONALIZED,
+        )
+    except ContextUnavailable:
+        generation = _chat_context_failure_generation(
+            data_class=AiCoachDataClass.GENERIC,
+        )
+
+    mark_user_message_result(
+        user_message,
+        outcome=generation.outcome,
+        safety_category=generation.safety_category.value,
+        failure_category=generation.failure_category,
+        request_id=request_id,
+        limitations=generation.limitations,
+    )
+    assistant_message = None
+    if generation.answer is not None:
+        assistant_message = add_assistant_message(
+            db,
+            conversation=conversation,
+            content=generation.answer,
+            outcome=generation.outcome,
+            safety_category=generation.safety_category.value,
+            failure_category=generation.failure_category,
+            request_id=request_id,
+            citations=generation.citations,
+            limitations=generation.limitations,
+        )
+    db.commit()
+    return AiCoachConversationSendResponse(
+        conversation_id=conversation.id,
+        user_message=serialize_message(user_message),
+        assistant_message=serialize_message(assistant_message)
+        if assistant_message is not None
+        else None,
+        outcome=generation.outcome,
+        data_class=generation.data_class,
+        answer=generation.answer,
+        citations=generation.citations,
+        limitations=generation.limitations,
+        safety_category=generation.safety_category.value,
+        failure_category=generation.failure_category,
+        prompt_version=generation.prompt_version,
+        request_id=request_id,
+    )
+
+
+@router.post("/conversations/{conversation_id}/messages/{message_id}/feedback", status_code=204)
+@limiter.limit("60/hour")
+def submit_ai_coach_conversation_feedback(
+    conversation_id: int,
+    message_id: int,
+    payload: AiCoachConversationFeedbackRequest,
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    del request
+    _conversation_or_404(
+        db,
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    message = get_conversation_message(
+        db,
+        conversation_id=conversation_id,
+        message_id=message_id,
+    )
+    if message is None or message.role != "assistant":
+        raise HTTPException(status_code=404, detail="Сообщение AI Coach не найдено")
+    record_audit_event(
+        db,
+        action="ai_coach.conversation_feedback",
+        resource_type="ai_coach_conversation_message",
+        resource_id=message_id,
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        details={"value": payload.value},
+    )
+    db.commit()
+    return Response(status_code=204)
 
 
 def _personal_state_response(

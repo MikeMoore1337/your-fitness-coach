@@ -2,9 +2,12 @@
 
 > Документ описывает сохранённый personal-data contract. Текущий endpoint доступен
 > аутентифицированному пользователю без internal cohort, но provider получает personal summary
-> только после отдельного consent и действующей policy.
+> только после отдельного consent и действующей policy. Новый обычный чат и его история описаны
+> в [ai-coach-conversations.md](ai-coach-conversations.md).
 
-Task 89 добавляет отдельный, выключенный по умолчанию маршрут персонального AI Coach.
+Task 89 добавляет отдельный read-only boundary персонального AI Coach. В conversational UI этот
+boundary вызывается автоматически только для вопроса, который действительно требует личных
+данных; legacy `/personal/generate` сохраняется для совместимости и внутренних сценариев.
 Он объясняет ограниченную сводку уже рассчитанных сервером фактов. Экран прогресса,
 тренировок или питания остаётся источником фактов; ценность AI Coach — в коротком
 естественно-языковом объяснении выбранной сводки и её ограничений, а не в замене
@@ -54,11 +57,14 @@ scope или проверенной provider policy делает прежнее 
 В provider уходит только текущая ограниченная структурированная сводка для выбранного
 tool, пользовательский вопрос и, при отдельном enabled memory consent, небольшой
 continuity context из разрешённых предпочтений. Memory не является evidence и не может
-переопределить canonical tool. Промпт, ответ и tool payload не сохраняются в БД;
-в логах остаются только request metadata, outcome, tool name, latency, token/cost
-metadata и безопасный error code. Экспорт содержит историю согласия и управляемые
-memory items, но не содержит prompt/answer/context payload. Удаление аккаунта удаляет
-обе записи согласия и memory items.
+переопределить canonical tool. История conversational UI сохраняется отдельно в
+`ai_coach_conversations` и `ai_coach_conversation_messages`, чтобы пользователь мог продолжить
+разговор после перезагрузки; она не становится durable memory автоматически. Legacy
+`/personal/generate` по-прежнему не сохраняет transient provider prompt/answer/tool payload.
+В логах остаются только request metadata, outcome, tool name, latency, token/cost metadata и
+безопасный error code. Экспорт содержит account-owned историю диалога, историю согласия и
+управляемые memory items, но не содержит raw provider payload. Удаление аккаунта явно удаляет
+messages и conversation shell, а также обе записи согласия и memory items.
 
 ## Ограничения безопасности
 
