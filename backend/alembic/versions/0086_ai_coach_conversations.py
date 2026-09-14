@@ -22,19 +22,22 @@ def upgrade() -> None:
     op.create_table(
         "ai_coach_conversations",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "users.id",
+                name="fk_ai_coach_conversations_user_id_users",
+                ondelete="CASCADE",
+            ),
+            nullable=False,
+        ),
         sa.Column("title", sa.String(length=80), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.CheckConstraint(
             "title IS NULL OR length(title) BETWEEN 1 AND 80",
             name="ck_ai_coach_conversations_title_length",
-        ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-            name="fk_ai_coach_conversations_user_id_users",
-            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -52,7 +55,16 @@ def upgrade() -> None:
     op.create_table(
         "ai_coach_conversation_messages",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("conversation_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "conversation_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "ai_coach_conversations.id",
+                name="fk_ai_coach_conversation_messages_conversation_id_conversations",
+                ondelete="CASCADE",
+            ),
+            nullable=False,
+        ),
         sa.Column("role", sa.String(length=16), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False),
@@ -74,12 +86,6 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "length(content) BETWEEN 1 AND 1600",
             name="ck_ai_coach_conversation_messages_content_length",
-        ),
-        sa.ForeignKeyConstraint(
-            ["conversation_id"],
-            ["ai_coach_conversations.id"],
-            name="fk_ai_coach_conversation_messages_conversation_id_conversations",
-            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id"),
     )
