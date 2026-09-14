@@ -29,7 +29,8 @@ Task 128F использует adaptive bounded набор из пяти вар�
 grayscale, локальный контраст с denoise, inversion, adaptive threshold) и три фиксированных PSM:
 `6`, `4`, `11`. Evidence-backed priority начинается с `roi_deskew_minus_1_5_2x` и PSM `6`, затем
 идут PSM `4`/`11` и остальные варианты. Каждый pass использует явный `argv`, TSV word-level
-output, общий request budget `8 s` и bounded per-pass budget `1.5 s`; число токенов, размер TSV,
+output, общий request budget `8 s`; для первого cold/high-resolution pass разрешено до `3.5 s`,
+последующие pass используют bounded budget `1.5 s`; число токенов, размер TSV,
 pixels preprocessing и суммарное число pass ограничены. После каждого pass candidate проходит
 nutrition scoring: strong draft (resolved basis, energy, P/F/C, явные unit associations и без
 safety warnings) останавливает pipeline. Optional timeout после reviewable candidate возвращает
@@ -169,5 +170,10 @@ Backend runtime устанавливает локальный Tesseract OCR и �
   candidates; clean strong candidate в deterministic tests завершает pipeline на одном pass.
   Это benchmark bounded runtime, не real-label accuracy и не device/TMA benchmark: production
   same-photo HUMAN_EVIDENCE остаётся обязательным.
+- После production HUMAN_EVIDENCE `503 local_ocr_timeout` на high-resolution label replay была
+  воспроизведена в constrained `0.5-1 CPU` container: первый deskewed pass превышал старый
+  `1.5 s` cap. Remediation оставляет общий request budget `8 s`, разрешает первому cold pass до
+  `3.5 s`, а последующим pass оставляет `1.5 s`; локальный replay вернул reviewable draft без
+  `503`. Это runtime regression evidence, а не подтверждение production real-label accuracy.
 - OCR recognition quality по реальным этикеткам, correction baseline и full corpus metrics
   остаются `NOT MEASURED` до owner-authorized validation на production representative labels.
