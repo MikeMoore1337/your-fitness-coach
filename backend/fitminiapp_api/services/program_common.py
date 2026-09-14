@@ -5,6 +5,7 @@ class ProgramError(ValueError):
 ASSIGNMENT_CONFLICT_ERRORS = {
     "Active program replacement requires confirmation",
     "Cannot replace a program while a workout is in progress",
+    "Cannot delete a program while a workout is in progress",
 }
 
 ASSIGNMENT_VALIDATION_PREFIXES = (

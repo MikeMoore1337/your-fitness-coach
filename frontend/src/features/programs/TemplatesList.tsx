@@ -119,6 +119,15 @@ export function TemplatesList({
     queryKey: ['templates', 'hidden'],
     queryFn: () => api<ProgramTemplate[]>('/api/v1/programs/templates/hidden'),
   });
+  const refreshProgramState = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['templates'] }),
+      queryClient.invalidateQueries({ queryKey: ['workout'] }),
+      queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+      reloadUser(),
+    ]);
+  };
   const mutation = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
       api(path, { method, body }),
@@ -151,11 +160,7 @@ export function TemplatesList({
         'program_activated',
       );
       setAssignmentTemplate(null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['templates'] }),
-        queryClient.invalidateQueries({ queryKey: ['workout'] }),
-        reloadUser(),
-      ]);
+      await refreshProgramState();
       toast('Программа назначена');
     },
     onError: async (reason, variables) => {
@@ -182,6 +187,36 @@ export function TemplatesList({
           : (reason as Error).message,
         'error',
       );
+    },
+  });
+
+  const deleteAssignedMutation = useMutation({
+    mutationFn: (programId: number) =>
+      api<void>(`/api/v1/programs/assigned/${programId}`, { method: 'DELETE' }),
+    onSuccess: async (_data, programId) => {
+      queryClient.setQueryData<ProgramTemplate[]>(['templates', 'mine'], (current) =>
+        current?.map((item) =>
+          item.assigned_program_id === programId
+            ? { ...item, is_active_for_current_user: false }
+            : item,
+        ),
+      );
+      await refreshProgramState();
+      toast('Программа удалена');
+    },
+    onError: (reason) => {
+      if (
+        reason instanceof ApiError &&
+        reason.status === 409 &&
+        reason.message.toLowerCase().includes('in progress')
+      ) {
+        toast(
+          'Сначала завершите текущую тренировку - во время неё программу удалить нельзя.',
+          'error',
+        );
+        return;
+      }
+      toast(reason instanceof Error ? reason.message : 'Не удалось удалить программу', 'error');
     },
   });
 
@@ -213,6 +248,21 @@ export function TemplatesList({
   };
 
   const activeTemplate = templates.data?.find((item) => item.is_active_for_current_user) ?? null;
+  const deleteActiveProgram = async () => {
+    const assignedProgramId = activeTemplate?.assigned_program_id;
+    if (assignedProgramId == null || deleteAssignedMutation.isPending) return;
+    if (
+      await confirm({
+        title: 'Удалить текущую программу?',
+        message:
+          'Программа перестанет быть активной, а будущие запланированные тренировки будут отменены. История выполненных тренировок и сам шаблон программы сохранятся.',
+        confirmText: 'Удалить программу',
+        danger: true,
+      })
+    ) {
+      deleteAssignedMutation.mutate(assignedProgramId);
+    }
+  };
   const ownTemplates =
     templates.data?.filter(
       (item) =>
@@ -381,6 +431,19 @@ export function TemplatesList({
                       : 'Редактировать шаблон'}
                   </button>
                 </div>
+                {activeTemplate.assigned_program_id != null && (
+                  <details className="program-danger-menu">
+                    <summary>Другие действия</summary>
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      disabled={deleteAssignedMutation.isPending}
+                      onClick={() => void deleteActiveProgram()}
+                    >
+                      Удалить программу
+                    </button>
+                  </details>
+                )}
               </>
             )}
           </>
