@@ -62,9 +62,10 @@ URL/query payload.
 `backend/fitminiapp_api/middleware/request_context.py`, константа
 `CONTENT_SECURITY_POLICY`. Для внешнего `tag.js` разрешены только `https://mc.yandex.ru` и
 `https://yastatic.net` в `script-src`; для noscript/telemetry — `https://mc.yandex.ru`, а для
-Chrome-specific consent/iframe runtime tag — `https://mc.yandex.md`. `connect-src` также содержит
-только canonical API origin `https://app.your-fitness-coach.ru` и `wss://mc.yandex.ru`; `blob:` и
-эти exact Yandex origins разрешены в `child-src`/`frame-src` для текущего `webvisor: true`.
+Chrome-specific consent/iframe runtime tag — `https://mc.yandex.md`. `connect-src` также сохраняет
+`'self'`, canonical app origin `https://app.your-fitness-coach.ru` и `wss://mc.yandex.ru`; public API
+запрашивается same-origin с landing, а `blob:` и эти exact Yandex origins разрешены в
+`child-src`/`frame-src` для текущего `webvisor: true`.
 `worker-src 'self'` явно сохраняет service-worker/worker boundary приложения.
 Существующие Telegram origins и security directives (`object-src 'none'`, `base-uri 'self'`,
 `form-action 'self'`, private-safe `frame-ancestors`) сохраняются. Для Yandex не используются

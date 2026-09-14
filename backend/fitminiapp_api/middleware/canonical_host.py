@@ -23,7 +23,9 @@ APPLICATION_PATHS = frozenset(
         "/reset-password",
     }
 )
-APPLICATION_PATH_PREFIXES = ("/api/", "/join/")
+# Public pages use relative API URLs, so redirecting /api/* to the app origin
+# would turn a same-origin browser request into a cross-origin response.
+APPLICATION_PATH_PREFIXES = ("/join/",)
 PUBLIC_PATHS = frozenset(public_page_paths())
 
 

@@ -96,10 +96,10 @@ def test_production_csp_allows_yandex_metrica_and_public_api_without_relaxing_se
         headers={"Host": "your-fitness-coach.ru"},
         follow_redirects=False,
     )
-    assert landing_api.status_code == 308
-    assert landing_api.headers["location"] == (
-        "https://app.your-fitness-coach.ru/api/v1/public/articles"
-    )
+    assert landing_api.status_code == 200
+    assert "location" not in landing_api.headers
+    assert "access-control-allow-origin" not in landing_api.headers
+    assert landing_api.headers["content-security-policy"] == policy
     api_response = client.get(
         "/api/v1/public/articles",
         headers={"Host": "app.your-fitness-coach.ru"},
