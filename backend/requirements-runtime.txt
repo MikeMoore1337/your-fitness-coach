@@ -143,7 +143,7 @@ pyclipper==1.4.0
     # via rapidocr
 pycparser==3.0 ; implementation_name != 'PyPy'
     # via cffi
-pydantic==2.13.4
+pydantic==2.13.5
     # via
     #   -r backend/requirements.in
     #   fastapi
