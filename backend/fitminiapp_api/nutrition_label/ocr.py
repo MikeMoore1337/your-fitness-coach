@@ -14,13 +14,32 @@ from typing import Protocol
 
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
 
-OCR_PIPELINE_VERSION = "tesseract-structured-multipass-v2"
+OCR_PIPELINE_VERSION = "tesseract-structured-adaptive-v3"
 OCR_PSM_MODES: tuple[int, ...] = (6, 4, 11)
 OCR_TESSERACT_DPI = 300
 OCR_MAX_VARIANTS = 5
 OCR_MAX_TOKENS = 4096
 OCR_MAX_PREPROCESSED_PIXELS = 12_000_000
 OCR_MAX_DIMENSION = 4096
+OCR_DEFAULT_PASS_TIMEOUT_SECONDS = 1.5
+
+# 128E's production-like benchmark found the deskewed ROI to be the first variant that
+# recovered all mandatory facts. Keep the fallback order explicit and bounded: each pair is
+# scheduled at most once, and the service may stop consuming this stream after a strong draft.
+OCR_VARIANT_PRIORITY: tuple[str, ...] = (
+    "roi_deskew_minus_1_5_2x",
+    "source_rgb_1x",
+    "roi_gray_contrast_denoised_2x",
+    "roi_inverted_2x",
+    "roi_adaptive_threshold_2x",
+)
+OCR_PSM_PRIORITY: dict[str, tuple[int, ...]] = {
+    "roi_deskew_minus_1_5_2x": (6, 4, 11),
+    "source_rgb_1x": (4, 11, 6),
+    "roi_gray_contrast_denoised_2x": (4, 6, 11),
+    "roi_inverted_2x": (4, 6, 11),
+    "roi_adaptive_threshold_2x": (4, 11, 6),
+}
 
 
 class LocalOcrError(RuntimeError):
@@ -223,19 +242,23 @@ def _iter_preprocessed_variants(normalized_png: bytes) -> Iterator[PreprocessedV
             rgb = _scale_image(source.convert("RGB"), 1.0)
             roi = _safe_roi(rgb)
             gray = _gray_contrast(roi)
-            yield PreprocessedVariant("source_rgb_1x", rgb.copy())
-            yield PreprocessedVariant("roi_gray_contrast_denoised_2x", _scale_image(gray, 2.0))
-            threshold = _adaptive_threshold(gray)
-            yield PreprocessedVariant("roi_adaptive_threshold_2x", _scale_image(threshold, 2.0))
-            inverted = ImageOps.invert(gray)
-            yield PreprocessedVariant("roi_inverted_2x", _scale_image(inverted, 2.0))
-            deskewed = gray.rotate(
-                -1.5,
-                resample=Image.Resampling.BICUBIC,
-                expand=True,
-                fillcolor=255,
-            )
-            yield PreprocessedVariant("roi_deskew_minus_1_5_2x", _scale_image(deskewed, 2.0))
+            variant_builders = {
+                "roi_deskew_minus_1_5_2x": lambda: _scale_image(
+                    gray.rotate(
+                        -1.5,
+                        resample=Image.Resampling.BICUBIC,
+                        expand=True,
+                        fillcolor=255,
+                    ),
+                    2.0,
+                ),
+                "source_rgb_1x": lambda: rgb.copy(),
+                "roi_gray_contrast_denoised_2x": lambda: _scale_image(gray, 2.0),
+                "roi_inverted_2x": lambda: _scale_image(ImageOps.invert(gray), 2.0),
+                "roi_adaptive_threshold_2x": lambda: _scale_image(_adaptive_threshold(gray), 2.0),
+            }
+            for variant_name in OCR_VARIANT_PRIORITY:
+                yield PreprocessedVariant(variant_name, variant_builders[variant_name]())
     except (OSError, ValueError, Image.DecompressionBombError) as exc:
         raise LocalOcrError("local_ocr_failed") from exc
 
@@ -254,6 +277,7 @@ class TesseractOcr:
     timeout_seconds: float
     max_output_chars: int
     executable: str | None = None
+    pass_timeout_seconds: float = OCR_DEFAULT_PASS_TIMEOUT_SECONDS
     name: str = "local_tesseract"
     version: str = OCR_PIPELINE_VERSION
 
@@ -295,46 +319,67 @@ class TesseractOcr:
             raise LocalOcrError("local_ocr_output_too_large")
         return stdout
 
-    def extract_candidates(self, normalized_png: bytes) -> tuple[OcrCandidate, ...]:
+    def _effective_pass_timeout(self) -> float:
+        if self.timeout_seconds <= 0 or self.pass_timeout_seconds <= 0:
+            raise LocalOcrError("local_ocr_timeout")
+        return min(self.timeout_seconds, self.pass_timeout_seconds)
+
+    def iter_candidates(self, normalized_png: bytes) -> Iterator[OcrCandidate]:
+        """Yield bounded OCR candidates in priority order.
+
+        The generator deliberately reports a timeout after already-yielded candidates instead
+        of converting the prefix into a success itself. The service owns nutrition parsing and
+        can therefore decide whether that prefix is safe enough to return as a review draft.
+        ``extract_candidates`` below keeps the lower-level compatibility contract for callers
+        that only need a tuple.
+        """
+
         executable = self.executable or shutil.which("tesseract")
         if not executable:
             raise LocalOcrError("local_ocr_unavailable")
-        if self.timeout_seconds <= 0:
-            raise LocalOcrError("local_ocr_timeout")
+        pass_timeout = self._effective_pass_timeout()
         deadline = time.monotonic() + self.timeout_seconds
-        candidates: list[OcrCandidate] = []
+        candidate_count = 0
         try:
             with tempfile.TemporaryDirectory(prefix="yfc-label-") as directory:
                 for variant in _iter_preprocessed_variants(normalized_png):
                     variant_path = Path(directory) / f"{variant.name}.png"
                     try:
+                        if time.monotonic() >= deadline:
+                            raise LocalOcrError("local_ocr_timeout")
                         variant.image.save(variant_path, format="PNG", optimize=False)
-                        for psm in OCR_PSM_MODES:
+                        for psm in OCR_PSM_PRIORITY[variant.name]:
+                            if time.monotonic() >= deadline:
+                                raise LocalOcrError("local_ocr_timeout")
                             started = time.monotonic()
-                            tsv = self._run_pass(executable, variant_path, psm, deadline)
+                            pass_deadline = min(deadline, started + pass_timeout)
+                            tsv = self._run_pass(executable, variant_path, psm, pass_deadline)
                             tokens = parse_tesseract_tsv(
                                 tsv,
                                 max_output_chars=self.max_output_chars,
                             )
-                            candidates.append(
-                                OcrCandidate(
-                                    variant=variant.name,
-                                    psm=psm,
-                                    text=structured_text_from_tokens(tokens),
-                                    tokens=tokens,
-                                    elapsed_ms=(time.monotonic() - started) * 1000,
-                                )
+                            yield OcrCandidate(
+                                variant=variant.name,
+                                psm=psm,
+                                text=structured_text_from_tokens(tokens),
+                                tokens=tokens,
+                                elapsed_ms=(time.monotonic() - started) * 1000,
                             )
-                            if len(candidates) >= OCR_MAX_VARIANTS * len(OCR_PSM_MODES):
-                                return tuple(candidates)
+                            candidate_count += 1
+                            if candidate_count >= OCR_MAX_VARIANTS * len(OCR_PSM_MODES):
+                                return
                     finally:
                         variant.image.close()
-        except LocalOcrError:
-            # A deadline or malformed pass must not silently downgrade a fixed quality run to
-            # whichever prefix happened to finish first.
-            raise
         except (OSError, ValueError) as exc:
             raise LocalOcrError("local_ocr_failed") from exc
+
+    def extract_candidates(self, normalized_png: bytes) -> tuple[OcrCandidate, ...]:
+        candidates: list[OcrCandidate] = []
+        try:
+            candidates.extend(self.iter_candidates(normalized_png))
+        except LocalOcrError as exc:
+            if exc.code != "local_ocr_timeout" or not candidates:
+                raise
         if not candidates:
             raise LocalOcrError("local_ocr_failed")
         return tuple(candidates)

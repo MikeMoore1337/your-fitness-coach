@@ -354,7 +354,7 @@ def test_tesseract_timeout_kills_child_and_fails_closed(monkeypatch: pytest.Monk
     assert process.killed is True
 
 
-def test_candidate_extraction_does_not_return_a_partial_timeout_prefix(
+def test_candidate_extraction_preserves_completed_candidates_before_optional_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     engine = TesseractOcr(
@@ -382,11 +382,126 @@ def test_candidate_extraction_does_not_return_a_partial_timeout_prefix(
     )
     monkeypatch.setattr(ocr_module.TesseractOcr, "_run_pass", fake_run)
 
-    # The extractor owns candidate accumulation; a timeout must not expose a prefix to service.
-    with pytest.raises(LocalOcrError, match="local_ocr_timeout"):
-        engine.extract_candidates(b"normalized")
+    candidates = engine.extract_candidates(b"normalized")
 
+    assert len(candidates) == 1
     assert calls == 2
+
+
+def _candidate(text: str, *, variant: str = "source_rgb_1x", psm: int = 6) -> OcrCandidate:
+    return OcrCandidate(variant=variant, psm=psm, text=text, tokens=(), elapsed_ms=1)
+
+
+class _StreamingCandidateEngine:
+    name = "local_tesseract"
+    version = "test-streaming-v1"
+
+    def __init__(self, events: tuple[OcrCandidate | LocalOcrError, ...]) -> None:
+        self.events = events
+        self.calls = 0
+
+    def iter_candidates(self, image_bytes: bytes):
+        assert image_bytes == b"normalized"
+        for event in self.events:
+            if isinstance(event, LocalOcrError):
+                raise event
+            self.calls += 1
+            yield event
+
+
+def test_strong_first_candidate_stops_remaining_passes() -> None:
+    engine = _StreamingCandidateEngine(
+        (_candidate(_complete_label()), LocalOcrError("local_ocr_failed"))
+    )
+
+    selected = nutrition_label_service._parse_ocr_candidates(engine, b"normalized")
+
+    assert selected.normalized_facts.protein_g is not None
+    assert engine.calls == 1
+
+
+def test_incomplete_primary_runs_fallback_and_stops_on_second_strong_candidate() -> None:
+    partial = "Per 100 g\nProtein 8 g\nFat 2 g\nCarbohydrate 4 g"
+    engine = _StreamingCandidateEngine(
+        (
+            _candidate(partial),
+            _candidate(_complete_label(), variant="roi_deskew_minus_1_5_2x", psm=4),
+            LocalOcrError("local_ocr_failed"),
+        )
+    )
+
+    selected = nutrition_label_service._parse_ocr_candidates(engine, b"normalized")
+
+    assert selected.normalized_facts.energy_kcal is not None
+    assert engine.calls == 2
+
+
+def test_optional_timeout_after_reviewable_candidate_returns_partial_draft() -> None:
+    partial = "Per 100 g\nProtein 8 g\nFat 2 g\nCarbohydrate 4 g"
+    engine = _StreamingCandidateEngine((_candidate(partial), LocalOcrError("local_ocr_timeout")))
+
+    selected = nutrition_label_service._parse_ocr_candidates(engine, b"normalized")
+
+    assert selected.normalized_facts.protein_g is not None
+    assert selected.normalized_facts.energy_kcal is None
+    assert "ocr_budget_exhausted" in selected.warnings
+
+
+def test_timeout_before_any_usable_candidate_remains_controlled_error() -> None:
+    engine = _StreamingCandidateEngine((LocalOcrError("local_ocr_timeout"),))
+
+    with pytest.raises(LocalOcrError, match="local_ocr_timeout"):
+        nutrition_label_service._parse_ocr_candidates(engine, b"normalized")
+
+
+def test_unsafe_energy_candidate_is_not_early_success_and_safe_fallback_wins() -> None:
+    engine = _StreamingCandidateEngine(
+        (
+            _candidate(_complete_label(energy="2814 kcal")),
+            _candidate(_complete_label(), variant="roi_deskew_minus_1_5_2x", psm=4),
+        )
+    )
+
+    selected = nutrition_label_service._parse_ocr_candidates(engine, b"normalized")
+
+    assert selected.normalized_facts.energy_kcal is not None
+    assert selected.normalized_facts.energy_kcal.value == Decimal("66.8")
+    assert "energy_outlier" not in selected.warnings
+    assert engine.calls == 2
+
+
+def test_pass_budget_is_bounded_and_each_priority_pair_runs_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = TesseractOcr(
+        languages="rus+eng",
+        timeout_seconds=1,
+        pass_timeout_seconds=0.2,
+        max_output_chars=50_000,
+        executable="fake-tesseract",
+    )
+    calls: list[tuple[str, int]] = []
+    deadline_budgets: list[float] = []
+    variants = (
+        ocr_module.PreprocessedVariant("source_rgb_1x", Image.new("RGB", (1, 1))),
+        ocr_module.PreprocessedVariant("roi_gray_contrast_denoised_2x", Image.new("RGB", (1, 1))),
+    )
+
+    def fake_run(self, executable, image_path, psm, deadline):
+        del self, executable
+        started = time.monotonic()
+        calls.append((image_path.stem, psm))
+        deadline_budgets.append(deadline - started)
+        return b"level\ttext\n"
+
+    monkeypatch.setattr(ocr_module, "_iter_preprocessed_variants", lambda _data: iter(variants))
+    monkeypatch.setattr(ocr_module.TesseractOcr, "_run_pass", fake_run)
+
+    candidates = tuple(engine.iter_candidates(b"normalized"))
+
+    assert len(candidates) == 6
+    assert len(calls) == len(set(calls))
+    assert all(0 < budget <= 0.21 for budget in deadline_budgets)
 
 
 def test_candidate_score_prefers_complete_safe_facts_over_longer_partial_text() -> None:

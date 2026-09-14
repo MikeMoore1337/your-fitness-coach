@@ -265,6 +265,15 @@ describe('NutritionLabelScanner', () => {
     expect(apiMock).not.toHaveBeenCalled();
   });
 
+  it('keeps the gallery picker separate from the explicit camera flow', () => {
+    render(<NutritionLabelScanner userId={10} onCancel={vi.fn()} />);
+
+    const galleryInput = document.querySelector('input[type="file"]');
+    expect(galleryInput).toBeInTheDocument();
+    expect(galleryInput).not.toHaveAttribute('capture');
+    expect(screen.getByRole('button', { name: 'Открыть камеру' })).toBeInTheDocument();
+  });
+
   it('does not attach an in-flight account A recognition result to account B', async () => {
     const draft = buildDraft();
     let resolveRecognition!: (value: NutritionLabelDraft) => void;

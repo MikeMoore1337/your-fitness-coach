@@ -326,6 +326,8 @@ for (const current of cases) {
       dialog.getByRole('heading', { name: 'Сканировать пищевую ценность' }),
     ).toBeVisible();
 
+    await expect(dialog.locator('input[type="file"]')).not.toHaveAttribute('capture');
+    await expect(dialog.getByRole('button', { name: 'Открыть камеру' })).toBeVisible();
     await dialog.locator('input[type="file"]').setInputFiles(labelPhoto);
     await expect(dialog.getByRole('button', { name: 'Распознать' })).toBeVisible();
     expect(labelApi.diaryPayload()).toBeNull();
