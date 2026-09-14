@@ -98,6 +98,22 @@ Current Git branch/worktree policy + CI + dev/master Rulesets + observed concurr
 Task `127` не зависит от product Task `119` и не меняет product dependency graph. До её завершения
 параллельные write tasks запрещены; действует прежний single-writer последовательный режим.
 
+## Nutrition Label OCR deferred branch
+
+Task 128G
+  -> implementation / merge / production deployment COMPLETE
+  -> RapidOCR activation + corpus validation COMPLETE
+  -> HUMAN_EVIDENCE FAIL: 503 local_ocr_timeout on current production host
+  -> production-quality GO NO; exposure disabled
+  -> server migration + explicit owner trigger
+       -> Task 128H performance validation
+       -> bounded optimization if proven
+       -> rollout + same-photo HUMAN_EVIDENCE
+
+Task 128G больше не является dependency для higher-priority work. Обычные Nutrition/Food,
+manual и barcode flows также не зависят от 128H. Только future tasks, которым нужен
+production-ready nutrition-label scanning, сохраняют hard dependency на Task 128H.
+
 Exercise catalog expansion 120A -> 120B -> 120C -> 120D
   + successful AI beta foundation 87 -> 88 -> 89 -> 90A -> 90B
   -> 126 umbrella

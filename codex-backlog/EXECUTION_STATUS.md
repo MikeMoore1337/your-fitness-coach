@@ -125,3 +125,21 @@ Umbrella `100` отдельно не выполняется; `100A` не наз�
 и owner decision. Tasks `107-111`, family `126` и Task `127` также не запускаются автоматически.
 Завершённая task `112` не изменила product order. Другие pending tasks автоматически не
 реализуются.
+
+## Nutrition Label OCR closeout
+
+- [x] Task 128G: implementation, PR #281, merge, production deployment, RapidOCR activation и
+      synthetic/corpus validation complete; production HUMAN_EVIDENCE FAIL /
+      BLOCKED BY CURRENT INFRASTRUCTURE из-за 503 local_ocr_timeout на текущем host; production
+      quality GO NO; public rollout и дальнейшая оптимизация DEFERRED UNTIL SERVER MIGRATION.
+- [x] Task 128G exposure mitigation: production NUTRITION_LABEL_SCAN_ENABLED=false,
+      NUTRITION_LABEL_SCAN_KILL_SWITCH=false; active SHA остаётся
+      1dae5176456b190c15fcd9c9fb6078cf8c338bf1; отдельный deploy не требуется.
+- [ ] Task 128H: DEFERRED, not started. Exact trigger:
+      Production migrated to a more powerful server and owner explicitly authorizes reopening
+      nutrition-label OCR work.
+- [ ] F-128G-01: MEDIUM UX follow-up deferred with 128H; обычные Nutrition/Food flows не входят
+      в dependency и продолжаются независимо от OCR.
+
+Task 128G не блокирует более приоритетные backlog tasks. Только tasks, которым нужен именно
+production-ready label scanning, сохраняют будущую dependency на 128H.

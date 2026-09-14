@@ -37,6 +37,12 @@ Tasks `80-101` и их буквенные подзадачи образуют tr
 задаёт предпочтительную последовательность реализации, но не отменяет фактический Trigger,
 dependency и отдельное решение владельца.
 
+Nutrition Label OCR family после owner-authorized closeout Task 128G вынесена в отдельную
+deferred ветку: production-quality GO отсутствует, exposure выключена, а Task 128H не входит
+в текущую общую очередь и не запускается автоматически. Более приоритетные tasks не должны
+ждать OCR; dependency на 128H сохраняется только для будущей production-ready label-scanning
+работы после миграции host и exact owner trigger.
+
 ## Последовательность pending-задач
 
 Таблица ниже сохраняет порядок общего pool после текущего UX-reset cycle и не переопределяет
