@@ -19,6 +19,7 @@ SAFE_EVENT_NAMES = frozenset(
         "application_started",
         "application_stopped",
         "ai_coach_generation",
+        "ai_coach_chat_generation",
         "nutrition_scan_started",
         "nutrition_scan_completed",
         "nutrition_scan_failed",
@@ -84,8 +85,11 @@ STRUCTURED_FIELDS = (
     "db_pool_overflow",
     "body_limit_bytes",
     "job",
+    "request_type",
     "data_class",
     "tool_name",
+    "context_kind",
+    "generation_success",
     "prompt_version",
     "schema_version",
     "policy_revision",
@@ -189,8 +193,10 @@ CODE_FIELDS = {
     "notification_category",
     "delivery_error",
     "job",
+    "request_type",
     "data_class",
     "tool_name",
+    "context_kind",
     "prompt_version",
     "schema_version",
     "policy_revision",
@@ -208,6 +214,7 @@ CODE_FIELDS = {
     "report_revision",
 }
 MODEL_FIELDS = {"configured_model", "actual_model"}
+BOOL_FIELDS = {"generation_success"}
 
 
 class JsonFormatter(logging.Formatter):
@@ -241,6 +248,8 @@ class JsonFormatter(logging.Formatter):
         return "application_log"
 
     def _structured_value(self, field: str, value: object) -> object | None:
+        if field in BOOL_FIELDS:
+            return value if isinstance(value, bool) else None
         if field in INTEGER_FIELDS:
             return (
                 value

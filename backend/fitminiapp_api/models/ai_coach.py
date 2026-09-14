@@ -188,6 +188,8 @@ class AiCoachConversationMessage(Base):
     )
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Keep migration 0086's inline bound while long chat input is expanded online.
+    content_overflow: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="complete")
     outcome: Mapped[str | None] = mapped_column(String(32), nullable=True)
     safety_category: Mapped[str] = mapped_column(

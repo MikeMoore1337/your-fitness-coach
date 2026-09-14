@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from enum import StrEnum
+from typing import Literal
 
 from fitminiapp_api.ai_coach.contracts import (
     AiCoachDataClass,
@@ -88,8 +90,8 @@ _PATTERNS: tuple[tuple[SafetyCategory, re.Pattern[str]], ...] = (
             r"(?:\bbmr\b|\btdee\b|кбжу|health\s+score|readiness|recovery|"
             r"fatigue|готовност|восстановлен|усталост|прогресси|прогноз|"
             r"forecast).{0,64}"
-            r"(?:мой|моя|мои|моего|мне|у\s+меня|для\s+меня|по\s+моим|my|me)|"
-            r"(?:прогноз|forecast|предскажи).{0,64}(?:мой|моя|мои|моего|для\s+меня|my|me))",
+            r"(?:мой|моя|мои|мою|моего|моей|моём|моем|моими|мне|у\s+меня|для\s+меня|по\s+моим|my|me)|"
+            r"(?:прогноз|forecast|предскажи).{0,64}(?:мой|моя|мои|мою|моего|моей|моём|моем|моими|для\s+меня|my|me))",
             re.IGNORECASE,
         ),
     ),
@@ -97,7 +99,7 @@ _PATTERNS: tuple[tuple[SafetyCategory, re.Pattern[str]], ...] = (
         SafetyCategory.ACTION_REQUEST,
         re.compile(
             r"(?:\b(?:измени|поменяй|назначь|создай|удали|добавь|перенеси|установи)\s+"
-            r"(?:мне|мой|моя|мои|програм|цель|калор|расписан|трениров)|"
+            r"(?:мне|мой|моя|мои|мою|моего|моей|моём|моем|моими|програм|цель|калор|расписан|трениров)|"
             r"сделай\s+мне\s+(?:план|програм)|"
             r"\b(?:change|create|delete|add|assign)\s+(?:my|the))",
             re.IGNORECASE,
@@ -106,13 +108,13 @@ _PATTERNS: tuple[tuple[SafetyCategory, re.Pattern[str]], ...] = (
     (
         SafetyCategory.PERSONAL_DATA,
         re.compile(
-            r"(?:(?:мой|моя|мои|мне|у\s+меня|для\s+меня|по\s+моим)\s+"
+            r"(?:(?:мой|моя|мои|мою|моего|моей|моём|моем|моими|мне|у\s+меня|для\s+меня|по\s+моим)\s+"
             r"(?:вес|рост|возраст|пол|калор|ккал|белк|жир|углевод|трениров|"
             r"программ|дневник|цель|прогресс|замер|сон|пульс|нагрузк|подход|"
             r"повтор|weight|height|age|calorie|protein|training|workout|goal|"
             r"progress|sleep)|"
             r"(?:вес|рост|возраст)\s*[:=]?\s*\d+(?:[.,]\d+)?|"
-            r"(?:сколько|какой|какие).{0,48}\b(?:мне|мой|моя|мои)\b.{0,48}"
+            r"(?:сколько|какой|какие).{0,48}\b(?:мне|мой|моя|мои|мою|моего|моей|моём|моем|моими)\b.{0,48}"
             r"(?:калор|ккал|белк|жир|углевод|трениров|программ|нагрузк|"
             r"weight|calorie|protein|training|workout)|"
             r"\bя\s+(?:вешу|весом|тренируюсь|занимаюсь|бегаю|сплю|"
@@ -145,7 +147,7 @@ _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST = re.compile(
     r"(?:креатин|протеин|витамин|добавк|creatine|protein|vitamin|supplement)\b|"
     r"\b(?:у\s+вас|вам|это|похоже\s+на)\s+"
     r"(?:диагноз|заболев\w*|болезн\w*|травм\w*|синдром\w*|симптом\w*)\b|"
-    r"\b(?:ваш|ваша|ваше|ваши|твой|твоя|твоё|твои|мой|моя|мои|"
+    r"\b(?:ваш|ваша|ваше|ваши|твой|твоя|твоё|твои|мой|моя|мои|мою|моего|моей|моём|моем|моими|"
     r"для\s+(?:вас|меня))\b.{0,96}\b"
     r"(?:tdee|bmr|кбжу|калори\w*|health\s+score|readiness|"
     r"пульс\w*|восстановлен\w*|fatigue)\b"
@@ -185,6 +187,17 @@ _PERIOD_REPORT_UNSAFE_CLAIM_BLOCKLIST = re.compile(
 )
 _URL_PATTERN = re.compile(r"https?://", re.IGNORECASE)
 _CYRILLIC_PATTERN = re.compile(r"[А-Яа-яЁё]")
+_LATIN_PATTERN = re.compile(r"[A-Za-z]")
+_INTERNAL_LABEL_PATTERN = re.compile(
+    r"(?:"
+    r"(?<![A-Za-zА-Яа-яЁё0-9_])/(?:today|nutrition|progress|training|api|v1)"
+    r"(?:[/?#\s).,:]|$)|"
+    r"\b(?:context_id|context_kind|data_class|tool_name|fallback_path|canonical_url|"
+    r"context_refs|prompt_version|output_version|schema_version|citation_ids|"
+    r"response_format|structured_output|get_[a-z0-9_]+)\b"
+    r")",
+    re.IGNORECASE,
+)
 
 
 def normalize_user_text(value: str) -> str:
@@ -199,6 +212,15 @@ def classify_message(message: str) -> SafetyCategory:
     return SafetyCategory.CLEAR
 
 
+def detect_chat_locale(message: str) -> Literal["ru", "en"]:
+    """Choose the response language from the current user turn, defaulting to Russian."""
+
+    normalized = normalize_user_text(message)
+    cyrillic_count = len(_CYRILLIC_PATTERN.findall(normalized))
+    latin_count = len(_LATIN_PATTERN.findall(normalized))
+    return "en" if latin_count > cyrillic_count else "ru"
+
+
 def classify_request(request: AiCoachRequest) -> SafetyCategory:
     category = classify_message(request.message)
     if request.data_class.value == "personalized" and category == SafetyCategory.PERSONAL_DATA:
@@ -206,7 +228,39 @@ def classify_request(request: AiCoachRequest) -> SafetyCategory:
     return category
 
 
-def refusal_text(category: SafetyCategory) -> str:
+def refusal_text(category: SafetyCategory, *, locale: Literal["ru", "en"] = "ru") -> str:
+    if locale == "en":
+        if category in {
+            SafetyCategory.MEDICAL,
+            SafetyCategory.EATING_DISORDER_OR_PREGNANCY,
+        }:
+            return (
+                "I can't diagnose conditions, choose treatment, or give medical instructions. "
+                "Please consult a qualified clinician; use local emergency services for an emergency."
+            )
+        if category == SafetyCategory.DRUGS_PERFORMANCE:
+            return "I can't choose drug cycles or dosages. Discuss those questions with a doctor."
+        if category == SafetyCategory.PERSONAL_DATA:
+            return (
+                "AI Coach can use personal training, nutrition, or progress data only in the "
+                "explicitly enabled personal mode. I can still explain general information."
+            )
+        if category == SafetyCategory.UNSUPPORTED_INFERENCE:
+            return (
+                "Your Fitness Coach does not calculate that personal assessment. I can explain "
+                "published definitions and service rules."
+            )
+        if category == SafetyCategory.ACTION_REQUEST:
+            return (
+                "AI Coach does not change programs, goals, calories, or schedules. Use the "
+                "corresponding app control."
+            )
+        if category in {
+            SafetyCategory.PRIVACY_EXFILTRATION,
+            SafetyCategory.PROMPT_INJECTION,
+        }:
+            return "I can't reveal other people's data, secrets, or internal instructions."
+        return "I can't process this request in the current safe mode."
     if category in {
         SafetyCategory.MEDICAL,
         SafetyCategory.EATING_DISORDER_OR_PREGNANCY,
@@ -241,13 +295,42 @@ def refusal_text(category: SafetyCategory) -> str:
     return "Я не могу обработать этот запрос в текущем безопасном режиме."
 
 
-def validate_chat_output(answer: str, *, data_class: AiCoachDataClass) -> str:
+def _has_expected_language(answer: str, locale: Literal["ru", "en"]) -> bool:
+    pattern = _CYRILLIC_PATTERN if locale == "ru" else _LATIN_PATTERN
+    return bool(pattern.search(answer))
+
+
+def _is_json_container(value: str) -> bool:
+    if not value.startswith(("{", "[")):
+        return False
+    try:
+        decoded = json.loads(value)
+    except TypeError, ValueError, json.JSONDecodeError:
+        return False
+    return isinstance(decoded, (dict, list))
+
+
+def validate_chat_output(
+    answer: str,
+    *,
+    data_class: AiCoachDataClass,
+    locale: Literal["ru", "en"] = "ru",
+) -> str:
     """Validate plain chat text without turning format failures into safety refusals."""
 
     normalized = unicodedata.normalize("NFKC", answer).strip()
-    if not normalized or len(normalized) > 1_600 or not _CYRILLIC_PATTERN.search(normalized):
+    if (
+        not normalized
+        or len(normalized) > 1_600
+        or not _has_expected_language(normalized, locale)
+        or _is_json_container(normalized)
+    ):
         raise ValueError("chat_answer_format_invalid")
-    if _OUTPUT_BLOCKLIST.search(normalized) or _URL_PATTERN.search(normalized):
+    if (
+        _OUTPUT_BLOCKLIST.search(normalized)
+        or _INTERNAL_LABEL_PATTERN.search(normalized)
+        or _URL_PATTERN.search(normalized)
+    ):
         raise ValueError("chat_answer_contains_untrusted_content")
     if data_class != AiCoachDataClass.PERSONALIZED and _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(
         normalized
@@ -261,19 +344,31 @@ def validate_chat_output(answer: str, *, data_class: AiCoachDataClass) -> str:
     return normalized
 
 
-def safe_chat_fallback(answer: str, *, data_class: AiCoachDataClass) -> str | None:
+def safe_chat_fallback(
+    answer: str,
+    *,
+    data_class: AiCoachDataClass,
+    locale: Literal["ru", "en"] = "ru",
+) -> str | None:
     """Keep safe prose when a provider added removable transport noise.
 
     A fallback is deliberately narrower than normal validation: it only removes URLs and
-    markdown link wrappers. Any prohibited claim, prompt-injection text, non-Russian output or
+    markdown link wrappers. Any prohibited claim, prompt-injection text, wrong-language output or
     oversized value is discarded instead of being shown as if it had passed validation.
     """
 
     normalized = unicodedata.normalize("NFKC", answer).strip()
-    if not normalized or len(normalized) > 1_600 or not _CYRILLIC_PATTERN.search(normalized):
+    if (
+        not normalized
+        or len(normalized) > 1_600
+        or not _has_expected_language(normalized, locale)
+        or _is_json_container(normalized)
+    ):
         return None
-    if _OUTPUT_BLOCKLIST.search(normalized) or _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(
-        normalized
+    if (
+        _OUTPUT_BLOCKLIST.search(normalized)
+        or _INTERNAL_LABEL_PATTERN.search(normalized)
+        or _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(normalized)
     ):
         return None
     if (
@@ -285,7 +380,7 @@ def safe_chat_fallback(answer: str, *, data_class: AiCoachDataClass) -> str | No
     sanitized = re.sub(r"https?://[^\s]+", "", sanitized)
     sanitized = re.sub(r"[ \t]{2,}", " ", sanitized)
     sanitized = re.sub(r"\n{3,}", "\n\n", sanitized).strip()
-    if not sanitized or len(sanitized) > 1_600 or not _CYRILLIC_PATTERN.search(sanitized):
+    if not sanitized or len(sanitized) > 1_600 or not _has_expected_language(sanitized, locale):
         return None
     return sanitized
 

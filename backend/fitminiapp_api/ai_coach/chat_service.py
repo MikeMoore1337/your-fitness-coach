@@ -39,13 +39,18 @@ CHAT_FAILURE_TIMEOUT = "timeout"
 CHAT_FAILURE_CONTEXT = "context_failure"
 CHAT_FAILURE_GENERATION = "generation_failure"
 CHAT_FAILURE_RATE_LIMITED = "rate_limited"
+_INTERNAL_APP_PATHS = ("/today", "/nutrition", "/progress", "/training", "/api", "/v1")
 
 _GENERIC_LIMITATION = (
     "Ответ основан на проверенных материалах YFC и не является персональным назначением."
 )
+_GENERAL_LIMITATION = "Ответ основан на общих знаниях и не является персональным назначением или медицинской рекомендацией."
 _PERSONAL_LIMITATION = (
     "Ответ основан только на разрешённом срезе ваших данных; AI Coach не изменяет "
     "программу, цели или расписание."
+)
+_PERSONAL_NO_CONTEXT_LIMITATION = (
+    "В разрешённом персональном срезе нет подходящих фактов; ответ не утверждает личные значения."
 )
 
 
@@ -173,6 +178,10 @@ class AiCoachChatService:
         if (
             request.data_class == AiCoachDataClass.PERSONALIZED
             and safety == SafetyCategory.PERSONAL_DATA
+        ) or (
+            request.data_class == AiCoachDataClass.GENERIC
+            and request.context_kind.value == "app_capabilities"
+            and safety == SafetyCategory.PERSONAL_DATA
         ):
             safety = SafetyCategory.CLEAR
         attempts = 0
@@ -188,7 +197,7 @@ class AiCoachChatService:
                 outcome = AiCoachOutcome.SAFETY_REFUSAL
                 return AiCoachChatGeneration(
                     outcome=outcome,
-                    answer=refusal_text(safety),
+                    answer=refusal_text(safety, locale=request.locale),
                     citations=(),
                     limitations=(),
                     safety_category=safety,
@@ -205,16 +214,6 @@ class AiCoachChatService:
                 return self._failure(
                     request,
                     outcome=AiCoachOutcome.UNAVAILABLE,
-                    safety=safety,
-                    failure_category=failure_category,
-                )
-            if not context_refs:
-                error_code = "context_unavailable"
-                failure_category = CHAT_FAILURE_CONTEXT
-                outcome = AiCoachOutcome.INSUFFICIENT_DATA
-                return self._failure(
-                    request,
-                    outcome=outcome,
                     safety=safety,
                     failure_category=failure_category,
                 )
@@ -297,6 +296,7 @@ class AiCoachChatService:
                 answer = validate_chat_output(
                     result.response.answer,
                     data_class=request.data_class,
+                    locale=request.locale,
                 )
             except ValueError:
                 error_code = ProviderErrorCode.INVALID_OUTPUT.value
@@ -310,16 +310,18 @@ class AiCoachChatService:
                     answer=safe_chat_fallback(
                         result.response.answer,
                         data_class=request.data_class,
+                        locale=request.locale,
                     ),
                 )
             self.cooldown.reset()
             outcome = AiCoachOutcome.ANSWER
             citations = self._citations(context_refs)
-            limitations = (
-                (_PERSONAL_LIMITATION,)
-                if request.data_class == AiCoachDataClass.PERSONALIZED
-                else (_GENERIC_LIMITATION,)
-            )
+            if request.data_class == AiCoachDataClass.PERSONALIZED:
+                limitations = (
+                    (_PERSONAL_LIMITATION,) if context_refs else (_PERSONAL_NO_CONTEXT_LIMITATION,)
+                )
+            else:
+                limitations = (_GENERIC_LIMITATION,) if context_refs else (_GENERAL_LIMITATION,)
             return AiCoachChatGeneration(
                 outcome=outcome,
                 answer=answer,
@@ -336,7 +338,9 @@ class AiCoachChatService:
                 extra={
                     "request_id": request_id,
                     "job": request.job.value,
+                    "request_type": request.job.value,
                     "data_class": request.data_class.value,
+                    "context_kind": request.context_kind.value,
                     "prompt_version": AI_COACH_CHAT_PROMPT_VERSION,
                     "schema_version": AI_COACH_CHAT_OUTPUT_VERSION,
                     "policy_revision": settings.ai_coach_policy_revision,
@@ -344,6 +348,7 @@ class AiCoachChatService:
                     "configured_model": configured_model,
                     "actual_model": actual_model,
                     "outcome": outcome.value,
+                    "generation_success": outcome == AiCoachOutcome.ANSWER,
                     "safety_category": safety.value,
                     "error_code": error_code,
                     "failure_category": failure_category,
@@ -419,7 +424,14 @@ class AiCoachChatService:
         seen: set[str] = set()
         for ref in context_refs:
             for citation in ref.citations:
+                if citation.source_type == "personal_tool_screen":
+                    continue
                 url = str(citation.url)
+                path = urlparse(url).path.rstrip("/") or "/"
+                if any(
+                    path == route or path.startswith(f"{route}/") for route in _INTERNAL_APP_PATHS
+                ):
+                    continue
                 if url in seen:
                     continue
                 seen.add(url)
@@ -437,14 +449,25 @@ class AiCoachChatService:
         failure_category: str,
         answer: str | None = None,
     ) -> AiCoachChatGeneration:
-        copy = {
-            CHAT_FAILURE_PROVIDER: "AI Coach временно недоступен. Попробуйте ещё раз позже.",
-            CHAT_FAILURE_STRUCTURED_VALIDATION: "Не удалось безопасно проверить ответ. Попробуйте ещё раз.",
-            CHAT_FAILURE_TIMEOUT: "Ответ занял слишком много времени. Попробуйте ещё раз.",
-            CHAT_FAILURE_CONTEXT: "Для этого вопроса пока нет подходящего проверенного контекста YFC.",
-            CHAT_FAILURE_GENERATION: "Не удалось получить проверенный ответ. Попробуйте ещё раз.",
-            CHAT_FAILURE_RATE_LIMITED: "Лимит AI Coach исчерпан. Попробуйте позже.",
-        }
+        copy = (
+            {
+                CHAT_FAILURE_PROVIDER: "AI Coach временно недоступен. Попробуйте ещё раз позже.",
+                CHAT_FAILURE_STRUCTURED_VALIDATION: "Не удалось безопасно проверить ответ. Попробуйте ещё раз.",
+                CHAT_FAILURE_TIMEOUT: "Ответ занял слишком много времени. Попробуйте ещё раз.",
+                CHAT_FAILURE_CONTEXT: "Не удалось получить материалы для ответа. Попробуйте ещё раз.",
+                CHAT_FAILURE_GENERATION: "Не удалось получить проверенный ответ. Попробуйте ещё раз.",
+                CHAT_FAILURE_RATE_LIMITED: "Лимит AI Coach исчерпан. Попробуйте позже.",
+            }
+            if request.locale == "ru"
+            else {
+                CHAT_FAILURE_PROVIDER: "AI Coach is temporarily unavailable. Please try again later.",
+                CHAT_FAILURE_STRUCTURED_VALIDATION: "The answer could not be checked safely. Please try again.",
+                CHAT_FAILURE_TIMEOUT: "The answer took too long. Please try again.",
+                CHAT_FAILURE_CONTEXT: "The approved materials could not be loaded. Please try again.",
+                CHAT_FAILURE_GENERATION: "A verified answer could not be generated. Please try again.",
+                CHAT_FAILURE_RATE_LIMITED: "The AI Coach limit has been reached. Please try again later.",
+            }
+        )
         return AiCoachChatGeneration(
             outcome=outcome,
             answer=answer,

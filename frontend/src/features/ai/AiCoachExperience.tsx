@@ -39,6 +39,7 @@ export const aiCoachMemoryQueryKey = ['ai-coach', 'memory'] as const;
 export const aiCoachConversationsQueryKey = ['ai-coach', 'conversations'] as const;
 
 const ACTIVE_CONVERSATION_KEY = 'yfc:ai-coach:active-conversation';
+const CHAT_MESSAGE_MAX_LENGTH = 2_000;
 
 const QUICK_PROMPTS = [
   { id: 'today', label: 'Что делать сегодня?', message: 'Что мне делать сегодня?' },
@@ -71,7 +72,7 @@ const CHAT_FAILURE_COPY: Record<string, string> = {
   provider_failure: 'AI Coach временно недоступен. Попробуйте ещё раз позже.',
   structured_validation: 'Не удалось безопасно проверить ответ. Попробуйте ещё раз.',
   timeout: 'Ответ занял слишком много времени. Попробуйте ещё раз.',
-  context_failure: 'Для этого вопроса пока нет подходящего проверенного контекста YFC.',
+  context_failure: 'Не удалось получить материалы для ответа. Попробуйте ещё раз позже.',
   generation_failure: 'Не удалось получить проверенный ответ. Попробуйте ещё раз.',
   rate_limited: 'Лимит AI Coach исчерпан. Попробуйте позже.',
 };
@@ -843,8 +844,8 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
         <div>
           <h3>Чем помочь?</h3>
           <p>
-            Задайте любой вопрос о тренировках, питании, прогрессе или работе YFC. Для личного
-            ответа AI Coach возьмёт только минимальную разрешённую сводку.
+            Задайте любой вопрос о тренировках, питании, прогрессе или работе YFC. Если вопрос
+            личный, AI Coach попросит отдельное разрешение на доступ к нужной сводке.
           </p>
         </div>
         <span className="ai-coach-chat__disclaimer">Не заменяет врача или тренера.</span>
@@ -935,7 +936,7 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
         <textarea
           ref={composerRef}
           id="ai-coach-chat-message"
-          maxLength={320}
+          maxLength={CHAT_MESSAGE_MAX_LENGTH}
           placeholder="Напишите вопрос…"
           rows={3}
           value={draft}
@@ -944,7 +945,9 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
         />
         <div className="ai-coach-chat__composer-meta">
           <span>Enter — отправить, Shift+Enter — новая строка</span>
-          <span>{draft.length}/320</span>
+          <span>
+            {draft.length}/{CHAT_MESSAGE_MAX_LENGTH}
+          </span>
         </div>
         <div className="ai-coach-chat__composer-actions">
           <Button disabled={!draft.trim() || pending} type="submit">

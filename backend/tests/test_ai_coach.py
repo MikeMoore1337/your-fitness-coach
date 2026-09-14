@@ -13,7 +13,9 @@ from pydantic import SecretStr, ValidationError
 from fitminiapp_api.ai_coach.contracts import (
     AI_COACH_DATA_CLASS,
     AI_COACH_PROMPT_VERSION,
+    AiCoachChatContextKind,
     AiCoachChatRequest,
+    AiCoachConversationTurn,
     AiCoachDataClass,
     AiCoachJob,
     AiCoachPolicy,
@@ -27,6 +29,7 @@ from fitminiapp_api.ai_coach.contracts import (
     ProviderTextResponse,
     ProviderTextResult,
 )
+from fitminiapp_api.ai_coach.prompts import build_chat_messages
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
 from fitminiapp_api.ai_coach.retrieval import _article_ref, _page_ref
 from fitminiapp_api.ai_coach.safety import validate_provider_output
@@ -844,7 +847,7 @@ def test_groq_adapter_sends_plain_text_chat_without_report_json(monkeypatch) -> 
         message="Сколько отдыхать между подходами?",
         data_class=AiCoachDataClass.GENERIC,
     )
-    result = GroqDirectAdapter().generate_text(request, _provider_context())
+    result = GroqDirectAdapter().generate_text(request, ())
 
     assert result.response == ProviderTextResponse(answer="Короткий проверенный ответ.")
     assert isinstance(result, ProviderTextResult)
@@ -853,6 +856,61 @@ def test_groq_adapter_sends_plain_text_chat_without_report_json(monkeypatch) -> 
     assert "response_format" not in payload
     assert "tools" not in payload
     assert "без JSON" in payload["messages"][0]["content"]
+
+
+def test_chat_prompt_sends_real_history_without_internal_context_labels() -> None:
+    request = AiCoachChatRequest(
+        job=AiCoachJob.NUTRITION_KNOWLEDGE,
+        context_id="personal:get_nutrition_summary",
+        context_kind=AiCoachChatContextKind.NUTRITION_SUMMARY,
+        message="А что насчёт воды?",
+        data_class=AiCoachDataClass.PERSONALIZED,
+        conversation_history=(
+            AiCoachConversationTurn(role="user", content="Как читать мою сводку питания?"),
+            AiCoachConversationTurn(role="assistant", content="Смотрите на записанные дни и цели."),
+        ),
+    )
+    ref = ContextRef(
+        ref_id="personal-tool:get_nutrition_summary",
+        title="Сводка питания",
+        category="personal_tool",
+        updated_at="2026-09-14",
+        reviewer="YFC",
+        canonical_url="https://your-fitness-coach.ru/nutrition",
+        content=(
+            '{"tool":"get_nutrition_summary","version":"internal-v1",'
+            '"facts":{"profile_and_goals":{"goal":"maintain"},"summary":{"logged_days":3}},'
+            '"limitations":["Пропущенный день не равен нулю."],"fallback_path":"/nutrition"}'
+        ),
+        citations=(
+            ContextCitation(
+                title="Сводка питания",
+                publisher="Your Fitness Coach",
+                url="https://your-fitness-coach.ru/nutrition",
+                source_type="personal_tool_screen",
+            ),
+        ),
+    )
+
+    messages = build_chat_messages(request, (ref,))
+    assert [(item["role"], item["content"]) for item in messages[:3]] == [
+        ("system", messages[0]["content"]),
+        ("user", "Как читать мою сводку питания?"),
+        ("assistant", "Смотрите на записанные дни и цели."),
+    ]
+    prompt = messages[-1]["content"]
+    assert "А что насчёт воды?" in prompt
+    assert "maintain" in prompt
+    for forbidden in (
+        "get_nutrition_summary",
+        "/nutrition",
+        "fallback_path",
+        "data_class",
+        "schema_version",
+        "citation_ids",
+        "canonical_url",
+    ):
+        assert forbidden not in prompt
 
 
 def test_groq_adapter_normalizes_429_and_honors_bounded_retry_after(monkeypatch) -> None:

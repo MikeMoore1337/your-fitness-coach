@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.ai_coach.contracts import (
     AI_COACH_PERIOD_REPORT_INPUT_VERSION,
@@ -22,6 +23,7 @@ from fitminiapp_api.ai_coach.contracts import (
 from fitminiapp_api.ai_coach.safety import SafetyCategory, classify_message
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.timezone import today_for_user
+from fitminiapp_api.models.program import UserProgram
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.seo import public_origin
@@ -246,7 +248,12 @@ def _training_facts(analytics: dict) -> tuple[dict[str, object], str]:
     return facts, _status_from_signals(analytics.get("data_sufficiency"))
 
 
-def _nutrition_facts(report: dict) -> tuple[dict[str, object], str]:
+def _nutrition_facts(
+    report: dict,
+    user: User,
+    *,
+    include_profile_goals: bool = False,
+) -> tuple[dict[str, object], str]:
     summary = _as_mapping(report.get("summary"))
     target_changes = [
         {
@@ -256,7 +263,7 @@ def _nutrition_facts(report: dict) -> tuple[dict[str, object], str]:
         for change in report.get("target_changes", [])[:12]
         if isinstance(change, dict)
     ]
-    facts = {
+    facts: dict[str, object] = {
         "period": report.get("period"),
         "period_start": report.get("period_start"),
         "period_end": report.get("period_end"),
@@ -265,6 +272,22 @@ def _nutrition_facts(report: dict) -> tuple[dict[str, object], str]:
         "target_changes": target_changes,
         "hydration": report.get("hydration"),
     }
+    if include_profile_goals:
+        facts["profile_and_goals"] = {
+            key: getattr(user.profile, key, None) if user.profile is not None else None
+            for key in (
+                "goal",
+                "level",
+                "height_cm",
+                "weight_kg",
+                "workouts_per_week",
+                "cardio_trainings_per_week",
+                "body_priority_mode",
+                "preferred_workout_duration_min",
+                "preferred_workout_duration_max",
+            )
+        }
+
     logged_value = summary.get("logged_days")
     eligible_value = summary.get("eligible_days")
     logged_days = int(logged_value) if isinstance(logged_value, (int, float)) else 0
@@ -777,6 +800,110 @@ def get_recent_training_summary_tool(
     )
 
 
+def _active_program_facts(db: Session, user: User) -> dict[str, object] | None:
+    program = (
+        db.query(UserProgram)
+        .options(
+            joinedload(UserProgram.template),
+            joinedload(UserProgram.training_blocks),
+        )
+        .filter(UserProgram.user_id == user.id, UserProgram.is_active.is_(True))
+        .order_by(UserProgram.start_date.desc(), UserProgram.id.desc())
+        .first()
+    )
+    if program is None:
+        return None
+    active_block = next(
+        (block for block in program.training_blocks if block.status == "active"),
+        None,
+    )
+    return {
+        "title": program.template.title if program.template else "Текущая программа",
+        "status": program.status,
+        "start_date": program.start_date,
+        "duration_weeks": program.duration_weeks,
+        "schedule_weekdays": (
+            [day for day in program.schedule_weekdays if isinstance(day, int)][:7]
+            if isinstance(program.schedule_weekdays, list)
+            else []
+        ),
+        "active_block": (
+            {
+                "title": active_block.title,
+                "start_date": active_block.start_date,
+                "end_date": active_block.end_date,
+                "purpose": active_block.purpose,
+                "is_deload": active_block.is_deload,
+                "status": active_block.status,
+            }
+            if active_block
+            else None
+        ),
+    }
+
+
+def _get_bench_history_tool(db: Session, user: User, period_days: int) -> PersonalToolResult:
+    """Return only exercise history relevant to a bench-press question."""
+
+    analytics = build_training_analytics(
+        db,
+        user,
+        period_days,
+        exercise_history_limit=20,
+    )
+    facts, _sufficiency = _training_facts(analytics)
+    raw_exercises = facts.get("exercises")
+    exercise_items = raw_exercises if isinstance(raw_exercises, list) else []
+    exercises = []
+    for item in exercise_items:
+        if not isinstance(item, dict):
+            continue
+        title = item.get("exercise_title")
+        if isinstance(title, str) and re.search(
+            r"(?:жим\w*|\bbench(?:-?press)?\b)", title, re.IGNORECASE
+        ):
+            exercises.append(item)
+    recent_context = _get_workout_context_tool(db, user, focus="recent")
+    raw_recent_workouts = recent_context.facts.get("nearby_workouts")
+    recent_workouts = raw_recent_workouts if isinstance(raw_recent_workouts, list) else []
+    focused_facts = {
+        "period_days": facts.get("period_days"),
+        "period_start": facts.get("period_start"),
+        "period_end": facts.get("period_end"),
+        "exercises": exercises[:8],
+        "recent_workouts": recent_workouts[:4],
+        "active_program": recent_context.facts.get("active_program"),
+    }
+    return _result(
+        tool=AiCoachPersonalTool.GET_RECENT_TRAINING_SUMMARY,
+        purpose="Объяснить только фактическую историю упражнений на жим.",
+        facts=focused_facts,
+        period_start=analytics["period_start"],
+        period_end=analytics["period_end"],
+        sufficiency="sufficient" if exercises else "insufficient",
+        limitations=(
+            "Показаны только найденные записи упражнений на жим за выбранный период.",
+            "Отсутствующие веса, повторы и подходы не восстанавливаются предположением.",
+            "Недавние тренировки и активная программа добавлены только как ограниченный контекст для объяснения.",
+        ),
+        fallback_path="/progress",
+        title="История жима",
+        screen_path="/progress",
+        context_version="ai-coach-chat-personal-context-v1",
+    )
+
+
+def get_bench_history_tool(db: Session, user: User, period_days: int) -> PersonalToolResult:
+    try:
+        return _get_bench_history_tool(db, user, period_days)
+    except PersonalToolUnsafe:
+        raise
+    except PersonalToolUnavailable:
+        raise
+    except (ValueError, KeyError, TypeError, AttributeError, SQLAlchemyError) as exc:
+        raise PersonalToolUnavailable("bench_context_unavailable") from exc
+
+
 def _get_workout_context_tool(
     db: Session,
     user: User,
@@ -843,6 +970,7 @@ def _get_workout_context_tool(
         "today": today,
         "today_workouts": today_workouts[:2],
         "nearby_workouts": nearby[:6],
+        "active_program": _active_program_facts(db, user),
         "focus": focus,
     }
     limitations = (
@@ -882,25 +1010,40 @@ def get_workout_context_tool(
         raise PersonalToolUnavailable("workout_context_unavailable") from exc
 
 
-def get_nutrition_summary_tool(db: Session, user: User, period_days: int) -> PersonalToolResult:
-    period = progress_period_for_days(period_days)
-    report = build_nutrition_report(db, user, NutritionReportPeriod(period))
-    facts, sufficiency = _nutrition_facts(report)
-    return _result(
-        tool=AiCoachPersonalTool.GET_NUTRITION_SUMMARY,
-        purpose="Объяснить фактическую сводку питания, целей и гидратации.",
-        facts=facts,
-        period_start=report["period_start"],
-        period_end=report["period_end"],
-        sufficiency=sufficiency,
-        limitations=(
-            "Пропущенные, неполные и fasting-дни сохраняют свой фактический статус и не превращаются в нули.",
-            "Цели показаны с историей изменений; AI Coach не пересчитывает их и не назначает новые.",
-        ),
-        fallback_path="/nutrition",
-        title="Сводка питания",
-        screen_path="/nutrition",
-    )
+def get_nutrition_summary_tool(
+    db: Session,
+    user: User,
+    period_days: int,
+    *,
+    include_profile_goals: bool = False,
+) -> PersonalToolResult:
+    try:
+        period = progress_period_for_days(period_days)
+        report = build_nutrition_report(db, user, NutritionReportPeriod(period))
+        facts, sufficiency = _nutrition_facts(
+            report,
+            user,
+            include_profile_goals=include_profile_goals,
+        )
+        return _result(
+            tool=AiCoachPersonalTool.GET_NUTRITION_SUMMARY,
+            purpose="Объяснить фактическую сводку питания, целей и гидратации.",
+            facts=facts,
+            period_start=report["period_start"],
+            period_end=report["period_end"],
+            sufficiency=sufficiency,
+            limitations=(
+                "Пропущенные, неполные и fasting-дни сохраняют свой фактический статус и не превращаются в нули.",
+                "Цели показаны с историей изменений; AI Coach не пересчитывает их и не назначает новые.",
+            ),
+            fallback_path="/nutrition",
+            title="Сводка питания",
+            screen_path="/nutrition",
+        )
+    except PersonalToolUnsafe:
+        raise
+    except (ValueError, KeyError, TypeError, AttributeError, SQLAlchemyError) as exc:
+        raise PersonalToolUnavailable("nutrition_context_unavailable") from exc
 
 
 _PERSONAL_TOOL_REGISTRY: dict[
@@ -937,6 +1080,7 @@ __all__ = [
     "PersonalToolResult",
     "PersonalToolUnavailable",
     "PersonalToolUnsafe",
+    "get_bench_history_tool",
     "get_nutrition_summary_tool",
     "get_progress_summary_tool",
     "get_recent_training_summary_tool",

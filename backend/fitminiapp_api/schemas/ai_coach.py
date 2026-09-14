@@ -9,6 +9,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.ai_coach.contracts import (
+    AI_COACH_CHAT_MAX_MESSAGE_LENGTH,
     AiCoachCitation,
     AiCoachDataClass,
     AiCoachJob,
@@ -211,7 +212,7 @@ class AiCoachConversationMessageResponse(BaseModel):
 
     id: int
     role: Literal["user", "assistant"]
-    content: str = Field(..., min_length=1, max_length=1_600)
+    content: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_MAX_MESSAGE_LENGTH)
     status: Literal["complete", "failed"]
     outcome: AiCoachOutcome | None = None
     safety_category: str = Field(..., min_length=1, max_length=48)
@@ -240,7 +241,7 @@ class AiCoachConversationListResponse(BaseModel):
 class AiCoachConversationSendRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    message: str = Field(..., min_length=1, max_length=320)
+    message: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_MAX_MESSAGE_LENGTH)
 
     @field_validator("message")
     @classmethod
