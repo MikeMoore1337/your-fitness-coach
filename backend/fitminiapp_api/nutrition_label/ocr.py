@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import gc
 import io
 import math
 import shutil
@@ -8,8 +9,11 @@ import subprocess
 import tempfile
 import time
 from collections.abc import Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from pathlib import Path
+from threading import BoundedSemaphore
 from typing import Protocol
 
 from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
@@ -27,6 +31,13 @@ OCR_MAX_DIMENSION = 4096
 # authoritative for the whole adaptive stream.
 OCR_DEFAULT_PASS_TIMEOUT_SECONDS = 1.5
 OCR_DEFAULT_INITIAL_PASS_TIMEOUT_SECONDS = 3.5
+RAPIDOCR_PIPELINE_VERSION = "rapidocr-3.9.2-ppocrv5-cyrillic-mobile-v1"
+RAPIDOCR_VARIANT = "rapidocr_ppocrv5_cyrillic"
+RAPIDOCR_MODEL_FILES = (
+    "ch_PP-OCRv5_det_mobile.onnx",
+    "cyrillic_PP-OCRv5_rec_mobile.onnx",
+    "ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx",
+)
 
 # 128E's production-like benchmark found the deskewed ROI to be the first variant that
 # recovered all mandatory facts. Keep the fallback order explicit and bounded: each pair is
@@ -274,6 +285,175 @@ def preprocessing_variant_names(normalized_png: bytes) -> tuple[str, ...]:
         names.append(variant.name)
         variant.image.close()
     return tuple(names)
+
+
+class RapidOcr:
+    """Bounded local RapidOCR adapter with immutable, preinstalled model assets."""
+
+    name = "local_rapidocr"
+    version = RAPIDOCR_PIPELINE_VERSION
+
+    def __init__(
+        self,
+        *,
+        model_dir: str | Path,
+        timeout_seconds: float,
+        max_output_chars: int,
+    ) -> None:
+        if timeout_seconds <= 0:
+            raise LocalOcrError("local_ocr_timeout")
+        self._model_dir = Path(model_dir)
+        self._timeout_seconds = timeout_seconds
+        self._max_output_chars = max_output_chars
+        self._validate_model_files()
+        try:
+            from rapidocr import EngineType, LangDet, LangRec, ModelType, OCRVersion, RapidOCR
+
+            params = {
+                "Global.model_root_dir": str(self._model_dir),
+                "Global.log_level": "error",
+                "Global.max_side_len": 2000,
+                "Global.return_word_box": False,
+                "EngineConfig.onnxruntime.intra_op_num_threads": 1,
+                "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+                "EngineConfig.onnxruntime.enable_cpu_mem_arena": False,
+                "Det.engine_type": EngineType.ONNXRUNTIME,
+                "Det.lang_type": LangDet.CH,
+                "Det.model_type": ModelType.MOBILE,
+                "Det.ocr_version": OCRVersion.PPOCRV5,
+                "Det.model_path": str(self._model_dir / RAPIDOCR_MODEL_FILES[0]),
+                "Det.limit_side_len": 2000,
+                "Cls.engine_type": EngineType.ONNXRUNTIME,
+                "Cls.model_type": ModelType.MOBILE,
+                "Cls.ocr_version": OCRVersion.PPOCRV5,
+                "Cls.model_path": str(self._model_dir / RAPIDOCR_MODEL_FILES[2]),
+                "Rec.engine_type": EngineType.ONNXRUNTIME,
+                "Rec.lang_type": LangRec.CYRILLIC,
+                "Rec.model_type": ModelType.MOBILE,
+                "Rec.ocr_version": OCRVersion.PPOCRV5,
+                "Rec.model_path": str(self._model_dir / RAPIDOCR_MODEL_FILES[1]),
+            }
+            self._ocr = RapidOCR(params=params)
+        except ImportError as exc:
+            raise LocalOcrError("local_ocr_unavailable") from exc
+        except Exception as exc:
+            raise LocalOcrError("local_ocr_unavailable") from exc
+        self._inference_slots = BoundedSemaphore(1)
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="yfc-rapidocr")
+
+    def _validate_model_files(self) -> None:
+        if not self._model_dir.is_dir():
+            raise LocalOcrError("local_ocr_model_missing")
+        try:
+            missing = [
+                file_name
+                for file_name in RAPIDOCR_MODEL_FILES
+                if not (self._model_dir / file_name).is_file()
+                or (self._model_dir / file_name).stat().st_size <= 0
+            ]
+        except OSError as exc:
+            raise LocalOcrError("local_ocr_model_missing") from exc
+        if missing:
+            raise LocalOcrError("local_ocr_model_missing")
+
+    def _run_inference(self, normalized_png: bytes):
+        return self._ocr(normalized_png)
+
+    def _tokens_from_result(self, result: object) -> tuple[OcrToken, ...]:
+        boxes = getattr(result, "boxes", None)
+        texts = getattr(result, "txts", None)
+        scores = getattr(result, "scores", None)
+        if boxes is None or texts is None or scores is None:
+            raise LocalOcrError("local_ocr_failed")
+        tokens: list[OcrToken] = []
+        try:
+            rows = zip(boxes, texts, scores, strict=True)
+            for line_number, (box, raw_text, raw_score) in enumerate(rows, start=1):
+                token_text = " ".join(str(raw_text).split())
+                if not token_text:
+                    continue
+                try:
+                    points = tuple((float(point[0]), float(point[1])) for point in box)
+                    score = float(raw_score)
+                except (IndexError, TypeError, ValueError) as exc:
+                    raise LocalOcrError("local_ocr_failed") from exc
+                if len(points) < 4 or not math.isfinite(score):
+                    raise LocalOcrError("local_ocr_failed")
+                if any(not math.isfinite(value) for point in points for value in point):
+                    raise LocalOcrError("local_ocr_failed")
+                left = math.floor(min(point[0] for point in points))
+                top = math.floor(min(point[1] for point in points))
+                right = math.ceil(max(point[0] for point in points))
+                bottom = math.ceil(max(point[1] for point in points))
+                if left < 0 or top < 0 or right <= left or bottom <= top:
+                    raise LocalOcrError("local_ocr_failed")
+                tokens.append(
+                    OcrToken(
+                        text=token_text,
+                        left=left,
+                        top=top,
+                        width=right - left,
+                        height=bottom - top,
+                        confidence=max(0.0, min(100.0, score * 100)),
+                        block_num=1,
+                        paragraph_num=1,
+                        line_num=line_number,
+                        word_num=1,
+                    )
+                )
+                if len(tokens) > OCR_MAX_TOKENS:
+                    raise LocalOcrError("local_ocr_output_too_large")
+        except (TypeError, ValueError) as exc:
+            raise LocalOcrError("local_ocr_failed") from exc
+        if not tokens:
+            raise LocalOcrError("local_ocr_failed")
+        return tuple(tokens)
+
+    def extract_candidates(self, normalized_png: bytes) -> tuple[OcrCandidate, ...]:
+        acquired = self._inference_slots.acquire(timeout=self._timeout_seconds)
+        if not acquired:
+            raise LocalOcrError("local_ocr_timeout")
+        started = time.monotonic()
+
+        def run_and_release():
+            try:
+                return self._run_inference(normalized_png)
+            finally:
+                self._inference_slots.release()
+
+        try:
+            future = self._executor.submit(run_and_release)
+        except RuntimeError as exc:
+            self._inference_slots.release()
+            raise LocalOcrError("local_ocr_unavailable") from exc
+        try:
+            result = future.result(timeout=self._timeout_seconds)
+        except FutureTimeoutError as exc:
+            future.cancel()
+            raise LocalOcrError("local_ocr_timeout") from exc
+        except Exception as exc:
+            raise LocalOcrError("local_ocr_failed") from exc
+
+        try:
+            tokens = self._tokens_from_result(result)
+        finally:
+            del result
+            gc.collect()
+        text = structured_text_from_tokens(tokens)
+        if len(text) > self._max_output_chars:
+            raise LocalOcrError("local_ocr_output_too_large")
+        return (
+            OcrCandidate(
+                variant=RAPIDOCR_VARIANT,
+                psm=0,
+                text=text,
+                tokens=tokens,
+                elapsed_ms=(time.monotonic() - started) * 1000,
+            ),
+        )
+
+    def extract_text(self, normalized_png: bytes) -> str:
+        return self.extract_candidates(normalized_png)[0].text
 
 
 @dataclass(frozen=True)

@@ -7,6 +7,7 @@ import time
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+from functools import lru_cache
 from typing import Literal, cast
 
 from sqlalchemy.exc import IntegrityError
@@ -39,6 +40,7 @@ from fitminiapp_api.nutrition_label.ocr import (
     LocalOcrError,
     OcrCandidate,
     OcrEngine,
+    RapidOcr,
     TesseractOcr,
 )
 from fitminiapp_api.nutrition_label.parser import (
@@ -156,15 +158,37 @@ def _get_owned_draft(
     return row
 
 
+@lru_cache(maxsize=2)
+def _build_rapidocr_engine(
+    model_dir: str,
+    timeout_seconds: float,
+    max_output_chars: int,
+) -> RapidOcr:
+    try:
+        return RapidOcr(
+            model_dir=model_dir,
+            timeout_seconds=timeout_seconds,
+            max_output_chars=max_output_chars,
+        )
+    except LocalOcrError as exc:
+        raise NutritionLabelError(exc.code, status_code=503) from exc
+
+
 def _build_ocr_engine() -> OcrEngine:
-    if settings.nutrition_label_scan_ocr_engine != "tesseract":
-        raise NutritionLabelError("local_ocr_unavailable", status_code=503)
-    return TesseractOcr(
-        languages=settings.nutrition_label_scan_ocr_languages,
-        timeout_seconds=settings.nutrition_label_scan_ocr_timeout_seconds,
-        max_output_chars=settings.nutrition_label_scan_ocr_max_output_chars,
-        version=OCR_PIPELINE_VERSION,
-    )
+    if settings.nutrition_label_scan_ocr_engine == "rapidocr":
+        return _build_rapidocr_engine(
+            settings.nutrition_label_scan_ocr_model_dir,
+            settings.nutrition_label_scan_ocr_timeout_seconds,
+            settings.nutrition_label_scan_ocr_max_output_chars,
+        )
+    if settings.nutrition_label_scan_ocr_engine == "tesseract":
+        return TesseractOcr(
+            languages=settings.nutrition_label_scan_ocr_languages,
+            timeout_seconds=settings.nutrition_label_scan_ocr_timeout_seconds,
+            max_output_chars=settings.nutrition_label_scan_ocr_max_output_chars,
+            version=OCR_PIPELINE_VERSION,
+        )
+    raise NutritionLabelError("local_ocr_unavailable", status_code=503)
 
 
 def _parse_ocr_candidates(
@@ -315,9 +339,14 @@ def create_label_draft(
     ocr_engine: OcrEngine | None = None,
 ) -> NutritionLabelDraftResponse:
     started = time.monotonic()
+    configured_provider = (
+        "local_rapidocr"
+        if settings.nutrition_label_scan_ocr_engine == "rapidocr"
+        else "local_tesseract"
+    )
     logger.info(
         "nutrition_scan_started",
-        extra={"data_class": "package_image", "provider": "local_tesseract"},
+        extra={"data_class": "package_image", "provider": configured_provider},
     )
     key = _normalize_idempotency_key(idempotency_key)
     existing = (

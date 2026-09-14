@@ -120,8 +120,9 @@ class Settings(BaseSettings):
     nutrition_label_scan_enabled: bool = False
     nutrition_label_scan_kill_switch: bool = False
     nutrition_label_scan_internal_user_ids: str = ""
-    nutrition_label_scan_ocr_engine: Literal["tesseract"] = "tesseract"
+    nutrition_label_scan_ocr_engine: Literal["rapidocr", "tesseract"] = "rapidocr"
     nutrition_label_scan_ocr_languages: str = "rus+eng"
+    nutrition_label_scan_ocr_model_dir: str = "/opt/rapidocr/models"
     nutrition_label_scan_max_image_bytes: int = Field(default=8_388_608, ge=256_000, le=8_388_608)
     nutrition_label_scan_max_request_bytes: int = Field(default=8_650_000, ge=300_000, le=9_000_000)
     nutrition_label_scan_max_pixels: int = Field(default=20_000_000, ge=1_000_000, le=40_000_000)

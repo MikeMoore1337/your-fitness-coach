@@ -35,7 +35,8 @@ and a separate quality run are still required before any rollout decision.
 | Groq Qwen Vision | official docs: Qwen 3.6/3.8 27B, image URL/base64, JSON mode | strict outputs only on supported-model allowlist; vision+strict combination not proven by local run | preview model/cost/rate/data location require account/policy review | research candidate, not approved |
 | OpenAI GPT-4o snapshot | official image input and text output including Structured Outputs | supported | paid token pricing; default abuse monitoring retention; ZDR/MAM eligibility/account setup to verify | paid candidate, owner/legal gate |
 | Google Gemini API | official image input formats | JSON Schema subset; application semantic validation still required | unpaid tier may use/review submitted content; available-region/account path needs verification | not acceptable as free/private default |
-| Local PaddleOCR/Tesseract hybrid | local image/OCR route, no provider transfer | YFC must build/validate parser itself | Russian/English support documented; table/layout and device cost not measured | narrow local spike candidate |
+| Local RapidOCR + ONNX Runtime | local image/OCR route, no provider transfer | positioned tokens -> existing strict parser | Task 128G: PP-OCRv5 Cyrillic quality/resource bakeoff passed on locked synthetic corpus; real-label proof still pending | selected primary, production HUMAN_EVIDENCE pending |
+| Local Tesseract 5.5.0 | local image/OCR fallback, no provider transfer | positioned TSV tokens -> existing strict parser | Task 128E/128G: safety preserved, materially slower and slightly weaker on the same corpus | explicit bounded fallback |
 
 ## Why no quality numbers are reported
 
@@ -97,3 +98,82 @@ Tesseract — p50 18.31 s и p95 20.71 s; configured hard timeout — 8 s.
 измерение real-label accuracy, device/TMA latency или correction baseline. Production
 HUMAN_EVIDENCE по той же оригинальной фотографии остаётся обязательным; до него public rollout
 не считается подтверждённым.
+
+## Addendum Task 128G (2026-09-14)
+
+Task 128G выполнил isolated local bakeoff и production integration без cloud/paid OCR. Сравнение
+проводилось на одном locked corpus: representative synthetic label + 31 PNG из
+`nutrition-label-corpus-v1`; oversized boundary fixture не передавался OCR engine. В corpus есть
+RU 100 g/100 ml, EU/UK, US Nutrition Facts, mixed RU/Latin, decimal comma, dark/white table,
+small text, rotation/perspective и partial/unreadable cases.
+
+### Candidate и compatibility
+
+- Primary candidate: `RapidOCR 3.9.2` + `ONNX Runtime 1.30.0` + `PP-OCRv5` mobile detector,
+  textline classifier и `cyrillic_PP-OCRv5_rec_mobile.onnx` recognizer. `rapidocr` требует
+  Python `>=3.8,<4`; locked wheels для Python 3.14 и Linux `manylinux_2_28` были доступны.
+- YFC runtime: Python `3.14.6`, `python:3.14-slim`, Debian image build PASS, `pip check` PASS,
+  CPU-only runtime smoke от non-root `appuser` PASS.
+- RapidOCR/PaddleOCR model license — Apache-2.0; ONNX Runtime — MIT; Tesseract fallback и
+  official `tessdata` остаются Apache-2.0. Pinned transitive Python dependencies и Debian
+  packages остаются в dependency/image audit; реальные user images, OCR text и credentials в
+  evidence не использовались.
+- Зафиксированный license inventory новых/активированных transitive packages: `opencv-python`
+  Apache-2.0, `numpy` BSD-3-Clause, `omegaconf` BSD-3-Clause, `protobuf` 3-Clause BSD,
+  `pyclipper` MIT, `shapely` BSD-3-Clause, `flatbuffers` Apache-2.0, `antlr4-python3-runtime`
+  BSD, `six` MIT, `tqdm` MPL-2.0/MIT и `colorlog` MIT. Это package/license evidence для
+  dependency review, а не замена итогов registry/SBOM-проверки конкретного Debian release.
+
+Model bundle скачивается только на этапе image build скриптом
+[`fetch_rapidocr_models.py`](../../scripts/fetch_rapidocr_models.py), проверяется SHA-256 и
+делается read-only для runtime. В production bundle входят только:
+
+| Model | SHA-256 | Размер |
+|---|---|---:|
+| `ch_PP-OCRv5_det_mobile.onnx` | `4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae` | 4,819,576 B |
+| `cyrillic_PP-OCRv5_rec_mobile.onnx` | `90f761b4bfcce0c8c561c0cb5c887b0971d3ec01c32164bdf7374a35b0982711` | 8,074,092 B |
+| `ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx` | `54379ae5174d026780215fc748a7f31910dee36818e63d49d17dc598ecc82df7` | 1,018,508 B |
+
+Итого production model bundle — `13,912,176 bytes`. Runtime model download не выполняется.
+
+### Same-corpus comparison
+
+| Метрика | RapidOCR 3.9.2, PP-OCRv5 Cyrillic | Tesseract 5.5.0 |
+|---|---:|---:|
+| Cold init | 585.9 ms | included in first bounded run |
+| Warm p50 | 1,879.9 ms | 3,614.2 ms |
+| Warm p95 | 2,228.2 ms | 4,409.5 ms |
+| Max | 2,577.4 ms | 6,606.1 ms |
+| Cases без `missing_required_fact` | 14/32 | 13/32 |
+| Fully resolved basis + energy + P/F/C | 12/32 | not separately recorded |
+| Dangerous `2814 kcal` | 0 | 0 |
+
+На representative label оба required quality paths дали `per_100_g`, `281.4 kJ`, `66.8 kcal`,
+protein `8.0 g`, fat `2.0 g`, carbohydrate `4.2 g`; RapidOCR candidate не имел warnings.
+US `%DV` и неуверенные/неполные строки остаются reviewable/null по существующему parser safety
+contract; Task 128G parser не переписывал.
+
+### Resource profile
+
+RapidOCR primary использует singleton process engine, ONNX `intra_op=1`/`inter_op=1`, отключённый
+CPU memory arena, `gc.collect()` после обработки результата и `BoundedSemaphore(1)`. Это даёт
+один тяжёлый OCR inference одновременно на process, model initialization не повторяется на
+каждый request, а timeout и controlled errors сохраняются. Quality profile с max side `2000`
+зафиксировал peak RSS `1,235,672 KiB` (около `1.18 GiB`), same-label warm p50 `2560.0 ms`,
+p95 `3961.2 ms` и CPU `2732.2 ms/request`; это release operational constraint, а не приглашение
+увеличивать concurrency. Профиль max side `1000` был отклонён: peak RSS около `342 MiB`, но
+только `6/32` cases без `missing_required_fact`.
+
+Docker size comparison на локальном BuildKit:
+
+- baseline `yfc-backend:128e-final`: `178,398,886 bytes`;
+- RapidOCR image: `428,252,871 bytes`;
+- delta: `+249,853,985 bytes` (`+238.3 MiB`), включая Python wheels, `libgl1` и 13.9 MB models.
+
+### Decision and limitations
+
+RapidOCR выбран primary, потому что на том же corpus он быстрее Tesseract и даёт небольшое,
+измеримое улучшение полноты, при этом не создаёт unsafe `2814 kcal`, сохраняет positioned
+evidence и existing deterministic parser. Tesseract остаётся только explicit fallback и не
+запускается безусловно вместе с RapidOCR. Это не доказывает real-label accuracy: после deploy
+нужна HUMAN_EVIDENCE на том же исходном фото, без коммита изображения и EXIF в repository.

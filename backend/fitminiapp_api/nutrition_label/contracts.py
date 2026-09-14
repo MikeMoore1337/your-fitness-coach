@@ -9,7 +9,7 @@ CANONICAL_DRAFT_SCHEMA_VERSION: Final[Literal["nutrition-label-draft-v1"]] = (
     "nutrition-label-draft-v1"
 )
 CANONICAL_POLICY_REVISION: Final[str] = "nutrition-label-local-v2"
-LOCAL_OCR_ENGINE_VERSION: Final[str] = "tesseract-structured-adaptive-v3"
+LOCAL_OCR_ENGINE_VERSION: Final[str] = "rapidocr-3.9.2-ppocrv5-cyrillic-mobile-v1"
 
 NUTRIENT_FIELDS = (
     "energy_kcal",

@@ -21,3 +21,6 @@ qrcode[pil]
 reportlab
 setuptools>=78.1.1
 slowapi
+# Task 128G: local CPU-only OCR; models are fetched and SHA-256 verified at image build time.
+onnxruntime==1.30.0
+rapidocr==3.9.2
