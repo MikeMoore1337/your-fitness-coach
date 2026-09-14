@@ -2,7 +2,7 @@
 # uv pip compile --upgrade --python-version 3.14 --universal --output-file requirements-runtime.txt requirements.in
 # pip install -r requirements-runtime.txt
 fastapi
-msgpack>=1.2.1
+msgpack>=1.2.2
 uvicorn[standard]
 sqlalchemy
 psycopg[binary]
