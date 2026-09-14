@@ -16,8 +16,9 @@ provider и policy. Старые переменные остаются толь�
 
 Используется существующий backend-only `GroqDirectAdapter` с фиксированным HTTPS endpoint
 `https://api.groq.com/openai/v1/chat/completions`, allowlisted model `openai/gpt-oss-120b`,
-structured JSON response, bounded timeout, normalized provider errors и без provider tools.
-Новая архитектура или новый платный сервис не добавляются.
+обычный plain-text response для conversational chat, bounded timeout, normalized provider errors
+и без provider tools. Legacy structured JSON остаётся только на старых report endpoints. Новая
+архитектура или новый платный сервис не добавляются.
 
 ## Production environment
 
@@ -58,11 +59,17 @@ Production policy после нормализации:
 
 ## User-facing и privacy contract
 
-- Обычный чат принимает любой поддерживаемый вопрос и использует только выбранный проверенный
-  public context; он не загружает профиль, дневник, тренировки или trainer notes. История текущего
-  разговора хранится отдельно и передаётся provider только в bounded объёме для follow-up.
+- Обычный чат принимает любой поддерживаемый вопрос и вызывает provider даже при пустом app
+  context. Проверенный public context добавляется только для релевантного общего или capability
+  вопроса; профиль, дневник, тренировки и trainer notes не загружаются на generic path. История
+  текущего разговора хранится отдельно и последние 8 user/assistant сообщений реально передаются
+  provider для follow-up.
 - Персональные quick prompts доступны после отдельного explicit consent и используют только
-  существующие readonly summaries за допустимый период.
+  релевантные existing readonly slices: профиль/цели, активная программа/расписание, недавние
+  тренировки, история жима или сводка питания. Missing data приводит к естественному уточнению,
+  а не к глобальному hardcoded отказу.
+- Основной chat answer — обычный текст или безопасный markdown; внутренние route/tool/schema
+  labels и ссылки на персональные экранные пути не возвращаются пользователю.
 - Consent revocation и provider policy revision сохраняют fail-closed поведение.
 - Memory не обязательна. `OFF` не блокирует AI Coach; `ON` принимает только user-confirmed
   разрешённые немедицинские preferences и позволяет пользователю pause/revoke/edit/delete.
@@ -86,13 +93,17 @@ normal PR-based production release для доставки изменения.
 сохранения raw content:
 
 1. authenticated `/api/v1/ai-coach/status` возвращает `ui_enabled=true` и runtime capability;
-2. обычный вопрос проходит настоящий provider request, отображается в chat UI и переживает reload;
-3. consent-enabled personal quick prompt проходит настоящий provider request для разрешённой
-   сводки;
-4. memory OFF и ON остаются рабочими и не расширяют context contract;
-5. safe failure path не ломает приложение, а UI не показывает internal-beta copy;
-6. `/health/live` и `/health/ready` остаются healthy после smoke.
+2. реальные provider requests для «Как рассчитать КБЖУ?», «Сколько нужно пить воды?» и
+   «Сколько отдыхать между подходами?» возвращают содержательный conversational answer;
+3. app-help, consent-enabled personal question без/с доступным context и follow-up проходят
+   настоящий provider request, а history переживает reload;
+4. ответы не содержат внутренних route/tool/schema labels;
+5. memory OFF и ON остаются рабочими и не расширяют context contract;
+6. safe failure path не ломает приложение, а UI не показывает internal-beta copy;
+7. `/health/live` и `/health/ready` остаются healthy после smoke.
 
 Обычный CI использует deterministic provider double и не выполняет paid/live calls. Реальная
 generation проверяется только отдельным production smoke после deploy, с owner/test account и без
-выгрузки raw prompt/answer в artifacts или logs.
+выгрузки raw prompt/answer в artifacts или logs. Smoke evidence содержит только request type,
+provider, configured/actual model, latency, outcome и generation success; отсутствие обязательного
+provider credential — точный `HUMAN_REQUIRED` blocker.

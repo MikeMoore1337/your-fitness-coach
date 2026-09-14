@@ -16,7 +16,7 @@ debug-поля или служебные citation metadata в основном �
 
 ## Разрешённый контур
 
-Обычный чат принимает короткое сообщение. Conversation принадлежит текущему account, а backend
+Обычный чат принимает сообщение до 2000 символов. Conversation принадлежит текущему account, а backend
 сам выбирает `job`, `context_id`, trust class и bounded context. Клиент не может передать provider,
 model, system prompt, URL, файл, SQL, user ID или персональный payload. В provider уходят только
 последние bounded turns, выбранные server-known references и текущая задача.
@@ -29,7 +29,8 @@ model, system prompt, URL, файл, SQL, user ID или персональны�
 Персональный вопрос сначала проходит отдельную проверку consent. Затем один allowlisted read-only
 tool возвращает минимальную сводку текущего пользователя: факты, даты, sufficiency, limitations
 и fallback path. Tool не меняет canonical data и не получает право выбирать другой пользовательский
-контекст. При отсутствии подходящей сводки provider не вызывается.
+контекст. Если фактов недостаточно, provider всё равно получает этот ограниченный срез и сам
+формирует естественное уточнение; hardcoded отказ используется только при реальной ошибке источника.
 
 ## Provider boundary
 
@@ -61,7 +62,7 @@ action и prompt-injection запросов. После provider проверя�
 Основные состояния чата:
 
 - `answer` — проверенный ответ;
-- `insufficient_data` — подходящего проверенного контекста нет;
+- `insufficient_data` — legacy structured path не получил подходящего проверенного контекста;
 - `safety_refusal` — запрос выходит за безопасную границу;
 - `consent_required` — для персонального вопроса нужно отдельное согласие;
 - `rate_limited` — сработала per-user или global quota;
@@ -81,8 +82,9 @@ AI Coach выключен по умолчанию. Одного `GROQ_API_KEY` �
 
 Quota и cooldown в текущем сервисе process-local и не требуют shared storage. Для горизонтального
 масштабирования перед отдельным rollout потребуется подтверждённый shared counter. Логи
-`ai_coach_chat_generation` metadata-only: request/job/trust class, версии, provider/model,
-outcome, safety/failure category, latency, attempts, context/history counts и nullable usage.
+`ai_coach_chat_generation` metadata-only: request id, request type/job, trust class, explicit
+context kind, версии, provider/model, outcome, safety/failure category, latency, attempts,
+generation success, context/history counts и nullable usage.
 Текст запроса, answer, memory, personal facts и raw provider payload в логи не записываются.
 
 Миграция `0086_ai_coach_conversations` добавляет только account-owned history. Account export

@@ -24,8 +24,9 @@ AI_COACH_SCHEMA_VERSION = "ai-coach-answer-v1"
 AI_COACH_PERIOD_REPORT_PROMPT_VERSION = "ai-coach-period-report-v2"
 AI_COACH_PERIOD_REPORT_INPUT_VERSION = "ai-coach-period-report-input-v1"
 AI_COACH_PERIOD_REPORT_OUTPUT_VERSION = "ai-coach-period-report-output-v1"
-AI_COACH_CHAT_PROMPT_VERSION = "ai-coach-chat-v1"
+AI_COACH_CHAT_PROMPT_VERSION = "ai-coach-chat-v2"
 AI_COACH_CHAT_OUTPUT_VERSION = "ai-coach-chat-text-v1"
+AI_COACH_CHAT_MAX_MESSAGE_LENGTH = 2_000
 _BoundedLimitation = Annotated[str, Field(max_length=240)]
 _BoundedAnchor = Annotated[str, Field(min_length=1, max_length=128)]
 AiCoachMemoryCategory = Literal[
@@ -72,6 +73,19 @@ class AiCoachPersonalTool(StrEnum):
     GET_RECENT_TRAINING_SUMMARY = "get_recent_training_summary"
     GET_NUTRITION_SUMMARY = "get_nutrition_summary"
     GET_PERIOD_REPORT_INSIGHTS = "get_period_report_insights"
+
+
+class AiCoachChatContextKind(StrEnum):
+    """Explicit scope of application context selected for one chat turn."""
+
+    NONE = "none"
+    APP_CAPABILITIES = "app_capabilities"
+    PUBLIC_KNOWLEDGE = "public_knowledge"
+    PROFILE_GOALS = "profile_goals"
+    ACTIVE_PROGRAM = "active_program"
+    RECENT_WORKOUTS = "recent_workouts"
+    BENCH_HISTORY = "bench_history"
+    NUTRITION_SUMMARY = "nutrition_summary"
 
 
 class AiCoachInsightKind(StrEnum):
@@ -151,7 +165,7 @@ class AiCoachConversationTurn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Literal["user", "assistant"]
-    content: str = Field(..., min_length=1, max_length=1_600)
+    content: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_MAX_MESSAGE_LENGTH)
 
     @field_validator("content")
     @classmethod
@@ -169,9 +183,10 @@ class AiCoachChatRequest(BaseModel):
 
     job: AiCoachJob
     context_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.:/-]+$")
-    message: str = Field(..., min_length=1, max_length=320)
+    message: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_MAX_MESSAGE_LENGTH)
     data_class: AiCoachDataClass
-    locale: Literal["ru"] = "ru"
+    context_kind: AiCoachChatContextKind = AiCoachChatContextKind.NONE
+    locale: Literal["ru", "en"] = "ru"
     conversation_history: tuple[AiCoachConversationTurn, ...] = Field(default=(), max_length=8)
     memory_context: tuple[AiCoachMemoryContext, ...] = Field(default=(), max_length=20)
 

@@ -13,6 +13,7 @@ from fitminiapp_api.ai_coach.chat_service import (
 )
 from fitminiapp_api.ai_coach.context_selection import (
     ChatContextSelection,
+    history_without_personal_context,
     message_requires_personal_context,
     select_chat_context,
 )
@@ -44,6 +45,7 @@ from fitminiapp_api.ai_coach.safety import (
     SafetyCategory,
     classify_message,
     classify_request,
+    detect_chat_locale,
     refusal_text,
 )
 from fitminiapp_api.ai_coach.service import ai_coach_service
@@ -149,21 +151,6 @@ def get_ai_coach_status(
     )
 
 
-def _chat_citations(selection: ChatContextSelection) -> tuple[AiCoachCitation, ...]:
-    citations: list[AiCoachCitation] = []
-    seen: set[str] = set()
-    for ref in selection.context_refs:
-        for citation in ref.citations:
-            url = str(citation.url)
-            if url in seen:
-                continue
-            seen.add(url)
-            citations.append(AiCoachCitation.model_validate(citation.model_dump()))
-            if len(citations) == 12:
-                return tuple(citations)
-    return tuple(citations)
-
-
 def _chat_state_generation(
     *,
     outcome: AiCoachOutcome,
@@ -186,25 +173,33 @@ def _chat_state_generation(
     )
 
 
-def _chat_consent_generation() -> AiCoachChatGeneration:
+def _chat_consent_generation(*, locale: str = "ru") -> AiCoachChatGeneration:
     return _chat_state_generation(
         outcome=AiCoachOutcome.CONSENT_REQUIRED,
         data_class=AiCoachDataClass.PERSONALIZED,
         answer=(
-            "Чтобы ответить по вашим тренировкам, прогрессу или питанию, сначала "
+            "To answer about your training, progress, or nutrition, first enable "
+            "separate consent for personal AI Coach answers. I do not access your data without it."
+            if locale == "en"
+            else "Чтобы ответить по вашим тренировкам, прогрессу или питанию, сначала "
             "включите отдельное согласие на персональный режим AI Coach. "
             "Без него я не открываю ваши данные."
         ),
     )
 
 
-def _chat_personal_unavailable_generation() -> AiCoachChatGeneration:
+def _chat_personal_unavailable_generation(*, locale: str = "ru") -> AiCoachChatGeneration:
     return _chat_state_generation(
         outcome=AiCoachOutcome.UNAVAILABLE,
         data_class=AiCoachDataClass.PERSONALIZED,
         limitations=(
-            "Персональный режим AI Coach сейчас недоступен; основные функции приложения "
-            "продолжают работать.",
+            (
+                "Personal AI Coach answers are temporarily unavailable; the main app "
+                "features are still available."
+                if locale == "en"
+                else "Персональный режим AI Coach сейчас недоступен; основные функции приложения "
+                "продолжают работать."
+            ),
         ),
         failure_category=CHAT_FAILURE_PROVIDER,
     )
@@ -213,18 +208,17 @@ def _chat_personal_unavailable_generation() -> AiCoachChatGeneration:
 def _chat_context_failure_generation(
     *,
     data_class: AiCoachDataClass,
-    fallback_path: str | None = None,
+    locale: str = "ru",
     citations: tuple[AiCoachCitation, ...] = (),
 ) -> AiCoachChatGeneration:
-    suffix = (
-        f" Откройте раздел {fallback_path} и повторите вопрос."
-        if fallback_path
-        else " Откройте соответствующий раздел приложения и повторите вопрос."
-    )
     return _chat_state_generation(
-        outcome=AiCoachOutcome.INSUFFICIENT_DATA,
+        outcome=AiCoachOutcome.UNAVAILABLE,
         data_class=data_class,
-        answer=("Пока недостаточно проверенных данных, чтобы ответить по вашей ситуации." + suffix),
+        answer=(
+            "The approved materials could not be loaded. Please try again later."
+            if locale == "en"
+            else "Не удалось получить материалы для ответа. Попробуйте ещё раз позже."
+        ),
         citations=citations,
         failure_category=CHAT_FAILURE_CONTEXT,
     )
@@ -237,12 +231,19 @@ def _chat_request_for_selection(
     selection: ChatContextSelection,
     memory_context=(),
 ) -> AiCoachChatRequest:
+    provider_history = (
+        history_without_personal_context(history)
+        if selection.data_class == AiCoachDataClass.GENERIC
+        else history
+    )
     return AiCoachChatRequest(
         job=selection.job,
         context_id=selection.context_id,
         message=message,
         data_class=selection.data_class,
-        conversation_history=history,
+        context_kind=selection.context_kind,
+        locale=detect_chat_locale(message),
+        conversation_history=provider_history,
         memory_context=memory_context,
     )
 
@@ -256,9 +257,13 @@ def _generate_chat(
     request_id: str | None,
 ) -> AiCoachChatGeneration:
     safety_category = classify_message(message)
-    personal_needed = message_requires_personal_context(message, history) or (
-        safety_category == SafetyCategory.PERSONAL_DATA
-    )
+    personal_needed = message_requires_personal_context(message, history)
+    # A capability question can mention a user's own screen (for example, "my progress")
+    # without requesting personal data. Let the explicit intent selector resolve that case;
+    # all other safety categories remain fail-closed.
+    if safety_category == SafetyCategory.PERSONAL_DATA and not personal_needed:
+        safety_category = SafetyCategory.CLEAR
+    personal_needed = personal_needed or safety_category == SafetyCategory.PERSONAL_DATA
 
     if safety_category not in {SafetyCategory.CLEAR, SafetyCategory.PERSONAL_DATA}:
         request = AiCoachChatRequest(
@@ -266,6 +271,7 @@ def _generate_chat(
             context_id="public:safety",
             message=message,
             data_class=AiCoachDataClass.UNKNOWN,
+            locale=detect_chat_locale(message),
             conversation_history=history,
         )
         return ai_coach_chat_service.generate(
@@ -277,25 +283,19 @@ def _generate_chat(
 
     if personal_needed:
         if not has_active_ai_coach_consent(get_ai_coach_consent(db, current_user.id)):
-            return _chat_consent_generation()
+            return _chat_consent_generation(locale=detect_chat_locale(message))
         if not (
             _chat_runtime_available()
             and settings.ai_coach_personal_enabled
             and settings.ai_coach_personal_data_policy == "verified_personal_user"
         ):
-            return _chat_personal_unavailable_generation()
+            return _chat_personal_unavailable_generation(locale=detect_chat_locale(message))
         selection = select_chat_context(
             db,
             current_user,
             message=message,
             history=history,
         )
-        if selection.data_sufficiency == "insufficient":
-            return _chat_context_failure_generation(
-                data_class=selection.data_class,
-                fallback_path=selection.fallback_path,
-                citations=_chat_citations(selection),
-            )
         request = _chat_request_for_selection(
             message=message,
             history=history,
@@ -465,19 +465,21 @@ def send_ai_coach_conversation_message(
         generation = _chat_state_generation(
             outcome=AiCoachOutcome.SAFETY_REFUSAL,
             data_class=AiCoachDataClass.PERSONALIZED,
-            answer=(
-                "Я могу отвечать только по безопасной структурированной сводке "
-                "и не меняю эти ограничения."
+            answer=refusal_text(
+                SafetyCategory.PROMPT_INJECTION,
+                locale=detect_chat_locale(payload.message),
             ),
             safety_category=SafetyCategory.PROMPT_INJECTION,
         )
     except PersonalToolUnavailable:
         generation = _chat_context_failure_generation(
             data_class=AiCoachDataClass.PERSONALIZED,
+            locale=detect_chat_locale(payload.message),
         )
     except ContextUnavailable:
         generation = _chat_context_failure_generation(
             data_class=AiCoachDataClass.GENERIC,
+            locale=detect_chat_locale(payload.message),
         )
 
     mark_user_message_result(
@@ -1030,7 +1032,7 @@ def generate_personal_ai_coach_answer(
             prompt_version=response_prompt_version,
             limitations=(
                 *tool_result.limitations,
-                f"Проверьте исходные данные на экране {tool_result.fallback_path}.",
+                "Проверьте исходные записи, если хотите дополнить эту сводку.",
             ),
         )
     return ai_coach_service.generate(

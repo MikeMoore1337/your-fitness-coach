@@ -21,6 +21,11 @@ from fitminiapp_api.schemas.ai_coach import (
 
 MAX_CONVERSATIONS_PER_USER = 50
 MAX_MESSAGES_PER_CONVERSATION = 100
+LEGACY_INLINE_CONTENT_LIMIT = 1_600
+
+
+def _message_content(message: AiCoachConversationMessage) -> str:
+    return message.content_overflow or message.content
 
 
 def get_owned_conversation(
@@ -154,7 +159,9 @@ def history_turns(
             message.role == "assistant" and message.outcome == AiCoachOutcome.INVALID_OUTPUT.value
         )
     ]
-    return tuple({"role": message.role, "content": message.content} for message in messages[-8:])
+    return tuple(
+        {"role": message.role, "content": _message_content(message)} for message in messages[-8:]
+    )
 
 
 def add_user_message(
@@ -163,10 +170,13 @@ def add_user_message(
     conversation: AiCoachConversation,
     content: str,
 ) -> AiCoachConversationMessage:
+    inline_content = content[:LEGACY_INLINE_CONTENT_LIMIT]
+    overflow_content = content if len(content) > LEGACY_INLINE_CONTENT_LIMIT else None
     message = AiCoachConversationMessage(
         conversation_id=conversation.id,
         role="user",
-        content=content,
+        content=inline_content,
+        content_overflow=overflow_content,
         status="complete",
         outcome=None,
         safety_category="clear",
@@ -225,6 +235,7 @@ def add_assistant_message(
         conversation_id=conversation.id,
         role="assistant",
         content=content,
+        content_overflow=None,
         status="complete",
         outcome=outcome.value,
         safety_category=safety_category,
@@ -296,7 +307,7 @@ def serialize_message(
     return AiCoachConversationMessageResponse(
         id=message.id,
         role=message.role,
-        content=message.content,
+        content=_message_content(message),
         status=message.status,
         outcome=outcome,
         safety_category=message.safety_category,

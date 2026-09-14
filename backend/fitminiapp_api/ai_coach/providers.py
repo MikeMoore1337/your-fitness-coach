@@ -209,9 +209,6 @@ class GroqDirectAdapter:
     ) -> ProviderTextResult:
         """Generate ordinary chat text without response_format or report JSON."""
 
-        if not context_refs:
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
-
         api_key = settings.groq_api_key.get_secret_value().strip()
         if not api_key or settings.ai_coach_provider != "groq":
             raise NormalizedProviderError(ProviderErrorCode.DISABLED)

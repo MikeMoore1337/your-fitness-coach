@@ -158,6 +158,31 @@ def _fields(row: object, names: tuple[str, ...]) -> dict[str, object]:
     return {name: getattr(row, name) for name in names}
 
 
+def _serialize_ai_coach_conversation_message(
+    message: AiCoachConversationMessage,
+) -> dict[str, object]:
+    payload = _fields(
+        message,
+        (
+            "id",
+            "conversation_id",
+            "role",
+            "content",
+            "status",
+            "outcome",
+            "safety_category",
+            "failure_category",
+            "request_id",
+            "citations",
+            "limitations",
+            "created_at",
+        ),
+    )
+    if message.content_overflow is not None:
+        payload["content"] = message.content_overflow
+    return payload
+
+
 FOOD_FIELDS = (
     "id",
     "name",
@@ -1359,23 +1384,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             for conversation in ai_coach_conversations
         ],
         "ai_coach_conversation_messages": [
-            _fields(
-                message,
-                (
-                    "id",
-                    "conversation_id",
-                    "role",
-                    "content",
-                    "status",
-                    "outcome",
-                    "safety_category",
-                    "failure_category",
-                    "request_id",
-                    "citations",
-                    "limitations",
-                    "created_at",
-                ),
-            )
+            _serialize_ai_coach_conversation_message(message)
             for message in ai_coach_conversation_messages
         ],
         "ai_coach_memory_consent": (

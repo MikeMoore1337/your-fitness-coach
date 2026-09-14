@@ -488,6 +488,8 @@ def test_memory_and_conversation_history_are_exported_and_deleted_with_account()
             failure_category=None,
             request_id="request-export-test",
         )
+        long_message = "а" * 1_800
+        add_user_message(db, conversation=conversation, content=long_message)
         db.flush()
         export = build_account_export(db, user)
         encoded = json.dumps(jsonable_encoder(export), ensure_ascii=False)
@@ -495,6 +497,9 @@ def test_memory_and_conversation_history_are_exported_and_deleted_with_account()
         assert export["ai_coach_memories"][0]["value_text"] == "Не добавляй лишние вступления"
         assert export["ai_coach_conversations"][0]["id"] == conversation_id
         assert export["ai_coach_conversation_messages"][0]["content"] == "Как читать прогресс?"
+        assert any(
+            item["content"] == long_message for item in export["ai_coach_conversation_messages"]
+        )
         assert "raw_prompt" not in encoded
         assert "provider_payload" not in encoded
         assert "api_key" not in encoded
