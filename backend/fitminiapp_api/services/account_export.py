@@ -7,7 +7,13 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.models.acquisition import FirstTouchAttribution
-from fitminiapp_api.models.ai_coach import AiCoachConsent, AiCoachMemory, AiCoachMemoryConsent
+from fitminiapp_api.models.ai_coach import (
+    AiCoachConsent,
+    AiCoachConversation,
+    AiCoachConversationMessage,
+    AiCoachMemory,
+    AiCoachMemoryConsent,
+)
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthIdentity, LocalCredential
 from fitminiapp_api.models.cardio import CardioSession
@@ -62,7 +68,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 13
+ACCOUNT_EXPORT_SCHEMA_VERSION = 14
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -122,6 +128,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "weekly_digest_deliveries": "weekly_digest_deliveries",
     "audit_events": "audit_events",
     "ai_coach_consents": "ai_coach_consent",
+    "ai_coach_conversations": "ai_coach_conversations",
+    "ai_coach_conversation_messages": "ai_coach_conversation_messages",
     "ai_coach_memory_consents": "ai_coach_memory_consent",
     "ai_coach_memories": "ai_coach_memories",
     "nutrition_catalog_contributions": "nutrition_catalog_contributions",
@@ -801,6 +809,24 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(AiCoachMemory.created_at.asc(), AiCoachMemory.id.asc())
         .all()
     )
+    ai_coach_conversations = (
+        db.query(AiCoachConversation)
+        .filter(AiCoachConversation.user_id == user.id)
+        .order_by(AiCoachConversation.created_at.asc(), AiCoachConversation.id.asc())
+        .all()
+    )
+    ai_coach_conversation_ids = [conversation.id for conversation in ai_coach_conversations]
+    ai_coach_conversation_messages = (
+        db.query(AiCoachConversationMessage)
+        .filter(AiCoachConversationMessage.conversation_id.in_(ai_coach_conversation_ids))
+        .order_by(
+            AiCoachConversationMessage.created_at.asc(),
+            AiCoachConversationMessage.id.asc(),
+        )
+        .all()
+        if ai_coach_conversation_ids
+        else []
+    )
     workout_comments = (
         db.query(WorkoutComment)
         .options(joinedload(WorkoutComment.revisions))
@@ -1328,6 +1354,30 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             if ai_coach_consent is not None
             else None
         ),
+        "ai_coach_conversations": [
+            _fields(conversation, ("id", "title", "created_at", "updated_at"))
+            for conversation in ai_coach_conversations
+        ],
+        "ai_coach_conversation_messages": [
+            _fields(
+                message,
+                (
+                    "id",
+                    "conversation_id",
+                    "role",
+                    "content",
+                    "status",
+                    "outcome",
+                    "safety_category",
+                    "failure_category",
+                    "request_id",
+                    "citations",
+                    "limitations",
+                    "created_at",
+                ),
+            )
+            for message in ai_coach_conversation_messages
+        ],
         "ai_coach_memory_consent": (
             _fields(
                 ai_coach_memory_consent,

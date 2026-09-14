@@ -13,6 +13,7 @@ from pydantic import SecretStr, ValidationError
 from fitminiapp_api.ai_coach.contracts import (
     AI_COACH_DATA_CLASS,
     AI_COACH_PROMPT_VERSION,
+    AiCoachChatRequest,
     AiCoachDataClass,
     AiCoachJob,
     AiCoachPolicy,
@@ -23,6 +24,8 @@ from fitminiapp_api.ai_coach.contracts import (
     ProviderErrorCode,
     ProviderResult,
     ProviderStructuredResponse,
+    ProviderTextResponse,
+    ProviderTextResult,
 )
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
 from fitminiapp_api.ai_coach.retrieval import _article_ref, _page_ref
@@ -795,6 +798,61 @@ def test_groq_adapter_sends_docs_compatible_strict_request_without_tools(monkeyp
     assert payload["reasoning_format"] == "hidden"
     assert "tools" not in payload
     assert payload["response_format"]["json_schema"]["strict"] is True
+
+
+def test_groq_adapter_sends_plain_text_chat_without_report_json(monkeypatch) -> None:
+    _enable_provider(monkeypatch)
+    captured: dict[str, object] = {}
+    raw_response = {
+        "model": "openai/gpt-oss-120b",
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "message": {"content": "Короткий проверенный ответ."},
+            }
+        ],
+    }
+
+    class FakeResponse:
+        status_code = 200
+        headers: ClassVar[dict[str, str]] = {}
+        content = json.dumps(raw_response, ensure_ascii=False).encode("utf-8")
+
+        def json(self):
+            return raw_response
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            captured["client_kwargs"] = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
+            return None
+
+        def post(self, endpoint, *, headers, json):
+            captured["endpoint"] = endpoint
+            captured["headers"] = headers
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("fitminiapp_api.ai_coach.providers.httpx.Client", FakeClient)
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge-test-v1",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+    result = GroqDirectAdapter().generate_text(request, _provider_context())
+
+    assert result.response == ProviderTextResponse(answer="Короткий проверенный ответ.")
+    assert isinstance(result, ProviderTextResult)
+    payload = captured["json"]
+    assert isinstance(payload, dict)
+    assert "response_format" not in payload
+    assert "tools" not in payload
+    assert "без JSON" in payload["messages"][0]["content"]
 
 
 def test_groq_adapter_normalizes_429_and_honors_bounded_retry_after(monkeypatch) -> None:

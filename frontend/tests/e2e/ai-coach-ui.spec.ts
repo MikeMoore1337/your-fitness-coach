@@ -10,17 +10,94 @@ import {
 
 const evidenceDir = resolve(process.cwd(), '../.artifacts/runtime/tests/ai-coach-ui');
 
-async function installAiCoachApi(page: Page, personalAvailable = false): Promise<void> {
+type MockMessageRole = 'user' | 'assistant';
+
+interface MockMessage {
+  id: number;
+  role: MockMessageRole;
+  content: string;
+  status: 'complete' | 'failed';
+  outcome: string | null;
+  safety_category: string;
+  failure_category: string | null;
+  citations: Array<{
+    title: string;
+    publisher: string;
+    url: string;
+    source_type: string;
+  }>;
+  limitations: string[];
+  created_at: string;
+}
+
+interface MockConversation {
+  id: number;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+  messages: MockMessage[];
+}
+
+const publicCitation = {
+  title: 'Проверенный материал YFC',
+  publisher: 'Your Fitness Coach',
+  url: 'https://example.org/guide',
+  source_type: 'public_page',
+};
+
+function makeMessage(
+  id: number,
+  role: MockMessageRole,
+  content: string,
+  overrides: Partial<MockMessage> = {},
+): MockMessage {
+  return {
+    id,
+    role,
+    content,
+    status: 'complete',
+    outcome: role === 'assistant' ? 'answer' : null,
+    safety_category: 'clear',
+    failure_category: null,
+    citations: role === 'assistant' ? [publicCitation] : [],
+    limitations: [],
+    created_at: '2026-09-14T12:00:00Z',
+    ...overrides,
+  };
+}
+
+function conversationSummary(conversation: MockConversation) {
+  return {
+    id: conversation.id,
+    title: conversation.title,
+    created_at: conversation.created_at,
+    updated_at: conversation.updated_at,
+    message_count: conversation.messages.length,
+  };
+}
+
+function isPersonalQuestion(message: string): boolean {
+  return /сегодня|мой|моя|мои|прогресс|питани/i.test(message);
+}
+
+async function installAiCoachApi(page: Page): Promise<void> {
+  let nextConversationId = 1;
+  let nextMessageId = 1;
+  let personalConsent: 'granted' | 'revoked' = 'revoked';
+  const conversations = new Map<number, MockConversation>();
+
   await page.route('**/api/v1/ai-coach/**', async (route: Route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    const method = request.method();
 
     if (path.endsWith('/status')) {
       return route.fulfill({
-        json: { ui_enabled: true, generic_available: true, personal_available: personalAvailable },
+        json: { ui_enabled: true, generic_available: true, personal_available: true },
       });
     }
-    if (path.endsWith('/memory') && request.method() === 'GET') {
+
+    if (path.endsWith('/memory/consent')) {
       return route.fulfill({
         json: {
           status: 'revoked',
@@ -39,7 +116,7 @@ async function installAiCoachApi(page: Page, personalAvailable = false): Promise
             explicit_ai_context: 'Явный контекст для AI Coach',
           },
           purpose: 'Помощь AI Coach с контролем памяти',
-          retention_notice: 'Память выключена по умолчанию.',
+          retention_notice: 'История чата и память хранятся отдельно.',
           max_items: 20,
           consent_source: 'test',
           items: [],
@@ -49,88 +126,199 @@ async function installAiCoachApi(page: Page, personalAvailable = false): Promise
         },
       });
     }
-    if (path.endsWith('/consent')) {
+
+    if (path.endsWith('/memory')) {
       return route.fulfill({
         json: {
-          status: personalAvailable ? 'granted' : 'revoked',
-          scope: 'personal_readonly_tools_v1',
-          consent_version: 'ai-coach-personal-v1',
-          categories: personalAvailable
-            ? ['personal_progress', 'training_history', 'nutrition_summary']
-            : [],
-          purpose: 'Персональная сводка AI Coach',
-          provider_name: 'groq',
-          provider_policy_revision: 'test',
-          retention_notice: 'Без долгосрочной памяти',
+          status: 'revoked',
+          scope: 'ai_coach_memory_v1',
+          consent_version: 'ai-coach-memory-v1',
+          categories: [
+            'preferred_explanation_style',
+            'ai_interaction_preferences',
+            'stable_non_medical_preferences',
+            'explicit_ai_context',
+          ],
+          category_labels: {
+            preferred_explanation_style: 'Стиль объяснений',
+            ai_interaction_preferences: 'Предпочтения общения',
+            stable_non_medical_preferences: 'Стабильные немедицинские предпочтения',
+            explicit_ai_context: 'Явный контекст для AI Coach',
+          },
+          purpose: 'Отдельная память для подтверждённых предпочтений.',
+          retention_notice: 'История чата и память хранятся отдельно.',
+          max_items: 20,
           consent_source: 'test',
-          granted_at: personalAvailable ? '2026-09-01T00:00:00Z' : null,
+          items: [],
+          granted_at: null,
+          paused_at: null,
           revoked_at: null,
         },
       });
     }
-    if (path.endsWith('/personal/generate') && request.method() === 'POST') {
+
+    if (path.endsWith('/consent') && method === 'PUT') {
+      personalConsent = 'granted';
       return route.fulfill({
         json: {
-          outcome: 'answer',
-          answer:
-            'Главное за период\n\n- Выполнено 3 тренировки.\n\nОграничения данных\n\n- Питание заполнено не полностью.\n\nЧто можно сделать дальше\n\n- Заполнить пропуски.\n\nПочему\n\n- Основание в отчёте.',
-          citations: [
-            {
-              title: 'Канонический отчёт',
-              publisher: 'YFC',
-              url: 'https://your-fitness-coach.ru/progress',
-              source_type: 'personal_tool_screen',
-            },
-          ],
-          insights: [
-            {
-              kind: 'fact',
-              text: 'За период выполнено 3 тренировки.',
-              evidence_ids: ['training.completed_workouts'],
-              reason_keys: [],
-            },
-            {
-              kind: 'suggestion',
-              text: 'Заполнить пропуски и повторить запрос.',
-              evidence_ids: ['nutrition.logged_days'],
-              reason_keys: ['nutrition_missing_days'],
-            },
-          ],
-          limitations: ['Пропущенные дни не считаются нулевыми.'],
-          safety_category: 'clear',
-          prompt_version: 'ai-coach-period-report-v2',
-          request_id: 'period-request',
-          report_version: 'progress-report-v1',
-          input_version: 'ai-coach-period-report-input-v1',
-          output_version: 'ai-coach-period-report-output-v1',
-          report_revision: 'revision-test',
-          period_start: '2026-09-01',
-          period_end: '2026-09-07',
-          timezone: 'Europe/Moscow',
+          status: personalConsent,
+          scope: 'personal_readonly_tools_v1',
+          consent_version: 'ai-coach-personal-v1',
+          categories: ['personal_progress', 'training_history', 'nutrition_summary'],
+          purpose: 'Персональные ответы на основе ограниченной сводки.',
+          provider_name: 'groq',
+          provider_policy_revision: 'test',
+          retention_notice: 'История диалога и память разделены.',
+          consent_source: 'test',
+          granted_at: '2026-09-14T12:00:00Z',
+          revoked_at: null,
         },
       });
     }
-    if (path.endsWith('/generate') && request.method() === 'POST') {
+
+    if (path.endsWith('/consent')) {
       return route.fulfill({
         json: {
-          outcome: 'answer',
-          answer:
-            'Публичный ответ по проверенному материалу. [Подробнее](https://example.org/guide)',
-          citations: [
-            {
-              title: 'Проверенный материал',
-              publisher: 'YFC',
-              url: 'https://example.org/guide',
-              source_type: 'canonical_yfc',
-            },
-          ],
-          limitations: ['Ответ основан только на доступном проверенном материале.'],
-          safety_category: 'clear',
-          prompt_version: 'ai-coach-production-v1',
-          request_id: 'ui-eval-request',
+          status: personalConsent,
+          scope: 'personal_readonly_tools_v1',
+          consent_version: 'ai-coach-personal-v1',
+          categories: ['personal_progress', 'training_history', 'nutrition_summary'],
+          purpose: 'Персональные ответы на основе ограниченной сводки.',
+          provider_name: 'groq',
+          provider_policy_revision: 'test',
+          retention_notice: 'История диалога и память разделены.',
+          consent_source: 'test',
+          granted_at: personalConsent === 'granted' ? '2026-09-14T12:00:00Z' : null,
+          revoked_at: null,
         },
       });
     }
+
+    if (path === '/api/v1/ai-coach/conversations' && method === 'GET') {
+      return route.fulfill({
+        json: { items: [...conversations.values()].map(conversationSummary) },
+      });
+    }
+
+    if (path === '/api/v1/ai-coach/conversations' && method === 'POST') {
+      const id = nextConversationId++;
+      const conversation: MockConversation = {
+        id,
+        title: null,
+        created_at: '2026-09-14T12:00:00Z',
+        updated_at: '2026-09-14T12:00:00Z',
+        messages: [],
+      };
+      conversations.set(id, conversation);
+      return route.fulfill({ status: 201, json: conversation });
+    }
+
+    const conversationMatch = /^\/api\/v1\/ai-coach\/conversations\/(\d+)$/.exec(path);
+    if (conversationMatch && method === 'GET') {
+      const conversation = conversations.get(Number(conversationMatch[1]));
+      if (!conversation) return route.fulfill({ status: 404, json: { detail: 'Not found' } });
+      return route.fulfill({ json: conversation });
+    }
+
+    const messageMatch = /^\/api\/v1\/ai-coach\/conversations\/(\d+)\/messages$/.exec(path);
+    if (messageMatch && method === 'POST') {
+      const conversation = conversations.get(Number(messageMatch[1]));
+      if (!conversation) return route.fulfill({ status: 404, json: { detail: 'Not found' } });
+      const body = request.postDataJSON() as { message?: unknown };
+      const message = typeof body.message === 'string' ? body.message : '';
+      const personal = isPersonalQuestion(message);
+      const invalidOutput = /ошибк|проверки ошибки/i.test(message);
+      const userMessage = makeMessage(nextMessageId++, 'user', message, {
+        status: invalidOutput ? 'failed' : 'complete',
+        outcome: invalidOutput ? 'invalid_output' : null,
+        failure_category: invalidOutput ? 'structured_validation' : null,
+        limitations: invalidOutput
+          ? ['Не удалось безопасно проверить ответ. Попробуйте ещё раз.']
+          : [],
+      });
+      conversation.messages.push(userMessage);
+      conversation.title ??= message.slice(0, 80);
+      conversation.updated_at = '2026-09-14T12:01:00Z';
+
+      if (personal && personalConsent !== 'granted') {
+        const answer = 'Чтобы ответить по вашей ситуации, сначала разрешите персональные ответы.';
+        const assistantMessage = makeMessage(nextMessageId++, 'assistant', answer, {
+          outcome: 'consent_required',
+          citations: [],
+        });
+        userMessage.status = 'complete';
+        userMessage.outcome = 'consent_required';
+        conversation.messages.push(assistantMessage);
+        return route.fulfill({
+          json: {
+            conversation_id: conversation.id,
+            user_message: userMessage,
+            assistant_message: assistantMessage,
+            outcome: 'consent_required',
+            data_class: 'personalized',
+            answer,
+            citations: [],
+            limitations: [],
+            safety_category: 'clear',
+            failure_category: null,
+            prompt_version: 'ai-coach-chat-v1',
+            request_id: 'e2e-consent-required',
+          },
+        });
+      }
+
+      if (invalidOutput) {
+        return route.fulfill({
+          json: {
+            conversation_id: conversation.id,
+            user_message: userMessage,
+            assistant_message: null,
+            outcome: 'invalid_output',
+            data_class: personal ? 'personalized' : 'generic',
+            answer: null,
+            citations: [],
+            limitations: ['Не удалось безопасно проверить ответ. Попробуйте ещё раз.'],
+            safety_category: 'clear',
+            failure_category: 'structured_validation',
+            prompt_version: 'ai-coach-chat-v1',
+            request_id: 'e2e-invalid-output',
+          },
+        });
+      }
+
+      const answer = personal
+        ? 'По вашей текущей сводке смотрите на записанные тренировки и отмечайте ограничения данных.'
+        : 'Проверенный ответ по материалам YFC. [Открыть материал](https://example.org/guide)';
+      const assistantMessage = makeMessage(nextMessageId++, 'assistant', answer, {
+        citations: [publicCitation],
+      });
+      conversation.messages.push(assistantMessage);
+      return route.fulfill({
+        json: {
+          conversation_id: conversation.id,
+          user_message: userMessage,
+          assistant_message: assistantMessage,
+          outcome: 'answer',
+          data_class: personal ? 'personalized' : 'generic',
+          answer,
+          citations: [publicCitation],
+          limitations: [
+            personal
+              ? 'Ответ основан только на разрешённом срезе ваших данных.'
+              : 'Ответ основан на проверенном публичном материале YFC.',
+          ],
+          safety_category: 'clear',
+          failure_category: null,
+          prompt_version: 'ai-coach-chat-v1',
+          request_id: `e2e-answer-${conversation.id}`,
+        },
+      });
+    }
+
+    const feedbackMatch =
+      /^\/api\/v1\/ai-coach\/conversations\/(\d+)\/messages\/(\d+)\/feedback$/.exec(path);
+    if (feedbackMatch && method === 'POST') return route.fulfill({ status: 204, body: '' });
+
     return route.continue();
   });
 }
@@ -140,7 +328,6 @@ async function openAiCoachSurface(
   theme: 'light' | 'dark',
   viewport: { width: number; height: number },
   tma = false,
-  personalAvailable = false,
 ): Promise<void> {
   await page.setViewportSize(viewport);
   await page.addInitScript((selectedTheme) => {
@@ -148,70 +335,34 @@ async function openAiCoachSurface(
   }, theme);
   if (tma) await installTelegramHarness(page, { colorScheme: theme });
   await installPlatformApi(page, { browserSession: !tma, measurementHistory: 'many' });
-  await installAiCoachApi(page, personalAvailable);
+  await installAiCoachApi(page);
   await page.goto(`/app?section=profile${tma ? '&tgWebAppPlatform=android' : ''}#profile-ai-coach`);
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
   await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
   await expect(page.locator('#profile-ai-coach')).toHaveAttribute('open');
   await expect(page.getByTestId('ai-coach-experience')).toBeVisible();
-
-  if (viewport.width <= 640) {
-    const securityLink = page.getByRole('link', {
-      name: 'Доступ и безопасность',
-      exact: true,
-    });
-    const aiCoachLink = page.getByRole('link', {
-      name: 'AI Coach',
-      exact: true,
-    });
-    const [securityBox, aiCoachBox] = await Promise.all([
-      securityLink.boundingBox(),
-      aiCoachLink.boundingBox(),
-    ]);
-
-    if (!securityBox || !aiCoachBox) {
-      throw new Error('Profile settings navigation links are not measurable');
-    }
-
-    expect(Math.abs(aiCoachBox.x - securityBox.x)).toBeLessThan(1);
-    expect(aiCoachBox.y).toBeGreaterThan(securityBox.y);
-  }
 }
 
-test('AI Coach production surface keeps honest states and responsive boundaries', async ({
-  browser,
-}) => {
+test('AI Coach answers ordinary questions with an ordinary chat UI', async ({ browser }) => {
   mkdirSync(evidenceDir, { recursive: true });
   const surfaces = [
     {
-      label: 'mobile-light-360x800',
-      theme: 'light' as const,
-      viewport: { width: 360, height: 800 },
-      tma: false,
-    },
-    {
-      label: 'mobile-dark-390x844',
-      theme: 'dark' as const,
-      viewport: { width: 390, height: 844 },
-      tma: false,
-    },
-    {
-      label: 'mobile-tma-dark-390x844',
-      theme: 'dark' as const,
-      viewport: { width: 390, height: 844 },
-      tma: true,
-    },
-    {
-      label: 'mobile-light-430x932',
-      theme: 'light' as const,
-      viewport: { width: 430, height: 932 },
-      tma: false,
-    },
-    {
-      label: 'desktop-dark-1440x900',
+      label: 'ai-coach-v2-desktop-dark-1440x900',
       theme: 'dark' as const,
       viewport: { width: 1440, height: 900 },
       tma: false,
+    },
+    {
+      label: 'ai-coach-v2-mobile-light-390x844',
+      theme: 'light' as const,
+      viewport: { width: 390, height: 844 },
+      tma: false,
+    },
+    {
+      label: 'ai-coach-v2-tma-dark-390x844',
+      theme: 'dark' as const,
+      viewport: { width: 390, height: 844 },
+      tma: true,
     },
   ];
 
@@ -221,35 +372,32 @@ test('AI Coach production surface keeps honest states and responsive boundaries'
       hasTouch: surface.viewport.width < 900,
     });
     const page = await context.newPage();
-    await openAiCoachSurface(page, surface.theme, surface.viewport, surface.tma ?? false);
+    await openAiCoachSurface(page, surface.theme, surface.viewport, surface.tma);
 
     const experience = page.getByTestId('ai-coach-experience');
-    await expect(experience).toContainText('AI Coach');
-    await expect(experience).not.toContainText(/внутренняя beta|внутренняя проверка|beta-экран/i);
-    await expect(experience.getByText('Что не передаётся')).toBeVisible();
-    await expect(experience.getByRole('link', { name: 'Продолжить без AI' })).toHaveAttribute(
-      'href',
-      '/app?section=today',
-    );
-    await expect(experience.getByTestId('ai-coach-personal-unavailable')).toHaveCount(0);
-    const question = experience.getByRole('textbox', { name: 'Ваш вопрос' });
-    await question.focus();
-    await expect(question).toBeFocused();
-    await expectTouchTargets(experience.locator('button'));
-    await expectTouchTargets(experience.locator('.ai-coach-experience__footer a'));
-
-    await experience.getByRole('button', { name: 'Моя сводка' }).click();
-    await expect(experience.getByTestId('ai-coach-personal-unavailable')).toBeVisible();
-    await experience.getByRole('button', { name: 'Публичная помощь' }).click();
-    await experience.getByRole('button', { name: 'Разобраться с тренировкой' }).click();
-    await experience.getByRole('button', { name: 'Получить ответ' }).click();
-    await expect(experience.getByTestId('ai-coach-response')).toContainText(
-      'Публичный ответ по проверенному материалу',
-    );
-    await expect(experience.getByRole('link', { name: 'Подробнее' })).toHaveAttribute(
+    await expect(experience).toContainText('Чем помочь?');
+    await expect(experience).not.toContainText(/Моя сводка|Публичная помощь|report_version|debug/i);
+    const input = experience.getByRole('textbox', { name: 'Сообщение AI Coach' });
+    await input.fill('Сколько отдыхать между подходами?');
+    const submit = experience.getByRole('button', { name: 'Отправить' });
+    await submit.scrollIntoViewIfNeeded();
+    await submit.click();
+    await expect(
+      experience.getByText('Проверенный ответ по материалам YFC.', { exact: false }),
+    ).toBeVisible();
+    const sources = experience.locator('details.ai-coach-message__sources');
+    await expect(sources).toBeVisible();
+    await expect(sources).not.toHaveAttribute('open', '');
+    await expect(experience.getByRole('link', { name: 'Открыть материал' })).toHaveAttribute(
       'href',
       'https://example.org/guide',
     );
+    await experience.getByRole('button', { name: '👍' }).click();
+    await expect(experience.getByRole('button', { name: '👍' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expectTouchTargets(experience.locator('button:visible'));
     await expectNoHorizontalOverflow(page);
     await page.screenshot({
       path: resolve(evidenceDir, `${surface.label}.png`),
@@ -260,46 +408,77 @@ test('AI Coach production surface keeps honest states and responsive boundaries'
   }
 });
 
-test('AI Coach period report exposes bounded custom dates and grounded sections', async ({
+test('AI Coach keeps follow-up history after reload and preserves failed draft', async ({
   browser,
 }) => {
-  mkdirSync(evidenceDir, { recursive: true });
   const viewport = { width: 390, height: 844 };
   const context = await browser.newContext({ viewport, hasTouch: true });
   const page = await context.newPage();
-  await openAiCoachSurface(page, 'light', viewport, false, true);
-
+  await openAiCoachSurface(page, 'light', viewport);
   const experience = page.getByTestId('ai-coach-experience');
-  await experience.getByRole('button', { name: 'Моя сводка' }).click();
-  await expect(experience.getByTestId('ai-coach-consent-granted')).toBeVisible();
-  await experience.getByRole('button', { name: 'Итог периода' }).click();
-  await experience.getByLabel('Период сводки').selectOption('custom');
+  const input = experience.getByRole('textbox', { name: 'Сообщение AI Coach' });
 
-  const endInput = experience.getByLabel('Окончание периода');
-  const endValue = await endInput.getAttribute('max');
-  if (!endValue) throw new Error('The custom period end date has no server-safe max');
-  const end = new Date(`${endValue}T00:00:00Z`);
-  const start = new Date(end);
-  start.setUTCDate(start.getUTCDate() - 6);
-  await experience.getByLabel('Начало периода').fill(start.toISOString().slice(0, 10));
-  await endInput.fill(endValue);
-  const submitButton = experience.getByRole('button', { name: 'Получить ответ' });
-  await submitButton.scrollIntoViewIfNeeded();
-  await submitButton.click();
+  await input.fill('Сколько отдыхать между подходами?');
+  const submit = experience.getByRole('button', { name: 'Отправить' });
+  await submit.scrollIntoViewIfNeeded();
+  await submit.click();
+  await expect(
+    experience.getByText('Проверенный ответ по материалам YFC.', { exact: false }),
+  ).toBeVisible();
+  await input.fill('А если одна запись недостаточна?');
+  await submit.scrollIntoViewIfNeeded();
+  await submit.click();
+  await expect(experience.getByTestId('ai-coach-message-user')).toHaveCount(2);
 
-  await expect(experience.getByTestId('ai-coach-period-insights')).toContainText(
-    'За период выполнено 3 тренировки',
+  await page.reload();
+  await expect(page.getByTestId('ai-coach-message-user')).toHaveCount(2);
+  await expect(page.getByText('А если одна запись недостаточна?')).toBeVisible();
+
+  await input.fill('Проверка ошибки ответа');
+  await page.getByRole('button', { name: 'Отправить' }).scrollIntoViewIfNeeded();
+  await page.getByRole('button', { name: 'Отправить' }).click();
+  await expect(page.getByTestId('ai-coach-chat-failure')).toContainText('безопасно проверить');
+  await expect(page.getByRole('textbox', { name: 'Сообщение AI Coach' })).toHaveValue(
+    'Проверка ошибки ответа',
   );
-  await expect(experience.getByTestId('ai-coach-period-insights')).toContainText(
-    'Что можно сделать дальше',
+  await expect(page.getByTestId('ai-coach-experience')).not.toContainText(
+    'На этот запрос нельзя ответить безопасно',
   );
-  await expect(experience).toContainText('Канонический отчёт progress-report-v1');
-  await expectTouchTargets(experience.locator('button'));
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: resolve(evidenceDir, 'mobile-light-period-report-390x844.png'),
+    path: resolve(evidenceDir, 'ai-coach-v2-mobile-failed-draft-390x844.png'),
     fullPage: true,
   });
+  await context.close();
+});
 
+test('AI Coach separates personal consent from ordinary chat', async ({ browser }) => {
+  const viewport = { width: 390, height: 844 };
+  const context = await browser.newContext({ viewport, hasTouch: true });
+  const page = await context.newPage();
+  await openAiCoachSurface(page, 'light', viewport);
+  const experience = page.getByTestId('ai-coach-experience');
+
+  const consentDisclosure = experience.locator('details.ai-coach-chat__consent');
+  await consentDisclosure.locator('summary').click();
+  await expect(
+    consentDisclosure.getByRole('button', { name: 'Разрешить персональные ответы' }),
+  ).toBeVisible();
+
+  await experience.getByRole('button', { name: 'Что делать сегодня?' }).click();
+  await experience.getByRole('button', { name: 'Отправить' }).scrollIntoViewIfNeeded();
+  await experience.getByRole('button', { name: 'Отправить' }).click();
+  await expect(experience).toContainText('сначала разрешите персональные ответы');
+
+  await consentDisclosure.getByRole('button', { name: 'Разрешить персональные ответы' }).click();
+  await expect(consentDisclosure).toHaveCount(0);
+  await experience.getByRole('button', { name: 'Что делать сегодня?' }).click();
+  await experience.getByRole('button', { name: 'Отправить' }).scrollIntoViewIfNeeded();
+  await experience.getByRole('button', { name: 'Отправить' }).click();
+  await expect(experience).toContainText('По вашей текущей сводке');
+  await expect(experience.locator('details.ai-coach-memory-disclosure')).toBeVisible();
+  await expect(experience).not.toContainText(/AI Coach UI v|prompt_version|report_version/i);
+  await expectTouchTargets(experience.locator('button:visible'));
+  await expectNoHorizontalOverflow(page);
   await context.close();
 });

@@ -396,6 +396,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-coach/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Conversations */
+        get: operations["get_ai_coach_conversations_api_v1_ai_coach_conversations_get"];
+        put?: never;
+        /** Create Ai Coach Conversation */
+        post: operations["create_ai_coach_conversation_api_v1_ai_coach_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Conversation */
+        get: operations["get_ai_coach_conversation_api_v1_ai_coach_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Ai Coach Conversation */
+        delete: operations["delete_ai_coach_conversation_api_v1_ai_coach_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Ai Coach Conversation Message */
+        post: operations["send_ai_coach_conversation_message_api_v1_ai_coach_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/conversations/{conversation_id}/messages/{message_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Ai Coach Conversation Feedback */
+        post: operations["submit_ai_coach_conversation_feedback_api_v1_ai_coach_conversations__conversation_id__messages__message_id__feedback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai-coach/generate": {
         parameters: {
             query?: never;
@@ -4035,6 +4105,139 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /** AiCoachConversationFeedbackRequest */
+        AiCoachConversationFeedbackRequest: {
+            /**
+             * Value
+             * @enum {string}
+             */
+            value: "helpful" | "not_helpful";
+        };
+        /** AiCoachConversationListResponse */
+        AiCoachConversationListResponse: {
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["AiCoachConversationSummaryResponse"][];
+        };
+        /** AiCoachConversationMessageResponse */
+        AiCoachConversationMessageResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "failed";
+            outcome?: components["schemas"]["AiCoachOutcome"] | null;
+            /** Safety Category */
+            safety_category: string;
+            /** Failure Category */
+            failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "context_failure" | "generation_failure" | "rate_limited") | null;
+            /**
+             * Citations
+             * @default []
+             */
+            citations: components["schemas"]["AiCoachCitation"][];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AiCoachConversationResponse */
+        AiCoachConversationResponse: {
+            /** Id */
+            id: number;
+            /** Title */
+            title?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Messages
+             * @default []
+             */
+            messages: components["schemas"]["AiCoachConversationMessageResponse"][];
+        };
+        /** AiCoachConversationSendRequest */
+        AiCoachConversationSendRequest: {
+            /** Message */
+            message: string;
+        };
+        /** AiCoachConversationSendResponse */
+        AiCoachConversationSendResponse: {
+            /** Conversation Id */
+            conversation_id: number;
+            user_message: components["schemas"]["AiCoachConversationMessageResponse"];
+            assistant_message?: components["schemas"]["AiCoachConversationMessageResponse"] | null;
+            outcome: components["schemas"]["AiCoachOutcome"];
+            data_class: components["schemas"]["AiCoachDataClass"];
+            /** Answer */
+            answer?: string | null;
+            /**
+             * Citations
+             * @default []
+             */
+            citations: components["schemas"]["AiCoachCitation"][];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /** Safety Category */
+            safety_category: string;
+            /** Failure Category */
+            failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "context_failure" | "generation_failure" | "rate_limited") | null;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Request Id */
+            request_id?: string | null;
+        };
+        /** AiCoachConversationSummaryResponse */
+        AiCoachConversationSummaryResponse: {
+            /** Id */
+            id: number;
+            /** Title */
+            title?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Message Count */
+            message_count: number;
+        };
+        /**
+         * AiCoachDataClass
+         * @enum {string}
+         */
+        AiCoachDataClass: "generic" | "personalized" | "unknown";
         /**
          * AiCoachGenerateRequest
          * @description A bounded intent plus a server-known public context id.
@@ -4267,7 +4470,7 @@ export interface components {
         };
         /**
          * AiCoachStatusResponse
-         * @description Safe server-authoritative state for the internal beta UI.
+         * @description Safe server-authoritative state for the AI Coach runtime and UI.
          */
         AiCoachStatusResponse: {
             /** Ui Enabled */
@@ -11488,6 +11691,175 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiCoachStatusResponse"];
+                };
+            };
+        };
+    };
+    get_ai_coach_conversations_api_v1_ai_coach_conversations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationListResponse"];
+                };
+            };
+        };
+    };
+    create_ai_coach_conversation_api_v1_ai_coach_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationResponse"];
+                };
+            };
+        };
+    };
+    get_ai_coach_conversation_api_v1_ai_coach_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ai_coach_conversation_api_v1_ai_coach_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_ai_coach_conversation_message_api_v1_ai_coach_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachConversationSendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationSendResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_ai_coach_conversation_feedback_api_v1_ai_coach_conversations__conversation_id__messages__message_id__feedback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachConversationFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

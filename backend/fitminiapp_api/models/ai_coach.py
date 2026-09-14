@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -126,4 +128,82 @@ class AiCoachMemory(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
-__all__ = ["AiCoachConsent", "AiCoachMemory", "AiCoachMemoryConsent"]
+class AiCoachConversation(Base):
+    """Account-owned conversation shell; separate from durable AI Coach memory."""
+
+    __tablename__ = "ai_coach_conversations"
+    __table_args__ = (
+        Index(
+            "ix_ai_coach_conversations_user_updated",
+            "user_id",
+            "updated_at",
+        ),
+        CheckConstraint(
+            "title IS NULL OR length(title) BETWEEN 1 AND 80",
+            name="ck_ai_coach_conversations_title_length",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=now_msk_naive, onupdate=now_msk_naive
+    )
+
+
+class AiCoachConversationMessage(Base):
+    """Bounded user/assistant text and safe display metadata for one conversation."""
+
+    __tablename__ = "ai_coach_conversation_messages"
+    __table_args__ = (
+        Index(
+            "ix_ai_coach_conversation_messages_conversation_created",
+            "conversation_id",
+            "created_at",
+            "id",
+        ),
+        CheckConstraint(
+            "role IN ('user', 'assistant')",
+            name="ck_ai_coach_conversation_messages_role",
+        ),
+        CheckConstraint(
+            "status IN ('complete', 'failed')",
+            name="ck_ai_coach_conversation_messages_status",
+        ),
+        CheckConstraint(
+            "length(content) BETWEEN 1 AND 1600",
+            name="ck_ai_coach_conversation_messages_content_length",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_coach_conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="complete")
+    outcome: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    safety_category: Mapped[str] = mapped_column(
+        String(48), nullable=False, default="clear", server_default="clear"
+    )
+    failure_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    citations: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False, default=list)
+    limitations: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+
+
+__all__ = [
+    "AiCoachConsent",
+    "AiCoachConversation",
+    "AiCoachConversationMessage",
+    "AiCoachMemory",
+    "AiCoachMemoryConsent",
+]

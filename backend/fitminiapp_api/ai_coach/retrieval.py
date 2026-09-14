@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, date, datetime, timedelta
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.ai_coach.contracts import (
@@ -365,3 +366,125 @@ def retrieve_context(db: Session, request: AiCoachRequest) -> tuple[ContextRef, 
     if ref is None or ref.category not in _JOB_CATEGORIES[request.job]:
         return ()
     return (ref,)
+
+
+_SEARCH_WORD_PATTERN = re.compile(r"[a-zа-яё0-9]{3,}", re.IGNORECASE)
+_SEARCH_STOP_WORDS = frozenset(
+    {
+        "как",
+        "что",
+        "это",
+        "для",
+        "мне",
+        "можно",
+        "почему",
+        "какой",
+        "какая",
+        "какие",
+        "есть",
+        "или",
+        "про",
+        "при",
+        "после",
+        "свой",
+        "свои",
+        "мой",
+        "моя",
+        "мои",
+        "уже",
+        "если",
+        "через",
+    }
+)
+
+
+def _search_words(message: str) -> tuple[str, ...]:
+    normalized = re.sub(r"[^a-zа-яё0-9]+", " ", message.lower())
+    return tuple(
+        word for word in _SEARCH_WORD_PATTERN.findall(normalized) if word not in _SEARCH_STOP_WORDS
+    )[:12]
+
+
+def _page_search_text(page: dict[str, object]) -> str:
+    values: list[str] = []
+    for key in ("title", "description", "heading", "intro", "category"):
+        value = page.get(key)
+        if isinstance(value, str):
+            values.append(value)
+    for key in ("tags", "appContexts", "highlights"):
+        value = page.get(key)
+        if isinstance(value, list):
+            values.extend(item for item in value if isinstance(item, str))
+    return " ".join([*values, _page_content(page)]).lower()
+
+
+def retrieve_context_for_message(
+    db: Session,
+    *,
+    message: str,
+    job: AiCoachJob,
+    max_refs: int = 2,
+) -> tuple[ContextRef, ...]:
+    """Select a small set of reviewed public contexts for an arbitrary chat question.
+
+    The search is deliberately local and deterministic: it reads only the
+    source-controlled public manifest and already-published current articles. It
+    never treats a user-provided URL as a retrieval instruction.
+    """
+
+    if max_refs < 1:
+        return ()
+    words = _search_words(message)
+    allowed_categories = _JOB_CATEGORIES[job]
+    candidates: list[tuple[int, str, ContextRef]] = []
+    for raw_page in public_pages():
+        if not isinstance(raw_page, dict):
+            continue
+        ref = _page_ref(raw_page)
+        if ref is None or ref.category not in allowed_categories:
+            continue
+        search_text = _page_search_text(raw_page)
+        score = sum(
+            (6 if word in search_text else 0)
+            + (3 if len(word) >= 5 and word[:5] in search_text else 0)
+            for word in words
+        )
+        if score:
+            candidates.append((score, ref.ref_id, ref))
+
+    try:
+        articles = (
+            db.query(WebArticle)
+            .filter(WebArticle.status == "published")
+            .order_by(WebArticle.updated_at.desc(), WebArticle.id.desc())
+            .limit(24)
+            .all()
+        )
+    except SQLAlchemyError as exc:
+        raise ContextUnavailable("public_context_unavailable") from exc
+    for article in articles:
+        ref = _article_ref(article, allowed_categories=allowed_categories)
+        if ref is None:
+            continue
+        search_text = " ".join(
+            [article.title, article.description, article.lead, " ".join(article.topics)]
+        ).lower()
+        score = sum(
+            (7 if word in search_text else 0)
+            + (3 if len(word) >= 5 and word[:5] in search_text else 0)
+            for word in words
+        )
+        if score:
+            candidates.append((score, ref.ref_id, ref))
+
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    selected: list[ContextRef] = []
+    used_chars = 0
+    for _score, _ref_id, ref in candidates:
+        if len(selected) >= max_refs:
+            break
+        if used_chars + len(ref.content) > settings.ai_coach_max_context_chars:
+            continue
+        selected.append(ref)
+        used_chars += len(ref.content)
+    return tuple(selected)

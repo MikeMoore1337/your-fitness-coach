@@ -7,7 +7,13 @@ from sqlalchemy.orm import Session
 
 from fitminiapp_api.models.account import AccountDataExport
 from fitminiapp_api.models.acquisition import FirstTouchAttribution
-from fitminiapp_api.models.ai_coach import AiCoachConsent, AiCoachMemory, AiCoachMemoryConsent
+from fitminiapp_api.models.ai_coach import (
+    AiCoachConsent,
+    AiCoachConversation,
+    AiCoachConversationMessage,
+    AiCoachMemory,
+    AiCoachMemoryConsent,
+)
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity, LocalCredential
 from fitminiapp_api.models.billing import Payment, Subscription
@@ -373,6 +379,19 @@ def delete_user_cascade(db: Session, user: User) -> None:
     db.query(AiCoachConsent).filter(AiCoachConsent.user_id == user.id).delete(
         synchronize_session=False
     )
+    conversation_ids = [
+        row.id
+        for row in db.query(AiCoachConversation.id)
+        .filter(AiCoachConversation.user_id == user.id)
+        .all()
+    ]
+    if conversation_ids:
+        db.query(AiCoachConversationMessage).filter(
+            AiCoachConversationMessage.conversation_id.in_(conversation_ids)
+        ).delete(synchronize_session=False)
+        db.query(AiCoachConversation).filter(AiCoachConversation.id.in_(conversation_ids)).delete(
+            synchronize_session=False
+        )
     db.query(AiCoachMemoryConsent).filter(AiCoachMemoryConsent.user_id == user.id).delete(
         synchronize_session=False
     )

@@ -9,7 +9,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.ai_coach.contracts import (
+    AiCoachCitation,
+    AiCoachDataClass,
     AiCoachJob,
+    AiCoachOutcome,
     AiCoachPersonalTool,
     AiCoachResponse,
 )
@@ -174,7 +177,7 @@ class AiCoachMemoryClearResponse(BaseModel):
 
 
 class AiCoachStatusResponse(BaseModel):
-    """Safe server-authoritative state for the internal beta UI."""
+    """Safe server-authoritative state for the AI Coach runtime and UI."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -183,9 +186,104 @@ class AiCoachStatusResponse(BaseModel):
     personal_available: bool
 
 
+ChatFailureCategory = Literal[
+    "provider_failure",
+    "structured_validation",
+    "timeout",
+    "context_failure",
+    "generation_failure",
+    "rate_limited",
+]
+
+
+class AiCoachConversationSummaryResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = Field(..., ge=0)
+
+
+class AiCoachConversationMessageResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=1_600)
+    status: Literal["complete", "failed"]
+    outcome: AiCoachOutcome | None = None
+    safety_category: str = Field(..., min_length=1, max_length=48)
+    failure_category: ChatFailureCategory | None = None
+    citations: tuple[AiCoachCitation, ...] = ()
+    limitations: tuple[str, ...] = ()
+    created_at: datetime
+
+
+class AiCoachConversationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    messages: tuple[AiCoachConversationMessageResponse, ...] = ()
+
+
+class AiCoachConversationListResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: tuple[AiCoachConversationSummaryResponse, ...] = ()
+
+
+class AiCoachConversationSendRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(..., min_length=1, max_length=320)
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
+            raise ValueError("message must be a single safe text value")
+        return normalized
+
+
+class AiCoachConversationFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: Literal["helpful", "not_helpful"]
+
+
+class AiCoachConversationSendResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: int
+    user_message: AiCoachConversationMessageResponse
+    assistant_message: AiCoachConversationMessageResponse | None = None
+    outcome: AiCoachOutcome
+    data_class: AiCoachDataClass
+    answer: str | None = Field(default=None, max_length=1_600)
+    citations: tuple[AiCoachCitation, ...] = ()
+    limitations: tuple[str, ...] = ()
+    safety_category: str = Field(..., min_length=1, max_length=48)
+    failure_category: ChatFailureCategory | None = None
+    prompt_version: str = Field(..., min_length=1, max_length=64)
+    request_id: str | None = Field(default=None, max_length=128)
+
+
 __all__ = [
     "AiCoachConsentResponse",
     "AiCoachConsentUpdateRequest",
+    "AiCoachConversationFeedbackRequest",
+    "AiCoachConversationListResponse",
+    "AiCoachConversationMessageResponse",
+    "AiCoachConversationResponse",
+    "AiCoachConversationSendRequest",
+    "AiCoachConversationSendResponse",
+    "AiCoachConversationSummaryResponse",
     "AiCoachGenerateRequest",
     "AiCoachMemoryClearResponse",
     "AiCoachMemoryConsentUpdateRequest",

@@ -241,6 +241,55 @@ def refusal_text(category: SafetyCategory) -> str:
     return "Я не могу обработать этот запрос в текущем безопасном режиме."
 
 
+def validate_chat_output(answer: str, *, data_class: AiCoachDataClass) -> str:
+    """Validate plain chat text without turning format failures into safety refusals."""
+
+    normalized = unicodedata.normalize("NFKC", answer).strip()
+    if not normalized or len(normalized) > 1_600 or not _CYRILLIC_PATTERN.search(normalized):
+        raise ValueError("chat_answer_format_invalid")
+    if _OUTPUT_BLOCKLIST.search(normalized) or _URL_PATTERN.search(normalized):
+        raise ValueError("chat_answer_contains_untrusted_content")
+    if data_class != AiCoachDataClass.PERSONALIZED and _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(
+        normalized
+    ):
+        raise ValueError("chat_answer_contains_prohibited_claim")
+    if (
+        data_class == AiCoachDataClass.PERSONALIZED
+        and _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(normalized)
+    ):
+        raise ValueError("chat_answer_contains_unsupported_personal_calculation")
+    return normalized
+
+
+def safe_chat_fallback(answer: str, *, data_class: AiCoachDataClass) -> str | None:
+    """Keep safe prose when a provider added removable transport noise.
+
+    A fallback is deliberately narrower than normal validation: it only removes URLs and
+    markdown link wrappers. Any prohibited claim, prompt-injection text, non-Russian output or
+    oversized value is discarded instead of being shown as if it had passed validation.
+    """
+
+    normalized = unicodedata.normalize("NFKC", answer).strip()
+    if not normalized or len(normalized) > 1_600 or not _CYRILLIC_PATTERN.search(normalized):
+        return None
+    if _OUTPUT_BLOCKLIST.search(normalized) or _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(
+        normalized
+    ):
+        return None
+    if (
+        data_class == AiCoachDataClass.PERSONALIZED
+        and _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(normalized)
+    ):
+        return None
+    sanitized = re.sub(r"\[([^\]]{1,120})\]\(https://[^)\s]+\)", r"\1", normalized)
+    sanitized = re.sub(r"https?://[^\s]+", "", sanitized)
+    sanitized = re.sub(r"[ \t]{2,}", " ", sanitized)
+    sanitized = re.sub(r"\n{3,}", "\n\n", sanitized).strip()
+    if not sanitized or len(sanitized) > 1_600 or not _CYRILLIC_PATTERN.search(sanitized):
+        return None
+    return sanitized
+
+
 def validate_provider_output(
     output: ProviderStructuredResponse,
     *,

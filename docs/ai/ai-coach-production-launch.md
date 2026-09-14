@@ -58,17 +58,19 @@ Production policy после нормализации:
 
 ## User-facing и privacy contract
 
-- Public AI Coach принимает только поддерживаемый вопрос и проверенный опубликованный context; он
-  не загружает профиль, дневник, тренировки, trainer notes или историю диалога.
-- `Моя сводка` доступна после отдельного explicit consent и использует только существующие
-  readonly summaries за выбранный период: 7, 30, 90 или bounded custom period.
+- Обычный чат принимает любой поддерживаемый вопрос и использует только выбранный проверенный
+  public context; он не загружает профиль, дневник, тренировки или trainer notes. История текущего
+  разговора хранится отдельно и передаётся provider только в bounded объёме для follow-up.
+- Персональные quick prompts доступны после отдельного explicit consent и используют только
+  существующие readonly summaries за допустимый период.
 - Consent revocation и provider policy revision сохраняют fail-closed поведение.
 - Memory не обязательна. `OFF` не блокирует AI Coach; `ON` принимает только user-confirmed
   разрешённые немедицинские preferences и позволяет пользователю pause/revoke/edit/delete.
 - AI Coach не заменяет врача или тренера, не ставит диагнозы и не меняет canonical data.
 - В telemetry остаются только технические metadata: provider/model, outcome, error class,
   attempts, latency, usage counters и version fields. Raw prompt, answer, personal context и
-  provider secret не сохраняются.
+  provider secret не попадают в логи; account-owned история чата хранится отдельно и удаляется
+  вместе с conversation/account.
 
 ## Failure and rollback
 
@@ -84,8 +86,9 @@ normal PR-based production release для доставки изменения.
 сохранения raw content:
 
 1. authenticated `/api/v1/ai-coach/status` возвращает `ui_enabled=true` и runtime capability;
-2. обычный public question проходит настоящий provider request и отображается в UI;
-3. consent-enabled `Моя сводка` проходит настоящий provider request для 7 и 30 дней;
+2. обычный вопрос проходит настоящий provider request, отображается в chat UI и переживает reload;
+3. consent-enabled personal quick prompt проходит настоящий provider request для разрешённой
+   сводки;
 4. memory OFF и ON остаются рабочими и не расширяют context contract;
 5. safe failure path не ломает приложение, а UI не показывает internal-beta copy;
 6. `/health/live` и `/health/ready` остаются healthy после smoke.
