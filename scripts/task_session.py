@@ -393,6 +393,18 @@ class GitRepository:
     def head(self, *, cwd: Path | None = None) -> str:
         return self.git("rev-parse", "HEAD", cwd=cwd)
 
+    def current_branch(self, *, cwd: Path | None = None) -> str | None:
+        result = _run(
+            ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
+            cwd=cwd or self.current_worktree,
+            check=False,
+        )
+        branch = result.stdout.strip()
+        return branch or None
+
+    def fast_forward_current(self, target: str, *, cwd: Path | None = None) -> None:
+        self.git("merge", "--ff-only", target, cwd=cwd or self.current_worktree)
+
     def is_ancestor(self, ancestor: str, descendant: str) -> bool:
         result = _run(
             ["git", "merge-base", "--is-ancestor", ancestor, descendant],
@@ -3845,6 +3857,22 @@ class TaskController:
             raise TaskSessionError("finish cleanup must run from the canonical repository worktree")
         if self.repository.ref("origin/master") != deployed_sha:
             raise TaskSessionError("finish requires current origin/master at deployed SHA")
+        if self.repository.current_branch(cwd=root) != "master":
+            raise TaskSessionError("finish cleanup requires canonical worktree on local master")
+        local_master_was_stale = self.repository.ref("master") != deployed_sha
+        if local_master_was_stale:
+            if not self.repository.is_ancestor(self.repository.ref("master"), deployed_sha):
+                raise TaskSessionError(
+                    "finish refuses to fast-forward local master because it diverged from deployed master"
+                )
+            try:
+                self.repository.fast_forward_current("origin/master", cwd=root)
+            except Exception as error:
+                raise TaskSessionError(
+                    f"finish could not fast-forward local master to deployed master: {error}"
+                ) from error
+            if self.repository.ref("master") != deployed_sha:
+                raise TaskSessionError("finish local master did not reach deployed master")
         branches = [
             line.removeprefix("refs/heads/")
             for line in self.repository.git(
@@ -3858,15 +3886,28 @@ class TaskController:
             if item.path == worktree_path
             or (item.branch and item.branch.startswith(f"task/{expected}-"))
         ]
-        if branches != [branch] or len(matches) != 1 or matches[0].branch != branch:
+        if branches != [branch] or len(matches) > 1:
             raise TaskSessionError(
                 "finish cleanup requires exactly one matching task branch/worktree"
             )
-        if self.repository.ref(branch) != expected_head or matches[0].head != expected_head:
+        worktree_registered = len(matches) == 1
+        if worktree_registered and (
+            matches[0].branch != branch or matches[0].path != worktree_path
+        ):
+            raise TaskSessionError(
+                "finish cleanup requires exactly one matching task branch/worktree"
+            )
+        if not worktree_registered and worktree_path.exists():
+            raise TaskSessionError(
+                "finish cleanup found an unregistered task worktree at the expected path"
+            )
+        if self.repository.ref(branch) != expected_head or (
+            worktree_registered and matches[0].head != expected_head
+        ):
             raise TaskSessionError("finish cleanup branch/worktree head changed after readiness")
-        if self.repository.status(worktree_path):
+        if worktree_registered and self.repository.status(worktree_path):
             raise TaskSessionError(f"finish cleanup refuses dirty task worktree {worktree_path}")
-        operations = self.repository.operation_issues(worktree_path)
+        operations = self.repository.operation_issues(worktree_path) if worktree_registered else []
         if operations:
             raise TaskSessionError(
                 f"finish cleanup refuses interrupted Git operation: {operations}"
@@ -3891,7 +3932,8 @@ class TaskController:
             "cleanup_errors"
         ):
             raise TaskSessionError("finish artifact cleanup stopped fail-closed")
-        self.repository.remove_worktree(worktree_path)
+        if worktree_registered:
+            self.repository.remove_worktree(worktree_path)
         if self.repository.ref(branch) != expected_head:
             raise TaskSessionError("finish cleanup branch changed after worktree removal")
         self.repository.delete_local_branch(branch)
@@ -3915,7 +3957,12 @@ class TaskController:
                 )
             history["state"] = "finished"
             history["finished_at"] = utc_now()
-            history["cleanup"] = {"worktree": str(worktree_path), "branch": branch}
+            history["cleanup"] = {
+                "worktree": str(worktree_path),
+                "branch": branch,
+                "worktree_already_removed": not worktree_registered,
+                "local_master_fast_forwarded": local_master_was_stale,
+            }
             history["artifact_cleanup"] = artifact_cleanup
             StateStore.replace_json(history_path, history)
             lease_path.unlink()
@@ -3931,6 +3978,8 @@ class TaskController:
             "cleanup_performed": True,
             "removed_worktree": str(worktree_path),
             "deleted_local_branch": branch,
+            "worktree_already_removed": not worktree_registered,
+            "local_master_fast_forwarded": local_master_was_stale,
         }
 
 

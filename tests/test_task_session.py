@@ -288,6 +288,20 @@ def _advance_remote_master(root: Path, count: int, *, fetch: bool = True) -> tup
     return old_sha, new_sha
 
 
+def _publish_task_merge_without_advancing_local_master(root: Path, branch: str) -> str:
+    base_sha = _git(root, "rev-parse", "master")
+    remote_worktree = root.parent / f"remote-task-merge-{uuid.uuid4().hex[:8]}"
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), base_sha)
+    try:
+        _git(remote_worktree, "merge", "--no-ff", branch, "-m", f"Merge {branch}")
+        merge_sha = _git(remote_worktree, "rev-parse", "HEAD")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    _git(root, "fetch", "origin", "master")
+    return merge_sha
+
+
 def _prepare_delivery(controller: Any, task_id: str, *, branch: str) -> dict[str, Any]:
     del branch
     acquired = controller.acquire_delivery(task_id)
@@ -2073,6 +2087,93 @@ def test_finish_preserves_active_delivery_artifacts_until_worker_cleanup(
     assert (
         controller.store.read_json(controller.store.history / "task-207.json")["state"]
         == "finished"
+    )
+
+
+def test_finish_fast_forwards_stale_local_master_before_cleanup(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "207A"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready("207A", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _prepare_delivery(controller, "207A", branch=branch)
+    merge_sha = _publish_task_merge_without_advancing_local_master(root, branch)
+    assert git_repository.ref("master") == base_sha
+    assert git_repository.ref("origin/master") == merge_sha
+
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    github.pulls[207] = _task_pr(207, "207A", base_sha, head_sha, merge_sha=merge_sha)
+    github.commits[207] = [_task_commit("207A")]
+    github.files[207] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.successful_deployments.add((merge_sha, "production"))
+    controller.record_production_success(
+        "207A", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
+    )
+
+    result = controller.finish("207A")
+
+    assert result["local_master_fast_forwarded"] is True
+    assert result["worktree_already_removed"] is False
+    assert git_repository.ref("master") == merge_sha
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
+
+
+def test_finish_recovers_after_worktree_removed_before_branch_cleanup(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "207B"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready("207B", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _prepare_delivery(controller, "207B", branch=branch)
+    merge_sha = _publish_task_merge_without_advancing_local_master(root, branch)
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    github.pulls[207] = _task_pr(207, "207B", base_sha, head_sha, merge_sha=merge_sha)
+    github.commits[207] = [_task_commit("207B")]
+    github.files[207] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.successful_deployments.add((merge_sha, "production"))
+    controller.record_production_success(
+        "207B", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
+    )
+
+    original_delete = git_repository.delete_local_branch
+    calls = 0
+
+    def fail_once(task_branch: str) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise task_session.TaskSessionError("simulated cleanup race")
+        original_delete(task_branch)
+
+    monkeypatch.setattr(git_repository, "delete_local_branch", fail_once)
+    with pytest.raises(task_session.TaskSessionError, match="simulated cleanup race"):
+        controller.finish("207B")
+
+    assert not worktree.exists()
+    assert git_repository.ref_exists(branch)
+    assert controller.store.read_json(controller.store.history / "task-207B.json")["state"] == (
+        "production-success"
+    )
+
+    result = controller.finish("207B")
+
+    assert result["worktree_already_removed"] is True
+    assert result["local_master_fast_forwarded"] is False
+    assert not git_repository.ref_exists(branch)
+    assert not controller.store.task_lease_path("207B").exists()
+    assert controller.store.read_json(controller.store.history / "task-207B.json")["state"] == (
+        "finished"
     )
 
 

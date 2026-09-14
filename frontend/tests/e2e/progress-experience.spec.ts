@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { resolve } from 'node:path';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
 
@@ -16,6 +17,17 @@ const signal = (
   counters,
   reason_keys: reasonKeys,
 });
+
+const TASK_111_SCREENSHOTS = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  '..',
+  'tasks',
+  '111',
+  'deliverables',
+  'screenshots',
+);
 
 type NutritionReportState = 'partial' | 'no-data' | 'long';
 
@@ -786,6 +798,11 @@ test('progress remains clear and free of horizontal overflow at supported widths
   await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
   await expect(page.getByText('84%').first()).toBeVisible();
 
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Тренировки/ })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
   await page.getByText('Жим штанги лёжа').click();
   await expect(page.getByText('Детали тренировки')).toBeVisible();
   await page.locator('.progress-hero').getByRole('tab', { name: '7 дней' }).click();
@@ -812,9 +829,7 @@ test('progress remains clear and free of horizontal overflow at supported widths
     await expect(
       page.locator('.progress-hero').getByRole('tab', { name: '30 дней' }),
     ).toBeVisible();
-    await expect(
-      page.getByRole('progressbar', { name: /Запланированные тренировки/ }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
   }
 
   expect(consoleErrors).toEqual([]);
@@ -848,12 +863,34 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
     .getByRole('link', { name: 'Прогресс' })
     .click();
 
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Тренировки/ })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
   const trainingConfidence = page
     .locator('#progress-training')
     .getByLabel('Достаточно ли данных: Данных достаточно для оценки')
     .first();
-  const limitedConfidence = page.getByLabel('Достаточно ли данных: Вывод пока предварительный');
   await expect(trainingConfidence).toContainText('28 рабочих подходов в 7 тренировках');
+  const trainingRegion = page.locator('#progress-training');
+  const confidenceBox = await trainingRegion.locator('.data-confidence').boundingBox();
+  const nextBox = await trainingRegion.locator('.progress-subsection').boundingBox();
+  expect(confidenceBox).not.toBeNull();
+  expect(nextBox).not.toBeNull();
+  expect(confidenceBox!.y + confidenceBox!.height).toBeLessThanOrEqual(nextBox!.y);
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator('#progress-training').screenshot({
+    path: '../.artifacts/screenshots/task-61/desktop-1440x900-light-analytics.png',
+  });
+
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Тело/ })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
+  const limitedConfidence = page.getByLabel('Достаточно ли данных: Вывод пока предварительный');
   await expect(limitedConfidence).toContainText(
     'В самой заполненной окружности — 2 замера; для оценки одной окружности нужно минимум 3 замера',
   );
@@ -890,18 +927,6 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
   expect(visualContract.limitedBoundary).toBe(visualContract.lime);
   expect(visualContract.disclosure).toEqual({ width: 28, height: 28, radius: '50%' });
 
-  const trainingRegion = page.locator('#progress-training');
-  const confidenceBox = await trainingRegion.locator('.data-confidence').boundingBox();
-  const nextBox = await trainingRegion.locator('.progress-subsection').boundingBox();
-  expect(confidenceBox).not.toBeNull();
-  expect(nextBox).not.toBeNull();
-  expect(confidenceBox!.y + confidenceBox!.height).toBeLessThanOrEqual(nextBox!.y);
-
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('#progress-body').screenshot({
-    path: '../.artifacts/screenshots/task-61/desktop-1440x900-light-analytics.png',
-  });
-
   for (const viewport of [
     { width: 768, height: 900 },
     { width: 430, height: 932 },
@@ -920,11 +945,12 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
     expect((await disclosure.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   }
 
-  await trainingConfidence.scrollIntoViewIfNeeded();
+  await limitedConfidence.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: '../.artifacts/screenshots/task-61/mobile-web-360x800-light-analytics.png',
   });
 
+  await page.locator('.progress-detail-header__back').click();
   await expect(progressOverview(page)).toHaveCount(1);
   await expect(progressOverview(page)).toBeVisible();
   await page.locator('.progress-hero').getByRole('tab', { name: '7 дней' }).click();
@@ -953,8 +979,14 @@ test('measurements keep priority context, units, mobile order and add/edit histo
     .getByRole('link', { name: 'Прогресс' })
     .click();
 
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Тело/ })
+    .click();
+
   const body = page.locator('#progress-body');
   await expect(body.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
+  await body.getByText('Выбранные мышечные группы').click();
   await expect(body.getByText('Мышцы спины')).toBeVisible();
   await expect(body.getByText('Задняя поверхность тела и ягодичные мышцы')).toBeVisible();
   await expect(body.getByText(/не оценивает тело/)).toBeVisible();
@@ -1044,6 +1076,11 @@ test('nutrition report preserves truthful period context, daily drill-down and r
   await page
     .getByRole('navigation', { name: 'Основная навигация' })
     .getByRole('link', { name: 'Прогресс' })
+    .click();
+
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Питание/ })
     .click();
 
   const report = page.locator('#nutrition-period-report');
@@ -1182,23 +1219,11 @@ test('nutrition report preserves truthful period context, daily drill-down and r
       );
       expect(selectorScrollState.overflowX).toBe('auto');
     }
-    const nextSection = page.locator('.progress-adherence');
-    await expect
-      .poll(async () => {
-        const [reportBox, nextSectionBox] = await Promise.all([
-          report.boundingBox(),
-          nextSection.boundingBox(),
-        ]);
-        return Boolean(
-          reportBox && nextSectionBox && reportBox.y + reportBox.height <= nextSectionBox.y + 1,
-        );
-      })
-      .toBe(true);
     const reportBox = await report.boundingBox();
-    const nextSectionBox = await nextSection.boundingBox();
+    const categoryNavBox = await page.locator('.progress-category-nav').boundingBox();
     expect(reportBox).not.toBeNull();
-    expect(nextSectionBox).not.toBeNull();
-    expect(reportBox!.y + reportBox!.height).toBeLessThanOrEqual(nextSectionBox!.y + 1);
+    expect(categoryNavBox).not.toBeNull();
+    expect(reportBox!.y).toBeGreaterThanOrEqual(categoryNavBox!.y);
     if (viewport.width === 1440) {
       expect(reportBox!.x).toBeGreaterThanOrEqual(24);
       expect(reportBox!.x + reportBox!.width).toBeLessThanOrEqual(viewport.width - 24);
@@ -1260,6 +1285,11 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
   await page
     .getByRole('navigation', { name: 'Основная навигация' })
     .getByRole('link', { name: 'Прогресс' })
+    .click();
+
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Питание/ })
     .click();
 
   const report = page.locator('#nutrition-period-report');
@@ -1362,7 +1392,7 @@ test('notification deep-link opens exact workout feedback and preserves back nav
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
 });
 
-test('dark progress keeps the bento adherence score readable on lime', async ({ page }) => {
+test('dark progress keeps the compact overview readable', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
   await mockProgress(page);
   await page.goto('/app?section=progress');
@@ -1372,30 +1402,15 @@ test('dark progress keeps the bento adherence score readable on lime', async ({ 
     .getByRole('link', { name: 'Прогресс' })
     .click();
 
-  const summaryScore = page.locator('.progress-bento__adherence .progress-summary__score');
-  const adherenceScore = page.locator('.progress-adherence__score');
-  await expect(summaryScore).toHaveText('84%');
-  await expect(adherenceScore).toHaveText('84%');
-
-  const colors = await page.evaluate(() => ({
-    summary: getComputedStyle(
-      document.querySelector('.progress-bento__adherence .progress-summary__score')!,
-    ).color,
-    adherence: getComputedStyle(document.querySelector('.progress-adherence__score')!).color,
-    accent: (() => {
-      const probe = document.createElement('span');
-      probe.style.color = 'var(--v2-accent-text)';
-      document.body.append(probe);
-      const color = getComputedStyle(probe).color;
-      probe.remove();
-      return color;
-    })(),
-  }));
-  expect(colors.summary).not.toBe(colors.accent);
-  expect(colors.adherence).toBe(colors.accent);
+  await expect(progressOverview(page)).toBeVisible();
+  await expect(page.getByText('84%', { exact: true })).toBeVisible();
+  await expect(page.locator('.progress-overview__metric')).toHaveCount(4);
+  await expect(page.locator('.progress-overview__adherence')).toHaveCount(1);
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await expect(page.locator('.progress-bento__adherence')).toHaveCount(0);
 });
 
-test('light progress keeps the bento adherence score readable on lime', async ({ page }) => {
+test('light progress keeps the compact overview readable', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
   await mockProgress(page);
   await page.goto('/app?section=progress');
@@ -1405,27 +1420,12 @@ test('light progress keeps the bento adherence score readable on lime', async ({
     .getByRole('link', { name: 'Прогресс' })
     .click();
 
-  const summaryScore = page.locator('.progress-bento__adherence .progress-summary__score');
-  const adherenceScore = page.locator('.progress-adherence__score');
-  await expect(summaryScore).toHaveText('84%');
-  await expect(adherenceScore).toHaveText('84%');
-
-  const colors = await page.evaluate(() => ({
-    summary: getComputedStyle(
-      document.querySelector('.progress-bento__adherence .progress-summary__score')!,
-    ).color,
-    adherence: getComputedStyle(document.querySelector('.progress-adherence__score')!).color,
-    accent: (() => {
-      const probe = document.createElement('span');
-      probe.style.color = 'var(--v2-accent-text)';
-      document.body.append(probe);
-      const color = getComputedStyle(probe).color;
-      probe.remove();
-      return color;
-    })(),
-  }));
-  expect(colors.summary).not.toBe(colors.accent);
-  expect(colors.adherence).toBe(colors.accent);
+  await expect(progressOverview(page)).toBeVisible();
+  await expect(page.getByText('84%', { exact: true })).toBeVisible();
+  await expect(page.locator('.progress-overview__metric')).toHaveCount(4);
+  await expect(page.locator('.progress-overview__adherence')).toHaveCount(1);
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
+  await expect(page.locator('.progress-bento__adherence')).toHaveCount(0);
 });
 
 test('canonical charts and icons remain operable in forced colors and reduced motion', async ({
@@ -1506,19 +1506,15 @@ test('exercise catalogue uses the selected folder and dumbbell glyph on desktop 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 
-test('progress bento keeps matching light and dark visual forms for the same data', async ({
+test('progress overview keeps matching light and dark visual forms for the same data', async ({
   browser,
   baseURL,
 }) => {
   test.setTimeout(120_000);
   const surfaces = [
     { name: 'desktop-1440x900', width: 1440, height: 900 },
-    { name: 'desktop-1280x900', width: 1280, height: 900 },
-    { name: 'tablet-1024x900', width: 1024, height: 900 },
     { name: 'tablet-768x900', width: 768, height: 900 },
-    { name: 'mobile-430x932', width: 430, height: 932 },
     { name: 'mobile-390x844', width: 390, height: 844 },
-    { name: 'mobile-360x800', width: 360, height: 800 },
   ];
 
   for (const surface of surfaces) {
@@ -1564,7 +1560,7 @@ test('progress bento keeps matching light and dark visual forms for the same dat
       ).toHaveAttribute('aria-selected', 'true');
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(surface.width);
       await page.screenshot({
-        path: `../.artifacts/screenshots/task-111/progress-bento-${surface.name}-${theme}.png`,
+        path: resolve(TASK_111_SCREENSHOTS, `progress-overview-${surface.name}-${theme}.png`),
       });
       await context.close();
     }

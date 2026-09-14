@@ -6,6 +6,17 @@ export type ProgressSelection =
   | { kind: 'preset'; days: ProgressPeriodDays }
   | { kind: 'custom'; dateFrom: string; dateTo: string };
 
+export const PROGRESS_DETAIL_VIEWS = [
+  'body',
+  'training',
+  'nutrition',
+  'cardio',
+  'wellbeing',
+  'history',
+] as const;
+export type ProgressDetailView = (typeof PROGRESS_DETAIL_VIEWS)[number];
+export type ProgressView = 'overview' | ProgressDetailView;
+
 export const progressPeriodOptions = [
   { value: '7', label: '7 дней' },
   { value: '30', label: '30 дней' },
@@ -36,6 +47,24 @@ export function parseProgressSelection(search: string): ProgressSelection {
     }
   }
   return { kind: 'preset', days: 30 };
+}
+
+function isProgressDetailView(value: string | null): value is ProgressDetailView {
+  return value != null && PROGRESS_DETAIL_VIEWS.includes(value as ProgressDetailView);
+}
+
+export function parseProgressView(search: string, hash = ''): ProgressView {
+  const params = new URLSearchParams(search);
+  const explicit = params.get('progress_view');
+  if (isProgressDetailView(explicit)) return explicit;
+
+  if (params.has('workout_id') || params.has('program_history')) return 'history';
+  if (params.get('weekly_review') === '1') return 'wellbeing';
+  if (params.get('focus') === 'measurements' || hash === '#progress-body') return 'body';
+  if (params.get('cardio') === '1' || hash === '#progress-cardio') return 'cardio';
+  if (hash === '#progress-training') return 'training';
+  if (hash === '#progress-nutrition' || hash === '#progress-reports') return 'nutrition';
+  return 'overview';
 }
 
 export function progressSelectionKey(selection: ProgressSelection): string {
@@ -76,6 +105,15 @@ export function progressPath(search: string, selection: ProgressSelection): stri
     url.searchParams.set('progress_to', selection.dateTo);
   }
   return `${url.pathname}${url.search}${url.hash}`;
+}
+
+export function progressViewPath(search: string, view: ProgressView, hash = ''): string {
+  const url = new URL(`${window.location.pathname}${search}${hash}`, window.location.origin);
+  url.searchParams.set('section', 'progress');
+  if (view === 'overview') url.searchParams.delete('progress_view');
+  else url.searchParams.set('progress_view', view);
+  url.hash = '';
+  return `${url.pathname}${url.search}`;
 }
 
 export function progressReportPath(selection: ProgressSelection): string {

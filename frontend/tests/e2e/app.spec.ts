@@ -2570,6 +2570,10 @@ test('поля адаптируются к разным iPhone, а пример 
   await page.getByRole('button', { name: 'Клиент' }).click();
 
   await openAppDestination(page, 'Прогресс');
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Тело Вес и окружности$/ })
+    .click();
   const measurementForm = page.locator('.measurement-diary__form');
   const dateField = measurementForm.locator('input[type="date"]');
   const weightField = measurementForm.getByLabel('Вес, кг');
@@ -2909,6 +2913,10 @@ test('сенсорное поле даты сохраняет нативный �
     await page.goto('/app');
     await page.getByRole('button', { name: 'Клиент' }).click();
     await openAppDestination(page, 'Прогресс');
+    await page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('link', { name: /^Тело Вес и окружности$/ })
+      .click();
     const dateField = page.getByLabel('Дата');
     const dateControl = page.locator('.diary-date-control');
     await expect(dateField).toHaveAttribute('type', 'date');

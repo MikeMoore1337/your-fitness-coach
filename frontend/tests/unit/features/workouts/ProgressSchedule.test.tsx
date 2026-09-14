@@ -325,9 +325,14 @@ describe('ProgressSchedule', () => {
   it('shows progress and sends a reschedule request', async () => {
     renderPanel();
 
-    expect((await screen.findAllByText('80%')).length).toBeGreaterThan(1);
+    expect(await screen.findByText('80%', { exact: true })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Прогресс' })).toBeInTheDocument();
-    expect(screen.getByText('Замеров за этот период нет')).toBeInTheDocument();
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('link', {
+        name: /^Тело/,
+      }),
+    );
+    expect(await screen.findByText('Мало данных для динамики')).toBeVisible();
     expect(screen.getByText('Тренировка A')).toBeInTheDocument();
     expect(screen.getByText('Запланирована')).toBeInTheDocument();
     expect(screen.queryByText('planned')).not.toBeInTheDocument();

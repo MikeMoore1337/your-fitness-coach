@@ -1,7 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { installTelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
-import { progressOverview } from './fixtures/locators';
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
 const captureVisualImpactFix = env?.YFC_CAPTURE_PULSE_VISUAL_IMPACT === '1';
@@ -272,7 +271,7 @@ test('frequent current action feedback is interruptible, repeatable and reduced-
   ).toBe(0);
 });
 
-test('weight bento trend keeps smooth truthful geometry, area fill and measurement alternative', async ({
+test('body trend keeps smooth truthful geometry, area fill and measurement alternative', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -281,8 +280,9 @@ test('weight bento trend keeps smooth truthful geometry, area fill and measureme
     measurementHistory: 'many',
     workoutStatus: 'completed',
   });
-  await page.goto('/app?section=progress');
-  const insight = progressOverview(page).locator('.progress-bento__trend');
+  await page.goto('/app?section=progress&progress_view=body');
+  const body = page.getByRole('region', { name: 'Замеры и приоритеты', exact: true });
+  const insight = body.locator('.progress-trend-panel').first();
   await insight.scrollIntoViewIfNeeded();
   const chart = insight.locator('.data-viz-chart');
   await expect(chart).toBeVisible();
@@ -323,8 +323,9 @@ test('weight bento trend keeps smooth truthful geometry, area fill and measureme
   }
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/app?section=progress');
-  const desktopInsight = progressOverview(page).locator('.progress-bento__trend');
+  await page.goto('/app?section=progress&progress_view=body');
+  const desktopBody = page.getByRole('region', { name: 'Замеры и приоритеты', exact: true });
+  const desktopInsight = desktopBody.locator('.progress-trend-panel').first();
   await desktopInsight.scrollIntoViewIfNeeded();
   await expect(desktopInsight.locator('.data-viz-chart__area')).toHaveCount(1);
   if (capture) {
@@ -343,9 +344,10 @@ test('mocked TMA dark uses the same chart and safe-area floating dock', async ({
     safeAreaInset: { top: 22, right: 2, bottom: 24, left: 2 },
   });
   await installPlatformApi(page, { measurementHistory: 'many', workoutStatus: 'completed' });
-  await page.goto('/app?section=progress');
+  await page.goto('/app?section=progress&progress_view=body');
   const dock = page.locator('#appBottomNav');
-  const insight = progressOverview(page).locator('.progress-bento__trend');
+  const body = page.getByRole('region', { name: 'Замеры и приоритеты', exact: true });
+  const insight = body.locator('.progress-trend-panel').first();
   await insight.scrollIntoViewIfNeeded();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await expect(insight.locator('.data-viz-chart__area')).toHaveCount(1);
