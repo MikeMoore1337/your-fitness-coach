@@ -318,11 +318,38 @@
 .landing-start__demo h3 {
   font-size: 32px;
 }
+.landing-start__demo-copy {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+.landing-start__demo-copy h3,
+.landing-start__demo-copy p,
+.landing-start__demo-copy small {
+  margin: 0;
+}
+.landing-start__demo-copy > p:not(.landing-kicker):not(.landing-start__demo-boundary) {
+  max-width: 48ch;
+}
+.landing-start__demo-copy > small {
+  color: var(--landing-muted);
+  font-size: 12px;
+}
+.landing-start__demo-boundary {
+  max-width: 54ch;
+  color: var(--landing-muted);
+  font-size: 13px;
+}
+.landing-start__demo-cta {
+  width: fit-content;
+  margin-top: 4px;
+}
 .landing-start__demo nav {
   display: grid;
 }
 .landing-start__demo nav > a {
   display: flex;
+  align-items: flex-start;
   gap: 20px;
   padding: 20px 0;
   color: inherit;
@@ -335,6 +362,11 @@
 .landing-start__demo nav p {
   font-size: 13px;
   color: var(--landing-muted);
+}
+.landing-start__demo nav small {
+  margin-top: 8px;
+  color: var(--landing-muted);
+  font-size: 11px;
 }
 .landing-start__demo nav small,
 .landing-start__demo nav strong {
@@ -490,6 +522,9 @@
   .landing-practice {
     padding: 32px 16px;
     gap: 20px;
+  }
+  .landing-start__demo-cta {
+    width: 100%;
   }
 }
 @media (prefers-reduced-motion: reduce) {

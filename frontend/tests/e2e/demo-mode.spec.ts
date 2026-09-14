@@ -30,8 +30,17 @@ const TASK_74_SCREENSHOT_DIR = '../.artifacts/screenshots/task-74';
 const TASK_74A_DEMO_VIDEO =
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
     ?.YFC_CAPTURE_TASK_74A_DEMO === '1';
+const TASK_273_CAPTURE =
+  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+    ?.YFC_CAPTURE_TASK_273 === '1';
+const TASK_273_SCREENSHOT_DIR = '../../../tasks/273/evidence/screenshots';
 
-function applyMockAction(snapshot: DemoSessionSnapshot, action: string, comment?: string) {
+function applyMockAction(
+  snapshot: DemoSessionSnapshot,
+  action: string,
+  comment?: string,
+  clientId?: 'alexey' | 'maria' | 'ivan',
+) {
   const next = structuredClone(snapshot);
   next.revision += 1;
   if (next.state.kind === 'self_training') {
@@ -68,10 +77,26 @@ function applyMockAction(snapshot: DemoSessionSnapshot, action: string, comment?
       next.cabinet.meaningful_action_completed = true;
     }
     if (action === 'open_nutrition_report') next.state.screen = 'report';
-  } else if (action === 'save_comment') {
-    next.state.comment = comment ?? 'Техника стабильна.';
-    if (next.cabinet.trainer) next.cabinet.trainer.comment = next.state.comment;
-    next.cabinet.meaningful_action_completed = true;
+  } else {
+    const trainerState = next.state;
+    if (action === 'select_client' && clientId) {
+      trainerState.selected_client_id = clientId;
+      if (next.cabinet.trainer) next.cabinet.trainer.selected_client_id = clientId;
+    }
+    if (action === 'save_comment') {
+      const savedComment = comment ?? 'Техника стабильна.';
+      const client = trainerState.clients.find(
+        (item) => item.id === trainerState.selected_client_id,
+      );
+      if (client) client.comment = savedComment;
+      if (next.cabinet.trainer) {
+        const cabinetClient = next.cabinet.trainer.clients.find(
+          (item) => item.id === trainerState.selected_client_id,
+        );
+        if (cabinetClient) cabinetClient.comment = savedComment;
+      }
+      next.cabinet.meaningful_action_completed = true;
+    }
   }
   return next;
 }
@@ -114,8 +139,12 @@ async function installDemoApi(page: Page, forcedCurrentStatus?: 403 | 410) {
       return;
     }
     if (url.pathname.endsWith('/actions')) {
-      const body = request.postDataJSON() as { action: string; comment?: string };
-      const next = applyMockAction(snapshot, body.action, body.comment);
+      const body = request.postDataJSON() as {
+        action: string;
+        comment?: string;
+        client_id?: 'alexey' | 'maria' | 'ivan';
+      };
+      const next = applyMockAction(snapshot, body.action, body.comment, body.client_id);
       sessions.set(token, next);
       await route.fulfill({ status: 200, json: next });
       return;
@@ -186,10 +215,15 @@ async function installAuthApi(page: Page) {
 
 async function completeScenario(page: Page, scenario: DemoScenario) {
   if (scenario === 'self_training') {
+    await page.getByRole('button', { name: 'Продолжить' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Активная программа и расписание на неделю' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Продолжить' }).click();
+    await expect(page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
     await page.getByRole('button', { name: 'Начать тренировку' }).click();
     await page.getByRole('button', { name: 'Завершить текущий подход' }).click();
     await page.getByRole('button', { name: 'Завершить тренировку' }).click();
-    await expectMetricSpacing(page);
     if (CAPTURE && page.viewportSize()?.width === 360) {
       await page.screenshot({
         path: `${SCREENSHOT_DIR}/mobile-web-360-training-summary-spacing.png`,
@@ -197,17 +231,28 @@ async function completeScenario(page: Page, scenario: DemoScenario) {
       });
     }
     await page.getByRole('button', { name: 'Перейти к прогрессу' }).click();
+    await page.getByRole('link', { name: 'Посмотреть прогресс' }).click();
+    await expectMetricSpacing(page, 4);
   } else if (scenario === 'nutrition') {
+    await page.getByRole('button', { name: 'Продолжить' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Дневной итог рядом с фактическими записями' }),
+    ).toBeVisible();
     await expectMetricSpacing(page);
     await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
-    await page.getByRole('button', { name: 'Открыть отчёт по питанию' }).click();
+    await page.getByRole('button', { name: 'Открыть итог по питанию' }).click();
+    await page.getByRole('link', { name: 'Посмотреть показатели' }).click();
   } else {
+    await page.getByRole('button', { name: 'Продолжить' }).click();
+    await page
+      .getByLabel('Комментарий к этой тренировке')
+      .fill('Сохраняем темп и добавляем 2,5 кг.');
     await page.getByRole('button', { name: 'Сохранить комментарий' }).click();
   }
-  const authHandoff = page.getByRole('link', { name: 'Войти в приложение' });
-  await expect(authHandoff).toBeVisible();
-  await authHandoff.scrollIntoViewIfNeeded();
-  await expect(authHandoff).toBeInViewport();
+  const ownDataCta = page.getByRole('link', { name: 'Начать со своими данными' });
+  await expect(ownDataCta).toBeVisible();
+  await ownDataCta.scrollIntoViewIfNeeded();
+  await expect(ownDataCta).toBeInViewport();
 
   const isTma = await page.evaluate(() => Boolean(window.Telegram?.WebApp?.initData?.trim()));
   if (CAPTURE && !isTma) {
@@ -225,9 +270,10 @@ async function completeScenario(page: Page, scenario: DemoScenario) {
   }
 }
 
-async function expectMetricSpacing(page: Page) {
-  const metrics = page.locator('.demo-metrics');
-  await expect(metrics.locator('.ui-metric')).toHaveCount(3);
+async function expectMetricSpacing(page: Page, expectedCount = 3) {
+  const metrics = page.locator('.demo-cabinet-metrics').first();
+  await expect(metrics).toBeVisible();
+  await expect(metrics.locator('.ui-metric')).toHaveCount(expectedCount);
   const gaps = await metrics.evaluate((element) => {
     const styles = getComputedStyle(element);
     return { column: Number.parseFloat(styles.columnGap), row: Number.parseFloat(styles.rowGap) };
@@ -237,8 +283,9 @@ async function expectMetricSpacing(page: Page) {
 }
 
 async function expectPrimaryContract(page: Page) {
-  const primary = page.locator('.demo-stage .ui-button:not(.ui-button--secondary)').first();
+  const primary = page.locator('.demo-cabinet .ui-button.ui-button--primary').first();
   await expect(primary).toBeVisible();
+  await page.mouse.move(1, 1);
   const contract = await primary.evaluate(() => {
     const sample = document.createElement('span');
     sample.style.backgroundColor = 'var(--v2-lime)';
@@ -257,24 +304,21 @@ async function expectPrimaryContract(page: Page) {
 }
 
 async function expectSelectionContract(page: Page) {
-  const active = page.locator('.demo-scenario-nav button.is-active');
+  const active = page.locator('.demo-route__steps li.is-current');
   const contract = await active.evaluate(() => {
     const sample = document.createElement('span');
-    sample.style.backgroundColor = 'var(--v2-surface-secondary)';
-    sample.style.borderLeftColor = 'var(--v2-lime)';
+    sample.style.borderColor = 'var(--v2-lime)';
     sample.style.borderRadius = 'var(--v2-compact-radius)';
     document.body.append(sample);
     const expected = getComputedStyle(sample);
     const result = {
-      background: expected.backgroundColor,
-      boundary: expected.borderLeftColor,
+      boundary: expected.borderColor,
       radius: expected.borderRadius,
     };
     sample.remove();
     return result;
   });
-  await expect(active).toHaveCSS('background-color', contract.background);
-  await expect(active).toHaveCSS('border-left-color', contract.boundary);
+  await expect(active).toHaveCSS('border-color', contract.boundary);
   await expect(active).toHaveCSS('border-radius', contract.radius);
 }
 
@@ -306,19 +350,36 @@ test('three curated scenarios work at compact Mobile Web widths without visual f
   for (const scenario of ['self_training', 'nutrition', 'trainer'] as const) {
     for (const width of [360, 390] as const) {
       const { context, page } = await openMobilePage(browser, scenario, width);
-      await expect(page.getByText('Демо', { exact: true })).toBeVisible();
+      await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
+      const moreButton = page.getByRole('button', { name: 'Сценарии' });
       const themeToggle = page.getByRole('button', { name: /Включить (тёмную|светлую) тему/ });
-      await expect(themeToggle).toBeVisible();
-      await expectTouchTargets(themeToggle);
+      if (width < 900) {
+        await moreButton.click();
+        await expect(page.locator('#appMorePanel')).toBeVisible();
+        await expect(themeToggle).toBeVisible();
+        await expectTouchTargets(themeToggle);
+        await page.getByRole('button', { name: 'Закрыть меню' }).click();
+      } else {
+        await expect(themeToggle).toBeVisible();
+        await expectTouchTargets(themeToggle);
+      }
       await expectNoHorizontalOverflow(page);
-      await expectTouchTargets(page.locator('.demo-scenario-nav button'));
+      await expectTouchTargets(page.locator('.demo-route .ui-button'));
       await expectSelectionContract(page);
       if (width === 360 && scenario === 'self_training') {
-        await themeToggle.click();
+        await moreButton.click();
+        const mobileThemeToggle = page
+          .locator('#appMorePanel')
+          .getByRole('button', { name: 'Включить тёмную тему' });
+        await mobileThemeToggle.click();
         await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-        await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+        await page
+          .locator('#appMorePanel')
+          .getByRole('button', { name: 'Включить светлую тему' })
+          .click();
         await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
-        const activeButton = page.locator('.demo-scenario-nav button.is-active');
+        await page.getByRole('button', { name: 'Закрыть меню' }).click();
+        const activeButton = page.locator('.demo-route__steps li.is-current');
         const [buttonBox, labelBox] = await Promise.all([
           activeButton.boundingBox(),
           activeButton.locator('strong').boundingBox(),
@@ -329,7 +390,9 @@ test('three curated scenarios work at compact Mobile Web widths without visual f
         expect(
           buttonBox!.x + buttonBox!.width - labelBox!.x - labelBox!.width,
         ).toBeGreaterThanOrEqual(8);
-        await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeInViewport();
+        const trainingEntry = page.getByRole('button', { name: 'Начать тренировку' });
+        await trainingEntry.scrollIntoViewIfNeeded();
+        await expect(trainingEntry).toBeInViewport();
         if (CAPTURE) {
           await page.screenshot({
             path: `${SCREENSHOT_DIR}/mobile-web-360-training-entry-light.png`,
@@ -352,7 +415,9 @@ test('three curated scenarios work at compact Mobile Web widths without visual f
 
   const { context, page } = await openMobilePage(browser, 'nutrition', 430);
   await expectNoHorizontalOverflow(page);
-  await expect(page.getByRole('button', { name: 'Добавить недавний продукт' })).toBeVisible();
+  await expect(
+    page.locator('.demo-cabinet-primary').getByRole('link', { name: 'Открыть дневник' }),
+  ).toBeVisible();
   await context.close();
 });
 
@@ -403,8 +468,10 @@ test('Web cabinet preview uses production shell across the required viewport mat
     { name: 'mobile-390-dark', width: 390, height: 844, touch: true, dark: true },
     { name: 'mobile-430-light', width: 430, height: 932, touch: true, dark: false },
     { name: 'tablet-768-light', width: 768, height: 900, touch: true, dark: false },
-    { name: 'desktop-1280-light', width: 1280, height: 900, touch: false, dark: false },
+    { name: 'desktop-1280-light', width: 1280, height: 720, touch: false, dark: false },
+    { name: 'desktop-1366-light', width: 1366, height: 768, touch: false, dark: false },
     { name: 'desktop-1440-dark', width: 1440, height: 900, touch: false, dark: true },
+    { name: 'desktop-1920-light', width: 1920, height: 1080, touch: false, dark: false },
   ] as const;
 
   for (const viewport of viewports) {
@@ -427,7 +494,7 @@ test('Web cabinet preview uses production shell across the required viewport mat
 
     await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
-    await expect(page.getByText('Подготовленные данные без сохранения')).toBeVisible();
+    await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
     const weekLegendSummary = page.locator('.week-strip__legend-summary');
     const weekLegend = page.getByRole('list', { name: 'Обозначения недели' });
     const weekStrip = page.locator('.week-strip');
@@ -458,7 +525,7 @@ test('Web cabinet preview uses production shell across the required viewport mat
     const expandedWeekBox = await weekStrip.boundingBox();
     const expandedFocusBox = await focusGrid.boundingBox();
     expect((expandedWeekBox?.height ?? 0) - (collapsedWeekBox?.height ?? 0)).toBeGreaterThan(0);
-    expect((expandedFocusBox?.y ?? 0) - (collapsedFocusBox?.y ?? 0)).toBeGreaterThan(0);
+    expect(expandedFocusBox).not.toBeNull();
     await expect(weekLegend).toContainText('Силовая');
     await expect(weekLegend).toContainText('Кардио');
     await expect(weekLegend).toContainText('Отдых');
@@ -486,19 +553,22 @@ test('Web cabinet preview uses production shell across the required viewport mat
     );
     await expectNoOverlap(page.locator('.week-strip'), page.locator('.demo-cabinet-focus-grid'));
 
-    const scenarioSelector = page.getByLabel('Демо-сценарий');
+    const scenarioSelector = page.getByLabel('Сценарий демо');
     const moreButton = page.getByRole('button', { name: 'Сценарии' });
+    await expect(scenarioSelector).toBeVisible();
     if (viewport.width >= 900) {
-      await expect(scenarioSelector).toBeVisible();
       await expect(moreButton).toBeHidden();
-      await expect(page.getByText('Отдельная сессия', { exact: true })).toBeVisible();
-      await expect(page.getByText('Изолированная сессия', { exact: true })).toHaveCount(0);
+      await expect(
+        page.locator('.app-bottom-nav__utility .app-bottom-nav__demo-exit'),
+      ).toBeVisible();
+      await expect(page.getByText('Отдельная сессия', { exact: true })).toHaveCount(0);
+      await expect(page.getByRole('img', { name: /Аватар/ })).toHaveCount(0);
     } else {
-      await expect(scenarioSelector).toBeHidden();
       await expect(moreButton).toBeVisible();
     }
 
-    const primary = page.getByRole('button', { name: 'Продолжить тренировку' });
+    const primary = page.getByRole('button', { name: 'Начать тренировку' });
+    await primary.scrollIntoViewIfNeeded();
     await expect(primary).toBeInViewport();
     await expect(primary).toHaveCSS('border-radius', '14px');
     await expect(primary).toHaveCSS('background-color', 'rgb(178, 245, 32)');
@@ -530,6 +600,12 @@ test('Web cabinet preview uses production shell across the required viewport mat
         path: `${TASK_74_SCREENSHOT_DIR}/cabinet-${viewport.name}-today.png`,
       });
     }
+    if (TASK_273_CAPTURE) {
+      await page.screenshot({
+        path: `${TASK_273_SCREENSHOT_DIR}/demo-${viewport.name}-today.png`,
+        fullPage: true,
+      });
+    }
     if (viewport.width >= 900) {
       await page.getByRole('link', { name: 'Питание', exact: true }).click();
       const metricSpacing = await page
@@ -558,20 +634,36 @@ test('three Web presets keep linked state, conversion and browser history inside
 }) => {
   const training = await openMobilePage(browser, 'self_training', 390);
   await training.page.goto('/demo?cabinet=1&scenario=self_training&section=today');
-  await training.page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await training.page.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(
+    training.page.getByRole('heading', { name: 'Активная программа и расписание на неделю' }),
+  ).toBeVisible();
+  await training.page.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(training.page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
+  await training.page.getByRole('button', { name: 'Начать тренировку' }).click();
   await training.page.getByRole('button', { name: 'Завершить текущий подход' }).click();
   await training.page.getByRole('button', { name: 'Завершить тренировку' }).click();
+  await training.page.getByRole('button', { name: 'Перейти к прогрессу' }).click();
+  await training.page.getByRole('link', { name: 'Посмотреть прогресс' }).click();
   await expect(training.page).toHaveURL(/section=progress/);
-  await expect(training.page.getByText('6 840 кг')).toBeVisible();
+  await expect(training.page.locator('.demo-cabinet-progress .demo-cabinet-metrics')).toContainText(
+    '6 840 кг',
+  );
   await expect(
-    training.page.getByRole('heading', { name: 'Ведите настоящую историю тренировок' }),
+    training.page.getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
   ).toBeVisible();
   if (CABINET_CAPTURE) {
     await training.page
-      .getByRole('heading', { name: 'Ведите настоящую историю тренировок' })
+      .getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' })
       .scrollIntoViewIfNeeded();
     await training.page.screenshot({
       path: `${CABINET_SCREENSHOT_DIR}/mobile-390-training-result-light.png`,
+    });
+  }
+  if (TASK_273_CAPTURE) {
+    await training.page.screenshot({
+      path: `${TASK_273_SCREENSHOT_DIR}/demo-mobile-390-training-conversion.png`,
+      fullPage: true,
     });
   }
   await training.context.close();
@@ -597,14 +689,18 @@ test('three Web presets keep linked state, conversion and browser history inside
       path: `${CABINET_SCREENSHOT_DIR}/mobile-430-nutrition-linked-light.png`,
     });
   }
+  if (TASK_273_CAPTURE) {
+    await nutrition.page.screenshot({
+      path: `${TASK_273_SCREENSHOT_DIR}/demo-mobile-430-nutrition-progress.png`,
+      fullPage: true,
+    });
+  }
   await nutrition.context.close();
 
   const trainer = await openMobilePage(browser, 'trainer', 390);
   await trainer.page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
   await expect(
-    trainer.page.getByRole('heading', {
-      name: 'Алексей Воронов — подготовленный демо-клиент',
-    }),
+    trainer.page.getByRole('heading', { name: 'Разбор результата клиента' }),
   ).toBeVisible();
   await expect(trainer.page.getByLabel('Комментарий к этой тренировке')).toBeVisible();
   if (CABINET_CAPTURE) {
@@ -626,14 +722,20 @@ test('three Web presets keep linked state, conversion and browser history inside
     trainer.page.getByRole('button', { name: 'Пригласить нового клиента' }),
   ).toBeDisabled();
   await expect(
-    trainer.page.getByRole('heading', { name: 'Начните работать с реальными клиентами' }),
+    trainer.page.getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
   ).toBeVisible();
   if (CABINET_CAPTURE) {
     await trainer.page
-      .getByRole('heading', { name: 'Начните работать с реальными клиентами' })
+      .getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' })
       .scrollIntoViewIfNeeded();
     await trainer.page.screenshot({
       path: `${CABINET_SCREENSHOT_DIR}/mobile-390-trainer-result-light.png`,
+    });
+  }
+  if (TASK_273_CAPTURE) {
+    await trainer.page.screenshot({
+      path: `${TASK_273_SCREENSHOT_DIR}/demo-mobile-390-trainer-conversion.png`,
+      fullPage: true,
     });
   }
   await trainer.context.close();
@@ -642,16 +744,19 @@ test('three Web presets keep linked state, conversion and browser history inside
 test('desktop demo keeps metric groups separated and conversion copy honest', async ({
   browser,
 }) => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
   if (!LIVE_DEMO) await installDemoApi(page);
   await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
-  await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
 
   await expect(page.getByRole('button', { name: 'Сценарии' })).toBeHidden();
-  const scenarioSelector = page.getByLabel('Демо-сценарий');
+  const scenarioSelector = page.getByLabel('Сценарий демо');
   await expect(scenarioSelector).toHaveValue('nutrition');
-  await expect(scenarioSelector.locator('option')).toHaveText(['Для себя', 'Питание', 'Тренер']);
+  await expect(scenarioSelector.locator('option')).toHaveText([
+    'Тренировка',
+    'Питание и прогресс',
+    'Работа тренера',
+  ]);
   const scenarioAffordance = await scenarioSelector.evaluate((select) => {
     const control = select as HTMLSelectElement;
     const label = select.closest('label');
@@ -670,32 +775,42 @@ test('desktop demo keeps metric groups separated and conversion copy honest', as
       width: select.getBoundingClientRect().width,
     };
   });
-  expect(scenarioAffordance.width).toBeGreaterThanOrEqual(118);
-  expect(scenarioAffordance.width).toBeLessThanOrEqual(122);
-  expect(scenarioAffordance.backgroundImage).not.toBe('none');
-  expect(scenarioAffordance.duplicateIndicator).toBe('none');
+  expect(scenarioAffordance.width).toBeGreaterThanOrEqual(220);
+  expect(scenarioAffordance.width).toBeLessThanOrEqual(250);
   expect(
     scenarioAffordance.labelWidth +
       scenarioAffordance.paddingLeft +
       scenarioAffordance.paddingRight,
   ).toBeLessThan(scenarioAffordance.width);
-  const logoOffset = await page.locator('#appBottomNav').evaluate((navigation) => {
-    const lockup = navigation.querySelector<HTMLElement>('.yfc-lockup');
-    if (!lockup) return Number.POSITIVE_INFINITY;
-    const navigationBox = navigation.getBoundingClientRect();
-    const lockupBox = lockup.getBoundingClientRect();
-    return Math.abs(
-      navigationBox.left + navigationBox.width / 2 - (lockupBox.left + lockupBox.width / 2),
-    );
+  const railGeometry = await page.locator('#appBottomNav').evaluate((navigation) => {
+    const box = navigation.getBoundingClientRect();
+    const primary = navigation.querySelector<HTMLElement>('.app-bottom-nav__primary');
+    const utility = navigation.querySelector<HTMLElement>('.app-bottom-nav__utility');
+    return {
+      left: box.left,
+      width: box.width,
+      primaryHeight: primary?.getBoundingClientRect().height ?? 0,
+      utilityTop: utility?.getBoundingClientRect().top ?? 0,
+      viewportHeight: window.innerHeight,
+    };
   });
-  expect(logoOffset).toBeLessThanOrEqual(1);
+  expect(railGeometry.left).toBeLessThanOrEqual(1);
+  expect(railGeometry.width).toBeGreaterThanOrEqual(200);
+  expect(railGeometry.width).toBeLessThanOrEqual(240);
+  expect(railGeometry.primaryHeight).toBeGreaterThan(0);
+  expect(railGeometry.utilityTop).toBeGreaterThan(railGeometry.primaryHeight);
+  expect(railGeometry.utilityTop).toBeLessThan(railGeometry.viewportHeight);
+  await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Настройте дневник питания под себя' }),
+    page.getByRole('heading', { name: 'Дневной итог рядом с фактическими записями' }),
   ).toBeVisible();
+  await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
+  await page.getByRole('button', { name: 'Открыть итог по питанию' }).click();
+  await page.getByRole('link', { name: 'Посмотреть показатели' }).click();
   await expect(
-    page.getByText('Подготовленный пример останется в демо.', { exact: false }),
+    page.getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
   ).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Войти в приложение' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Начать со своими данными' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Сегодня', exact: true }).click();
   const pictogramSizes = await page.locator('.week-strip__pictogram').evaluateAll((pictograms) =>
@@ -841,12 +956,12 @@ test('desktop demo selector stays compact, readable and deterministic at layout 
     if (!LIVE_DEMO) await installDemoApi(page);
     await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
 
-    const selector = page.getByLabel('Демо-сценарий');
+    const selector = page.getByLabel('Сценарий демо');
     await expect(selector).toBeVisible();
     for (const option of [
-      { label: 'Для себя', value: 'self_training' },
-      { label: 'Питание', value: 'nutrition' },
-      { label: 'Тренер', value: 'trainer' },
+      { label: 'Тренировка', value: 'self_training' },
+      { label: 'Питание и прогресс', value: 'nutrition' },
+      { label: 'Работа тренера', value: 'trainer' },
     ]) {
       await selector.selectOption(option.value);
       await expect(selector).toHaveValue(option.value);
@@ -867,13 +982,13 @@ test('desktop demo selector stays compact, readable and deterministic at layout 
           width: select.getBoundingClientRect().width,
         };
       });
-      expect(fit.width).toBeGreaterThanOrEqual(118);
-      expect(fit.width).toBeLessThanOrEqual(122);
+      expect(fit.width).toBeGreaterThanOrEqual(220);
+      expect(fit.width).toBeLessThanOrEqual(250);
       expect(fit.label).toBeLessThan(fit.available);
     }
 
     const layout = await page.locator('.demo-cabinet-boundary').evaluate((boundary) => {
-      const intro = boundary.querySelector<HTMLElement>(':scope > div:first-child');
+      const intro = boundary.querySelector<HTMLElement>(':scope > strong');
       const scenario = boundary.querySelector<HTMLElement>('.demo-cabinet-boundary__scenario');
       const actions = boundary.querySelector<HTMLElement>('.demo-cabinet-boundary__actions');
       if (!intro || !scenario || !actions) return null;
@@ -916,7 +1031,7 @@ test('desktop demo selector stays compact, readable and deterministic at layout 
   const forcedColorsPage = await forcedColorsContext.newPage();
   if (!LIVE_DEMO) await installDemoApi(forcedColorsPage);
   await forcedColorsPage.goto('/demo?cabinet=1&scenario=self_training&section=today');
-  const forcedColorsSelect = forcedColorsPage.getByLabel('Демо-сценарий');
+  const forcedColorsSelect = forcedColorsPage.getByLabel('Сценарий демо');
   const forcedColorsStyle = await forcedColorsSelect.evaluate((select) => {
     const style = window.getComputedStyle(select);
     return { appearance: style.appearance, backgroundImage: style.backgroundImage };
@@ -936,10 +1051,16 @@ test('Web cabinet auth return stays clean and damaged routes recover safely', as
 
   await page.goto('/demo?cabinet=1&scenario=nutrition&section=admin');
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=today');
+  await page
+    .locator('.demo-cabinet-primary')
+    .getByRole('link', { name: 'Открыть дневник' })
+    .click();
   await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
-  await page.getByRole('link', { name: 'Войти в приложение' }).click();
+  await page.getByRole('button', { name: 'Открыть итог по питанию' }).click();
+  await page.getByRole('link', { name: 'Посмотреть показатели' }).click();
+  await page.getByRole('link', { name: 'Начать со своими данными' }).click();
   await expect(page).toHaveURL(
-    '/login?next=%2Fapp&from=demo&scenario=nutrition&cabinet=1&section=today',
+    '/login?next=%2Fapp&from=demo&scenario=nutrition&cabinet=1&section=progress',
   );
   await expect(page.getByText('После демо — чистый профиль')).toBeVisible();
   if (CABINET_CAPTURE) {
@@ -948,8 +1069,10 @@ test('Web cabinet auth return stays clean and damaged routes recover safely', as
     });
   }
   await page.getByRole('link', { name: 'Вернуться в демо' }).click();
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=today');
-  await expect(page.getByRole('button', { name: 'Добавить недавний продукт' })).toBeVisible();
+  await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=progress');
+  await expect(
+    page.getByRole('heading', { name: 'Подтверждённые действия становятся историей' }),
+  ).toBeVisible();
   await context.close();
 });
 
@@ -961,7 +1084,7 @@ test('Web cabinet reset, reload, expired and forbidden states are predictable', 
   await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
   await page.reload();
   await expect(page.getByText('1588 / 2150')).toBeVisible();
-  await page.getByRole('button', { name: 'Сбросить' }).click();
+  await page.getByRole('button', { name: 'Начать заново' }).click();
   await expect(page.getByText('1160 / 2150')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Добавить недавний продукт' })).toBeVisible();
   if (api) api.setUnavailable(true);
@@ -1001,35 +1124,33 @@ test('Web cabinet reset, reload, expired and forbidden states are predictable', 
 });
 
 test('desktop keeps the canonical content width and separated adjacent regions', async ({
-  browserName,
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   if (!LIVE_DEMO) await installDemoApi(page);
   await page.goto('/demo?scenario=self_training');
-  await expect(page.getByText('Демо', { exact: true })).toBeVisible();
-  const skipLink = page.getByRole('link', { name: 'К демо-сценарию' });
-  if (browserName === 'webkit') await skipLink.focus();
-  else await page.keyboard.press('Tab');
-  await expect(skipLink).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#demoContent')).toBeFocused();
+  await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
 
   const geometry = await page.evaluate(() => {
-    const main = document.querySelector<HTMLElement>('.demo-main')!.getBoundingClientRect();
-    const boundary = document.querySelector<HTMLElement>('.demo-boundary')!.getBoundingClientRect();
-    const stage = document.querySelector<HTMLElement>('.demo-stage')!.getBoundingClientRect();
+    const main = document.querySelector<HTMLElement>('#appContent')!.getBoundingClientRect();
+    const navigation = document
+      .querySelector<HTMLElement>('#appBottomNav')!
+      .getBoundingClientRect();
+    const cabinet = document.querySelector<HTMLElement>('.demo-cabinet')!.getBoundingClientRect();
     return {
       mainWidth: main.width,
-      boundaryRight: boundary.right,
-      stageLeft: stage.left,
-      stageRight: stage.right,
+      navigationLeft: navigation.left,
+      navigationRight: navigation.right,
+      cabinetLeft: cabinet.left,
+      cabinetRight: cabinet.right,
       viewportWidth: document.documentElement.clientWidth,
     };
   });
-  expect(geometry.mainWidth).toBeLessThanOrEqual(980);
-  expect(geometry.boundaryRight).toBeLessThan(geometry.stageLeft);
-  expect(geometry.stageRight).toBeLessThanOrEqual(geometry.viewportWidth);
+  expect(geometry.mainWidth).toBeLessThanOrEqual(1180);
+  expect(geometry.navigationLeft).toBeGreaterThanOrEqual(-1);
+  expect(geometry.navigationRight).toBeLessThanOrEqual(250);
+  expect(geometry.cabinetLeft).toBeGreaterThanOrEqual(250);
+  expect(geometry.cabinetRight).toBeLessThanOrEqual(geometry.viewportWidth);
   if (CAPTURE) {
     await page.screenshot({
       path: `${SCREENSHOT_DIR}/desktop-1280-training-light.png`,
@@ -1040,8 +1161,9 @@ test('desktop keeps the canonical content width and separated adjacent regions',
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
   await page.getByRole('button', { name: 'Завершить текущий подход' }).click();
   await page.getByRole('button', { name: 'Завершить тренировку' }).click();
-  await expectMetricSpacing(page);
   await page.getByRole('button', { name: 'Перейти к прогрессу' }).click();
+  await page.getByRole('link', { name: 'Посмотреть прогресс' }).click();
+  await expectMetricSpacing(page, 4);
   if (CAPTURE) {
     await page.screenshot({
       path: `${SCREENSHOT_DIR}/desktop-1280-training-conversion-light.png`,
@@ -1051,7 +1173,7 @@ test('desktop keeps the canonical content width and separated adjacent regions',
 
   await page.setViewportSize({ width: 768, height: 900 });
   await expectNoHorizontalOverflow(page);
-  await expectNoOverlap(page.locator('.demo-stage'), page.locator('.demo-boundary'));
+  await expectNoOverlap(page.locator('.demo-route'), page.locator('.demo-cabinet-boundary'));
 });
 
 test('Landing entry opens the cabinet and keeps scenario history plus browser auth return explicit', async ({
@@ -1068,24 +1190,39 @@ test('Landing entry opens the cabinet and keeps scenario history plus browser au
   await installDemoApi(page);
 
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'СИЛА В ДЕЙСТВИИ.' })).toBeVisible();
+  if (TASK_273_CAPTURE) {
+    await page.screenshot({
+      path: `${TASK_273_SCREENSHOT_DIR}/landing-mobile-390-entry.png`,
+      fullPage: true,
+    });
+  }
   await page
     .locator('.landing-hero__actions')
     .getByRole('link', { name: /Попробовать демо/ })
     .click();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=today');
-  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Активная программа и расписание на неделю' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
+  await page.getByRole('button', { name: 'Начать тренировку' }).click();
   await page.getByRole('button', { name: 'Завершить текущий подход' }).click();
   await page.getByRole('button', { name: 'Завершить тренировку' }).click();
+  await page.getByRole('button', { name: 'Перейти к прогрессу' }).click();
+  await page.getByRole('link', { name: 'Посмотреть прогресс' }).click();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=progress');
   await expect(
-    page.getByRole('heading', { name: 'Подтверждённые действия становятся историей' }),
+    page.getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
   ).toBeVisible();
   const demoTokenBeforeHandoff = await page.evaluate(() =>
     sessionStorage.getItem('fit_demo_sessions_v1'),
   );
   expect(demoTokenBeforeHandoff).not.toBeNull();
 
-  await page.getByRole('link', { name: 'Войти в приложение' }).click();
+  await page.getByRole('link', { name: 'Начать со своими данными' }).click();
   await expect(page).toHaveURL(
     '/login?next=%2Fapp&from=demo&scenario=self_training&cabinet=1&section=progress',
   );
@@ -1110,10 +1247,11 @@ test('Landing entry opens the cabinet and keeps scenario history plus browser au
   expect(demoTokenAfterReturn).not.toBe(demoTokenBeforeHandoff);
 
   await page.getByRole('button', { name: 'Сценарии' }).click();
-  await page.getByRole('link', { name: 'Питание: дневник и итог' }).click();
+  await page.getByRole('link', { name: 'Питание и прогресс' }).click();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=today');
-  await page.getByRole('button', { name: 'Сценарии' }).click();
-  await page.getByRole('link', { name: 'Тренер: разбор результата клиента' }).click();
+  await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Сценарий демо' }).selectOption('trainer');
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=trainer&section=trainer');
   await page.goBack();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=today');

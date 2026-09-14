@@ -96,7 +96,12 @@ def apply_demo_action(
     del request
     _no_store(response)
     snapshot = _snapshot_or_error(
-        lambda: demo_session_store.apply_action(token, payload.action, payload.comment)
+        lambda: demo_session_store.apply_action(
+            token,
+            payload.action,
+            payload.comment,
+            payload.client_id,
+        )
     )
     return DemoSessionSnapshot(**snapshot)
 

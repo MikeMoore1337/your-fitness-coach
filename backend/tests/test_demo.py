@@ -20,23 +20,27 @@ def test_demo_scenarios_are_deterministic_and_do_not_write_user_tables(client) -
     with get_session_context() as db:
         users_before = db.query(User).count()
 
-    conversion_titles = {
-        "self_training": "Ведите настоящую историю тренировок",
-        "nutrition": "Настройте дневник питания под себя",
-        "trainer": "Начните работать с реальными клиентами",
-    }
+    conversion_title = "Готово. Вы посмотрели основной сценарий"
     for scenario in ("self_training", "nutrition", "trainer"):
         first_token, first = _create_session(client, scenario)
         second_token, second = _create_session(client, scenario)
 
         assert first_token != second_token
         assert first["capability"] == "demo"
-        assert first["fixture_version"] == "demo-curated-v1"
+        assert first["fixture_version"] == "demo-curated-v2"
         assert first["scenario"] == scenario
         assert first["state"] == second["state"]
         assert first["cabinet"] == second["cabinet"]
         assert first["cabinet"]["meaningful_action_completed"] is False
-        assert first["cabinet"]["conversion_title"] == conversion_titles[scenario]
+        assert first["cabinet"]["conversion_title"] == conversion_title
+        assert len(first["cabinet"]["progress"]["training_history"]) == 4
+        assert len(first["cabinet"]["progress"]["nutrition_history"]) == 7
+        if scenario == "trainer":
+            assert {client["id"] for client in first["state"]["clients"]} == {
+                "alexey",
+                "maria",
+                "ivan",
+            }
 
     with get_session_context() as db:
         assert db.query(User).count() == users_before
@@ -107,14 +111,27 @@ def test_nutrition_and_trainer_sessions_are_isolated(client) -> None:
     assert nutrition.json()["cabinet"]["progress"]["nutrition_completion_percent"] == 74
     assert nutrition.json()["cabinet"]["meaningful_action_completed"] is True
 
+    selected_trainer = client.post(
+        "/api/v1/demo/sessions/current/actions",
+        headers={"X-Demo-Session": trainer_token},
+        json={"action": "select_client", "client_id": "maria"},
+    )
+    assert selected_trainer.status_code == 200
+    assert selected_trainer.json()["state"]["selected_client_id"] == "maria"
+    assert selected_trainer.json()["cabinet"]["trainer"]["selected_client_id"] == "maria"
+
     trainer = client.post(
         "/api/v1/demo/sessions/current/actions",
         headers={"X-Demo-Session": trainer_token},
         json={"action": "save_comment", "comment": "  Техника стабильна, сохраняем темп.  "},
     )
     assert trainer.status_code == 200
-    assert trainer.json()["state"]["comment"] == "Техника стабильна, сохраняем темп."
-    assert trainer.json()["cabinet"]["trainer"]["comment"] == "Техника стабильна, сохраняем темп."
+    assert trainer.json()["state"]["clients"][0]["comment"] is None
+    assert trainer.json()["state"]["clients"][1]["comment"] == "Техника стабильна, сохраняем темп."
+    assert (
+        trainer.json()["cabinet"]["trainer"]["clients"][1]["comment"]
+        == "Техника стабильна, сохраняем темп."
+    )
     assert trainer.json()["cabinet"]["meaningful_action_completed"] is True
 
     nutrition_after = client.get(
@@ -192,7 +209,7 @@ def test_concurrent_demo_sessions_keep_independent_state() -> None:
         token, _ = store.create(scenario)
         if scenario == "trainer":
             state = store.apply_action(token, "save_comment", f"Комментарий {index}")
-            return token, state["state"]["comment"]
+            return token, state["state"]["clients"][0]["comment"]
         state = store.apply_action(token, "add_recent")
         return token, str(state["state"]["calories"])
 

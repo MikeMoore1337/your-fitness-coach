@@ -9,7 +9,7 @@ import {
 const snapshot = {
   capability: 'demo',
   scenario: 'self_training',
-  fixture_version: 'demo-curated-v1',
+  fixture_version: 'demo-curated-v2',
   revision: 1,
   expires_at: '2026-08-24T12:30:00Z',
   state: {

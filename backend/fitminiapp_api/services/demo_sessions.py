@@ -55,7 +55,7 @@ def _training_fixture() -> dict[str, Any]:
         "kind": "self_training",
         "screen": "today",
         "workout_title": "Верх тела · уверенный старт",
-        "workout_subtitle": "Подготовленная тренировка на сегодня",
+        "workout_subtitle": "Неделя 4 · подготовленная тренировка на сегодня",
         "completed_sets": 2,
         "total_sets": 3,
         "exercises": [
@@ -100,17 +100,149 @@ def _trainer_fixture() -> dict[str, Any]:
     return {
         "kind": "trainer",
         "screen": "client",
-        "client_name": "Алексей Воронов — подготовленный демо-клиент",
-        "context_label": "Последняя тренировка · сегодня, 18:40",
-        "workout_title": "Ноги и корпус · неделя 4",
-        "facts": [
-            {"label": "Выполнено", "value": "6 из 6 упражнений"},
-            {"label": "Объём", "value": "6 840 кг"},
-            {"label": "Самочувствие", "value": "8 из 10"},
-            {"label": "Следующий ориентир", "value": "+2,5 кг в приседе"},
+        "selected_client_id": "alexey",
+        "clients": [
+            {
+                "id": "alexey",
+                "name": "Алексей",
+                "status_label": "В ритме",
+                "context_label": "8 из 8 тренировок за 4 недели · объём вырос на 6,5%",
+                "workout_title": "Ноги и корпус · неделя 4",
+                "facts": [
+                    {"label": "Выполнено", "value": "6 из 6 упражнений"},
+                    {"label": "Объём", "value": "6 840 кг"},
+                    {"label": "Самочувствие", "value": "8 из 10"},
+                    {"label": "Следующий ориентир", "value": "+2,5 кг в приседе"},
+                ],
+                "comment": None,
+            },
+            {
+                "id": "maria",
+                "name": "Мария",
+                "status_label": "Нужна регулярность",
+                "context_label": "6 из 8 тренировок за 4 недели · два пропуска подряд",
+                "workout_title": "Всё тело · неделя 4",
+                "facts": [
+                    {"label": "Выполнено", "value": "4 из 6 упражнений"},
+                    {"label": "Объём", "value": "4 920 кг"},
+                    {"label": "Самочувствие", "value": "6 из 10"},
+                    {"label": "Следующий ориентир", "value": "Вернуться к расписанию"},
+                ],
+                "comment": None,
+            },
+            {
+                "id": "ivan",
+                "name": "Иван",
+                "status_label": "Плато",
+                "context_label": "8 из 8 тренировок за 4 недели · объём без изменений 3 недели",
+                "workout_title": "Верх тела · неделя 4",
+                "facts": [
+                    {"label": "Выполнено", "value": "5 из 5 упражнений"},
+                    {"label": "Объём", "value": "6 120 кг"},
+                    {"label": "Самочувствие", "value": "7 из 10"},
+                    {"label": "Следующий ориентир", "value": "Обсудить прогрессию"},
+                ],
+                "comment": None,
+            },
         ],
-        "comment": None,
     }
+
+
+def _program_fixture(completed_today: bool = False) -> dict[str, Any]:
+    return {
+        "name": "Силовая база",
+        "current_week": 4,
+        "total_weeks": 8,
+        "sessions_per_week": 4,
+        "schedule": [
+            {"day_label": "Пн", "workout_title": "Верх тела", "status": "completed"},
+            {"day_label": "Вт", "workout_title": "Кардио", "status": "completed"},
+            {
+                "day_label": "Ср",
+                "workout_title": "Ноги и корпус",
+                "status": "completed" if completed_today else "planned",
+            },
+            {"day_label": "Чт", "workout_title": "Отдых", "status": "rest"},
+            {"day_label": "Пт", "workout_title": "Верх тела", "status": "planned"},
+            {"day_label": "Сб", "workout_title": "Кардио", "status": "planned"},
+            {"day_label": "Вс", "workout_title": "Отдых", "status": "rest"},
+        ],
+    }
+
+
+def _training_history_fixture(completed_today: bool = False) -> list[dict[str, Any]]:
+    history = [
+        {
+            "period_label": "4 недели назад",
+            "workout_title": "Ноги и корпус",
+            "completed_sets": 16,
+            "volume_kg": 5920,
+        },
+        {
+            "period_label": "3 недели назад",
+            "workout_title": "Верх тела",
+            "completed_sets": 17,
+            "volume_kg": 6080,
+        },
+        {
+            "period_label": "2 недели назад",
+            "workout_title": "Верх тела",
+            "completed_sets": 18,
+            "volume_kg": 6220,
+        },
+        {
+            "period_label": "На прошлой неделе",
+            "workout_title": "Ноги и корпус",
+            "completed_sets": 18,
+            "volume_kg": 6480,
+        },
+    ]
+    if completed_today:
+        history.append(
+            {
+                "period_label": "Сегодня",
+                "workout_title": "Верх тела · уверенный старт",
+                "completed_sets": 3,
+                "volume_kg": 6840,
+            }
+        )
+    return history
+
+
+def _volume_history_fixture(completed_today: bool = False) -> list[dict[str, Any]]:
+    history = [
+        {"period_label": "4 недели назад", "volume_kg": 5920},
+        {"period_label": "3 недели назад", "volume_kg": 6080},
+        {"period_label": "2 недели назад", "volume_kg": 6220},
+        {"period_label": "На прошлой неделе", "volume_kg": 6480},
+    ]
+    if completed_today:
+        history.append({"period_label": "Сегодня", "volume_kg": 6840})
+    return history
+
+
+def _nutrition_history_fixture(item_added: bool = False) -> list[dict[str, Any]]:
+    return [
+        {"date_label": "4 дня назад", "status": "complete", "calories": 1980, "protein_g": 132.0},
+        {"date_label": "3 дня назад", "status": "complete", "calories": 2140, "protein_g": 141.0},
+        {"date_label": "2 дня назад", "status": "incomplete", "calories": 1160, "protein_g": 82.0},
+        {"date_label": "Вчера", "status": "complete", "calories": 2060, "protein_g": 139.0},
+        {
+            "date_label": "Сегодня",
+            "status": "complete" if item_added else "incomplete",
+            "calories": 1588 if item_added else 1160,
+            "protein_g": 106.0 if item_added else 82.0,
+        },
+        {"date_label": "Позавчера", "status": "not_logged", "calories": None, "protein_g": None},
+        {"date_label": "6 дней назад", "status": "complete", "calories": 2010, "protein_g": 128.0},
+    ]
+
+
+def _measurements_fixture() -> list[dict[str, str]]:
+    return [
+        {"label": "Вес", "value": "77,8 кг", "date_label": "4 недели назад"},
+        {"label": "Вес", "value": "77,1 кг", "date_label": "Сегодня"},
+    ]
 
 
 def _fixture_for(scenario: DemoScenario) -> dict[str, Any]:
@@ -125,7 +257,11 @@ def _fixture_for(scenario: DemoScenario) -> dict[str, Any]:
 def _cabinet_for(scenario: DemoScenario, state: dict[str, Any]) -> dict[str, Any]:
     training_completed = scenario == "self_training" and state["screen"] in {"summary", "progress"}
     nutrition_added = scenario == "nutrition" and state["item_added"]
-    trainer_commented = scenario == "trainer" and state["comment"] is not None
+    trainer_commented = scenario == "trainer" and any(
+        client["comment"] is not None for client in state["clients"]
+    )
+
+    program = _program_fixture(training_completed)
 
     nutrition: _DemoCabinetNutritionPayload = (
         {
@@ -172,13 +308,18 @@ def _cabinet_for(scenario: DemoScenario, state: dict[str, Any]) -> dict[str, Any
             "nutrition_completion_percent": round(
                 nutrition["calories"] / nutrition["calorie_target"] * 100
             ),
+            "adherence_percent": 82 if training_completed else 78,
+            "training_history": _training_history_fixture(training_completed),
+            "volume_history": _volume_history_fixture(training_completed),
+            "nutrition_history": _nutrition_history_fixture(),
+            "measurements": _measurements_fixture(),
             "summary": (
                 "Сегодняшняя тренировка уже учтена в динамике."
                 if training_completed
                 else "Динамика обновится после завершения тренировки."
             ),
         }
-        conversion_title = "Ведите настоящую историю тренировок"
+        conversion_title = "Готово. Вы посмотрели основной сценарий"
     elif scenario == "nutrition":
         today = {
             "title": "Дневник питания на сегодня",
@@ -195,17 +336,26 @@ def _cabinet_for(scenario: DemoScenario, state: dict[str, Any]) -> dict[str, Any
             "nutrition_completion_percent": round(
                 nutrition["calories"] / nutrition["calorie_target"] * 100
             ),
+            "adherence_percent": 86 if nutrition_added else 79,
+            "training_history": _training_history_fixture(),
+            "volume_history": _volume_history_fixture(),
+            "nutrition_history": _nutrition_history_fixture(nutrition_added),
+            "measurements": _measurements_fixture(),
             "summary": (
                 "Новая запись уже отражена в дневном итоге."
                 if nutrition_added
                 else "Итог использует только подтверждённые записи."
             ),
         }
-        conversion_title = "Настройте дневник питания под себя"
+        conversion_title = "Готово. Вы посмотрели основной сценарий"
     else:
         today = {
             "title": "Результат клиента готов к разбору",
-            "summary": state["context_label"],
+            "summary": next(
+                client["context_label"]
+                for client in state["clients"]
+                if client["id"] == state["selected_client_id"]
+            ),
             "status_label": "Комментарий сохранён" if trainer_commented else "Нужна обратная связь",
             "completed_days": 4,
             "planned_days": 5,
@@ -218,15 +368,21 @@ def _cabinet_for(scenario: DemoScenario, state: dict[str, Any]) -> dict[str, Any
             "nutrition_completion_percent": round(
                 nutrition["calories"] / nutrition["calorie_target"] * 100
             ),
+            "adherence_percent": 88,
+            "training_history": _training_history_fixture(),
+            "volume_history": _volume_history_fixture(),
+            "nutrition_history": _nutrition_history_fixture(),
+            "measurements": _measurements_fixture(),
             "summary": (
                 "Комментарий связан с подготовленным результатом клиента."
                 if trainer_commented
                 else "Факты тренировки готовы для контекстной обратной связи."
             ),
         }
-        conversion_title = "Начните работать с реальными клиентами"
+        conversion_title = "Готово. Вы посмотрели основной сценарий"
 
     return {
+        "program": program,
         "today": today,
         "nutrition": nutrition,
         "progress": progress,
@@ -272,7 +428,7 @@ class DemoSessionStore:
         return {
             "capability": "demo",
             "scenario": session.scenario,
-            "fixture_version": "demo-curated-v1",
+            "fixture_version": "demo-curated-v2",
             "revision": session.revision,
             "expires_at": session.expires_at,
             "state": deepcopy(session.state),
@@ -311,11 +467,17 @@ class DemoSessionStore:
             session.expires_at = now + self._ttl
             return self._snapshot(session)
 
-    def apply_action(self, token: str, action: str, comment: str | None = None) -> dict[str, Any]:
+    def apply_action(
+        self,
+        token: str,
+        action: str,
+        comment: str | None = None,
+        client_id: str | None = None,
+    ) -> dict[str, Any]:
         with self._lock:
             now = self._now()
             session = self._session(token, now)
-            changed = self._apply_allowed_action(session, action, comment)
+            changed = self._apply_allowed_action(session, action, comment, client_id)
             if changed:
                 session.revision += 1
             return self._snapshot(session)
@@ -325,6 +487,7 @@ class DemoSessionStore:
         session: _DemoSession,
         action: str,
         comment: str | None,
+        client_id: str | None,
     ) -> bool:
         state = session.state
         if session.scenario == "self_training":
@@ -332,7 +495,7 @@ class DemoSessionStore:
         if session.scenario == "nutrition":
             return DemoSessionStore._apply_nutrition_action(state, action)
         if session.scenario == "trainer":
-            return DemoSessionStore._apply_trainer_action(state, action, comment)
+            return DemoSessionStore._apply_trainer_action(state, action, comment, client_id)
         raise DemoActionForbiddenError
 
     @staticmethod
@@ -400,14 +563,28 @@ class DemoSessionStore:
         state: dict[str, Any],
         action: str,
         comment: str | None,
+        client_id: str | None,
     ) -> bool:
+        if action == "select_client":
+            if client_id is None:
+                raise DemoTransitionError
+            available_ids = {client["id"] for client in state["clients"]}
+            if client_id not in available_ids:
+                raise DemoTransitionError
+            if state["selected_client_id"] == client_id:
+                return False
+            state["selected_client_id"] = client_id
+            return True
         if action != "save_comment":
             raise DemoActionForbiddenError
         if comment is None:
             raise DemoTransitionError
-        if state["comment"] == comment:
+        selected_client = next(
+            client for client in state["clients"] if client["id"] == state["selected_client_id"]
+        )
+        if selected_client["comment"] == comment:
             return False
-        state["comment"] = comment
+        selected_client["comment"] = comment
         return True
 
 
