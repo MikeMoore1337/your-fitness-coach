@@ -29,8 +29,11 @@ import {
   progressPeriodOptions,
   progressReportPath,
   progressSelectionKey,
+  progressViewPath,
+  parseProgressView,
   selectionDateRange,
   validateCustomProgressRange,
+  type ProgressView,
   type ProgressSelection,
 } from './progressPeriods';
 
@@ -127,149 +130,305 @@ function periodDateLabel(start: string, end: string): string {
     : `${formatDate(start, true)} — ${formatDate(end, true)}`;
 }
 
-function ProgressBentoMetric({
+function progressPercent(component: AdherenceComponent): string {
+  return component.percent == null ? 'Мало данных' : `${formatNumber(component.percent)}%`;
+}
+
+function ProgressMetricCard({
   detail,
   label,
+  to,
   value,
 }: {
   detail: string;
   label: string;
+  to: string;
   value: string;
 }) {
   return (
-    <div className="progress-bento__metric">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
+    <AppLink className="progress-overview__metric" to={to}>
+      <span>{label}</span>
+      <strong>{value}</strong>
       <small>{detail}</small>
-    </div>
+      <span className="progress-overview__metric-arrow" aria-hidden="true">
+        <Icon name="arrow-right" size={16} />
+      </span>
+    </AppLink>
   );
 }
 
-function LatestMeasurementPoints({ summary }: { summary: ProgressSummary }) {
-  const trend =
-    summary.body.trends.find((item) => item.metric === 'weight_kg') ?? summary.body.trends[0];
-  const points = trend?.points.slice(-4).reverse() ?? [];
+function ProgressTrendRows({
+  trends,
+  selectedMetric,
+}: {
+  selectedMetric: BodyTrend['metric'] | null;
+  trends: BodyTrend[];
+}) {
+  const compactTrends = trends.filter((trend) => trend.metric !== selectedMetric);
+  if (!compactTrends.length) return null;
   return (
-    <article className="progress-bento__journal">
-      <div className="progress-bento__journal-head">
-        <div>
-          <span className="progress-bento__eyebrow">Последние факты</span>
-          <h3>Журнал замеров</h3>
-        </div>
-        <span className="progress-bento__journal-count">
-          {points.length ? `${points.length} точек` : 'Нет точек'}
-        </span>
-      </div>
-      {points.length ? (
-        <ul aria-label="Последние замеры за выбранный период">
-          {points.map((point) => (
-            <li key={point.measured_on}>
-              <span>{formatDate(point.measured_on, true)}</span>
-              <strong>
-                {formatNumber(point.value)} {bodyMetricUnits[trend?.metric ?? 'weight_kg']}
-              </strong>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="progress-note">
-          Добавьте фактический замер, чтобы увидеть первую точку истории. Одна точка ещё не образует
-          тренд.
-        </p>
-      )}
-    </article>
+    <ul className="progress-overview__trend-list" aria-label="Другие замеры тела">
+      {compactTrends.map((trend) => (
+        <li key={trend.metric}>
+          <span>{bodyMetricLabels[trend.metric]}</span>
+          <strong>
+            {formatNumber(trend.latest_value)} {bodyMetricUnits[trend.metric]}
+          </strong>
+          <small>{formatChange(trend.change, bodyMetricUnits[trend.metric])}</small>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-function SummaryOverview({ summary }: { summary: ProgressSummary }) {
+function ProgressTrendPanel({
+  summary,
+  detail = false,
+  showConfidence = true,
+}: {
+  detail?: boolean;
+  summary: ProgressSummary;
+  showConfidence?: boolean;
+}) {
+  const trends = summary.body.trends;
+  const defaultMetric =
+    trends.find((trend) => trend.metric === 'weight_kg')?.metric ?? trends[0]?.metric ?? null;
+  const [selectedMetric, setSelectedMetric] = useState<BodyTrend['metric'] | null>(defaultMetric);
+  const selectedTrend = trends.find((trend) => trend.metric === selectedMetric) ?? trends[0];
+
+  return (
+    <section className={`progress-trend-panel${detail ? ' progress-trend-panel--detail' : ''}`}>
+      <div className="progress-trend-panel__head">
+        <div>
+          <span className="progress-section__eyebrow">Динамика</span>
+          <h3>{detail ? 'Один график для всех замеров' : 'Главная динамика'}</h3>
+        </div>
+        {selectedTrend && (
+          <strong className="progress-trend-panel__value">
+            {formatNumber(selectedTrend.latest_value)} {bodyMetricUnits[selectedTrend.metric]}
+            <small>
+              {formatChange(selectedTrend.change, bodyMetricUnits[selectedTrend.metric])}
+            </small>
+          </strong>
+        )}
+      </div>
+      {trends.length ? (
+        <>
+          <div className="progress-trend-switcher" role="tablist" aria-label="Показатель графика">
+            {trends.map((trend) => (
+              <button
+                aria-selected={selectedTrend?.metric === trend.metric}
+                className={selectedTrend?.metric === trend.metric ? 'is-active' : ''}
+                key={trend.metric}
+                onClick={() => setSelectedMetric(trend.metric)}
+                role="tab"
+                type="button"
+              >
+                {bodyMetricLabels[trend.metric]}
+              </button>
+            ))}
+          </div>
+          {selectedTrend ? (
+            <BodyChart trend={selectedTrend} />
+          ) : (
+            <EmptyState title="Мало данных" text="За выбранный период нет замеров тела." />
+          )}
+          <ProgressTrendRows selectedMetric={selectedTrend?.metric ?? null} trends={trends} />
+          {showConfidence && (
+            <DataConfidence
+              className="data-confidence--compact"
+              kind="weight"
+              signal={summary.data_sufficiency.weight_trend}
+            />
+          )}
+        </>
+      ) : (
+        <EmptyState
+          title="Мало данных для динамики"
+          text="Добавьте вес или окружность: первая запись сохранит факт, а повторные замеры покажут направление."
+        />
+      )}
+    </section>
+  );
+}
+
+function ProgressInsights({ summary }: { summary: ProgressSummary }) {
+  const good: string[] = [];
+  const attention: string[] = [];
+  const { training, nutrition, cardio, body, adherence } = summary;
+  const confirmedNutritionDays = nutrition.complete_days + nutrition.fasted_days;
+  const weight = body.trends.find((trend) => trend.metric === 'weight_kg');
+
+  if (training.completed_workouts > 0) {
+    good.push(
+      `Выполнено ${training.completed_workouts} из ${training.planned_workouts} тренировок`,
+    );
+  }
+  if (training.new_personal_records > 0) {
+    good.push(
+      `${training.new_personal_records} ${plural(training.new_personal_records, 'новый рекорд', 'новых рекорда', 'новых рекордов')}`,
+    );
+  }
+  if (confirmedNutritionDays > 0)
+    good.push(`Питание подтверждено за ${confirmedNutritionDays} дней`);
+  if (cardio.completed_sessions > 0) {
+    good.push(`Кардио: ${cardio.completed_sessions} завершённых сессий`);
+  }
+  if (!good.length && adherence.overall_percent != null) {
+    good.push(`Общий adherence: ${formatNumber(adherence.overall_percent)}%`);
+  }
+
+  if (training.planned_workouts > training.completed_workouts) {
+    attention.push(
+      `${training.planned_workouts - training.completed_workouts} тренировок ещё не завершено`,
+    );
+  }
+  if (nutrition.visible && nutrition.unlogged_days > 0) {
+    attention.push(`${nutrition.unlogged_days} дней питания без записей`);
+  }
+  if (!weight || summary.data_sufficiency.weight_trend.status !== 'sufficient') {
+    attention.push('Для динамики веса пока мало повторных замеров');
+  }
+  if (!attention.length && cardio.planned_sessions > cardio.completed_sessions) {
+    attention.push(
+      `${cardio.planned_sessions - cardio.completed_sessions} кардио-сессий ещё не завершено`,
+    );
+  }
+
+  return (
+    <section className="progress-insights" aria-label="Короткие выводы">
+      <div className="progress-insights__column progress-insights__column--good">
+        <h3>Что идёт хорошо</h3>
+        <ul>
+          {(good.length ? good : ['Пока недостаточно фактов для вывода'])
+            .slice(0, 3)
+            .map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+        </ul>
+      </div>
+      <div className="progress-insights__column progress-insights__column--attention">
+        <h3>Что требует внимания</h3>
+        <ul>
+          {(attention.length ? attention : ['За выбранный период явных отклонений нет'])
+            .slice(0, 3)
+            .map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function ProgressCategoryNav({ search, view }: { search: string; view: ProgressView }) {
+  const categories: Array<{ detail: string; label: string; value: ProgressView }> = [
+    { detail: 'Обзор периода', label: 'Обзор', value: 'overview' },
+    { detail: 'Вес и окружности', label: 'Тело', value: 'body' },
+    { detail: 'Нагрузка и PR', label: 'Тренировки', value: 'training' },
+    { detail: 'Калории и БЖУ', label: 'Питание', value: 'nutrition' },
+    { detail: 'Сессии и дистанция', label: 'Кардио', value: 'cardio' },
+    { detail: 'Check-in и история', label: 'Самочувствие', value: 'wellbeing' },
+    { detail: 'Исходные записи', label: 'История', value: 'history' },
+  ];
+  return (
+    <nav className="progress-category-nav" aria-label="Разделы прогресса">
+      {categories.map((category) => (
+        <AppLink
+          aria-current={view === category.value ? 'page' : undefined}
+          className={view === category.value ? 'is-active' : undefined}
+          key={category.value}
+          to={progressViewPath(search, category.value)}
+        >
+          <strong>{category.label}</strong>
+          <small>{category.detail}</small>
+        </AppLink>
+      ))}
+    </nav>
+  );
+}
+
+function SummaryOverview({ summary, search }: { search: string; summary: ProgressSummary }) {
   const weight = summary.body.trends.find((trend) => trend.metric === 'weight_kg');
   const confirmedNutritionDays = summary.nutrition.complete_days + summary.nutrition.fasted_days;
-  const latestWeight = weight ? `${formatNumber(weight.latest_value)} кг` : 'Нет данных';
+  const latestWeight = weight ? `${formatNumber(weight.latest_value)} кг` : 'Мало данных';
   return (
     <section
-      className="progress-summary progress-bento semantic-card semantic-card--summary semantic-card--progress"
+      className="progress-summary progress-overview semantic-card semantic-card--summary semantic-card--progress"
       data-card-variant="summary"
       data-semantic-family="progress"
       aria-labelledby="progress-overview-title"
     >
-      <div className="progress-bento__context">
+      <div className="progress-overview__heading">
         <div>
-          <span className="progress-bento__eyebrow">Сводка выбранного периода</span>
-          <h2 id="progress-overview-title">Прогресс по фактам</h2>
-          <p>
-            {periodDateLabel(summary.period_start, summary.period_end)}. Показаны только записи,
-            попавшие в этот диапазон.
-          </p>
+          <span className="progress-section__eyebrow">Сводка выбранного периода</span>
+          <h2 id="progress-overview-title">Что изменилось</h2>
+          <p>{periodDateLabel(summary.period_start, summary.period_end)}</p>
         </div>
         <Badge>{summary.period_days} дн.</Badge>
       </div>
-      <div className="progress-bento__grid">
-        <article className="progress-bento__adherence">
-          <span className="progress-bento__eyebrow">Ритм плана</span>
-          <strong className="progress-summary__score">
-            {summary.adherence.overall_percent == null
-              ? 'Пока не оценить'
-              : `${formatNumber(summary.adherence.overall_percent)}%`}
-          </strong>
-          <p>
-            {summary.adherence.overall_percent == null
-              ? 'Появится, когда за период будет что сравнивать с планом.'
-              : 'Расчёт учитывает только доступные компоненты плана.'}
-          </p>
-        </article>
-        <article className="progress-bento__trend">
-          <div className="progress-bento__trend-head">
-            <div>
-              <span className="progress-bento__eyebrow">Главная динамика</span>
-              <h3>{weight ? 'Вес' : 'Замеры тела'}</h3>
-            </div>
-            {weight && (
-              <strong>
-                {latestWeight}
-                <small>{formatChange(weight.change, 'кг')}</small>
-              </strong>
-            )}
-          </div>
-          {weight ? (
-            <>
-              <BodyChart trend={weight} />
-              <DataConfidence kind="weight" signal={summary.data_sufficiency.weight_trend} />
-            </>
-          ) : (
-            <EmptyState
-              title="Недостаточно точек для динамики"
-              text="Добавьте замеры тела: первая запись сохранит факт, но не станет трендом сама по себе."
-            />
-          )}
-        </article>
-        <dl className="progress-bento__metrics" aria-label="Факты за выбранный период">
-          <ProgressBentoMetric
-            detail={`${summary.training.planned_workouts} запланировано`}
-            label="Тренировки"
-            value={`${summary.training.completed_workouts} из ${summary.training.planned_workouts}`}
-          />
-          <ProgressBentoMetric
-            detail={
-              summary.nutrition.visible
-                ? `${summary.nutrition.incomplete_days} частичных, не входят в средние`
-                : 'Доступ закрыт для этой роли'
-            }
-            label="Питание"
-            value={summary.nutrition.visible ? `${confirmedNutritionDays} дней` : 'Недоступно'}
-          />
-          <ProgressBentoMetric
-            detail={`${summary.cardio.duration_minutes} мин фактической длительности`}
-            label="Кардио"
-            value={`${summary.cardio.completed_sessions} сессий`}
-          />
-          <ProgressBentoMetric
-            detail={weight ? `${weight.point_count} точек веса в периоде` : 'Нет фактических точек'}
-            label="Замеры"
-            value={latestWeight}
-          />
-        </dl>
-        <LatestMeasurementPoints summary={summary} />
+      <div className="progress-overview__metrics" aria-label="Ключевые показатели">
+        <ProgressMetricCard
+          detail={weight ? formatChange(weight.change, 'кг') : 'Мало данных'}
+          label="Тело"
+          to={progressViewPath(search, 'body')}
+          value={latestWeight}
+        />
+        <ProgressMetricCard
+          detail={`${formatNumber(summary.training.frequency_per_week, 1)} в неделю · ${summary.training.new_personal_records} PR`}
+          label="Тренировки"
+          to={progressViewPath(search, 'training')}
+          value={`${summary.training.completed_workouts} / ${summary.training.planned_workouts}`}
+        />
+        <ProgressMetricCard
+          detail={
+            summary.nutrition.visible
+              ? `${confirmedNutritionDays} подтверждённых дней · ${progressPercent(summary.adherence.protein)} белок`
+              : 'Недоступно для этой роли'
+          }
+          label="Питание"
+          to={progressViewPath(search, 'nutrition')}
+          value={
+            !summary.nutrition.visible
+              ? 'Недоступно'
+              : summary.nutrition.average_calories == null
+                ? 'Мало данных'
+                : `${formatNumber(summary.nutrition.average_calories, 0)} ккал`
+          }
+        />
+        <ProgressMetricCard
+          detail={`${formatNumber(summary.cardio.duration_minutes, 0)} мин · ${progressPercent(summary.adherence.cardio)}`}
+          label="Кардио"
+          to={progressViewPath(search, 'cardio')}
+          value={`${summary.cardio.completed_sessions} сессий`}
+        />
       </div>
+      <ProgressTrendPanel summary={summary} />
+      <ProgressInsights summary={summary} />
+      <details className="progress-overview__adherence">
+        <summary>
+          <span>
+            <strong>Общий adherence</strong>
+            <small>
+              {summary.adherence.overall_percent == null ? (
+                'Мало данных'
+              ) : (
+                <>
+                  <strong>{formatNumber(summary.adherence.overall_percent)}%</strong> по доступным
+                  компонентам
+                </>
+              )}
+            </small>
+          </span>
+          <DisclosureIcon />
+        </summary>
+        <div>
+          <ComplianceRow label="Тренировки" component={summary.adherence.workouts} />
+          <ComplianceRow label="Калории" component={summary.adherence.calories} />
+          <ComplianceRow label="Белок" component={summary.adherence.protein} />
+          <ComplianceRow label="Кардио" component={summary.adherence.cardio} />
+        </div>
+      </details>
     </section>
   );
 }
@@ -554,12 +713,10 @@ function BodySection({
   isStale,
   measurementDiary,
   summary,
-  weightChartInOverview = false,
 }: {
   isStale?: boolean;
   measurementDiary?: ReactNode;
   summary: ProgressSummary;
-  weightChartInOverview?: boolean;
 }) {
   const { body } = summary;
   const priorityOptions = useQuery({
@@ -590,44 +747,46 @@ function BodySection({
           )
         }
       />
-      <div
-        className={`progress-priority${body.priority ? ' is-selected' : ' is-empty'}`}
-        aria-label="Выбранный приоритет развития"
-      >
+      <details className="progress-priority progress-priority--compact">
+        <summary>
+          <span>
+            <small>Контекст планирования</small>
+            <strong>
+              {!body.priority
+                ? 'Приоритет не выбран'
+                : body.priority.mode === 'balanced'
+                  ? 'Сбалансированное развитие'
+                  : 'Выбранные мышечные группы'}
+            </strong>
+          </span>
+          <DisclosureIcon />
+        </summary>
         <div>
-          <span>Приоритет развития</span>
-          <strong>
-            {!body.priority
-              ? 'Не выбран'
-              : body.priority.mode === 'balanced'
-                ? 'Сбалансированное развитие'
-                : 'Выбранные мышечные группы'}
-          </strong>
+          {body.priority?.mode === 'muscle_groups' &&
+            (priorityOptions.isLoading ? (
+              <p role="status">Загружаем названия выбранных групп…</p>
+            ) : priorityOptions.error ? (
+              <p role="alert">
+                Не удалось загрузить названия групп. Выбрано:{' '}
+                {body.priority.muscle_group_ids?.length ?? 0}.
+              </p>
+            ) : (
+              <ul>
+                {priorityNames.map((name) => (
+                  <li key={name}>{name}</li>
+                ))}
+              </ul>
+            ))}
+          <p>
+            {body.priority
+              ? 'Это предпочтение для планирования. Оно не оценивает тело и не объясняет изменение окружностей.'
+              : 'Можно оставить развитие без отдельного акцента или выбрать предпочтения в профиле.'}
+          </p>
+          <AppLink to="/app?section=profile#profile-fitness">
+            {body.priority ? 'Изменить в профиле' : 'Выбрать в профиле'}
+          </AppLink>
         </div>
-        {body.priority?.mode === 'muscle_groups' &&
-          (priorityOptions.isLoading ? (
-            <p role="status">Загружаем названия выбранных групп…</p>
-          ) : priorityOptions.error ? (
-            <p role="alert">
-              Не удалось загрузить названия групп. Выбрано:{' '}
-              {body.priority.muscle_group_ids?.length ?? 0}.
-            </p>
-          ) : (
-            <ul>
-              {priorityNames.map((name) => (
-                <li key={name}>{name}</li>
-              ))}
-            </ul>
-          ))}
-        <p>
-          {body.priority
-            ? 'Это предпочтение для планирования. Оно не оценивает тело и не объясняет изменение окружностей.'
-            : 'Можно оставить развитие без отдельного акцента или выбрать предпочтения в профиле.'}
-        </p>
-        <AppLink to="/app?section=profile#profile-fitness">
-          {body.priority ? 'Изменить в профиле' : 'Выбрать в профиле'}
-        </AppLink>
-      </div>
+      </details>
       <div className="progress-body-flow">
         {measurementDiary && <div className="progress-body-diary">{measurementDiary}</div>}
         <div className="progress-body-trends" aria-label="Динамика замеров">
@@ -652,55 +811,15 @@ function BodySection({
               }
             />
           </div>
-          {!body.trends.length ? (
-            <EmptyState
-              title="Замеров за этот период нет"
-              text="Добавьте вес или окружности — первая точка начнёт историю, но ещё не станет трендом."
-            />
-          ) : (
-            <>
-              <div className="progress-body-grid">
-                {body.trends.map((trend) => {
-                  const unit = bodyMetricUnits[trend.metric];
-                  const interpretation = trendInterpretationText(trend, body.guidance);
-                  return (
-                    <article
-                      className={`progress-body-metric${trend.metric === 'weight_kg' ? ' progress-body-metric--data-insight' : ''}`}
-                      key={trend.metric}
-                    >
-                      <header>
-                        <div>
-                          <span className="progress-body-metric__kind">
-                            {trend.metric === 'weight_kg' ? 'Масса тела' : 'Окружность'}
-                          </span>
-                          <h3>{bodyMetricLabels[trend.metric]}</h3>
-                          <p>
-                            {trend.point_count === 1
-                              ? `1 точка · ${formatDate(trend.latest_measured_on, true)}`
-                              : `${trend.point_count} ${plural(trend.point_count, 'точка', 'точки', 'точек')} · ${trend.span_days} ${plural(trend.span_days, 'день', 'дня', 'дней')}`}
-                          </p>
-                        </div>
-                        <div className="progress-body-metric__value">
-                          <strong>
-                            {formatNumber(trend.latest_value)} {unit}
-                          </strong>
-                          <span>{formatChange(trend.change, unit)}</span>
-                        </div>
-                      </header>
-                      {weightChartInOverview && trend.metric === 'weight_kg' ? (
-                        <p className="progress-note">
-                          График веса вынесен в сводку выбранного периода.
-                        </p>
-                      ) : (
-                        <BodyChart trend={trend} />
-                      )}
-                      {interpretation && <p className="progress-note">{interpretation}</p>}
-                    </article>
-                  );
-                })}
-              </div>
-            </>
-          )}
+          <ProgressTrendPanel detail showConfidence={false} summary={summary} />
+          {body.trends.map((trend) => {
+            const interpretation = trendInterpretationText(trend, body.guidance);
+            return interpretation ? (
+              <p className="progress-note" key={`${trend.metric}-interpretation`}>
+                <strong>{bodyMetricLabels[trend.metric]}:</strong> {interpretation}
+              </p>
+            ) : null;
+          })}
           {hasGuidance && (
             <details className="progress-body-guidance">
               <summary>Как сравнивать замеры</summary>
@@ -848,45 +967,6 @@ function ComplianceRow({ label, component }: { label: string; component: Adheren
   );
 }
 
-function AdherenceSection({ summary }: { summary: ProgressSummary }) {
-  const rows: Array<{ label: string; component: AdherenceComponent }> = [
-    { label: 'Запланированные тренировки', component: summary.adherence.workouts },
-    { label: 'Калории', component: summary.adherence.calories },
-    { label: 'Белок', component: summary.adherence.protein },
-    { label: 'Кардио', component: summary.adherence.cardio },
-  ];
-  return (
-    <section
-      className="progress-section progress-adherence"
-      id="progress-adherence"
-      aria-labelledby="progress-adherence-title"
-    >
-      <SectionHeading
-        eyebrow="Ритм"
-        title="Соблюдение плана"
-        titleId="progress-adherence-title"
-        description="Готовая серверная оценка: отсутствующие компоненты не превращаются в ноль."
-        trailing={
-          <strong className="progress-adherence__score">
-            {summary.adherence.overall_percent == null
-              ? '—'
-              : `${formatNumber(summary.adherence.overall_percent)}%`}
-          </strong>
-        }
-      />
-      <div className="progress-adherence__rows">
-        {rows.map((row) => (
-          <ComplianceRow key={row.label} {...row} />
-        ))}
-      </div>
-      <p className="progress-note">
-        Текущий день питания не учитывается: его ещё можно дополнить. Кардио сравнивается с
-        действовавшей недельной целью только по завершённым ручным записям.
-      </p>
-    </section>
-  );
-}
-
 function ProgressPeriodControls({
   onSelectPreset,
   onApplyCustom,
@@ -1004,7 +1084,35 @@ function ProgressPeriodControls({
   );
 }
 
-function useTrainingAnalytics(selection: ProgressSelection) {
+function ProgressDetailHeader({
+  search,
+  view,
+}: {
+  search: string;
+  view: Exclude<ProgressView, 'overview'>;
+}) {
+  const labels: Record<Exclude<ProgressView, 'overview'>, string> = {
+    body: 'Тело',
+    training: 'Тренировки',
+    nutrition: 'Питание',
+    cardio: 'Кардио',
+    wellbeing: 'Самочувствие',
+    history: 'История тренировок',
+  };
+  return (
+    <header className="progress-detail-header">
+      <AppLink className="progress-detail-header__back" to={progressViewPath(search, 'overview')}>
+        <Icon name="arrow-left" size={16} /> Обзор
+      </AppLink>
+      <div>
+        <span className="progress-section__eyebrow">Детали выбранного периода</span>
+        <p className="progress-detail-header__title">{labels[view]}</p>
+      </div>
+    </header>
+  );
+}
+
+function useTrainingAnalytics(selection: ProgressSelection, enabled: boolean) {
   const selectionKey = progressSelectionKey(selection);
   return useQuery({
     queryKey: ['workout', 'training-analytics', selectionKey],
@@ -1013,19 +1121,25 @@ function useTrainingAnalytics(selection: ProgressSelection) {
         `/api/v1/workouts/progress/training-analytics${progressApiQuery(selection)}`,
       ),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 
 export function ProgressExperience({
+  detailContent,
   focusMeasurements = false,
   measurementDiary,
+  progressView,
   timeZone,
 }: {
+  detailContent?: ReactNode;
   focusMeasurements?: boolean;
   measurementDiary?: ReactNode;
+  progressView?: ProgressView;
   timeZone?: string | null;
 } = {}) {
   const { navigate, search } = useNavigation();
+  const view = progressView ?? parseProgressView(search, window.location.hash);
   const selection = useMemo(() => parseProgressSelection(search), [search]);
   const resolvedTimeZone = timeZone ?? detectedTimeZone();
   const today = dateInputValue(new Date(), resolvedTimeZone);
@@ -1037,7 +1151,7 @@ export function ProgressExperience({
       api<ProgressSummary>(`/api/v1/workouts/progress/summary${progressApiQuery(selection)}`),
     placeholderData: keepPreviousData,
   });
-  const analytics = useTrainingAnalytics(selection);
+  const analytics = useTrainingAnalytics(selection, view === 'training');
   const controlledNutritionPeriod = useMemo<ControlledNutritionPeriod>(
     () => nutritionPeriodForProgress(selection),
     [selection],
@@ -1078,9 +1192,8 @@ export function ProgressExperience({
     <div className="progress-experience progress-experience--bento">
       <header className="progress-hero">
         <div className="progress-hero__copy">
-          <span className="eyebrow">Ваша динамика</span>
+          <span className="eyebrow">Факты за период</span>
           <h1>Прогресс</h1>
-          <p>Что изменилось в тренировках, теле и питании — только по фактическим данным.</p>
           <ContextualHelp articlePath="/knowledge/progress/how-to-read-progress">
             <p>
               Сначала смотрите на период и полноту данных. Одна точка не образует тренд, а
@@ -1117,33 +1230,55 @@ export function ProgressExperience({
               Обновляем динамику за период…
             </p>
           )}
-          <SummaryOverview summary={summary.data} />
-          <div className="progress-details" aria-label="Подробности прогресса">
-            <TrainingSection analytics={analytics} summary={summary.data} />
-            <CardioHistory
-              dateFrom={summary.data.period_start}
-              dateTo={summary.data.period_end}
-              summary={summary.data.cardio}
-              timeZone={resolvedTimeZone}
-            />
-            <BodySection
-              measurementDiary={measurementDiary}
-              summary={summary.data}
-              weightChartInOverview
-            />
-            <NutritionSection summary={summary.data} />
-            <div id="progress-reports">
-              <NutritionPeriodReport
-                controlledPeriod={controlledNutritionPeriod}
-                showSelector={false}
-              />
-            </div>
-            <AdherenceSection summary={summary.data} />
-          </div>
+          {view === 'overview' ? (
+            <>
+              <SummaryOverview search={search} summary={summary.data} />
+              <ProgressCategoryNav search={search} view={view} />
+            </>
+          ) : (
+            <>
+              <ProgressDetailHeader search={search} view={view} />
+              <ProgressCategoryNav search={search} view={view} />
+              <div className="progress-details" aria-label="Подробности прогресса">
+                {view === 'training' && (
+                  <TrainingSection analytics={analytics} summary={summary.data} />
+                )}
+                {view === 'cardio' && (
+                  <CardioHistory
+                    dateFrom={summary.data.period_start}
+                    dateTo={summary.data.period_end}
+                    summary={summary.data.cardio}
+                    timeZone={resolvedTimeZone}
+                  />
+                )}
+                {view === 'body' && (
+                  <BodySection measurementDiary={measurementDiary} summary={summary.data} />
+                )}
+                {view === 'nutrition' && (
+                  <>
+                    <NutritionSection isStale={summary.isPlaceholderData} summary={summary.data} />
+                    <div id="progress-reports">
+                      <NutritionPeriodReport
+                        controlledPeriod={controlledNutritionPeriod}
+                        showSelector={false}
+                      />
+                    </div>
+                  </>
+                )}
+                {(view === 'wellbeing' || view === 'history') && detailContent}
+                {(view === 'wellbeing' || view === 'history') && !detailContent && (
+                  <EmptyState
+                    title="Раздел пока недоступен"
+                    text="Попробуйте открыть его ещё раз."
+                  />
+                )}
+              </div>
+            </>
+          )}
         </>
       ) : null}
 
-      {summary.error && <TrainingSection analytics={analytics} />}
+      {summary.error && view === 'training' && <TrainingSection analytics={analytics} />}
     </div>
   );
 }

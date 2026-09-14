@@ -290,7 +290,8 @@ function installApi({
   });
 }
 
-function renderExperience() {
+function renderExperience(search = '') {
+  window.history.replaceState({}, '', `/app${search}`);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -313,19 +314,25 @@ describe('ProgressExperience', () => {
     installApi();
     renderExperience();
 
-    expect(await screen.findAllByText('84%')).toHaveLength(2);
+    expect(await screen.findByRole('heading', { name: 'Что изменилось' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Прогресс' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Тренировки' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Питание' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Соблюдение плана' })).toBeVisible();
+    expect(screen.getAllByRole('link', { name: /Тренировки/ })).toHaveLength(2);
+    expect(screen.queryByRole('heading', { name: 'Замеры и приоритеты' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Питание' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Соблюдение плана' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Скачать отчёт' })).toHaveAttribute(
       'href',
       '/app/report?period=days_30',
     );
     expect(screen.getByRole('img', { name: /Вес: 2 янв. — 69,4 кг/ })).toBeVisible();
 
-    fireEvent.click(screen.getByText('Жим штанги лёжа'));
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('link', {
+        name: /^Тренировки/,
+      }),
+    );
+    expect(await screen.findByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+    fireEvent.click(await screen.findByText('Жим штанги лёжа'));
     expect(screen.getByText('Детали тренировки')).toBeVisible();
     expect(screen.getByText('Показаны последние 20 тренировок упражнения.')).toBeVisible();
     expect(screen.queryByText('too_few_points')).not.toBeInTheDocument();
@@ -342,14 +349,16 @@ describe('ProgressExperience', () => {
       'Окружность плеча не измеряет отдельно бицепс или трицепс.',
     ];
     installApi({ summary });
-    renderExperience();
+    renderExperience('?section=progress&progress_view=body');
 
+    await screen.findByRole('heading', { name: 'Замеры и приоритеты' });
+    fireEvent.click(screen.getByText('Выбранные мышечные группы'));
     expect(await screen.findByText('Мышцы спины')).toBeVisible();
     expect(screen.getByText('Задняя поверхность тела')).toBeVisible();
     expect(
       screen.getByText(/Это предпочтение для планирования\. Оно не оценивает тело/),
     ).toBeVisible();
-    expect(screen.getAllByText('Окружность').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Талия').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('Как сравнивать замеры'));
     expect(screen.getByText('Снимайте замеры в похожее время суток.')).toBeVisible();
     expect(
@@ -359,8 +368,8 @@ describe('ProgressExperience', () => {
 
   it('requests both backend aggregates when the period changes', async () => {
     installApi();
-    renderExperience();
-    await screen.findAllByText('84%');
+    renderExperience('?section=progress&progress_view=training');
+    await screen.findByRole('heading', { name: 'Тренировки', level: 2 });
 
     fireEvent.click(
       within(screen.getByRole('tablist', { name: 'Период прогресса' })).getByRole('tab', {
@@ -411,6 +420,16 @@ describe('ProgressExperience', () => {
         points: [{ measured_on: '2030-01-29', value: 68.4 }],
       },
     ];
+    summary.data_sufficiency.weight_trend = {
+      status: 'limited',
+      counters: {
+        point_count: 1,
+        span_days: 0,
+        required_point_count: 3,
+        required_span_days: 14,
+      },
+      reason_keys: ['too_few_points'],
+    };
     summary.adherence.overall_percent = null;
     summary.adherence.included_components = [];
     summary.adherence.workouts = {
@@ -434,19 +453,31 @@ describe('ProgressExperience', () => {
     installApi({ summary, analytics });
     renderExperience();
 
-    expect(await screen.findByText('Пока не оценить')).toBeVisible();
-    expect(screen.getByText('0 новых рекордов')).toBeVisible();
-    expect(screen.getByText('История упражнений пока пуста')).toBeVisible();
-    expect(screen.getByText('Нет подтверждённых дней питания')).toBeVisible();
+    expect((await screen.findAllByText('Мало данных')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('История упражнений пока пуста')).not.toBeInTheDocument();
+    expect(screen.queryByText('Нет подтверждённых дней питания')).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('link', {
+        name: /^Тело/,
+      }),
+    );
+    expect(
+      await screen.findByText(
+        'Одна точка сохраняет факт, но ещё не показывает направление изменений.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/1 замер/)).toBeVisible();
+
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('link', {
+        name: /^Питание/,
+      }),
+    );
+    expect(await screen.findByText('Нет подтверждённых дней питания')).toBeVisible();
     expect(
       screen.getByText('0 частичных и 29 отсутствующих дней не входят в средние значения.'),
     ).toBeVisible();
-    expect(screen.getByText(/1 точка/)).toBeVisible();
-    expect(
-      screen.getByText('Одна точка сохраняет факт, но ещё не показывает направление изменений.'),
-    ).toBeVisible();
-    expect(screen.getByText('Нет цели или плана')).toBeVisible();
-    expect(screen.getAllByText('Мало данных').length).toBeGreaterThan(0);
   });
 
   it('shows a loading state without inventing zero values', () => {
@@ -459,7 +490,7 @@ describe('ProgressExperience', () => {
 
   it('keeps training analytics available when the main summary fails', async () => {
     installApi({ failSummary: true });
-    renderExperience();
+    renderExperience('?section=progress&progress_view=training');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Сводка временно недоступна');
     expect(await screen.findByText('Жим штанги лёжа')).toBeVisible();

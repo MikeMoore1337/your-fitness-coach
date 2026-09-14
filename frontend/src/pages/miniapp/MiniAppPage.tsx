@@ -20,6 +20,7 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { programProfileReadiness } from '../../features/profile/programReadiness';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import { parseProgressView } from '../../features/workouts/progressPeriods';
 import '../../styles/pulse-concepts.css';
 import '../../styles/semantic-cards.css';
 
@@ -210,18 +211,6 @@ function launchInviteToken(): string | null {
   return startParam?.startsWith('trainer_') ? startParam.slice('trainer_'.length) : null;
 }
 
-function ProgressCategoryNav() {
-  return (
-    <nav className="ux-progress-category-nav" aria-label="Категории прогресса">
-      <a href="#progress-body">Замеры</a>
-      <a href="#progress-training">Тренировки</a>
-      <a href="#progress-nutrition">Питание</a>
-      <a href="#progress-cardio">Кардио</a>
-      <a href="#progress-reports">Отчёты</a>
-    </nav>
-  );
-}
-
 export default function MiniAppPage() {
   const { user, reloadUser } = useAuth();
   const { navigate, search } = useNavigation();
@@ -256,6 +245,7 @@ export default function MiniAppPage() {
   const focusDailyWellbeing = new URLSearchParams(search).get('wellbeing') === '1';
   const focusCardio = new URLSearchParams(search).get('cardio') === '1';
   const focusMeasurements = requestedMeasurementsFocus(search);
+  const progressView = parseProgressView(search, window.location.hash);
   const dailyWellbeingDate = requestedWellbeingDate(search);
   const [focusedWorkout, setFocusedWorkout] = useState<{
     id: number;
@@ -435,24 +425,29 @@ export default function MiniAppPage() {
                   <HistoricalProgramWorkout {...historicalProgramWorkout} />
                 )}
                 <div className="stack progress-workout-stack">
-                  <ProgressCategoryNav />
                   <ProgressExperience
                     focusMeasurements={focusMeasurements}
+                    progressView={progressView}
                     timeZone={user?.profile?.timezone}
                     measurementDiary={
                       <Diary embedded onSaved={async () => void (await reloadUser())} />
                     }
-                  />
-                  <WeeklyCheckInCard
-                    autoFocus={focusWeeklyReview}
-                    userId={user?.id ?? 'anonymous'}
-                  />
-                  <WorkoutHistory
-                    timeZone={user?.profile?.timezone}
-                    focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
-                    focusedCommentId={requestedFeedback?.commentId}
-                    focusedExerciseId={requestedFeedback?.workoutExerciseId}
-                    onWorkoutSelect={(id, target) => setFocusedWorkout({ id, target })}
+                    detailContent={
+                      progressView === 'wellbeing' ? (
+                        <WeeklyCheckInCard
+                          autoFocus={focusWeeklyReview}
+                          userId={user?.id ?? 'anonymous'}
+                        />
+                      ) : progressView === 'history' ? (
+                        <WorkoutHistory
+                          timeZone={user?.profile?.timezone}
+                          focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
+                          focusedCommentId={requestedFeedback?.commentId}
+                          focusedExerciseId={requestedFeedback?.workoutExerciseId}
+                          onWorkoutSelect={(id, target) => setFocusedWorkout({ id, target })}
+                        />
+                      ) : null
+                    }
                   />
                 </div>
               </>

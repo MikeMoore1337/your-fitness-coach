@@ -3,10 +3,12 @@ import {
   inclusiveDays,
   nutritionPeriodForProgress,
   parseProgressSelection,
+  parseProgressView,
   progressApiQuery,
   progressPath,
   progressPeriodOptions,
   progressReportPath,
+  progressViewPath,
   selectionDateRange,
   validateCustomProgressRange,
 } from '../../../../src/features/workouts/progressPeriods';
@@ -80,5 +82,23 @@ describe('progress period contract', () => {
     expect(validateCustomProgressRange('2026-09-01', '2026-09-03', '2026-09-02')).toBe(
       'Нельзя выбрать будущую дату.',
     );
+  });
+
+  it('keeps overview and detail routes in the same period state', () => {
+    expect(parseProgressView('?section=progress')).toBe('overview');
+    expect(parseProgressView('?section=progress&progress_view=nutrition')).toBe('nutrition');
+    expect(parseProgressView('?section=progress&workout_id=42')).toBe('history');
+    expect(parseProgressView('?section=progress', '#progress-body')).toBe('body');
+    expect(
+      progressViewPath(
+        '?section=progress&progress_period=custom&progress_from=2026-01-01&progress_to=2026-01-30',
+        'nutrition',
+      ),
+    ).toBe(
+      '/app?section=progress&progress_period=custom&progress_from=2026-01-01&progress_to=2026-01-30&progress_view=nutrition',
+    );
+    expect(
+      progressViewPath('?section=progress&progress_period=days_90&progress_view=body', 'overview'),
+    ).toBe('/app?section=progress&progress_period=days_90');
   });
 });

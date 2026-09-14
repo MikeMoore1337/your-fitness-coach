@@ -375,6 +375,10 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
 
   await mobilePage.setViewportSize({ width: 1440, height: 900 });
   await mobilePage.goto('/app?section=progress');
+  await mobilePage
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Кардио/ })
+    .click();
   const history = mobilePage.locator('#progress-cardio');
   await history.scrollIntoViewIfNeeded();
   await expect(history.getByText('1 завершено')).toBeVisible();
@@ -871,6 +875,10 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
   ]);
 
   for (const currentPage of [tmaPage, mobilePage]) {
+    await currentPage
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('link', { name: /^Питание/ })
+      .click();
     const report = currentPage.locator('#nutrition-period-report');
     await expect(report.getByRole('heading', { name: 'Отчёт по питанию' })).toBeVisible();
     await expect(report.getByText('Заполнено 3 из 7 дней')).toBeVisible();
@@ -948,7 +956,9 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
   await expect(tmaPage).toHaveURL(/section=nutrition&date=.*return_to=/);
   await expect(tmaPage.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
   await tmaPage.getByRole('link', { name: 'К отчёту по питанию' }).click();
-  await expect(tmaPage).toHaveURL(/section=progress&progress_period=days_7/);
+  await expect(tmaPage).toHaveURL(/section=progress/);
+  await expect(tmaPage).toHaveURL(/progress_view=nutrition/);
+  await expect(tmaPage).toHaveURL(/progress_period=days_7/);
   await expect(tmaSelector.getByRole('tab', { name: '7 дней' })).toHaveAttribute(
     'aria-selected',
     'true',
@@ -968,9 +978,13 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   ]);
 
   for (const currentPage of [tmaPage, mobilePage]) {
+    await currentPage
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('link', { name: /^Тело/ })
+      .click();
     const body = currentPage.locator('#progress-body');
     await expect(body.getByText('Сбалансированное развитие')).toBeVisible();
-    await expect(body.getByText('Замеров за этот период нет')).toBeVisible();
+    await expect(body.getByText('Мало данных для динамики')).toBeVisible();
     await expect(body.getByText('Замеров пока нет')).toBeVisible();
     await expect(body.getByLabel('Вес, кг')).toHaveAttribute('inputmode', 'decimal');
     await body.getByLabel('Вес, кг').fill('74.2');
@@ -1067,6 +1081,10 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
   ]);
 
   for (const page of [tmaPage, mobilePage]) {
+    await page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('link', { name: /^Тренировки/ })
+      .click();
     const insufficient = page
       .getByRole('region', { name: 'Достаточно ли данных: Пока мало данных', exact: true })
       .filter({ hasText: '0 рабочих подходов' });
@@ -1076,7 +1094,9 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
     await expect(page.getByRole('link', { name: 'Открыть тренировку' })).toBeVisible();
     await expectLimeStartBoundary(insufficient);
     await expectNoHorizontalOverflow(page);
-    await expectTouchTargets(page.locator('#progress-body details > summary:visible'));
+    await expectTouchTargets(
+      page.locator('#progress-training .data-confidence__details > summary:visible'),
+    );
   }
   expect(await sharedSurfaceSignature(tmaPage)).toEqual(await sharedSurfaceSignature(mobilePage));
 
@@ -1088,6 +1108,10 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
   }
   await tmaPage.setViewportSize(MOBILE_CONTEXTS.baseline);
   await tma.setViewport(MOBILE_CONTEXTS.baseline.height, MOBILE_CONTEXTS.baseline.height);
+  await tmaPage
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Тело/ })
+    .click();
   const bodyConfidence = tmaPage
     .locator('#progress-body')
     .getByRole('region', { name: 'Достаточно ли данных: Пока мало данных', exact: true })
@@ -1140,6 +1164,10 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   });
 
   await tmaPage.goto('/app?section=progress');
+  await tmaPage
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('link', { name: /^Тренировки/ })
+    .click();
   await tma.setTheme('dark');
   await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   const training = tmaPage.locator('#progress-training');
@@ -2557,6 +2585,12 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
         await installPlatformApi(page, { browserSession: true });
       }
       await page.goto(scenario.path);
+      if (scenario.label === 'progress') {
+        await page
+          .getByRole('navigation', { name: 'Разделы прогресса' })
+          .getByRole('link', { name: /^Тело/ })
+          .click();
+      }
       if (scenario.label === 'today') {
         await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
       } else if (scenario.label === 'progress') {
@@ -2615,6 +2649,12 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
     const page = await browser.newPage({ viewport });
     await installPlatformApi(page, { browserSession: true });
     await page.goto(viewport.width === 768 ? '/app?section=progress' : '/app');
+    if (viewport.width === 768) {
+      await page
+        .getByRole('navigation', { name: 'Разделы прогресса' })
+        .getByRole('link', { name: /^Тело/ })
+        .click();
+    }
     const progressConfidences = page
       .locator('#progress-body')
       .getByRole('region', { name: /^Достаточно ли данных:/ });

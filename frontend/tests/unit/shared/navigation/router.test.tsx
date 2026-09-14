@@ -92,6 +92,12 @@ describe('NavigationProvider Telegram BackButton', () => {
     expect(focusedContextReturn('?section=programs&workout_id=43')).toBe('/app?section=programs');
   });
 
+  it('возвращает из detail-state Progress в Overview с выбранным периодом', () => {
+    expect(
+      focusedContextReturn('?section=progress&progress_period=days_90&progress_view=nutrition'),
+    ).toBe('/app?section=progress&progress_period=days_90');
+  });
+
   it('возвращает из публичного demo на landing без запуска защищённого TMA auth', async () => {
     window.history.replaceState({}, '', '/demo?scenario=trainer');
 

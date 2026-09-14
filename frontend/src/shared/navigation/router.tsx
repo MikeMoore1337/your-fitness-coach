@@ -25,6 +25,14 @@ const DEMO_CABINET_SECTIONS = new Set([
   'profile',
   'trainer',
 ]);
+const PROGRESS_DETAIL_VIEWS = new Set([
+  'body',
+  'training',
+  'nutrition',
+  'cardio',
+  'wellbeing',
+  'history',
+]);
 
 export function demoReturnPathFromLogin(search: string): string | null {
   const params = new URLSearchParams(search);
@@ -109,6 +117,16 @@ function progressReportReturn(search: string): string {
   return '/app?section=progress';
 }
 
+function progressOverviewReturn(search: string): string {
+  const current = new URLSearchParams(search);
+  const params = new URLSearchParams({ section: 'progress' });
+  for (const key of ['progress_period', 'progress_from', 'progress_to']) {
+    const value = current.get(key);
+    if (value) params.set(key, value);
+  }
+  return `/app?${params.toString()}`;
+}
+
 export function focusedContextReturn(search: string): string | null {
   const params = new URLSearchParams(search);
   const workoutId = params.get('workout_id');
@@ -119,6 +137,12 @@ export function focusedContextReturn(search: string): string | null {
       todayReturn(params.get('return_to')) ??
       (params.get('section') === 'programs' ? '/app?section=programs' : '/app?section=progress')
     );
+  }
+  if (
+    params.get('section') === 'progress' &&
+    PROGRESS_DETAIL_VIEWS.has(params.get('progress_view') ?? '')
+  ) {
+    return progressOverviewReturn(search);
   }
   if (params.get('weekly_review') === '1') return '/app';
   return null;
