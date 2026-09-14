@@ -61,6 +61,7 @@ SAFE_PROVIDER_NAMES = frozenset(
         "deterministic",
         "google",
         "groq",
+        "local_rapidocr",
         "local_tesseract",
         "open_food_facts",
         "openai_compatible",

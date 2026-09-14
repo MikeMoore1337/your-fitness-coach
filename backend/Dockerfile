@@ -18,6 +18,7 @@ RUN apt-get update \
     && apt-get upgrade --yes \
     && apt-get install -y --no-install-recommends \
         fonts-dejavu-core \
+        libgl1 \
         tesseract-ocr \
         tesseract-ocr-eng \
         tesseract-ocr-rus \
@@ -25,7 +26,11 @@ RUN apt-get update \
 COPY backend/requirements-runtime.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements-runtime.txt && pip check
+COPY scripts/fetch_rapidocr_models.py /app/scripts/fetch_rapidocr_models.py
+RUN python /app/scripts/fetch_rapidocr_models.py --output /opt/rapidocr/models
 RUN useradd --create-home --uid 10001 appuser
+RUN chmod 0555 /opt/rapidocr/models \
+    && chmod 0444 /opt/rapidocr/models/*.onnx
 COPY --chown=appuser:appuser backend/assets/ ./assets/
 COPY --chown=appuser:appuser backend/alembic/ ./alembic/
 COPY --chown=appuser:appuser backend/fitminiapp_api/ ./fitminiapp_api/

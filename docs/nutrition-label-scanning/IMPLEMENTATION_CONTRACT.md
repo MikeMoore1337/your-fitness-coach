@@ -20,10 +20,18 @@ Pipeline состоит из четырёх явно разделённых ша
 
 ## Local-only OCR runtime
 
-В production image добавлены Debian-пакеты `tesseract-ocr`, `tesseract-ocr-eng` и
-`tesseract-ocr-rus`. Python-код запускает только allowlisted executable `tesseract` через явный
-`argv`, `shell=False`, `stdin=DEVNULL`, timeout и bounded stdout. Поддерживаемые языки —
-`rus+eng`; текущая адаптерная версия — `tesseract-structured-adaptive-v3`.
+Task 128G добавляет primary engine `RapidOCR 3.9.2` на `ONNX Runtime 1.30.0` с
+`PP-OCRv5` mobile detector, textline classifier и Cyrillic/Russian recognizer. В production image
+модели копируются на этапе build только после потоковой SHA-256-проверки; runtime использует
+три явных `model_path` и не скачивает модели по пользовательскому запросу. Каталог по умолчанию —
+`/opt/rapidocr/models`, разрешённые файлы перечислены в `RAPIDOCR_MODEL_FILES`.
+
+RapidOCR работает CPU-only, с `intra_op_num_threads=1`, `inter_op_num_threads=1`, одним in-flight
+inference на singleton engine и явным cleanup OCR buffers после каждого результата. CPU memory
+arena отключён: это ограничивает рост RSS на повторных вызовах. Model initialization кэшируется
+процессом; timeout остаётся общим bounded OCR budget `8 s`, а отсутствие модели, timeout или
+ошибка runtime переводятся в controlled `local_ocr_*` error. `Tesseract 5.5.0` и `rus+eng`
+остаются только явным bounded fallback при `NUTRITION_LABEL_SCAN_OCR_ENGINE=tesseract`.
 
 Task 128F использует adaptive bounded набор из пяти вариантов изображения (консервативный ROI,
 grayscale, локальный контраст с denoise, inversion, adaptive threshold) и три фиксированных PSM:
@@ -43,15 +51,19 @@ Parser использует token text + `left/top/width/height`, block/paragrap
 unit-qualified value adjacency, required-field completeness, pair consistency, impossible-value
 и column-collision checks; длина распознанного текста не является критерием.
 
-Tesseract core распространяется под Apache License 2.0; репозиторий официальных `tessdata`
-указывает Apache-2.0 для training data. В образе нужно сохранять package/license manifest
-конкретного Debian release и отдельно учитывать лицензии транзитивных библиотек (в частности
-Leptonica). Источники: [Tesseract license](https://github.com/tesseract-ocr/tesseract/blob/main/LICENSE)
-и [tessdata README](https://github.com/tesseract-ocr/tessdata/blob/main/README.md).
+RapidOCR и upstream PaddleOCR-модели распространяются под Apache License 2.0, ONNX Runtime —
+под MIT; Tesseract core и официальные `tessdata` сохраняют Apache-2.0 fallback-контракт.
+Pinned Python dependencies и Debian packages остаются частью обычного dependency/image audit;
+новые прямые runtime dependencies — `rapidocr`, `onnxruntime`, их transitive runtime packages,
+`opencv-python` и системный `libgl1`. Источники: [RapidOCR repository](https://github.com/RapidAI/RapidOCR),
+[RapidOCR model list](https://rapidai.github.io/RapidOCRDocs/main/model_list/),
+[ONNX Runtime package](https://pypi.org/project/onnxruntime/),
+[Tesseract license](https://github.com/tesseract-ocr/tesseract/blob/main/LICENSE) и
+[tessdata README](https://github.com/tesseract-ocr/tessdata/blob/main/README.md).
 
 В Windows-разработке наличие CLI не предполагается: unit и integration tests подменяют OCR
-детерминированным synthetic engine. Это не является quality run. Результаты качества OCR остаются
-`NOT MEASURED` до owner-authorized runtime validation на locked corpus.
+детерминированным synthetic engine. Это не является quality run; historical pre-128G status был
+`NOT MEASURED`, а Task 128G добавил отдельный locked-corpus bakeoff ниже.
 
 ## Image ingress и privacy
 
@@ -141,18 +153,21 @@ Local YFC catalog checked first. Exact local barcode lookup завершаетс
 - production rollout после owner validation означает `NUTRITION_LABEL_SCAN_ENABLED=true` и
   `NUTRITION_LABEL_SCAN_KILL_SWITCH=false` для всех авторизованных пользователей.
 
-Для текущего кода environment change required: `no`; OCR limits и runtime contract не меняются.
-Для фактического public production rollout после прохождения gate потребуется операционная смена
-`NUTRITION_LABEL_SCAN_ENABLED=true` в deployment contract при сохранении
-`NUTRITION_LABEL_SCAN_KILL_SWITCH=false`; это rollout action, а не новая credential или provider
-настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны и не добавляются.
+Для Task 128G `env change required: yes`: в production `.env` нужно выставить
+`NUTRITION_LABEL_SCAN_OCR_ENGINE=rapidocr`, если там сохранено прежнее явное значение
+`tesseract`; новых secrets не требуется. `NUTRITION_LABEL_SCAN_OCR_MODEL_DIR` задавать не нужно,
+если используется стандартный image path `/opt/rapidocr/models`. Для фактического public rollout
+после HUMAN_EVIDENCE также потребуется операционная смена `NUTRITION_LABEL_SCAN_ENABLED=true`
+при сохранении `NUTRITION_LABEL_SCAN_KILL_SWITCH=false`; это rollout action, а не новая credential
+или provider настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны.
 
 ## Runtime OCR
 
-Backend runtime устанавливает локальный Tesseract OCR и языковые данные `eng`, `rus`, `osd`;
-проверенная container-сборка использует Tesseract 5.5.0. Вызов выполняется через явный `argv`
-с `shell=False`, явным `--dpi 300`, timeout и ограничением вывода. Tesseract и официальный `tessdata` распространяются
-под Apache-2.0; cloud/paid Vision и локальная LLM в этом pipeline не используются.
+Backend runtime устанавливает локальный RapidOCR/ONNX Runtime и pinned PP-OCRv5 model bundle;
+проверенная container-сборка использует Python 3.14 на `python:3.14-slim`, CPU-only inference,
+read-only model files и `appuser`. Tesseract 5.5.0 с `eng`, `rus`, `osd` остаётся explicit
+fallback через явный `argv`, `shell=False`, timeout и ограничение вывода. Raw image/OCR и cloud/
+paid Vision payloads в pipeline не сохраняются и не логируются.
 
 ## Verification status
 
@@ -170,10 +185,30 @@ Backend runtime устанавливает локальный Tesseract OCR и �
   candidates; clean strong candidate в deterministic tests завершает pipeline на одном pass.
   Это benchmark bounded runtime, не real-label accuracy и не device/TMA benchmark: production
   same-photo HUMAN_EVIDENCE остаётся обязательным.
+- Task 128G сравнил RapidOCR 3.9.2 + PP-OCRv5 Cyrillic/mobile с Tesseract 5.5.0 на одном
+  locked corpus из representative label и 31 synthetic PNG. RapidOCR на quality profile
+  (`Global/Det.max_side_len=2000`, ONNX threads `1/1`, CPU arena disabled) дал cold init
+  `585.9 ms`, warm p50 `1879.9 ms`, p95 `2228.2 ms`, max `2577.4 ms`; Tesseract на том же corpus дал
+  p50 `3614.2 ms`, p95 `4409.5 ms`, max `6606.1 ms`. RapidOCR не создал dangerous `2814 kcal`;
+  в `14/32` cases не было `missing_required_fact`, в `12/32` одновременно resolved basis и
+  все обязательные facts. Target label получил `per_100_g`, `281.4 kJ`, `66.8 kcal`, P/F/C
+  `8/2/4.2` без warnings. Quality profile ограничивает inference одним in-flight request;
+  container probe зафиксировал peak RSS `1,235,672 KiB` (около `1.18 GiB`), same-label warm p50
+  `2560.0 ms`, p95 `3961.2 ms` и CPU `2732.2 ms/request`; поэтому memory/concurrency bound
+  является обязательной частью rollout. Профиль `1000 px` был отвергнут:
+  peak RSS около `342 MiB`, но только `6/32` cases без missing required fact.
+- Task 128G production-like Docker build прошёл с `pip check`; model bundle содержит только три
+  pinned ONNX-файла размером `13,912,176 bytes`, скачанных и проверенных во время image build.
+  Образ `yfc-backend:128e-final` был `178,398,886 bytes`, образ с RapidOCR — `428,252,871 bytes`,
+  delta `+249,853,985 bytes` (`+238.3 MiB`). Runtime smoke от `appuser` подтвердил import,
+  read-only model access, explicit inference и target tokens; network/model download в request
+  path не используется. Эти цифры synthetic/container evidence, не real-label accuracy и не
+  device/TMA benchmark: production same-photo HUMAN_EVIDENCE остаётся обязательным.
 - После production HUMAN_EVIDENCE `503 local_ocr_timeout` на high-resolution label replay была
   воспроизведена в constrained `0.5-1 CPU` container: первый deskewed pass превышал старый
   `1.5 s` cap. Remediation оставляет общий request budget `8 s`, разрешает первому cold pass до
   `3.5 s`, а последующим pass оставляет `1.5 s`; локальный replay вернул reviewable draft без
   `503`. Это runtime regression evidence, а не подтверждение production real-label accuracy.
-- OCR recognition quality по реальным этикеткам, correction baseline и full corpus metrics
-  остаются `NOT MEASURED` до owner-authorized validation на production representative labels.
+- OCR recognition quality по реальным этикеткам, correction baseline и device/TMA metrics
+  остаются `NOT MEASURED` до owner-authorized validation на production representative labels;
+  Task 128G synthetic locked-corpus metrics приведены выше и не заменяют HUMAN_EVIDENCE.
