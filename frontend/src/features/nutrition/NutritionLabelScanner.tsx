@@ -832,7 +832,6 @@ export function NutritionLabelScanner({
             ref={inputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            capture="environment"
             onChange={(event) => {
               const selected = event.target.files?.[0];
               event.currentTarget.value = '';

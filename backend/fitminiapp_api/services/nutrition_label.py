@@ -55,8 +55,25 @@ from fitminiapp_api.schemas.nutrition_label import (
 )
 from fitminiapp_api.services.foods import get_food_response
 
-NUTRITION_LABEL_SOURCE_VERSION = "nutrition-label-local-v2"
-NUTRITION_LABEL_PROMPT_VERSION = "ocr-structured-multipass-v2"
+NUTRITION_LABEL_SOURCE_VERSION = "nutrition-label-local-v3"
+NUTRITION_LABEL_PROMPT_VERSION = "ocr-structured-adaptive-v3"
+OCR_BUDGET_EXHAUSTED_WARNING = "ocr_budget_exhausted"
+_STRONG_SUCCESS_BLOCKING_WARNINGS = frozenset(
+    {
+        "ambiguous_basis",
+        "serving_size_required_for_normalization",
+        "dv_as_mass",
+        "missing_required_fact",
+        "energy_unit_ambiguous",
+        "ambiguous_column",
+        "untrusted_numeric_token",
+        "energy_outlier",
+        "nutrient_outlier",
+        "energy_unit_conflict",
+        "energy_sanity_warning",
+        "unreadable_field",
+    }
+)
 logger = logging.getLogger("app")
 
 
@@ -154,7 +171,103 @@ def _parse_ocr_candidates(
     engine: OcrEngine,
     normalized_png: bytes,
 ) -> CanonicalDraft:
+    def parse_candidate(candidate: object) -> CanonicalDraft | None:
+        if not isinstance(candidate, OcrCandidate):
+            return None
+        try:
+            return build_draft_from_ocr(
+                candidate.text,
+                structured_tokens=candidate.tokens or None,
+                provider=engine.name,
+                model=engine.version,
+                prompt_version=NUTRITION_LABEL_PROMPT_VERSION,
+            )
+        except CanonicalNormalizationError:
+            return None
+
+    def is_strong_success(canonical: CanonicalDraft) -> bool:
+        if canonical.source_basis == "ambiguous":
+            return False
+        if _STRONG_SUCCESS_BLOCKING_WARNINGS.intersection(canonical.warnings):
+            return False
+        for field_name in ("protein_g", "fat_g", "carbohydrate_g"):
+            source_facts = getattr(canonical.source_facts, field_name) or []
+            if (
+                getattr(canonical.field_evidence, field_name) != "read"
+                or getattr(canonical.normalized_facts, field_name) is None
+                or len(source_facts) != 1
+                or source_facts[0].evidence != "read"
+                or source_facts[0].unit != NUTRIENT_UNITS[field_name]
+            ):
+                return False
+        energy_read = False
+        for field_name in ("energy_kcal", "energy_kj"):
+            source_facts = getattr(canonical.source_facts, field_name) or []
+            if (
+                getattr(canonical.field_evidence, field_name) == "read"
+                and getattr(canonical.normalized_facts, field_name) is not None
+                and len(source_facts) == 1
+                and source_facts[0].evidence == "read"
+                and source_facts[0].unit == NUTRIENT_UNITS[field_name]
+            ):
+                energy_read = True
+                break
+        return energy_read
+
+    def select_best(
+        parsed_candidates: list[tuple[tuple[int, ...], int, CanonicalDraft]],
+        *,
+        budget_exhausted: bool = False,
+    ) -> CanonicalDraft:
+        if not parsed_candidates:
+            raise CanonicalNormalizationError("ocr_candidates_unusable")
+        _, _, selected = max(parsed_candidates, key=lambda item: (item[0], -item[1]))
+        if budget_exhausted:
+            if not _has_reviewable_source_signal(selected):
+                raise LocalOcrError("local_ocr_timeout")
+            selected = selected.model_copy(
+                update={
+                    "warnings": list(
+                        dict.fromkeys([*selected.warnings, OCR_BUDGET_EXHAUSTED_WARNING])
+                    )
+                }
+            )
+        return selected
+
     extract_candidates = getattr(engine, "extract_candidates", None)
+    iter_candidates = getattr(engine, "iter_candidates", None)
+    if callable(iter_candidates):
+        stream_parsed_candidates: list[tuple[tuple[int, ...], int, CanonicalDraft]] = []
+        candidate_index = 0
+        iterator = iter_candidates(normalized_png)
+        budget_exhausted = False
+        try:
+            while True:
+                try:
+                    candidate = next(iterator)
+                except StopIteration:
+                    break
+                except LocalOcrError as exc:
+                    if exc.code != "local_ocr_timeout" or not stream_parsed_candidates:
+                        raise
+                    budget_exhausted = True
+                    break
+                if not isinstance(candidate, OcrCandidate):
+                    continue
+                canonical = parse_candidate(candidate)
+                if canonical is None:
+                    continue
+                score = score_nutrition_candidate(canonical, candidate.tokens)
+                stream_parsed_candidates.append((score.rank, candidate_index, canonical))
+                candidate_index += 1
+                if is_strong_success(canonical):
+                    return canonical
+        finally:
+            close = getattr(iterator, "close", None)
+            if callable(close):
+                close()
+        return select_best(stream_parsed_candidates, budget_exhausted=budget_exhausted)
+
     if not callable(extract_candidates):
         return build_draft_from_ocr(
             engine.extract_text(normalized_png),
@@ -166,24 +279,12 @@ def _parse_ocr_candidates(
     raw_candidates = tuple(extract_candidates(normalized_png))
     parsed_candidates: list[tuple[tuple[int, ...], int, CanonicalDraft]] = []
     for index, candidate in enumerate(raw_candidates):
-        if not isinstance(candidate, OcrCandidate):
-            continue
-        try:
-            canonical = build_draft_from_ocr(
-                candidate.text,
-                structured_tokens=candidate.tokens or None,
-                provider=engine.name,
-                model=engine.version,
-                prompt_version=NUTRITION_LABEL_PROMPT_VERSION,
-            )
-        except CanonicalNormalizationError:
+        canonical = parse_candidate(candidate)
+        if canonical is None or not isinstance(candidate, OcrCandidate):
             continue
         score = score_nutrition_candidate(canonical, candidate.tokens)
         parsed_candidates.append((score.rank, index, canonical))
-    if not parsed_candidates:
-        raise CanonicalNormalizationError("ocr_candidates_unusable")
-    _, _, selected = max(parsed_candidates, key=lambda item: (item[0], -item[1]))
-    return selected
+    return select_best(parsed_candidates)
 
 
 def _usable_read_fact_count(canonical: CanonicalDraft) -> int:

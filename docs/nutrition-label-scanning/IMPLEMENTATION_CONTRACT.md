@@ -23,14 +23,19 @@ Pipeline состоит из четырёх явно разделённых ша
 В production image добавлены Debian-пакеты `tesseract-ocr`, `tesseract-ocr-eng` и
 `tesseract-ocr-rus`. Python-код запускает только allowlisted executable `tesseract` через явный
 `argv`, `shell=False`, `stdin=DEVNULL`, timeout и bounded stdout. Поддерживаемые языки —
-`rus+eng`; текущая адаптерная версия — `tesseract-structured-multipass-v2`.
+`rus+eng`; текущая адаптерная версия — `tesseract-structured-adaptive-v3`.
 
-Task 128E запускает bounded набор из пяти вариантов изображения (консервативный ROI, grayscale,
-локальный контраст с denoise, adaptive threshold, inversion и один фиксированный малый deskew)
-и три фиксированных PSM: `6`, `4`, `11`. Каждый pass использует явный `argv`, TSV word-level
-output и общий timeout; число токенов, размер TSV, pixels preprocessing и суммарное число pass
-ограничены. Надёжная perspective correction и удаление table lines в production pipeline не
-включены: локальный synthetic probe не доказал устойчивого улучшения.
+Task 128F использует adaptive bounded набор из пяти вариантов изображения (консервативный ROI,
+grayscale, локальный контраст с denoise, inversion, adaptive threshold) и три фиксированных PSM:
+`6`, `4`, `11`. Evidence-backed priority начинается с `roi_deskew_minus_1_5_2x` и PSM `6`, затем
+идут PSM `4`/`11` и остальные варианты. Каждый pass использует явный `argv`, TSV word-level
+output, общий request budget `8 s` и bounded per-pass budget `1.5 s`; число токенов, размер TSV,
+pixels preprocessing и суммарное число pass ограничены. После каждого pass candidate проходит
+nutrition scoring: strong draft (resolved basis, energy, P/F/C, явные unit associations и без
+safety warnings) останавливает pipeline. Optional timeout после reviewable candidate возвращает
+лучший draft с warning `ocr_budget_exhausted`, а не удаляет уже полученные результаты. Надёжная
+perspective correction и удаление table lines в production pipeline не включены: локальный
+synthetic probe не доказал устойчивого улучшения.
 
 Parser использует token text + `left/top/width/height`, block/paragraph/line/word и confidence
 для детерминированной строковой/колоночной association. Кандидат выбирается по basis,
@@ -159,5 +164,10 @@ Backend runtime устанавливает локальный Tesseract OCR и �
   peak RSS `81404 KiB`, Tesseract CPU p50 `18.31 s` и p95 `20.71 s` на десять запусков;
   configured hard timeout — `8 s`. Эти цифры не являются real-label accuracy или device/TMA
   benchmark: production same-photo HUMAN_EVIDENCE остаётся обязательным.
+- Task 128F container profile на трёх locked synthetic layouts зафиксировал per-pass p95 до
+  `~764 ms`, peak RSS до `~130 MiB` и стабильный fallback в пределах `8 s` для ambiguous/noisy
+  candidates; clean strong candidate в deterministic tests завершает pipeline на одном pass.
+  Это benchmark bounded runtime, не real-label accuracy и не device/TMA benchmark: production
+  same-photo HUMAN_EVIDENCE остаётся обязательным.
 - OCR recognition quality по реальным этикеткам, correction baseline и full corpus metrics
   остаются `NOT MEASURED` до owner-authorized validation на production representative labels.
