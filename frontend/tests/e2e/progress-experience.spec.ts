@@ -1317,9 +1317,11 @@ test('notification deep-link opens exact workout feedback and preserves back nav
   await page.goto('/app?workout_id=43&comment_id=7&workout_exercise_id=55');
 
   await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
-  await expect(
-    page.getByText('Держите колени по направлению носков.', { exact: false }),
-  ).toBeVisible();
+  const feedbackDisclosure = page.locator('#workout-history-43 .workout-feedback-disclosure');
+  await expect(feedbackDisclosure).toHaveAttribute('open', '');
+  await expect(feedbackDisclosure.locator('.workout-feedback__body')).toContainText(
+    'Держите колени по направлению носков.',
+  );
   await expect(page.locator('#workout-comment-7')).toHaveClass(/is-focused/);
   await expect(page.locator('#workout-comment-7')).toHaveCount(1);
   await expect(page.getByText('Упражнение · Присед со штангой')).toBeVisible();

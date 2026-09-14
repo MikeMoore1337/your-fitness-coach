@@ -418,15 +418,24 @@ export function WorkoutFeedbackDisclosure({
   ...feedbackProps
 }: WorkoutFeedbackProps & { defaultOpen?: boolean }) {
   const auth = useOptionalAuth();
-  const [open, setOpen] = useState(defaultOpen || Boolean(feedbackProps.focusedCommentId));
+  const disclosureRequestKey =
+    feedbackProps.focusedCommentId ?? (defaultOpen ? 'default-open' : null);
+  const [open, setOpen] = useState(disclosureRequestKey !== null);
+  const [closedRequestKey, setClosedRequestKey] = useState<number | 'default-open' | null>(null);
+  const isOpen =
+    (disclosureRequestKey !== null && disclosureRequestKey !== closedRequestKey) || open;
 
   if (auth && feedbackProps.viewer === 'client' && !auth.user?.trainer) return null;
 
   return (
     <details
       className="workout-feedback-disclosure"
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      open={isOpen}
+      onToggle={(event) => {
+        const nextOpen = event.currentTarget.open;
+        setOpen(nextOpen);
+        setClosedRequestKey(nextOpen ? null : disclosureRequestKey);
+      }}
     >
       <summary>
         <span>
@@ -437,7 +446,7 @@ export function WorkoutFeedbackDisclosure({
         </span>
         <DisclosureIcon />
       </summary>
-      {open && <WorkoutFeedback {...feedbackProps} />}
+      {isOpen && <WorkoutFeedback {...feedbackProps} />}
     </details>
   );
 }
