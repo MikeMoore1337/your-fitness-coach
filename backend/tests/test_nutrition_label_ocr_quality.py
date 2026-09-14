@@ -354,6 +354,44 @@ def test_tesseract_timeout_kills_child_and_fails_closed(monkeypatch: pytest.Monk
     assert process.killed is True
 
 
+def test_default_pass_budget_allows_constrained_first_pass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = TesseractOcr(
+        languages="rus+eng",
+        timeout_seconds=8,
+        max_output_chars=50_000,
+        executable="fake-tesseract",
+    )
+    monkeypatch.setattr(
+        ocr_module,
+        "_iter_preprocessed_variants",
+        lambda _data: iter(
+            (ocr_module.PreprocessedVariant("roi_deskew_minus_1_5_2x", Image.new("RGB", (1, 1))),)
+        ),
+    )
+
+    calls = 0
+    budgets: list[float] = []
+
+    def fake_run(self, executable, image_path, psm, deadline):
+        nonlocal calls
+        del self, executable, image_path, psm
+        budgets.append(deadline - time.monotonic())
+        if calls == 0 and deadline - time.monotonic() < 3.0:
+            raise LocalOcrError("local_ocr_timeout")
+        calls += 1
+        return b"level\ttext\n"
+
+    monkeypatch.setattr(ocr_module.TesseractOcr, "_run_pass", fake_run)
+
+    candidates = tuple(engine.iter_candidates(b"normalized"))
+
+    assert len(candidates) == 3
+    assert budgets[0] > 3.0
+    assert all(budget <= 1.6 for budget in budgets[1:])
+
+
 def test_candidate_extraction_preserves_completed_candidates_before_optional_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -477,6 +515,7 @@ def test_pass_budget_is_bounded_and_each_priority_pair_runs_once(
         languages="rus+eng",
         timeout_seconds=1,
         pass_timeout_seconds=0.2,
+        initial_pass_timeout_seconds=0.2,
         max_output_chars=50_000,
         executable="fake-tesseract",
     )

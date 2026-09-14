@@ -21,7 +21,12 @@ OCR_MAX_VARIANTS = 5
 OCR_MAX_TOKENS = 4096
 OCR_MAX_PREPROCESSED_PIXELS = 12_000_000
 OCR_MAX_DIMENSION = 4096
+# Production-like constrained containers can need a little over three seconds for the first
+# high-resolution deskewed pass (Tesseract language/model startup plus the 2x ROI). Keep that
+# cold-start allowance separate from the normal per-pass budget; the request deadline remains
+# authoritative for the whole adaptive stream.
 OCR_DEFAULT_PASS_TIMEOUT_SECONDS = 1.5
+OCR_DEFAULT_INITIAL_PASS_TIMEOUT_SECONDS = 3.5
 
 # 128E's production-like benchmark found the deskewed ROI to be the first variant that
 # recovered all mandatory facts. Keep the fallback order explicit and bounded: each pair is
@@ -278,6 +283,7 @@ class TesseractOcr:
     max_output_chars: int
     executable: str | None = None
     pass_timeout_seconds: float = OCR_DEFAULT_PASS_TIMEOUT_SECONDS
+    initial_pass_timeout_seconds: float = OCR_DEFAULT_INITIAL_PASS_TIMEOUT_SECONDS
     name: str = "local_tesseract"
     version: str = OCR_PIPELINE_VERSION
 
@@ -319,10 +325,11 @@ class TesseractOcr:
             raise LocalOcrError("local_ocr_output_too_large")
         return stdout
 
-    def _effective_pass_timeout(self) -> float:
-        if self.timeout_seconds <= 0 or self.pass_timeout_seconds <= 0:
+    def _effective_pass_timeout(self, *, initial: bool = False) -> float:
+        configured = self.initial_pass_timeout_seconds if initial else self.pass_timeout_seconds
+        if self.timeout_seconds <= 0 or configured <= 0:
             raise LocalOcrError("local_ocr_timeout")
-        return min(self.timeout_seconds, self.pass_timeout_seconds)
+        return min(self.timeout_seconds, configured)
 
     def iter_candidates(self, normalized_png: bytes) -> Iterator[OcrCandidate]:
         """Yield bounded OCR candidates in priority order.
@@ -337,8 +344,8 @@ class TesseractOcr:
         executable = self.executable or shutil.which("tesseract")
         if not executable:
             raise LocalOcrError("local_ocr_unavailable")
-        pass_timeout = self._effective_pass_timeout()
         deadline = time.monotonic() + self.timeout_seconds
+        pass_index = 0
         candidate_count = 0
         try:
             with tempfile.TemporaryDirectory(prefix="yfc-label-") as directory:
@@ -352,6 +359,8 @@ class TesseractOcr:
                             if time.monotonic() >= deadline:
                                 raise LocalOcrError("local_ocr_timeout")
                             started = time.monotonic()
+                            pass_timeout = self._effective_pass_timeout(initial=pass_index == 0)
+                            pass_index += 1
                             pass_deadline = min(deadline, started + pass_timeout)
                             tsv = self._run_pass(executable, variant_path, psm, pass_deadline)
                             tokens = parse_tesseract_tsv(
