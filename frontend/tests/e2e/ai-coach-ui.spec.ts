@@ -231,10 +231,8 @@ async function installAiCoachApi(page: Page): Promise<void> {
       const userMessage = makeMessage(nextMessageId++, 'user', message, {
         status: invalidOutput ? 'failed' : 'complete',
         outcome: invalidOutput ? 'invalid_output' : null,
-        failure_category: invalidOutput ? 'structured_validation' : null,
-        limitations: invalidOutput
-          ? ['Не удалось безопасно проверить ответ. Попробуйте ещё раз.']
-          : [],
+        failure_category: invalidOutput ? 'repair_failed' : null,
+        limitations: invalidOutput ? ['Не удалось сформировать ответ. Повторить.'] : [],
       });
       conversation.messages.push(userMessage);
       conversation.title ??= message.slice(0, 80);
@@ -277,9 +275,9 @@ async function installAiCoachApi(page: Page): Promise<void> {
             data_class: personal ? 'personalized' : 'generic',
             answer: null,
             citations: [],
-            limitations: ['Не удалось безопасно проверить ответ. Попробуйте ещё раз.'],
+            limitations: ['Не удалось сформировать ответ. Повторить.'],
             safety_category: 'clear',
-            failure_category: 'structured_validation',
+            failure_category: 'repair_failed',
             prompt_version: 'ai-coach-chat-v1',
             request_id: 'e2e-invalid-output',
           },
@@ -437,7 +435,9 @@ test('AI Coach keeps follow-up history after reload and preserves failed draft',
   await input.fill('Проверка ошибки ответа');
   await page.getByRole('button', { name: 'Отправить' }).scrollIntoViewIfNeeded();
   await page.getByRole('button', { name: 'Отправить' }).click();
-  await expect(page.getByTestId('ai-coach-chat-failure')).toContainText('безопасно проверить');
+  await expect(page.getByTestId('ai-coach-chat-failure')).toContainText(
+    'Не удалось сформировать ответ. Повторить.',
+  );
   await expect(page.getByRole('textbox', { name: 'Сообщение AI Coach' })).toHaveValue(
     'Проверка ошибки ответа',
   );

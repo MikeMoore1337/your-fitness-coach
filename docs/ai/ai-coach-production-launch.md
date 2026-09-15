@@ -75,9 +75,9 @@ Production policy после нормализации:
   разрешённые немедицинские preferences и позволяет пользователю pause/revoke/edit/delete.
 - AI Coach не заменяет врача или тренера, не ставит диагнозы и не меняет canonical data.
 - В telemetry остаются только технические metadata: provider/model, outcome, error class,
-  attempts, latency, usage counters и version fields. Raw prompt, answer, personal context и
-  provider secret не попадают в логи; account-owned история чата хранится отдельно и удаляется
-  вместе с conversation/account.
+  repair flags, validation failure reason, attempts, latency, usage counters и version fields.
+  Raw prompt, answer, personal context и provider secret не попадают в логи; account-owned история
+  чата хранится отдельно и удаляется вместе с conversation/account.
 
 ## Failure and rollback
 

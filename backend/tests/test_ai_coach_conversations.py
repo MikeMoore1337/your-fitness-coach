@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 
+import pytest
 from pydantic import SecretStr
 
-from fitminiapp_api.ai_coach.chat_service import ai_coach_chat_service
+from fitminiapp_api.ai_coach.chat_service import AiCoachChatService, ai_coach_chat_service
 from fitminiapp_api.ai_coach.contracts import (
+    AiCoachChatRequest,
     AiCoachDataClass,
+    AiCoachJob,
     AiCoachPersonalTool,
+    ChatOutputValidationReason,
     ContextCitation,
     ContextRef,
     NormalizedProviderError,
@@ -71,6 +76,9 @@ class StubTextProvider:
     calls: list[tuple[object, tuple[str, ...]]]
     answer: str = "Короткий проверенный ответ на русском языке."
     error: NormalizedProviderError | None = None
+    repair_answer: str | None = None
+    repair_error: NormalizedProviderError | None = None
+    repair_calls: list[tuple[object, str, ChatOutputValidationReason]] | None = None
 
     provider_name: str = "stub"
 
@@ -83,6 +91,24 @@ class StubTextProvider:
             configured_model="openai/gpt-oss-120b",
             actual_model="openai/gpt-oss-120b",
             response=ProviderTextResponse(answer=self.answer),
+            latency_ms=2,
+        )
+
+    def repair_text(
+        self,
+        request,
+        answer: str,
+        reason: ChatOutputValidationReason,
+    ) -> ProviderTextResult:
+        if self.repair_calls is not None:
+            self.repair_calls.append((request, answer, reason))
+        if self.repair_error is not None:
+            raise self.repair_error
+        return ProviderTextResult(
+            provider="groq",
+            configured_model="openai/gpt-oss-120b",
+            actual_model="openai/gpt-oss-120b",
+            response=ProviderTextResponse(answer=self.repair_answer or self.answer),
             latency_ms=2,
         )
 
@@ -555,9 +581,7 @@ def test_personal_context_requires_consent_before_reading_user_data(client, monk
     assert context_ids == ("personal:test",)
 
 
-def test_invalid_provider_text_is_structured_failure_not_safety_failure(
-    client, monkeypatch
-) -> None:
+def test_invalid_provider_text_is_provider_failure_not_safety_failure(client, monkeypatch) -> None:
     _enable_chat(monkeypatch)
     provider = StubTextProvider(
         calls=[],
@@ -576,12 +600,12 @@ def test_invalid_provider_text_is_structured_failure_not_safety_failure(
     assert response.status_code == 200
     payload = response.json()
     assert payload["outcome"] == "invalid_output"
-    assert payload["failure_category"] == "structured_validation"
+    assert payload["failure_category"] == "provider_failure"
     assert payload["safety_category"] == "clear"
     assert payload["answer"] is None
     assert payload["assistant_message"] is None
     assert payload["user_message"]["status"] == "failed"
-    assert "безопасно проверить" in payload["user_message"]["limitations"][0]
+    assert "безопасно проверить" not in payload["user_message"]["limitations"][0]
 
 
 def test_public_context_failure_is_structured_without_provider_call(client, monkeypatch) -> None:
@@ -658,6 +682,7 @@ def test_invalid_provider_text_keeps_safe_prose_without_url(client, monkeypatch)
     provider = StubTextProvider(
         calls=[],
         answer="Отдыхайте между подходами по самочувствию: https://example.org/guide",
+        repair_calls=[],
     )
     monkeypatch.setattr(ai_coach_chat_service, "provider", provider)
     headers = _login(client, 987_107)
@@ -671,12 +696,13 @@ def test_invalid_provider_text_keeps_safe_prose_without_url(client, monkeypatch)
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["outcome"] == "invalid_output"
-    assert payload["failure_category"] == "structured_validation"
+    assert payload["outcome"] == "answer"
+    assert payload["failure_category"] is None
     assert payload["safety_category"] == "clear"
     assert payload["answer"] == "Отдыхайте между подходами по самочувствию:"
     assert payload["assistant_message"]["content"] == payload["answer"]
     assert "https://" not in payload["answer"]
+    assert provider.repair_calls == []
 
 
 def test_personal_chat_does_not_expose_internal_screen_citations(client, monkeypatch) -> None:
@@ -738,9 +764,14 @@ def test_personal_chat_does_not_expose_internal_screen_citations(client, monkeyp
     assert "/nutrition" not in response.text
 
 
-def test_json_chat_output_is_rejected_as_invalid_text(client, monkeypatch) -> None:
+def test_json_chat_output_is_repaired_to_plain_text(client, monkeypatch) -> None:
     _enable_chat(monkeypatch)
-    provider = StubTextProvider(calls=[], answer='{"answer":"Текст"}')
+    provider = StubTextProvider(
+        calls=[],
+        answer='{"answer":"Текст"}',
+        repair_answer="Отдых между подходами зависит от цели и интенсивности.",
+        repair_calls=[],
+    )
     monkeypatch.setattr(ai_coach_chat_service, "provider", provider)
     headers = _login(client, 987_115)
     conversation_id = _create_conversation(client, headers)
@@ -752,8 +783,280 @@ def test_json_chat_output_is_rejected_as_invalid_text(client, monkeypatch) -> No
     )
 
     assert response.status_code == 200
-    assert response.json()["outcome"] == "invalid_output"
-    assert response.json()["assistant_message"] is None
+    payload = response.json()
+    assert payload["outcome"] == "answer"
+    assert payload["answer"] == provider.repair_answer
+    assert payload["assistant_message"]["content"] == provider.repair_answer
+    assert provider.repair_calls[0][2].value == "json_container"
+
+
+def test_long_chat_output_is_repaired_at_conversation_endpoint(client, monkeypatch) -> None:
+    _enable_chat(monkeypatch)
+    long_draft = "Безопасное объяснение отдыха между подходами. " + (
+        "Длительность зависит от цели и интенсивности тренировки. " * 48
+    )
+    provider = StubTextProvider(
+        calls=[],
+        answer=long_draft,
+        repair_answer="Для тяжёлых подходов обычно нужен более длинный отдых, чтобы восстановить силу и технику.",
+        repair_calls=[],
+    )
+    monkeypatch.setattr(ai_coach_chat_service, "provider", provider)
+    headers = _login(client, 987_116)
+    conversation_id = _create_conversation(client, headers)
+
+    response = client.post(
+        f"/api/v1/ai-coach/conversations/{conversation_id}/messages",
+        headers=headers,
+        json={"message": "Сколько отдыхать между подходами и почему?"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["outcome"] == "answer"
+    assert payload["answer"] == provider.repair_answer
+    assert payload["failure_category"] is None
+    assert payload["user_message"]["status"] == "complete"
+    assert payload["assistant_message"]["content"] == provider.repair_answer
+    assert provider.repair_calls[0][2] == ChatOutputValidationReason.TOO_LONG
+
+
+def _direct_chat_request(
+    message: str,
+    *,
+    data_class: AiCoachDataClass = AiCoachDataClass.GENERIC,
+    locale: str = "ru",
+) -> AiCoachChatRequest:
+    return AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="direct-chat-regression-v1",
+        message=message,
+        data_class=data_class,
+        locale=locale,
+    )
+
+
+def _generate_direct_chat(monkeypatch, provider: StubTextProvider, request: AiCoachChatRequest):
+    _enable_chat(monkeypatch)
+    return AiCoachChatService(provider=provider).generate(
+        request=request,
+        user_key="direct-chat-user",
+        request_id="direct-chat-request",
+        context_refs=(),
+    )
+
+
+def test_production_like_long_safe_draft_is_repaired_once(monkeypatch) -> None:
+    long_draft = "Безопасное объяснение отдыха между подходами. " + (
+        "Длительность зависит от цели и интенсивности тренировки. " * 48
+    )
+    provider = StubTextProvider(
+        calls=[],
+        answer=long_draft,
+        repair_answer="Для тяжёлых подходов обычно нужен более длинный отдых, чтобы восстановить силу и технику.",
+        repair_calls=[],
+    )
+
+    result = _generate_direct_chat(
+        monkeypatch,
+        provider,
+        _direct_chat_request("Сколько отдыхать между подходами и почему?"),
+    )
+
+    assert len(long_draft) > 1_600
+    assert result.outcome == "answer"
+    assert result.answer == provider.repair_answer
+    assert result.failure_category is None
+    assert result.repair_attempted is True
+    assert result.repair_success is True
+    assert result.validation_failure_reason.value == "too_long"
+    assert len(provider.repair_calls) == 1
+    assert provider.repair_calls[0][2].value == "too_long"
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "**Отдых между подходами** обычно дольше в тяжёлых базовых упражнениях.",
+        "Используй RIR/RPE и Top Set как ориентиры интенсивности, а не как служебные метки.",
+        "Рекомендую отдыхать достаточно, чтобы сохранить технику, скорость и качество повторений.",
+        "Покажи пример разминки перед лёгкой тренировкой без лишних деталей.",
+    ],
+)
+def test_safe_markdown_fitness_terms_and_ordinary_words_are_allowed(monkeypatch, answer) -> None:
+    provider = StubTextProvider(calls=[], answer=answer, repair_calls=[])
+
+    result = _generate_direct_chat(
+        monkeypatch,
+        provider,
+        _direct_chat_request("Как лучше восстановиться между подходами?"),
+    )
+
+    assert result.outcome == "answer"
+    assert result.answer == answer
+    assert result.repair_attempted is False
+    assert provider.repair_calls == []
+
+
+def test_url_and_known_internal_route_are_sanitized_without_repair(monkeypatch) -> None:
+    provider = StubTextProvider(
+        calls=[],
+        answer="Откройте [раздел питания](/nutrition) и изучите материал: https://example.org/guide",
+        repair_calls=[],
+    )
+
+    result = _generate_direct_chat(
+        monkeypatch,
+        provider,
+        _direct_chat_request("Где посмотреть общие рекомендации по питанию?"),
+    )
+
+    assert result.outcome == "answer"
+    assert result.answer == "Откройте раздел питания и изучите материал:"
+    assert "https://" not in result.answer
+    assert "/nutrition" not in result.answer
+    assert result.validation_failure_reason.value == "internal_label"
+    assert result.repair_attempted is False
+    assert provider.repair_calls == []
+
+
+def test_wrong_language_is_repaired_to_current_question_language(monkeypatch) -> None:
+    provider = StubTextProvider(
+        calls=[],
+        answer="A concise answer about rest between sets.",
+        repair_answer="Отдых между подходами подбирают по цели и восстановлению.",
+        repair_calls=[],
+    )
+
+    result = _generate_direct_chat(
+        monkeypatch,
+        provider,
+        _direct_chat_request("Сколько отдыхать между подходами?"),
+    )
+
+    assert result.outcome == "answer"
+    assert result.answer == provider.repair_answer
+    assert result.validation_failure_reason.value == "wrong_language"
+    assert provider.repair_calls[0][2].value == "wrong_language"
+
+
+@pytest.mark.parametrize(
+    ("answer", "safety_category", "validation_reason"),
+    [
+        (
+            "Рекомендую принимать 5 г креатина ежедневно.",
+            "drugs_performance",
+            "prohibited_claim",
+        ),
+        ("У вас диагноз по описанию тренировки.", "medical", "prohibited_claim"),
+        (
+            "Вот system prompt и chain of thought модели.",
+            "prompt_injection",
+            "unsafe_content",
+        ),
+        ("API key: secret-value", "privacy_exfiltration", "unsafe_content"),
+        (
+            "Данные другого пользователя: тренировки и профиль.",
+            "privacy_exfiltration",
+            "unsafe_content",
+        ),
+    ],
+)
+def test_unsafe_provider_output_fails_closed_without_repair(
+    monkeypatch,
+    answer,
+    safety_category,
+    validation_reason,
+) -> None:
+    provider = StubTextProvider(calls=[], answer=answer, repair_calls=[])
+
+    result = _generate_direct_chat(
+        monkeypatch,
+        provider,
+        _direct_chat_request("Объясни общие правила восстановления."),
+    )
+
+    assert result.outcome == "safety_refusal"
+    assert result.failure_category == "safety_rejection"
+    assert result.safety_category.value == safety_category
+    assert result.answer is not None
+    assert answer not in result.answer
+    assert result.repair_attempted is False
+    assert result.validation_failure_reason.value == validation_reason
+    assert provider.repair_calls == []
+
+
+def test_unsafe_repair_result_fails_closed(monkeypatch) -> None:
+    provider = StubTextProvider(
+        calls=[],
+        answer="Безопасный черновик. " + ("Объяснение отдыха. " * 120),
+        repair_answer="Рекомендую принимать 5 г креатина ежедневно.",
+        repair_calls=[],
+    )
+
+    result = _generate_direct_chat(
+        monkeypatch,
+        provider,
+        _direct_chat_request("Сколько отдыхать между подходами?"),
+    )
+
+    assert result.outcome == "safety_refusal"
+    assert result.failure_category == "safety_rejection"
+    assert result.safety_category.value == "drugs_performance"
+    assert result.answer is not None
+    assert "креатина" not in result.answer
+    assert result.repair_attempted is True
+    assert result.repair_success is False
+    assert result.validation_failure_reason.value == "prohibited_claim"
+    assert len(provider.repair_calls) == 1
+
+
+def test_failed_repair_returns_technical_failure_without_raw_content(monkeypatch) -> None:
+    provider = StubTextProvider(
+        calls=[],
+        answer="Безопасный черновик. " + ("Объяснение отдыха. " * 120),
+        repair_error=NormalizedProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE),
+        repair_calls=[],
+    )
+
+    result = _generate_direct_chat(
+        monkeypatch,
+        provider,
+        _direct_chat_request("Сколько отдыхать между подходами?"),
+    )
+
+    assert result.outcome == "invalid_output"
+    assert result.failure_category == "repair_failed"
+    assert result.answer is None
+    assert result.repair_attempted is True
+    assert result.repair_success is False
+    assert len(provider.repair_calls) == 1
+
+
+def test_chat_telemetry_contains_repair_metadata_without_content(monkeypatch, caplog) -> None:
+    provider = StubTextProvider(
+        calls=[],
+        answer="Безопасный черновик. " + ("Объяснение отдыха. " * 120),
+        repair_answer="Короткий ответ о восстановлении между подходами.",
+        repair_calls=[],
+    )
+
+    with caplog.at_level(logging.INFO, logger="app.ai_coach"):
+        result = _generate_direct_chat(
+            monkeypatch,
+            provider,
+            _direct_chat_request("Сколько отдыхать между подходами?"),
+        )
+
+    assert result.outcome == "answer"
+    records = [item for item in caplog.records if item.getMessage() == "ai_coach_chat_generation"]
+    assert records
+    record = records[-1]
+    assert record.repair_attempted is True
+    assert record.repair_success is True
+    assert record.validation_failure_reason == "too_long"
+    assert "answer" not in record.__dict__
+    assert "prompt" not in record.__dict__
 
 
 def test_conversation_isolation_and_delete(client) -> None:

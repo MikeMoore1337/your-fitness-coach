@@ -69,11 +69,16 @@ const MEMORY_CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CHAT_FAILURE_COPY: Record<string, string> = {
-  provider_failure: 'AI Coach временно недоступен. Попробуйте ещё раз позже.',
+  safety_rejection: 'Я не могу помочь с этим запросом в таком виде.',
+  provider_failure: 'AI Coach сейчас не ответил. Попробуйте ещё раз.',
+  repair_failed: 'Не удалось сформировать ответ. Повторить.',
+  presentation_validation_failed: 'Не удалось сформировать ответ. Повторить.',
+  internal_error: 'Не удалось сформировать ответ. Повторить.',
   structured_validation: 'Не удалось безопасно проверить ответ. Попробуйте ещё раз.',
   timeout: 'Ответ занял слишком много времени. Попробуйте ещё раз.',
   context_failure: 'Не удалось получить материалы для ответа. Попробуйте ещё раз позже.',
   generation_failure: 'Не удалось получить проверенный ответ. Попробуйте ещё раз.',
+  rate_limit: 'Лимит AI Coach исчерпан. Попробуйте позже.',
   rate_limited: 'Лимит AI Coach исчерпан. Попробуйте позже.',
 };
 

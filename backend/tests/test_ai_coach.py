@@ -20,6 +20,7 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachJob,
     AiCoachPolicy,
     AiCoachRequest,
+    ChatOutputValidationReason,
     ContextCitation,
     ContextRef,
     NormalizedProviderError,
@@ -856,6 +857,73 @@ def test_groq_adapter_sends_plain_text_chat_without_report_json(monkeypatch) -> 
     assert "response_format" not in payload
     assert "tools" not in payload
     assert "без JSON" in payload["messages"][0]["content"]
+
+
+def test_groq_adapter_repair_stays_plain_text_and_bounded(monkeypatch) -> None:
+    _enable_provider(monkeypatch)
+    captured: dict[str, object] = {}
+    raw_response = {
+        "model": "openai/gpt-oss-120b",
+        "choices": [
+            {
+                "finish_reason": "stop",
+                "message": {"content": "Короткий исправленный ответ."},
+            }
+        ],
+    }
+
+    class FakeResponse:
+        status_code = 200
+        headers: ClassVar[dict[str, str]] = {}
+        content = json.dumps(raw_response, ensure_ascii=False).encode("utf-8")
+
+        def json(self):
+            return raw_response
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            captured["client_kwargs"] = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
+            return None
+
+        def post(self, endpoint, *, headers, json):
+            captured["endpoint"] = endpoint
+            captured["headers"] = headers
+            captured["json"] = json
+            return FakeResponse()
+
+    monkeypatch.setattr("fitminiapp_api.ai_coach.providers.httpx.Client", FakeClient)
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge-test-v1",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+
+    result = GroqDirectAdapter().repair_text(
+        request,
+        "Черновик с URL https://example.org и лишней длиной.",
+        ChatOutputValidationReason.URL,
+    )
+
+    assert result.response == ProviderTextResponse(answer="Короткий исправленный ответ.")
+    payload = captured["json"]
+    assert isinstance(payload, dict)
+    assert "response_format" not in payload
+    assert "tools" not in payload
+    assert "Черновик с URL" in payload["messages"][1]["content"]
+    assert "URL" in payload["messages"][1]["content"]
+
+
+def test_provider_text_response_keeps_repair_headroom_but_remains_bounded() -> None:
+    accepted = ProviderTextResponse(answer="а" * 1_601)
+    assert len(accepted.answer) == 1_601
+    with pytest.raises(ValidationError):
+        ProviderTextResponse(answer="а" * 8_001)
 
 
 def test_chat_prompt_sends_real_history_without_internal_context_labels() -> None:
