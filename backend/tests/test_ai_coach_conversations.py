@@ -463,7 +463,7 @@ def test_personal_follow_up_reuses_previous_context_scope(client, monkeypatch) -
 
 def test_chat_passes_bounded_follow_up_history_and_survives_reload(client, monkeypatch) -> None:
     _enable_chat(monkeypatch)
-    provider = StubTextProvider(calls=[])
+    provider = StubTextProvider(calls=[], answer="Первая строка ответа.\n\nВторая строка ответа.")
     monkeypatch.setattr(ai_coach_chat_service, "provider", provider)
     headers = _login(client, 987_101)
     conversation_id = _create_conversation(client, headers)

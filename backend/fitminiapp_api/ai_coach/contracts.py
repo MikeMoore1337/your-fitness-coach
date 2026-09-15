@@ -170,8 +170,10 @@ class AiCoachConversationTurn(BaseModel):
     @field_validator("content")
     @classmethod
     def normalize_content(cls, value: str) -> str:
-        normalized = unicodedata.normalize("NFKC", value).strip()
-        if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
+        normalized = (
+            unicodedata.normalize("NFKC", value).replace("\r\n", "\n").replace("\r", "\n").strip()
+        )
+        if not normalized or any(ord(char) < 0x20 and char not in "\t\n" for char in normalized):
             raise ValueError("conversation content must be a single safe text value")
         return normalized
 
