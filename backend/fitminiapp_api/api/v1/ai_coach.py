@@ -93,6 +93,7 @@ from fitminiapp_api.services.ai_coach_consent import (
 )
 from fitminiapp_api.services.ai_coach_conversations import (
     add_assistant_message,
+    add_message_request,
     add_user_message,
     conversation_response,
     create_conversation,
@@ -102,6 +103,7 @@ from fitminiapp_api.services.ai_coach_conversations import (
     get_owned_conversation,
     has_later_messages,
     history_turns,
+    is_processing_message,
     list_conversations,
     list_processing_user_messages,
     mark_user_message_result,
@@ -520,7 +522,9 @@ def _recover_stale_processing_messages(db: Session, *, conversation) -> None:
 
 
 def _reset_message_for_processing(message, *, request_id: str) -> None:
-    message.status = "processing"
+    # The production schema keeps the original complete/failed check
+    # constraint. The nullable timestamp is the durable in-flight marker.
+    message.status = "failed"
     message.outcome = None
     message.safety_category = "clear"
     message.failure_category = None
@@ -723,7 +727,7 @@ def send_ai_coach_conversation_message(
                 status_code=409,
                 detail="Этот request id уже связан с другим сообщением AI Coach",
             )
-        if existing.status == "processing":
+        if is_processing_message(existing):
             if not _processing_is_stale(existing):
                 raise HTTPException(
                     status_code=409,
@@ -774,7 +778,7 @@ def send_ai_coach_conversation_message(
                     status_code=409,
                     detail="Этот request id уже связан с другим сообщением AI Coach",
                 )
-            if existing.status == "processing":
+            if is_processing_message(existing):
                 if not _processing_is_stale(existing):
                     raise HTTPException(
                         status_code=409,
@@ -833,7 +837,7 @@ def retry_ai_coach_conversation_message(
     if idempotent_message is not None:
         if idempotent_message.id != message_id:
             raise HTTPException(status_code=409, detail="Этот request id уже используется")
-        if idempotent_message.status == "processing":
+        if is_processing_message(idempotent_message):
             if not _processing_is_stale(idempotent_message):
                 raise HTTPException(
                     status_code=409,
@@ -876,6 +880,7 @@ def retry_ai_coach_conversation_message(
         for item in history_turns(db, conversation_id=conversation.id)
     )
     _reset_message_for_processing(user_message, request_id=request_id)
+    add_message_request(db, message=user_message, request_id=request_id)
     db.commit()
     generation = _generate_conversation_message(
         db=db,

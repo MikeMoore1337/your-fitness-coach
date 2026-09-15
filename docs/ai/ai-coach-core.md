@@ -115,8 +115,11 @@ quota remaining/limit/reset и nullable usage. Текст запроса, answer
 raw provider payload и содержимое reservation в логи не записываются.
 
 Миграция `0086_ai_coach_conversations` добавляет только account-owned history, а additive migration
-`0088_ai_coach_durable_quota` добавляет durable quota/reservation и metadata для processing и
-idempotency. Account export
+`0088_ai_coach_durable_quota` добавляет durable quota/reservation, request-key table и metadata для
+processing и idempotency. Expand не меняет существующий check `status IN ('complete', 'failed')`:
+in-flight сообщение хранится как `failed` с непустым `processing_started_at`, а API сериализует
+его эффективный статус как `processing`. Это сохраняет online rollout без table rewrite и
+одновременно даёт crash recovery. Account export
 включает историю и безопасные display metadata; удаление account удаляет messages перед
 conversation shell и quota rows по account cascade. Production helper закрепляет
 `AI_COACH_QUOTA_WINDOW_SECONDS=86400` и `AI_COACH_PER_USER_REQUEST_LIMIT=20`; provider, model,

@@ -121,9 +121,14 @@ idempotency key одного пользовательского turn: повто
 ## Quota и повторная отправка
 
 `0088_ai_coach_durable_quota` добавляет additive PostgreSQL-таблицы
-`ai_coach_quota_windows` и `ai_coach_quota_reservations`, а также metadata processing для
-сообщений. Quota хранит только account identity, тип окна, timestamps, limit/counter и opaque
-request key; prompt, answer, context и fitness data в quota storage не попадают. Один message
+`ai_coach_quota_windows`, `ai_coach_quota_reservations` и
+`ai_coach_conversation_message_requests`, а также nullable metadata processing для сообщений.
+Существующий message status check не переписывается: in-flight row имеет `status='failed'` и
+непустой `processing_started_at`, а transport возвращает эффективный статус `processing`.
+Уникальная request-key row создаётся в одной транзакции с user message; при конкурентном
+конфликте откатывается вся новая message, поэтому duplicate user turn не сохраняется. Quota
+хранит только account identity, тип окна, timestamps, limit/counter и opaque request key;
+prompt, answer, context и fitness data в quota storage не попадают. Один message
 может занять максимум одну reservation. Она считается только после успешного проверенного ответа;
 provider timeout/5xx/429, invalid или malformed output, internal/safety/validation failure и
 неудачный repair освобождают reservation. Внутренний retry/repair и клиентский replay того же

@@ -101,6 +101,14 @@ def test_ai_coach_conversations_migration_satisfies_production_online_contract()
     )
 
 
+def test_ai_coach_quota_migration_satisfies_production_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(
+        root / "backend" / "alembic" / "versions" / "0088_ai_coach_durable_quota.py"
+    )
+
+
 def test_online_migration_rejects_index_on_existing_table(tmp_path: Path) -> None:
     path = _migration(
         tmp_path / "0065_existing_index.py",
