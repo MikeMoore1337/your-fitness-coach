@@ -10,6 +10,7 @@ from fitminiapp_api.schemas.demo import (
     DemoSessionCreated,
     DemoSessionCreateRequest,
     DemoSessionSnapshot,
+    DemoTransportRequest,
 )
 from fitminiapp_api.services.demo_sessions import (
     DemoActionForbiddenError,
@@ -83,6 +84,21 @@ def get_demo_session(
     del request
     _no_store(response)
     return DemoSessionSnapshot(**_snapshot_or_error(lambda: demo_session_store.get(token)))
+
+
+@router.post("/sessions/current/transport")
+@limiter.limit("240/minute")
+def transport_demo_request(
+    request: Request,
+    response: Response,
+    payload: DemoTransportRequest,
+    token: str = Depends(_demo_token),
+) -> Any:
+    del request
+    _no_store(response)
+    return _snapshot_or_error(
+        lambda: demo_session_store.transport(token, payload.path, payload.method, payload.body)
+    )
 
 
 @router.post("/sessions/current/actions", response_model=DemoSessionSnapshot)

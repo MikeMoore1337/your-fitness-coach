@@ -47,6 +47,7 @@ import {
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
 import { isPwaStandalone } from '../../shared/pwa/pwaRuntime';
+import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 
 export function formatTodayHeading(value: string): { title: string } {
   const weekday = formatCalendarDate(value, { weekday: 'long' });
@@ -378,6 +379,7 @@ function WorkoutOverview({
   onOpenDetails,
   onAddActivity,
   onStart,
+  canMutateProgress,
 }: {
   today: string;
   workout?: Workout;
@@ -390,6 +392,7 @@ function WorkoutOverview({
   onOpenDetails(): void;
   onAddActivity(): void;
   onStart(): void;
+  canMutateProgress: boolean;
 }) {
   const { user } = useAuth();
   const trackPrimaryAction = (
@@ -517,7 +520,14 @@ function WorkoutOverview({
               Посмотреть упражнения
             </Button>
           ) : null}
-          {!started && <WorkoutAdaptation workout={workout} entryContext="today" />}
+          {!started &&
+            (canMutateProgress ? (
+              <WorkoutAdaptation workout={workout} entryContext="today" />
+            ) : (
+              <p className="muted demo-capability-notice" role="status">
+                Изменение плана тренировки доступно после входа.
+              </p>
+            ))}
         </div>
       </>
     );
@@ -626,9 +636,20 @@ function WorkoutOverview({
         >
           Добавить питание
         </AppLink>
-        <Button fullWidth variant="secondary" type="button" onClick={onAddActivity}>
+        <Button
+          disabled={!canMutateProgress}
+          fullWidth
+          variant="secondary"
+          type="button"
+          onClick={onAddActivity}
+        >
           Добавить активность
         </Button>
+        {!canMutateProgress && (
+          <p className="muted demo-capability-notice" role="status">
+            Добавление активности доступно после входа.
+          </p>
+        )}
       </div>
     </>
   );
@@ -694,6 +715,7 @@ export function TodayDashboard({
   initialCardioOpen?: boolean;
 } = {}) {
   const { user } = useAuth();
+  const capabilities = useRuntimeCapabilities();
   const { toast } = useFeedback();
   const { navigate, search } = useNavigation();
   const queryClient = useQueryClient();
@@ -1035,6 +1057,7 @@ export function TodayDashboard({
                 onOpenDetails={() => setDetailsOpen(true)}
                 onAddActivity={() => setCardioOpenRequest((request) => request + 1)}
                 onStart={() => visibleWorkout && start.mutate(visibleWorkout.id)}
+                canMutateProgress={capabilities.canMutateProgress}
               />
             )}
           </section>
@@ -1065,27 +1088,44 @@ export function TodayDashboard({
           <NutritionSummary date={selectedDate} today={today} />
           <ProgressSummaryPanel summary={progress} />
           {user && wellbeingRequested && (
-            <DailyWellbeingCheckIn
-              autoFocus={initialWellbeingOpen}
-              initialDate={initialWellbeingDate || selectedDate}
-              key={`${user.id}:${initialWellbeingDate || selectedDate}:${
-                initialWellbeingOpen ? 'open' : 'closed'
-              }`}
-              timeZone={timeZone}
-              userId={user.id}
-            />
+            <>
+              {!capabilities.canMutateProgress && (
+                <p className="muted demo-capability-notice" role="status">
+                  Отметка самочувствия доступна после входа. В демо ответы не отправляются.
+                </p>
+              )}
+              <fieldset
+                className="demo-capability-fieldset"
+                disabled={!capabilities.canMutateProgress}
+              >
+                <DailyWellbeingCheckIn
+                  autoFocus={initialWellbeingOpen}
+                  initialDate={initialWellbeingDate || selectedDate}
+                  key={`${user.id}:${initialWellbeingDate || selectedDate}:${
+                    initialWellbeingOpen ? 'open' : 'closed'
+                  }`}
+                  timeZone={timeZone}
+                  userId={user.id}
+                />
+              </fieldset>
+            </>
           )}
         </div>
       </div>
 
-      {cardioOpenRequest > 0 && (
-        <CardioQuickLog
-          key={`${selectedDate}:${cardioOpenRequest}`}
-          onDismiss={dismissCardioRequest}
-          startOpen
-          today={selectedDate}
-        />
-      )}
+      {cardioOpenRequest > 0 &&
+        (capabilities.canMutateProgress ? (
+          <CardioQuickLog
+            key={`${selectedDate}:${cardioOpenRequest}`}
+            onDismiss={dismissCardioRequest}
+            startOpen
+            today={selectedDate}
+          />
+        ) : (
+          <p className="muted demo-capability-notice" role="status">
+            Добавление cardio-активности доступно после входа.
+          </p>
+        ))}
 
       {profileMissing && (
         <aside className="today-profile-nudge">

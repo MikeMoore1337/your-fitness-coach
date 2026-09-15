@@ -84,10 +84,12 @@ export function TemplatesList({
   children,
   defaultLibraryOpen = false,
   mode = 'full',
+  readOnly = false,
 }: {
   children?: ReactNode;
   defaultLibraryOpen?: boolean;
   mode?: 'full' | 'summary';
+  readOnly?: boolean;
 }) {
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
@@ -370,9 +372,13 @@ export function TemplatesList({
             {mode === 'summary' ? (
               <div className="program-active__summary">
                 <span>Ближайшие тренировки и календарь — в разделе «План».</span>
-                <AppLink className="button-link" to="/app?section=programs&view=manage">
-                  Управление программой
-                </AppLink>
+                {readOnly ? (
+                  <span className="muted">Управление доступно после входа.</span>
+                ) : (
+                  <AppLink className="button-link" to="/app?section=programs&view=manage">
+                    Управление программой
+                  </AppLink>
+                )}
               </div>
             ) : (
               <>
@@ -455,18 +461,24 @@ export function TemplatesList({
             <div className="program-active__actions">
               {mode === 'summary' ? (
                 <>
-                  <AppLink
-                    className="button-link program-wizard__anchor"
-                    to="/app?section=programs&view=manage&start=create"
-                  >
-                    Создать свою программу
-                  </AppLink>
-                  <AppLink
-                    className="secondary program-wizard__anchor"
-                    to="/app?section=programs&view=manage&start=templates"
-                  >
-                    Программы и шаблоны
-                  </AppLink>
+                  {readOnly ? (
+                    <span className="muted">Создание и выбор программы доступны после входа.</span>
+                  ) : (
+                    <>
+                      <AppLink
+                        className="button-link program-wizard__anchor"
+                        to="/app?section=programs&view=manage&start=create"
+                      >
+                        Создать свою программу
+                      </AppLink>
+                      <AppLink
+                        className="secondary program-wizard__anchor"
+                        to="/app?section=programs&view=manage&start=templates"
+                      >
+                        Программы и шаблоны
+                      </AppLink>
+                    </>
+                  )}
                 </>
               ) : (
                 <>

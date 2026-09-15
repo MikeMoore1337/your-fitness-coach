@@ -1,15 +1,19 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { demoFixture } from '../../../e2e/fixtures/demo-session';
-import type { DemoScenario, DemoSessionSnapshot } from '../../../../src/features/demo/demoApi';
+import type { DemoScenario } from '../../../../src/features/demo/demoApi';
+import { getDemoRouteState } from '../../../../src/features/demo/demoRoute';
 import DemoPage from '../../../../src/pages/demo/DemoPage';
 import { NavigationProvider } from '../../../../src/shared/navigation/router';
+import { PwaProvider } from '../../../../src/shared/pwa/PwaProvider';
 
 const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
   clearAll: vi.fn(),
   clear: vi.fn(),
+  getToken: vi.fn(() => 'demo-token-000000000000000000000000000000'),
   load: vi.fn(),
   reset: vi.fn(),
   start: vi.fn(),
@@ -23,80 +27,60 @@ vi.mock('../../../../src/features/demo/demoApi', async (importOriginal) => {
     applyDemoAction: mocks.apply,
     clearAllDemoSessions: mocks.clearAll,
     clearDemoSession: mocks.clear,
+    getDemoSessionToken: mocks.getToken,
     loadDemoSession: mocks.load,
     resetDemoSession: mocks.reset,
     startDemoSession: mocks.start,
   };
 });
 
-vi.mock('../../../../src/shared/analytics/productEvents', () => ({
-  productEventSurface: () => 'mobile_web',
-  trackProductEvent: mocks.track,
+vi.mock('../../../../src/shared/analytics/productEvents', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../../../src/shared/analytics/productEvents')>();
+  return { ...actual, productEventSurface: () => 'mobile_web', trackProductEvent: mocks.track };
+});
+
+vi.mock('../../../../src/pages/demo/DemoAuthProvider', () => ({
+  default: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock('../../../../src/pages/miniapp/MiniAppPage', () => ({
+  default: ({ sectionOverride }: { sectionOverride?: string }) => (
+    <section data-testid="production-mini-app">
+      <h1>
+        {sectionOverride === 'programs' ? 'Production plan' : `Production ${sectionOverride}`}
+      </h1>
+      <button type="button">Начать тренировку</button>
+    </section>
+  ),
+}));
+
+vi.mock('../../../../src/pages/coach/CoachPage', () => ({
+  default: () => (
+    <section data-testid="production-coach">
+      <h1>Production coach</h1>
+      <button type="button">Сохранить комментарий</button>
+    </section>
+  ),
 }));
 
 function renderPage(path: string) {
   window.history.replaceState({}, '', path);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   return render(
-    <NavigationProvider>
-      <DemoPage />
-    </NavigationProvider>,
+    <PwaProvider>
+      <QueryClientProvider client={queryClient}>
+        <NavigationProvider>
+          <DemoPage />
+        </NavigationProvider>
+      </QueryClientProvider>
+    </PwaProvider>,
   );
 }
 
-function mutateSnapshot(
-  snapshot: DemoSessionSnapshot,
-  action: string,
-  comment?: string,
-  clientId?: 'alexey' | 'maria' | 'ivan',
-): DemoSessionSnapshot {
-  const next = structuredClone(snapshot);
-  next.revision += 1;
-  if (next.state.kind === 'self_training') {
-    if (action === 'start_workout') next.state.screen = 'active_workout';
-    if (action === 'complete_set') next.state.completed_sets = next.state.total_sets;
-    if (action === 'finish_workout') {
-      next.state.screen = 'summary';
-      next.state.duration_minutes = 46;
-      next.state.total_volume_kg = 6840;
-      next.state.progress_change_percent = 6.5;
-      next.cabinet.progress.latest_volume_kg = 6840;
-      next.cabinet.progress.volume_change_percent = 6.5;
-      next.cabinet.meaningful_action_completed = true;
-    }
-    if (action === 'open_progress') next.state.screen = 'progress';
-  } else if (next.state.kind === 'nutrition') {
-    if (action === 'add_recent') {
-      next.state.item_added = true;
-      next.state.calories += next.state.recent_item.calories;
-      next.state.protein_g += next.state.recent_item.protein_g;
-      next.state.meals_logged += 1;
-      next.cabinet.nutrition.calories = next.state.calories;
-      next.cabinet.nutrition.protein_g = next.state.protein_g;
-      next.cabinet.nutrition.meals_logged = next.state.meals_logged;
-      next.cabinet.nutrition.item_added = true;
-      next.cabinet.progress.nutrition_completion_percent = 74;
-      next.cabinet.meaningful_action_completed = true;
-    }
-    if (action === 'open_nutrition_report') next.state.screen = 'report';
-  } else {
-    const trainerState = next.state;
-    if (action === 'select_client' && clientId) {
-      trainerState.selected_client_id = clientId;
-      next.cabinet.trainer!.selected_client_id = clientId;
-    }
-    if (action === 'save_comment') {
-      const selected = trainerState.clients.find(
-        (client) => client.id === trainerState.selected_client_id,
-      );
-      if (selected) selected.comment = comment ?? 'Техника стабильна.';
-      next.cabinet.trainer!.clients = next.state.clients;
-      next.cabinet.meaningful_action_completed = true;
-    }
-  }
-  return next;
-}
-
-describe('Demo cabinet journey', () => {
+describe('Demo cabinet production composition', () => {
   afterEach(() => {
     cleanup();
     window.sessionStorage.clear();
@@ -104,51 +88,29 @@ describe('Demo cabinet journey', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    let current: DemoSessionSnapshot | null = null;
-    mocks.load.mockImplementation((scenario: DemoScenario) => {
-      current = demoFixture(scenario);
-      return Promise.resolve(current);
-    });
-    mocks.apply.mockImplementation(
-      async (
-        scenario: DemoScenario,
-        action: string,
-        comment?: string,
-        clientId?: 'alexey' | 'maria' | 'ivan',
-      ) => {
-        current = mutateSnapshot(current ?? demoFixture(scenario), action, comment, clientId);
-        return current;
-      },
+    mocks.getToken.mockReturnValue('demo-token-000000000000000000000000000000');
+    mocks.load.mockImplementation((scenario: DemoScenario) =>
+      Promise.resolve(demoFixture(scenario)),
     );
-    mocks.reset.mockImplementation(async (scenario: DemoScenario) => {
-      current = demoFixture(scenario);
-      return current;
-    });
-    mocks.start.mockImplementation(async (scenario: DemoScenario) => {
-      current = demoFixture(scenario);
-      return current;
-    });
+    mocks.reset.mockImplementation((scenario: DemoScenario) =>
+      Promise.resolve(demoFixture(scenario)),
+    );
+    mocks.start.mockImplementation((scenario: DemoScenario) =>
+      Promise.resolve(demoFixture(scenario)),
+    );
   });
 
-  it('opens the cabinet from bare /demo with the exact scenario contract and clean utility rail', async () => {
+  it('renders the shared production page inside the demo boundary', async () => {
     renderPage('/demo');
 
-    expect(await screen.findByRole('heading', { name: 'План на сегодня' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Production today' })).toBeVisible();
     expect(screen.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
-    expect(screen.queryByText('Отдельная сессия')).not.toBeInTheDocument();
-    expect(screen.queryByText('Демо-кабинет')).not.toBeInTheDocument();
-    expect(screen.queryByRole('img', { name: /Аватар/ })).not.toBeInTheDocument();
-
-    const selector = screen.getByRole('combobox', { name: 'Сценарий демо' });
-    expect(within(selector).getAllByRole('option')).toHaveLength(3);
-    expect(within(selector).getByRole('option', { name: 'Тренировка' })).toBeVisible();
-    expect(within(selector).getByRole('option', { name: 'Питание и прогресс' })).toBeVisible();
-    expect(within(selector).getByRole('option', { name: 'Работа тренера' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Скрыть маршрут' })).toBeVisible();
-    expect(screen.getByText(/Маршрут демо · \d из 4/)).toBeVisible();
+    expect(screen.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
+    expect(mocks.apply).not.toHaveBeenCalled();
   });
 
-  it('switches and resets all three scenarios without leaving demo navigation', async () => {
+  it('keeps scenario switching, reset and trainer routing inside the cabinet', async () => {
     const user = userEvent.setup();
     renderPage('/demo?scenario=self_training');
 
@@ -157,94 +119,62 @@ describe('Demo cabinet journey', () => {
     await waitFor(() =>
       expect(window.location.search).toBe('?cabinet=1&scenario=nutrition&section=today'),
     );
-    expect(await screen.findByRole('heading', { name: 'План на сегодня' })).toBeVisible();
-    expect(screen.getByText('Питание и прогресс')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Production today' })).toBeVisible();
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Сценарий демо' }), 'trainer');
     await waitFor(() =>
       expect(window.location.search).toBe('?cabinet=1&scenario=trainer&section=trainer'),
     );
-    expect(await screen.findByRole('heading', { name: 'Разбор результата клиента' })).toBeVisible();
-    expect(screen.getByRole('option', { name: /Мария/ })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Production coach' })).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Начать заново' }));
     await waitFor(() => expect(mocks.reset).toHaveBeenCalledWith('trainer'));
-    expect(screen.getByText(/Маршрут демо · \d из 4/)).toBeVisible();
+    expect(mocks.apply).not.toHaveBeenCalled();
   });
 
-  it('does not mark causal route sections complete when browsing profile freely', async () => {
+  it('uses navigation-only route steps and does not auto-start a workout', async () => {
     const user = userEvent.setup();
     renderPage('/demo?scenario=self_training&section=profile');
 
-    expect(
-      await screen.findByRole('heading', { name: 'Настройки по одной понятной группе' }),
-    ).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Production profile' })).toBeVisible();
     expect(screen.getByText('Маршрут демо · 1 из 4')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Продолжить' }));
     await waitFor(() => expect(window.location.search).toContain('section=plan'));
+    expect(await screen.findByRole('heading', { name: 'Production plan' })).toBeVisible();
+    expect(mocks.apply).not.toHaveBeenCalled();
   });
 
-  it('supports hide and reopen plus a causal training route to the conversion state', async () => {
-    const user = userEvent.setup();
-    renderPage('/demo?scenario=self_training');
+  it('completes the nutrition route from the real diary mutation and progress visit', () => {
+    const snapshot = demoFixture('nutrition');
+    if (snapshot.state.kind !== 'nutrition') throw new Error('Expected nutrition fixture');
+    snapshot.state.item_added = true;
 
-    await screen.findByRole('heading', { name: 'План на сегодня' });
-    await user.click(screen.getByRole('button', { name: 'Скрыть маршрут' }));
-    expect(screen.queryByText(/Маршрут демо ·/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Показать маршрут' }));
-    expect(screen.getByText(/Маршрут демо ·/)).toBeVisible();
+    const afterAdd = getDemoRouteState('nutrition', snapshot, 'nutrition', new Set(['nutrition']));
+    expect(afterAdd.steps[1]?.complete).toBe(true);
+    expect(afterAdd.steps[2]?.complete).toBe(true);
+    expect(afterAdd.target).toEqual({ kind: 'navigate', section: 'progress' });
 
-    await user.click(screen.getByRole('button', { name: 'Продолжить' }));
-    expect(
-      await screen.findByRole('heading', { name: 'Активная программа и расписание на неделю' }),
-    ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Продолжить' }));
-    expect(await screen.findByRole('heading', { name: 'План на сегодня' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Начать тренировку' }));
-    await user.click(screen.getByRole('button', { name: 'Завершить текущий подход' }));
-    await user.click(screen.getByRole('button', { name: 'Завершить тренировку' }));
-    await user.click(screen.getByRole('button', { name: 'Перейти к прогрессу' }));
-    await user.click(screen.getByRole('link', { name: 'Посмотреть прогресс' }));
-
-    expect(
-      await screen.findByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
-    ).toBeVisible();
-    expect(
-      screen.getByText('Теперь можно начать со своими тренировками, питанием и прогрессом.'),
-    ).toBeVisible();
-    const ownData = screen.getByRole('link', { name: 'Начать со своими данными' });
-    expect(ownData).toHaveAttribute(
-      'href',
-      '/login?next=%2Fapp&from=demo&scenario=self_training&cabinet=1&section=progress',
+    const complete = getDemoRouteState(
+      'nutrition',
+      snapshot,
+      'progress',
+      new Set(['nutrition', 'progress']),
     );
-    await user.click(ownData);
-    expect(mocks.clearAll).toHaveBeenCalledOnce();
-    expect(mocks.track).toHaveBeenCalledWith(
-      { name: 'demo_own_data_selected', surface: 'mobile_web', scenario: 'self_training' },
-      { dedupe: 'session', dedupeKey: 'self_training' },
+    expect(complete.complete).toBe(true);
+  });
+
+  it('completes the training route from finish and the real progress visit', () => {
+    const snapshot = demoFixture('self_training');
+    if (snapshot.state.kind !== 'self_training') throw new Error('Expected training fixture');
+    snapshot.state.screen = 'summary';
+
+    const route = getDemoRouteState(
+      'self_training',
+      snapshot,
+      'progress',
+      new Set(['plan', 'progress']),
     );
-  }, 15_000);
-
-  it('shows nutrition updates, progress history and multiple trainer states with invite disabled', async () => {
-    const user = userEvent.setup();
-    renderPage('/demo?scenario=nutrition&section=nutrition');
-    await user.click(await screen.findByRole('button', { name: 'Добавить недавний продукт' }));
-    expect(await screen.findByText('1588 / 2150')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Открыть итог по питанию' }));
-    await user.click(screen.getByRole('link', { name: 'Посмотреть показатели' }));
-    expect(
-      await screen.findByRole('heading', { name: 'Подтверждённые действия становятся историей' }),
-    ).toBeVisible();
-    expect(screen.getAllByText('Неделя 1').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('День заполнен частично').length).toBeGreaterThan(0);
-
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Сценарий демо' }), 'trainer');
-    await waitFor(() => expect(window.location.search).toContain('scenario=trainer'));
-    expect(await screen.findByText('Алексей · подготовленный клиент')).toBeVisible();
-    const clientSelector = screen.getByRole('combobox', { name: 'Демонстрационный клиент' });
-    await user.selectOptions(clientSelector, 'maria');
-    expect(await screen.findByText('Мария · подготовленный клиент')).toBeVisible();
-    expect(screen.getByText('Нужна регулярность')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Пригласить нового клиента' })).toBeDisabled();
+    expect(route.complete).toBe(true);
+    expect(route.target).toBeNull();
   });
 });

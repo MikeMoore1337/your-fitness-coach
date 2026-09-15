@@ -30,6 +30,7 @@ import { WorkoutAdaptation } from './WorkoutAdaptation';
 import { WorkoutCompletionSummary } from './WorkoutCompletionSummary';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
+import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import {
   productEventSurface,
   trackCoreProductEvent,
@@ -762,6 +763,7 @@ export function TodayWorkout({
 }) {
   const { toast, confirm } = useFeedback();
   const { user } = useAuth();
+  const capabilities = useRuntimeCapabilities();
   const queryClient = useQueryClient();
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [dismissedGuidance, setDismissedGuidance] = useState<Set<number>>(() => new Set());
@@ -924,7 +926,13 @@ export function TodayWorkout({
     activeSync.syncState !== 'pending';
 
   if (data.status === 'completed') {
-    return <WorkoutCompletionSummary workout={data} onReturnToday={onCompletionClose} />;
+    return (
+      <WorkoutCompletionSummary
+        readOnly={!capabilities.canMutateProgress}
+        workout={data}
+        onReturnToday={onCompletionClose}
+      />
+    );
   }
 
   return (
@@ -996,9 +1004,14 @@ export function TodayWorkout({
           </Button>
         )}
 
-        {(data.status === 'planned' || started) && (
-          <WorkoutAdaptation workout={data} safetyOnly={started} />
-        )}
+        {(data.status === 'planned' || started) &&
+          (capabilities.canMutatePrograms ? (
+            <WorkoutAdaptation workout={data} safetyOnly={started} />
+          ) : (
+            <p className="muted demo-capability-notice" role="status">
+              Изменение плана тренировки доступно после входа.
+            </p>
+          ))}
 
         <div className="active-workout-exercises">
           {data.exercises.map((exercise, exerciseIndex) => {
@@ -1229,22 +1242,30 @@ export function TodayWorkout({
         )}
 
         {data.status !== 'in_progress' && data.status !== 'completed' && (
-          <button
-            className="active-workout-skip"
-            onClick={async () => {
-              if (
-                await confirm({
-                  title: 'Пропустить тренировку?',
-                  message:
-                    'Она останется в истории как пропущенная. Если хотите выполнить её позже, перенесите дату в разделе «Прогресс».',
-                  confirmText: 'Пропустить',
-                })
-              )
-                mutation.mutate({ path: `/api/v1/workouts/${data.id}/skip`, method: 'POST' });
-            }}
-          >
-            Пропустить тренировку
-          </button>
+          <>
+            <button
+              className="active-workout-skip"
+              disabled={!capabilities.canMutatePrograms}
+              onClick={async () => {
+                if (
+                  await confirm({
+                    title: 'Пропустить тренировку?',
+                    message:
+                      'Она останется в истории как пропущенная. Если хотите выполнить её позже, перенесите дату в разделе «Прогресс».',
+                    confirmText: 'Пропустить',
+                  })
+                )
+                  mutation.mutate({ path: `/api/v1/workouts/${data.id}/skip`, method: 'POST' });
+              }}
+            >
+              Пропустить тренировку
+            </button>
+            {!capabilities.canMutatePrograms && (
+              <p className="muted demo-capability-notice" role="status">
+                Пропуск тренировки доступен после входа.
+              </p>
+            )}
+          </>
         )}
       </section>
 

@@ -8,6 +8,7 @@ import {
   type AnchorHTMLAttributes,
 } from 'react';
 import { hideTelegramBackButtonWhenIdle, registerTelegramBackButton } from '../telegram/backButton';
+import { getApiRuntime, useRuntime } from '../runtime/runtime';
 
 interface NavigationContextValue {
   path: string;
@@ -33,6 +34,11 @@ const PROGRESS_DETAIL_VIEWS = new Set([
   'wellbeing',
   'history',
 ]);
+
+function resolveNavigationPath(to: string): string {
+  const runtime = getApiRuntime();
+  return runtime.kind === 'demo' ? runtime.mapNavigationPath(to) : to;
+}
 
 export function demoReturnPathFromLogin(search: string): string | null {
   const params = new URLSearchParams(search);
@@ -162,8 +168,9 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const navigate = useCallback((to: string, replace = false) => {
-    if (replace) window.history.replaceState({}, '', to);
-    else window.history.pushState({}, '', to);
+    const destination = resolveNavigationPath(to);
+    if (replace) window.history.replaceState({}, '', destination);
+    else window.history.pushState({}, '', destination);
     setLocation({ path: window.location.pathname, search: window.location.search });
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
@@ -218,9 +225,11 @@ export function AppLink({
   children: React.ReactNode;
 } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>) {
   const { navigate } = useNavigation();
+  const runtime = useRuntime();
+  const href = runtime.kind === 'demo' ? runtime.mapNavigationPath(to) : to;
   return (
     <a
-      href={to}
+      href={href}
       className={className}
       {...anchorAttributes}
       onClick={(event) => {
@@ -229,6 +238,7 @@ export function AppLink({
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
           return;
         event.preventDefault();
+        if (runtime.kind === 'demo') runtime.onNavigate?.(to);
         navigate(to);
       }}
     >

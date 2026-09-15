@@ -52,6 +52,7 @@ export interface DemoAppShellConfig {
   minimalUtility?: boolean;
   moreLinks: ReadonlyArray<{ label: string; to: string; onClick?: () => void }>;
   quickAddLinks?: ReadonlyArray<QuickAddAction>;
+  onNavigate?: (to: string) => void;
   onReset(): void;
   resetDisabled?: boolean;
 }
@@ -364,6 +365,7 @@ export function AppShell({
                       : undefined
                   }
                   aria-label={demo?.accountLabel ?? 'Профиль и настройки'}
+                  onClick={() => demo?.onNavigate?.(demo.accountTo ?? '/app?section=profile')}
                 >
                   <AccountIdentity
                     avatarClassName="app-desktop-account-entry__avatar"
@@ -381,15 +383,15 @@ export function AppShell({
               {shellDestinations.map((destination) => {
                 const destinationKey =
                   'section' in destination ? destination.section : destination.key;
+                const destinationTo =
+                  'to' in destination ? destination.to : `/app?section=${destination.section}`;
                 const active = demo
                   ? demo.activeSection === destinationKey
                   : path === '/app' && section === destinationKey;
                 return (
                   <AppLink
                     key={destinationKey}
-                    to={
-                      'to' in destination ? destination.to : `/app?section=${destination.section}`
-                    }
+                    to={destinationTo}
                     className={`app-bottom-nav__btn${active ? ' is-active' : ''}${
                       'mobileHidden' in destination && destination.mobileHidden
                         ? ' app-bottom-nav__btn--mobile-hidden'
@@ -397,6 +399,7 @@ export function AppShell({
                     }`}
                     {...(active ? glassProps('clear', true) : {})}
                     aria-current={active ? 'page' : undefined}
+                    onClick={() => demo?.onNavigate?.(destinationTo)}
                   >
                     <AppNavigationIcon name={destination.icon} />
                     <span className="app-bottom-nav__label">{destination.label}</span>

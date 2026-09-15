@@ -74,10 +74,12 @@ export function ClientAnalytics({
   clientId,
   clientName,
   canComment = true,
+  canSchedule = true,
 }: {
   clientId: number;
   clientName: string;
   canComment?: boolean;
+  canSchedule?: boolean;
 }) {
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
@@ -195,7 +197,7 @@ export function ClientAnalytics({
                   <DisclosureIcon />
                 </summary>
                 <div className="stack top-gap">
-                  {workout.status === 'planned' && (
+                  {workout.status === 'planned' && canSchedule && (
                     <CoachScheduleForm
                       workout={workout}
                       pending={

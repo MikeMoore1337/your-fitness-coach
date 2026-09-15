@@ -182,17 +182,21 @@ function FoodResults({
   onFavorite,
   onSelect,
   pendingFavorite,
+  allowManage = true,
 }: {
   foods: Food[];
   onEdit: (food: Food) => void;
   onFavorite: (food: Food) => void;
   onSelect: (food: Food) => void;
   pendingFavorite: number | null;
+  allowManage?: boolean;
 }) {
   if (!foods.length)
     return (
       <p className="nutrition-picker__empty">
-        Здесь пока пусто. Найдите продукт по названию или создайте свой.
+        {allowManage
+          ? 'Здесь пока пусто. Найдите продукт по названию или создайте свой.'
+          : 'Подготовленных продуктов пока нет. Попробуйте поиск по названию.'}
       </p>
     );
   return (
@@ -214,30 +218,32 @@ function FoodResults({
             </span>
             <Badge>{foodSourceLabel(food)}</Badge>
           </button>
-          <div className="nutrition-food-result__actions">
-            <button
-              type="button"
-              aria-label={
-                food.is_favorite
-                  ? `Убрать ${food.name} из избранного`
-                  : `Добавить ${food.name} в избранное`
-              }
-              aria-pressed={food.is_favorite}
-              disabled={pendingFavorite === food.id}
-              onClick={() => onFavorite(food)}
-            >
-              <Icon name={food.is_favorite ? 'star-filled' : 'star'} size={20} />
-            </button>
-            {food.food_type === 'user' && (
+          {allowManage && (
+            <div className="nutrition-food-result__actions">
               <button
                 type="button"
-                onClick={() => onEdit(food)}
-                aria-label={`Изменить ${food.name}`}
+                aria-label={
+                  food.is_favorite
+                    ? `Убрать ${food.name} из избранного`
+                    : `Добавить ${food.name} в избранное`
+                }
+                aria-pressed={food.is_favorite}
+                disabled={pendingFavorite === food.id}
+                onClick={() => onFavorite(food)}
               >
-                Изменить
+                <Icon name={food.is_favorite ? 'star-filled' : 'star'} size={20} />
               </button>
-            )}
-          </div>
+              {food.food_type === 'user' && (
+                <button
+                  type="button"
+                  onClick={() => onEdit(food)}
+                  aria-label={`Изменить ${food.name}`}
+                >
+                  Изменить
+                </button>
+              )}
+            </div>
+          )}
         </li>
       ))}
     </ul>
@@ -338,6 +344,7 @@ export function FoodPickerDialog({
   mealType,
   initialView = 'browse',
   disabled = false,
+  demoSafeMode = false,
   onAdded,
   onClose,
 }: {
@@ -345,6 +352,7 @@ export function FoodPickerDialog({
   mealType: MealType;
   initialView?: 'browse' | 'quick-add';
   disabled?: boolean;
+  demoSafeMode?: boolean;
   onAdded?: (entry: FoodDiaryEntry) => void;
   onClose: () => void;
 }) {
@@ -354,7 +362,11 @@ export function FoodPickerDialog({
   const panelRef = useModalA11y<HTMLDivElement>(
     true,
     onClose,
-    initialView === 'quick-add' ? '#nutrition-quick-calories' : '#nutrition-barcode-entry',
+    initialView === 'quick-add'
+      ? '#nutrition-quick-calories'
+      : demoSafeMode
+        ? '#nutrition-food-search'
+        : '#nutrition-barcode-entry',
   );
   const [view, setView] = useState<PickerView>(initialView);
   const [source, setSource] = useState<PickerSource>('recent');
@@ -412,6 +424,7 @@ export function FoodPickerDialog({
     enabled: searchQuery.length >= 2,
   });
   const externalQuery =
+    !demoSafeMode &&
     searchQuery.length >= 2 &&
     searchQuery === normalizedSearchInput &&
     !search.isFetching &&
@@ -429,7 +442,7 @@ export function FoodPickerDialog({
         `/api/v1/nutrition/foods/search?q=${encodeURIComponent(externalQuery)}&limit=20&include_external=true`,
         { signal },
       ),
-    enabled: externalQuery.length >= 2 && externalQuery === searchQuery,
+    enabled: !demoSafeMode && externalQuery.length >= 2 && externalQuery === searchQuery,
   });
   const favorite = useMutation({
     mutationFn: (food: Food) =>
@@ -633,6 +646,7 @@ export function FoodPickerDialog({
     });
   };
   const selectExternalFood = (food: ExternalFood) => {
+    if (demoSafeMode) return;
     importExternal.mutate(food, {
       onSuccess: async (savedFood) => {
         await queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] });
@@ -1005,30 +1019,40 @@ export function FoodPickerDialog({
           </div>
         ) : (
           <div className="nutrition-picker__browse">
-            <Button
-              id="nutrition-label-scan-entry"
-              fullWidth
-              type="button"
-              onClick={() => {
-                setEntryMethod('label_scan');
-                setScanBarcode('');
-                setView('label-scan');
-              }}
-            >
-              Сканировать пищевую ценность
-            </Button>
-            <Button
-              id="nutrition-barcode-entry"
-              fullWidth
-              variant="secondary"
-              type="button"
-              onClick={() => {
-                setEntryMethod('barcode');
-                setView('barcode');
-              }}
-            >
-              Поиск по штрихкоду
-            </Button>
+            {!demoSafeMode && (
+              <>
+                <Button
+                  id="nutrition-label-scan-entry"
+                  fullWidth
+                  type="button"
+                  onClick={() => {
+                    setEntryMethod('label_scan');
+                    setScanBarcode('');
+                    setView('label-scan');
+                  }}
+                >
+                  Сканировать пищевую ценность
+                </Button>
+                <Button
+                  id="nutrition-barcode-entry"
+                  fullWidth
+                  variant="secondary"
+                  type="button"
+                  onClick={() => {
+                    setEntryMethod('barcode');
+                    setView('barcode');
+                  }}
+                >
+                  Поиск по штрихкоду
+                </Button>
+              </>
+            )}
+            {demoSafeMode && (
+              <p className="muted demo-capability-notice" role="status">
+                В демо доступны подготовленный каталог и быстрый ввод. Сканирование, свой продукт,
+                рецепты и внешние каталоги доступны после входа.
+              </p>
+            )}
             <Field
               label="Поиск по названию или бренду"
               labelFor="nutrition-food-search"
@@ -1061,28 +1085,32 @@ export function FoodPickerDialog({
               >
                 <Icon name="plus" size={16} /> Быстрый ввод
               </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setEntryMethod('custom');
-                  setEditingFood(undefined);
-                  setEditorBarcode('');
-                  setView('food-editor');
-                }}
-              >
-                <Icon name="plus" size={16} /> Свой продукт
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setEntryMethod('recipe');
-                  setView('recipes');
-                }}
-              >
-                Рецепты
-              </Button>
+              {!demoSafeMode && (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setEntryMethod('custom');
+                      setEditingFood(undefined);
+                      setEditorBarcode('');
+                      setView('food-editor');
+                    }}
+                  >
+                    <Icon name="plus" size={16} /> Свой продукт
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setEntryMethod('recipe');
+                      setView('recipes');
+                    }}
+                  >
+                    Рецепты
+                  </Button>
+                </>
+              )}
             </div>
             {searchQuery.length < 2 && (
               <div className="nutrition-picker__tabs" aria-label="Быстрое добавление">
@@ -1125,6 +1153,7 @@ export function FoodPickerDialog({
                 onSelect={selectFood}
                 onFavorite={(food) => favorite.mutate(food)}
                 pendingFavorite={favorite.isPending ? (favorite.variables?.id ?? null) : null}
+                allowManage={!demoSafeMode}
                 onEdit={(food) => {
                   setEditingFood(food);
                   setEditorBarcode('');
@@ -1144,7 +1173,7 @@ export function FoodPickerDialog({
                 <span>Можно использовать локальный поиск или создать свой продукт.</span>
               </div>
             )}
-            {external.data && externalQuery === searchQuery && (
+            {!demoSafeMode && external.data && externalQuery === searchQuery && (
               <ExternalResults
                 response={external.data}
                 onSelect={selectExternalFood}

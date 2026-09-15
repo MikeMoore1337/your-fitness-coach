@@ -49,7 +49,7 @@ function offlineWorkoutUser(): User | null {
   };
 }
 
-interface DevLoginInput {
+export interface DevLoginInput {
   telegram_user_id: number;
   username?: string;
   full_name?: string;
@@ -62,7 +62,7 @@ interface EmailRegistrationResult {
   verification_token?: string | null;
 }
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: User | null;
   config: PublicConfig | null;
   loading: boolean;
@@ -85,6 +85,16 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthContextProvider({
+  children,
+  value,
+}: {
+  children: React.ReactNode;
+  value: AuthContextValue;
+}) {
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -398,7 +408,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
     ],
   );
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContextProvider value={value}>{children}</AuthContextProvider>;
 }
 
 export function useAuth(): AuthContextValue {

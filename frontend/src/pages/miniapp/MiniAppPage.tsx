@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { AppShell, type AppSection } from '../../app/AppShell';
+import { AppShell, type AppSection, type DemoAppShellConfig } from '../../app/AppShell';
 import '../../styles/react.css';
 import '../../styles/design-v2.css';
 import '../../styles/ux-ia-redesign.css';
@@ -23,6 +23,7 @@ import { productEventSurface, trackProductEvent } from '../../shared/analytics/p
 import { parseProgressView } from '../../features/workouts/progressPeriods';
 import '../../styles/pulse-concepts.css';
 import '../../styles/semantic-cards.css';
+import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
 
 const NotificationsPanel = lazy(() =>
   import('../../features/account/NotificationsPanel').then((module) => ({
@@ -211,8 +212,18 @@ function launchInviteToken(): string | null {
   return startParam?.startsWith('trainer_') ? startParam.slice('trainer_'.length) : null;
 }
 
-export default function MiniAppPage() {
+export default function MiniAppPage({
+  demo,
+  renderShell = true,
+  sectionOverride,
+}: {
+  demo?: DemoAppShellConfig;
+  renderShell?: boolean;
+  sectionOverride?: AppSection;
+} = {}) {
   const { user, reloadUser } = useAuth();
+  const runtime = useRuntime();
+  const capabilities = useRuntimeCapabilities();
   const { navigate, search } = useNavigation();
   const { toast } = useFeedback();
   const [initialInviteToken] = useState(launchInviteToken);
@@ -224,7 +235,7 @@ export default function MiniAppPage() {
       ? 'profile'
       : 'today';
   });
-  const section = requestedSection(search) ?? fallbackSection;
+  const section = sectionOverride ?? requestedSection(search) ?? fallbackSection;
   const aiCoachStatus = useAiCoachStatus(section === 'profile');
   const nutritionDate = requestedNutritionDate(search);
   const nutritionMeal = requestedNutritionMeal(search);
@@ -367,145 +378,187 @@ export default function MiniAppPage() {
     return () => observer.disconnect();
   }, [section, search]);
 
-  return (
-    <AppShell section={section}>
-      <div
-        className={`page-stack app-section app-section--${section} app-section--design-v2`}
-        id={sectionMotion.elementId}
-        data-motion-phase={section === 'progress' ? sectionMotion.motionPhase : 'idle'}
-        data-motion-revision={sectionMotion.motionRevision}
-        data-motion-surface={section === 'progress' ? 'progress' : undefined}
-        onAnimationEnd={sectionMotion.onMotionAnimationEnd}
-      >
-        {section !== 'today' && section !== 'progress' && section !== 'nutrition' && (
-          <header className="card hero-card">
-            <div>
-              <span className="eyebrow">Your Fitness Coach</span>
-              <h1>
-                {section === 'profile'
-                  ? 'Профиль и настройки'
-                  : section === 'programs'
-                    ? 'План'
-                    : user?.profile?.full_name || user?.first_name || 'Мой фитнес'}
-              </h1>
-              <p className="muted">
-                {section === 'profile'
-                  ? 'Личные данные, связи, уведомления и безопасность аккаунта.'
-                  : section === 'programs'
-                    ? 'Активная программа, ближайшие тренировки и управление планом.'
-                    : 'Тренировки, питание и прогресс в одном месте.'}
-              </p>
-            </div>
-          </header>
-        )}
-        {(section === 'programs' || section === 'catalog') && <TelegramLinkPrompt />}
-        <section className="page-stack">
-          <Suspense
-            fallback={
-              <p className="muted" role="status">
-                Загружаем раздел…
-              </p>
-            }
-          >
-            {section === 'today' && (
-              <TodayDashboard
-                initialCardioOpen={focusCardio}
-                initialWellbeingDate={dailyWellbeingDate}
-                initialWellbeingOpen={focusDailyWellbeing}
-              />
-            )}
-            {section === 'progress' && (
-              <>
-                {workoutReturnPath?.includes('section=programs') && (
-                  <AppLink className="program-history-return" to={workoutReturnPath}>
-                    К истории программы
-                  </AppLink>
-                )}
-                {historicalProgramWorkout && (
-                  <HistoricalProgramWorkout {...historicalProgramWorkout} />
-                )}
-                <div className="stack progress-workout-stack">
-                  <ProgressExperience
-                    focusMeasurements={focusMeasurements}
-                    progressView={progressView}
-                    timeZone={user?.profile?.timezone}
-                    measurementDiary={
-                      <Diary embedded onSaved={async () => void (await reloadUser())} />
-                    }
-                    detailContent={
-                      progressView === 'wellbeing' ? (
-                        <WeeklyCheckInCard
-                          autoFocus={focusWeeklyReview}
-                          userId={user?.id ?? 'anonymous'}
-                        />
-                      ) : progressView === 'history' ? (
-                        <WorkoutHistory
-                          timeZone={user?.profile?.timezone}
-                          focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
-                          focusedCommentId={requestedFeedback?.commentId}
-                          focusedExerciseId={requestedFeedback?.workoutExerciseId}
-                          onWorkoutSelect={(id, target) => setFocusedWorkout({ id, target })}
-                        />
-                      ) : null
-                    }
+  const content = (
+    <div
+      className={`page-stack app-section app-section--${section} app-section--design-v2`}
+      id={sectionMotion.elementId}
+      data-motion-phase={section === 'progress' ? sectionMotion.motionPhase : 'idle'}
+      data-motion-revision={sectionMotion.motionRevision}
+      data-motion-surface={section === 'progress' ? 'progress' : undefined}
+      onAnimationEnd={sectionMotion.onMotionAnimationEnd}
+    >
+      {section !== 'today' && section !== 'progress' && section !== 'nutrition' && (
+        <header className="card hero-card">
+          <div>
+            <span className="eyebrow">Your Fitness Coach</span>
+            <h1>
+              {section === 'profile'
+                ? 'Профиль и настройки'
+                : section === 'programs'
+                  ? 'План'
+                  : user?.profile?.full_name || user?.first_name || 'Мой фитнес'}
+            </h1>
+            <p className="muted">
+              {section === 'profile'
+                ? 'Личные данные, связи, уведомления и безопасность аккаунта.'
+                : section === 'programs'
+                  ? 'Активная программа, ближайшие тренировки и управление планом.'
+                  : 'Тренировки, питание и прогресс в одном месте.'}
+            </p>
+          </div>
+        </header>
+      )}
+      {capabilities.canMutatePrograms && (section === 'programs' || section === 'catalog') && (
+        <TelegramLinkPrompt />
+      )}
+      <section className="page-stack">
+        <Suspense
+          fallback={
+            <p className="muted" role="status">
+              Загружаем раздел…
+            </p>
+          }
+        >
+          {section === 'today' && (
+            <TodayDashboard
+              initialCardioOpen={focusCardio}
+              initialWellbeingDate={dailyWellbeingDate}
+              initialWellbeingOpen={focusDailyWellbeing}
+            />
+          )}
+          {section === 'progress' && (
+            <>
+              {workoutReturnPath?.includes('section=programs') && (
+                <AppLink className="program-history-return" to={workoutReturnPath}>
+                  К истории программы
+                </AppLink>
+              )}
+              {historicalProgramWorkout && (
+                <HistoricalProgramWorkout {...historicalProgramWorkout} />
+              )}
+              <div className="stack progress-workout-stack">
+                <ProgressExperience
+                  canExport={capabilities.canExport}
+                  focusMeasurements={focusMeasurements}
+                  progressView={progressView}
+                  timeZone={user?.profile?.timezone}
+                  measurementDiary={
+                    <Diary
+                      embedded
+                      onSaved={async () => void (await reloadUser())}
+                      readOnly={!capabilities.canMutateProgress}
+                    />
+                  }
+                  detailContent={
+                    progressView === 'wellbeing' ? (
+                      <>
+                        {!capabilities.canMutateProgress && (
+                          <p className="muted demo-capability-notice" role="status">
+                            Проверка самочувствия доступна после входа. В демо показана
+                            production-поверхность без отправки персональных ответов.
+                          </p>
+                        )}
+                        <fieldset
+                          className="demo-capability-fieldset"
+                          disabled={!capabilities.canMutateProgress}
+                        >
+                          <WeeklyCheckInCard
+                            autoFocus={focusWeeklyReview}
+                            userId={user?.id ?? 'anonymous'}
+                          />
+                        </fieldset>
+                      </>
+                    ) : progressView === 'history' ? (
+                      <WorkoutHistory
+                        readOnly={!capabilities.canMutateProgress}
+                        timeZone={user?.profile?.timezone}
+                        focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
+                        focusedCommentId={requestedFeedback?.commentId}
+                        focusedExerciseId={requestedFeedback?.workoutExerciseId}
+                        onWorkoutSelect={(id, target) => setFocusedWorkout({ id, target })}
+                      />
+                    ) : null
+                  }
+                />
+              </div>
+            </>
+          )}
+          {section === 'programs' && (
+            <fieldset
+              className="demo-capability-fieldset"
+              disabled={!capabilities.canMutatePrograms}
+            >
+              {!capabilities.canMutatePrograms && (
+                <p className="muted demo-capability-notice">
+                  Управление программой недоступно в демо-режиме. Просмотр использует ту же
+                  production-поверхность.
+                </p>
+              )}
+              {programManagementOpen ? (
+                <TemplatesList
+                  key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
+                  defaultLibraryOpen={programStart === 'templates'}
+                  mode="full"
+                  readOnly={!capabilities.canMutatePrograms}
+                >
+                  <ProgramBuilder
+                    key={programStart === 'create' ? 'create-start' : 'create-default'}
+                    defaultOpen={programStart === 'create'}
                   />
-                </div>
-              </>
-            )}
-            {section === 'programs' && (
-              <>
-                {programManagementOpen ? (
-                  <TemplatesList
-                    key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
-                    defaultLibraryOpen={programStart === 'templates'}
-                    mode="full"
-                  >
-                    <ProgramBuilder
-                      key={programStart === 'create' ? 'create-start' : 'create-default'}
-                      defaultOpen={programStart === 'create'}
-                    />
-                  </TemplatesList>
-                ) : (
-                  <>
-                    <TemplatesList mode="summary" />
-                    <SchedulePanel
-                      focusedCommentId={requestedFeedback?.commentId}
-                      focusedExerciseId={requestedFeedback?.workoutExerciseId}
-                      focusedWorkoutId={scheduleFocusId}
-                      timeZone={user?.profile?.timezone}
-                    />
+                </TemplatesList>
+              ) : (
+                <>
+                  <TemplatesList mode="summary" readOnly={!capabilities.canMutatePrograms} />
+                  <SchedulePanel
+                    focusedCommentId={requestedFeedback?.commentId}
+                    focusedExerciseId={requestedFeedback?.workoutExerciseId}
+                    focusedWorkoutId={scheduleFocusId}
+                    timeZone={user?.profile?.timezone}
+                  />
+                  {capabilities.canMutatePrograms && (
                     <AppLink
                       className="ux-plan-management-link"
                       to="/app?section=programs&view=manage"
                     >
                       Открыть управление программой
                     </AppLink>
-                  </>
-                )}
-              </>
-            )}
-            {section === 'catalog' && <ExerciseCatalog canCreate={Boolean(user?.is_coach)} />}
-            {section === 'nutrition' && (
-              <NutritionPage
-                key={JSON.stringify([
-                  user?.profile?.kbju ?? null,
-                  nutritionDate,
-                  nutritionMeal,
-                  nutritionQuickAdd,
-                  nutritionHydrationOpen,
-                ])}
-                initial={user?.profile?.kbju}
-                initialDate={nutritionDate}
-                initialFoodQuickAdd={nutritionQuickAdd}
-                initialMealType={nutritionMeal}
-                initialHydrationOpen={nutritionHydrationOpen}
-                returnPath={requestedProgressReturn(search)}
-                timeZone={user?.profile?.timezone}
-                onSaved={async () => void (await reloadUser())}
-              />
-            )}
-            {section === 'profile' && (
+                  )}
+                </>
+              )}
+            </fieldset>
+          )}
+          {section === 'catalog' && <ExerciseCatalog canCreate={capabilities.canCreateCatalog} />}
+          {section === 'nutrition' && (
+            <NutritionPage
+              key={JSON.stringify([
+                user?.profile?.kbju ?? null,
+                nutritionDate,
+                nutritionMeal,
+                nutritionQuickAdd,
+                nutritionHydrationOpen,
+              ])}
+              initial={user?.profile?.kbju}
+              initialDate={nutritionDate}
+              initialFoodQuickAdd={nutritionQuickAdd}
+              initialMealType={nutritionMeal}
+              initialHydrationOpen={nutritionHydrationOpen}
+              demoSafeMode={runtime.kind === 'demo'}
+              readOnlyEntries={!capabilities.canMutateNutritionEntries}
+              readOnlyTargets={!capabilities.canMutateProfile}
+              returnPath={requestedProgressReturn(search)}
+              timeZone={user?.profile?.timezone}
+              onSaved={async () => void (await reloadUser())}
+            />
+          )}
+          {section === 'profile' && (
+            <fieldset className="profile-settings-fieldset" disabled={runtime.kind === 'demo'}>
               <div className="profile-settings">
+                {runtime.kind === 'demo' && (
+                  <p className="muted demo-capability-notice" role="status">
+                    Изменение профиля, уведомлений и настроек аккаунта доступно после входа. В демо
+                    доступен только просмотр.
+                  </p>
+                )}
                 {!profileReadiness.isComplete && (
                   <section className="profile-status-shell" aria-labelledby="profile-status-title">
                     <div className="profile-status-shell__copy">
@@ -706,10 +759,17 @@ export default function MiniAppPage() {
                   <AccountPrivacy />
                 </Card>
               </div>
-            )}
-          </Suspense>
-        </section>
-      </div>
+            </fieldset>
+          )}
+        </Suspense>
+      </section>
+    </div>
+  );
+  return renderShell ? (
+    <AppShell demo={demo} section={section}>
+      {content}
     </AppShell>
+  ) : (
+    content
   );
 }

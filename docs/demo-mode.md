@@ -23,6 +23,39 @@
 Mini App launch, frontend до авторизации удаляет оставшиеся demo credentials и переводит запуск в
 обычный `/app`. Demo UI, demo navigation и demo mutations в TMA не открываются.
 
+## Единая production-поверхность
+
+`/demo` не содержит отдельного кабинета с упрощёнными экранами. `DemoCabinet` отвечает только за
+границу демо, выбор сценария, reset, route и conversion, а продуктовый компонентный tree остаётся
+общим:
+
+| Поверхность | Общий компонент | Разница в демо |
+| --- | --- | --- |
+| Сегодня и тренировка | `MiniAppPage` → `TodayDashboard` | Изолированный demo transport и подготовленные данные |
+| План и программы | `MiniAppPage` → `TemplatesList`, `SchedulePanel`, `ProgramBuilder` | Просмотр; управление отключено capability registry |
+| Питание | `MiniAppPage` → `NutritionPage`/diary/food controls | Изменения живут только в текущей demo session |
+| Прогресс и история | `MiniAppPage` → `ProgressExperience` | Чтение подготовленных production-shaped DTO |
+| Профиль | `MiniAppPage` → текущая profile composition | Account/profile writes отключены и отображаются read-only |
+| Тренер | `CoachPage` и его `ClientAnalytics`/feedback | Три curated клиента; комментарий сохраняется только в demo session |
+
+Production authenticated runtime продолжает ходить в обычный API. Demo runtime отправляет тот же
+`path`/`method`/body в один явный server-side transport endpoint с `X-Demo-Session`; это не
+перехват `fetch`, service worker или подмена глобального API. Навигационные ссылки production tree
+в демо преобразуются только в allowlisted `/demo` routes. `Продолжить` не вызывает product action:
+он лишь открывает, прокручивает или фокусирует реальную production-поверхность.
+
+Capability boundary для текущего демо:
+
+| Capability | Поведение |
+| --- | --- |
+| Workout и nutrition | Разрешены безопасные переходы и изменения в session-scoped state |
+| Coach feedback | Разрешён комментарий к выбранному клиенту и тренировке в session-scoped state |
+| Progress writes, profile, programs и catalog | Read-only/disabled с объяснением в той же поверхности |
+| Coach management, invites, notifications, Telegram/OAuth, exports, deletes, providers и AI jobs | Не вызываются; серверный allowlist отвечает безопасным отказом |
+
+Таким образом, demo token является только транспортным контекстом и не превращается в
+`Authorization`, cookie, account identity или доступ к production user/account/coach tables.
+
 ## Ограниченный кабинет и маршрут
 
 Allowlist кабинета включает `Сегодня`, `План`, `Питание`, `Прогресс` и подготовленный контекст клиента
@@ -63,8 +96,9 @@ login удаляются все demo credentials; после регистрац�
 
 Demo API использует allowlist переходов:
 
-- `self_training`: открыть план, начать тренировку, завершить подготовленный подход, завершить
-  занятие, открыть Progress;
+- `self_training`: открыть план, начать тренировку, заполнить и подтвердить каждый подход,
+  использовать rest/next переходы, завершить занятие полностью или через подтверждение неполного
+  результата и открыть Progress;
 - `nutrition`: открыть дневник, добавить подготовленный недавний продукт, открыть дневной итог и
   показатели;
 - `trainer`: выбрать одно из трёх подготовленных состояний и сохранить короткий контекстный

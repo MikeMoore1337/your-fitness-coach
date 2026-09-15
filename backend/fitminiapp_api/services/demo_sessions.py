@@ -44,6 +44,7 @@ class _DemoCabinetNutritionPayload(TypedDict):
 @dataclass
 class _DemoSession:
     scenario: DemoScenario
+    user_id: int
     state: dict[str, Any]
     revision: int
     created_at: datetime
@@ -73,6 +74,13 @@ def _training_fixture() -> dict[str, Any]:
         "duration_minutes": 0,
         "total_volume_kg": 0,
         "progress_change_percent": 0.0,
+        "hydration_entries": [],
+        "hydration_goal_enabled": True,
+        "hydration_goal_ml": 2_200,
+        "hydration_presets": [],
+        "workout_set_details": {},
+        "workout_mutations": {},
+        "workout_completed_sets": [1, 2],
     }
 
 
@@ -93,6 +101,10 @@ def _nutrition_fixture() -> dict[str, Any]:
         "protein_g": 82.0,
         "protein_target_g": 145.0,
         "meals_logged": 2,
+        "hydration_entries": [],
+        "hydration_goal_enabled": True,
+        "hydration_goal_ml": 2_200,
+        "hydration_presets": [],
     }
 
 
@@ -145,6 +157,10 @@ def _trainer_fixture() -> dict[str, Any]:
                 "comment": None,
             },
         ],
+        "hydration_entries": [],
+        "hydration_goal_enabled": True,
+        "hydration_goal_ml": 2_200,
+        "hydration_presets": [],
     }
 
 
@@ -444,6 +460,7 @@ class DemoSessionStore:
             token = secrets.token_urlsafe(32)
             session = _DemoSession(
                 scenario=scenario,
+                user_id=900_000_000 + (int(_token_digest(token)[:8], 16) % 90_000_000),
                 state=_fixture_for(scenario),
                 revision=1,
                 created_at=now,
@@ -451,6 +468,15 @@ class DemoSessionStore:
             )
             self._sessions[_token_digest(token)] = session
             return token, self._snapshot(session)
+
+    def transport(self, token: str, path: str, method: str, body: Any = None) -> Any:
+        from fitminiapp_api.services.demo_transport import handle_demo_transport
+
+        with self._lock:
+            now = self._now()
+            self._prune_expired(now)
+            session = self._session(token, now)
+            return handle_demo_transport(self, session, path, method, body)
 
     def get(self, token: str) -> dict[str, Any]:
         with self._lock:
@@ -514,6 +540,7 @@ class DemoSessionStore:
             if state["completed_sets"] >= state["total_sets"]:
                 return False
             state["completed_sets"] = state["total_sets"]
+            state["workout_completed_sets"] = list(range(1, state["total_sets"] + 1))
             state["exercises"][0]["status"] = "completed"
             state["exercises"][1]["status"] = "current"
             return True

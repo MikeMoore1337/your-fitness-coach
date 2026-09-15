@@ -5,6 +5,23 @@ import pytest
 
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.user import User
+from fitminiapp_api.schemas.feedback import WorkoutCommentResponse
+from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse
+from fitminiapp_api.schemas.hydration import HydrationDayResponse, HydrationEntryResponse
+from fitminiapp_api.schemas.program import (
+    ClientResponse,
+    CoachAssignedProgramResponse,
+    ProgramTemplateResponse,
+)
+from fitminiapp_api.schemas.progress import NutritionReportResponse, ProgressSummaryResponse
+from fitminiapp_api.schemas.user import UserResponse
+from fitminiapp_api.schemas.workout import (
+    TrainingAnalyticsResponse,
+    WorkoutScheduleItem,
+    WorkoutStatusResponse,
+    WorkoutTimelineItem,
+    WorkoutTodayResponse,
+)
 from fitminiapp_api.services.demo_sessions import DemoSessionExpiredError, DemoSessionStore
 
 
@@ -14,6 +31,14 @@ def _create_session(client, scenario: str) -> tuple[str, dict]:
     assert "no-store" in response.headers["cache-control"]
     payload = response.json()
     return payload.pop("session_token"), payload
+
+
+def _transport(client, token: str, path: str, method: str = "GET", body=None):
+    return client.post(
+        "/api/v1/demo/sessions/current/transport",
+        headers={"X-Demo-Session": token},
+        json={"path": path, "method": method, "body": body},
+    )
 
 
 def test_demo_scenarios_are_deterministic_and_do_not_write_user_tables(client) -> None:
@@ -228,3 +253,178 @@ def test_demo_frontend_route_is_noindex(client) -> None:
 
     assert response.status_code == 200
     assert response.headers["x-robots-tag"] == "noindex, nofollow"
+
+
+def test_demo_transport_returns_production_dtos_and_keeps_set_updates_independent(client) -> None:
+    token, _ = _create_session(client, "self_training")
+
+    UserResponse.model_validate(_transport(client, token, "/api/v1/me").json())
+    workout_response = _transport(client, token, "/api/v1/workouts/today")
+    workout = WorkoutTodayResponse.model_validate(workout_response.json())
+    assert [item.is_completed for item in workout.exercises[0].sets] == [True, True, False]
+    for item in _transport(client, token, "/api/v1/workouts/week").json():
+        WorkoutScheduleItem.model_validate(item)
+    ProgressSummaryResponse.model_validate(
+        _transport(client, token, "/api/v1/workouts/progress/summary").json()
+    )
+    TrainingAnalyticsResponse.model_validate(
+        _transport(client, token, "/api/v1/workouts/progress/training-analytics").json()
+    )
+    NutritionReportResponse.model_validate(
+        _transport(client, token, "/api/v1/workouts/progress/nutrition-report").json()
+    )
+    FoodDiaryDayResponse.model_validate(_transport(client, token, "/api/v1/nutrition/diary").json())
+    HydrationDayResponse.model_validate(
+        _transport(client, token, "/api/v1/nutrition/hydration").json()
+    )
+    ProgramTemplateResponse.model_validate(
+        _transport(client, token, "/api/v1/programs/templates/mine").json()[0]
+    )
+
+    started = _transport(client, token, "/api/v1/workouts/50001/start", "POST")
+    assert started.status_code == 200
+    pending_set = workout.exercises[0].sets[-1]
+    saved = _transport(
+        client,
+        token,
+        f"/api/v1/workouts/sets/{pending_set.id}",
+        "PATCH",
+        {
+            "actual_reps": 9,
+            "actual_weight": 17.5,
+            "rir": "3",
+            "set_kind": "working",
+            "reached_failure": False,
+            "is_completed": True,
+            "expected_version": pending_set.version,
+            "mutation_id": "demo-set-mutation-0001",
+        },
+    )
+    assert saved.status_code == 200
+    saved_set = WorkoutStatusResponse.model_validate(saved.json())
+    assert saved_set.is_completed is True
+    assert saved_set.actual_reps == 9
+    assert saved_set.actual_weight == 17.5
+    assert saved_set.version == pending_set.version + 1
+    repeated = _transport(
+        client,
+        token,
+        f"/api/v1/workouts/sets/{pending_set.id}",
+        "PATCH",
+        {
+            "actual_reps": 9,
+            "actual_weight": 17.5,
+            "rir": "3",
+            "set_kind": "working",
+            "reached_failure": False,
+            "is_completed": True,
+            "expected_version": pending_set.version,
+            "mutation_id": "demo-set-mutation-0001",
+        },
+    )
+    assert repeated.status_code == 200
+    assert repeated.json() == saved.json()
+    refreshed = WorkoutTodayResponse.model_validate(
+        _transport(client, token, "/api/v1/workouts/today").json()
+    )
+    assert [item.is_completed for item in refreshed.exercises[0].sets] == [True, True, True]
+
+
+def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_writes(
+    client,
+) -> None:
+    nutrition_token, _ = _create_session(client, "nutrition")
+    before = _transport(client, nutrition_token, "/api/v1/nutrition/hydration").json()
+    added_water = _transport(
+        client,
+        nutrition_token,
+        "/api/v1/nutrition/hydration/entries",
+        "POST",
+        {"volume_ml": 350, "beverage_type": "water", "source": "quick_preset"},
+    )
+    entry = HydrationEntryResponse.model_validate(added_water.json())
+    assert entry.volume_ml == 350
+    after = HydrationDayResponse.model_validate(
+        _transport(client, nutrition_token, "/api/v1/nutrition/hydration").json()
+    )
+    assert after.total_ml == before["total_ml"] + 350
+    assert any(item.id == entry.id for item in after.entries)
+    assert (
+        _transport(
+            client, nutrition_token, f"/api/v1/nutrition/hydration/entries/{entry.id}", "DELETE"
+        ).status_code
+        == 200
+    )
+
+    added_food = _transport(
+        client,
+        nutrition_token,
+        "/api/v1/nutrition/diary/entries",
+        "POST",
+        {"diary_date": "2026-09-15", "meal_type": "breakfast"},
+    )
+    assert added_food.status_code == 200
+    FoodDiaryDayResponse.model_validate(
+        _transport(client, nutrition_token, "/api/v1/nutrition/diary").json()
+    )
+    report = NutritionReportResponse.model_validate(
+        _transport(client, nutrition_token, "/api/v1/workouts/progress/nutrition-report").json()
+    )
+    assert report.summary.current_day_status == "complete"
+    assert report.daily[0].calories == 1_588
+    assert (
+        _transport(
+            client,
+            nutrition_token,
+            "/api/v1/exports/current",
+            "POST",
+            {},
+        ).status_code
+        == 403
+    )
+
+    trainer_token, _ = _create_session(client, "trainer")
+    for item in _transport(client, trainer_token, "/api/v1/coach/clients").json():
+        ClientResponse.model_validate(item)
+    for item in _transport(client, trainer_token, "/api/v1/coach/assigned-programs").json():
+        CoachAssignedProgramResponse.model_validate(item)
+    timeline = _transport(client, trainer_token, "/api/v1/coach/clients/51002/workouts?limit=30")
+    WorkoutTimelineItem.model_validate(timeline.json()[0])
+    comment = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/clients/51002/workouts/50011/comments",
+        "POST",
+        {"body": "Техника стабильна", "workout_exercise_id": 62001},
+    )
+    WorkoutCommentResponse.model_validate(comment.json())
+    saved_comments = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/clients/51002/workouts/50011/comments",
+    )
+    assert saved_comments.json()[0]["client_user_id"] == 51002
+
+
+def test_demo_transport_rejects_unknown_path_extensions(client) -> None:
+    token, _ = _create_session(client, "self_training")
+
+    for path in (
+        "/api/v1/workouts/cardio/unknown",
+        "/api/v1/coach/clients/51002/workouts/50011/comments/extra",
+    ):
+        response = _transport(client, token, path)
+        assert response.status_code == 403
+
+
+def test_demo_transport_bounds_progress_period(client) -> None:
+    token, _ = _create_session(client, "self_training")
+
+    valid = _transport(client, token, "/api/v1/workouts/progress/summary?period_days=366")
+    assert valid.status_code == 200
+
+    too_long = _transport(client, token, "/api/v1/workouts/progress/summary?period_days=999999999")
+    assert too_long.status_code == 403
+
+    out_of_range = _transport(client, token, "/api/v1/workouts/progress/summary?period_days=0")
+    assert out_of_range.status_code == 403

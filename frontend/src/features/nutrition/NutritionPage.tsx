@@ -11,6 +11,9 @@ export function NutritionPage({
   initialFoodQuickAdd = false,
   initialHydrationOpen = false,
   onSaved,
+  demoSafeMode = false,
+  readOnlyEntries = false,
+  readOnlyTargets = false,
   returnPath,
   timeZone,
 }: {
@@ -20,6 +23,9 @@ export function NutritionPage({
   initialFoodQuickAdd?: boolean;
   initialHydrationOpen?: boolean;
   onSaved?: () => void | Promise<void>;
+  demoSafeMode?: boolean;
+  readOnlyEntries?: boolean;
+  readOnlyTargets?: boolean;
   returnPath?: string;
   timeZone?: string | null;
 }) {
@@ -37,10 +43,17 @@ export function NutritionPage({
         initialFoodQuickAdd={initialFoodQuickAdd}
         initialMealType={initialMealType}
         initialHydrationOpen={initialHydrationOpen}
+        demoSafeMode={demoSafeMode}
+        readOnlyEntries={readOnlyEntries}
         timeZone={timeZone}
       />
       <div id="nutrition-target-settings" className="nutrition-target-settings">
-        <NutritionForm initial={initial} timeZone={timeZone} onSaved={onSaved} />
+        <NutritionForm
+          initial={initial}
+          readOnly={readOnlyTargets}
+          timeZone={timeZone}
+          onSaved={onSaved}
+        />
       </div>
     </div>
   );

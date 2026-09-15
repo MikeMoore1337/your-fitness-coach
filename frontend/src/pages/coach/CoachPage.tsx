@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AppShell } from '../../app/AppShell';
+import { AppShell, type DemoAppShellConfig } from '../../app/AppShell';
 import '../../styles/react.css';
 import '../../styles/design-v2.css';
 import { useAuth } from '../../app/AuthProvider';
@@ -43,6 +43,7 @@ import {
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
+import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import {
   BodyPriorityPicker,
   isBodyPriorityComplete,
@@ -161,7 +162,7 @@ function ClientDataSection({
   );
 }
 
-function ClientProfileEditor({ client }: { client: Client }) {
+function ClientProfileEditor({ client, readOnly = false }: { client: Client; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
   const serverDraft = useMemo(() => clientProfileDraft(client), [client]);
@@ -192,7 +193,7 @@ function ClientProfileEditor({ client }: { client: Client }) {
           goal: form.goal || null,
         },
       }),
-    enabled: validBirthDate && validRestingHeartRate,
+    enabled: !readOnly && validBirthDate && validRestingHeartRate,
     retry: false,
   });
   const heartRate = heartRatePreview.data;
@@ -242,145 +243,154 @@ function ClientProfileEditor({ client }: { client: Client }) {
         mutation.mutate();
       }}
     >
-      <div className="form-grid profile-form-grid">
-        <label className="field">
-          <span>Имя у тренера</span>
-          <input
-            value={form.full_name || ''}
-            maxLength={128}
-            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-          />
-          <small className="field-hint">Это имя видите только вы.</small>
-        </label>
-        <label className="field">
-          <span>Дата рождения</span>
-          <DateInput
-            controlClassName="coach-client-birth-date-control"
-            value={form.birth_date ?? ''}
-            onChange={(event) => setForm({ ...form, birth_date: event.target.value || null })}
-          />
-        </label>
-        <label className="field">
-          <span>Цель</span>
-          <select
-            value={form.goal || ''}
-            required
-            onChange={(e) => setForm({ ...form, goal: e.target.value })}
-          >
-            <option value="" disabled>
-              Выберите цель
-            </option>
-            <option value="fat_loss">Похудение</option>
-            <option value="muscle_gain">Набор мышц</option>
-            <option value="maintenance">Поддержание</option>
-            <option value="recomposition">Рекомпозиция</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>Уровень</span>
-          <select
-            value={form.level || ''}
-            required
-            onChange={(e) => setForm({ ...form, level: e.target.value })}
-          >
-            <option value="" disabled>
-              Выберите уровень
-            </option>
-            <option value="beginner">Начальный</option>
-            <option value="intermediate">Средний</option>
-            <option value="advanced">Продвинутый</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>Рост, см</span>
-          <input
-            type="number"
-            min="100"
-            max="250"
-            value={form.height_cm ?? ''}
-            onChange={(e) => setForm({ ...form, height_cm: numberValue(e.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>Вес, кг</span>
-          <input
-            type="number"
-            min="20"
-            max="350"
-            step="0.1"
-            value={form.weight_kg ?? ''}
-            onChange={(e) => setForm({ ...form, weight_kg: numberValue(e.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>Силовых в неделю</span>
-          <input
-            type="number"
-            min="0"
-            max="14"
-            value={form.workouts_per_week ?? ''}
-            onChange={(e) => setForm({ ...form, workouts_per_week: numberValue(e.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span>Кардио в неделю</span>
-          <input
-            type="number"
-            min="0"
-            max="14"
-            value={form.cardio_trainings_per_week ?? ''}
-            onChange={(e) =>
-              setForm({ ...form, cardio_trainings_per_week: numberValue(e.target.value) })
-            }
-          />
-        </label>
-        <label className="field">
-          <span>Средний пульс в покое, уд/мин</span>
-          <input
-            type="number"
-            min="30"
-            max="120"
-            step="1"
-            value={form.resting_heart_rate ?? ''}
-            onChange={(e) => setForm({ ...form, resting_heart_rate: numberValue(e.target.value) })}
-          />
-        </label>
-      </div>
-      <BodyPriorityPicker
-        value={form.body_priority}
-        onChange={(body_priority) => setForm({ ...form, body_priority })}
-      />
-      <ClientDataSection
-        title="Тренировочные предпочтения"
-        description="Длительность, расписание, места, инвентарь и упражнения"
-      >
-        <TrainingPreferencesFields
-          value={form.training_preferences}
-          ownerUserId={client.id}
-          onChange={(training_preferences) => setForm({ ...form, training_preferences })}
-        />
-      </ClientDataSection>
-      {heartRate && (
-        <div className="auth-notice stack">
-          <strong>Пульсовые зоны · максимум {heartRate.estimated_max_heart_rate} уд/мин</strong>
-          {heartRate.recommended_cardio_range && (
-            <span>
-              Рекомендация для кардио: {heartRate.recommended_cardio_range.min_bpm}–
-              {heartRate.recommended_cardio_range.max_bpm} уд/мин
-            </span>
-          )}
-          <div className="toolbar wrap">
-            {heartRate.heart_rate_zones.map((zone) => (
-              <Badge key={zone.zone}>
-                Z{zone.zone}: {zone.min_bpm}–{zone.max_bpm}
-              </Badge>
-            ))}
-          </div>
-        </div>
+      {readOnly && (
+        <p className="muted demo-capability-notice" role="status">
+          Изменение профиля клиента доступно после входа в рабочий кабинет.
+        </p>
       )}
-      <button type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? 'Сохраняем…' : 'Сохранить профиль'}
-      </button>
+      <fieldset disabled={readOnly}>
+        <div className="form-grid profile-form-grid">
+          <label className="field">
+            <span>Имя у тренера</span>
+            <input
+              value={form.full_name || ''}
+              maxLength={128}
+              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+            />
+            <small className="field-hint">Это имя видите только вы.</small>
+          </label>
+          <label className="field">
+            <span>Дата рождения</span>
+            <DateInput
+              controlClassName="coach-client-birth-date-control"
+              value={form.birth_date ?? ''}
+              onChange={(event) => setForm({ ...form, birth_date: event.target.value || null })}
+            />
+          </label>
+          <label className="field">
+            <span>Цель</span>
+            <select
+              value={form.goal || ''}
+              required
+              onChange={(e) => setForm({ ...form, goal: e.target.value })}
+            >
+              <option value="" disabled>
+                Выберите цель
+              </option>
+              <option value="fat_loss">Похудение</option>
+              <option value="muscle_gain">Набор мышц</option>
+              <option value="maintenance">Поддержание</option>
+              <option value="recomposition">Рекомпозиция</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Уровень</span>
+            <select
+              value={form.level || ''}
+              required
+              onChange={(e) => setForm({ ...form, level: e.target.value })}
+            >
+              <option value="" disabled>
+                Выберите уровень
+              </option>
+              <option value="beginner">Начальный</option>
+              <option value="intermediate">Средний</option>
+              <option value="advanced">Продвинутый</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Рост, см</span>
+            <input
+              type="number"
+              min="100"
+              max="250"
+              value={form.height_cm ?? ''}
+              onChange={(e) => setForm({ ...form, height_cm: numberValue(e.target.value) })}
+            />
+          </label>
+          <label className="field">
+            <span>Вес, кг</span>
+            <input
+              type="number"
+              min="20"
+              max="350"
+              step="0.1"
+              value={form.weight_kg ?? ''}
+              onChange={(e) => setForm({ ...form, weight_kg: numberValue(e.target.value) })}
+            />
+          </label>
+          <label className="field">
+            <span>Силовых в неделю</span>
+            <input
+              type="number"
+              min="0"
+              max="14"
+              value={form.workouts_per_week ?? ''}
+              onChange={(e) => setForm({ ...form, workouts_per_week: numberValue(e.target.value) })}
+            />
+          </label>
+          <label className="field">
+            <span>Кардио в неделю</span>
+            <input
+              type="number"
+              min="0"
+              max="14"
+              value={form.cardio_trainings_per_week ?? ''}
+              onChange={(e) =>
+                setForm({ ...form, cardio_trainings_per_week: numberValue(e.target.value) })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Средний пульс в покое, уд/мин</span>
+            <input
+              type="number"
+              min="30"
+              max="120"
+              step="1"
+              value={form.resting_heart_rate ?? ''}
+              onChange={(e) =>
+                setForm({ ...form, resting_heart_rate: numberValue(e.target.value) })
+              }
+            />
+          </label>
+        </div>
+        <BodyPriorityPicker
+          value={form.body_priority}
+          onChange={(body_priority) => setForm({ ...form, body_priority })}
+        />
+        <ClientDataSection
+          title="Тренировочные предпочтения"
+          description="Длительность, расписание, места, инвентарь и упражнения"
+        >
+          <TrainingPreferencesFields
+            value={form.training_preferences}
+            ownerUserId={client.id}
+            onChange={(training_preferences) => setForm({ ...form, training_preferences })}
+          />
+        </ClientDataSection>
+        {heartRate && (
+          <div className="auth-notice stack">
+            <strong>Пульсовые зоны · максимум {heartRate.estimated_max_heart_rate} уд/мин</strong>
+            {heartRate.recommended_cardio_range && (
+              <span>
+                Рекомендация для кардио: {heartRate.recommended_cardio_range.min_bpm}–
+                {heartRate.recommended_cardio_range.max_bpm} уд/мин
+              </span>
+            )}
+            <div className="toolbar wrap">
+              {heartRate.heart_rate_zones.map((zone) => (
+                <Badge key={zone.zone}>
+                  Z{zone.zone}: {zone.min_bpm}–{zone.max_bpm}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        <button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Сохраняем…' : 'Сохранить профиль'}
+        </button>
+      </fieldset>
     </form>
   );
 }
@@ -482,10 +492,12 @@ function CoachWorkspaceDashboard({
 
 function CoachZeroState({
   inviteCreating,
+  inviteDisabled,
   pendingCount,
   onInvite,
 }: {
   inviteCreating: boolean;
+  inviteDisabled?: boolean;
   pendingCount: number;
   onInvite: () => void;
 }) {
@@ -498,8 +510,12 @@ function CoachZeroState({
           После подключения здесь появятся программа, ближайшие тренировки, прогресс и разрешённые
           данные питания.
         </p>
-        <button disabled={inviteCreating} onClick={onInvite} type="button">
-          {inviteCreating ? 'Создаём приглашение…' : 'Пригласить первого клиента'}
+        <button disabled={inviteCreating || inviteDisabled} onClick={onInvite} type="button">
+          {inviteDisabled
+            ? 'Приглашения недоступны в демо'
+            : inviteCreating
+              ? 'Создаём приглашение…'
+              : 'Пригласить первого клиента'}
         </button>
       </div>
       <ol className="coach-onboarding-steps">
@@ -625,6 +641,7 @@ function CoachClientDetail({
   programs: CoachAssignedProgram[];
   summary?: TrainerClientProgressSummary;
 }) {
+  const capabilities = useRuntimeCapabilities();
   if (client.id == null) return null;
   const activeProgram = programs.find((program) => program.is_active);
   return (
@@ -670,7 +687,12 @@ function CoachClientDetail({
               </span>
             </div>
             {activeProgram && (
-              <button type="button" className="secondary" onClick={onOpenCatalog}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={!capabilities.canMutatePrograms}
+                onClick={onOpenCatalog}
+              >
                 Добавить упражнение
               </button>
             )}
@@ -699,18 +721,34 @@ function CoachClientDetail({
                   {program.is_active ? 'Активна' : 'Архив'}
                 </Badge>
                 {program.is_active && (
-                  <AssignedProgramDetails
-                    programId={program.id}
-                    currentRevisionNumber={program.current_revision_number}
-                    startDate={program.start_date}
-                    durationWeeks={program.duration_weeks}
-                  />
+                  <>
+                    {!capabilities.canMutatePrograms && (
+                      <p className="muted demo-capability-notice" role="status">
+                        Изменение этапов программы доступно после входа в рабочий кабинет.
+                      </p>
+                    )}
+                    <fieldset
+                      className="demo-capability-fieldset"
+                      disabled={!capabilities.canMutatePrograms}
+                    >
+                      <AssignedProgramDetails
+                        programId={program.id}
+                        currentRevisionNumber={program.current_revision_number}
+                        startDate={program.start_date}
+                        durationWeeks={program.duration_weeks}
+                      />
+                    </fieldset>
+                  </>
                 )}
               </article>
             ))
           )}
         </div>
-        <ProgramAssignmentDisclosure key={`program-${client.id}`} client={client} />
+        {capabilities.canMutatePrograms ? (
+          <ProgramAssignmentDisclosure key={`program-${client.id}`} client={client} />
+        ) : (
+          <p className="muted">Изменение программ доступно в рабочем кабинете.</p>
+        )}
       </ClientDataSection>
 
       <ClientDataSection
@@ -723,8 +761,14 @@ function CoachClientDetail({
           clientId={client.id}
           clientName={clientDisplayName(client)}
           canComment={client.status === 'active'}
+          canSchedule={capabilities.canManageCoach}
         />
-        <Diary key={`diary-${client.id}`} clientId={client.id} timeZone={client.timezone} />
+        <Diary
+          key={`diary-${client.id}`}
+          clientId={client.id}
+          readOnly={!capabilities.canMutateProgress}
+          timeZone={client.timezone}
+        />
       </ClientDataSection>
 
       <ClientDataSection
@@ -744,7 +788,11 @@ function CoachClientDetail({
         ) : (
           <>
             {client.status === 'active' && (
-              <NutritionPeriodReport key={`nutrition-report-${client.id}`} clientId={client.id} />
+              <NutritionPeriodReport
+                canExport={capabilities.canExport}
+                key={`nutrition-report-${client.id}`}
+                clientId={client.id}
+              />
             )}
             <NutritionForm
               key={JSON.stringify([client.id, client.kbju])}
@@ -752,6 +800,7 @@ function CoachClientDetail({
               targetTelegramId={client.telegram_user_id}
               initial={client.kbju}
               timeZone={client.timezone}
+              readOnly={!capabilities.canMutateProfile}
             />
           </>
         )}
@@ -762,14 +811,25 @@ function CoachClientDetail({
         title="Профиль клиента"
         description="Анкета, цель и параметры"
       >
-        <ClientProfileEditor key={clientProfileKey(client)} client={client} />
+        <ClientProfileEditor
+          key={clientProfileKey(client)}
+          client={client}
+          readOnly={!capabilities.canMutateProfile}
+        />
       </ClientDataSection>
     </article>
   );
 }
 
-export default function CoachPage() {
+export default function CoachPage({
+  demo,
+  renderShell = true,
+}: {
+  demo?: DemoAppShellConfig;
+  renderShell?: boolean;
+} = {}) {
   const { user } = useAuth();
+  const capabilities = useRuntimeCapabilities();
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<CoachTab>('clients');
@@ -878,6 +938,10 @@ export default function CoachPage() {
     }
   };
   const createInvite = async () => {
+    if (!capabilities.canManageCoach) {
+      toast('Приглашения доступны только в рабочем кабинете.', 'error');
+      return;
+    }
     setInviteCreating(true);
     try {
       const result = await api<InviteLink>('/api/v1/coach/invite-links', {
@@ -895,413 +959,433 @@ export default function CoachPage() {
     }
   };
 
-  return (
-    <AppShell>
-      <div
-        className={`page-stack app-section app-section--programs app-section--design-v2 coach-workspace--design-v2${clientDetailOpen ? ' is-client-detail-open' : ''}`}
-      >
-        <TrainerModeSwitch
-          mode="clients"
-          sticky
-          clientName={clientDetailOpen && selected ? clientDisplayName(selected) : undefined}
-        />
-        <header className="coach-workspace-header">
-          <div>
-            <span className="eyebrow">Клиенты · рабочее пространство</span>
-            <h1>Кабинет тренера</h1>
-            <p>Факты о тренировках, планах и прогрессе — без потери контекста клиента.</p>
-          </div>
-          <div className="coach-workspace-header__actions">
-            <button disabled={inviteCreating} onClick={() => void createInvite()} type="button">
-              {inviteCreating ? 'Создаём…' : 'Пригласить клиента'}
-            </button>
-          </div>
-        </header>
-        <div className="react-tabs react-tabs--coach" role="tablist" aria-label="Разделы тренера">
-          {(
-            [
-              ['clients', 'Клиенты'],
-              ['programs', 'Назначенные программы'],
-              ['catalog', 'Упражнения'],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === key}
-              id={`coach-tab-${key}`}
-              aria-controls={`coach-panel-${key}`}
-              tabIndex={tab === key ? 0 : -1}
-              className={tab === key ? 'is-active' : 'secondary'}
-              onClick={() => setTab(key)}
-              onKeyDown={handleTabKeyDown}
-              key={key}
-            >
-              {label}
-            </button>
-          ))}
+  const content = (
+    <div
+      className={`page-stack app-section app-section--programs app-section--design-v2 coach-workspace--design-v2${clientDetailOpen ? ' is-client-detail-open' : ''}`}
+    >
+      <TrainerModeSwitch
+        mode="clients"
+        sticky
+        clientName={clientDetailOpen && selected ? clientDisplayName(selected) : undefined}
+      />
+      <header className="coach-workspace-header">
+        <div>
+          <span className="eyebrow">Клиенты · рабочее пространство</span>
+          <h1>Кабинет тренера</h1>
+          <p>Факты о тренировках, планах и прогрессе — без потери контекста клиента.</p>
         </div>
-        <section
-          className="page-stack"
-          role="tabpanel"
-          id={`coach-panel-${tab}`}
-          aria-labelledby={`coach-tab-${tab}`}
-        >
-          {tab === 'clients' && (
-            <>
-              <CoachWorkspaceDashboard
-                clients={clients.data ?? []}
-                loading={activeClients.length > 0 && clientSummaries.isPending}
-                summaries={clientSummaries.data?.items ?? []}
-                unavailable={Boolean(clientSummaries.error)}
+        <div className="coach-workspace-header__actions">
+          <button
+            disabled={inviteCreating || !capabilities.canManageCoach}
+            onClick={() => void createInvite()}
+            type="button"
+          >
+            {inviteCreating ? 'Создаём…' : 'Пригласить клиента'}
+          </button>
+        </div>
+      </header>
+      <div className="react-tabs react-tabs--coach" role="tablist" aria-label="Разделы тренера">
+        {(
+          [
+            ['clients', 'Клиенты'],
+            ['programs', 'Назначенные программы'],
+            ['catalog', 'Упражнения'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            id={`coach-tab-${key}`}
+            aria-controls={`coach-panel-${key}`}
+            tabIndex={tab === key ? 0 : -1}
+            className={tab === key ? 'is-active' : 'secondary'}
+            onClick={() => setTab(key)}
+            onKeyDown={handleTabKeyDown}
+            key={key}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <section
+        className="page-stack"
+        role="tabpanel"
+        id={`coach-panel-${tab}`}
+        aria-labelledby={`coach-tab-${tab}`}
+      >
+        {tab === 'clients' && (
+          <>
+            <CoachWorkspaceDashboard
+              clients={clients.data ?? []}
+              loading={activeClients.length > 0 && clientSummaries.isPending}
+              summaries={clientSummaries.data?.items ?? []}
+              unavailable={Boolean(clientSummaries.error)}
+            />
+            {clientSummaries.error && activeClients.length > 0 && (
+              <div className="coach-summary-warning" role="status">
+                Краткие показатели временно недоступны. Список клиентов и подробные разделы
+                продолжают работать.
+                <button className="secondary" onClick={() => void clientSummaries.refetch()}>
+                  Повторить
+                </button>
+              </div>
+            )}
+            {!clients.isLoading && activeClients.length === 0 && (
+              <CoachZeroState
+                inviteCreating={inviteCreating}
+                inviteDisabled={!capabilities.canManageCoach}
+                pendingCount={pendingCount}
+                onInvite={() => void createInvite()}
               />
-              {clientSummaries.error && activeClients.length > 0 && (
-                <div className="coach-summary-warning" role="status">
-                  Краткие показатели временно недоступны. Список клиентов и подробные разделы
-                  продолжают работать.
-                  <button className="secondary" onClick={() => void clientSummaries.refetch()}>
-                    Повторить
-                  </button>
-                </div>
-              )}
-              {!clients.isLoading && activeClients.length === 0 && (
-                <CoachZeroState
-                  inviteCreating={inviteCreating}
-                  pendingCount={pendingCount}
-                  onInvite={() => void createInvite()}
-                />
-              )}
-              <Card
-                className={`coach-invite-panel${inviteLink ? ' is-visible' : ''}`}
-                collapsible={false}
-                title="Пригласить клиента"
-                description="Отправьте персональную ссылку. Клиент сначала увидит ваше имя и сам подтвердит подключение."
-                actions={
-                  <button
-                    className="secondary"
-                    disabled={inviteCreating}
-                    onClick={() => void createInvite()}
-                  >
-                    {inviteCreating ? 'Создаём…' : 'Создать приглашение'}
-                  </button>
-                }
-              >
-                {inviteLink ? (
-                  <div className="auth-notice stack top-gap">
-                    {inviteLink.web_url && (
-                      <label className="field">
-                        <span>Универсальная ссылка — для браузера и Telegram</span>
-                        <input
-                          readOnly
-                          value={inviteLink.web_url}
-                          onFocus={(event) => event.currentTarget.select()}
-                        />
-                      </label>
-                    )}
-                    {inviteLink.telegram_url && (
-                      <label className="field">
-                        <span>Открыть сразу внутри Telegram</span>
-                        <input
-                          readOnly
-                          value={inviteLink.telegram_url}
-                          onFocus={(event) => event.currentTarget.select()}
-                        />
-                      </label>
-                    )}
-                    {inviteLink.code && (
-                      <label className="field">
-                        <span>Код приглашения — если ссылка не открывается</span>
-                        <input
-                          readOnly
-                          value={inviteLink.code}
-                          onFocus={(event) => event.currentTarget.select()}
-                        />
-                      </label>
-                    )}
-                    <p className="muted">
-                      Действует до {new Date(inviteLink.expires_at).toLocaleString('ru-RU')}.
-                    </p>
-                    <div className="toolbar wrap">
+            )}
+            <Card
+              className={`coach-invite-panel${inviteLink ? ' is-visible' : ''}`}
+              collapsible={false}
+              title="Пригласить клиента"
+              description="Отправьте персональную ссылку. Клиент сначала увидит ваше имя и сам подтвердит подключение."
+              actions={
+                <button
+                  className="secondary"
+                  disabled={inviteCreating || !capabilities.canManageCoach}
+                  onClick={() => void createInvite()}
+                >
+                  {inviteCreating ? 'Создаём…' : 'Создать приглашение'}
+                </button>
+              }
+            >
+              {inviteLink ? (
+                <div className="auth-notice stack top-gap">
+                  {inviteLink.web_url && (
+                    <label className="field">
+                      <span>Универсальная ссылка — для браузера и Telegram</span>
+                      <input
+                        readOnly
+                        value={inviteLink.web_url}
+                        onFocus={(event) => event.currentTarget.select()}
+                      />
+                    </label>
+                  )}
+                  {inviteLink.telegram_url && (
+                    <label className="field">
+                      <span>Открыть сразу внутри Telegram</span>
+                      <input
+                        readOnly
+                        value={inviteLink.telegram_url}
+                        onFocus={(event) => event.currentTarget.select()}
+                      />
+                    </label>
+                  )}
+                  {inviteLink.code && (
+                    <label className="field">
+                      <span>Код приглашения — если ссылка не открывается</span>
+                      <input
+                        readOnly
+                        value={inviteLink.code}
+                        onFocus={(event) => event.currentTarget.select()}
+                      />
+                    </label>
+                  )}
+                  <p className="muted">
+                    Действует до {new Date(inviteLink.expires_at).toLocaleString('ru-RU')}.
+                  </p>
+                  <div className="toolbar wrap">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void copyInvite(
+                          inviteLink.web_url ||
+                            inviteLink.url ||
+                            inviteLink.code ||
+                            inviteLink.start_param,
+                        )
+                      }
+                    >
+                      Копировать
+                    </button>
+                    {inviteLink.web_url && typeof navigator.share === 'function' && (
                       <button
                         type="button"
+                        className="secondary"
                         onClick={() =>
-                          void copyInvite(
-                            inviteLink.web_url ||
-                              inviteLink.url ||
-                              inviteLink.code ||
-                              inviteLink.start_param,
-                          )
+                          void navigator
+                            .share({
+                              title: 'Приглашение тренера',
+                              text: 'Откройте Your Fitness Coach и подтвердите подключение к тренеру.',
+                              url: inviteLink.web_url,
+                            })
+                            .catch(() => undefined)
                         }
                       >
-                        Копировать
+                        Поделиться
                       </button>
-                      {inviteLink.web_url && typeof navigator.share === 'function' && (
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="muted">
+                  Новая персональная ссылка появится здесь. Приглашение не даёт доступ к данным до
+                  подтверждения клиентом.
+                </p>
+              )}
+            </Card>
+            <div className={`coach-client-workspace${clientDetailOpen ? ' is-client-open' : ''}`}>
+              <Card className="coach-client-roster" title="Клиенты" collapsible={false}>
+                <div className="coach-client-tools">
+                  <label className="field">
+                    <span>Найти клиента</span>
+                    <input
+                      type="search"
+                      placeholder="Имя, username или Telegram ID"
+                      value={clientSearch}
+                      onChange={(event) => setClientSearch(event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Показать</span>
+                    <select
+                      value={clientFilter}
+                      onChange={(event) => setClientFilter(event.target.value as CoachClientFilter)}
+                    >
+                      <option value="all">Все</option>
+                      <option value="attention">Нет тренировок 7+ дней</option>
+                      <option value="recent">Тренировались за 7 дней</option>
+                      <option value="without_program">Без активной программы</option>
+                      <option value="pending">Ожидают подключения</option>
+                    </select>
+                  </label>
+                </div>
+                {clients.isLoading ? (
+                  <LoadingState />
+                ) : clients.error ? (
+                  <ErrorState message={(clients.error as Error).message} />
+                ) : !clients.data?.length ? (
+                  <EmptyState
+                    title="Клиентов пока нет"
+                    text="Создайте приглашение, чтобы начать работу."
+                  />
+                ) : !filteredClients.length ? (
+                  <EmptyState
+                    title="Клиенты не найдены"
+                    text="Измените запрос или выберите другой фильтр."
+                  />
+                ) : (
+                  <div className="coach-client-list">
+                    {filteredClients.map((client) => {
+                      const summary = client.id ? summaryMap.get(client.id) : undefined;
+                      const activeProgram = (programs.data ?? []).find(
+                        (program) => program.client_id === client.id && program.is_active,
+                      );
+                      return (
+                        <article
+                          className={`coach-client-row${selected?.id === client.id ? ' selected' : ''}`}
+                          key={client.id || `invite-${client.invite_id}`}
+                        >
+                          <button
+                            className="coach-client-row__main text-button"
+                            disabled={!client.id}
+                            onClick={() => {
+                              if (!client.id) return;
+                              trackProductEvent({
+                                name: 'trainer_client_opened',
+                                surface: productEventSurface(),
+                              });
+                              setSelectedId(client.id);
+                              setFocusedProgramId(null);
+                              setClientDetailOpen(true);
+                            }}
+                          >
+                            <span className="coach-client-row__identity">
+                              <strong>{clientDisplayName(client)}</strong>
+                              <small>
+                                {client.status === 'pending'
+                                  ? 'Ожидает подтверждения'
+                                  : activeProgram?.title || 'Нет активной программы'}
+                              </small>
+                            </span>
+                            {client.status === 'active' ? (
+                              <span className="coach-client-row__signals">
+                                <span
+                                  className={needsCoachAttention(summary) ? 'is-attention' : ''}
+                                >
+                                  {activityLabel(summary?.training.last_completed_workout_on)}
+                                </span>
+                                <small>{adherenceText(summary)}</small>
+                              </span>
+                            ) : (
+                              <Badge tone="warning">Ожидает</Badge>
+                            )}
+                          </button>
+                          <details className="coach-client-row__menu">
+                            <summary aria-label={`Действия: ${clientDisplayName(client)}`}>
+                              <Icon name="more-horizontal" size={20} />
+                            </summary>
+                            <button
+                              className="btn-danger"
+                              disabled={!capabilities.canManageCoach}
+                              onClick={async () => {
+                                if (
+                                  await confirm({
+                                    title:
+                                      client.status === 'pending'
+                                        ? 'Отозвать приглашение?'
+                                        : 'Завершить работу с клиентом?',
+                                    message: clientDisplayName(client),
+                                    confirmText:
+                                      client.status === 'pending' ? 'Отозвать' : 'Завершить',
+                                  })
+                                )
+                                  mutation.mutate({
+                                    path: client.id
+                                      ? `/api/v1/coach/clients/${client.id}`
+                                      : `/api/v1/coach/client-invites/id/${client.invite_id}`,
+                                    method: 'DELETE',
+                                  });
+                              }}
+                            >
+                              {client.status === 'pending'
+                                ? 'Отозвать приглашение'
+                                : 'Завершить работу'}
+                            </button>
+                          </details>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+              {selected?.id && selected.status === 'active' && (
+                <CoachClientDetail
+                  key={selected.id}
+                  client={selected}
+                  focusedProgramId={focusedProgramId}
+                  onBack={() => setClientDetailOpen(false)}
+                  onOpenCatalog={() => setTab('catalog')}
+                  programs={selectedPrograms}
+                  summary={selectedSummary}
+                />
+              )}
+            </div>
+          </>
+        )}
+        {tab === 'programs' && (
+          <Card
+            title="Программы клиентов"
+            description="Здесь только назначения вашим клиентам. Собственные программы хранятся в личном плане."
+            actions={
+              <AppLink className="button-link secondary-link" to="/app?section=programs">
+                Мои программы
+              </AppLink>
+            }
+          >
+            <label className="field top-gap">
+              <span>Поиск</span>
+              <input
+                type="search"
+                value={programSearch}
+                onChange={(e) => setProgramSearch(e.target.value)}
+              />
+            </label>
+            {programs.isLoading ? (
+              <LoadingState />
+            ) : programs.error ? (
+              <ErrorState message={(programs.error as Error).message} />
+            ) : !filteredPrograms.length ? (
+              <EmptyState title="Назначений не найдено" />
+            ) : (
+              <div className="list-grid top-gap">
+                {filteredPrograms.map((item) => (
+                  <article className="coach-program-row" key={item.id}>
+                    <div className="coach-program-row__main">
+                      <span className="eyebrow">Программа клиента</span>
+                      <strong>{item.title}</strong>
+                      <p>
+                        {item.client_full_name ||
+                          item.client_username ||
+                          item.client_telegram_user_id}
+                      </p>
+                      <small>
+                        Назначена {new Date(item.assigned_at).toLocaleDateString('ru-RU')}
+                        {item.next_workout_date
+                          ? ` · следующая ${new Date(`${item.next_workout_date}T12:00:00`).toLocaleDateString('ru-RU')}`
+                          : ''}
+                      </small>
+                    </div>
+                    <div className="coach-program-row__progress">
+                      <Badge tone={item.is_active ? 'success' : 'neutral'}>
+                        {item.is_active ? 'Активна' : 'Архив'}
+                      </Badge>
+                      <strong>
+                        {item.workouts_completed} / {item.workouts_total}
+                      </strong>
+                      <span>тренировок выполнено</span>
+                    </div>
+                    <div className="coach-program-row__actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          trackProductEvent({
+                            name: 'trainer_client_opened',
+                            surface: productEventSurface(),
+                          });
+                          setSelectedId(item.client_id);
+                          setFocusedProgramId(item.id);
+                          setClientDetailOpen(true);
+                          setTab('clients');
+                        }}
+                      >
+                        Открыть клиента
+                      </button>
+                      {item.is_active && (
                         <button
                           type="button"
                           className="secondary"
-                          onClick={() =>
-                            void navigator
-                              .share({
-                                title: 'Приглашение тренера',
-                                text: 'Откройте Your Fitness Coach и подтвердите подключение к тренеру.',
-                                url: inviteLink.web_url,
-                              })
-                              .catch(() => undefined)
-                          }
-                        >
-                          Поделиться
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="muted">
-                    Новая персональная ссылка появится здесь. Приглашение не даёт доступ к данным до
-                    подтверждения клиентом.
-                  </p>
-                )}
-              </Card>
-              <div className={`coach-client-workspace${clientDetailOpen ? ' is-client-open' : ''}`}>
-                <Card className="coach-client-roster" title="Клиенты" collapsible={false}>
-                  <div className="coach-client-tools">
-                    <label className="field">
-                      <span>Найти клиента</span>
-                      <input
-                        type="search"
-                        placeholder="Имя, username или Telegram ID"
-                        value={clientSearch}
-                        onChange={(event) => setClientSearch(event.target.value)}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Показать</span>
-                      <select
-                        value={clientFilter}
-                        onChange={(event) =>
-                          setClientFilter(event.target.value as CoachClientFilter)
-                        }
-                      >
-                        <option value="all">Все</option>
-                        <option value="attention">Нет тренировок 7+ дней</option>
-                        <option value="recent">Тренировались за 7 дней</option>
-                        <option value="without_program">Без активной программы</option>
-                        <option value="pending">Ожидают подключения</option>
-                      </select>
-                    </label>
-                  </div>
-                  {clients.isLoading ? (
-                    <LoadingState />
-                  ) : clients.error ? (
-                    <ErrorState message={(clients.error as Error).message} />
-                  ) : !clients.data?.length ? (
-                    <EmptyState
-                      title="Клиентов пока нет"
-                      text="Создайте приглашение, чтобы начать работу."
-                    />
-                  ) : !filteredClients.length ? (
-                    <EmptyState
-                      title="Клиенты не найдены"
-                      text="Измените запрос или выберите другой фильтр."
-                    />
-                  ) : (
-                    <div className="coach-client-list">
-                      {filteredClients.map((client) => {
-                        const summary = client.id ? summaryMap.get(client.id) : undefined;
-                        const activeProgram = (programs.data ?? []).find(
-                          (program) => program.client_id === client.id && program.is_active,
-                        );
-                        return (
-                          <article
-                            className={`coach-client-row${selected?.id === client.id ? ' selected' : ''}`}
-                            key={client.id || `invite-${client.invite_id}`}
-                          >
-                            <button
-                              className="coach-client-row__main text-button"
-                              disabled={!client.id}
-                              onClick={() => {
-                                if (!client.id) return;
-                                trackProductEvent({
-                                  name: 'trainer_client_opened',
-                                  surface: productEventSurface(),
-                                });
-                                setSelectedId(client.id);
-                                setFocusedProgramId(null);
-                                setClientDetailOpen(true);
-                              }}
-                            >
-                              <span className="coach-client-row__identity">
-                                <strong>{clientDisplayName(client)}</strong>
-                                <small>
-                                  {client.status === 'pending'
-                                    ? 'Ожидает подтверждения'
-                                    : activeProgram?.title || 'Нет активной программы'}
-                                </small>
-                              </span>
-                              {client.status === 'active' ? (
-                                <span className="coach-client-row__signals">
-                                  <span
-                                    className={needsCoachAttention(summary) ? 'is-attention' : ''}
-                                  >
-                                    {activityLabel(summary?.training.last_completed_workout_on)}
-                                  </span>
-                                  <small>{adherenceText(summary)}</small>
-                                </span>
-                              ) : (
-                                <Badge tone="warning">Ожидает</Badge>
-                              )}
-                            </button>
-                            <details className="coach-client-row__menu">
-                              <summary aria-label={`Действия: ${clientDisplayName(client)}`}>
-                                <Icon name="more-horizontal" size={20} />
-                              </summary>
-                              <button
-                                className="btn-danger"
-                                onClick={async () => {
-                                  if (
-                                    await confirm({
-                                      title:
-                                        client.status === 'pending'
-                                          ? 'Отозвать приглашение?'
-                                          : 'Завершить работу с клиентом?',
-                                      message: clientDisplayName(client),
-                                      confirmText:
-                                        client.status === 'pending' ? 'Отозвать' : 'Завершить',
-                                    })
-                                  )
-                                    mutation.mutate({
-                                      path: client.id
-                                        ? `/api/v1/coach/clients/${client.id}`
-                                        : `/api/v1/coach/client-invites/id/${client.invite_id}`,
-                                      method: 'DELETE',
-                                    });
-                                }}
-                              >
-                                {client.status === 'pending'
-                                  ? 'Отозвать приглашение'
-                                  : 'Завершить работу'}
-                              </button>
-                            </details>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  )}
-                </Card>
-                {selected?.id && selected.status === 'active' && (
-                  <CoachClientDetail
-                    key={selected.id}
-                    client={selected}
-                    focusedProgramId={focusedProgramId}
-                    onBack={() => setClientDetailOpen(false)}
-                    onOpenCatalog={() => setTab('catalog')}
-                    programs={selectedPrograms}
-                    summary={selectedSummary}
-                  />
-                )}
-              </div>
-            </>
-          )}
-          {tab === 'programs' && (
-            <Card
-              title="Программы клиентов"
-              description="Здесь только назначения вашим клиентам. Собственные программы хранятся в личном плане."
-              actions={
-                <AppLink className="button-link secondary-link" to="/app?section=programs">
-                  Мои программы
-                </AppLink>
-              }
-            >
-              <label className="field top-gap">
-                <span>Поиск</span>
-                <input
-                  type="search"
-                  value={programSearch}
-                  onChange={(e) => setProgramSearch(e.target.value)}
-                />
-              </label>
-              {programs.isLoading ? (
-                <LoadingState />
-              ) : programs.error ? (
-                <ErrorState message={(programs.error as Error).message} />
-              ) : !filteredPrograms.length ? (
-                <EmptyState title="Назначений не найдено" />
-              ) : (
-                <div className="list-grid top-gap">
-                  {filteredPrograms.map((item) => (
-                    <article className="coach-program-row" key={item.id}>
-                      <div className="coach-program-row__main">
-                        <span className="eyebrow">Программа клиента</span>
-                        <strong>{item.title}</strong>
-                        <p>
-                          {item.client_full_name ||
-                            item.client_username ||
-                            item.client_telegram_user_id}
-                        </p>
-                        <small>
-                          Назначена {new Date(item.assigned_at).toLocaleDateString('ru-RU')}
-                          {item.next_workout_date
-                            ? ` · следующая ${new Date(`${item.next_workout_date}T12:00:00`).toLocaleDateString('ru-RU')}`
-                            : ''}
-                        </small>
-                      </div>
-                      <div className="coach-program-row__progress">
-                        <Badge tone={item.is_active ? 'success' : 'neutral'}>
-                          {item.is_active ? 'Активна' : 'Архив'}
-                        </Badge>
-                        <strong>
-                          {item.workouts_completed} / {item.workouts_total}
-                        </strong>
-                        <span>тренировок выполнено</span>
-                      </div>
-                      <div className="coach-program-row__actions">
-                        <button
-                          type="button"
+                          disabled={!capabilities.canMutatePrograms || !capabilities.canManageCoach}
                           onClick={() => {
-                            trackProductEvent({
-                              name: 'trainer_client_opened',
-                              surface: productEventSurface(),
-                            });
                             setSelectedId(item.client_id);
-                            setFocusedProgramId(item.id);
                             setClientDetailOpen(true);
-                            setTab('clients');
+                            setTab('catalog');
                           }}
                         >
-                          Открыть клиента
+                          Добавить упражнение
                         </button>
-                        {item.is_active && (
-                          <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => {
-                              setSelectedId(item.client_id);
-                              setClientDetailOpen(true);
-                              setTab('catalog');
-                            }}
-                          >
-                            Добавить упражнение
-                          </button>
-                        )}
-                      </div>
-                      {item.is_active && (
-                        <AssignedProgramDetails
-                          programId={item.id}
-                          currentRevisionNumber={item.current_revision_number}
-                          startDate={item.start_date}
-                          durationWeeks={item.duration_weeks}
-                        />
                       )}
-                    </article>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
-          {tab === 'catalog' && (
-            <ExerciseCatalog canCreate canAssign targetTelegramId={selected?.telegram_user_id} />
-          )}
-        </section>
-      </div>
-    </AppShell>
+                    </div>
+                    {item.is_active && (
+                      <>
+                        {!capabilities.canMutatePrograms && (
+                          <p className="muted demo-capability-notice" role="status">
+                            Изменение этапов программы доступно после входа в рабочий кабинет.
+                          </p>
+                        )}
+                        <fieldset
+                          className="demo-capability-fieldset"
+                          disabled={!capabilities.canMutatePrograms}
+                        >
+                          <AssignedProgramDetails
+                            programId={item.id}
+                            currentRevisionNumber={item.current_revision_number}
+                            startDate={item.start_date}
+                            durationWeeks={item.duration_weeks}
+                          />
+                        </fieldset>
+                      </>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+        {tab === 'catalog' && (
+          <ExerciseCatalog
+            canCreate={capabilities.canCreateCatalog}
+            canAssign={capabilities.canMutatePrograms && capabilities.canManageCoach}
+            targetTelegramId={selected?.telegram_user_id}
+          />
+        )}
+      </section>
+    </div>
   );
+  return renderShell ? <AppShell demo={demo}>{content}</AppShell> : content;
 }
