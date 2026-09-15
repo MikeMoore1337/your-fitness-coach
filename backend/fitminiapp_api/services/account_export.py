@@ -155,6 +155,9 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "ai_coach_quota_reservations": (
         "short-lived AI Coach quota reservations and opaque idempotency metadata"
     ),
+    "ai_coach_conversation_message_requests": (
+        "opaque AI Coach message request keys used only for idempotency"
+    ),
 }
 
 

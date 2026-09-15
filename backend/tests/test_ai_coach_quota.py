@@ -470,6 +470,8 @@ def test_stale_processing_is_recovered_on_conversation_reload_without_charge(
             request_id=request_id,
             status="processing",
         )
+        assert message.status == "failed"
+        assert message.processing_started_at is not None
         message.processing_started_at = datetime.now() - timedelta(seconds=120)
         db.commit()
 

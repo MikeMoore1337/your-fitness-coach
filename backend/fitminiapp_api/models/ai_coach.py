@@ -12,7 +12,6 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -167,20 +166,12 @@ class AiCoachConversationMessage(Base):
             "created_at",
             "id",
         ),
-        Index(
-            "uq_ai_coach_conversation_messages_user_request",
-            "conversation_id",
-            "request_id",
-            unique=True,
-            postgresql_where=text("role = 'user' AND request_id IS NOT NULL"),
-            sqlite_where=text("role = 'user' AND request_id IS NOT NULL"),
-        ),
         CheckConstraint(
             "role IN ('user', 'assistant')",
             name="ck_ai_coach_conversation_messages_role",
         ),
         CheckConstraint(
-            "status IN ('processing', 'complete', 'failed')",
+            "status IN ('complete', 'failed')",
             name="ck_ai_coach_conversation_messages_status",
         ),
         CheckConstraint(
@@ -213,6 +204,31 @@ class AiCoachConversationMessage(Base):
     processing_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     citations: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False, default=list)
     limitations: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+
+
+class AiCoachConversationMessageRequest(Base):
+    """Durable per-conversation request key used for idempotent message creation."""
+
+    __tablename__ = "ai_coach_conversation_message_requests"
+    __table_args__ = (
+        UniqueConstraint(
+            "conversation_id",
+            "request_id",
+            name="uq_ai_coach_conversation_message_requests_conversation_request",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_coach_conversations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    message_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_coach_conversation_messages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    request_id: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
 
 
@@ -291,6 +307,7 @@ __all__ = [
     "AiCoachConsent",
     "AiCoachConversation",
     "AiCoachConversationMessage",
+    "AiCoachConversationMessageRequest",
     "AiCoachMemory",
     "AiCoachMemoryConsent",
     "AiCoachQuotaReservation",
