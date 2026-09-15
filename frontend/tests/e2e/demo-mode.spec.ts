@@ -20,10 +20,20 @@ const DEMO_VIEWPORTS = [
 ] as const;
 
 const TASK_274_EVIDENCE_DIR = process.env.TASK_274_EVIDENCE_DIR;
+const TASK_278_EVIDENCE_DIR = process.env.TASK_278_EVIDENCE_DIR;
+const TASK_278_THEME =
+  process.env.TASK_278_THEME === 'light' || process.env.TASK_278_THEME === 'dark'
+    ? process.env.TASK_278_THEME
+    : undefined;
 
 async function captureEvidence(page: Page, fileName: string): Promise<void> {
   if (!TASK_274_EVIDENCE_DIR) return;
   await page.screenshot({ path: resolve(TASK_274_EVIDENCE_DIR, fileName), fullPage: true });
+}
+
+async function captureTask278Evidence(page: Page, fileName: string): Promise<void> {
+  if (!TASK_278_EVIDENCE_DIR) return;
+  await page.screenshot({ path: resolve(TASK_278_EVIDENCE_DIR, fileName), fullPage: true });
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -923,9 +933,16 @@ test('demo uses production today composition and persists one workout set throug
     if (url.pathname.startsWith('/api/v1/workouts/')) directProductionRequests.push(url.pathname);
   });
   await installDemoTransport(page);
+  if (TASK_278_THEME) {
+    await page.emulateMedia({ colorScheme: TASK_278_THEME });
+    await page.addInitScript((theme) => localStorage.setItem('app-theme', theme), TASK_278_THEME);
+  }
   await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
+  if (TASK_278_THEME) {
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', TASK_278_THEME);
+  }
   await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
   await expect(page.locator('.demo-cabinet-primary')).toHaveCount(0);
   await page.getByRole('button', { name: 'Продолжить' }).click();
@@ -970,6 +987,44 @@ test('demo uses production today composition and persists one workout set throug
   await expect(page.getByRole('button', { name: 'Начать тренировку' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Завершить тренировку' }).click();
   await expect(page.getByRole('heading', { name: 'Тренировка завершена', level: 2 })).toBeVisible();
+  for (const viewport of [
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 430, height: 932 },
+    { width: 1280, height: 720 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expectNoHorizontalOverflow(page);
+    const geometry = await page.evaluate(() => {
+      const check = document.querySelector('.workout-completion__check')?.getBoundingClientRect();
+      const icon = document
+        .querySelector('.workout-completion__check svg')
+        ?.getBoundingClientRect();
+      const title = document.getElementById('workout-completion-title')?.getBoundingClientRect();
+      if (!check || !icon || !title) return null;
+      return {
+        checkLeft: check.left,
+        checkTop: check.top,
+        checkRight: check.right,
+        checkBottom: check.bottom,
+        iconLeft: icon.left,
+        iconRight: icon.right,
+        iconTop: icon.top,
+        iconBottom: icon.bottom,
+        titleLeft: title.left,
+      };
+    });
+    expect(geometry).not.toBeNull();
+    expect(geometry!.iconLeft).toBeGreaterThanOrEqual(geometry!.checkLeft - 1);
+    expect(geometry!.iconRight).toBeLessThanOrEqual(geometry!.checkRight + 1);
+    expect(geometry!.iconTop).toBeGreaterThanOrEqual(geometry!.checkTop - 1);
+    expect(geometry!.iconBottom).toBeLessThanOrEqual(geometry!.checkBottom + 1);
+    expect(geometry!.checkRight).toBeLessThanOrEqual(geometry!.titleLeft + 1);
+    await captureTask278Evidence(
+      page,
+      `completion-${viewport.width}x${viewport.height}-${TASK_278_THEME ?? 'default'}.png`,
+    );
+  }
   await page.getByRole('button', { name: 'Продолжить' }).click();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=progress');
   await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();

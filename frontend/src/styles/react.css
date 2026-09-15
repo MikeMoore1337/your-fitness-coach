@@ -4414,8 +4414,8 @@ button.today-text-link {
   color: var(--success-text);
 }
 .workout-completion__check svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 .workout-completion__facts {
   display: grid;
