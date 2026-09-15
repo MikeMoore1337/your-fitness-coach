@@ -83,7 +83,11 @@ test('canonical brand assets render on light and dark public surfaces', async ({
     await expect(page.locator('.public-footer .yfc-lockup__wordmark')).toBeVisible();
 
     await page.goto('/demo');
-    await expect(page.locator('.demo-header__brand .yfc-lockup__wordmark')).toBeVisible();
+    if (viewport.name === 'desktop') {
+      await expect(page.locator('.app-bottom-nav__brand .yfc-lockup__wordmark')).toBeVisible();
+    } else {
+      await expect(page.locator('.app-bottom-nav--demo .app-bottom-nav__more')).toBeVisible();
+    }
   }
 });
 

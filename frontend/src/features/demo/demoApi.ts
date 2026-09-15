@@ -40,14 +40,30 @@ export interface DemoNutritionState {
 export interface DemoTrainerState {
   kind: 'trainer';
   screen: 'client';
-  client_name: string;
-  context_label: string;
-  workout_title: string;
-  facts: Array<{ label: string; value: string }>;
-  comment: string | null;
+  selected_client_id: 'alexey' | 'maria' | 'ivan';
+  clients: Array<{
+    id: 'alexey' | 'maria' | 'ivan';
+    name: 'Алексей' | 'Мария' | 'Иван';
+    status_label: string;
+    context_label: string;
+    workout_title: string;
+    facts: Array<{ label: string; value: string }>;
+    comment: string | null;
+  }>;
 }
 
 export interface DemoCabinetState {
+  program: {
+    name: string;
+    current_week: number;
+    total_weeks: number;
+    sessions_per_week: number;
+    schedule: Array<{
+      day_label: string;
+      workout_title: string;
+      status: 'completed' | 'planned' | 'rest';
+    }>;
+  };
   today: {
     title: string;
     summary: string;
@@ -71,6 +87,21 @@ export interface DemoCabinetState {
     nutrition_days_logged: number;
     nutrition_completion_percent: number;
     summary: string;
+    adherence_percent: number;
+    training_history: Array<{
+      period_label: string;
+      workout_title: string;
+      completed_sets: number;
+      volume_kg: number;
+    }>;
+    volume_history: Array<{ period_label: string; volume_kg: number }>;
+    nutrition_history: Array<{
+      date_label: string;
+      status: 'complete' | 'incomplete' | 'not_logged';
+      calories: number | null;
+      protein_g: number | null;
+    }>;
+    measurements: Array<{ label: string; value: string; date_label: string }>;
   };
   trainer: DemoTrainerState | null;
   meaningful_action_completed: boolean;
@@ -82,7 +113,7 @@ export type DemoScenarioState = DemoSelfTrainingState | DemoNutritionState | Dem
 export interface DemoSessionSnapshot {
   capability: 'demo';
   scenario: DemoScenario;
-  fixture_version: 'demo-curated-v1';
+  fixture_version: 'demo-curated-v2';
   revision: number;
   expires_at: string;
   state: DemoScenarioState;
@@ -213,9 +244,14 @@ export function applyDemoAction(
   scenario: DemoScenario,
   action: string,
   comment?: string,
+  clientId?: DemoTrainerState['selected_client_id'],
 ): Promise<DemoSessionSnapshot> {
   return demoRequest('/api/v1/demo/sessions/current/actions', {
-    body: { action, ...(comment === undefined ? {} : { comment }) },
+    body: {
+      action,
+      ...(comment === undefined ? {} : { comment }),
+      ...(clientId === undefined ? {} : { client_id: clientId }),
+    },
     token: requireToken(scenario),
   });
 }

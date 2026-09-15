@@ -42,13 +42,15 @@ export interface DemoAppShellConfig {
     label: string;
     icon: AppNavigationIconName;
     to: string;
+    mobileHidden?: boolean;
   }>;
   displayName: string;
   exitTo: string;
   accountTo?: string;
   accountLabel?: string;
   menuTitle?: string;
-  moreLinks: ReadonlyArray<{ label: string; to: string }>;
+  minimalUtility?: boolean;
+  moreLinks: ReadonlyArray<{ label: string; to: string; onClick?: () => void }>;
   quickAddLinks?: ReadonlyArray<QuickAddAction>;
   onReset(): void;
   resetDisabled?: boolean;
@@ -338,7 +340,7 @@ export function AppShell({
               <BrandLockup markClassName="app-bottom-nav__brand-mark" />
             </AppLink>
 
-            {(!demo || demo.accountTo) && (
+            {(!demo || (!demo.minimalUtility && demo.accountTo)) && (
               <div className="app-bottom-nav__profile-slot">
                 <AppLink
                   id="appAccountProfileLink"
@@ -388,7 +390,11 @@ export function AppShell({
                     to={
                       'to' in destination ? destination.to : `/app?section=${destination.section}`
                     }
-                    className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
+                    className={`app-bottom-nav__btn${active ? ' is-active' : ''}${
+                      'mobileHidden' in destination && destination.mobileHidden
+                        ? ' app-bottom-nav__btn--mobile-hidden'
+                        : ''
+                    }`}
                     {...(active ? glassProps('clear', true) : {})}
                     aria-current={active ? 'page' : undefined}
                   >
@@ -461,25 +467,37 @@ export function AppShell({
             <div className="app-bottom-nav__utility">
               <AppThemeToggle navigation />
               {demo ? (
-                <div className="app-bottom-nav__account">
-                  <AccountAvatar
-                    className="app-bottom-nav__avatar"
-                    name={displayName}
-                    photoUrl={user?.photo_url}
-                  />
-                  <>
-                    <strong className="app-bottom-nav__account-name">{displayName}</strong>
-                    <small className="app-bottom-nav__account-role">Отдельная сессия</small>
-                  </>
+                demo.minimalUtility ? (
                   <AppLink
-                    className="app-bottom-nav__logout"
+                    className="app-bottom-nav__btn app-bottom-nav__utility-action app-bottom-nav__demo-exit"
                     to={demo.exitTo}
                     aria-label="Выйти из демо"
                     title="Выйти из демо"
                   >
                     <AppNavigationIcon name="logout" />
+                    <span className="app-bottom-nav__label">Выйти из демо</span>
                   </AppLink>
-                </div>
+                ) : (
+                  <div className="app-bottom-nav__account">
+                    <AccountAvatar
+                      className="app-bottom-nav__avatar"
+                      name={displayName}
+                      photoUrl={user?.photo_url}
+                    />
+                    <>
+                      <strong className="app-bottom-nav__account-name">{displayName}</strong>
+                      <small className="app-bottom-nav__account-role">Отдельная сессия</small>
+                    </>
+                    <AppLink
+                      className="app-bottom-nav__logout"
+                      to={demo.exitTo}
+                      aria-label="Выйти из демо"
+                      title="Выйти из демо"
+                    >
+                      <AppNavigationIcon name="logout" />
+                    </AppLink>
+                  </div>
+                )
               ) : (
                 <button
                   type="button"
@@ -519,17 +537,26 @@ export function AppShell({
               >
                 <header className="app-more-panel__header">
                   <div className="app-more-panel__account">
-                    <AccountIdentity
-                      avatarClassName="app-bottom-nav__avatar"
-                      className="app-more-panel__identity"
-                      customAvatarVersion={user?.custom_avatar?.updated_at}
-                      name={demo?.menuTitle ?? displayName}
-                      photoUrl={user?.photo_url}
-                      role={demo ? 'Отдельная сессия' : accountRole}
-                    />
-                    <span className="sr-only" id="appMoreTitle">
-                      {demo?.menuTitle ?? (demo ? displayName : 'Профиль и настройки')}
-                    </span>
+                    {demo?.minimalUtility ? (
+                      <div className="app-more-panel__demo-heading">
+                        <strong id="appMoreTitle">{demo.menuTitle ?? 'Сценарии демо'}</strong>
+                        <small>Выберите следующий сценарий</small>
+                      </div>
+                    ) : (
+                      <>
+                        <AccountIdentity
+                          avatarClassName="app-bottom-nav__avatar"
+                          className="app-more-panel__identity"
+                          customAvatarVersion={user?.custom_avatar?.updated_at}
+                          name={demo?.menuTitle ?? displayName}
+                          photoUrl={user?.photo_url}
+                          role={demo ? 'Отдельная сессия' : accountRole}
+                        />
+                        <span className="sr-only" id="appMoreTitle">
+                          {demo?.menuTitle ?? (demo ? displayName : 'Профиль и настройки')}
+                        </span>
+                      </>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -558,7 +585,10 @@ export function AppShell({
                       <AppLink
                         className="app-more-panel__item"
                         key={item.to}
-                        onClick={() => closeMore()}
+                        onClick={() => {
+                          item.onClick?.();
+                          closeMore();
+                        }}
                         to={item.to}
                       >
                         <AppNavigationIcon name="plan" />
@@ -602,7 +632,7 @@ export function AppShell({
                         }}
                       >
                         <AppNavigationIcon name="progress" />
-                        <span>Сбросить демо</span>
+                        <span>Начать заново</span>
                       </button>
                       <AppLink
                         className="app-more-panel__item app-more-panel__logout"

@@ -31,6 +31,9 @@ export type AiCoachOutcome =
   | 'consent_required';
 export type AiCoachFailureClass = 'network' | 'timeout' | 'validation' | 'unknown';
 export type AiCoachHelpfulness = 'helpful' | 'not_helpful';
+export type DemoAnalyticsScenario = 'self_training' | 'nutrition' | 'trainer';
+export type DemoLandingPlacement = 'hero' | 'section' | 'continuity' | 'footer';
+export type DemoMeaningfulAction = 'finish_workout' | 'add_recent' | 'save_comment';
 
 export const IMPLEMENTED_GROWTH_EVENT_NAMES = [
   'registration_started',
@@ -82,10 +85,7 @@ export const GROWTH_GOAL_IDS: Readonly<Record<GrowthEventName, GrowthEventName>>
 type ContextFreeProductEventName =
   | 'landing_viewed'
   | 'landing_app_selected'
-  | 'landing_demo_selected'
   | 'landing_login_selected'
-  | 'demo_started'
-  | 'demo_meaningful_action_completed'
   | 'demo_login_selected'
   | 'login_started'
   | 'login_completed'
@@ -174,6 +174,36 @@ type GrowthProductEvent = {
 export type ProductEvent =
   | ContextFreeProductEvent
   | GrowthProductEvent
+  | {
+      name: 'landing_demo_selected';
+      surface: ProductSurface;
+      placement: DemoLandingPlacement;
+      scenario: DemoAnalyticsScenario;
+    }
+  | {
+      name:
+        | 'demo_started'
+        | 'demo_scenario_selected'
+        | 'demo_route_started'
+        | 'demo_route_completed'
+        | 'demo_route_hidden'
+        | 'demo_route_reopened'
+        | 'demo_own_data_selected';
+      surface: ProductSurface;
+      scenario: DemoAnalyticsScenario;
+    }
+  | {
+      name: 'demo_meaningful_action_completed';
+      surface: ProductSurface;
+      scenario: DemoAnalyticsScenario;
+      action: DemoMeaningfulAction;
+    }
+  | {
+      name: 'demo_other_scenario_selected';
+      surface: ProductSurface;
+      from_scenario: DemoAnalyticsScenario;
+      to_scenario: DemoAnalyticsScenario;
+    }
   | {
       name: 'landing_telegram_selected';
       surface: ProductSurface;
@@ -296,10 +326,7 @@ type ProductAnalyticsRuntimeOptions = {
 const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'landing_viewed',
   'landing_app_selected',
-  'landing_demo_selected',
   'landing_login_selected',
-  'demo_started',
-  'demo_meaningful_action_completed',
   'demo_login_selected',
   'login_started',
   'login_completed',
@@ -442,6 +469,18 @@ const AI_COACH_FAILURES = new Set<AiCoachFailureClass>([
   'unknown',
 ]);
 const AI_COACH_HELPFULNESS = new Set<AiCoachHelpfulness>(['helpful', 'not_helpful']);
+const DEMO_SCENARIOS = new Set<DemoAnalyticsScenario>(['self_training', 'nutrition', 'trainer']);
+const DEMO_LANDING_PLACEMENTS = new Set<DemoLandingPlacement>([
+  'hero',
+  'section',
+  'continuity',
+  'footer',
+]);
+const DEMO_MEANINGFUL_ACTIONS = new Set<DemoMeaningfulAction>([
+  'finish_workout',
+  'add_recent',
+  'save_comment',
+]);
 const LANDING_TELEGRAM_PLACEMENTS = new Set<LandingTelegramPlacement>([
   'hero',
   'continuity',
@@ -463,6 +502,19 @@ function hasOnlyKeys(value: Record<string, unknown>, allowedKeys: readonly strin
 }
 
 function eventPropertyKeys(name: string): readonly string[] {
+  if (name === 'landing_demo_selected') return ['placement', 'scenario'];
+  if (
+    name === 'demo_started' ||
+    name === 'demo_scenario_selected' ||
+    name === 'demo_route_started' ||
+    name === 'demo_route_completed' ||
+    name === 'demo_route_hidden' ||
+    name === 'demo_route_reopened' ||
+    name === 'demo_own_data_selected'
+  )
+    return ['scenario'];
+  if (name === 'demo_meaningful_action_completed') return ['scenario', 'action'];
+  if (name === 'demo_other_scenario_selected') return ['from_scenario', 'to_scenario'];
   if (name === 'landing_telegram_selected') return ['placement'];
   if (name === 'onboarding_next_action_selected') return ['next_action'];
   if (name === 'today_primary_action_selected') return ['destination'];
@@ -484,6 +536,36 @@ function eventPropertyKeys(name: string): readonly string[] {
 
 function hasValidEventProperties(value: Record<string, unknown>): boolean {
   if (CONTEXT_FREE_EVENT_NAMES.has(value.name as ProductEventName)) return true;
+  if (value.name === 'landing_demo_selected') {
+    return (
+      DEMO_LANDING_PLACEMENTS.has(value.placement as DemoLandingPlacement) &&
+      DEMO_SCENARIOS.has(value.scenario as DemoAnalyticsScenario)
+    );
+  }
+  if (
+    value.name === 'demo_started' ||
+    value.name === 'demo_scenario_selected' ||
+    value.name === 'demo_route_started' ||
+    value.name === 'demo_route_completed' ||
+    value.name === 'demo_route_hidden' ||
+    value.name === 'demo_route_reopened' ||
+    value.name === 'demo_own_data_selected'
+  ) {
+    return DEMO_SCENARIOS.has(value.scenario as DemoAnalyticsScenario);
+  }
+  if (value.name === 'demo_meaningful_action_completed') {
+    return (
+      DEMO_SCENARIOS.has(value.scenario as DemoAnalyticsScenario) &&
+      DEMO_MEANINGFUL_ACTIONS.has(value.action as DemoMeaningfulAction)
+    );
+  }
+  if (value.name === 'demo_other_scenario_selected') {
+    return (
+      DEMO_SCENARIOS.has(value.from_scenario as DemoAnalyticsScenario) &&
+      DEMO_SCENARIOS.has(value.to_scenario as DemoAnalyticsScenario) &&
+      value.from_scenario !== value.to_scenario
+    );
+  }
   if (value.name === 'landing_telegram_selected') {
     return LANDING_TELEGRAM_PLACEMENTS.has(value.placement as LandingTelegramPlacement);
   }

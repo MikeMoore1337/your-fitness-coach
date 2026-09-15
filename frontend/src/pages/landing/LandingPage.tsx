@@ -5,8 +5,11 @@ import { api } from '../../shared/api/client';
 import {
   productEventSurface,
   trackProductEvent,
+  type DemoLandingPlacement,
   type LandingTelegramPlacement,
 } from '../../shared/analytics/productEvents';
+import type { DemoScenario } from '../../features/demo/demoApi';
+import { DEMO_SCENARIOS } from '../../features/demo/demoContent';
 import {
   appUrlForHostname,
   demoUrlForHostname,
@@ -31,8 +34,6 @@ export {
   demoUrlForHostname,
   loginUrlForHostname,
 } from '../../shared/navigation/appUrl';
-
-type DemoScenario = 'self_training' | 'nutrition' | 'trainer';
 
 const coreFeatures: ReadonlyArray<{
   icon: IconName;
@@ -95,32 +96,6 @@ const workflow: ReadonlyArray<{
     number: '03',
     title: 'Сверяйтесь с динамикой',
     text: 'Смотрите подтверждённые изменения и ограничения данных перед следующим шагом.',
-  },
-];
-
-const demoScenarios: ReadonlyArray<{
-  value: DemoScenario;
-  eyebrow: string;
-  title: string;
-  text: string;
-}> = [
-  {
-    value: 'self_training',
-    eyebrow: 'Для себя',
-    title: 'Пройдите тренировку',
-    text: 'Начните занятие, отметьте подходы и посмотрите, как результат становится частью прогресса.',
-  },
-  {
-    value: 'nutrition',
-    eyebrow: 'Дневник',
-    title: 'Добавьте питание',
-    text: 'Запишите недавний продукт и откройте дневной итог рядом с фактическими ориентирами.',
-  },
-  {
-    value: 'trainer',
-    eyebrow: 'Клиент',
-    title: 'Посмотрите кабинет тренера',
-    text: 'Откройте результат подготовленного клиента и сохраните контекстный комментарий.',
   },
 ];
 
@@ -210,8 +185,13 @@ export default function LandingPage() {
 
   const trackAppSelection = () =>
     trackProductEvent({ name: 'landing_app_selected', surface: productEventSurface() });
-  const trackDemoSelection = () =>
-    trackProductEvent({ name: 'landing_demo_selected', surface: productEventSurface() });
+  const trackDemoSelection = (placement: DemoLandingPlacement, scenario: DemoScenario) =>
+    trackProductEvent({
+      name: 'landing_demo_selected',
+      surface: productEventSurface(),
+      placement,
+      scenario,
+    });
   const trackTelegramSelection = (placement: LandingTelegramPlacement) =>
     trackProductEvent({
       name: 'landing_telegram_selected',
@@ -296,7 +276,7 @@ export default function LandingPage() {
                 {...glassProps('clear', true)}
                 data-glass-tone="on-image"
                 href={cabinetScenarioUrl(demoUrl, 'self_training')}
-                onClick={trackDemoSelection}
+                onClick={() => trackDemoSelection('hero', 'self_training')}
               >
                 Попробовать демо <Icon name="arrow-right" size={20} />
               </a>
@@ -436,26 +416,38 @@ export default function LandingPage() {
             ))}
           </ol>
           <div className="landing-start__demo">
-            <div>
+            <div className="landing-start__demo-copy">
               <p className="landing-kicker">Демо без регистрации</p>
-              <h3>Три сценария. Никаких реальных данных.</h3>
+              <h3>Попробуйте Your Fitness Coach на готовых данных</h3>
               <p>
-                Изменения живут только в отдельной подготовленной сессии и не переносятся в аккаунт.
-                Приглашения, уведомления и действия с реальными пользователями заблокированы.
+                Тренировка, питание, прогресс и работа тренера - без настройки аккаунта и ввода
+                личных данных.
+              </p>
+              <a
+                className="landing-button landing-button--secondary landing-start__demo-cta"
+                href={cabinetScenarioUrl(demoUrl, 'self_training')}
+                onClick={() => trackDemoSelection('section', 'self_training')}
+              >
+                Попробовать демо <Icon name="arrow-right" size={20} />
+              </a>
+              <small>Без регистрации · изменения не сохраняются</small>
+              <p className="landing-start__demo-boundary">
+                Данные живут только в изолированной демо-сессии. Приглашения, уведомления и действия
+                с реальными пользователями недоступны.
               </p>
             </div>
             <nav aria-label="Демо-сценарии">
-              {demoScenarios.map((scenario, index) => (
+              {DEMO_SCENARIOS.map((scenario, index) => (
                 <a
                   key={scenario.value}
                   href={cabinetScenarioUrl(demoUrl, scenario.value)}
-                  onClick={trackDemoSelection}
+                  onClick={() => trackDemoSelection('section', scenario.value)}
                 >
                   <span>{String(index + 1).padStart(2, '0')}</span>
                   <div>
-                    <small>{scenario.eyebrow}</small>
-                    <strong>{scenario.title}</strong>
-                    <p>{scenario.text}</p>
+                    <strong>{scenario.label}</strong>
+                    <p>{scenario.description}</p>
+                    <small>{scenario.duration}</small>
                   </div>
                   <Icon name="arrow-right" size={20} />
                 </a>
@@ -586,7 +578,7 @@ export default function LandingPage() {
             <a
               className="landing-button landing-button--secondary"
               href={cabinetScenarioUrl(demoUrl, 'self_training')}
-              onClick={trackDemoSelection}
+              onClick={() => trackDemoSelection('section', 'self_training')}
             >
               Попробовать демо <Icon name="arrow-right" size={20} />
             </a>

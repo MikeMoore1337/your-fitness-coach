@@ -107,11 +107,11 @@ describe('LandingPage', () => {
       'href',
       '/demo?cabinet=1&scenario=self_training&section=today',
     );
-    expect(screen.getByRole('link', { name: /добавьте питание/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Питание и прогресс/ })).toHaveAttribute(
       'href',
       '/demo?cabinet=1&scenario=nutrition&section=nutrition',
     );
-    expect(screen.getByRole('link', { name: /посмотрите кабинет тренера/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Работа тренера/ })).toHaveAttribute(
       'href',
       '/demo?cabinet=1&scenario=trainer&section=trainer',
     );
@@ -143,6 +143,41 @@ describe('LandingPage', () => {
     );
     expect(document.querySelector('#privacy')).toBeInTheDocument();
     expect(screen.getByText('Ваши данные остаются под вашим управлением.')).toBeInTheDocument();
+  });
+
+  it('distinguishes demo entry placement and selected scenario without personal data', () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) => {
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    };
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+    const { container } = renderLanding();
+
+    fireEvent.click(
+      container.querySelector<HTMLAnchorElement>(
+        '.landing-hero__actions .landing-button--secondary',
+      )!,
+    );
+    fireEvent.click(container.querySelector<HTMLAnchorElement>('.landing-start__demo-cta')!);
+    fireEvent.click(
+      container.querySelector<HTMLAnchorElement>('.landing-start__demo nav a:nth-child(2)')!,
+    );
+
+    expect(
+      events
+        .filter((event) => event.name === 'landing_demo_selected')
+        .map((event) =>
+          'placement' in event
+            ? { placement: event.placement, scenario: event.scenario }
+            : undefined,
+        ),
+    ).toEqual([
+      { placement: 'hero', scenario: 'self_training' },
+      { placement: 'section', scenario: 'self_training' },
+      { placement: 'section', scenario: 'nutrition' },
+    ]);
+
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
   });
 
   it('tracks Telegram Mini App selections with their landing placement', () => {

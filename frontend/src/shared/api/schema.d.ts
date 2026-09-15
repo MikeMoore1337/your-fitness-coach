@@ -5624,6 +5624,8 @@ export interface components {
             action: string;
             /** Comment */
             comment?: string | null;
+            /** Client Id */
+            client_id?: ("alexey" | "maria" | "ivan") | null;
         };
         /** DemoCabinetNutrition */
         DemoCabinetNutrition: {
@@ -5655,9 +5657,20 @@ export interface components {
             nutrition_completion_percent: number;
             /** Summary */
             summary: string;
+            /** Adherence Percent */
+            adherence_percent: number;
+            /** Training History */
+            training_history: components["schemas"]["DemoTrainingHistoryItem"][];
+            /** Volume History */
+            volume_history: components["schemas"]["DemoVolumeHistoryItem"][];
+            /** Nutrition History */
+            nutrition_history: components["schemas"]["DemoNutritionHistoryDay"][];
+            /** Measurements */
+            measurements: components["schemas"]["DemoMeasurement"][];
         };
         /** DemoCabinetState */
         DemoCabinetState: {
+            program: components["schemas"]["DemoProgramSummary"];
             today: components["schemas"]["DemoCabinetToday"];
             nutrition: components["schemas"]["DemoCabinetNutrition"];
             progress: components["schemas"]["DemoCabinetProgress"];
@@ -5691,6 +5704,29 @@ export interface components {
              * @enum {string}
              */
             status: "completed" | "current" | "next";
+        };
+        /** DemoMeasurement */
+        DemoMeasurement: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+            /** Date Label */
+            date_label: string;
+        };
+        /** DemoNutritionHistoryDay */
+        DemoNutritionHistoryDay: {
+            /** Date Label */
+            date_label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "complete" | "incomplete" | "not_logged";
+            /** Calories */
+            calories?: number | null;
+            /** Protein G */
+            protein_g?: number | null;
         };
         /** DemoNutritionItem */
         DemoNutritionItem: {
@@ -5730,6 +5766,31 @@ export interface components {
             protein_target_g: number;
             /** Meals Logged */
             meals_logged: number;
+        };
+        /** DemoProgramScheduleDay */
+        DemoProgramScheduleDay: {
+            /** Day Label */
+            day_label: string;
+            /** Workout Title */
+            workout_title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "planned" | "rest";
+        };
+        /** DemoProgramSummary */
+        DemoProgramSummary: {
+            /** Name */
+            name: string;
+            /** Current Week */
+            current_week: number;
+            /** Total Weeks */
+            total_weeks: number;
+            /** Sessions Per Week */
+            sessions_per_week: number;
+            /** Schedule */
+            schedule: components["schemas"]["DemoProgramScheduleDay"][];
         };
         /** DemoSelfTrainingState */
         DemoSelfTrainingState: {
@@ -5783,10 +5844,10 @@ export interface components {
             scenario: "self_training" | "nutrition" | "trainer";
             /**
              * Fixture Version
-             * @default demo-curated-v1
+             * @default demo-curated-v2
              * @constant
              */
-            fixture_version: "demo-curated-v1";
+            fixture_version: "demo-curated-v2";
             /** Revision */
             revision: number;
             /**
@@ -5815,10 +5876,10 @@ export interface components {
             scenario: "self_training" | "nutrition" | "trainer";
             /**
              * Fixture Version
-             * @default demo-curated-v1
+             * @default demo-curated-v2
              * @constant
              */
-            fixture_version: "demo-curated-v1";
+            fixture_version: "demo-curated-v2";
             /** Revision */
             revision: number;
             /**
@@ -5829,6 +5890,26 @@ export interface components {
             /** State */
             state: components["schemas"]["DemoSelfTrainingState"] | components["schemas"]["DemoNutritionState"] | components["schemas"]["DemoTrainerState"];
             cabinet: components["schemas"]["DemoCabinetState"];
+        };
+        /** DemoTrainerClient */
+        DemoTrainerClient: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "alexey" | "maria" | "ivan";
+            /** Name */
+            name: string;
+            /** Status Label */
+            status_label: string;
+            /** Context Label */
+            context_label: string;
+            /** Workout Title */
+            workout_title: string;
+            /** Facts */
+            facts: components["schemas"]["DemoTrainerFact"][];
+            /** Comment */
+            comment?: string | null;
         };
         /** DemoTrainerFact */
         DemoTrainerFact: {
@@ -5850,16 +5931,31 @@ export interface components {
              * @constant
              */
             screen: "client";
-            /** Client Name */
-            client_name: string;
-            /** Context Label */
-            context_label: string;
+            /**
+             * Selected Client Id
+             * @enum {string}
+             */
+            selected_client_id: "alexey" | "maria" | "ivan";
+            /** Clients */
+            clients: components["schemas"]["DemoTrainerClient"][];
+        };
+        /** DemoTrainingHistoryItem */
+        DemoTrainingHistoryItem: {
+            /** Period Label */
+            period_label: string;
             /** Workout Title */
             workout_title: string;
-            /** Facts */
-            facts: components["schemas"]["DemoTrainerFact"][];
-            /** Comment */
-            comment?: string | null;
+            /** Completed Sets */
+            completed_sets: number;
+            /** Volume Kg */
+            volume_kg: number;
+        };
+        /** DemoVolumeHistoryItem */
+        DemoVolumeHistoryItem: {
+            /** Period Label */
+            period_label: string;
+            /** Volume Kg */
+            volume_kg: number;
         };
         /** DerivedFact */
         DerivedFact: {

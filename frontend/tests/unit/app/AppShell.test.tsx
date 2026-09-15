@@ -250,6 +250,36 @@ describe('AppShell', () => {
     expect(within(dialog).getByText('Отдельная сессия')).toBeInTheDocument();
   });
 
+  it('оставляет в минимальном demo utility только тему и полный выход из демо', () => {
+    authState.missing = true;
+    render(
+      <AppShell
+        demo={{
+          activeSection: 'today',
+          brandTo: '/demo?cabinet=1',
+          destinations: [{ key: 'today', label: 'Сегодня', icon: 'today', to: '/demo?cabinet=1' }],
+          displayName: 'Демо',
+          exitTo: '/',
+          menuTitle: 'Сценарии демо',
+          minimalUtility: true,
+          moreLinks: [{ label: 'Тренировка', to: '/demo?scenario=self_training' }],
+          onReset: vi.fn(),
+        }}
+      >
+        Демо-содержимое
+      </AppShell>,
+    );
+
+    expect(screen.queryByText('Отдельная сессия')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Your Fitness Coach — демо')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Выйти из демо' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Сценарии' }));
+    const dialog = screen.getByRole('dialog', { name: 'Сценарии демо' });
+    expect(within(dialog).getByText('Выберите следующий сценарий')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Тренировка' })).toBeInTheDocument();
+  });
+
   it('не показывает библиотеку знаний в Web или Telegram Mini App navigation', () => {
     stubViewport(390);
     navigation.path = '/app';
