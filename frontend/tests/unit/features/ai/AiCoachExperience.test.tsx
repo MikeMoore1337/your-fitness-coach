@@ -291,21 +291,31 @@ describe('AiCoachExperience', () => {
   });
 
   it('preserves typed text and shows a repair failure separately from safety refusal', async () => {
+    const messages: AiCoachConversationMessage[] = [];
     apiMock.mockImplementation(async (path, options) => {
       if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST')
         return conversation(3);
-      if (path === '/api/v1/ai-coach/conversations') return { items: [] };
+      if (path === '/api/v1/ai-coach/conversations') {
+        return {
+          items: messages.length
+            ? [{ ...conversation(3, messages), message_count: messages.length }]
+            : [],
+        };
+      }
       if (path === '/api/v1/ai-coach/memory') return memoryResponse();
+      if (path === '/api/v1/ai-coach/conversations/3') return conversation(3, messages);
       if (path === '/api/v1/ai-coach/conversations/3/messages') {
         const body = options?.body as { message: string };
+        const userMessage = chatMessage(3, 'user', body.message, {
+          status: 'failed',
+          outcome: 'invalid_output',
+          failure_category: 'repair_failed',
+          limitations: ['Не удалось сформировать ответ. Повторить.'],
+        });
+        messages.push(userMessage);
         return {
           conversation_id: 3,
-          user_message: chatMessage(3, 'user', body.message, {
-            status: 'failed',
-            outcome: 'invalid_output',
-            failure_category: 'repair_failed',
-            limitations: ['Не удалось сформировать ответ. Повторить.'],
-          }),
+          user_message: userMessage,
           assistant_message: null,
           outcome: 'invalid_output',
           data_class: 'generic',
@@ -318,6 +328,30 @@ describe('AiCoachExperience', () => {
           request_id: 'request-3',
         };
       }
+      if (path === '/api/v1/ai-coach/conversations/3/messages/3/retry') {
+        const userMessage = messages[0];
+        if (!userMessage) throw new Error('missing failed user message');
+        userMessage.status = 'complete';
+        userMessage.outcome = null;
+        userMessage.failure_category = null;
+        userMessage.limitations = [];
+        const assistantMessage = chatMessage(4, 'assistant', 'Ответ после повторной попытки.');
+        messages.push(assistantMessage);
+        return {
+          conversation_id: 3,
+          user_message: userMessage,
+          assistant_message: assistantMessage,
+          outcome: 'answer',
+          data_class: 'generic',
+          answer: assistantMessage.content,
+          citations: [],
+          limitations: [],
+          safety_category: 'clear',
+          failure_category: null,
+          prompt_version: 'ai-coach-chat-v1',
+          request_id: 'request-3-retry',
+        };
+      }
       throw new Error(`unexpected path ${path} ${options?.method ?? 'GET'}`);
     });
     renderExperience();
@@ -328,6 +362,12 @@ describe('AiCoachExperience', () => {
     expect(input).toHaveValue('Объясни мне этот материал.');
     expect(screen.getByText(/Не удалось сформировать ответ\. Повторить\./)).toBeInTheDocument();
     expect(screen.queryByText('На этот запрос нельзя ответить безопасно')).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Повторить' }));
+    await waitFor(() =>
+      expect(screen.getByText('Ответ после повторной попытки.')).toBeInTheDocument(),
+    );
+    expect(screen.getAllByTestId('ai-coach-message-user')).toHaveLength(1);
+    expect(screen.getAllByTestId('ai-coach-message-assistant')).toHaveLength(1);
   });
 
   it('requires explicit consent for personal prompts and keeps memory secondary', async () => {

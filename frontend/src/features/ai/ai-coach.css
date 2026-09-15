@@ -175,6 +175,29 @@
   font-size: 0.875rem;
 }
 
+.ai-coach-message__retry {
+  justify-self: start;
+  min-height: var(--touch-target);
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-coach-message__retry:hover,
+.ai-coach-message__retry:focus-visible {
+  border-color: var(--v2-lime);
+}
+
+.ai-coach-message__retry:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .ai-coach-answer__body {
   line-height: 1.6;
   overflow-wrap: anywhere;

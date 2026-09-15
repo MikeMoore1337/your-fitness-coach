@@ -21,6 +21,9 @@ PRODUCTION_AI_COACH_FLAGS = {
     "AI_COACH_PERSONAL_DATA_POLICY": "verified_personal_user",
     "AI_COACH_STRUCTURED_OUTPUT": "true",
     "AI_COACH_POLICY_REVISION": "ai-coach-production-v1",
+    # GPT-OSS reasoning can exhaust a single small completion budget; keep one bounded retry.
+    "AI_COACH_MAX_ATTEMPTS": "2",
+    "AI_COACH_MAX_OUTPUT_TOKENS": "2048",
 }
 
 _PLACEHOLDER_SECRETS = {

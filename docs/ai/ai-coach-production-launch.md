@@ -48,11 +48,14 @@ Production policy после нормализации:
 | `AI_COACH_PERSONAL_DATA_POLICY` | `verified_personal_user` |
 | `AI_COACH_STRUCTURED_OUTPUT` | `true` |
 | `AI_COACH_POLICY_REVISION` | `ai-coach-production-v1` |
+| `AI_COACH_MAX_ATTEMPTS` | `2` |
+| `AI_COACH_MAX_OUTPUT_TOKENS` | `2048` |
 
 `AI_COACH_PER_USER_REQUEST_LIMIT`, `AI_COACH_GLOBAL_REQUEST_LIMIT`, timeout и cooldown не
-перезаписываются helper-ом: сохраняются текущие production значения из host `.env`. При отсутствии
-допустимого ключа deploy останавливается до изменения `.env`; paid/unknown route не получает
-скрытый fallback. Актуальные provider limits и data controls нужно сверять с официальными
+перезаписываются helper-ом: сохраняются текущие production значения из host `.env`. Helper
+идемпотентно закрепляет только две bounded recovery настройки выше. При отсутствии допустимого
+ключа deploy останавливается до изменения `.env`; paid/unknown route не получает скрытый fallback.
+Актуальные provider limits и data controls нужно сверять с официальными
 документами перед изменением cost policy: [Groq models](https://console.groq.com/docs/models),
 [Groq rate limits](https://console.groq.com/docs/rate-limits),
 [Groq data controls](https://console.groq.com/docs/your-data).

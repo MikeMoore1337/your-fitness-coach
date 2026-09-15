@@ -214,8 +214,8 @@ class Settings(BaseSettings):
     ai_coach_structured_output: bool = True
     ai_coach_policy_revision: str = "unverified"
     ai_coach_timeout_seconds: float = Field(default=20, ge=1, le=60)
-    ai_coach_max_attempts: int = Field(default=1, ge=1, le=2)
-    ai_coach_max_output_tokens: int = Field(default=1024, ge=256, le=2048)
+    ai_coach_max_attempts: int = Field(default=2, ge=1, le=2)
+    ai_coach_max_output_tokens: int = Field(default=2048, ge=256, le=2048)
     ai_coach_max_context_chars: int = Field(default=8_000, ge=1_000, le=16_000)
     ai_coach_content_max_age_days: int = Field(default=365, ge=1, le=1_095)
     ai_coach_quota_window_seconds: int = Field(default=86_400, ge=60, le=604_800)

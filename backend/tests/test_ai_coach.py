@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import ClassVar
 
+import httpx
 import pytest
 from pydantic import SecretStr, ValidationError
 
@@ -25,6 +26,7 @@ from fitminiapp_api.ai_coach.contracts import (
     ContextRef,
     NormalizedProviderError,
     ProviderErrorCode,
+    ProviderFailureReason,
     ProviderResult,
     ProviderStructuredResponse,
     ProviderTextResponse,
@@ -86,6 +88,71 @@ class StubProvider:
             ),
             latency_ms=3,
         )
+
+
+def _patch_plain_responses(monkeypatch, specs: list[dict[str, object]]) -> list[dict[str, object]]:
+    captured_payloads: list[dict[str, object]] = []
+
+    class FakeResponse:
+        def __init__(self, spec: dict[str, object]) -> None:
+            self.status_code = int(spec.get("status", 200))
+            self.headers = spec.get("headers", {})
+            payload = spec.get("payload")
+            self.content = spec.get(
+                "content",
+                json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                if "payload" in spec
+                else b"provider response",
+            )
+            self._spec = spec
+
+        def json(self):
+            if self._spec.get("json_error"):
+                raise ValueError("malformed provider JSON")
+            return self._spec.get("payload")
+
+    class FakeClient:
+        def __init__(self, **kwargs) -> None:
+            del kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
+            del exc_type, exc_value, traceback
+
+        def post(self, endpoint, *, headers, json):
+            del endpoint, headers
+            captured_payloads.append(json)
+            spec = specs.pop(0)
+            exception = spec.get("exception")
+            if isinstance(exception, BaseException):
+                raise exception
+            return FakeResponse(spec)
+
+    monkeypatch.setattr("fitminiapp_api.ai_coach.providers.httpx.Client", FakeClient)
+    return captured_payloads
+
+
+def _plain_payload(
+    *,
+    content: object = "Короткий ответ.",
+    finish_reason: object = "stop",
+    message_overrides: dict[str, object] | None = None,
+) -> dict[str, object]:
+    message: dict[str, object] = {"content": content}
+    if message_overrides:
+        message.update(message_overrides)
+    return {
+        "model": "openai/gpt-oss-120b",
+        "choices": [{"finish_reason": finish_reason, "message": message}],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 8,
+            "total_tokens": 18,
+            "completion_tokens_details": {"reasoning_tokens": 3},
+        },
+    }
 
 
 def test_generic_request_rejects_arbitrary_provider_fields_and_urls() -> None:
@@ -797,7 +864,7 @@ def test_groq_adapter_sends_docs_compatible_strict_request_without_tools(monkeyp
     payload = captured["json"]
     assert isinstance(payload, dict)
     assert "max_tokens" not in payload
-    assert payload["max_completion_tokens"] == 1024
+    assert payload["max_completion_tokens"] == 2048
     assert payload["reasoning_effort"] == "low"
     assert payload["reasoning_format"] == "hidden"
     assert "tools" not in payload
@@ -815,6 +882,12 @@ def test_groq_adapter_sends_plain_text_chat_without_report_json(monkeypatch) -> 
                 "message": {"content": "Короткий проверенный ответ."},
             }
         ],
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 8,
+            "total_tokens": 18,
+            "completion_tokens_details": {"reasoning_tokens": 3},
+        },
     }
 
     class FakeResponse:
@@ -852,11 +925,216 @@ def test_groq_adapter_sends_plain_text_chat_without_report_json(monkeypatch) -> 
 
     assert result.response == ProviderTextResponse(answer="Короткий проверенный ответ.")
     assert isinstance(result, ProviderTextResult)
+    assert result.http_status == 200
+    assert result.finish_reason == "stop"
+    assert result.response_bytes == len(FakeResponse.content)
+    assert result.usage is not None
+    assert result.usage.reasoning_tokens == 3
     payload = captured["json"]
     assert isinstance(payload, dict)
     assert "response_format" not in payload
+    assert payload["include_reasoning"] is False
+    assert "reasoning_format" not in payload
     assert "tools" not in payload
     assert "без JSON" in payload["messages"][0]["content"]
+
+
+@pytest.mark.parametrize(
+    ("spec", "reason"),
+    [
+        ({"json_error": True, "content": b"{"}, ProviderFailureReason.MALFORMED_JSON),
+        ({"payload": []}, ProviderFailureReason.INVALID_PROVIDER_PAYLOAD),
+        (
+            {"payload": {"choices": []}},
+            ProviderFailureReason.INVALID_CHOICES,
+        ),
+        (
+            {"payload": {"choices": [{"finish_reason": "stop"}]}},
+            ProviderFailureReason.INVALID_PROVIDER_PAYLOAD,
+        ),
+        (
+            {"payload": _plain_payload(finish_reason="tool_calls")},
+            ProviderFailureReason.FINISH_REASON_OTHER,
+        ),
+        (
+            {"payload": _plain_payload(message_overrides={"refusal": "not allowed"})},
+            ProviderFailureReason.PROVIDER_REFUSAL,
+        ),
+        (
+            {"payload": _plain_payload(message_overrides={"content": None})},
+            ProviderFailureReason.MISSING_CONTENT,
+        ),
+        (
+            {"payload": _plain_payload(content=[])},
+            ProviderFailureReason.INVALID_CONTENT,
+        ),
+        (
+            {"payload": _plain_payload(content="")},
+            ProviderFailureReason.INVALID_CONTENT,
+        ),
+        (
+            {"payload": _plain_payload(content="x" * 8_001)},
+            ProviderFailureReason.INVALID_CONTENT,
+        ),
+        (
+            {"content": b"x" * 128_001},
+            ProviderFailureReason.RESPONSE_TOO_LARGE,
+        ),
+    ],
+)
+def test_groq_plain_text_parser_reports_privacy_safe_failure_reason(
+    monkeypatch,
+    spec: dict[str, object],
+    reason: ProviderFailureReason,
+) -> None:
+    _enable_provider(monkeypatch)
+    _patch_plain_responses(monkeypatch, [spec])
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge-test-v1",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+
+    with pytest.raises(NormalizedProviderError) as raised:
+        GroqDirectAdapter().generate_text(request, ())
+
+    error = raised.value
+    assert error.code == ProviderErrorCode.INVALID_OUTPUT
+    assert error.provider_failure_reason == reason
+    assert error.http_status == 200
+    assert error.response_bytes is not None
+    assert "Короткий" not in str(error)
+
+
+def test_groq_plain_text_parser_classifies_length_as_recoverable(monkeypatch) -> None:
+    _enable_provider(monkeypatch)
+    _patch_plain_responses(
+        monkeypatch,
+        [{"payload": _plain_payload(finish_reason="length")}],
+    )
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge-test-v1",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+
+    with pytest.raises(NormalizedProviderError) as raised:
+        GroqDirectAdapter().generate_text(request, ())
+
+    error = raised.value
+    assert error.provider_failure_reason == ProviderFailureReason.FINISH_REASON_LENGTH
+    assert error.finish_reason == "length"
+    assert error.retryable is True
+    assert error.usage is not None
+    assert error.usage.reasoning_tokens == 3
+
+
+def test_groq_plain_text_retry_hint_uses_bounded_extra_budget(monkeypatch) -> None:
+    _enable_provider(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_max_output_tokens", 1_024)
+    payloads = _patch_plain_responses(
+        monkeypatch,
+        [{"payload": _plain_payload()}],
+    )
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge-test-v1",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+        retry_hint=True,
+    )
+
+    result = GroqDirectAdapter().generate_text(request, ())
+
+    assert result.response.answer == "Короткий ответ."
+    assert payloads[0]["max_completion_tokens"] == 2_048
+    assert payloads[0]["include_reasoning"] is False
+    assert "Сформулируй ответ сразу кратко" in payloads[0]["messages"][-1]["content"]
+
+
+@pytest.mark.parametrize(
+    ("exception", "code", "reason"),
+    [
+        (
+            httpx.ReadTimeout("provider timeout"),
+            ProviderErrorCode.TIMEOUT,
+            ProviderFailureReason.TIMEOUT,
+        ),
+        (
+            httpx.ConnectError("provider network"),
+            ProviderErrorCode.PROVIDER_UNAVAILABLE,
+            ProviderFailureReason.NETWORK_ERROR,
+        ),
+    ],
+)
+def test_groq_plain_text_adapter_classifies_transport_failures(
+    monkeypatch,
+    exception: BaseException,
+    code: ProviderErrorCode,
+    reason: ProviderFailureReason,
+) -> None:
+    _enable_provider(monkeypatch)
+    _patch_plain_responses(monkeypatch, [{"exception": exception}])
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge-test-v1",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+
+    with pytest.raises(NormalizedProviderError) as raised:
+        GroqDirectAdapter().generate_text(request, ())
+
+    error = raised.value
+    assert error.code == code
+    assert error.provider_failure_reason == reason
+    assert error.retryable is True
+    assert str(error) == code.value
+
+
+@pytest.mark.parametrize(
+    ("status", "code", "reason", "retryable"),
+    [
+        (429, ProviderErrorCode.RATE_LIMITED, ProviderFailureReason.HTTP_429, False),
+        (401, ProviderErrorCode.AUTHENTICATION_FAILED, ProviderFailureReason.HTTP_401, False),
+        (403, ProviderErrorCode.AUTHENTICATION_FAILED, ProviderFailureReason.HTTP_403, False),
+        (400, ProviderErrorCode.REQUEST_REJECTED, ProviderFailureReason.HTTP_400, False),
+        (500, ProviderErrorCode.PROVIDER_UNAVAILABLE, ProviderFailureReason.HTTP_5XX, True),
+    ],
+)
+def test_groq_plain_text_parser_classifies_http_failures_without_payload_logging(
+    monkeypatch,
+    status: int,
+    code: ProviderErrorCode,
+    reason: ProviderFailureReason,
+    retryable: bool,
+) -> None:
+    _enable_provider(monkeypatch)
+    _patch_plain_responses(
+        monkeypatch,
+        [{"status": status, "headers": {"retry-after": "37"}, "content": b"provider error"}],
+    )
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge-test-v1",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+
+    with pytest.raises(NormalizedProviderError) as raised:
+        GroqDirectAdapter().generate_text(request, ())
+
+    error = raised.value
+    assert error.code == code
+    assert error.provider_failure_reason == reason
+    assert error.http_status == status
+    assert error.retryable is retryable
+    if status == 429:
+        assert error.retry_after_seconds == 37
+    else:
+        assert error.retry_after_seconds == (37 if status == 500 else None)
 
 
 def test_groq_adapter_repair_stays_plain_text_and_bounded(monkeypatch) -> None:

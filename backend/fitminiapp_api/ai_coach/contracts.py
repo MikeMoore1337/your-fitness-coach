@@ -141,6 +141,28 @@ class ProviderErrorCode(StrEnum):
     COOLDOWN_ACTIVE = "cooldown_active"
 
 
+class ProviderFailureReason(StrEnum):
+    """Privacy-safe provider/protocol reason for routing and metadata-only telemetry."""
+
+    HTTP_429 = "http_429"
+    HTTP_401 = "http_401"
+    HTTP_403 = "http_403"
+    HTTP_400 = "http_400"
+    HTTP_5XX = "http_5xx"
+    TIMEOUT = "timeout"
+    NETWORK_ERROR = "network_error"
+    RESPONSE_TOO_LARGE = "response_too_large"
+    MALFORMED_JSON = "malformed_json"
+    INVALID_CHOICES = "invalid_choices"
+    FINISH_REASON_LENGTH = "finish_reason_length"
+    FINISH_REASON_OTHER = "finish_reason_other"
+    PROVIDER_REFUSAL = "provider_refusal"
+    MISSING_CONTENT = "missing_content"
+    INVALID_CONTENT = "invalid_content"
+    INVALID_PROVIDER_PAYLOAD = "invalid_provider_payload"
+    UNKNOWN = "unknown"
+
+
 class AiCoachRequest(BaseModel):
     """Internal request with a server-assigned trust class."""
 
@@ -203,6 +225,8 @@ class AiCoachChatRequest(BaseModel):
     data_class: AiCoachDataClass
     context_kind: AiCoachChatContextKind = AiCoachChatContextKind.NONE
     locale: Literal["ru", "en"] = "ru"
+    # Internal bounded retry hint; it is never accepted from the public API or sent as metadata.
+    retry_hint: bool = False
     conversation_history: tuple[AiCoachConversationTurn, ...] = Field(default=(), max_length=8)
     memory_context: tuple[AiCoachMemoryContext, ...] = Field(default=(), max_length=20)
 
@@ -339,6 +363,7 @@ class ProviderUsage(BaseModel):
     prompt_tokens: int | None = Field(default=None, ge=0)
     completion_tokens: int | None = Field(default=None, ge=0)
     total_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: int | None = Field(default=None, ge=0)
     cost_microunits: int | None = Field(default=None, ge=0)
 
 
@@ -351,6 +376,9 @@ class ProviderResult(BaseModel):
     response: ProviderStructuredResponse
     usage: ProviderUsage | None = None
     latency_ms: int = Field(..., ge=0)
+    http_status: int | None = Field(default=None, ge=100, le=599)
+    finish_reason: str | None = Field(default=None, max_length=64)
+    response_bytes: int | None = Field(default=None, ge=0)
 
 
 class ProviderTextResponse(BaseModel):
@@ -370,6 +398,9 @@ class ProviderTextResult(BaseModel):
     response: ProviderTextResponse
     usage: ProviderUsage | None = None
     latency_ms: int = Field(..., ge=0)
+    http_status: int | None = Field(default=None, ge=100, le=599)
+    finish_reason: str | None = Field(default=None, max_length=64)
+    response_bytes: int | None = Field(default=None, ge=0)
 
 
 class AiCoachCitation(BaseModel):
@@ -413,6 +444,19 @@ class NormalizedProviderError(RuntimeError):
     retryable: bool = False
     retry_after_seconds: int | None = None
     misconfigured: bool = False
+    provider_failure_reason: ProviderFailureReason = ProviderFailureReason.UNKNOWN
+    http_status: int | None = None
+    finish_reason: str | None = None
+    response_bytes: int | None = None
+    response_payload_type: str | None = None
+    choices_count: int | None = None
+    choices_item_type: str | None = None
+    message_present: bool | None = None
+    message_type: str | None = None
+    refusal_present: bool | None = None
+    content_present: bool | None = None
+    content_type: str | None = None
+    usage: ProviderUsage | None = None
 
     def __str__(self) -> str:
         return self.code.value

@@ -386,6 +386,14 @@ def build_chat_messages(
         ),
         f"{material_heading}:" if evidence else no_materials,
     ]
+    if request.retry_hint:
+        current_parts.append(
+            "Сформулируй ответ сразу кратко и закончи все важные мысли; не добавляй ход "
+            "рассуждений и служебный текст."
+            if request.locale == "ru"
+            else "Answer concisely and finish all important points; do not include reasoning "
+            "or service text."
+        )
     current_parts.extend(f"- {item}" for item in evidence)
     if memory_lines:
         current_parts.append(
