@@ -106,6 +106,33 @@ def list_conversations(
     )
 
 
+def delete_conversation_history(db: Session, *, user_id: int) -> int:
+    """Delete every conversation owned by one account and return its row count."""
+
+    conversation_ids = [
+        row.id
+        for row in db.query(AiCoachConversation.id)
+        .filter(AiCoachConversation.user_id == user_id)
+        .all()
+    ]
+    if not conversation_ids:
+        return 0
+    # Delete children explicitly so the operation is deterministic on the
+    # SQLite test runtime as well as on PostgreSQL. Request-key rows cascade
+    # from their message/conversation foreign keys and are content-free.
+    db.query(AiCoachConversationMessage).filter(
+        AiCoachConversationMessage.conversation_id.in_(conversation_ids)
+    ).delete(synchronize_session=False)
+    return int(
+        db.query(AiCoachConversation)
+        .filter(
+            AiCoachConversation.user_id == user_id,
+            AiCoachConversation.id.in_(conversation_ids),
+        )
+        .delete(synchronize_session=False)
+    )
+
+
 def list_messages(
     db: Session,
     *,
@@ -502,6 +529,7 @@ __all__ = [
     "add_user_message",
     "conversation_response",
     "create_conversation",
+    "delete_conversation_history",
     "get_conversation_message",
     "get_following_assistant_message",
     "get_message_by_request_id",
