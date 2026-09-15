@@ -116,14 +116,31 @@ def get_conversation_message(
     *,
     conversation_id: int,
     message_id: int,
+    for_update: bool = False,
 ) -> AiCoachConversationMessage | None:
+    query = db.query(AiCoachConversationMessage).filter(
+        AiCoachConversationMessage.id == message_id,
+        AiCoachConversationMessage.conversation_id == conversation_id,
+    )
+    if for_update:
+        query = query.with_for_update()
+    return query.one_or_none()
+
+
+def has_later_messages(
+    db: Session,
+    *,
+    conversation_id: int,
+    message_id: int,
+) -> bool:
     return (
-        db.query(AiCoachConversationMessage)
+        db.query(AiCoachConversationMessage.id)
         .filter(
-            AiCoachConversationMessage.id == message_id,
             AiCoachConversationMessage.conversation_id == conversation_id,
+            AiCoachConversationMessage.id > message_id,
         )
-        .one_or_none()
+        .first()
+        is not None
     )
 
 
@@ -327,6 +344,7 @@ __all__ = [
     "create_conversation",
     "get_conversation_message",
     "get_owned_conversation",
+    "has_later_messages",
     "history_turns",
     "list_conversations",
     "list_messages",

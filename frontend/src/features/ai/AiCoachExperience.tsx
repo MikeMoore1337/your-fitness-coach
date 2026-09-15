@@ -243,10 +243,14 @@ function ChatMessage({
   feedback,
   message,
   onFeedback,
+  onRetry,
+  retrying,
 }: {
   feedback: AiCoachHelpfulness | null;
   message: AiCoachConversationMessage;
   onFeedback: (messageId: number, value: AiCoachHelpfulness) => void;
+  onRetry: (messageId: number) => void;
+  retrying: boolean;
 }) {
   const isAssistant = message.role === 'assistant';
   return (
@@ -262,9 +266,21 @@ function ChatMessage({
         <p className="ai-coach-message__text">{message.content}</p>
       )}
       {message.status === 'failed' && message.limitations.length > 0 && (
-        <p className="ai-coach-message__failure" role="alert">
-          {message.limitations[0]}
-        </p>
+        <>
+          <p className="ai-coach-message__failure" role="alert">
+            {message.limitations[0]}
+          </p>
+          {!isAssistant && (
+            <button
+              className="ai-coach-message__retry"
+              type="button"
+              disabled={retrying}
+              onClick={() => onRetry(message.id)}
+            >
+              {retrying ? 'Повторяем…' : 'Повторить'}
+            </button>
+          )}
+        </>
       )}
       {isAssistant && <MessageSources message={message} />}
       {isAssistant && message.outcome === 'answer' && (
@@ -608,6 +624,7 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
   const [isNewConversation, setIsNewConversation] = useState(false);
   const [draft, setDraft] = useState('');
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [retryingMessageId, setRetryingMessageId] = useState<number | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, AiCoachHelpfulness>>(
     {},
@@ -729,6 +746,48 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
       });
     },
   });
+  const retryMutation = useMutation({
+    mutationFn: async ({
+      conversationId,
+      messageId,
+    }: {
+      conversationId: number;
+      messageId: number;
+      message: string;
+    }) =>
+      api<AiCoachConversationSendResponse>(
+        `/api/v1/ai-coach/conversations/${conversationId}/messages/${messageId}/retry`,
+        { method: 'POST' },
+      ),
+    onMutate: () => {
+      setFailure(null);
+    },
+    onSuccess: (response, variables) => {
+      setRetryingMessageId(null);
+      queryClient.invalidateQueries({ queryKey: aiCoachConversationsQueryKey });
+      queryClient.invalidateQueries({
+        queryKey: ['ai-coach', 'conversation', variables.conversationId],
+      });
+      trackProductEvent({
+        name: 'ai_coach_response_received',
+        surface: productEventSurface(),
+        mode: response.data_class === 'personalized' ? 'personal' : 'generic',
+        outcome: response.outcome,
+      });
+      if (response.answer === null && response.outcome !== 'safety_refusal') {
+        setDraft(response.user_message.content);
+        setFailure(failureCopy(response));
+        return;
+      }
+      setDraft('');
+      setFailure(null);
+    },
+    onError: (_reason, variables) => {
+      setRetryingMessageId(null);
+      setDraft(variables.message);
+      setFailure('Не удалось повторить ответ. Попробуйте ещё раз.');
+    },
+  });
   const feedbackMutation = useMutation({
     mutationFn: ({
       conversationId,
@@ -755,7 +814,7 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
   });
 
   const currentMessages = conversation.data?.messages ?? [];
-  const pending = sendMutation.isPending;
+  const pending = sendMutation.isPending || retryMutation.isPending;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const message = draft.trim();
@@ -772,6 +831,19 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
     setDraft(message);
     setFailure(null);
     window.requestAnimationFrame(() => composerRef.current?.focus());
+  };
+  const retryMessage = (messageId: number) => {
+    if (currentConversationId === null || pending) return;
+    const message = currentMessages.find(
+      (item) => item.id === messageId && item.role === 'user' && item.status === 'failed',
+    );
+    if (!message) return;
+    setRetryingMessageId(messageId);
+    retryMutation.mutate({
+      conversationId: currentConversationId,
+      messageId,
+      message: message.content,
+    });
   };
   const startNewConversation = () => {
     if (pending) return;
@@ -816,6 +888,7 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
               <span className="sr-only">Выбрать разговор</span>
               <select
                 aria-label="Выбрать разговор"
+                disabled={pending}
                 value={currentConversationId ?? ''}
                 onChange={(event) => {
                   const next = Number(event.target.value);
@@ -875,6 +948,8 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
             key={message.id}
             message={message}
             onFeedback={sendFeedback}
+            onRetry={retryMessage}
+            retrying={retryingMessageId === message.id}
           />
         ))}
         {pendingMessage && (
@@ -887,6 +962,11 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
               AI Coach готовит ответ…
             </div>
           </>
+        )}
+        {retryingMessageId !== null && (
+          <div className="ai-coach-chat__loading" role="status">
+            AI Coach готовит ответ…
+          </div>
         )}
       </div>
 

@@ -20,6 +20,7 @@ from fitminiapp_api.ai_coach.contracts import (
     ContextRef,
     NormalizedProviderError,
     ProviderErrorCode,
+    ProviderFailureReason,
     ProviderTextResult,
 )
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
@@ -98,28 +99,47 @@ class _ChatCooldown:
         self._clock = clock
         self._lock = threading.Lock()
         self._until = 0.0
+        self._consecutive_5xx_failures = 0
 
     def active(self) -> bool:
         with self._lock:
-            if self._clock() >= self._until:
+            if self._until and self._clock() >= self._until:
                 self._until = 0.0
+                self._consecutive_5xx_failures = 0
                 return False
-            return True
+            return bool(self._until)
 
     def mark(self, error: NormalizedProviderError) -> None:
-        if error.code in {
-            ProviderErrorCode.DISABLED,
-            ProviderErrorCode.REQUEST_REJECTED,
-            ProviderErrorCode.INVALID_OUTPUT,
-        }:
-            return
-        delay = error.retry_after_seconds or settings.ai_coach_cooldown_seconds
         with self._lock:
-            self._until = max(self._until, self._clock() + max(1, min(delay, 3600)))
+            if error.code == ProviderErrorCode.RATE_LIMITED:
+                self._consecutive_5xx_failures = 0
+                delay = (
+                    error.retry_after_seconds
+                    if error.retry_after_seconds is not None
+                    else settings.ai_coach_cooldown_seconds
+                )
+                self._until = max(self._until, self._clock() + max(1, min(delay, 3600)))
+                return
+            if error.misconfigured or error.code == ProviderErrorCode.AUTHENTICATION_FAILED:
+                self._consecutive_5xx_failures = 0
+                self._until = max(
+                    self._until,
+                    self._clock() + max(1, min(settings.ai_coach_cooldown_seconds, 3600)),
+                )
+                return
+            if error.provider_failure_reason == ProviderFailureReason.HTTP_5XX:
+                self._consecutive_5xx_failures += 1
+                if self._consecutive_5xx_failures < 3:
+                    return
+                delay = settings.ai_coach_cooldown_seconds
+                self._until = max(self._until, self._clock() + max(1, min(delay, 3600)))
+                return
+            self._consecutive_5xx_failures = 0
 
     def reset(self) -> None:
         with self._lock:
             self._until = 0.0
+            self._consecutive_5xx_failures = 0
 
 
 class _ChatProviderFailure(RuntimeError):
@@ -142,6 +162,7 @@ class AiCoachChatGeneration:
     repair_attempted: bool = False
     repair_success: bool = False
     validation_failure_reason: ChatOutputValidationReason | None = None
+    provider_failure_reason: ProviderFailureReason | None = None
 
 
 def _safe_groq_route() -> bool:
@@ -205,6 +226,18 @@ class AiCoachChatService:
         repair_attempted = False
         repair_success = False
         validation_failure_reason: ChatOutputValidationReason | None = None
+        provider_failure_reason: ProviderFailureReason | None = None
+        http_status: int | None = None
+        finish_reason: str | None = None
+        provider_response_bytes: int | None = None
+        response_payload_type: str | None = None
+        choices_count: int | None = None
+        choices_item_type: str | None = None
+        message_present: bool | None = None
+        message_type: str | None = None
+        refusal_present: bool | None = None
+        content_present: bool | None = None
+        content_type: str | None = None
         answer: str | None = None
         try:
             if safety != SafetyCategory.CLEAR:
@@ -271,10 +304,23 @@ class AiCoachChatService:
                 )
 
             try:
-                result, attempts = self._call_provider(request, context_refs)
+                result, attempts, recovered_failure = self._call_provider(request, context_refs)
             except _ChatProviderFailure as failure:
                 attempts = failure.attempts
                 error_code = failure.error.code.value
+                provider_failure_reason = failure.error.provider_failure_reason
+                http_status = failure.error.http_status
+                finish_reason = failure.error.finish_reason
+                provider_response_bytes = failure.error.response_bytes
+                response_payload_type = failure.error.response_payload_type
+                choices_count = failure.error.choices_count
+                choices_item_type = failure.error.choices_item_type
+                message_present = failure.error.message_present
+                message_type = failure.error.message_type
+                refusal_present = failure.error.refusal_present
+                content_present = failure.error.content_present
+                content_type = failure.error.content_type
+                usage = failure.error.usage
                 self.cooldown.mark(failure.error)
                 if failure.error.code == ProviderErrorCode.RATE_LIMITED:
                     outcome = AiCoachOutcome.RATE_LIMITED
@@ -282,7 +328,6 @@ class AiCoachChatService:
                 elif failure.error.code == ProviderErrorCode.INVALID_OUTPUT:
                     outcome = AiCoachOutcome.INVALID_OUTPUT
                     failure_category = CHAT_FAILURE_PROVIDER
-                    validation_failure_reason = ChatOutputValidationReason.OTHER
                 elif failure.error.code == ProviderErrorCode.TIMEOUT:
                     outcome = AiCoachOutcome.UNAVAILABLE
                     failure_category = CHAT_FAILURE_TIMEOUT
@@ -302,12 +347,31 @@ class AiCoachChatService:
                     outcome=outcome,
                     safety=safety,
                     failure_category=failure_category,
+                    provider_failure_reason=provider_failure_reason,
                 )
+
+            if recovered_failure is not None:
+                provider_failure_reason = recovered_failure.provider_failure_reason
+                http_status = recovered_failure.http_status
+                finish_reason = recovered_failure.finish_reason
+                provider_response_bytes = recovered_failure.response_bytes
+                response_payload_type = recovered_failure.response_payload_type
+                choices_count = recovered_failure.choices_count
+                choices_item_type = recovered_failure.choices_item_type
+                message_present = recovered_failure.message_present
+                message_type = recovered_failure.message_type
+                refusal_present = recovered_failure.refusal_present
+                content_present = recovered_failure.content_present
+                content_type = recovered_failure.content_type
 
             provider_name = result.provider
             configured_model = result.configured_model
             actual_model = result.actual_model
             usage = result.usage
+            if recovered_failure is None:
+                http_status = result.http_status
+                finish_reason = result.finish_reason
+            provider_response_bytes = result.response_bytes
             inspection = inspect_chat_output(
                 result.response.answer,
                 data_class=request.data_class,
@@ -347,6 +411,19 @@ class AiCoachChatService:
                         )
                     except _ChatProviderFailure as failure:
                         error_code = failure.error.code.value
+                        provider_failure_reason = failure.error.provider_failure_reason
+                        http_status = failure.error.http_status
+                        finish_reason = failure.error.finish_reason
+                        provider_response_bytes = failure.error.response_bytes
+                        response_payload_type = failure.error.response_payload_type
+                        choices_count = failure.error.choices_count
+                        choices_item_type = failure.error.choices_item_type
+                        message_present = failure.error.message_present
+                        message_type = failure.error.message_type
+                        refusal_present = failure.error.refusal_present
+                        content_present = failure.error.content_present
+                        content_type = failure.error.content_type
+                        usage = failure.error.usage
                         outcome = AiCoachOutcome.INVALID_OUTPUT
                         failure_category = CHAT_FAILURE_REPAIR_FAILED
                         return self._failure(
@@ -356,11 +433,15 @@ class AiCoachChatService:
                             failure_category=failure_category,
                             repair_attempted=repair_attempted,
                             validation_failure_reason=validation_failure_reason,
+                            provider_failure_reason=provider_failure_reason,
                         )
                     provider_name = repaired.provider
                     configured_model = repaired.configured_model
                     actual_model = repaired.actual_model
                     usage = repaired.usage
+                    http_status = repaired.http_status
+                    finish_reason = repaired.finish_reason
+                    provider_response_bytes = repaired.response_bytes
                     repaired_inspection = inspect_chat_output(
                         repaired.response.answer,
                         data_class=request.data_class,
@@ -424,6 +505,7 @@ class AiCoachChatService:
                 repair_attempted=repair_attempted,
                 repair_success=repair_success,
                 validation_failure_reason=validation_failure_reason,
+                provider_failure_reason=provider_failure_reason,
             )
         finally:
             logger.info(
@@ -449,6 +531,11 @@ class AiCoachChatService:
                         if validation_failure_reason is not None
                         else None
                     ),
+                    "provider_failure_reason": (
+                        provider_failure_reason.value
+                        if provider_failure_reason is not None
+                        else None
+                    ),
                     "safety_category": safety.value,
                     "error_code": error_code,
                     "failure_category": failure_category,
@@ -460,6 +547,18 @@ class AiCoachChatService:
                     "prompt_tokens": usage.prompt_tokens if usage is not None else None,
                     "completion_tokens": usage.completion_tokens if usage is not None else None,
                     "total_tokens": usage.total_tokens if usage is not None else None,
+                    "reasoning_tokens": usage.reasoning_tokens if usage is not None else None,
+                    "http_status": http_status,
+                    "finish_reason": finish_reason,
+                    "provider_response_bytes": provider_response_bytes,
+                    "response_payload_type": response_payload_type,
+                    "choices_count": choices_count,
+                    "choices_item_type": choices_item_type,
+                    "message_present": message_present,
+                    "message_type": message_type,
+                    "refusal_present": refusal_present,
+                    "content_present": content_present,
+                    "content_type": content_type,
                 },
             )
 
@@ -490,31 +589,50 @@ class AiCoachChatService:
         self,
         request: AiCoachChatRequest,
         context_refs: tuple[ContextRef, ...],
-    ) -> tuple[ProviderTextResult, int]:
-        max_attempts = (
-            1
-            if request.data_class == AiCoachDataClass.PERSONALIZED
-            else settings.ai_coach_max_attempts
-        )
+    ) -> tuple[ProviderTextResult, int, NormalizedProviderError | None]:
+        max_attempts = max(1, min(2, settings.ai_coach_max_attempts))
         attempts = 0
+        recovered_failure: NormalizedProviderError | None = None
         while attempts < max_attempts:
             attempts += 1
             try:
-                result = self.provider.generate_text(request, context_refs)
+                provider_request = (
+                    request
+                    if attempts == 1
+                    or recovered_failure is None
+                    or recovered_failure.provider_failure_reason
+                    != ProviderFailureReason.FINISH_REASON_LENGTH
+                    else request.model_copy(update={"retry_hint": True})
+                )
+                result = self.provider.generate_text(provider_request, context_refs)
                 if not isinstance(result, ProviderTextResult):
-                    raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
-                return result, attempts
+                    raise NormalizedProviderError(
+                        ProviderErrorCode.INVALID_OUTPUT,
+                        provider_failure_reason=ProviderFailureReason.INVALID_PROVIDER_PAYLOAD,
+                    )
+                return result, attempts, recovered_failure
             except NormalizedProviderError as exc:
-                if exc.retryable and attempts < max_attempts:
+                length_retry = (
+                    exc.provider_failure_reason == ProviderFailureReason.FINISH_REASON_LENGTH
+                    and attempts < 2
+                )
+                if (exc.retryable and attempts < max_attempts) or length_retry:
+                    recovered_failure = exc
                     continue
                 raise _ChatProviderFailure(exc, attempts) from exc
             except Exception as exc:
                 raise _ChatProviderFailure(
-                    NormalizedProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE),
+                    NormalizedProviderError(
+                        ProviderErrorCode.PROVIDER_UNAVAILABLE,
+                        provider_failure_reason=ProviderFailureReason.UNKNOWN,
+                    ),
                     attempts,
                 ) from exc
         raise _ChatProviderFailure(
-            NormalizedProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE),
+            NormalizedProviderError(
+                ProviderErrorCode.PROVIDER_UNAVAILABLE,
+                provider_failure_reason=ProviderFailureReason.UNKNOWN,
+            ),
             attempts,
         )
 
@@ -529,13 +647,19 @@ class AiCoachChatService:
         try:
             result = self.provider.repair_text(request, answer, reason)
             if not isinstance(result, ProviderTextResult):
-                raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+                raise NormalizedProviderError(
+                    ProviderErrorCode.INVALID_OUTPUT,
+                    provider_failure_reason=ProviderFailureReason.INVALID_PROVIDER_PAYLOAD,
+                )
             return result, 1
         except NormalizedProviderError as exc:
             raise _ChatProviderFailure(exc, 1) from exc
         except Exception as exc:
             raise _ChatProviderFailure(
-                NormalizedProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE),
+                NormalizedProviderError(
+                    ProviderErrorCode.PROVIDER_UNAVAILABLE,
+                    provider_failure_reason=ProviderFailureReason.UNKNOWN,
+                ),
                 1,
             ) from exc
 
@@ -572,6 +696,7 @@ class AiCoachChatService:
         repair_attempted: bool = False,
         repair_success: bool = False,
         validation_failure_reason: ChatOutputValidationReason | None = None,
+        provider_failure_reason: ProviderFailureReason | None = None,
     ) -> AiCoachChatGeneration:
         copy = (
             {
@@ -612,6 +737,7 @@ class AiCoachChatService:
             repair_attempted=repair_attempted,
             repair_success=repair_success,
             validation_failure_reason=validation_failure_reason,
+            provider_failure_reason=provider_failure_reason,
         )
 
 

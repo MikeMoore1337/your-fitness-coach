@@ -18,6 +18,7 @@ from fitminiapp_api.ai_coach.contracts import (
     ContextRef,
     NormalizedProviderError,
     ProviderErrorCode,
+    ProviderFailureReason,
     ProviderTextResponse,
     ProviderTextResult,
 )
@@ -606,6 +607,425 @@ def test_invalid_provider_text_is_provider_failure_not_safety_failure(client, mo
     assert payload["assistant_message"] is None
     assert payload["user_message"]["status"] == "failed"
     assert "безопасно проверить" not in payload["user_message"]["limitations"][0]
+
+
+def test_finish_length_retries_once_for_personalized_chat_and_records_reason(
+    monkeypatch,
+    caplog,
+) -> None:
+    _enable_chat(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_max_attempts", 2)
+
+    @dataclass
+    class FinishLengthThenSuccessProvider:
+        calls: list[object]
+        provider_name: str = "stub"
+
+        def generate_text(self, request, context_refs) -> ProviderTextResult:
+            del context_refs
+            self.calls.append(request)
+            if len(self.calls) == 1:
+                raise NormalizedProviderError(
+                    ProviderErrorCode.INVALID_OUTPUT,
+                    retryable=False,
+                    provider_failure_reason=ProviderFailureReason.FINISH_REASON_LENGTH,
+                    http_status=200,
+                    finish_reason="length",
+                    response_bytes=128,
+                )
+            return ProviderTextResult(
+                provider="groq",
+                configured_model="openai/gpt-oss-120b",
+                actual_model="openai/gpt-oss-120b",
+                response=ProviderTextResponse(answer="Короткий персональный ответ."),
+                latency_ms=2,
+                finish_reason="stop",
+                response_bytes=256,
+            )
+
+        def repair_text(self, request, answer, reason) -> ProviderTextResult:
+            del request, answer, reason
+            raise AssertionError("presentation repair is not expected")
+
+    provider = FinishLengthThenSuccessProvider(calls=[])
+    with caplog.at_level(logging.INFO, logger="app.ai_coach"):
+        result = AiCoachChatService(provider=provider).generate(
+            request=AiCoachChatRequest(
+                job=AiCoachJob.FITNESS_KNOWLEDGE,
+                context_id="personal:training",
+                message="Объясни мой прогресс.",
+                data_class=AiCoachDataClass.PERSONALIZED,
+            ),
+            user_key="personal-retry-user",
+            request_id="personal-retry-request",
+            context_refs=(),
+        )
+
+    assert result.outcome == "answer"
+    assert len(provider.calls) == 2
+    assert provider.calls[0].retry_hint is False
+    assert provider.calls[1].retry_hint is True
+    records = [item for item in caplog.records if item.getMessage() == "ai_coach_chat_generation"]
+    assert records[-1].provider_failure_reason == "finish_reason_length"
+    assert records[-1].finish_reason == "length"
+    assert records[-1].attempts == 2
+    assert records[-1].retry_count == 1
+
+
+def test_repeated_finish_length_fails_closed_without_global_cooldown(monkeypatch) -> None:
+    _enable_chat(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_max_attempts", 2)
+
+    @dataclass
+    class AlwaysFinishLengthProvider:
+        calls: int = 0
+        provider_name: str = "stub"
+
+        def generate_text(self, request, context_refs) -> ProviderTextResult:
+            del request, context_refs
+            self.calls += 1
+            raise NormalizedProviderError(
+                ProviderErrorCode.INVALID_OUTPUT,
+                retryable=True,
+                provider_failure_reason=ProviderFailureReason.FINISH_REASON_LENGTH,
+                http_status=200,
+                finish_reason="length",
+            )
+
+        def repair_text(self, request, answer, reason) -> ProviderTextResult:
+            del request, answer, reason
+            raise AssertionError("presentation repair is not expected")
+
+    provider = AlwaysFinishLengthProvider()
+    service = AiCoachChatService(provider=provider)
+    result = service.generate(
+        request=AiCoachChatRequest(
+            job=AiCoachJob.FITNESS_KNOWLEDGE,
+            context_id="knowledge:test",
+            message="Сколько отдыхать между подходами?",
+            data_class=AiCoachDataClass.GENERIC,
+        ),
+        user_key="length-failure-user",
+        request_id="length-failure-request",
+        context_refs=(),
+    )
+
+    assert result.outcome == "invalid_output"
+    assert result.provider_failure_reason == ProviderFailureReason.FINISH_REASON_LENGTH
+    assert provider.calls == 2
+    assert service.cooldown.active() is False
+
+
+def test_timeout_gets_one_bounded_retry_without_global_cooldown(monkeypatch) -> None:
+    _enable_chat(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_max_attempts", 2)
+
+    @dataclass
+    class AlwaysTimeoutProvider:
+        calls: int = 0
+        provider_name: str = "stub"
+
+        def generate_text(self, request, context_refs) -> ProviderTextResult:
+            assert request.retry_hint is False
+            del context_refs
+            self.calls += 1
+            raise NormalizedProviderError(
+                ProviderErrorCode.TIMEOUT,
+                retryable=True,
+                provider_failure_reason=ProviderFailureReason.TIMEOUT,
+            )
+
+        def repair_text(self, request, answer, reason) -> ProviderTextResult:
+            del request, answer, reason
+            raise AssertionError("presentation repair is not expected")
+
+    provider = AlwaysTimeoutProvider()
+    service = AiCoachChatService(provider=provider)
+    result = service.generate(
+        request=AiCoachChatRequest(
+            job=AiCoachJob.FITNESS_KNOWLEDGE,
+            context_id="knowledge:test",
+            message="Сколько отдыхать между подходами?",
+            data_class=AiCoachDataClass.GENERIC,
+        ),
+        user_key="timeout-user",
+        request_id="timeout-request",
+        context_refs=(),
+    )
+
+    assert result.outcome == "unavailable"
+    assert result.failure_category == "timeout"
+    assert result.provider_failure_reason == ProviderFailureReason.TIMEOUT
+    assert provider.calls == 2
+    assert service.cooldown.active() is False
+
+
+def test_transient_provider_5xx_gets_one_bounded_retry_and_recovers(monkeypatch, caplog) -> None:
+    _enable_chat(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_max_attempts", 2)
+
+    @dataclass
+    class ServerErrorThenSuccessProvider:
+        calls: int = 0
+        provider_name: str = "stub"
+
+        def generate_text(self, request, context_refs) -> ProviderTextResult:
+            del context_refs
+            self.calls += 1
+            if self.calls == 1:
+                assert request.retry_hint is False
+                raise NormalizedProviderError(
+                    ProviderErrorCode.PROVIDER_UNAVAILABLE,
+                    retryable=True,
+                    provider_failure_reason=ProviderFailureReason.HTTP_5XX,
+                    http_status=503,
+                )
+            assert request.retry_hint is False
+            return ProviderTextResult(
+                provider="groq",
+                configured_model="openai/gpt-oss-120b",
+                actual_model="openai/gpt-oss-120b",
+                response=ProviderTextResponse(answer="Ответ после временной ошибки."),
+                latency_ms=2,
+                finish_reason="stop",
+            )
+
+        def repair_text(self, request, answer, reason) -> ProviderTextResult:
+            del request, answer, reason
+            raise AssertionError("presentation repair is not expected")
+
+    provider = ServerErrorThenSuccessProvider()
+    service = AiCoachChatService(provider=provider)
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge:test",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+    with caplog.at_level(logging.INFO, logger="app.ai_coach"):
+        result = service.generate(
+            request=request,
+            user_key="5xx-recovery-user",
+            request_id="5xx-recovery-request",
+            context_refs=(),
+        )
+
+    assert result.outcome == "answer"
+    assert provider.calls == 2
+    assert service.cooldown.active() is False
+    records = [item for item in caplog.records if item.getMessage() == "ai_coach_chat_generation"]
+    assert records[-1].provider_failure_reason == "http_5xx"
+    assert records[-1].http_status == 503
+    assert records[-1].attempts == 2
+    assert records[-1].retry_count == 1
+
+
+def test_rate_limit_is_not_retried_and_honors_cooldown(monkeypatch) -> None:
+    _enable_chat(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_max_attempts", 2)
+
+    @dataclass
+    class RateLimitedProvider:
+        calls: int = 0
+        provider_name: str = "stub"
+
+        def generate_text(self, request, context_refs) -> ProviderTextResult:
+            del context_refs
+            self.calls += 1
+            raise NormalizedProviderError(
+                ProviderErrorCode.RATE_LIMITED,
+                retry_after_seconds=17,
+                provider_failure_reason=ProviderFailureReason.HTTP_429,
+                http_status=429,
+            )
+
+        def repair_text(self, request, answer, reason) -> ProviderTextResult:
+            del request, answer, reason
+            raise AssertionError("presentation repair is not expected")
+
+    provider = RateLimitedProvider()
+    service = AiCoachChatService(provider=provider)
+    result = service.generate(
+        request=AiCoachChatRequest(
+            job=AiCoachJob.FITNESS_KNOWLEDGE,
+            context_id="knowledge:test",
+            message="Сколько отдыхать между подходами?",
+            data_class=AiCoachDataClass.GENERIC,
+        ),
+        user_key="rate-limit-user",
+        request_id="rate-limit-request",
+        context_refs=(),
+    )
+
+    assert result.outcome == "rate_limited"
+    assert result.provider_failure_reason == ProviderFailureReason.HTTP_429
+    assert provider.calls == 1
+    assert service.cooldown.active() is True
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        (401, ProviderFailureReason.HTTP_401),
+        (403, ProviderFailureReason.HTTP_403),
+    ],
+)
+def test_auth_provider_failure_is_not_retried(monkeypatch, status, reason) -> None:
+    _enable_chat(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_max_attempts", 2)
+
+    @dataclass
+    class AuthFailureProvider:
+        calls: int = 0
+        provider_name: str = "stub"
+
+        def generate_text(self, request, context_refs) -> ProviderTextResult:
+            del request, context_refs
+            self.calls += 1
+            raise NormalizedProviderError(
+                ProviderErrorCode.AUTHENTICATION_FAILED,
+                misconfigured=True,
+                provider_failure_reason=reason,
+                http_status=status,
+            )
+
+        def repair_text(self, request, answer, reason) -> ProviderTextResult:
+            del request, answer, reason
+            raise AssertionError("presentation repair is not expected")
+
+    provider = AuthFailureProvider()
+    service = AiCoachChatService(provider=provider)
+    result = service.generate(
+        request=AiCoachChatRequest(
+            job=AiCoachJob.FITNESS_KNOWLEDGE,
+            context_id="knowledge:test",
+            message="Сколько отдыхать между подходами?",
+            data_class=AiCoachDataClass.GENERIC,
+        ),
+        user_key=f"auth-user-{status}",
+        request_id=f"auth-request-{status}",
+        context_refs=(),
+    )
+
+    assert result.outcome == "unavailable"
+    assert result.provider_failure_reason == reason
+    assert provider.calls == 1
+    assert service.cooldown.active() is True
+
+
+def test_global_cooldown_waits_for_repeated_provider_5xx(monkeypatch) -> None:
+    _enable_chat(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_max_attempts", 1)
+
+    @dataclass
+    class AlwaysServerErrorProvider:
+        calls: int = 0
+        provider_name: str = "stub"
+
+        def generate_text(self, request, context_refs) -> ProviderTextResult:
+            del request, context_refs
+            self.calls += 1
+            raise NormalizedProviderError(
+                ProviderErrorCode.PROVIDER_UNAVAILABLE,
+                retryable=True,
+                provider_failure_reason=ProviderFailureReason.HTTP_5XX,
+                http_status=503,
+            )
+
+        def repair_text(self, request, answer, reason) -> ProviderTextResult:
+            del request, answer, reason
+            raise AssertionError("presentation repair is not expected")
+
+    provider = AlwaysServerErrorProvider()
+    service = AiCoachChatService(provider=provider)
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="knowledge:test",
+        message="Сколько отдыхать между подходами?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+    for index in range(3):
+        result = service.generate(
+            request=request,
+            user_key=f"5xx-user-{index}",
+            request_id=f"5xx-request-{index}",
+            context_refs=(),
+        )
+        assert result.outcome == "unavailable"
+    assert service.cooldown.active() is True
+    blocked = service.generate(
+        request=request,
+        user_key="5xx-user-blocked",
+        request_id="5xx-request-blocked",
+        context_refs=(),
+    )
+    assert blocked.outcome == "unavailable"
+    assert provider.calls == 3
+
+
+def test_conversation_retry_reuses_failed_user_message_without_duplicate_history(
+    client,
+    monkeypatch,
+) -> None:
+    _enable_chat(monkeypatch)
+
+    @dataclass
+    class FailOnceProvider:
+        calls: int = 0
+        provider_name: str = "stub"
+
+        def generate_text(self, request, context_refs) -> ProviderTextResult:
+            del request, context_refs
+            self.calls += 1
+            if self.calls == 1:
+                raise NormalizedProviderError(
+                    ProviderErrorCode.INVALID_OUTPUT,
+                    provider_failure_reason=ProviderFailureReason.FINISH_REASON_OTHER,
+                    finish_reason="content_filter",
+                )
+            return ProviderTextResult(
+                provider="groq",
+                configured_model="openai/gpt-oss-120b",
+                actual_model="openai/gpt-oss-120b",
+                response=ProviderTextResponse(answer="Ответ после повторной попытки."),
+                latency_ms=2,
+                finish_reason="stop",
+            )
+
+        def repair_text(self, request, answer, reason) -> ProviderTextResult:
+            del request, answer, reason
+            raise AssertionError("presentation repair is not expected")
+
+    provider = FailOnceProvider()
+    monkeypatch.setattr(ai_coach_chat_service, "provider", provider)
+    headers = _login(client, 987_106)
+    conversation_id = _create_conversation(client, headers)
+    initial = client.post(
+        f"/api/v1/ai-coach/conversations/{conversation_id}/messages",
+        headers=headers,
+        json={"message": "Сколько отдыхать между подходами?"},
+    )
+
+    assert initial.status_code == 200, initial.text
+    failed_message_id = initial.json()["user_message"]["id"]
+    assert initial.json()["user_message"]["status"] == "failed"
+
+    retried = client.post(
+        f"/api/v1/ai-coach/conversations/{conversation_id}/messages/{failed_message_id}/retry",
+        headers=headers,
+    )
+
+    assert retried.status_code == 200, retried.text
+    assert retried.json()["user_message"]["id"] == failed_message_id
+    assert retried.json()["user_message"]["status"] == "complete"
+    assert retried.json()["assistant_message"]["content"] == "Ответ после повторной попытки."
+    detail = client.get(
+        f"/api/v1/ai-coach/conversations/{conversation_id}",
+        headers=headers,
+    )
+    assert [item["role"] for item in detail.json()["messages"]] == ["user", "assistant"]
+    assert [item["id"] for item in detail.json()["messages"]].count(failed_message_id) == 1
+    assert provider.calls == 2
 
 
 def test_public_context_failure_is_structured_without_provider_call(client, monkeypatch) -> None:

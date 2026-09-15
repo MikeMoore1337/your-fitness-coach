@@ -89,6 +89,7 @@ from fitminiapp_api.services.ai_coach_conversations import (
     create_conversation,
     get_conversation_message,
     get_owned_conversation,
+    has_later_messages,
     history_turns,
     list_conversations,
     mark_user_message_result,
@@ -339,6 +340,92 @@ def _conversation_or_404(
     return conversation
 
 
+def _generate_conversation_message(
+    *,
+    db: Session,
+    current_user: User,
+    message: str,
+    history: tuple[AiCoachConversationTurn, ...],
+    request_id: str | None,
+) -> AiCoachChatGeneration:
+    try:
+        return _generate_chat(
+            db=db,
+            current_user=current_user,
+            message=message,
+            history=history,
+            request_id=request_id,
+        )
+    except PersonalToolUnsafe:
+        return _chat_state_generation(
+            outcome=AiCoachOutcome.SAFETY_REFUSAL,
+            data_class=AiCoachDataClass.PERSONALIZED,
+            answer=refusal_text(
+                SafetyCategory.PROMPT_INJECTION,
+                locale=detect_chat_locale(message),
+            ),
+            safety_category=SafetyCategory.PROMPT_INJECTION,
+        )
+    except PersonalToolUnavailable:
+        return _chat_context_failure_generation(
+            data_class=AiCoachDataClass.PERSONALIZED,
+            locale=detect_chat_locale(message),
+        )
+    except ContextUnavailable:
+        return _chat_context_failure_generation(
+            data_class=AiCoachDataClass.GENERIC,
+            locale=detect_chat_locale(message),
+        )
+
+
+def _persist_conversation_generation(
+    *,
+    db: Session,
+    conversation,
+    user_message,
+    generation: AiCoachChatGeneration,
+    request_id: str | None,
+) -> AiCoachConversationSendResponse:
+    mark_user_message_result(
+        user_message,
+        outcome=generation.outcome,
+        safety_category=generation.safety_category.value,
+        failure_category=generation.failure_category,
+        request_id=request_id,
+        limitations=generation.limitations,
+    )
+    assistant_message = None
+    if generation.answer is not None:
+        assistant_message = add_assistant_message(
+            db,
+            conversation=conversation,
+            content=generation.answer,
+            outcome=generation.outcome,
+            safety_category=generation.safety_category.value,
+            failure_category=generation.failure_category,
+            request_id=request_id,
+            citations=generation.citations,
+            limitations=generation.limitations,
+        )
+    db.commit()
+    return AiCoachConversationSendResponse(
+        conversation_id=conversation.id,
+        user_message=serialize_message(user_message),
+        assistant_message=serialize_message(assistant_message)
+        if assistant_message is not None
+        else None,
+        outcome=generation.outcome,
+        data_class=generation.data_class,
+        answer=generation.answer,
+        citations=generation.citations,
+        limitations=generation.limitations,
+        safety_category=generation.safety_category.value,
+        failure_category=generation.failure_category,
+        prompt_version=generation.prompt_version,
+        request_id=request_id,
+    )
+
+
 @router.get("/conversations", response_model=AiCoachConversationListResponse)
 @limiter.limit("60/hour")
 def get_ai_coach_conversations(
@@ -453,71 +540,77 @@ def send_ai_coach_conversation_message(
         content=payload.message,
     )
     update_title_from_message(conversation, content=payload.message)
-    try:
-        generation = _generate_chat(
-            db=db,
-            current_user=current_user,
-            message=payload.message,
-            history=history,
-            request_id=request_id,
-        )
-    except PersonalToolUnsafe:
-        generation = _chat_state_generation(
-            outcome=AiCoachOutcome.SAFETY_REFUSAL,
-            data_class=AiCoachDataClass.PERSONALIZED,
-            answer=refusal_text(
-                SafetyCategory.PROMPT_INJECTION,
-                locale=detect_chat_locale(payload.message),
-            ),
-            safety_category=SafetyCategory.PROMPT_INJECTION,
-        )
-    except PersonalToolUnavailable:
-        generation = _chat_context_failure_generation(
-            data_class=AiCoachDataClass.PERSONALIZED,
-            locale=detect_chat_locale(payload.message),
-        )
-    except ContextUnavailable:
-        generation = _chat_context_failure_generation(
-            data_class=AiCoachDataClass.GENERIC,
-            locale=detect_chat_locale(payload.message),
-        )
-
-    mark_user_message_result(
-        user_message,
-        outcome=generation.outcome,
-        safety_category=generation.safety_category.value,
-        failure_category=generation.failure_category,
+    generation = _generate_conversation_message(
+        db=db,
+        current_user=current_user,
+        message=payload.message,
+        history=history,
         request_id=request_id,
-        limitations=generation.limitations,
     )
-    assistant_message = None
-    if generation.answer is not None:
-        assistant_message = add_assistant_message(
-            db,
-            conversation=conversation,
-            content=generation.answer,
-            outcome=generation.outcome,
-            safety_category=generation.safety_category.value,
-            failure_category=generation.failure_category,
-            request_id=request_id,
-            citations=generation.citations,
-            limitations=generation.limitations,
-        )
-    db.commit()
-    return AiCoachConversationSendResponse(
+    return _persist_conversation_generation(
+        db=db,
+        conversation=conversation,
+        user_message=user_message,
+        generation=generation,
+        request_id=request_id,
+    )
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages/{message_id}/retry",
+    response_model=AiCoachConversationSendResponse,
+)
+@limiter.limit("10/minute")
+def retry_ai_coach_conversation_message(
+    conversation_id: int,
+    message_id: int,
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachConversationSendResponse:
+    conversation = _conversation_or_404(
+        db,
+        user_id=current_user.id,
+        conversation_id=conversation_id,
+    )
+    user_message = get_conversation_message(
+        db,
         conversation_id=conversation.id,
-        user_message=serialize_message(user_message),
-        assistant_message=serialize_message(assistant_message)
-        if assistant_message is not None
-        else None,
-        outcome=generation.outcome,
-        data_class=generation.data_class,
-        answer=generation.answer,
-        citations=generation.citations,
-        limitations=generation.limitations,
-        safety_category=generation.safety_category.value,
-        failure_category=generation.failure_category,
-        prompt_version=generation.prompt_version,
+        message_id=message_id,
+        for_update=True,
+    )
+    if (
+        user_message is None
+        or user_message.role != "user"
+        or user_message.status != "failed"
+        or has_later_messages(
+            db,
+            conversation_id=conversation.id,
+            message_id=message_id,
+        )
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Повторить можно только последнее неудачное сообщение AI Coach",
+        )
+    content = user_message.content_overflow or user_message.content
+    history = tuple(
+        AiCoachConversationTurn.model_validate(item)
+        for item in history_turns(db, conversation_id=conversation.id)
+    )
+    request_id = getattr(request.state, "request_id", None)
+    generation = _generate_conversation_message(
+        db=db,
+        current_user=current_user,
+        message=content,
+        history=history,
+        request_id=request_id,
+    )
+    return _persist_conversation_generation(
+        db=db,
+        conversation=conversation,
+        user_message=user_message,
+        generation=generation,
         request_id=request_id,
     )
 

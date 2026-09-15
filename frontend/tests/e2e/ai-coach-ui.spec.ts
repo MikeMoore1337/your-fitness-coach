@@ -220,6 +220,44 @@ async function installAiCoachApi(page: Page): Promise<void> {
       return route.fulfill({ json: conversation });
     }
 
+    const retryMatch = /^\/api\/v1\/ai-coach\/conversations\/(\d+)\/messages\/(\d+)\/retry$/.exec(
+      path,
+    );
+    if (retryMatch && method === 'POST') {
+      const conversation = conversations.get(Number(retryMatch[1]));
+      const userMessage = conversation?.messages.find(
+        (item) =>
+          item.id === Number(retryMatch[2]) && item.role === 'user' && item.status === 'failed',
+      );
+      if (!conversation || !userMessage) {
+        return route.fulfill({ status: 409, json: { detail: 'Retry is no longer available' } });
+      }
+      userMessage.status = 'complete';
+      userMessage.outcome = null;
+      userMessage.failure_category = null;
+      userMessage.limitations = [];
+      const answer = 'Ответ после повторной попытки.';
+      const assistantMessage = makeMessage(nextMessageId++, 'assistant', answer);
+      conversation.messages.push(assistantMessage);
+      conversation.updated_at = '2026-09-14T12:02:00Z';
+      return route.fulfill({
+        json: {
+          conversation_id: conversation.id,
+          user_message: userMessage,
+          assistant_message: assistantMessage,
+          outcome: 'answer',
+          data_class: 'generic',
+          answer,
+          citations: [],
+          limitations: [],
+          safety_category: 'clear',
+          failure_category: null,
+          prompt_version: 'ai-coach-chat-v1',
+          request_id: 'e2e-retry',
+        },
+      });
+    }
+
     const messageMatch = /^\/api\/v1\/ai-coach\/conversations\/(\d+)\/messages$/.exec(path);
     if (messageMatch && method === 'POST') {
       const conversation = conversations.get(Number(messageMatch[1]));
@@ -441,6 +479,9 @@ test('AI Coach keeps follow-up history after reload and preserves failed draft',
   await expect(page.getByRole('textbox', { name: 'Сообщение AI Coach' })).toHaveValue(
     'Проверка ошибки ответа',
   );
+  await page.getByRole('button', { name: 'Повторить' }).click();
+  await expect(page.getByText('Ответ после повторной попытки.')).toBeVisible();
+  await expect(page.getByTestId('ai-coach-message-user')).toHaveCount(3);
   await expect(page.getByTestId('ai-coach-experience')).not.toContainText(
     'На этот запрос нельзя ответить безопасно',
   );
