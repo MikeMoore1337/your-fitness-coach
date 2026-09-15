@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Literal, cast
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from fitminiapp_api.ai_coach.contracts import AiCoachCitation, AiCoachOutcome
+from fitminiapp_api.ai_coach.contracts import (
+    AiCoachCitation,
+    AiCoachOutcome,
+    AiCoachRateLimitScope,
+)
 from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.models.ai_coach import (
     AiCoachConversation,
@@ -111,6 +116,24 @@ def list_messages(
     )
 
 
+def list_processing_user_messages(
+    db: Session,
+    *,
+    conversation_id: int,
+    for_update: bool = False,
+) -> list[AiCoachConversationMessage]:
+    """Return in-flight user messages that may need crash recovery."""
+
+    query = db.query(AiCoachConversationMessage).filter(
+        AiCoachConversationMessage.conversation_id == conversation_id,
+        AiCoachConversationMessage.role == "user",
+        AiCoachConversationMessage.status == "processing",
+    )
+    if for_update:
+        query = query.with_for_update()
+    return query.order_by(AiCoachConversationMessage.id.asc()).all()
+
+
 def get_conversation_message(
     db: Session,
     *,
@@ -125,6 +148,41 @@ def get_conversation_message(
     if for_update:
         query = query.with_for_update()
     return query.one_or_none()
+
+
+def get_message_by_request_id(
+    db: Session,
+    *,
+    conversation_id: int,
+    request_id: str,
+    for_update: bool = False,
+) -> AiCoachConversationMessage | None:
+    query = db.query(AiCoachConversationMessage).filter(
+        AiCoachConversationMessage.conversation_id == conversation_id,
+        AiCoachConversationMessage.request_id == request_id,
+        AiCoachConversationMessage.role == "user",
+    )
+    if for_update:
+        query = query.with_for_update()
+    return query.order_by(AiCoachConversationMessage.id.desc()).first()
+
+
+def get_following_assistant_message(
+    db: Session,
+    *,
+    conversation_id: int,
+    user_message_id: int,
+) -> AiCoachConversationMessage | None:
+    next_message = (
+        db.query(AiCoachConversationMessage)
+        .filter(
+            AiCoachConversationMessage.conversation_id == conversation_id,
+            AiCoachConversationMessage.id > user_message_id,
+        )
+        .order_by(AiCoachConversationMessage.id.asc())
+        .first()
+    )
+    return next_message if next_message is not None and next_message.role == "assistant" else None
 
 
 def has_later_messages(
@@ -186,6 +244,10 @@ def add_user_message(
     *,
     conversation: AiCoachConversation,
     content: str,
+    request_id: str | None = None,
+    status: str = "complete",
+    data_class: str | None = None,
+    prompt_version: str | None = None,
 ) -> AiCoachConversationMessage:
     inline_content = content[:LEGACY_INLINE_CONTENT_LIMIT]
     overflow_content = content if len(content) > LEGACY_INLINE_CONTENT_LIMIT else None
@@ -194,11 +256,14 @@ def add_user_message(
         role="user",
         content=inline_content,
         content_overflow=overflow_content,
-        status="complete",
+        status=status,
         outcome=None,
         safety_category="clear",
         failure_category=None,
-        request_id=None,
+        request_id=request_id,
+        data_class=data_class,
+        prompt_version=prompt_version,
+        processing_started_at=now_msk_naive() if status == "processing" else None,
         citations=[],
         limitations=[],
     )
@@ -217,6 +282,10 @@ def mark_user_message_result(
     failure_category: str | None,
     request_id: str | None,
     limitations: Iterable[str] = (),
+    data_class: str | None = None,
+    prompt_version: str | None = None,
+    rate_limit_scope: AiCoachRateLimitScope | None = None,
+    rate_limit_retry_after_seconds: int | None = None,
 ) -> None:
     message.status = (
         "complete"
@@ -233,6 +302,11 @@ def mark_user_message_result(
     message.safety_category = safety_category
     message.failure_category = failure_category
     message.request_id = request_id
+    message.data_class = data_class or message.data_class
+    message.prompt_version = prompt_version or message.prompt_version
+    message.rate_limit_scope = rate_limit_scope.value if rate_limit_scope is not None else None
+    message.rate_limit_retry_after_seconds = rate_limit_retry_after_seconds
+    message.processing_started_at = None
     message.limitations = list(limitations)
 
 
@@ -245,6 +319,8 @@ def add_assistant_message(
     safety_category: str,
     failure_category: str | None,
     request_id: str | None,
+    data_class: str | None = None,
+    prompt_version: str | None = None,
     citations: Iterable[AiCoachCitation] = (),
     limitations: Iterable[str] = (),
 ) -> AiCoachConversationMessage:
@@ -258,6 +334,8 @@ def add_assistant_message(
         safety_category=safety_category,
         failure_category=failure_category,
         request_id=request_id,
+        data_class=data_class,
+        prompt_version=prompt_version,
         citations=[citation.model_dump(mode="json") for citation in citations],
         limitations=list(limitations),
     )
@@ -323,12 +401,34 @@ def serialize_message(
             outcome = None
     return AiCoachConversationMessageResponse(
         id=message.id,
-        role=message.role,
+        role=cast(Literal["user", "assistant"], message.role),
         content=_message_content(message),
-        status=message.status,
+        status=cast(Literal["processing", "complete", "failed"], message.status),
         outcome=outcome,
         safety_category=message.safety_category,
-        failure_category=message.failure_category,
+        failure_category=cast(
+            Literal[
+                "provider_failure",
+                "structured_validation",
+                "timeout",
+                "rate_limit",
+                "repair_failed",
+                "presentation_validation_failed",
+                "internal_error",
+                "safety_rejection",
+                "context_failure",
+                "generation_failure",
+                "rate_limited",
+            ]
+            | None,
+            message.failure_category,
+        ),
+        rate_limit_scope=(
+            AiCoachRateLimitScope(message.rate_limit_scope)
+            if message.rate_limit_scope in {scope.value for scope in AiCoachRateLimitScope}
+            else None
+        ),
+        rate_limit_retry_after_seconds=message.rate_limit_retry_after_seconds,
         citations=tuple(citations),
         limitations=limitations,
         created_at=message.created_at,
@@ -343,11 +443,14 @@ __all__ = [
     "conversation_response",
     "create_conversation",
     "get_conversation_message",
+    "get_following_assistant_message",
+    "get_message_by_request_id",
     "get_owned_conversation",
     "has_later_messages",
     "history_turns",
     "list_conversations",
     "list_messages",
+    "list_processing_user_messages",
     "mark_user_message_result",
     "serialize_message",
     "trim_messages",

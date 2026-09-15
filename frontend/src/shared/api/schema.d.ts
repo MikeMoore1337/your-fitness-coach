@@ -413,6 +413,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-coach/quota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Coach Quota */
+        get: operations["get_ai_coach_quota_api_v1_ai_coach_quota_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai-coach/conversations": {
         parameters: {
             query?: never;
@@ -4170,12 +4187,15 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "complete" | "failed";
+            status: "processing" | "complete" | "failed";
             outcome?: components["schemas"]["AiCoachOutcome"] | null;
             /** Safety Category */
             safety_category: string;
             /** Failure Category */
             failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "rate_limit" | "repair_failed" | "presentation_validation_failed" | "internal_error" | "safety_rejection" | "context_failure" | "generation_failure" | "rate_limited") | null;
+            rate_limit_scope?: components["schemas"]["AiCoachRateLimitScope"] | null;
+            /** Rate Limit Retry After Seconds */
+            rate_limit_retry_after_seconds?: number | null;
             /**
              * Citations
              * @default []
@@ -4247,6 +4267,10 @@ export interface components {
             prompt_version: string;
             /** Request Id */
             request_id?: string | null;
+            quota: components["schemas"]["AiCoachQuotaSnapshot"];
+            rate_limit_scope?: components["schemas"]["AiCoachRateLimitScope"] | null;
+            /** Rate Limit Retry After Seconds */
+            rate_limit_retry_after_seconds?: number | null;
         };
         /** AiCoachConversationSummaryResponse */
         AiCoachConversationSummaryResponse: {
@@ -4459,6 +4483,33 @@ export interface components {
          */
         AiCoachPersonalTool: "get_progress_summary" | "get_recent_training_summary" | "get_nutrition_summary" | "get_period_report_insights";
         /**
+         * AiCoachQuotaSnapshot
+         * @description Server-owned user quota state; no prompt or answer data is included.
+         */
+        AiCoachQuotaSnapshot: {
+            /** Limit */
+            limit: number;
+            /** Used */
+            used: number;
+            /** Remaining */
+            remaining: number;
+            /**
+             * Reset At
+             * Format: date-time
+             */
+            reset_at: string;
+            /** Retry After Seconds */
+            retry_after_seconds: number;
+            /** Can Send */
+            can_send: boolean;
+        };
+        /**
+         * AiCoachRateLimitScope
+         * @description The boundary that blocked a generation request.
+         * @enum {string}
+         */
+        AiCoachRateLimitScope: "user" | "service" | "provider";
+        /**
          * AiCoachResponse
          * @description Stable user-facing response; provider topology is intentionally absent.
          */
@@ -4501,6 +4552,10 @@ export interface components {
             period_end?: string | null;
             /** Timezone */
             timezone?: string | null;
+            quota?: components["schemas"]["AiCoachQuotaSnapshot"] | null;
+            rate_limit_scope?: components["schemas"]["AiCoachRateLimitScope"] | null;
+            /** Rate Limit Retry After Seconds */
+            rate_limit_retry_after_seconds?: number | null;
         };
         /**
          * AiCoachStatusResponse
@@ -11869,6 +11924,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiCoachStatusResponse"];
+                };
+            };
+        };
+    };
+    get_ai_coach_quota_api_v1_ai_coach_quota_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachQuotaSnapshot"];
                 };
             };
         };

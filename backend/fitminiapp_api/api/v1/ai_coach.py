@@ -1,12 +1,16 @@
 """Authenticated, bounded AI Coach endpoints."""
 
-from datetime import date
+from datetime import date, timedelta
+from typing import cast
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.ai_coach.chat_service import (
     CHAT_FAILURE_CONTEXT,
+    CHAT_FAILURE_INTERNAL_ERROR,
     CHAT_FAILURE_PROVIDER,
     AiCoachChatGeneration,
     ai_coach_chat_service,
@@ -30,6 +34,8 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachJob,
     AiCoachOutcome,
     AiCoachPersonalTool,
+    AiCoachQuotaSnapshot,
+    AiCoachRateLimitScope,
     AiCoachRequest,
     AiCoachResponse,
     AiCoachResponseMetadata,
@@ -40,6 +46,7 @@ from fitminiapp_api.ai_coach.personal_tools import (
     run_period_report_tool,
     run_personal_tool,
 )
+from fitminiapp_api.ai_coach.quota import ai_coach_quota
 from fitminiapp_api.ai_coach.retrieval import ContextUnavailable
 from fitminiapp_api.ai_coach.safety import (
     SafetyCategory,
@@ -55,6 +62,7 @@ from fitminiapp_api.api.dependencies.auth import (
 )
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.rate_limit import limiter
+from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.ai_coach import (
@@ -74,6 +82,7 @@ from fitminiapp_api.schemas.ai_coach import (
     AiCoachMemoryUpdateRequest,
     AiCoachPersonalGenerateRequest,
     AiCoachStatusResponse,
+    ChatFailureCategory,
 )
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.services.ai_coach_consent import (
@@ -88,10 +97,13 @@ from fitminiapp_api.services.ai_coach_conversations import (
     conversation_response,
     create_conversation,
     get_conversation_message,
+    get_following_assistant_message,
+    get_message_by_request_id,
     get_owned_conversation,
     has_later_messages,
     history_turns,
     list_conversations,
+    list_processing_user_messages,
     mark_user_message_result,
     serialize_message,
     update_title_from_message,
@@ -150,6 +162,32 @@ def get_ai_coach_status(
         generic_available=generic_available,
         personal_available=personal_available,
     )
+
+
+@router.get("/quota", response_model=AiCoachQuotaSnapshot)
+@limiter.limit("120/hour")
+def get_ai_coach_quota(
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachQuotaSnapshot:
+    del request
+    quota = ai_coach_quota.snapshot(db, user_id=current_user.id)
+    db.commit()
+    return quota
+
+
+def _with_user_quota(
+    *,
+    db: Session,
+    user_id: int,
+    response: AiCoachResponse,
+) -> AiCoachResponse:
+    """Attach one fresh server-owned snapshot to the legacy generation routes."""
+
+    quota = ai_coach_quota.snapshot(db, user_id=user_id)
+    db.commit()
+    return response.model_copy(update={"quota": quota})
 
 
 def _chat_state_generation(
@@ -280,6 +318,8 @@ def _generate_chat(
             user_key=str(current_user.id),
             request_id=request_id,
             context_refs=(),
+            db=db,
+            user_id=current_user.id,
         )
 
     if personal_needed:
@@ -321,6 +361,8 @@ def _generate_chat(
         user_key=str(current_user.id),
         request_id=request_id,
         context_refs=selection.context_refs,
+        db=db,
+        user_id=current_user.id,
     )
 
 
@@ -390,9 +432,13 @@ def _persist_conversation_generation(
         user_message,
         outcome=generation.outcome,
         safety_category=generation.safety_category.value,
-        failure_category=generation.failure_category,
+        failure_category=cast(ChatFailureCategory | None, generation.failure_category),
         request_id=request_id,
         limitations=generation.limitations,
+        data_class=generation.data_class.value,
+        prompt_version=generation.prompt_version,
+        rate_limit_scope=generation.rate_limit_scope,
+        rate_limit_retry_after_seconds=generation.rate_limit_retry_after_seconds,
     )
     assistant_message = None
     if generation.answer is not None:
@@ -404,9 +450,12 @@ def _persist_conversation_generation(
             safety_category=generation.safety_category.value,
             failure_category=generation.failure_category,
             request_id=request_id,
+            data_class=generation.data_class.value,
+            prompt_version=generation.prompt_version,
             citations=generation.citations,
             limitations=generation.limitations,
         )
+    quota_snapshot = ai_coach_quota.snapshot(db, user_id=conversation.user_id)
     db.commit()
     return AiCoachConversationSendResponse(
         conversation_id=conversation.id,
@@ -420,9 +469,139 @@ def _persist_conversation_generation(
         citations=generation.citations,
         limitations=generation.limitations,
         safety_category=generation.safety_category.value,
-        failure_category=generation.failure_category,
+        failure_category=cast(ChatFailureCategory | None, generation.failure_category),
         prompt_version=generation.prompt_version,
         request_id=request_id,
+        quota=quota_snapshot,
+        rate_limit_scope=generation.rate_limit_scope,
+        rate_limit_retry_after_seconds=generation.rate_limit_retry_after_seconds,
+    )
+
+
+def _request_key(request: Request) -> str:
+    value = getattr(request.state, "request_id", None)
+    return value if isinstance(value, str) and value else str(uuid4())
+
+
+def _processing_is_stale(message) -> bool:
+    started_at = message.processing_started_at or message.created_at
+    lease_seconds = min(
+        600,
+        max(30, settings.ai_coach_timeout_seconds * settings.ai_coach_max_attempts + 60),
+    )
+    return now_msk_naive() - started_at >= timedelta(seconds=lease_seconds)
+
+
+def _recover_stale_processing_messages(db: Session, *, conversation) -> None:
+    """Make a crashed generation visible as a retryable, non-charged failure."""
+
+    recovered = False
+    for message in list_processing_user_messages(
+        db,
+        conversation_id=conversation.id,
+        for_update=True,
+    ):
+        if not _processing_is_stale(message):
+            continue
+        if message.request_id:
+            ai_coach_quota.release(db, request_key=message.request_id)
+        message.status = "failed"
+        message.outcome = AiCoachOutcome.UNAVAILABLE.value
+        message.safety_category = "clear"
+        message.failure_category = CHAT_FAILURE_INTERNAL_ERROR
+        message.rate_limit_scope = None
+        message.rate_limit_retry_after_seconds = None
+        message.processing_started_at = None
+        message.limitations = ["Не удалось сформировать ответ. Попробуйте повторить запрос."]
+        recovered = True
+    if recovered:
+        conversation.updated_at = now_msk_naive()
+        db.commit()
+
+
+def _reset_message_for_processing(message, *, request_id: str) -> None:
+    message.status = "processing"
+    message.outcome = None
+    message.safety_category = "clear"
+    message.failure_category = None
+    message.request_id = request_id
+    message.data_class = None
+    message.prompt_version = None
+    message.rate_limit_scope = None
+    message.rate_limit_retry_after_seconds = None
+    message.processing_started_at = now_msk_naive()
+    message.citations = []
+    message.limitations = []
+
+
+def _persisted_conversation_response(
+    *,
+    db: Session,
+    conversation,
+    user_message,
+) -> AiCoachConversationSendResponse:
+    assistant_message = get_following_assistant_message(
+        db,
+        conversation_id=conversation.id,
+        user_message_id=user_message.id,
+    )
+    serialized_assistant = serialize_message(assistant_message) if assistant_message else None
+    outcome_value = user_message.outcome or (
+        assistant_message.outcome if assistant_message is not None else None
+    )
+    try:
+        outcome = AiCoachOutcome(outcome_value or AiCoachOutcome.UNAVAILABLE.value)
+    except ValueError:
+        outcome = AiCoachOutcome.UNAVAILABLE
+    try:
+        data_class = AiCoachDataClass(
+            user_message.data_class
+            or (assistant_message.data_class if assistant_message is not None else None)
+            or AiCoachDataClass.GENERIC.value
+        )
+    except ValueError:
+        data_class = AiCoachDataClass.GENERIC
+    try:
+        rate_limit_scope = (
+            AiCoachRateLimitScope(user_message.rate_limit_scope)
+            if user_message.rate_limit_scope
+            else None
+        )
+    except ValueError:
+        rate_limit_scope = None
+    quota_snapshot = ai_coach_quota.snapshot(db, user_id=conversation.user_id)
+    db.commit()
+    return AiCoachConversationSendResponse(
+        conversation_id=conversation.id,
+        user_message=serialize_message(user_message),
+        assistant_message=serialized_assistant,
+        outcome=outcome,
+        data_class=data_class,
+        answer=serialized_assistant.content if serialized_assistant is not None else None,
+        citations=serialized_assistant.citations if serialized_assistant is not None else (),
+        limitations=(
+            serialized_assistant.limitations
+            if serialized_assistant is not None
+            else tuple(user_message.limitations or ())
+        ),
+        safety_category=(
+            serialized_assistant.safety_category
+            if serialized_assistant is not None
+            else user_message.safety_category
+        ),
+        failure_category=(
+            user_message.failure_category
+            or (serialized_assistant.failure_category if serialized_assistant is not None else None)
+        ),
+        prompt_version=(
+            user_message.prompt_version
+            or (assistant_message.prompt_version if assistant_message is not None else None)
+            or AI_COACH_CHAT_PROMPT_VERSION
+        ),
+        request_id=user_message.request_id,
+        quota=quota_snapshot,
+        rate_limit_scope=rate_limit_scope,
+        rate_limit_retry_after_seconds=user_message.rate_limit_retry_after_seconds,
     )
 
 
@@ -482,6 +661,7 @@ def get_ai_coach_conversation(
         user_id=current_user.id,
         conversation_id=conversation_id,
     )
+    _recover_stale_processing_messages(db, conversation=conversation)
     return conversation_response(db, conversation)
 
 
@@ -529,17 +709,87 @@ def send_ai_coach_conversation_message(
         user_id=current_user.id,
         conversation_id=conversation_id,
     )
-    request_id = getattr(request.state, "request_id", None)
+    request_id = _request_key(request)
+    existing = get_message_by_request_id(
+        db,
+        conversation_id=conversation.id,
+        request_id=request_id,
+        for_update=True,
+    )
+    if existing is not None:
+        existing_content = existing.content_overflow or existing.content
+        if existing_content != payload.message:
+            raise HTTPException(
+                status_code=409,
+                detail="Этот request id уже связан с другим сообщением AI Coach",
+            )
+        if existing.status == "processing":
+            if not _processing_is_stale(existing):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Запрос AI Coach уже выполняется; повторите позже",
+                )
+            ai_coach_quota.release(db, request_key=request_id)
+            _reset_message_for_processing(existing, request_id=request_id)
+            db.commit()
+        else:
+            return _persisted_conversation_response(
+                db=db,
+                conversation=conversation,
+                user_message=existing,
+            )
     history = tuple(
         AiCoachConversationTurn.model_validate(item)
         for item in history_turns(db, conversation_id=conversation.id)
     )
-    user_message = add_user_message(
-        db,
-        conversation=conversation,
-        content=payload.message,
-    )
-    update_title_from_message(conversation, content=payload.message)
+    if existing is None:
+        try:
+            user_message = add_user_message(
+                db,
+                conversation=conversation,
+                content=payload.message,
+                request_id=request_id,
+                status="processing",
+            )
+            update_title_from_message(conversation, content=payload.message)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            conversation = _conversation_or_404(
+                db,
+                user_id=current_user.id,
+                conversation_id=conversation_id,
+            )
+            existing = get_message_by_request_id(
+                db,
+                conversation_id=conversation.id,
+                request_id=request_id,
+                for_update=True,
+            )
+            if existing is None:
+                raise
+            existing_content = existing.content_overflow or existing.content
+            if existing_content != payload.message:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Этот request id уже связан с другим сообщением AI Coach",
+                )
+            if existing.status == "processing":
+                if not _processing_is_stale(existing):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Запрос AI Coach уже выполняется; повторите позже",
+                    )
+                ai_coach_quota.release(db, request_key=request_id)
+                _reset_message_for_processing(existing, request_id=request_id)
+                db.commit()
+                user_message = existing
+            else:
+                return _persisted_conversation_response(
+                    db=db,
+                    conversation=conversation,
+                    user_message=existing,
+                )
     generation = _generate_conversation_message(
         db=db,
         current_user=current_user,
@@ -573,6 +823,33 @@ def retry_ai_coach_conversation_message(
         user_id=current_user.id,
         conversation_id=conversation_id,
     )
+    request_id = _request_key(request)
+    idempotent_message = get_message_by_request_id(
+        db,
+        conversation_id=conversation.id,
+        request_id=request_id,
+        for_update=True,
+    )
+    if idempotent_message is not None:
+        if idempotent_message.id != message_id:
+            raise HTTPException(status_code=409, detail="Этот request id уже используется")
+        if idempotent_message.status == "processing":
+            if not _processing_is_stale(idempotent_message):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Запрос AI Coach уже выполняется; повторите позже",
+                )
+            ai_coach_quota.release(db, request_key=request_id)
+            idempotent_message.status = "failed"
+            idempotent_message.outcome = AiCoachOutcome.UNAVAILABLE.value
+            idempotent_message.failure_category = "internal_error"
+            idempotent_message.processing_started_at = None
+        elif idempotent_message.status in {"complete", "failed"}:
+            return _persisted_conversation_response(
+                db=db,
+                conversation=conversation,
+                user_message=idempotent_message,
+            )
     user_message = get_conversation_message(
         db,
         conversation_id=conversation.id,
@@ -598,7 +875,8 @@ def retry_ai_coach_conversation_message(
         AiCoachConversationTurn.model_validate(item)
         for item in history_turns(db, conversation_id=conversation.id)
     )
-    request_id = getattr(request.state, "request_id", None)
+    _reset_message_for_processing(user_message, request_id=request_id)
+    db.commit()
     generation = _generate_conversation_message(
         db=db,
         current_user=current_user,
@@ -796,11 +1074,15 @@ def generate_ai_coach_answer(
         message=payload.message,
         data_class=data_class,
     )
-    return ai_coach_service.generate(
+    return _with_user_quota(
         db=db,
-        request=internal_request,
-        user_key=str(current_user.id),
-        request_id=getattr(request.state, "request_id", None),
+        user_id=current_user.id,
+        response=ai_coach_service.generate(
+            db=db,
+            request=internal_request,
+            user_key=str(current_user.id),
+            request_id=_request_key(request),
+        ),
     )
 
 
@@ -1026,7 +1308,7 @@ def generate_personal_ai_coach_answer(
     current_user: User = Depends(require_ai_coach_user),
     db: Session = Depends(get_db),
 ) -> AiCoachResponse:
-    request_id = getattr(request.state, "request_id", None)
+    request_id = _request_key(request)
     period_report_request = payload.tool == AiCoachPersonalTool.GET_PERIOD_REPORT_INSIGHTS
     response_prompt_version = (
         AI_COACH_PERIOD_REPORT_PROMPT_VERSION
@@ -1035,12 +1317,16 @@ def generate_personal_ai_coach_answer(
     )
     consent = get_ai_coach_consent(db, current_user.id)
     if not has_active_ai_coach_consent(consent):
-        return _personal_state_response(
-            request_id=request_id,
-            outcome=AiCoachOutcome.CONSENT_REQUIRED,
-            prompt_version=response_prompt_version,
-            limitations=(
-                "Сначала включите отдельное согласие на передачу ограниченной персональной сводки AI Coach.",
+        return _with_user_quota(
+            db=db,
+            user_id=current_user.id,
+            response=_personal_state_response(
+                request_id=request_id,
+                outcome=AiCoachOutcome.CONSENT_REQUIRED,
+                prompt_version=response_prompt_version,
+                limitations=(
+                    "Сначала включите отдельное согласие на передачу ограниченной персональной сводки AI Coach.",
+                ),
             ),
         )
 
@@ -1053,13 +1339,17 @@ def generate_personal_ai_coach_answer(
     )
     safety = classify_request(internal_request)
     if safety != SafetyCategory.CLEAR:
-        return _personal_state_response(
-            request_id=request_id,
-            outcome=AiCoachOutcome.SAFETY_REFUSAL,
-            safety_category=safety,
-            limitations=(),
-            answer=refusal_text(safety),
-            prompt_version=response_prompt_version,
+        return _with_user_quota(
+            db=db,
+            user_id=current_user.id,
+            response=_personal_state_response(
+                request_id=request_id,
+                outcome=AiCoachOutcome.SAFETY_REFUSAL,
+                safety_category=safety,
+                limitations=(),
+                answer=refusal_text(safety),
+                prompt_version=response_prompt_version,
+            ),
         )
     internal_request = internal_request.model_copy(
         update={
@@ -1075,12 +1365,16 @@ def generate_personal_ai_coach_answer(
         or not settings.ai_coach_personal_enabled
         or settings.ai_coach_personal_data_policy != "verified_personal_user"
     ):
-        return _personal_state_response(
-            request_id=request_id,
-            outcome=AiCoachOutcome.UNAVAILABLE,
-            prompt_version=response_prompt_version,
-            limitations=(
-                "Персональный режим AI Coach сейчас недоступен; основные функции приложения продолжают работать.",
+        return _with_user_quota(
+            db=db,
+            user_id=current_user.id,
+            response=_personal_state_response(
+                request_id=request_id,
+                outcome=AiCoachOutcome.UNAVAILABLE,
+                prompt_version=response_prompt_version,
+                limitations=(
+                    "Персональный режим AI Coach сейчас недоступен; основные функции приложения продолжают работать.",
+                ),
             ),
         )
     try:
@@ -1096,45 +1390,68 @@ def generate_personal_ai_coach_answer(
         else:
             tool_result = run_personal_tool(db, current_user, payload.tool, period_days)
     except PersonalToolUnsafe:
-        return _personal_state_response(
-            request_id=request_id,
-            outcome=AiCoachOutcome.SAFETY_REFUSAL,
-            safety_category=SafetyCategory.PROMPT_INJECTION,
-            limitations=(),
-            answer="Я могу отвечать только по безопасной структурированной сводке и не меняю эти ограничения.",
-            prompt_version=response_prompt_version,
+        return _with_user_quota(
+            db=db,
+            user_id=current_user.id,
+            response=_personal_state_response(
+                request_id=request_id,
+                outcome=AiCoachOutcome.SAFETY_REFUSAL,
+                safety_category=SafetyCategory.PROMPT_INJECTION,
+                limitations=(),
+                answer="Я могу отвечать только по безопасной структурированной сводке и не меняю эти ограничения.",
+                prompt_version=response_prompt_version,
+            ),
         )
     except PeriodBoundsError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except PersonalToolUnavailable:
-        return _personal_state_response(
-            request_id=request_id,
-            outcome=AiCoachOutcome.UNAVAILABLE,
-            prompt_version=response_prompt_version,
-            limitations=(
-                "Не удалось безопасно получить эту сводку. Откройте соответствующий экран приложения.",
+        return _with_user_quota(
+            db=db,
+            user_id=current_user.id,
+            response=_personal_state_response(
+                request_id=request_id,
+                outcome=AiCoachOutcome.UNAVAILABLE,
+                prompt_version=response_prompt_version,
+                limitations=(
+                    "Не удалось безопасно получить эту сводку. Откройте соответствующий экран приложения.",
+                ),
             ),
         )
 
     if tool_result.data_sufficiency == "insufficient":
         if payload.tool == AiCoachPersonalTool.GET_PERIOD_REPORT_INSIGHTS:
-            return _period_report_insufficient_response(request_id=request_id, result=tool_result)
-        return _personal_state_response(
-            request_id=request_id,
-            outcome=AiCoachOutcome.INSUFFICIENT_DATA,
-            prompt_version=response_prompt_version,
-            limitations=(
-                *tool_result.limitations,
-                "Проверьте исходные записи, если хотите дополнить эту сводку.",
+            return _with_user_quota(
+                db=db,
+                user_id=current_user.id,
+                response=_period_report_insufficient_response(
+                    request_id=request_id,
+                    result=tool_result,
+                ),
+            )
+        return _with_user_quota(
+            db=db,
+            user_id=current_user.id,
+            response=_personal_state_response(
+                request_id=request_id,
+                outcome=AiCoachOutcome.INSUFFICIENT_DATA,
+                prompt_version=response_prompt_version,
+                limitations=(
+                    *tool_result.limitations,
+                    "Проверьте исходные записи, если хотите дополнить эту сводку.",
+                ),
             ),
         )
-    return ai_coach_service.generate(
+    return _with_user_quota(
         db=db,
-        request=internal_request,
-        user_key=str(current_user.id),
-        request_id=request_id,
-        context_refs=tool_result.context_refs,
-        response_metadata=tool_result.response_metadata,
-        evidence_ids=frozenset(tool_result.evidence_ids),
-        reason_keys=frozenset(tool_result.reason_keys),
+        user_id=current_user.id,
+        response=ai_coach_service.generate(
+            db=db,
+            request=internal_request,
+            user_key=str(current_user.id),
+            request_id=request_id,
+            context_refs=tool_result.context_refs,
+            response_metadata=tool_result.response_metadata,
+            evidence_ids=frozenset(tool_result.evidence_ids),
+            reason_keys=frozenset(tool_result.reason_keys),
+        ),
     )

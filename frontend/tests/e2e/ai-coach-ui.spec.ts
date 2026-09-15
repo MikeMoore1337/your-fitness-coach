@@ -83,8 +83,18 @@ function isPersonalQuestion(message: string): boolean {
 async function installAiCoachApi(page: Page): Promise<void> {
   let nextConversationId = 1;
   let nextMessageId = 1;
+  let quotaUsed = 0;
   let personalConsent: 'granted' | 'revoked' = 'revoked';
   const conversations = new Map<number, MockConversation>();
+  const quotaResetAt = '2026-09-16T12:00:00+03:00';
+  const quotaSnapshot = () => ({
+    limit: 20,
+    used: quotaUsed,
+    remaining: Math.max(0, 20 - quotaUsed),
+    reset_at: quotaResetAt,
+    retry_after_seconds: 86_400,
+    can_send: quotaUsed < 20,
+  });
 
   await page.route('**/api/v1/ai-coach/**', async (route: Route) => {
     const request = route.request();
@@ -95,6 +105,10 @@ async function installAiCoachApi(page: Page): Promise<void> {
       return route.fulfill({
         json: { ui_enabled: true, generic_available: true, personal_available: true },
       });
+    }
+
+    if (path.endsWith('/quota')) {
+      return route.fulfill({ json: quotaSnapshot() });
     }
 
     if (path.endsWith('/memory/consent')) {
@@ -237,6 +251,7 @@ async function installAiCoachApi(page: Page): Promise<void> {
       userMessage.failure_category = null;
       userMessage.limitations = [];
       const answer = 'Ответ после повторной попытки.';
+      quotaUsed += 1;
       const assistantMessage = makeMessage(nextMessageId++, 'assistant', answer);
       conversation.messages.push(assistantMessage);
       conversation.updated_at = '2026-09-14T12:02:00Z';
@@ -254,6 +269,7 @@ async function installAiCoachApi(page: Page): Promise<void> {
           failure_category: null,
           prompt_version: 'ai-coach-chat-v1',
           request_id: 'e2e-retry',
+          quota: quotaSnapshot(),
         },
       });
     }
@@ -325,6 +341,7 @@ async function installAiCoachApi(page: Page): Promise<void> {
       const answer = personal
         ? 'По вашей текущей сводке смотрите на записанные тренировки и отмечайте ограничения данных.'
         : 'Проверенный ответ по материалам YFC. [Открыть материал](https://example.org/guide)';
+      quotaUsed += 1;
       const assistantMessage = makeMessage(nextMessageId++, 'assistant', answer, {
         citations: [publicCitation],
       });
@@ -347,6 +364,7 @@ async function installAiCoachApi(page: Page): Promise<void> {
           failure_category: null,
           prompt_version: 'ai-coach-chat-v1',
           request_id: `e2e-answer-${conversation.id}`,
+          quota: quotaSnapshot(),
         },
       });
     }
@@ -421,6 +439,10 @@ test('AI Coach answers ordinary questions with an ordinary chat UI', async ({ br
     await expect(
       experience.getByText('Проверенный ответ по материалам YFC.', { exact: false }),
     ).toBeVisible();
+    await expect(experience.getByTestId('ai-coach-quota')).toHaveAttribute(
+      'data-quota-remaining',
+      '19',
+    );
     const sources = experience.locator('details.ai-coach-message__sources');
     await expect(sources).toBeVisible();
     await expect(sources).not.toHaveAttribute('open', '');
@@ -439,6 +461,25 @@ test('AI Coach answers ordinary questions with an ordinary chat UI', async ({ br
       path: resolve(evidenceDir, `${surface.label}.png`),
       fullPage: true,
     });
+
+    await context.close();
+  }
+});
+
+test('AI Coach quota and composer fit the supported narrow mobile bounds', async ({ browser }) => {
+  for (const width of [320, 430]) {
+    const viewport = { width, height: 844 };
+    const context = await browser.newContext({ viewport, hasTouch: true });
+    const page = await context.newPage();
+    await openAiCoachSurface(page, 'light', viewport);
+
+    const experience = page.getByTestId('ai-coach-experience');
+    await expect(experience.getByTestId('ai-coach-quota')).toHaveAttribute(
+      'data-quota-remaining',
+      '20',
+    );
+    await expectTouchTargets(experience.locator('button:visible'));
+    await expectNoHorizontalOverflow(page);
 
     await context.close();
   }
@@ -469,6 +510,7 @@ test('AI Coach keeps follow-up history after reload and preserves failed draft',
   await page.reload();
   await expect(page.getByTestId('ai-coach-message-user')).toHaveCount(2);
   await expect(page.getByText('А если одна запись недостаточна?')).toBeVisible();
+  await expect(page.getByTestId('ai-coach-quota')).toHaveAttribute('data-quota-remaining', '18');
 
   await input.fill('Проверка ошибки ответа');
   await page.getByRole('button', { name: 'Отправить' }).scrollIntoViewIfNeeded();

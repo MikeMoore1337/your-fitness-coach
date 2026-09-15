@@ -24,6 +24,9 @@ PRODUCTION_AI_COACH_FLAGS = {
     # GPT-OSS reasoning can exhaust a single small completion budget; keep one bounded retry.
     "AI_COACH_MAX_ATTEMPTS": "2",
     "AI_COACH_MAX_OUTPUT_TOKENS": "2048",
+    # Account-owned AI Coach quota: 20 successful answers per rolling 24-hour window.
+    "AI_COACH_QUOTA_WINDOW_SECONDS": "86400",
+    "AI_COACH_PER_USER_REQUEST_LIMIT": "20",
 }
 
 _PLACEHOLDER_SECRETS = {

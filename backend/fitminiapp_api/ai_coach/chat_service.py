@@ -8,6 +8,8 @@ import time
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from sqlalchemy.orm import Session
+
 from fitminiapp_api.ai_coach.contracts import (
     AI_COACH_CHAT_OUTPUT_VERSION,
     AI_COACH_CHAT_PROMPT_VERSION,
@@ -15,6 +17,7 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachCitation,
     AiCoachDataClass,
     AiCoachOutcome,
+    AiCoachRateLimitScope,
     ChatLlmPort,
     ChatOutputValidationReason,
     ContextRef,
@@ -24,6 +27,7 @@ from fitminiapp_api.ai_coach.contracts import (
     ProviderTextResult,
 )
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
+from fitminiapp_api.ai_coach.quota import PersistentAiCoachQuota, ai_coach_quota
 from fitminiapp_api.ai_coach.safety import (
     SafetyCategory,
     bound_safe_chat_output,
@@ -62,36 +66,13 @@ _PERSONAL_NO_CONTEXT_LIMITATION = (
 )
 
 
-@dataclass
-class _ChatWindow:
-    started_at: float
-    global_count: int
-    per_user_count: dict[str, int]
-
-
-class _ChatQuota:
-    def __init__(self, clock=time.monotonic) -> None:
-        self._clock = clock
-        self._lock = threading.Lock()
-        self._window = _ChatWindow(clock(), 0, {})
-
-    def reserve(self, user_key: str) -> bool:
-        now = self._clock()
-        with self._lock:
-            if now - self._window.started_at >= settings.ai_coach_quota_window_seconds:
-                self._window = _ChatWindow(now, 0, {})
-            if self._window.global_count >= settings.ai_coach_global_request_limit:
-                return False
-            current = self._window.per_user_count.get(user_key, 0)
-            if current >= settings.ai_coach_per_user_request_limit:
-                return False
-            self._window.global_count += 1
-            self._window.per_user_count[user_key] = current + 1
-            return True
-
-    def reset(self) -> None:
-        with self._lock:
-            self._window = _ChatWindow(self._clock(), 0, {})
+def _provider_retry_after_seconds(error: NormalizedProviderError) -> int:
+    return max(
+        1,
+        error.retry_after_seconds
+        if error.retry_after_seconds is not None
+        else settings.ai_coach_cooldown_seconds,
+    )
 
 
 class _ChatCooldown:
@@ -100,19 +81,34 @@ class _ChatCooldown:
         self._lock = threading.Lock()
         self._until = 0.0
         self._consecutive_5xx_failures = 0
+        self._rate_limit_scope: AiCoachRateLimitScope | None = None
 
     def active(self) -> bool:
         with self._lock:
             if self._until and self._clock() >= self._until:
                 self._until = 0.0
                 self._consecutive_5xx_failures = 0
+                self._rate_limit_scope = None
                 return False
             return bool(self._until)
+
+    def rate_limit_retry_after_seconds(self) -> int | None:
+        with self._lock:
+            if not self._until or self._rate_limit_scope is None:
+                return None
+            remaining = self._until - self._clock()
+            if remaining <= 0:
+                self._until = 0.0
+                self._consecutive_5xx_failures = 0
+                self._rate_limit_scope = None
+                return None
+            return max(1, int(remaining + 0.999))
 
     def mark(self, error: NormalizedProviderError) -> None:
         with self._lock:
             if error.code == ProviderErrorCode.RATE_LIMITED:
                 self._consecutive_5xx_failures = 0
+                self._rate_limit_scope = AiCoachRateLimitScope.PROVIDER
                 delay = (
                     error.retry_after_seconds
                     if error.retry_after_seconds is not None
@@ -122,6 +118,7 @@ class _ChatCooldown:
                 return
             if error.misconfigured or error.code == ProviderErrorCode.AUTHENTICATION_FAILED:
                 self._consecutive_5xx_failures = 0
+                self._rate_limit_scope = None
                 self._until = max(
                     self._until,
                     self._clock() + max(1, min(settings.ai_coach_cooldown_seconds, 3600)),
@@ -132,6 +129,7 @@ class _ChatCooldown:
                 if self._consecutive_5xx_failures < 3:
                     return
                 delay = settings.ai_coach_cooldown_seconds
+                self._rate_limit_scope = None
                 self._until = max(self._until, self._clock() + max(1, min(delay, 3600)))
                 return
             self._consecutive_5xx_failures = 0
@@ -140,6 +138,7 @@ class _ChatCooldown:
         with self._lock:
             self._until = 0.0
             self._consecutive_5xx_failures = 0
+            self._rate_limit_scope = None
 
 
 class _ChatProviderFailure(RuntimeError):
@@ -163,6 +162,8 @@ class AiCoachChatGeneration:
     repair_success: bool = False
     validation_failure_reason: ChatOutputValidationReason | None = None
     provider_failure_reason: ProviderFailureReason | None = None
+    rate_limit_scope: AiCoachRateLimitScope | None = None
+    rate_limit_retry_after_seconds: int | None = None
 
 
 def _safe_groq_route() -> bool:
@@ -185,15 +186,15 @@ class AiCoachChatService:
         self,
         *,
         provider: ChatLlmPort | None = None,
-        quota: _ChatQuota | None = None,
+        quota: PersistentAiCoachQuota | None = None,
         cooldown: _ChatCooldown | None = None,
     ) -> None:
         self.provider = provider or GroqDirectAdapter()
-        self.quota = quota or _ChatQuota()
+        self.quota = quota or ai_coach_quota
         self.cooldown = cooldown or _ChatCooldown()
 
     def reset_runtime_state(self) -> None:
-        self.quota.reset()
+        self.quota.reset_runtime_state()
         self.cooldown.reset()
 
     def generate(
@@ -203,7 +204,11 @@ class AiCoachChatService:
         user_key: str,
         request_id: str | None,
         context_refs: tuple[ContextRef, ...],
+        db: Session | None = None,
+        user_id: int | None = None,
     ) -> AiCoachChatGeneration:
+        if (db is None) != (user_id is None):
+            raise ValueError("Persistent AI Coach quota requires both db and user_id")
         started = time.monotonic()
         safety = classify_message(request.message)
         if (
@@ -238,6 +243,10 @@ class AiCoachChatService:
         refusal_present: bool | None = None
         content_present: bool | None = None
         content_type: str | None = None
+        reservation_key: str | None = None
+        reservation_active = False
+        rate_limit_scope: AiCoachRateLimitScope | None = None
+        rate_limit_retry_after_seconds: int | None = None
         answer: str | None = None
         try:
             if safety != SafetyCategory.CLEAR:
@@ -285,6 +294,20 @@ class AiCoachChatService:
                     failure_category=failure_category,
                 )
             if self.cooldown.active():
+                cooldown_retry_after = self.cooldown.rate_limit_retry_after_seconds()
+                if cooldown_retry_after is not None:
+                    error_code = ProviderErrorCode.COOLDOWN_ACTIVE.value
+                    failure_category = CHAT_FAILURE_RATE_LIMIT
+                    rate_limit_scope = AiCoachRateLimitScope.PROVIDER
+                    rate_limit_retry_after_seconds = cooldown_retry_after
+                    return self._failure(
+                        request,
+                        outcome=AiCoachOutcome.RATE_LIMITED,
+                        safety=safety,
+                        failure_category=failure_category,
+                        rate_limit_scope=rate_limit_scope,
+                        rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
+                    )
                 error_code = ProviderErrorCode.COOLDOWN_ACTIVE.value
                 failure_category = CHAT_FAILURE_PROVIDER
                 return self._failure(
@@ -293,15 +316,54 @@ class AiCoachChatService:
                     safety=safety,
                     failure_category=failure_category,
                 )
-            if not self.quota.reserve(user_key):
-                error_code = "quota_exhausted"
-                failure_category = CHAT_FAILURE_RATE_LIMITED
-                return self._failure(
-                    request,
-                    outcome=AiCoachOutcome.RATE_LIMITED,
-                    safety=safety,
-                    failure_category=failure_category,
+            if db is not None and user_id is not None:
+                quota_decision = self.quota.reserve(
+                    db,
+                    user_id=user_id,
+                    request_key=request_id,
                 )
+                if quota_decision.already_processing:
+                    error_code = "request_in_progress"
+                    failure_category = CHAT_FAILURE_INTERNAL_ERROR
+                    return self._failure(
+                        request,
+                        outcome=AiCoachOutcome.UNAVAILABLE,
+                        safety=safety,
+                        failure_category=failure_category,
+                    )
+                if quota_decision.request_key_conflict:
+                    error_code = "request_key_conflict"
+                    failure_category = CHAT_FAILURE_INTERNAL_ERROR
+                    return self._failure(
+                        request,
+                        outcome=AiCoachOutcome.UNAVAILABLE,
+                        safety=safety,
+                        failure_category=failure_category,
+                    )
+                if quota_decision.already_consumed:
+                    error_code = "request_already_completed"
+                    failure_category = CHAT_FAILURE_INTERNAL_ERROR
+                    return self._failure(
+                        request,
+                        outcome=AiCoachOutcome.UNAVAILABLE,
+                        safety=safety,
+                        failure_category=failure_category,
+                    )
+                if not quota_decision.granted:
+                    error_code = "quota_exhausted"
+                    failure_category = CHAT_FAILURE_RATE_LIMITED
+                    rate_limit_scope = quota_decision.rate_limit_scope
+                    rate_limit_retry_after_seconds = quota_decision.retry_after_seconds
+                    return self._failure(
+                        request,
+                        outcome=AiCoachOutcome.RATE_LIMITED,
+                        safety=safety,
+                        failure_category=failure_category,
+                        rate_limit_scope=rate_limit_scope,
+                        rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
+                    )
+                reservation_key = quota_decision.request_key
+                reservation_active = True
 
             try:
                 result, attempts, recovered_failure = self._call_provider(request, context_refs)
@@ -325,6 +387,8 @@ class AiCoachChatService:
                 if failure.error.code == ProviderErrorCode.RATE_LIMITED:
                     outcome = AiCoachOutcome.RATE_LIMITED
                     failure_category = CHAT_FAILURE_RATE_LIMIT
+                    rate_limit_scope = AiCoachRateLimitScope.PROVIDER
+                    rate_limit_retry_after_seconds = _provider_retry_after_seconds(failure.error)
                 elif failure.error.code == ProviderErrorCode.INVALID_OUTPUT:
                     outcome = AiCoachOutcome.INVALID_OUTPUT
                     failure_category = CHAT_FAILURE_PROVIDER
@@ -348,6 +412,8 @@ class AiCoachChatService:
                     safety=safety,
                     failure_category=failure_category,
                     provider_failure_reason=provider_failure_reason,
+                    rate_limit_scope=rate_limit_scope,
+                    rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
                 )
 
             if recovered_failure is not None:
@@ -426,6 +492,14 @@ class AiCoachChatService:
                         usage = failure.error.usage
                         outcome = AiCoachOutcome.INVALID_OUTPUT
                         failure_category = CHAT_FAILURE_REPAIR_FAILED
+                        self.cooldown.mark(failure.error)
+                        if failure.error.code == ProviderErrorCode.RATE_LIMITED:
+                            outcome = AiCoachOutcome.RATE_LIMITED
+                            failure_category = CHAT_FAILURE_RATE_LIMIT
+                            rate_limit_scope = AiCoachRateLimitScope.PROVIDER
+                            rate_limit_retry_after_seconds = _provider_retry_after_seconds(
+                                failure.error
+                            )
                         return self._failure(
                             request,
                             outcome=outcome,
@@ -434,6 +508,8 @@ class AiCoachChatService:
                             repair_attempted=repair_attempted,
                             validation_failure_reason=validation_failure_reason,
                             provider_failure_reason=provider_failure_reason,
+                            rate_limit_scope=rate_limit_scope,
+                            rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
                         )
                     provider_name = repaired.provider
                     configured_model = repaired.configured_model
@@ -484,6 +560,22 @@ class AiCoachChatService:
                     else:
                         answer = repaired_inspection.normalized
                     repair_success = True
+            if reservation_active and db is not None and reservation_key is not None:
+                if not self.quota.consume(db, request_key=reservation_key):
+                    reservation_active = False
+                    error_code = "quota_reservation_expired"
+                    failure_category = CHAT_FAILURE_RATE_LIMITED
+                    rate_limit_scope = AiCoachRateLimitScope.USER
+                    rate_limit_retry_after_seconds = settings.ai_coach_quota_window_seconds
+                    return self._failure(
+                        request,
+                        outcome=AiCoachOutcome.RATE_LIMITED,
+                        safety=safety,
+                        failure_category=failure_category,
+                        rate_limit_scope=rate_limit_scope,
+                        rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
+                    )
+                reservation_active = False
             self.cooldown.reset()
             outcome = AiCoachOutcome.ANSWER
             citations = self._citations(context_refs)
@@ -506,8 +598,12 @@ class AiCoachChatService:
                 repair_success=repair_success,
                 validation_failure_reason=validation_failure_reason,
                 provider_failure_reason=provider_failure_reason,
+                rate_limit_scope=rate_limit_scope,
+                rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
             )
         finally:
+            if reservation_active and db is not None and reservation_key is not None:
+                self.quota.release(db, request_key=reservation_key)
             logger.info(
                 "ai_coach_chat_generation",
                 extra={
@@ -539,6 +635,8 @@ class AiCoachChatService:
                     "safety_category": safety.value,
                     "error_code": error_code,
                     "failure_category": failure_category,
+                    "rate_limit_scope": rate_limit_scope.value if rate_limit_scope else None,
+                    "rate_limit_retry_after_seconds": rate_limit_retry_after_seconds,
                     "attempts": attempts,
                     "retry_count": max(0, attempts - 1),
                     "history_count": len(request.conversation_history),
@@ -697,6 +795,8 @@ class AiCoachChatService:
         repair_success: bool = False,
         validation_failure_reason: ChatOutputValidationReason | None = None,
         provider_failure_reason: ProviderFailureReason | None = None,
+        rate_limit_scope: AiCoachRateLimitScope | None = None,
+        rate_limit_retry_after_seconds: int | None = None,
     ) -> AiCoachChatGeneration:
         copy = (
             {
@@ -738,6 +838,8 @@ class AiCoachChatService:
             repair_success=repair_success,
             validation_failure_reason=validation_failure_reason,
             provider_failure_reason=provider_failure_reason,
+            rate_limit_scope=rate_limit_scope,
+            rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
         )
 
 

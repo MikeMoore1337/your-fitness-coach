@@ -1,5 +1,8 @@
 # AI Coach: production launch contract (Task 267)
 
+> Task 276 уточняет этот текущий contract: durable PostgreSQL quota, idempotent reservation,
+> server-owned snapshot и UI countdown. Архивный Task 272 этим изменением не переоткрывается.
+
 Этот документ фиксирует актуальный production-контракт после явного решения владельца включить
 AI Coach для 100% аутентифицированных пользователей. Исторические документы Tasks 88, 89, 90A,
 90B, 92A и 92B сохраняют исходные evidence и решения на момент их выполнения; они не являются
@@ -50,11 +53,14 @@ Production policy после нормализации:
 | `AI_COACH_POLICY_REVISION` | `ai-coach-production-v1` |
 | `AI_COACH_MAX_ATTEMPTS` | `2` |
 | `AI_COACH_MAX_OUTPUT_TOKENS` | `2048` |
+| `AI_COACH_QUOTA_WINDOW_SECONDS` | `86400` |
+| `AI_COACH_PER_USER_REQUEST_LIMIT` | `20` |
 
-`AI_COACH_PER_USER_REQUEST_LIMIT`, `AI_COACH_GLOBAL_REQUEST_LIMIT`, timeout и cooldown не
-перезаписываются helper-ом: сохраняются текущие production значения из host `.env`. Helper
-идемпотентно закрепляет только две bounded recovery настройки выше. При отсутствии допустимого
-ключа deploy останавливается до изменения `.env`; paid/unknown route не получает скрытый fallback.
+`AI_COACH_GLOBAL_REQUEST_LIMIT`, timeout и cooldown сохраняются из текущего host `.env`; helper
+не меняет global protective limit. В рамках Task 276 helper идемпотентно закрепляет
+`AI_COACH_QUOTA_WINDOW_SECONDS=86400` и `AI_COACH_PER_USER_REQUEST_LIMIT=20` вместе с
+остальными перечисленными AI Coach flags. При отсутствии допустимого ключа deploy останавливается
+до изменения `.env`; paid/unknown route не получает скрытый fallback.
 Актуальные provider limits и data controls нужно сверять с официальными
 документами перед изменением cost policy: [Groq models](https://console.groq.com/docs/models),
 [Groq rate limits](https://console.groq.com/docs/rate-limits),
@@ -77,16 +83,28 @@ Production policy после нормализации:
 - Memory не обязательна. `OFF` не блокирует AI Coach; `ON` принимает только user-confirmed
   разрешённые немедицинские preferences и позволяет пользователю pause/revoke/edit/delete.
 - AI Coach не заменяет врача или тренера, не ставит диагнозы и не меняет canonical data.
+- Quota пользователя хранится в PostgreSQL и едина после restart/deploy для workers, вкладок и
+  устройств. Начальный target — `20` успешных ответов за `86400` секунд; точные `limit`, `used`,
+  `remaining`, `reset_at`, `retry_after_seconds` и `can_send` возвращает backend через
+  `/api/v1/ai-coach/quota` и message response.
+- Успешный проверенный answer расходует ровно одну reservation. Provider timeout/5xx/429,
+  malformed output, internal/safety/validation failure и failed repair её освобождают. Один
+  `X-Request-ID` защищает от повторного расхода и duplicate user turn. `user`, `provider` и
+  `service` rate-limit scopes показываются разными безопасными состояниями; provider name,
+  HTTP 429 и raw `Retry-After` в UI не выводятся.
 - В telemetry остаются только технические metadata: provider/model, outcome, error class,
   repair flags, validation failure reason, attempts, latency, usage counters и version fields.
   Raw prompt, answer, personal context и provider secret не попадают в логи; account-owned история
-  чата хранится отдельно и удаляется вместе с conversation/account.
+  чата хранится отдельно и удаляется вместе с conversation/account. Additive migration
+  `0088_ai_coach_durable_quota` не выполняет backfill старых process-local counters; при rollout
+  persistent window начинается с первого обращения после deploy.
 
 ## Failure and rollback
 
 Provider timeout, network/HTTP error, malformed response, policy mismatch, quota или cooldown
-дают bounded safe outcome и оставляют основные функции YFC доступными. UI предлагает повторить
-запрос, но не раскрывает provider error или secret. Для incident владелец может включить
+дают bounded safe outcome и оставляют основные функции YFC доступными. User exhaustion не
+вызывает provider; provider 429 и service limit не списывают personal quota. UI предлагает
+повторить запрос, но не раскрывает provider error или secret. Для incident владелец может включить
 `AI_COACH_KILL_SWITCH=true` в persistent host `.env`; это отключает только AI Coach и требует
 normal PR-based production release для доставки изменения.
 
@@ -103,10 +121,12 @@ normal PR-based production release для доставки изменения.
 4. ответы не содержат внутренних route/tool/schema labels;
 5. memory OFF и ON остаются рабочими и не расширяют context contract;
 6. safe failure path не ломает приложение, а UI не показывает internal-beta copy;
-7. `/health/live` и `/health/ready` остаются healthy после smoke.
+7. quota snapshot до и после одной bounded generation показывает configured `20/86400` и
+   decrement ровно на `1`; reload сохраняет состояние и countdown использует server `reset_at`;
+8. `/health/live` и `/health/ready` остаются healthy после smoke.
 
 Обычный CI использует deterministic provider double и не выполняет paid/live calls. Реальная
 generation проверяется только отдельным production smoke после deploy, с owner/test account и без
 выгрузки raw prompt/answer в artifacts или logs. Smoke evidence содержит только request type,
-provider, configured/actual model, latency, outcome и generation success; отсутствие обязательного
-provider credential — точный `HUMAN_REQUIRED` blocker.
+provider, configured/actual model, latency, outcome, generation success и quota metadata;
+отсутствие обязательного provider credential — точный `HUMAN_REQUIRED` blocker.
