@@ -123,6 +123,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/demo/sessions/current/transport": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transport Demo Request */
+        post: operations["transport_demo_request_api_v1_demo_sessions_current_transport_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/demo/sessions/current/actions": {
         parameters: {
             query?: never;
@@ -5950,6 +5967,19 @@ export interface components {
             /** Volume Kg */
             volume_kg: number;
         };
+        /** DemoTransportRequest */
+        DemoTransportRequest: {
+            /** Path */
+            path: string;
+            /**
+             * Method
+             * @default GET
+             * @enum {string}
+             */
+            method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+            /** Body */
+            body?: unknown;
+        };
         /** DemoVolumeHistoryItem */
         DemoVolumeHistoryItem: {
             /** Period Label */
@@ -11234,6 +11264,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemoSessionSnapshot"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transport_demo_request_api_v1_demo_sessions_current_transport_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-demo-session"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DemoTransportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

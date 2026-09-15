@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -173,6 +173,12 @@ class DemoActionRequest(BaseModel):
         if not normalized:
             raise ValueError("Комментарий не может быть пустым")
         return normalized
+
+
+class DemoTransportRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=256, pattern=r"^/api/v1/[A-Za-z0-9_/?=&%.:-]+$")
+    method: Literal["GET", "POST", "PATCH", "PUT", "DELETE"] = "GET"
+    body: Any = None
 
 
 class DemoSessionSnapshot(BaseModel):

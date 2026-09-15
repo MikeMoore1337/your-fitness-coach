@@ -28,12 +28,14 @@ export function WorkoutHistory({
   focusedCommentId,
   focusedExerciseId,
   onWorkoutSelect,
+  readOnly = false,
   timeZone,
 }: {
   focusedWorkoutId?: number | null;
   focusedCommentId?: number | null;
   focusedExerciseId?: number | null;
   onWorkoutSelect?: (workoutId: number, target: WorkoutNavigationTarget) => void;
+  readOnly?: boolean;
   timeZone?: string | null;
 }) {
   const queryClient = useQueryClient();
@@ -228,7 +230,7 @@ export function WorkoutHistory({
             <div className="workout-history__footer-actions">
               <button
                 className="btn-danger"
-                disabled={clearHistory.isPending}
+                disabled={readOnly || clearHistory.isPending}
                 onClick={async () => {
                   if (
                     await confirm({
@@ -243,6 +245,12 @@ export function WorkoutHistory({
                 Очистить историю
               </button>
             </div>
+            {readOnly && (
+              <p className="muted demo-capability-notice" role="status">
+                Очистка истории доступна после входа. Просмотр и навигация по результатам доступны в
+                демо.
+              </p>
+            )}
           </>
         )}
       </Card>

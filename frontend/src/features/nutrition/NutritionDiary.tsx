@@ -290,10 +290,12 @@ function EntryRow({
   entry,
   isNew,
   onCopy,
+  readOnly = false,
 }: {
   entry: FoodDiaryEntry;
   isNew: boolean;
   onCopy: () => void;
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { confirm, toast } = useFeedback();
@@ -370,7 +372,7 @@ function EntryRow({
           <button
             type="button"
             onClick={onCopy}
-            disabled={remove.isPending}
+            disabled={readOnly || remove.isPending}
             aria-label={`Повторить ${entry.food_name}`}
             title="Повторить"
           >
@@ -380,7 +382,7 @@ function EntryRow({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              disabled={remove.isPending}
+              disabled={readOnly || remove.isPending}
               aria-label={`Изменить ${entry.food_name}`}
               title="Изменить"
             >
@@ -390,7 +392,7 @@ function EntryRow({
           <button
             type="button"
             onClick={() => void requestDelete()}
-            disabled={remove.isPending}
+            disabled={readOnly || remove.isPending}
             aria-label={`${remove.isPending ? 'Удаляем' : 'Удалить'} ${entry.food_name}`}
             title="Удалить"
           >
@@ -437,11 +439,11 @@ function EntryRow({
             </Select>
           </Field>
           <div className="nutrition-entry-editor__actions">
-            <Button disabled={update.isPending} type="submit">
+            <Button disabled={readOnly || update.isPending} type="submit">
               {update.isPending ? 'Сохраняем…' : 'Сохранить'}
             </Button>
             <Button
-              disabled={update.isPending}
+              disabled={readOnly || update.isPending}
               type="button"
               variant="ghost"
               onClick={() => {
@@ -485,6 +487,7 @@ function MealSection({
   onCopy,
   onRepeatYesterday,
   onCopyEntry,
+  readOnly = false,
 }: {
   meal: FoodDiaryMeal;
   newEntryIds: ReadonlySet<number>;
@@ -494,6 +497,7 @@ function MealSection({
   onCopy: () => void;
   onRepeatYesterday: () => void;
   onCopyEntry: (entry: FoodDiaryEntry) => void;
+  readOnly?: boolean;
 }) {
   const hasEntries = meal.entries.length > 0;
   const contentId = `nutrition-meal-content-${meal.meal_type}`;
@@ -529,11 +533,16 @@ function MealSection({
       </header>
       <div className="nutrition-meal__content" hidden={!expanded} id={contentId}>
         <div className="nutrition-meal__secondary-actions">
-          <button type="button" onClick={onRepeatYesterday} aria-label="Повторить вчера">
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={onRepeatYesterday}
+            aria-label="Повторить вчера"
+          >
             Вчера
           </button>
           {hasEntries && (
-            <button type="button" onClick={onCopy}>
+            <button type="button" disabled={readOnly} onClick={onCopy}>
               Копировать
             </button>
           )}
@@ -546,6 +555,7 @@ function MealSection({
                 isNew={newEntryIds.has(entry.id)}
                 key={entry.id}
                 onCopy={() => onCopyEntry(entry)}
+                readOnly={readOnly}
               />
             ))}
           </ul>
@@ -588,7 +598,7 @@ const completenessCopy: Record<FoodDiaryDay['status'], { label: string; descript
   },
 };
 
-function DayCompleteness({ day }: { day: FoodDiaryDay }) {
+function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnly?: boolean }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
   const update = useMutation({
@@ -634,45 +644,52 @@ function DayCompleteness({ day }: { day: FoodDiaryDay }) {
       </div>
       <strong className="nutrition-completeness__status">{copy.label}</strong>
       <p>{copy.description}</p>
-      <div className="nutrition-completeness__actions">
-        <Button
-          type="button"
-          variant="secondary"
-          aria-pressed={day.status === 'complete'}
-          disabled={!hasEntries || update.isPending}
-          onClick={() => update.mutate('complete')}
-        >
-          День заполнен
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          aria-pressed={day.status === 'incomplete'}
-          disabled={update.isPending}
-          onClick={() => update.mutate('incomplete')}
-        >
-          Заполнен частично
-        </Button>
-        <Button
-          type="button"
-          variant="secondary"
-          aria-pressed={day.status === 'fasted'}
-          disabled={hasEntries || update.isPending}
-          onClick={() => update.mutate('fasted')}
-        >
-          Отметить день без приёмов пищи
-        </Button>
-        {day.status_is_explicit && (
-          <button
+      {readOnly && (
+        <p className="muted demo-capability-notice" role="status">
+          Изменение статуса дневника доступно после входа.
+        </p>
+      )}
+      <fieldset className="demo-capability-fieldset" disabled={readOnly}>
+        <div className="nutrition-completeness__actions">
+          <Button
             type="button"
-            className="nutrition-completeness__reset"
-            disabled={update.isPending}
-            onClick={() => update.mutate('unlogged')}
+            variant="secondary"
+            aria-pressed={day.status === 'complete'}
+            disabled={!hasEntries || update.isPending}
+            onClick={() => update.mutate('complete')}
           >
-            Снять отметку
-          </button>
-        )}
-      </div>
+            День заполнен
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            aria-pressed={day.status === 'incomplete'}
+            disabled={update.isPending}
+            onClick={() => update.mutate('incomplete')}
+          >
+            Заполнен частично
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            aria-pressed={day.status === 'fasted'}
+            disabled={hasEntries || update.isPending}
+            onClick={() => update.mutate('fasted')}
+          >
+            Отметить день без приёмов пищи
+          </Button>
+          {day.status_is_explicit && (
+            <button
+              type="button"
+              className="nutrition-completeness__reset"
+              disabled={update.isPending}
+              onClick={() => update.mutate('unlogged')}
+            >
+              Снять отметку
+            </button>
+          )}
+        </div>
+      </fieldset>
       {update.error && (
         <div className="nutrition-inline-error" role="alert">
           <span>{(update.error as Error).message}</span>
@@ -737,12 +754,16 @@ export function NutritionDiary({
   initialMealType,
   initialFoodQuickAdd = false,
   initialHydrationOpen = false,
+  readOnlyEntries = false,
+  demoSafeMode = false,
 }: {
   timeZone?: string | null;
   initialDate?: string;
   initialMealType?: MealType;
   initialFoodQuickAdd?: boolean;
   initialHydrationOpen?: boolean;
+  readOnlyEntries?: boolean;
+  demoSafeMode?: boolean;
 }) {
   const today = dateInputValue(new Date(), timeZone || undefined);
   const [selectedDate, setSelectedDate] = useState(initialDate || today);
@@ -819,7 +840,7 @@ export function NutritionDiary({
       )}
       {diary.data && (
         <>
-          <DayCompleteness day={diary.data} />
+          <DayCompleteness day={diary.data} readOnly={readOnlyEntries} />
           <DayBalance
             day={diary.data}
             hydration={hydration.data}
@@ -833,8 +854,14 @@ export function NutritionDiary({
               <div>
                 <span className="eyebrow">Дневник приёмов пищи</span>
                 <h2 id="nutrition-food-title">Еда</h2>
+                {readOnlyEntries && (
+                  <p className="muted demo-capability-notice" role="status">
+                    Новые записи можно добавить в демо-сессию. Редактирование, удаление и
+                    копирование существующих записей доступно после входа.
+                  </p>
+                )}
               </div>
-              {diary.data.meals.some((meal) => meal.entries.length > 0) && (
+              {!readOnlyEntries && diary.data.meals.some((meal) => meal.entries.length > 0) && (
                 <button
                   className="nutrition-food-card__copy"
                   type="button"
@@ -892,6 +919,7 @@ export function NutritionDiary({
                       label: entry.food_name,
                     })
                   }
+                  readOnly={readOnlyEntries}
                 />
               ))}
             </div>
@@ -908,6 +936,7 @@ export function NutritionDiary({
           mealType={addingTo.mealType}
           initialView={addingTo.initialView}
           disabled={diary.data?.status === 'fasted'}
+          demoSafeMode={demoSafeMode}
           onAdded={(entry) => {
             setLastAddedEntryId(entry.id);
             setMealExpansion((current) => ({
@@ -918,7 +947,7 @@ export function NutritionDiary({
           onClose={() => setAddingTo(null)}
         />
       )}
-      {copySubject && (
+      {copySubject && !readOnlyEntries && (
         <CopyDiaryDialog subject={copySubject} today={today} onClose={() => setCopySubject(null)} />
       )}
     </div>

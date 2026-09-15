@@ -1126,6 +1126,7 @@ function useTrainingAnalytics(selection: ProgressSelection, enabled: boolean) {
 }
 
 export function ProgressExperience({
+  canExport = true,
   detailContent,
   focusMeasurements = false,
   measurementDiary,
@@ -1133,6 +1134,7 @@ export function ProgressExperience({
   timeZone,
 }: {
   detailContent?: ReactNode;
+  canExport?: boolean;
   focusMeasurements?: boolean;
   measurementDiary?: ReactNode;
   progressView?: ProgressView;
@@ -1210,9 +1212,15 @@ export function ProgressExperience({
             timeZone={resolvedTimeZone}
             today={today}
           />
-          <AppLink className="button-link secondary-link" to={progressReportPath(selection)}>
-            <Icon name="print" size={16} /> Скачать отчёт
-          </AppLink>
+          {canExport ? (
+            <AppLink className="button-link secondary-link" to={progressReportPath(selection)}>
+              <Icon name="print" size={16} /> Скачать отчёт
+            </AppLink>
+          ) : (
+            <button className="button-link secondary-link" disabled type="button">
+              <Icon name="print" size={16} /> Скачать отчёт
+            </button>
+          )}
         </div>
       </header>
 
@@ -1259,6 +1267,7 @@ export function ProgressExperience({
                     <NutritionSection isStale={summary.isPlaceholderData} summary={summary.data} />
                     <div id="progress-reports">
                       <NutritionPeriodReport
+                        canExport={canExport}
                         controlledPeriod={controlledNutritionPeriod}
                         showSelector={false}
                       />

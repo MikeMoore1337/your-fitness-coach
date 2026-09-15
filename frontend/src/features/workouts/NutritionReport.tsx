@@ -398,10 +398,12 @@ export type ControlledNutritionPeriod = {
 };
 
 export function NutritionPeriodReport({
+  canExport = true,
   clientId,
   controlledPeriod,
   showSelector = true,
 }: {
+  canExport?: boolean;
   clientId?: number;
   controlledPeriod?: ControlledNutritionPeriod;
   showSelector?: boolean;
@@ -518,7 +520,7 @@ export function NutritionPeriodReport({
           <p>Полнота данных, КБЖУ и цели, которые действовали в каждый день периода.</p>
         </div>
         <Button
-          disabled={!report.data || exportState === 'loading'}
+          disabled={!canExport || !report.data || exportState === 'loading'}
           onClick={() => void downloadCsv()}
           type="button"
           variant="secondary"
@@ -532,6 +534,11 @@ export function NutritionPeriodReport({
           )}
         </Button>
       </header>
+      {!canExport && (
+        <p className="muted demo-capability-notice" role="status">
+          Выгрузка отчёта доступна после входа.
+        </p>
+      )}
 
       {showSelector && (
         <>

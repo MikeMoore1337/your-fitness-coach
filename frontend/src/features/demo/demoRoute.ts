@@ -20,7 +20,6 @@ export type DemoRouteStep = {
 
 export type DemoRouteTarget =
   | { kind: 'navigate'; section: 'today' | 'plan' | 'nutrition' | 'progress' | 'trainer' }
-  | { kind: 'action'; action: string }
   | { kind: 'focus'; targetId: string }
   | null;
 
@@ -92,8 +91,7 @@ function trainingRoute(
   const planComplete = currentSectionVisited(visitedSections, 'plan');
   const workoutComplete = state.screen !== 'today';
   const resultComplete = state.screen === 'summary' || state.screen === 'progress';
-  const progressComplete =
-    state.screen === 'progress' && currentSectionVisited(visitedSections, 'progress');
+  const progressComplete = resultComplete && currentSectionVisited(visitedSections, 'progress');
   const steps: readonly DemoRouteStep[] = [
     { key: 'plan', label: 'План', complete: planComplete },
     { key: 'workout', label: 'Тренировка', complete: workoutComplete },
@@ -106,24 +104,16 @@ function trainingRoute(
     target = { kind: 'navigate', section: 'plan' };
     nextHint = 'Следующий шаг: откройте активный план.';
   } else if (!workoutComplete) {
-    target =
-      section === 'today'
-        ? { kind: 'action', action: 'start_workout' }
-        : { kind: 'navigate', section: 'today' };
+    target = { kind: 'navigate', section: 'today' };
     nextHint = 'Следующий шаг: откройте сегодняшнюю тренировку.';
   } else if (!resultComplete) {
-    if (state.completed_sets < state.total_sets) {
-      target = { kind: 'action', action: 'complete_set' };
-      nextHint = 'Следующий шаг: завершите текущий подход.';
-    } else {
-      target = { kind: 'action', action: 'finish_workout' };
-      nextHint = 'Следующий шаг: завершите тренировку.';
-    }
+    target = { kind: 'navigate', section: 'today' };
+    nextHint =
+      state.completed_sets < state.total_sets
+        ? 'Следующий шаг: завершите текущий подход на экране тренировки.'
+        : 'Следующий шаг: завершите тренировку на экране тренировки.';
   } else if (!progressComplete) {
-    target =
-      section === 'progress'
-        ? { kind: 'action', action: 'open_progress' }
-        : { kind: 'navigate', section: 'progress' };
+    target = { kind: 'navigate', section: 'progress' };
     nextHint = 'Следующий шаг: откройте обновлённый прогресс.';
   }
   return {
@@ -144,7 +134,10 @@ function nutritionRoute(
   if (state.kind !== 'nutrition') throw new Error('Nutrition route requires a nutrition snapshot');
   const diaryComplete = currentSectionVisited(visitedSections, 'nutrition');
   const productComplete = state.item_added;
-  const resultComplete = state.screen === 'report';
+  // The shared production nutrition surface has no client-side report transition.
+  // Adding the curated item updates the diary totals; the next route step is
+  // therefore the real Progress navigation, not a legacy demo-only action.
+  const resultComplete = productComplete;
   const progressComplete = resultComplete && currentSectionVisited(visitedSections, 'progress');
   const steps: readonly DemoRouteStep[] = [
     { key: 'diary', label: 'Дневник', complete: diaryComplete },
@@ -158,17 +151,11 @@ function nutritionRoute(
     target = { kind: 'navigate', section: 'nutrition' };
     nextHint = 'Следующий шаг: откройте подготовленный дневник.';
   } else if (!productComplete) {
-    target =
-      section === 'nutrition'
-        ? { kind: 'action', action: 'add_recent' }
-        : { kind: 'navigate', section: 'nutrition' };
-    nextHint = 'Следующий шаг: добавьте недавний продукт.';
+    target = { kind: 'navigate', section: 'nutrition' };
+    nextHint = 'Следующий шаг: добавьте недавний продукт на экране дневника.';
   } else if (!resultComplete) {
-    target =
-      section === 'nutrition'
-        ? { kind: 'action', action: 'open_nutrition_report' }
-        : { kind: 'navigate', section: 'nutrition' };
-    nextHint = 'Следующий шаг: откройте обновлённый дневной итог.';
+    target = { kind: 'navigate', section: 'nutrition' };
+    nextHint = 'Следующий шаг: откройте обновлённый дневной итог в дневнике.';
   } else if (!progressComplete) {
     target = { kind: 'navigate', section: 'progress' };
     nextHint = 'Следующий шаг: посмотрите, как запись влияет на показатели.';
@@ -204,8 +191,8 @@ function trainerRoute(
     target = { kind: 'navigate', section: 'trainer' };
     nextHint = 'Следующий шаг: откройте подготовленного клиента.';
   } else if (!commentComplete) {
-    target = { kind: 'focus', targetId: 'demoCabinetTrainerComment' };
-    nextHint = 'Следующий шаг: оставьте короткий комментарий к результату.';
+    target = { kind: 'navigate', section: 'trainer' };
+    nextHint = 'Следующий шаг: откройте клиента и оставьте комментарий к результату.';
   }
   return {
     steps,

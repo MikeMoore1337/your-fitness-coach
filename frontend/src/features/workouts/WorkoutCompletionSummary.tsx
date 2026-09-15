@@ -65,9 +65,11 @@ function nextWorkoutText(workout: NonNullable<Workout['completion_summary']>['ne
 export function WorkoutCompletionSummary({
   workout,
   onReturnToday,
+  readOnly = false,
 }: {
   workout: Workout;
   onReturnToday?: () => void;
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const summary = workout.completion_summary;
@@ -228,58 +230,65 @@ export function WorkoutCompletionSummary({
         </details>
       )}
 
-      <form
-        className="workout-completion__feedback"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (changed && !saveFeedback.isPending) saveFeedback.mutate();
-        }}
-      >
-        <fieldset>
-          <legend>
-            Как ощущалась тренировка? <span>Необязательно</span>
-          </legend>
-          <div className="workout-completion__feedback-options">
-            {feedbackOptions.map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={feedback === value}
-                onClick={() => updateFeedback(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <label htmlFor={`workout-completion-note-${workout.id}`}>Заметка</label>
-        <textarea
-          id={`workout-completion-note-${workout.id}`}
-          value={note}
-          rows={3}
-          maxLength={NOTE_MAX_LENGTH}
-          placeholder="Что стоит учесть в следующий раз"
-          onChange={(event) => {
-            setNote(event.target.value);
-            saveFeedback.reset();
+      {readOnly && (
+        <p className="muted demo-capability-notice" role="status">
+          Обратная связь к результату доступна после входа.
+        </p>
+      )}
+      <fieldset className="demo-capability-fieldset" disabled={readOnly}>
+        <form
+          className="workout-completion__feedback"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (changed && !saveFeedback.isPending) saveFeedback.mutate();
           }}
-        />
-        <div className="workout-completion__feedback-footer">
-          <span aria-live="polite">
-            {saveFeedback.isSuccess && !changed
-              ? 'Обратная связь сохранена'
-              : `${note.length} из ${NOTE_MAX_LENGTH}`}
-          </span>
-          <Button type="submit" disabled={!changed || saveFeedback.isPending}>
-            {saveFeedback.isPending ? 'Сохраняем…' : 'Сохранить'}
-          </Button>
-        </div>
-        {saveFeedback.error && (
-          <p className="workout-completion__error" role="alert">
-            {(saveFeedback.error as Error).message} Введённый текст сохранён в форме.
-          </p>
-        )}
-      </form>
+        >
+          <fieldset>
+            <legend>
+              Как ощущалась тренировка? <span>Необязательно</span>
+            </legend>
+            <div className="workout-completion__feedback-options">
+              {feedbackOptions.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={feedback === value}
+                  onClick={() => updateFeedback(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <label htmlFor={`workout-completion-note-${workout.id}`}>Заметка</label>
+          <textarea
+            id={`workout-completion-note-${workout.id}`}
+            value={note}
+            rows={3}
+            maxLength={NOTE_MAX_LENGTH}
+            placeholder="Что стоит учесть в следующий раз"
+            onChange={(event) => {
+              setNote(event.target.value);
+              saveFeedback.reset();
+            }}
+          />
+          <div className="workout-completion__feedback-footer">
+            <span aria-live="polite">
+              {saveFeedback.isSuccess && !changed
+                ? 'Обратная связь сохранена'
+                : `${note.length} из ${NOTE_MAX_LENGTH}`}
+            </span>
+            <Button type="submit" disabled={!changed || saveFeedback.isPending}>
+              {saveFeedback.isPending ? 'Сохраняем…' : 'Сохранить'}
+            </Button>
+          </div>
+          {saveFeedback.error && (
+            <p className="workout-completion__error" role="alert">
+              {(saveFeedback.error as Error).message} Введённый текст сохранён в форме.
+            </p>
+          )}
+        </form>
+      </fieldset>
 
       <WorkoutFeedbackDisclosure
         workoutId={workout.id}

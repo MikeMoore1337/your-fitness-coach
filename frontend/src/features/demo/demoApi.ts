@@ -240,6 +240,10 @@ function requireToken(scenario: DemoScenario): string {
   return token;
 }
 
+export function getDemoSessionToken(scenario: DemoScenario): string | null {
+  return readTokens()[scenario] ?? null;
+}
+
 export function applyDemoAction(
   scenario: DemoScenario,
   action: string,

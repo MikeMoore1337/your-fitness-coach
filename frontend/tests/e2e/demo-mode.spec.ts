@@ -1,1285 +1,1222 @@
+import { resolve } from 'node:path';
+import { expect, test, type Page } from '@playwright/test';
 import { demoFixture } from './fixtures/demo-session';
-import type { Browser, Page } from '@playwright/test';
 import type { DemoScenario, DemoSessionSnapshot } from '../../src/features/demo/demoApi';
 import {
-  expect,
+  expectDockWithinViewport,
+  expectElementsWithinHorizontalViewport,
   expectNoHorizontalOverflow,
-  expectNoOverlap,
-  expectTouchTargets,
-  installTelegramHarness,
-  MOBILE_CONTEXTS,
-  setNetworkOffline,
-  test,
 } from './fixtures/mobile-tma';
 
-const CAPTURE =
-  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-    ?.YFC_CAPTURE_TASK_69 === '1';
-const LIVE_DEMO =
-  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-    ?.YFC_DEMO_LIVE === '1';
-const SCREENSHOT_DIR = '../.artifacts/screenshots/task-69';
-const CABINET_CAPTURE =
-  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-    ?.YFC_CAPTURE_TASK_69A === '1';
-const CABINET_SCREENSHOT_DIR = '../.artifacts/screenshots/task-69a';
-const TASK_74_CAPTURE =
-  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-    ?.YFC_CAPTURE_TASK_74 === '1';
-const TASK_74_SCREENSHOT_DIR = '../.artifacts/screenshots/task-74';
-const TASK_74A_DEMO_VIDEO =
-  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-    ?.YFC_CAPTURE_TASK_74A_DEMO === '1';
-const TASK_273_CAPTURE =
-  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-    ?.YFC_CAPTURE_TASK_273 === '1';
-const TASK_273_SCREENSHOT_DIR = '../../../tasks/273/evidence/screenshots';
+const DEMO_VIEWPORTS = [
+  { name: 'compact-mobile', width: 360, height: 800, mobile: true },
+  { name: 'baseline-mobile', width: 390, height: 844, mobile: true },
+  { name: 'large-mobile', width: 430, height: 932, mobile: true },
+  { name: 'tablet', width: 768, height: 900, mobile: true },
+  { name: 'desktop', width: 1280, height: 720, mobile: false },
+  { name: 'desktop-wide', width: 1366, height: 768, mobile: false },
+  { name: 'desktop-large', width: 1440, height: 900, mobile: false },
+  { name: 'desktop-xl', width: 1920, height: 1080, mobile: false },
+] as const;
 
-function applyMockAction(
-  snapshot: DemoSessionSnapshot,
-  action: string,
-  comment?: string,
-  clientId?: 'alexey' | 'maria' | 'ivan',
-) {
-  const next = structuredClone(snapshot);
-  next.revision += 1;
-  if (next.state.kind === 'self_training') {
-    if (action === 'start_workout') next.state.screen = 'active_workout';
-    if (action === 'complete_set') next.state.completed_sets = next.state.total_sets;
-    if (action === 'finish_workout') {
-      next.state.screen = 'summary';
-      next.state.duration_minutes = 46;
-      next.state.total_volume_kg = 6840;
-      next.cabinet.today.status_label = 'Тренировка завершена';
-      next.cabinet.progress.workouts_completed = 12;
-      next.cabinet.progress.latest_volume_kg = 6840;
-      next.cabinet.progress.volume_change_percent = 6.5;
-      next.cabinet.progress.summary = 'Сегодняшняя тренировка уже учтена в динамике.';
-      next.cabinet.meaningful_action_completed = true;
-    }
-    if (action === 'open_progress') {
-      next.state.screen = 'progress';
-      next.state.progress_change_percent = 6.5;
-    }
-  } else if (next.state.kind === 'nutrition') {
-    if (action === 'add_recent' && !next.state.item_added) {
-      next.state.item_added = true;
-      next.state.calories += next.state.recent_item.calories;
-      next.state.protein_g += next.state.recent_item.protein_g;
-      next.state.meals_logged += 1;
-      next.cabinet.nutrition.calories = next.state.calories;
-      next.cabinet.nutrition.protein_g = next.state.protein_g;
-      next.cabinet.nutrition.meals_logged = next.state.meals_logged;
-      next.cabinet.nutrition.item_added = true;
-      next.cabinet.progress.nutrition_days_logged = 6;
-      next.cabinet.progress.nutrition_completion_percent = 74;
-      next.cabinet.progress.summary = 'Новая запись уже отражена в дневном итоге.';
-      next.cabinet.meaningful_action_completed = true;
-    }
-    if (action === 'open_nutrition_report') next.state.screen = 'report';
-  } else {
-    const trainerState = next.state;
-    if (action === 'select_client' && clientId) {
-      trainerState.selected_client_id = clientId;
-      if (next.cabinet.trainer) next.cabinet.trainer.selected_client_id = clientId;
-    }
-    if (action === 'save_comment') {
-      const savedComment = comment ?? 'Техника стабильна.';
-      const client = trainerState.clients.find(
-        (item) => item.id === trainerState.selected_client_id,
-      );
-      if (client) client.comment = savedComment;
-      if (next.cabinet.trainer) {
-        const cabinetClient = next.cabinet.trainer.clients.find(
-          (item) => item.id === trainerState.selected_client_id,
-        );
-        if (cabinetClient) cabinetClient.comment = savedComment;
-      }
-      next.cabinet.meaningful_action_completed = true;
-    }
-  }
-  return next;
+const TASK_274_EVIDENCE_DIR = process.env.TASK_274_EVIDENCE_DIR;
+
+async function captureEvidence(page: Page, fileName: string): Promise<void> {
+  if (!TASK_274_EVIDENCE_DIR) return;
+  await page.screenshot({ path: resolve(TASK_274_EVIDENCE_DIR, fileName), fullPage: true });
 }
 
-async function installDemoApi(page: Page, forcedCurrentStatus?: 403 | 410) {
-  const sessions = new Map<string, DemoSessionSnapshot>();
-  let sequence = 0;
-  let unavailable = false;
-  await page.route('**/api/v1/demo/**', async (route) => {
-    if (unavailable) {
-      await route.abort('internetdisconnected');
-      return;
+const today = () => new Date().toISOString().slice(0, 10);
+
+function demoUser(snapshot: DemoSessionSnapshot) {
+  const coach = snapshot.scenario === 'trainer';
+  return {
+    id: snapshot.scenario === 'trainer' ? 900000003 : 900000001,
+    telegram_user_id: null,
+    username: 'demo_user',
+    first_name: 'Демо',
+    last_name: null,
+    photo_url: null,
+    custom_avatar: null,
+    is_coach: coach,
+    is_admin: false,
+    is_root: false,
+    has_active_program: true,
+    has_workout_history: true,
+    has_food_history: true,
+    auth_providers: [],
+    onboarding: { status: 'complete', required_fields: [], missing_fields: [] },
+    profile: {
+      full_name: 'Демо-профиль',
+      birth_date: null,
+      sex: 'male',
+      goal: 'muscle_gain',
+      level: 'intermediate',
+      height_cm: 180,
+      weight_kg: 77.1,
+      workouts_per_week: 4,
+      cardio_trainings_per_week: 2,
+      resting_heart_rate: null,
+      body_priority: { mode: 'balanced', muscle_group_ids: [] },
+      training_preferences: null,
+      timezone: 'Europe/Moscow',
+      estimated_max_heart_rate: null,
+      heart_rate_reserve: null,
+      heart_rate_calculation_method: null,
+      heart_rate_zones: [],
+      recommended_cardio_range: null,
+      kbju: {
+        id: 70001,
+        user_id: 900000001,
+        telegram_user_id: null,
+        effective_from: '2026-08-25',
+        effective_to: null,
+        source: 'calculated',
+        created_at: '2026-08-25T10:00:00Z',
+        note: null,
+        superseded_by_id: null,
+        sex: 'male',
+        weight_kg: 77.1,
+        height_cm: 180,
+        age: 31,
+        daily_routine: 'mixed',
+        steps_range: 'from_7000_to_10000',
+        strength_trainings_per_week: 4,
+        strength_training_duration_minutes: 60,
+        strength_training_type: 'regular',
+        strength_rest: 'one_to_two',
+        cardio_trainings: [],
+        goal: 'muscle_gain',
+        bmr: 1740,
+        tdee: 2420,
+        calories: 2150,
+        protein_g: 145,
+        fat_g: 70,
+        carbs_g: 245,
+        saved_at: '2026-08-25T10:00:00Z',
+        created_by: null,
+        assigned_by: null,
+        daily_activity_level: 'moderate',
+        cardio_trainings_per_week: 2,
+        cardio_training_duration_minutes: 30,
+        cardio_intensity: 'moderate',
+      },
+    },
+    trainer: null,
+  };
+}
+
+function workout(snapshot: DemoSessionSnapshot) {
+  const state = snapshot.state.kind === 'self_training' ? snapshot.state : null;
+  const completed = state?.completed_sets ?? 0;
+  const status =
+    state?.screen === 'active_workout'
+      ? 'in_progress'
+      : state?.screen === 'summary' || state?.screen === 'progress'
+        ? 'completed'
+        : 'planned';
+  return {
+    id: 50001,
+    scheduled_date: today(),
+    scheduled_time: '19:00:00',
+    title: 'Верх тела · уверенный старт',
+    status,
+    day_number: new Date().getDay() || 7,
+    week_number: 4,
+    started_at: status === 'planned' ? null : '2026-09-15T17:00:00Z',
+    completed_at: status === 'completed' ? '2026-09-15T17:46:00Z' : null,
+    exercises: [
+      {
+        id: 61001,
+        exercise_id: 1001,
+        exercise_title: 'Жим гантелей лёжа с контролируемой паузой',
+        metric_type: 'strength',
+        sort_order: 1,
+        prescribed_sets: 3,
+        prescribed_reps: '10',
+        prescribed_duration_minutes: null,
+        rest_seconds: 90,
+        notes: 'Сохраняйте контроль в нижней точке.',
+        superset_group: null,
+        superset_order: null,
+        has_guide: false,
+        progression_guidance: null,
+        sets: [1, 2, 3].map((setNumber) => ({
+          id: 60001 + setNumber,
+          set_number: setNumber,
+          actual_reps: setNumber <= completed ? 10 : null,
+          actual_weight: setNumber <= completed ? 18 : null,
+          duration_minutes: null,
+          distance_km: null,
+          average_heart_rate_bpm: null,
+          heart_rate_zone: null,
+          rir: setNumber <= completed ? '2' : null,
+          set_kind: 'working',
+          reached_failure: setNumber <= completed ? false : null,
+          is_completed: setNumber <= completed,
+          version: 1,
+        })),
+      },
+    ],
+    completion_summary:
+      status === 'completed'
+        ? {
+            duration_seconds: 2760,
+            performed_exercises: 1,
+            completed_sets: completed,
+            total_sets: 3,
+            reps_total: completed * 10,
+            reps_recorded_sets: completed,
+            load_recorded_sets: completed,
+            exercises: [],
+            personal_records: [],
+            next_workout: null,
+            feedback: null,
+            note: null,
+          }
+        : null,
+  };
+}
+
+function progressSummary(snapshot: DemoSessionSnapshot) {
+  const completed =
+    snapshot.state.kind === 'self_training' &&
+    ['summary', 'progress'].includes(snapshot.state.screen);
+  const end = today();
+  return {
+    user_id: 900000001,
+    period_days: 30,
+    period_start: '2026-08-17',
+    period_end: end,
+    training: {
+      planned_workouts: 12,
+      completed_workouts: completed ? 12 : 11,
+      skipped_workouts: 0,
+      frequency_per_week: 3.2,
+      volume_kg: completed ? 6840 : 6220,
+      new_personal_records: completed ? 1 : 0,
+      last_completed_workout_on: '2026-09-13',
+      next_workout: {
+        id: 50005,
+        scheduled_date: '2026-09-17',
+        scheduled_time: '19:00:00',
+        title: 'Верх тела',
+        status: 'planned',
+      },
+    },
+    cardio: {
+      completed_sessions: 6,
+      planned_sessions: 8,
+      frequency_per_week: 1.5,
+      duration_minutes: 210,
+      distance_km: 22.4,
+      zone_duration: [{ zone: 2, duration_minutes: 142 }],
+    },
+    nutrition: {
+      visible: true,
+      logged_days: 5,
+      complete_days: 4,
+      incomplete_days: 1,
+      fasted_days: 0,
+      unlogged_days: 25,
+      adherence_evaluated_days: 6,
+      average_calories: 2010,
+      target_calories: 2150,
+      average_protein_g: 132,
+      target_protein_g: 145,
+      target_effective_on: '2026-08-25',
+    },
+    body: {
+      latest_measurement: null,
+      trends: [],
+      priority: { mode: 'balanced', muscle_group_ids: [] },
+      guidance: {
+        comparison_basis: 'self',
+        minimum_points_for_interpretation: 2,
+        minimum_span_days_for_interpretation: 14,
+        consistency_tips: [],
+        circumference_limitations: [],
+      },
+    },
+    adherence: {
+      formula_version: 'adherence-v1',
+      overall_percent: 82,
+      included_components: ['workouts'],
+      workouts: {
+        status: 'available',
+        percent: 92,
+        achieved: 11,
+        evaluated: 12,
+        weight: 0.4,
+        reason: null,
+      },
+      cardio: {
+        status: 'available',
+        percent: 75,
+        achieved: 6,
+        evaluated: 8,
+        weight: 0.2,
+        reason: null,
+      },
+      calories: {
+        status: 'available',
+        percent: 78,
+        achieved: 5,
+        evaluated: 6,
+        weight: 0.2,
+        reason: null,
+      },
+      protein: {
+        status: 'available',
+        percent: 81,
+        achieved: 5,
+        evaluated: 6,
+        weight: 0.2,
+        reason: null,
+      },
+    },
+    data_sufficiency: {
+      ruleset_version: 'data-sufficiency-v1',
+      workout_logging: {
+        status: 'sufficient',
+        counters: { available: 1 },
+        reason_keys: ['thresholds_met'],
+      },
+      working_sets: {
+        status: 'sufficient',
+        counters: { available: 1 },
+        reason_keys: ['thresholds_met'],
+      },
+      rir_coverage: {
+        status: 'limited',
+        counters: { available: 1 },
+        reason_keys: ['too_few_rir_observations'],
+      },
+      nutrition_coverage: {
+        status: 'sufficient',
+        counters: { available: 1 },
+        reason_keys: ['thresholds_met'],
+      },
+      weight_trend: {
+        status: 'sufficient',
+        counters: { available: 1 },
+        reason_keys: ['thresholds_met'],
+      },
+      anthropometry: {
+        status: 'insufficient',
+        counters: { available: 0 },
+        reason_keys: ['no_anthropometry_measurements'],
+      },
+      schedule_adherence: {
+        status: 'sufficient',
+        counters: { available: 1 },
+        reason_keys: ['thresholds_met'],
+      },
+      confirm_energy_mismatch: false,
+    },
+  };
+}
+
+function nutritionDay(snapshot: DemoSessionSnapshot) {
+  const state = snapshot.state.kind === 'nutrition' ? snapshot.state : null;
+  const added = Boolean(state?.item_added);
+  const entry = {
+    id: 80101,
+    diary_date: today(),
+    meal_type: 'breakfast',
+    food_id: null,
+    recipe_id: null,
+    entry_kind: 'quick_add',
+    logged_at: '09:00:00',
+    food_name: 'Овсяная каша с бананом и греческим йогуртом',
+    food_brand: null,
+    amount: 1,
+    amount_unit: 'serving',
+    weight_g: null,
+    nutrition_basis_kind: null,
+    nutrition_basis_amount: null,
+    nutrition_basis_unit: null,
+    serving_amount: 1,
+    serving_unit: 'порция',
+    serving_weight_g: 320,
+    nutrition: { energy_kcal: 428, protein_g: 24, fat_g: 10, carbs_g: 56, fiber_g: 8 },
+    created_at: '2026-09-15T09:00:00Z',
+    updated_at: '2026-09-15T09:00:00Z',
+  };
+  const calories = state?.calories ?? 1160;
+  const protein = state?.protein_g ?? 82;
+  const meals = ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type) => ({
+    meal_type,
+    entries: meal_type === 'breakfast' && added ? [entry] : [],
+    totals: {
+      energy_kcal: meal_type === 'breakfast' && added ? 428 : 0,
+      protein_g: meal_type === 'breakfast' && added ? 24 : 0,
+      fat_g: meal_type === 'breakfast' && added ? 10 : 0,
+      carbs_g: meal_type === 'breakfast' && added ? 56 : 0,
+      fiber_g: meal_type === 'breakfast' && added ? 8 : 0,
+    },
+  }));
+  return {
+    diary_date: today(),
+    timezone: 'Europe/Moscow',
+    meals,
+    totals: { energy_kcal: calories, protein_g: protein, fat_g: 48, carbs_g: 180, fiber_g: 22 },
+    targets: { energy_kcal: 2150, protein_g: 145, fat_g: 70, carbs_g: 245 },
+    remaining: {
+      energy_kcal: Math.max(0, 2150 - calories),
+      protein_g: Math.max(0, 145 - protein),
+      fat_g: 22,
+      carbs_g: 65,
+    },
+    status: added ? 'complete' : 'incomplete',
+    status_is_explicit: false,
+  };
+}
+
+function hydrationDay(snapshot: DemoSessionSnapshot) {
+  const entries =
+    (snapshot as DemoSessionSnapshot & { hydration?: Array<Record<string, unknown>> }).hydration ??
+    [];
+  return {
+    diary_date: today(),
+    timezone: 'Europe/Moscow',
+    total_ml: 1350 + entries.reduce((sum, item) => sum + Number(item.volume_ml ?? 0), 0),
+    goal: {
+      id: 90001,
+      enabled: true,
+      target_ml: 2200,
+      source: 'manual',
+      method_version: 'demo-v1',
+      reference_scope: 'demo',
+      sex: 'male',
+      adult_confirmed: true,
+      effective_from: '2026-08-25',
+      effective_to: null,
+      created_at: '2026-08-25T10:00:00Z',
+    },
+    progress_percent: 61.4,
+    entries,
+    presets: [
+      { id: 90101, label: 'Стакан', volume_ml: 250, beverage_type: 'water', is_default: true },
+      { id: 90102, label: 'Бутылка', volume_ml: 500, beverage_type: 'water', is_default: false },
+    ],
+    last_logged_at: '2026-09-15T09:00:00Z',
+    reminder_suppression_key: null,
+    action_url: '/api/v1/nutrition/hydration/entries',
+    original_estimated_minutes: 0,
+    adapted_estimated_minutes: 0,
+    time_budget_minutes: null,
+    changes: [],
+    original_exercises: [],
+    adapted_exercises: [],
+    warnings: [],
+    message: 'Данные гидратации доступны только в текущей демо-сессии.',
+    preview_token: null,
+  };
+}
+
+function foodItem() {
+  return {
+    id: 80001,
+    name: 'Овсяная каша с бананом и греческим йогуртом',
+    brand: null,
+    barcode: null,
+    energy_kcal_per_100g: 134,
+    protein_g_per_100g: 7.5,
+    fat_g_per_100g: 3.2,
+    carbs_g_per_100g: 18.1,
+    fiber_g_per_100g: 2.4,
+    nutrition_basis_kind: 'per_100_g',
+    nutrition_basis_amount: 100,
+    nutrition_basis_unit: 'g',
+    canonical_facts: null,
+    nutrition_provenance: null,
+    catalog_quality: 'verified',
+    provenance: 'internal',
+    trust_level: 'verified',
+    canonical_complete: true,
+    standard_serving_amount: 320,
+    standard_serving_unit: 'g',
+    standard_serving_weight_g: 320,
+    food_type: 'system',
+    is_favorite: false,
+    last_used_at: '2026-09-15T09:00:00Z',
+    created_at: '2026-09-15T09:00:00Z',
+    updated_at: '2026-09-15T09:00:00Z',
+  };
+}
+
+function client(slug: 'alexey' | 'maria' | 'ivan') {
+  const names = { alexey: 'Алексей', maria: 'Мария', ivan: 'Иван' };
+  return {
+    id: { alexey: 51001, maria: 51002, ivan: 51003 }[slug],
+    invite_id: null,
+    telegram_user_id: null,
+    username: slug,
+    full_name: names[slug],
+    birth_date: null,
+    goal: 'muscle_gain',
+    level: 'intermediate',
+    height_cm: 180,
+    weight_kg: 77,
+    workouts_per_week: 4,
+    cardio_trainings_per_week: 2,
+    resting_heart_rate: null,
+    body_priority: { mode: 'balanced', muscle_group_ids: [] },
+    training_preferences: null,
+    timezone: 'Europe/Moscow',
+    kbju: null,
+    status: 'active',
+  };
+}
+
+function timeline() {
+  return [
+    {
+      id: 50011,
+      scheduled_date: '2026-09-13',
+      scheduled_time: '19:00:00',
+      title: 'Ноги и корпус',
+      status: 'completed',
+      completed_at: '2026-09-13T17:46:00Z',
+      completed_sets: 18,
+      volume_kg: 6480,
+      completion_feedback: 'as_expected',
+      completion_note: null,
+      exercises: [
+        {
+          workout_exercise_id: 62001,
+          exercise_id: 1001,
+          exercise_title: 'Присед со штангой',
+          notes: 'Контролируйте глубину и темп.',
+          superset_group: null,
+          superset_order: null,
+          sets: [1, 2, 3].map((set_number) => ({
+            set_number,
+            actual_reps: 10,
+            actual_weight: 80,
+            rir: '2',
+            set_kind: 'working',
+            reached_failure: false,
+            is_completed: true,
+          })),
+        },
+      ],
+    },
+  ];
+}
+
+function transport(snapshot: DemoSessionSnapshot, path: string, method: string, body: unknown) {
+  if (path === '/api/v1/me') return demoUser(snapshot);
+  if (path === '/api/v1/workouts/today') return workout(snapshot);
+  if (path === '/api/v1/workouts/week' || path === '/api/v1/workouts/schedule')
+    return [
+      {
+        id: 50001,
+        scheduled_date: today(),
+        scheduled_time: '19:00:00',
+        title: 'Верх тела · уверенный старт',
+        status:
+          snapshot.state.kind === 'self_training' && snapshot.state.screen === 'active_workout'
+            ? 'in_progress'
+            : 'planned',
+        day_number: new Date().getDay() || 7,
+        week_number: 4,
+      },
+    ];
+  if (path.startsWith('/api/v1/workouts/cardio')) return [];
+  if (path.startsWith('/api/v1/workouts/progress/summary')) return progressSummary(snapshot);
+  if (path.startsWith('/api/v1/workouts/progress/training-analytics'))
+    return {
+      period_days: 30,
+      period_start: '2026-08-17',
+      period_end: today(),
+      exercise_history_limit: 20,
+      completed_set_count: 54,
+      reps_total: 620,
+      reps_recorded_sets: 54,
+      external_load_volume_kg: 24680,
+      volume_recorded_sets: 54,
+      exercises: [],
+      rir: {
+        completed_set_count: 54,
+        recorded_set_count: 42,
+        missing_set_count: 12,
+        distribution: [{ value: '2', completed_set_count: 20 }],
+      },
+      primary_muscle_exposure: [],
+      secondary_muscle_exposure: [],
+      completed_sets_without_muscle_metadata: 0,
+      data_sufficiency: {},
+    };
+  if (path.startsWith('/api/v1/workouts/progress/nutrition-report'))
+    return {
+      period: 'days_30',
+      period_start: '2026-08-17',
+      period_end: today(),
+      timezone: 'Europe/Moscow',
+      summary: {
+        logged_days: 5,
+        eligible_days: 30,
+        coverage_percent: 16.7,
+        complete_days: 4,
+        incomplete_days: 1,
+        fasted_days: 0,
+        missing_days: 25,
+        current_day_status: 'incomplete',
+        calories: { average: 2010, minimum: 1900, maximum: 2100, sample_days: 5 },
+        protein_g: { average: 132, minimum: 100, maximum: 150, sample_days: 5 },
+        fat_g: { average: 68, minimum: 60, maximum: 75, sample_days: 5 },
+        carbs_g: { average: 230, minimum: 200, maximum: 250, sample_days: 5 },
+        calorie_comparison: {
+          average_actual: 2010,
+          average_target: 2150,
+          average_deviation: -140,
+          evaluated_days: 5,
+        },
+        protein_comparison: {
+          average_actual: 132,
+          average_target: 145,
+          average_deviation: -13,
+          evaluated_days: 5,
+        },
+        fat_comparison: {
+          average_actual: 68,
+          average_target: 70,
+          average_deviation: -2,
+          evaluated_days: 5,
+        },
+        carbs_comparison: {
+          average_actual: 230,
+          average_target: 245,
+          average_deviation: -15,
+          evaluated_days: 5,
+        },
+        days_within_calorie_tolerance: 4,
+        calorie_tolerance_evaluated_days: 5,
+        days_meeting_protein_target: 2,
+        protein_target_evaluated_days: 5,
+      },
+      daily: [],
+      target_changes: [],
+      hydration: {
+        total_ml: 10800,
+        average_ml: 2160,
+        logged_days: 5,
+        eligible_days: 5,
+        coverage_percent: 100,
+        days_meeting_goal: 3,
+        goal_evaluated_days: 5,
+        trend_ml: 120,
+      },
+    };
+  if (path === '/api/v1/workouts/progress')
+    return {
+      workouts_total: 32,
+      workouts_completed: 12,
+      workouts_skipped: 1,
+      workouts_missed: 0,
+      adherence_percent: 82,
+      current_streak: 3,
+      weight_change_kg: -0.7,
+      weights: [],
+      weekly_volume: [],
+      personal_records: [],
+    };
+  if (path === '/api/v1/workouts/diary') return [];
+  if (/^\/api\/v1\/workouts\/\d+\/comments$/.test(path)) return [];
+  if (path.startsWith('/api/v1/workouts/history')) return timeline();
+  if (path.startsWith('/api/v1/check-ins/weekly/current'))
+    return {
+      status: 'not_submitted',
+      week_start: '2026-09-14',
+      week_end: '2026-09-20',
+      submitted_on: null,
+      training_load: null,
+      recovery: null,
+      hunger: null,
+      adherence_difficulty: null,
+      note: null,
+    };
+  if (path.startsWith('/api/v1/check-ins/daily'))
+    return {
+      local_date: today(),
+      status: 'not_submitted',
+      energy: null,
+      sleep_quality: null,
+      stress: null,
+      soreness: null,
+      note: null,
+    };
+  if (path.startsWith('/api/v1/check-ins/weekly')) return { items: [], total: 0 };
+  if (path.startsWith('/api/v1/nutrition/diary') && method === 'GET') return nutritionDay(snapshot);
+  if (path.startsWith('/api/v1/nutrition/hydration') && method === 'GET')
+    return hydrationDay(snapshot);
+  if (path.startsWith('/api/v1/nutrition/foods/'))
+    return {
+      items: [foodItem()],
+      total: 1,
+      limit: 20,
+      offset: 0,
+      external_items: [],
+      provider_status: 'not_needed',
+      provider_statuses: [],
+    };
+  if (path === '/api/v1/nutrition/targets/current') return demoUser(snapshot).profile.kbju;
+  if (path.startsWith('/api/v1/nutrition/targets/history'))
+    return { items: [demoUser(snapshot).profile.kbju], total: 1, limit: 20, offset: 0 };
+  if (path.startsWith('/api/v1/nutrition/recipes'))
+    return { items: [], total: 0, limit: 20, offset: 0 };
+  if (path === '/api/v1/programs/exercises') return [];
+  if (path.endsWith('/programs/templates/mine'))
+    return [
+      {
+        id: 40001,
+        title: 'Силовая база',
+        slug: 'demo-strength-base',
+        goal: 'muscle_gain',
+        level: 'intermediate',
+        split_type: 'upper_lower',
+        owner_user_id: 900000001,
+        owner_telegram_user_id: null,
+        owner_full_name: 'Демо-профиль',
+        created_by_user_id: 900000001,
+        is_public: false,
+        is_example: false,
+        is_assigned_to_current_user: true,
+        is_active_for_current_user: true,
+        can_edit: false,
+        assigned_by_user_id: null,
+        assigned_by_full_name: null,
+        assigned_program_id: 41001,
+        assigned_program_status: 'active',
+        assigned_program_start_date: '2026-08-25',
+        assigned_program_duration_weeks: 8,
+        current_revision_number: 1,
+        default_duration_weeks: 8,
+        days: [],
+      },
+    ];
+  if (path.endsWith('/programs/templates/hidden')) return [];
+  if (path === '/api/v1/coach/clients') return (['alexey', 'maria', 'ivan'] as const).map(client);
+  if (path === '/api/v1/coach/assigned-programs') return [];
+  if (path.startsWith('/api/v1/coach/client-summaries'))
+    return {
+      items: (['alexey', 'maria', 'ivan'] as const).map((slug) => ({
+        ...progressSummary(snapshot),
+        user_id: client(slug).id,
+        client_name: client(slug).full_name,
+      })),
+      total: 3,
+      limit: 100,
+      offset: 0,
+    };
+  if (/^\/api\/v1\/coach\/clients\/\d+\/analytics$/.test(path)) {
+    return {
+      workouts_total: 32,
+      workouts_completed: 8,
+      workouts_skipped: 1,
+      workouts_missed: 0,
+      adherence_percent: 88,
+      current_streak: 3,
+      weight_change_kg: -0.7,
+      weights: [
+        { measured_on: '2026-08-18', weight_kg: 77.8 },
+        { measured_on: today(), weight_kg: 77.1 },
+      ],
+      weekly_volume: [
+        { week_start: '2026-08-25', completed_workouts: 2, volume_kg: 5920 },
+        { week_start: '2026-09-01', completed_workouts: 2, volume_kg: 6220 },
+        { week_start: '2026-09-08', completed_workouts: 3, volume_kg: 6480 },
+      ],
+      personal_records: [],
+    };
+  }
+  if (/^\/api\/v1\/coach\/clients\/\d+\/workouts\/\d+\/comments$/.test(path) && method === 'GET')
+    return [];
+  if (/^\/api\/v1\/coach\/clients\/\d+\/workouts/.test(path) && method === 'GET') return timeline();
+  if (path.startsWith('/api/v1/coach/clients/') && method === 'GET') return [];
+  if (path === '/api/v1/me/profile/body-priority-options') return { items: [] };
+  if (path === '/api/v1/me/trainer-capability')
+    return {
+      is_active: snapshot.scenario === 'trainer',
+      activated_now: false,
+      active_client_count: 3,
+      pending_invite_count: 0,
+      can_disable: false,
+      terms_version: 'demo-v1',
+    };
+  if (path === '/api/v1/me/exports/current')
+    return {
+      status: 'none',
+      export_id: null,
+      created_at: null,
+      completed_at: null,
+      expires_at: null,
+      filename: null,
+      content_size_bytes: null,
+      error_code: null,
+    };
+  if (path.startsWith('/api/v1/notifications'))
+    return path.endsWith('/settings')
+      ? {
+          workout_reminders_enabled: true,
+          weekly_check_in_reminders_enabled: true,
+          measurement_reminders_enabled: true,
+          meal_reminders_enabled: false,
+          hydration_reminders_enabled: true,
+          movement_reminders_enabled: false,
+          telegram_enabled: false,
+          telegram_linked: false,
+          reminder_hour: 19,
+          quiet_hours_start: '23:00:00',
+          quiet_hours_end: '07:00:00',
+        }
+      : [];
+  if (path === '/api/v1/ai-coach/status')
+    return { ui_enabled: false, generic_available: false, personal_available: false };
+  if (method === 'GET') return [];
+  if (path === '/api/v1/workouts/50001/start' && method === 'POST') {
+    if (snapshot.state.kind === 'self_training') snapshot.state.screen = 'active_workout';
+    return workout(snapshot);
+  }
+  if (path === '/api/v1/workouts/50001/finish' && method === 'POST') {
+    if (snapshot.state.kind === 'self_training') {
+      snapshot.state.screen = 'summary';
+      snapshot.state.duration_minutes = 46;
+      snapshot.state.total_volume_kg = 6840;
+      snapshot.cabinet.meaningful_action_completed = true;
     }
+    return workout(snapshot);
+  }
+  const setMatch = path.match(/^\/api\/v1\/workouts\/sets\/(\d+)$/);
+  if (setMatch && method === 'PATCH') {
+    const setNumber = Number(setMatch[1]) - 60001;
+    const values = (body ?? {}) as {
+      actual_reps?: number;
+      actual_weight?: number;
+      is_completed?: boolean;
+    };
+    if (snapshot.state.kind === 'self_training' && values.is_completed)
+      snapshot.state.completed_sets = Math.max(snapshot.state.completed_sets, setNumber);
+    return {
+      id: Number(setMatch[1]),
+      set_number: setNumber,
+      actual_reps: values.actual_reps ?? 10,
+      actual_weight: values.actual_weight ?? 18,
+      duration_minutes: null,
+      distance_km: null,
+      average_heart_rate_bpm: null,
+      heart_rate_zone: null,
+      rir: '2',
+      set_kind: 'working',
+      reached_failure: false,
+      is_completed: values.is_completed ?? true,
+      version: 2,
+    };
+  }
+  if (path === '/api/v1/nutrition/diary/entries' && method === 'POST') {
+    if (snapshot.state.kind !== 'nutrition') return {};
+    snapshot.state.item_added = true;
+    snapshot.cabinet.meaningful_action_completed = true;
+    const breakfast = nutritionDay(snapshot).meals.find((meal) => meal.meal_type === 'breakfast');
+    if (!breakfast?.entries[0]) throw new Error('Demo nutrition fixture did not create an entry');
+    return breakfast.entries[0];
+  }
+  if (path === '/api/v1/nutrition/hydration/entries' && method === 'POST') {
+    const values = (body ?? {}) as { volume_ml?: number; beverage_type?: string };
+    const entry = {
+      id: 90200,
+      volume_ml: values.volume_ml ?? 250,
+      beverage_type: values.beverage_type ?? 'water',
+      occurred_at: '2026-09-15T10:00:00Z',
+      diary_date: today(),
+      timezone: 'Europe/Moscow',
+      source: 'manual',
+      created_at: '2026-09-15T10:00:00Z',
+      updated_at: '2026-09-15T10:00:00Z',
+    };
+    (snapshot as DemoSessionSnapshot & { hydration?: Array<Record<string, unknown>> }).hydration = [
+      entry,
+    ];
+    return entry;
+  }
+  if (/^\/api\/v1\/coach\/clients\/\d+\/workouts\/\d+\/comments$/.test(path) && method === 'POST') {
+    const values = (body ?? {}) as { body?: string; workout_exercise_id?: number | null };
+    return {
+      id: 99001,
+      trainer_author_id: 900000003,
+      client_user_id: 51002,
+      workout_id: 50011,
+      workout_exercise_id: values.workout_exercise_id ?? null,
+      body: values.body ?? '',
+      body_format: 'plain_text',
+      created_at: '2026-09-15T10:00:00Z',
+      updated_at: null,
+      revisions: [],
+    };
+  }
+  return {};
+}
+
+async function installDemoTransport(page: Page) {
+  const sessions = new Map<string, DemoSessionSnapshot>();
+  let counter = 0;
+  await page.route('**/api/v1/demo/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    const token = request.headers()['x-demo-session'];
     if (url.pathname.endsWith('/sessions') && request.method() === 'POST') {
-      const body = request.postDataJSON() as { scenario: DemoScenario };
-      const nextToken = `demo-token-${String(++sequence).padStart(32, '0')}`;
-      const snapshot = demoFixture(body.scenario);
-      sessions.set(nextToken, snapshot);
-      await route.fulfill({ status: 201, json: { ...snapshot, session_token: nextToken } });
+      const scenario = (request.postDataJSON() as { scenario: DemoScenario }).scenario;
+      const token = `demo-token-${String(++counter).padStart(32, '0')}`;
+      const snapshot = demoFixture(scenario);
+      sessions.set(token, snapshot);
+      await route.fulfill({ status: 201, json: { ...snapshot, session_token: token } });
       return;
     }
-    if (forcedCurrentStatus && request.method() === 'GET') {
+    const token = request.headers()['x-demo-session'];
+    const snapshot = token ? sessions.get(token) : undefined;
+    if (!token || !snapshot) {
       await route.fulfill({
-        status: forcedCurrentStatus,
-        json: {
-          detail:
-            forcedCurrentStatus === 410
-              ? 'Демо-сессия истекла. Начните новый сценарий.'
-              : 'Это действие недоступно в демо-режиме.',
-        },
+        status: 410,
+        json: { detail: 'Демо-сессия истекла. Начните новый сценарий.' },
       });
       return;
     }
-    const snapshot = token ? sessions.get(token) : undefined;
-    if (!token || !snapshot) {
-      await route.fulfill({ status: 410, json: { detail: 'Демо-сессия истекла.' } });
+    if (url.pathname.endsWith('/sessions/current') && request.method() === 'GET') {
+      await route.fulfill({ status: 200, json: snapshot });
       return;
     }
-    if (url.pathname.endsWith('/actions')) {
-      const body = request.postDataJSON() as {
-        action: string;
-        comment?: string;
-        client_id?: 'alexey' | 'maria' | 'ivan';
-      };
-      const next = applyMockAction(snapshot, body.action, body.comment, body.client_id);
-      sessions.set(token, next);
-      await route.fulfill({ status: 200, json: next });
-      return;
-    }
-    if (url.pathname.endsWith('/reset')) {
+    if (url.pathname.endsWith('/reset') && request.method() === 'POST') {
       const next = demoFixture(snapshot.scenario);
       sessions.set(token, next);
       await route.fulfill({ status: 200, json: next });
       return;
     }
-    await route.fulfill({ status: 200, json: snapshot });
+    if (url.pathname.endsWith('/transport') && request.method() === 'POST') {
+      const payload = request.postDataJSON() as { path: string; method: string; body: unknown };
+      const result = transport(snapshot, payload.path, payload.method, payload.body);
+      await route.fulfill({ status: 200, json: result });
+      return;
+    }
+    await route.fulfill({ status: 404, json: { detail: 'Неизвестный demo endpoint' } });
   });
-  return {
-    setUnavailable(value: boolean) {
-      unavailable = value;
-    },
-  };
 }
 
-async function installAuthApi(page: Page) {
-  let authenticated = false;
-  await page.route('**/api/v1/**', async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (path.includes('/demo/')) return route.fallback();
-    if (path.endsWith('/public/config')) {
-      return route.fulfill({
-        json: {
-          app_env: 'prod',
-          enable_dev_auth: false,
-          enable_web_auth: true,
-          enable_email_auth: false,
-          telegram_bot_username: 'fitness_bot',
-          oauth_providers: ['telegram', 'google', 'yandex', 'vk'],
-        },
+test('demo uses production today composition and persists one workout set through demo transport', async ({
+  page,
+}) => {
+  const transportRequests: Array<{ pathname: string; method: string; demoSession: string }> = [];
+  const transportPayloads: Array<{ path: string; method: string; body: unknown }> = [];
+  const directProductionRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.endsWith('/transport')) {
+      transportPayloads.push(
+        request.postDataJSON() as { path: string; method: string; body: unknown },
+      );
+      transportRequests.push({
+        pathname: url.pathname,
+        method: request.method(),
+        demoSession: request.headers()['x-demo-session'] ?? '',
       });
     }
-    if (path.endsWith('/auth/refresh')) {
-      return route.fulfill({ status: 401, json: { detail: 'Сессия отсутствует' } });
-    }
-    if (path.endsWith('/auth/telegram/init')) {
-      authenticated = true;
-      return route.fulfill({ json: { access_token: 'telegram-demo-handoff-token' } });
-    }
-    if (path.endsWith('/me')) {
-      return authenticated
-        ? route.fulfill({
-            json: {
-              id: 69,
-              is_coach: false,
-              is_admin: false,
-              is_root: false,
-              has_active_program: false,
-              has_workout_history: false,
-              onboarding: {
-                status: 'required',
-                required_fields: ['goal'],
-                missing_fields: ['goal'],
-              },
-              profile: null,
-              trainer: null,
-            },
-          })
-        : route.fulfill({ status: 401, json: { detail: 'Требуется вход' } });
-    }
-    return route.fallback();
+    if (url.pathname.startsWith('/api/v1/workouts/')) directProductionRequests.push(url.pathname);
   });
-}
+  await installDemoTransport(page);
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
+  await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
+  await expect(page.locator('.demo-cabinet-primary')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=plan');
+  await expect(page.getByRole('heading', { name: 'План', level: 1 })).toBeVisible();
+  await page.getByRole('link', { name: 'Сегодня', exact: true }).first().click();
+  await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=today');
+  await page.getByRole('button', { name: 'Начать тренировку' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Верх тела · уверенный старт', level: 2 }),
+  ).toBeVisible();
+  await page
+    .getByRole('spinbutton', { name: 'Вес, Жим гантелей лёжа с контролируемой паузой, подход 3' })
+    .fill('19');
+  await page
+    .getByRole('spinbutton', {
+      name: 'Повторы, Жим гантелей лёжа с контролируемой паузой, подход 3',
+    })
+    .fill('8');
+  const setButton = page.getByRole('button', { name: /Завершить:.*подход 3/ });
+  await setButton.click();
+  await expect(page.locator('.active-workout-rest')).toBeVisible();
+  await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
+  await expect
+    .poll(() =>
+      transportPayloads.some((payload) => {
+        const body = payload.body;
+        return (
+          payload.path.startsWith('/api/v1/workouts/sets/') &&
+          typeof body === 'object' &&
+          body !== null &&
+          'actual_weight' in body &&
+          body.actual_weight === 19 &&
+          'actual_reps' in body &&
+          body.actual_reps === 8 &&
+          'is_completed' in body &&
+          body.is_completed === true
+        );
+      }),
+    )
+    .toBe(true);
+  await expect(page.getByRole('button', { name: 'Начать тренировку' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Завершить тренировку' }).click();
+  await expect(page.getByRole('heading', { name: 'Тренировка завершена', level: 2 })).toBeVisible();
+  await page.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=progress');
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+  await expect(page.getByText('Готово. Вы посмотрели основной сценарий')).toBeVisible();
+  expect(transportRequests.length).toBeGreaterThan(0);
+  expect(transportRequests.every((request) => request.method === 'POST')).toBe(true);
+  expect(transportRequests.every((request) => Boolean(request.demoSession))).toBe(true);
+  expect(directProductionRequests).toEqual([]);
+});
 
-async function completeScenario(page: Page, scenario: DemoScenario) {
-  if (scenario === 'self_training') {
-    await page.getByRole('button', { name: 'Продолжить' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Активная программа и расписание на неделю' }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: 'Продолжить' }).click();
-    await expect(page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
-    await page.getByRole('button', { name: 'Начать тренировку' }).click();
-    await page.getByRole('button', { name: 'Завершить текущий подход' }).click();
-    await page.getByRole('button', { name: 'Завершить тренировку' }).click();
-    if (CAPTURE && page.viewportSize()?.width === 360) {
-      await page.screenshot({
-        path: `${SCREENSHOT_DIR}/mobile-web-360-training-summary-spacing.png`,
-        fullPage: true,
-      });
-    }
-    await page.getByRole('button', { name: 'Перейти к прогрессу' }).click();
-    await page.getByRole('link', { name: 'Посмотреть прогресс' }).click();
-    await expectMetricSpacing(page, 4);
-  } else if (scenario === 'nutrition') {
-    await page.getByRole('button', { name: 'Продолжить' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Дневной итог рядом с фактическими записями' }),
-    ).toBeVisible();
-    await expectMetricSpacing(page);
-    await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
-    await page.getByRole('button', { name: 'Открыть итог по питанию' }).click();
-    await page.getByRole('link', { name: 'Посмотреть показатели' }).click();
-  } else {
-    await page.getByRole('button', { name: 'Продолжить' }).click();
-    await page
-      .getByLabel('Комментарий к этой тренировке')
-      .fill('Сохраняем темп и добавляем 2,5 кг.');
-    await page.getByRole('button', { name: 'Сохранить комментарий' }).click();
-  }
-  const ownDataCta = page.getByRole('link', { name: 'Начать со своими данными' });
-  await expect(ownDataCta).toBeVisible();
-  await ownDataCta.scrollIntoViewIfNeeded();
-  await expect(ownDataCta).toBeInViewport();
-
-  const isTma = await page.evaluate(() => Boolean(window.Telegram?.WebApp?.initData?.trim()));
-  if (CAPTURE && !isTma) {
-    const width = page.viewportSize()?.width;
-    const shouldCapture =
-      (scenario === 'self_training' && width === 360) ||
-      (scenario === 'nutrition' && width === 390) ||
-      (scenario === 'trainer' && width === 390);
-    if (shouldCapture) {
-      await page.screenshot({
-        path: `${SCREENSHOT_DIR}/mobile-web-${width}-${scenario}-conversion-light.png`,
-        fullPage: true,
-      });
-    }
-  }
-}
-
-async function expectMetricSpacing(page: Page, expectedCount = 3) {
-  const metrics = page.locator('.demo-cabinet-metrics').first();
-  await expect(metrics).toBeVisible();
-  await expect(metrics.locator('.ui-metric')).toHaveCount(expectedCount);
-  const gaps = await metrics.evaluate((element) => {
-    const styles = getComputedStyle(element);
-    return { column: Number.parseFloat(styles.columnGap), row: Number.parseFloat(styles.rowGap) };
-  });
-  expect(gaps.column).toBeGreaterThanOrEqual(8);
-  expect(gaps.row).toBeGreaterThanOrEqual(8);
-}
-
-async function expectPrimaryContract(page: Page) {
-  const primary = page.locator('.demo-cabinet .ui-button.ui-button--primary').first();
-  await expect(primary).toBeVisible();
-  await page.mouse.move(1, 1);
-  const contract = await primary.evaluate(() => {
-    const sample = document.createElement('span');
-    sample.style.backgroundColor = 'var(--v2-lime)';
-    sample.style.borderRadius = 'var(--radius-action)';
-    document.body.append(sample);
-    const expected = getComputedStyle(sample);
-    const result = {
-      expectedBackground: expected.backgroundColor,
-      expectedRadius: expected.borderRadius,
-    };
-    sample.remove();
-    return result;
-  });
-  await expect(primary).toHaveCSS('background-color', contract.expectedBackground);
-  await expect(primary).toHaveCSS('border-radius', contract.expectedRadius);
-}
-
-async function expectSelectionContract(page: Page) {
-  const active = page.locator('.demo-route__steps li.is-current');
-  const contract = await active.evaluate(() => {
-    const sample = document.createElement('span');
-    sample.style.borderColor = 'var(--v2-lime)';
-    sample.style.borderRadius = 'var(--v2-compact-radius)';
-    document.body.append(sample);
-    const expected = getComputedStyle(sample);
-    const result = {
-      boundary: expected.borderColor,
-      radius: expected.borderRadius,
-    };
-    sample.remove();
-    return result;
-  });
-  await expect(active).toHaveCSS('border-color', contract.boundary);
-  await expect(active).toHaveCSS('border-radius', contract.radius);
-}
-
-async function openMobilePage(browser: Browser, scenario: DemoScenario, width: 360 | 390 | 430) {
-  const viewport =
-    width === 360
-      ? MOBILE_CONTEXTS.compact
-      : width === 390
-        ? MOBILE_CONTEXTS.baseline
-        : MOBILE_CONTEXTS.large;
-  const context = await browser.newContext({
-    viewport,
-    hasTouch: true,
-    isMobile: true,
-    reducedMotion: TASK_74A_DEMO_VIDEO ? 'no-preference' : 'reduce',
-    recordVideo: TASK_74A_DEMO_VIDEO
-      ? { dir: '../.artifacts/videos/task-74a/demo', size: viewport }
-      : undefined,
-  });
-  const page = await context.newPage();
-  const api = LIVE_DEMO ? null : await installDemoApi(page);
-  await page.goto(`/demo?scenario=${scenario}`);
-  return { api, context, page };
-}
-
-test('three curated scenarios work at compact Mobile Web widths without visual forks', async ({
+test('nutrition and coach scenarios render shared production surfaces with local mutations', async ({
   browser,
 }) => {
-  for (const scenario of ['self_training', 'nutrition', 'trainer'] as const) {
-    for (const width of [360, 390] as const) {
-      const { context, page } = await openMobilePage(browser, scenario, width);
+  const nutritionContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const nutritionPage = await nutritionContext.newPage();
+  await installDemoTransport(nutritionPage);
+  await nutritionPage.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
+  await expect(nutritionPage.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
+  await expect(nutritionPage.getByRole('button', { name: 'Быстрый ввод' })).toBeVisible();
+  await nutritionPage.getByRole('button', { name: 'Быстрый ввод' }).click();
+  await expect(nutritionPage.getByRole('dialog')).toBeVisible();
+  await nutritionPage.getByRole('spinbutton', { name: 'Калории' }).fill('420');
+  await nutritionPage.getByRole('button', { name: 'Сохранить Quick Add' }).click();
+  await expect(
+    nutritionPage.getByText('Овсяная каша с бананом и греческим йогуртом'),
+  ).toBeVisible();
+  await nutritionPage.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(nutritionPage).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=progress');
+  await expect(nutritionPage.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+  await expect(nutritionPage.getByText('Готово. Вы посмотрели основной сценарий')).toBeVisible();
+  await nutritionContext.close();
+
+  const planContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const planPage = await planContext.newPage();
+  await installDemoTransport(planPage);
+  await planPage.goto('/demo?cabinet=1&scenario=self_training&section=plan');
+  await expect(planPage.getByText(/Управление программой недоступно/)).toBeVisible();
+  await expect(planPage.locator('fieldset.demo-capability-fieldset')).toHaveAttribute(
+    'disabled',
+    '',
+  );
+  await expect(planPage.getByRole('link', { name: 'Управление программой' })).toHaveCount(0);
+  await captureEvidence(planPage, 'disabled-plan-390x844-light.png');
+  await planContext.close();
+
+  const trainerContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const trainerPage = await trainerContext.newPage();
+  await installDemoTransport(trainerPage);
+  await trainerPage.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
+  await expect(trainerPage.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
+  await expect(trainerPage.getByRole('button', { name: 'Пригласить клиента' })).toBeDisabled();
+  await expect(trainerPage.getByRole('button', { name: /^Алексей/ })).toBeVisible();
+  await trainerPage.getByRole('button', { name: /^Алексей/ }).click();
+  await trainerPage.getByRole('link', { name: 'Тренировки и прогресс' }).click();
+  const progressDisclosure = trainerPage.locator('details#coach-client-progress');
+  if ((await progressDisclosure.getAttribute('open')) === null) {
+    await progressDisclosure.locator(':scope > summary').click();
+  }
+  await expect(progressDisclosure).toHaveAttribute('open', '');
+  await expect(trainerPage.getByText('Лента тренировок')).toBeVisible();
+  const workoutTitle = trainerPage.getByText('Ноги и корпус', { exact: true }).last();
+  await expect(workoutTitle).toBeVisible();
+  await workoutTitle.click();
+  await trainerPage.getByText('Комментарий тренера', { exact: true }).click();
+  await trainerPage.getByLabel('Комментарий', { exact: true }).fill('Хороший контроль темпа.');
+  await trainerPage.getByRole('button', { name: 'Отправить комментарий' }).click();
+  await expect(trainerPage.getByText('Хороший контроль темпа.')).toBeVisible();
+  await trainerContext.close();
+});
+
+test('demo exposes deterministic loading and error states without leaving the boundary', async ({
+  browser,
+}) => {
+  const loadingContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const loadingPage = await loadingContext.newPage();
+  await installDemoTransport(loadingPage);
+  let pendingSessionRoute: import('@playwright/test').Route | null = null;
+  await loadingPage.route('**/api/v1/demo/sessions', async (route) => {
+    if (route.request().method() === 'POST') {
+      pendingSessionRoute = route;
+      return;
+    }
+    await route.fallback();
+  });
+  await loadingPage.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  await expect(loadingPage.locator('[data-demo-state="loading"]')).toBeVisible();
+  await expect(loadingPage.getByText('Готовим демо-кабинет…')).toBeVisible();
+  await captureEvidence(loadingPage, 'loading-390x844-light.png');
+  expect(pendingSessionRoute).not.toBeNull();
+  await pendingSessionRoute!.abort();
+  await expect(loadingPage.locator('[data-demo-state="error"]')).toBeVisible();
+  await captureEvidence(loadingPage, 'error-aborted-390x844-light.png');
+  await loadingContext.close();
+
+  const errorContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const errorPage = await errorContext.newPage();
+  await installDemoTransport(errorPage);
+  await errorPage.route('**/api/v1/demo/sessions', async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 503, json: { detail: 'Демо временно недоступно.' } });
+      return;
+    }
+    await route.fallback();
+  });
+  await errorPage.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  await expect(errorPage.locator('[data-demo-state="error"]')).toBeVisible();
+  await expect(errorPage.getByText('Демо временно недоступно.')).toBeVisible();
+  await expect(errorPage.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
+  await captureEvidence(errorPage, 'error-503-390x844-light.png');
+  await errorContext.close();
+});
+
+test('demo reload, reset, expiry and isolated sessions preserve the session boundary', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  await installDemoTransport(page);
+  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  await page.getByRole('button', { name: 'Начать тренировку' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Верх тела · уверенный старт', level: 2 }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: /Завершить:.*подход 3/ }).click();
+  await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Начать заново', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
+
+  const expiredSession = async (route: import('@playwright/test').Route) => {
+    await route.fulfill({
+      status: 410,
+      json: { detail: 'Демо-сессия истекла. Начните новый сценарий.' },
+    });
+  };
+  await page.route('**/api/v1/demo/sessions/current', expiredSession);
+  await page.reload();
+  await expect(page.locator('[data-demo-state="error"]')).toBeVisible();
+  await expect(page.getByText('Демо-сессия истекла. Начните новый сценарий.')).toBeVisible();
+  await page.unroute('**/api/v1/demo/sessions/current', expiredSession);
+  await page.getByRole('button', { name: 'Повторить' }).click();
+  await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
+  await context.close();
+
+  const firstContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const secondContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
+  const firstPage = await firstContext.newPage();
+  const secondPage = await secondContext.newPage();
+  await installDemoTransport(firstPage);
+  await installDemoTransport(secondPage);
+  await firstPage.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  await secondPage.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  await firstPage.getByRole('button', { name: 'Начать тренировку' }).click();
+  await firstPage.getByRole('button', { name: /Завершить:.*подход 3/ }).click();
+  await expect(firstPage.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
+  await expect(secondPage.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
+  await expect(secondPage.getByText('Все подходы отмечены — можно завершать.')).toHaveCount(0);
+  await firstContext.close();
+  await secondContext.close();
+});
+
+test('production composition keeps responsive geometry, utility and keyboard focus in light and dark demo states', async ({
+  browser,
+}) => {
+  for (const viewport of DEMO_VIEWPORTS) {
+    for (const colorScheme of ['light', 'dark'] as const) {
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        colorScheme,
+        isMobile: viewport.mobile,
+        hasTouch: viewport.mobile,
+      });
+      const page = await context.newPage();
+      await installDemoTransport(page);
+      await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
       await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
-      const moreButton = page.getByRole('button', { name: 'Сценарии' });
-      const themeToggle = page.getByRole('button', { name: /Включить (тёмную|светлую) тему/ });
-      if (width < 900) {
-        await moreButton.click();
+      await expect(page.locator('.app-bottom-nav')).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+      await expectDockWithinViewport(page);
+      await expectElementsWithinHorizontalViewport(
+        page,
+        '.demo-cabinet-boundary, .demo-route, .app-section',
+      );
+
+      if (viewport.mobile) {
+        const moreButton = page.getByRole('button', { name: 'Сценарии', exact: true });
+        await moreButton.focus();
+        await expect(moreButton).toBeFocused();
+        await moreButton.press('Enter');
         await expect(page.locator('#appMorePanel')).toBeVisible();
-        await expect(themeToggle).toBeVisible();
-        await expectTouchTargets(themeToggle);
-        await page.getByRole('button', { name: 'Закрыть меню' }).click();
-      } else {
-        await expect(themeToggle).toBeVisible();
-        await expectTouchTargets(themeToggle);
-      }
-      await expectNoHorizontalOverflow(page);
-      await expectTouchTargets(page.locator('.demo-route .ui-button'));
-      await expectSelectionContract(page);
-      if (width === 360 && scenario === 'self_training') {
-        await moreButton.click();
-        const mobileThemeToggle = page
-          .locator('#appMorePanel')
-          .getByRole('button', { name: 'Включить тёмную тему' });
-        await mobileThemeToggle.click();
-        await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-        await page
-          .locator('#appMorePanel')
-          .getByRole('button', { name: 'Включить светлую тему' })
-          .click();
-        await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
-        await page.getByRole('button', { name: 'Закрыть меню' }).click();
-        const activeButton = page.locator('.demo-route__steps li.is-current');
-        const [buttonBox, labelBox] = await Promise.all([
-          activeButton.boundingBox(),
-          activeButton.locator('strong').boundingBox(),
-        ]);
-        expect(buttonBox).not.toBeNull();
-        expect(labelBox).not.toBeNull();
-        expect(labelBox!.x - buttonBox!.x).toBeGreaterThanOrEqual(8);
-        expect(
-          buttonBox!.x + buttonBox!.width - labelBox!.x - labelBox!.width,
-        ).toBeGreaterThanOrEqual(8);
-        const trainingEntry = page.getByRole('button', { name: 'Начать тренировку' });
-        await trainingEntry.scrollIntoViewIfNeeded();
-        await expect(trainingEntry).toBeInViewport();
-        if (CAPTURE) {
-          await page.screenshot({
-            path: `${SCREENSHOT_DIR}/mobile-web-360-training-entry-light.png`,
-            fullPage: true,
-          });
-        }
-      }
-      await expectPrimaryContract(page);
-      await completeScenario(page, scenario);
-      await expectNoHorizontalOverflow(page);
-      if (CAPTURE && scenario === 'self_training' && width === 360) {
-        await page.screenshot({
-          path: `${SCREENSHOT_DIR}/mobile-web-360-training-light.png`,
-          fullPage: true,
+        await expect(page.locator('#appMorePanel .app-more-panel__close')).toBeFocused();
+        await page.keyboard.press('Escape');
+        await expect(moreButton).toBeFocused();
+
+        const safeArea = await page.evaluate(() => {
+          document.documentElement.style.setProperty('--yfc-tg-safe-bottom', '24px');
+          document.documentElement.style.setProperty('--yfc-tg-content-safe-bottom', '12px');
+          return {
+            safeBottom: document.documentElement.style.getPropertyValue('--yfc-tg-safe-bottom'),
+            contentSafeBottom: document.documentElement.style.getPropertyValue(
+              '--yfc-tg-content-safe-bottom',
+            ),
+          };
         });
+        expect(safeArea).toEqual({ safeBottom: '24px', contentSafeBottom: '12px' });
+      } else {
+        await expect(page.locator('.app-bottom-nav__utility')).toBeVisible();
+        await expect(
+          page.locator('.app-bottom-nav__utility .app-bottom-nav__demo-exit'),
+        ).toBeVisible();
       }
+      await captureEvidence(page, `${viewport.name}-${colorScheme}-today.png`);
       await context.close();
     }
   }
-
-  const { context, page } = await openMobilePage(browser, 'nutrition', 430);
-  await expectNoHorizontalOverflow(page);
-  await expect(
-    page.locator('.demo-cabinet-primary').getByRole('link', { name: 'Открыть дневник' }),
-  ).toBeVisible();
-  await context.close();
-});
-
-test('signed TMA launch does not open the Web-only demo', async ({ browser }) => {
-  const context = await browser.newContext({
-    viewport: MOBILE_CONTEXTS.baseline,
-    hasTouch: true,
-    isMobile: true,
-    reducedMotion: 'reduce',
-  });
-  const page = await context.newPage();
-  const requestedPaths: string[] = [];
-  page.on('request', (request) => requestedPaths.push(new URL(request.url()).pathname));
-  await installTelegramHarness(page, { colorScheme: 'dark' });
-  await installAuthApi(page);
-
-  await page.goto('/demo?scenario=trainer&tgWebAppPlatform=android');
-
-  await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
-  await expect(page.getByText('Демо', { exact: true })).toHaveCount(0);
-  expect(requestedPaths.some((path) => path.includes('/api/v1/demo/'))).toBe(false);
-  expect(requestedPaths.some((path) => path.includes('/auth/telegram/init'))).toBe(true);
-  await context.close();
-
-  const failedSdkContext = await browser.newContext({ viewport: MOBILE_CONTEXTS.baseline });
-  const failedSdkPage = await failedSdkContext.newPage();
-  const failedSdkRequests: string[] = [];
-  failedSdkPage.on('request', (request) => failedSdkRequests.push(new URL(request.url()).pathname));
-  await failedSdkPage.route('https://telegram.org/js/telegram-web-app.js', (route) =>
-    route.abort(),
-  );
-  await installAuthApi(failedSdkPage);
-  await failedSdkPage.goto('/demo?scenario=trainer&tgWebAppPlatform=android');
-
-  await expect(failedSdkPage).not.toHaveURL(/\/demo/);
-  await expect(failedSdkPage.getByText('Демо', { exact: true })).toHaveCount(0);
-  expect(failedSdkRequests.some((path) => path.includes('/api/v1/demo/'))).toBe(false);
-  await failedSdkContext.close();
-});
-
-test('Web cabinet preview uses production shell across the required viewport matrix', async ({
-  browser,
-}) => {
-  const viewports = [
-    { name: 'mobile-360-light', width: 360, height: 800, touch: true, dark: false },
-    { name: 'mobile-390-light', width: 390, height: 844, touch: true, dark: false },
-    { name: 'mobile-390-dark', width: 390, height: 844, touch: true, dark: true },
-    { name: 'mobile-430-light', width: 430, height: 932, touch: true, dark: false },
-    { name: 'tablet-768-light', width: 768, height: 900, touch: true, dark: false },
-    { name: 'desktop-1280-light', width: 1280, height: 720, touch: false, dark: false },
-    { name: 'desktop-1366-light', width: 1366, height: 768, touch: false, dark: false },
-    { name: 'desktop-1440-dark', width: 1440, height: 900, touch: false, dark: true },
-    { name: 'desktop-1920-light', width: 1920, height: 1080, touch: false, dark: false },
-  ] as const;
-
-  for (const viewport of viewports) {
-    const context = await browser.newContext({
-      viewport: { width: viewport.width, height: viewport.height },
-      hasTouch: viewport.touch,
-      isMobile: viewport.width < 768,
-      colorScheme: viewport.dark ? 'dark' : 'light',
-      reducedMotion: 'reduce',
-    });
-    const page = await context.newPage();
-    const consoleErrors: string[] = [];
-    const pageErrors: string[] = [];
-    page.on('console', (message) => {
-      if (message.type() === 'error') consoleErrors.push(message.text());
-    });
-    page.on('pageerror', (error) => pageErrors.push(error.message));
-    await installDemoApi(page);
-    await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
-
-    await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
-    await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
-    const weekLegendSummary = page.locator('.week-strip__legend-summary');
-    const weekLegend = page.getByRole('list', { name: 'Обозначения недели' });
-    const weekStrip = page.locator('.week-strip');
-    const legendDisclosure = page.locator('.week-strip__legend-disclosure');
-    const focusGrid = page.locator('.demo-cabinet-focus-grid');
-    await expect(weekLegendSummary).toBeVisible();
-    await expect(weekLegendSummary).toHaveText('Обозначения');
-    await expect(weekLegend).toBeHidden();
-    expect((await weekLegendSummary.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-    const collapsedWeekBox = await weekStrip.boundingBox();
-    const legendDisclosureBox = await legendDisclosure.boundingBox();
-    const collapsedFocusBox = await focusGrid.boundingBox();
-    const summaryLabelBox = await page.locator('.week-strip__legend-summary-label').boundingBox();
-    expect(collapsedWeekBox).not.toBeNull();
-    expect(legendDisclosureBox).not.toBeNull();
-    expect(collapsedFocusBox).not.toBeNull();
-    expect(summaryLabelBox).not.toBeNull();
-    expect(
-      Math.abs((summaryLabelBox?.x ?? 0) - ((legendDisclosureBox?.x ?? 0) + 2)),
-    ).toBeLessThanOrEqual(1);
-    if (viewport.touch) {
-      await weekLegendSummary.click();
-    } else {
-      await weekLegendSummary.focus();
-      await page.keyboard.press('Enter');
-    }
-    await expect(weekLegend).toBeVisible();
-    const expandedWeekBox = await weekStrip.boundingBox();
-    const expandedFocusBox = await focusGrid.boundingBox();
-    expect((expandedWeekBox?.height ?? 0) - (collapsedWeekBox?.height ?? 0)).toBeGreaterThan(0);
-    expect(expandedFocusBox).not.toBeNull();
-    await expect(weekLegend).toContainText('Силовая');
-    await expect(weekLegend).toContainText('Кардио');
-    await expect(weekLegend).toContainText('Отдых');
-    await expect(weekLegend).toContainText('Выполнено');
-    const legendCenterOffset = await weekLegend.evaluate((legend) => {
-      const legendItems = Array.from(legend.querySelectorAll<HTMLElement>(':scope > li'));
-      const firstItem = legendItems[0];
-      if (!firstItem) return Number.POSITIVE_INFINITY;
-      const availableBox = legend.getBoundingClientRect();
-      const rowTop = firstItem.getBoundingClientRect().top;
-      const firstRowItems = legendItems.filter(
-        (item) => Math.abs(item.getBoundingClientRect().top - rowTop) <= 1,
-      );
-      const firstBox = firstRowItems[0]?.getBoundingClientRect();
-      const lastBox = firstRowItems.at(-1)?.getBoundingClientRect();
-      if (!firstBox || !lastBox) return Number.POSITIVE_INFINITY;
-      const rowCenter = (firstBox.left + lastBox.right) / 2;
-      return Math.abs(rowCenter - (availableBox.left + availableBox.width / 2));
-    });
-    expect(legendCenterOffset).toBeLessThanOrEqual(2);
-    await expectNoHorizontalOverflow(page);
-    await expectNoOverlap(
-      page.locator('.demo-cabinet-boundary'),
-      page.locator('.demo-cabinet-title'),
-    );
-    await expectNoOverlap(page.locator('.week-strip'), page.locator('.demo-cabinet-focus-grid'));
-
-    const scenarioSelector = page.getByLabel('Сценарий демо');
-    const moreButton = page.getByRole('button', { name: 'Сценарии' });
-    await expect(scenarioSelector).toBeVisible();
-    if (viewport.width >= 900) {
-      await expect(moreButton).toBeHidden();
-      await expect(
-        page.locator('.app-bottom-nav__utility .app-bottom-nav__demo-exit'),
-      ).toBeVisible();
-      await expect(page.getByText('Отдельная сессия', { exact: true })).toHaveCount(0);
-      await expect(page.getByRole('img', { name: /Аватар/ })).toHaveCount(0);
-    } else {
-      await expect(moreButton).toBeVisible();
-    }
-
-    const primary = page.getByRole('button', { name: 'Начать тренировку' });
-    await primary.scrollIntoViewIfNeeded();
-    await expect(primary).toBeInViewport();
-    await expect(primary).toHaveCSS('border-radius', '14px');
-    await expect(primary).toHaveCSS('background-color', 'rgb(178, 245, 32)');
-    if (viewport.touch) {
-      await expectTouchTargets(page.locator('#appBottomNav .app-bottom-nav__primary > *'));
-      await expectTouchTargets(primary);
-    }
-    if (
-      CABINET_CAPTURE &&
-      [
-        'mobile-360-light',
-        'mobile-390-light',
-        'mobile-390-dark',
-        'desktop-1280-light',
-        'desktop-1440-dark',
-      ].includes(viewport.name)
-    ) {
-      await page.screenshot({
-        path: `${CABINET_SCREENSHOT_DIR}/${viewport.name}-today.png`,
-      });
-    }
-    if (
-      TASK_74_CAPTURE &&
-      ['mobile-360-light', 'mobile-390-dark', 'desktop-1280-light', 'desktop-1440-dark'].includes(
-        viewport.name,
-      )
-    ) {
-      await page.screenshot({
-        path: `${TASK_74_SCREENSHOT_DIR}/cabinet-${viewport.name}-today.png`,
-      });
-    }
-    if (TASK_273_CAPTURE) {
-      await page.screenshot({
-        path: `${TASK_273_SCREENSHOT_DIR}/demo-${viewport.name}-today.png`,
-        fullPage: true,
-      });
-    }
-    if (viewport.width >= 900) {
-      await page.getByRole('link', { name: 'Питание', exact: true }).click();
-      const metricSpacing = await page
-        .locator('.demo-cabinet-metrics')
-        .first()
-        .evaluate((node) => {
-          const groupStyle = window.getComputedStyle(node);
-          const firstMetric = node.querySelector<HTMLElement>('.ui-metric');
-          const metricStyle = firstMetric ? window.getComputedStyle(firstMetric) : null;
-          return {
-            gap: Number.parseFloat(groupStyle.columnGap),
-            paddingLeft: Number.parseFloat(metricStyle?.paddingLeft ?? '0'),
-          };
-        });
-      expect(metricSpacing.gap).toBeGreaterThan(0);
-      expect(metricSpacing.paddingLeft).toBeGreaterThan(0);
-    }
-    expect(consoleErrors).toEqual([]);
-    expect(pageErrors).toEqual([]);
-    await context.close();
-  }
-});
-
-test('three Web presets keep linked state, conversion and browser history inside the allowlist', async ({
-  browser,
-}) => {
-  const training = await openMobilePage(browser, 'self_training', 390);
-  await training.page.goto('/demo?cabinet=1&scenario=self_training&section=today');
-  await training.page.getByRole('button', { name: 'Продолжить' }).click();
-  await expect(
-    training.page.getByRole('heading', { name: 'Активная программа и расписание на неделю' }),
-  ).toBeVisible();
-  await training.page.getByRole('button', { name: 'Продолжить' }).click();
-  await expect(training.page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
-  await training.page.getByRole('button', { name: 'Начать тренировку' }).click();
-  await training.page.getByRole('button', { name: 'Завершить текущий подход' }).click();
-  await training.page.getByRole('button', { name: 'Завершить тренировку' }).click();
-  await training.page.getByRole('button', { name: 'Перейти к прогрессу' }).click();
-  await training.page.getByRole('link', { name: 'Посмотреть прогресс' }).click();
-  await expect(training.page).toHaveURL(/section=progress/);
-  await expect(training.page.locator('.demo-cabinet-progress .demo-cabinet-metrics')).toContainText(
-    '6 840 кг',
-  );
-  await expect(
-    training.page.getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
-  ).toBeVisible();
-  if (CABINET_CAPTURE) {
-    await training.page
-      .getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' })
-      .scrollIntoViewIfNeeded();
-    await training.page.screenshot({
-      path: `${CABINET_SCREENSHOT_DIR}/mobile-390-training-result-light.png`,
-    });
-  }
-  if (TASK_273_CAPTURE) {
-    await training.page.screenshot({
-      path: `${TASK_273_SCREENSHOT_DIR}/demo-mobile-390-training-conversion.png`,
-      fullPage: true,
-    });
-  }
-  await training.context.close();
-
-  const nutrition = await openMobilePage(browser, 'nutrition', 430);
-  await nutrition.page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
-  await nutrition.page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
-  await expect(nutrition.page.getByText('1588 / 2150')).toBeVisible();
-  await nutrition.page.getByRole('link', { name: /Прогресс/ }).click();
-  await expect(
-    nutrition.page.getByRole('progressbar', { name: 'Дневной итог питания: 74 из 100 %' }),
-  ).toBeVisible();
-  await nutrition.page.goBack();
-  await expect(nutrition.page).toHaveURL(/section=nutrition/);
-  await nutrition.page.goForward();
-  await expect(nutrition.page).toHaveURL(/section=progress/);
-  await nutrition.page.reload();
-  await expect(
-    nutrition.page.getByRole('progressbar', { name: 'Дневной итог питания: 74 из 100 %' }),
-  ).toBeVisible();
-  if (CABINET_CAPTURE) {
-    await nutrition.page.screenshot({
-      path: `${CABINET_SCREENSHOT_DIR}/mobile-430-nutrition-linked-light.png`,
-    });
-  }
-  if (TASK_273_CAPTURE) {
-    await nutrition.page.screenshot({
-      path: `${TASK_273_SCREENSHOT_DIR}/demo-mobile-430-nutrition-progress.png`,
-      fullPage: true,
-    });
-  }
-  await nutrition.context.close();
-
-  const trainer = await openMobilePage(browser, 'trainer', 390);
-  await trainer.page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
-  await expect(
-    trainer.page.getByRole('heading', { name: 'Разбор результата клиента' }),
-  ).toBeVisible();
-  await expect(trainer.page.getByLabel('Комментарий к этой тренировке')).toBeVisible();
-  if (CABINET_CAPTURE) {
-    await trainer.page.screenshot({
-      path: `${CABINET_SCREENSHOT_DIR}/mobile-390-trainer-entry-light.png`,
-    });
-  }
-  const trainerComment = trainer.page.getByLabel('Комментарий к этой тренировке');
-  const saveComment = trainer.page.getByRole('button', { name: 'Сохранить комментарий' });
-  await trainerComment.focus();
-  await expect(trainer.page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
-  await expect(trainer.page.locator('#appBottomNav')).toBeHidden();
-  await trainerComment.fill('Сохраняем темп и добавляем 2,5 кг.');
-  await saveComment.scrollIntoViewIfNeeded();
-  await expect(saveComment).toBeInViewport();
-  await saveComment.click();
-  await expect(trainer.page.getByText('Комментарий сохранён до конца демо-сессии')).toBeVisible();
-  await expect(
-    trainer.page.getByRole('button', { name: 'Пригласить нового клиента' }),
-  ).toBeDisabled();
-  await expect(
-    trainer.page.getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
-  ).toBeVisible();
-  if (CABINET_CAPTURE) {
-    await trainer.page
-      .getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' })
-      .scrollIntoViewIfNeeded();
-    await trainer.page.screenshot({
-      path: `${CABINET_SCREENSHOT_DIR}/mobile-390-trainer-result-light.png`,
-    });
-  }
-  if (TASK_273_CAPTURE) {
-    await trainer.page.screenshot({
-      path: `${TASK_273_SCREENSHOT_DIR}/demo-mobile-390-trainer-conversion.png`,
-      fullPage: true,
-    });
-  }
-  await trainer.context.close();
-});
-
-test('desktop demo keeps metric groups separated and conversion copy honest', async ({
-  browser,
-}) => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
-  const page = await context.newPage();
-  if (!LIVE_DEMO) await installDemoApi(page);
-  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
-
-  await expect(page.getByRole('button', { name: 'Сценарии' })).toBeHidden();
-  const scenarioSelector = page.getByLabel('Сценарий демо');
-  await expect(scenarioSelector).toHaveValue('nutrition');
-  await expect(scenarioSelector.locator('option')).toHaveText([
-    'Тренировка',
-    'Питание и прогресс',
-    'Работа тренера',
-  ]);
-  const scenarioAffordance = await scenarioSelector.evaluate((select) => {
-    const control = select as HTMLSelectElement;
-    const label = select.closest('label');
-    const indicator = label ? window.getComputedStyle(label, '::after') : null;
-    const style = window.getComputedStyle(select);
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    if (context) context.font = style.font;
-    const selectedLabel = control.options[control.selectedIndex]?.text ?? '';
-    return {
-      backgroundImage: style.backgroundImage,
-      duplicateIndicator: indicator?.content ?? 'none',
-      labelWidth: context?.measureText(selectedLabel).width ?? 0,
-      paddingLeft: Number.parseFloat(style.paddingLeft),
-      paddingRight: Number.parseFloat(style.paddingRight),
-      width: select.getBoundingClientRect().width,
-    };
-  });
-  expect(scenarioAffordance.width).toBeGreaterThanOrEqual(220);
-  expect(scenarioAffordance.width).toBeLessThanOrEqual(250);
-  expect(
-    scenarioAffordance.labelWidth +
-      scenarioAffordance.paddingLeft +
-      scenarioAffordance.paddingRight,
-  ).toBeLessThan(scenarioAffordance.width);
-  const railGeometry = await page.locator('#appBottomNav').evaluate((navigation) => {
-    const box = navigation.getBoundingClientRect();
-    const primary = navigation.querySelector<HTMLElement>('.app-bottom-nav__primary');
-    const utility = navigation.querySelector<HTMLElement>('.app-bottom-nav__utility');
-    return {
-      left: box.left,
-      width: box.width,
-      primaryHeight: primary?.getBoundingClientRect().height ?? 0,
-      utilityTop: utility?.getBoundingClientRect().top ?? 0,
-      viewportHeight: window.innerHeight,
-    };
-  });
-  expect(railGeometry.left).toBeLessThanOrEqual(1);
-  expect(railGeometry.width).toBeGreaterThanOrEqual(200);
-  expect(railGeometry.width).toBeLessThanOrEqual(240);
-  expect(railGeometry.primaryHeight).toBeGreaterThan(0);
-  expect(railGeometry.utilityTop).toBeGreaterThan(railGeometry.primaryHeight);
-  expect(railGeometry.utilityTop).toBeLessThan(railGeometry.viewportHeight);
-  await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'Дневной итог рядом с фактическими записями' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
-  await page.getByRole('button', { name: 'Открыть итог по питанию' }).click();
-  await page.getByRole('link', { name: 'Посмотреть показатели' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
-  ).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Начать со своими данными' })).toBeVisible();
-
-  await page.getByRole('link', { name: 'Сегодня', exact: true }).click();
-  const pictogramSizes = await page.locator('.week-strip__pictogram').evaluateAll((pictograms) =>
-    pictograms.map((pictogram) => {
-      const box = pictogram.getBoundingClientRect();
-      return { height: box.height, width: box.width };
-    }),
-  );
-  expect(pictogramSizes.length).toBeGreaterThan(0);
-  expect(
-    pictogramSizes.every(
-      (size) => Math.abs(size.width - 16) <= 0.1 && Math.abs(size.height - 16) <= 0.1,
-    ),
-  ).toBe(true);
-  const statusGeometry = await page.evaluate(() => {
-    const geometry = (kind: string) => {
-      const pictogram = document.querySelector<HTMLElement>(
-        `.week-strip__pictogram[data-pictogram="${kind}"]`,
-      );
-      const icon = pictogram?.querySelector<SVGSVGElement>('svg.yfc-icon');
-      if (!pictogram || !icon) return null;
-      const box = icon.getBoundingClientRect();
-      return {
-        viewBox: icon.getAttribute('viewBox'),
-        canvasHeight: pictogram.getBoundingClientRect().height,
-        canvasWidth: pictogram.getBoundingClientRect().width,
-        iconHeight: icon.getBoundingClientRect().height,
-        iconWidth: icon.getBoundingClientRect().width,
-        assetHeight: box.height,
-        assetWidth: box.width,
-      };
-    };
-    return { inProgress: geometry('in-progress'), planned: geometry('planned') };
-  });
-  expect(statusGeometry.planned).toMatchObject({
-    canvasHeight: 16,
-    canvasWidth: 16,
-    viewBox: '0 0 24 24',
-  });
-  expect(statusGeometry.planned?.iconHeight).toBe(16);
-  expect(statusGeometry.planned?.iconWidth).toBe(16);
-  expect(statusGeometry.planned?.assetHeight).toBe(16);
-  expect(statusGeometry.planned?.assetWidth).toBe(16);
-  expect(statusGeometry.inProgress).toMatchObject({
-    canvasHeight: 16,
-    canvasWidth: 16,
-    viewBox: '0 0 24 24',
-  });
-  expect(statusGeometry.inProgress?.iconHeight).toBe(16);
-  expect(statusGeometry.inProgress?.iconWidth).toBe(16);
-  expect(statusGeometry.inProgress?.assetHeight).toBe(16);
-  expect(statusGeometry.inProgress?.assetWidth).toBe(16);
-  const statusColors = await page.evaluate(() => {
-    const color = (kind: string) => {
-      const pictogram = document.querySelector<HTMLElement>(
-        `.week-strip__pictogram[data-pictogram="${kind}"]`,
-      );
-      return pictogram ? window.getComputedStyle(pictogram).color : null;
-    };
-    return {
-      inProgress: color('in-progress'),
-      planned: color('planned'),
-      strength: color('strength'),
-    };
-  });
-  expect(statusColors.planned).toBe(statusColors.strength);
-  expect(statusColors.planned).toBe(statusColors.inProgress);
-  const legendDisclosure = page.locator('.week-strip__legend-disclosure');
-  if ((await legendDisclosure.getAttribute('open')) === null) {
-    await page.locator('.week-strip__legend-summary').click();
-  }
-  await expect(page.getByRole('list', { name: 'Обозначения недели' })).toBeVisible();
-  const legendCenterOffset = await page
-    .locator('.week-strip__legend-disclosure')
-    .evaluate((disclosure) => {
-      const legend = disclosure.querySelector<HTMLElement>('.week-strip__legend');
-      const legendItems = Array.from(legend?.querySelectorAll<HTMLElement>(':scope > li') ?? []);
-      const firstItem = legendItems[0];
-      if (!legend || !firstItem) return Number.POSITIVE_INFINITY;
-      const availableBox = legend.getBoundingClientRect();
-      const rowTop = firstItem.getBoundingClientRect().top;
-      const firstRowItems = legendItems.filter(
-        (item) => Math.abs(item.getBoundingClientRect().top - rowTop) <= 1,
-      );
-      const firstBox = firstRowItems[0]?.getBoundingClientRect();
-      const lastBox = firstRowItems.at(-1)?.getBoundingClientRect();
-      if (!firstBox || !lastBox) return Number.POSITIVE_INFINITY;
-      const legendCenter = (firstBox.left + lastBox.right) / 2;
-      return Math.abs(legendCenter - (availableBox.left + availableBox.width / 2));
-    });
-  expect(legendCenterOffset).toBeLessThanOrEqual(2);
-  await page.getByRole('link', { name: 'Питание', exact: true }).click();
-
-  const nutritionMetrics = page.locator('.demo-cabinet-metrics').first();
-  const nutritionGeometry = await nutritionMetrics.evaluate((node) => {
-    const metrics = Array.from(node.querySelectorAll<HTMLElement>('.ui-metric'));
-    const first = metrics[0];
-    const second = metrics[1];
-    return {
-      gap: Number.parseFloat(window.getComputedStyle(node).columnGap),
-      firstPaddingLeft: first ? Number.parseFloat(window.getComputedStyle(first).paddingLeft) : 0,
-      renderedGap:
-        first && second
-          ? second.getBoundingClientRect().left - first.getBoundingClientRect().right
-          : 0,
-    };
-  });
-  expect(nutritionGeometry.gap).toBeGreaterThan(0);
-  expect(nutritionGeometry.firstPaddingLeft).toBeGreaterThan(0);
-  expect(nutritionGeometry.renderedGap).toBeGreaterThan(0);
-  if (CABINET_CAPTURE) {
-    await page.screenshot({
-      path: `${CABINET_SCREENSHOT_DIR}/desktop-1280-nutrition-conversion-light.png`,
-    });
-  }
-
-  await page.getByRole('link', { name: 'Прогресс', exact: true }).click();
-  const progressMetrics = page.locator('.demo-cabinet-metrics').first();
-  await expect(progressMetrics).toBeVisible();
-  expect(
-    await progressMetrics.evaluate((node) => window.getComputedStyle(node).columnGap),
-  ).not.toBe('0px');
-  if (CABINET_CAPTURE) {
-    await page.screenshot({
-      path: `${CABINET_SCREENSHOT_DIR}/desktop-1280-progress-conversion-light.png`,
-    });
-  }
-  await context.close();
-});
-
-test('desktop demo selector stays compact, readable and deterministic at layout boundaries', async ({
-  browser,
-}) => {
-  const viewports = [
-    { width: 1280, height: 900 },
-    { width: 1024, height: 900 },
-    { width: 900, height: 900 },
-  ];
-
-  for (const viewport of viewports) {
-    const context = await browser.newContext({ viewport });
-    const page = await context.newPage();
-    if (!LIVE_DEMO) await installDemoApi(page);
-    await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
-
-    const selector = page.getByLabel('Сценарий демо');
-    await expect(selector).toBeVisible();
-    for (const option of [
-      { label: 'Тренировка', value: 'self_training' },
-      { label: 'Питание и прогресс', value: 'nutrition' },
-      { label: 'Работа тренера', value: 'trainer' },
-    ]) {
-      await selector.selectOption(option.value);
-      await expect(selector).toHaveValue(option.value);
-      await expect(selector.locator('option:checked')).toHaveText(option.label);
-      const fit = await selector.evaluate((select) => {
-        const control = select as HTMLSelectElement;
-        const style = window.getComputedStyle(select);
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        if (context) context.font = style.font;
-        const selectedLabel = control.options[control.selectedIndex]?.text ?? '';
-        return {
-          available:
-            select.clientWidth -
-            Number.parseFloat(style.paddingLeft) -
-            Number.parseFloat(style.paddingRight),
-          label: context?.measureText(selectedLabel).width ?? 0,
-          width: select.getBoundingClientRect().width,
-        };
-      });
-      expect(fit.width).toBeGreaterThanOrEqual(220);
-      expect(fit.width).toBeLessThanOrEqual(250);
-      expect(fit.label).toBeLessThan(fit.available);
-    }
-
-    const layout = await page.locator('.demo-cabinet-boundary').evaluate((boundary) => {
-      const intro = boundary.querySelector<HTMLElement>(':scope > strong');
-      const scenario = boundary.querySelector<HTMLElement>('.demo-cabinet-boundary__scenario');
-      const actions = boundary.querySelector<HTMLElement>('.demo-cabinet-boundary__actions');
-      if (!intro || !scenario || !actions) return null;
-      const introBox = intro.getBoundingClientRect();
-      const scenarioBox = scenario.getBoundingClientRect();
-      const actionsBox = actions.getBoundingClientRect();
-      return {
-        actionsCenter: actionsBox.top + actionsBox.height / 2,
-        introBottom: introBox.bottom,
-        introCenter: introBox.top + introBox.height / 2,
-        scenarioCenter: scenarioBox.top + scenarioBox.height / 2,
-        scenarioTop: scenarioBox.top,
-      };
-    });
-    expect(layout).not.toBeNull();
-    if (viewport.width >= 1100) {
-      expect(
-        Math.abs((layout?.introCenter ?? 0) - (layout?.scenarioCenter ?? 0)),
-      ).toBeLessThanOrEqual(2);
-    } else {
-      expect((layout?.scenarioTop ?? 0) - (layout?.introBottom ?? 0)).toBeGreaterThan(0);
-    }
-    expect(
-      Math.abs((layout?.scenarioCenter ?? 0) - (layout?.actionsCenter ?? 0)),
-    ).toBeLessThanOrEqual(2);
-
-    if (CABINET_CAPTURE) {
-      await page.screenshot({
-        path: `${CABINET_SCREENSHOT_DIR}/desktop-${viewport.width}-selector-trainer-light.png`,
-        fullPage: true,
-      });
-    }
-    await context.close();
-  }
-
-  const forcedColorsContext = await browser.newContext({
-    forcedColors: 'active',
-    viewport: { width: 1280, height: 900 },
-  });
-  const forcedColorsPage = await forcedColorsContext.newPage();
-  if (!LIVE_DEMO) await installDemoApi(forcedColorsPage);
-  await forcedColorsPage.goto('/demo?cabinet=1&scenario=self_training&section=today');
-  const forcedColorsSelect = forcedColorsPage.getByLabel('Сценарий демо');
-  const forcedColorsStyle = await forcedColorsSelect.evaluate((select) => {
-    const style = window.getComputedStyle(select);
-    return { appearance: style.appearance, backgroundImage: style.backgroundImage };
-  });
-  expect(forcedColorsStyle.appearance).toBe('auto');
-  expect(forcedColorsStyle.backgroundImage).toBe('none');
-  await forcedColorsContext.close();
-});
-
-test('Web cabinet auth return stays clean and damaged routes recover safely', async ({
-  browser,
-}) => {
-  const context = await browser.newContext({ viewport: MOBILE_CONTEXTS.baseline, hasTouch: true });
-  const page = await context.newPage();
-  await installDemoApi(page);
-  await installAuthApi(page);
-
-  await page.goto('/demo?cabinet=1&scenario=nutrition&section=admin');
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=today');
-  await page
-    .locator('.demo-cabinet-primary')
-    .getByRole('link', { name: 'Открыть дневник' })
-    .click();
-  await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
-  await page.getByRole('button', { name: 'Открыть итог по питанию' }).click();
-  await page.getByRole('link', { name: 'Посмотреть показатели' }).click();
-  await page.getByRole('link', { name: 'Начать со своими данными' }).click();
-  await expect(page).toHaveURL(
-    '/login?next=%2Fapp&from=demo&scenario=nutrition&cabinet=1&section=progress',
-  );
-  await expect(page.getByText('После демо — чистый профиль')).toBeVisible();
-  if (CABINET_CAPTURE) {
-    await page.screenshot({
-      path: `${CABINET_SCREENSHOT_DIR}/mobile-390-auth-return-light.png`,
-    });
-  }
-  await page.getByRole('link', { name: 'Вернуться в демо' }).click();
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=progress');
-  await expect(
-    page.getByRole('heading', { name: 'Подтверждённые действия становятся историей' }),
-  ).toBeVisible();
-  await context.close();
-});
-
-test('Web cabinet reset, reload, expired and forbidden states are predictable', async ({
-  browser,
-}) => {
-  const { api, context, page } = await openMobilePage(browser, 'nutrition', 390);
-  await page.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
-  await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
-  await page.reload();
-  await expect(page.getByText('1588 / 2150')).toBeVisible();
-  await page.getByRole('button', { name: 'Начать заново' }).click();
-  await expect(page.getByText('1160 / 2150')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Добавить недавний продукт' })).toBeVisible();
-  if (api) api.setUnavailable(true);
-  else await setNetworkOffline(page, true);
-  await page.getByRole('button', { name: 'Добавить недавний продукт' }).click();
-  await expect(page.getByText(/Нет соединения с сервером/)).toBeVisible();
-  if (api) api.setUnavailable(false);
-  else await setNetworkOffline(page, false);
-  await page.getByRole('button', { name: 'Повторить' }).click();
-  await expect(page.getByRole('button', { name: 'Добавить недавний продукт' })).toBeVisible();
-  await context.close();
-
-  if (LIVE_DEMO) return;
-
-  for (const status of [410, 403] as const) {
-    const stateContext = await browser.newContext({ viewport: MOBILE_CONTEXTS.baseline });
-    const statePage = await stateContext.newPage();
-    await statePage.addInitScript(() => {
-      sessionStorage.setItem(
-        'fit_demo_sessions_v1',
-        JSON.stringify({ self_training: 'forced-demo-token-000000000000000000000000' }),
-      );
-    });
-    await installDemoApi(statePage, status);
-    await statePage.goto('/demo?cabinet=1&scenario=self_training&section=today');
-    await expect(
-      statePage.getByText(status === 410 ? /Демо-сессия истекла/ : /действие недоступно/),
-    ).toBeVisible();
-    if (CABINET_CAPTURE) {
-      await statePage.screenshot({
-        path: `${CABINET_SCREENSHOT_DIR}/${status === 410 ? 'expired' : 'forbidden'}-390.png`,
-        fullPage: true,
-      });
-    }
-    await stateContext.close();
-  }
-});
-
-test('desktop keeps the canonical content width and separated adjacent regions', async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-  if (!LIVE_DEMO) await installDemoApi(page);
-  await page.goto('/demo?scenario=self_training');
-  await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
-
-  const geometry = await page.evaluate(() => {
-    const main = document.querySelector<HTMLElement>('#appContent')!.getBoundingClientRect();
-    const navigation = document
-      .querySelector<HTMLElement>('#appBottomNav')!
-      .getBoundingClientRect();
-    const cabinet = document.querySelector<HTMLElement>('.demo-cabinet')!.getBoundingClientRect();
-    return {
-      mainWidth: main.width,
-      navigationLeft: navigation.left,
-      navigationRight: navigation.right,
-      cabinetLeft: cabinet.left,
-      cabinetRight: cabinet.right,
-      viewportWidth: document.documentElement.clientWidth,
-    };
-  });
-  expect(geometry.mainWidth).toBeLessThanOrEqual(1180);
-  expect(geometry.navigationLeft).toBeGreaterThanOrEqual(-1);
-  expect(geometry.navigationRight).toBeLessThanOrEqual(250);
-  expect(geometry.cabinetLeft).toBeGreaterThanOrEqual(250);
-  expect(geometry.cabinetRight).toBeLessThanOrEqual(geometry.viewportWidth);
-  if (CAPTURE) {
-    await page.screenshot({
-      path: `${SCREENSHOT_DIR}/desktop-1280-training-light.png`,
-      fullPage: true,
-    });
-  }
-
-  await page.getByRole('button', { name: 'Начать тренировку' }).click();
-  await page.getByRole('button', { name: 'Завершить текущий подход' }).click();
-  await page.getByRole('button', { name: 'Завершить тренировку' }).click();
-  await page.getByRole('button', { name: 'Перейти к прогрессу' }).click();
-  await page.getByRole('link', { name: 'Посмотреть прогресс' }).click();
-  await expectMetricSpacing(page, 4);
-  if (CAPTURE) {
-    await page.screenshot({
-      path: `${SCREENSHOT_DIR}/desktop-1280-training-conversion-light.png`,
-      fullPage: true,
-    });
-  }
-
-  await page.setViewportSize({ width: 768, height: 900 });
-  await expectNoHorizontalOverflow(page);
-  await expectNoOverlap(page.locator('.demo-route'), page.locator('.demo-cabinet-boundary'));
-});
-
-test('Landing entry opens the cabinet and keeps scenario history plus browser auth return explicit', async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    viewport: MOBILE_CONTEXTS.baseline,
-    hasTouch: true,
-    isMobile: true,
-    reducedMotion: 'reduce',
-  });
-  const page = await context.newPage();
-  await installAuthApi(page);
-  await installDemoApi(page);
-
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'СИЛА В ДЕЙСТВИИ.' })).toBeVisible();
-  if (TASK_273_CAPTURE) {
-    await page.screenshot({
-      path: `${TASK_273_SCREENSHOT_DIR}/landing-mobile-390-entry.png`,
-      fullPage: true,
-    });
-  }
-  await page
-    .locator('.landing-hero__actions')
-    .getByRole('link', { name: /Попробовать демо/ })
-    .click();
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=today');
-  await page.getByRole('button', { name: 'Продолжить' }).click();
-  await expect(
-    page.getByRole('heading', { name: 'Активная программа и расписание на неделю' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Продолжить' }).click();
-  await expect(page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
-  await page.getByRole('button', { name: 'Начать тренировку' }).click();
-  await page.getByRole('button', { name: 'Завершить текущий подход' }).click();
-  await page.getByRole('button', { name: 'Завершить тренировку' }).click();
-  await page.getByRole('button', { name: 'Перейти к прогрессу' }).click();
-  await page.getByRole('link', { name: 'Посмотреть прогресс' }).click();
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=progress');
-  await expect(
-    page.getByRole('heading', { name: 'Готово. Вы посмотрели основной сценарий' }),
-  ).toBeVisible();
-  const demoTokenBeforeHandoff = await page.evaluate(() =>
-    sessionStorage.getItem('fit_demo_sessions_v1'),
-  );
-  expect(demoTokenBeforeHandoff).not.toBeNull();
-
-  await page.getByRole('link', { name: 'Начать со своими данными' }).click();
-  await expect(page).toHaveURL(
-    '/login?next=%2Fapp&from=demo&scenario=self_training&cabinet=1&section=progress',
-  );
-  await expect(page.getByText('После демо — чистый профиль')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Продолжить с Google' })).toBeVisible();
-  expect(await page.evaluate(() => sessionStorage.getItem('fit_demo_sessions_v1'))).toBeNull();
-  if (CAPTURE) {
-    await page.screenshot({
-      path: `${SCREENSHOT_DIR}/mobile-web-390-auth-handoff-light.png`,
-      fullPage: true,
-    });
-  }
-
-  await page.getByRole('link', { name: 'Вернуться в демо' }).click();
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=progress');
-  await expect(
-    page.getByRole('heading', { name: 'Подтверждённые действия становятся историей' }),
-  ).toBeVisible();
-  const demoTokenAfterReturn = await page.evaluate(() =>
-    sessionStorage.getItem('fit_demo_sessions_v1'),
-  );
-  expect(demoTokenAfterReturn).not.toBe(demoTokenBeforeHandoff);
-
-  await page.getByRole('button', { name: 'Сценарии' }).click();
-  await page.getByRole('link', { name: 'Питание и прогресс' }).click();
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=today');
-  await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'План на сегодня' })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Сценарий демо' }).selectOption('trainer');
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=trainer&section=trainer');
-  await page.goBack();
-  await expect(page).toHaveURL('/demo?cabinet=1&scenario=nutrition&section=today');
-  await context.close();
-});
-
-test('signed TMA launch clears a stale Web demo session before clean first run', async ({
-  browser,
-}) => {
-  const context = await browser.newContext({
-    viewport: MOBILE_CONTEXTS.baseline,
-    hasTouch: true,
-    isMobile: true,
-    reducedMotion: 'reduce',
-  });
-  const page = await context.newPage();
-  await page.addInitScript(() => {
-    sessionStorage.setItem(
-      'fit_demo_sessions_v1',
-      JSON.stringify({ nutrition: 'stale-web-demo-token-000000000000000000000000' }),
-    );
-  });
-  await installTelegramHarness(page, { colorScheme: 'dark' });
-  await installAuthApi(page);
-  await page.goto('/demo?scenario=nutrition&tgWebAppPlatform=android');
-
-  await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
-  expect(await page.evaluate(() => sessionStorage.getItem('fit_demo_sessions_v1'))).toBeNull();
-  await context.close();
 });

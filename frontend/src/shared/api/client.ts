@@ -1,4 +1,5 @@
 import { crossContextCoordinator, type CrossContextCoordinator } from '../browser/crossContextLock';
+import { getApiRuntime } from '../runtime/runtime';
 
 const ACCESS_TOKEN_KEY = 'fit_access_token';
 const AUTH_CHANNEL_NAME = 'fit_auth_session';
@@ -239,7 +240,33 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   else signal?.addEventListener('abort', abortFromCaller, { once: true });
   const token = getAccessToken();
   const formData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const runtime = getApiRuntime();
   try {
+    if (runtime.kind === 'demo') {
+      if (formData) {
+        throw new ApiError('Загрузка файлов недоступна в демо-режиме.', 403);
+      }
+      const method = (init.method ?? 'GET').toUpperCase();
+      const response = await fetch('/api/v1/demo/sessions/current/transport', {
+        method: 'POST',
+        credentials: 'omit',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Demo-Session': runtime.sessionToken,
+        },
+        body: JSON.stringify({
+          path,
+          method,
+          body: body === undefined ? null : typeof body === 'string' ? body : body,
+        }),
+      });
+      if (!response.ok) throw await responseError(response);
+      if (response.status === 204) return undefined as T;
+      const text = await response.text();
+      if (method !== 'GET' && method !== 'HEAD') void runtime.onMutation?.();
+      return (text ? JSON.parse(text) : null) as T;
+    }
     const response = await fetch(path, {
       ...init,
       credentials: 'same-origin',
@@ -292,6 +319,9 @@ export async function apiFile(
   path: string,
   { retryAuth = true }: { retryAuth?: boolean } = {},
 ): Promise<ApiFile> {
+  if (getApiRuntime().kind === 'demo') {
+    throw new ApiError('Скачивание файлов недоступно в демо-режиме.', 403);
+  }
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 15_000);
   const token = getAccessToken();

@@ -18,11 +18,13 @@ export function Diary({
   timeZone: clientTimeZone,
   onSaved,
   embedded = false,
+  readOnly = false,
 }: {
   clientId?: number;
   timeZone?: string | null;
   onSaved?: () => void | Promise<void>;
   embedded?: boolean;
+  readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -127,177 +129,187 @@ export function Diary({
           </p>
         </div>
         {editingMeasurement && (
-          <Button type="button" variant="secondary" onClick={resetForm}>
+          <Button type="button" variant="secondary" disabled={readOnly} onClick={resetForm}>
             Отменить изменение
           </Button>
         )}
       </header>
-      <form
-        ref={formRef}
-        className="stack measurement-diary__form"
-        aria-busy={mutation.isPending}
-        onSubmit={(e) => {
-          e.preventDefault();
-          mutation.mutate({ path: base, method: 'POST', body: form });
-        }}
-      >
-        <div className="form-grid diary-form-grid">
-          <label className="field">
-            <span>Дата</span>
-            <DateInput
-              controlClassName="diary-date-control"
-              disabled={Boolean(editingMeasurement)}
-              value={form.measured_on || ''}
-              max={today}
-              onChange={(e) => setForm({ ...form, measured_on: e.target.value })}
-            />
-          </label>
-          {numeric.map((key) => (
-            <label className="field" key={key}>
-              <span>
-                {
-                  {
-                    weight_kg: 'Вес, кг',
-                    chest_cm: 'Грудь, см',
-                    waist_cm: 'Талия, см',
-                    hips_cm: 'Бёдра, см',
-                    biceps_cm: 'Плечо (окружность), см',
-                    thigh_cm: 'Бедро (окружность), см',
-                  }[key]
-                }
-              </span>
-              <input
-                type="number"
-                inputMode="decimal"
-                enterKeyHint={key === 'thigh_cm' ? 'done' : 'next'}
-                step="0.1"
-                min={numericLimits[key].min}
-                max={numericLimits[key].max}
-                value={form[key] ?? ''}
-                onChange={(e) =>
-                  setForm({ ...form, [key]: e.target.value === '' ? null : Number(e.target.value) })
-                }
+      {readOnly && (
+        <p className="muted demo-capability-notice" role="status">
+          Изменение замеров доступно после входа. Здесь показаны только подготовленные данные.
+        </p>
+      )}
+      <fieldset className="demo-capability-fieldset" disabled={readOnly}>
+        <form
+          ref={formRef}
+          className="stack measurement-diary__form"
+          aria-busy={mutation.isPending}
+          onSubmit={(e) => {
+            e.preventDefault();
+            mutation.mutate({ path: base, method: 'POST', body: form });
+          }}
+        >
+          <div className="form-grid diary-form-grid">
+            <label className="field">
+              <span>Дата</span>
+              <DateInput
+                controlClassName="diary-date-control"
+                disabled={Boolean(editingMeasurement)}
+                value={form.measured_on || ''}
+                max={today}
+                onChange={(e) => setForm({ ...form, measured_on: e.target.value })}
               />
             </label>
-          ))}
-        </div>
-        <div className="auth-notice stack" aria-label="Как делать замеры">
-          <strong>Как сравнивать замеры</strong>
-          <span>
-            Снимайте их в похожее время суток, в одинаковых условиях и накладывайте ленту в одном
-            месте. Оценивайте несколько замеров, а не единичное колебание.
-          </span>
-          <small className="muted">
-            Окружность плеча не показывает отдельно размер бицепса, а окружность бедра — размер
-            квадрицепса. Эти значения описывают участок тела целиком.
-          </small>
-        </div>
-        <label className="field">
-          <span>Заметка</span>
-          <textarea
-            value={form.note || ''}
-            maxLength={500}
-            onChange={(e) => setForm({ ...form, note: e.target.value })}
-          />
-        </label>
-        {submitError && (
-          <p className="measurement-diary__error" role="alert">
-            {submitError} Введённые значения сохранены — исправьте данные или повторите попытку.
-          </p>
-        )}
-        <div className="measurement-diary__save-dock">
-          <Button
-            className="measurement-diary__save"
-            disabled={mutation.isPending}
-            fullWidth
-            onMouseDown={(event) => {
-              const activeElement = document.activeElement;
-              if (
-                activeElement instanceof HTMLElement &&
-                formRef.current?.contains(activeElement)
-              ) {
-                event.preventDefault();
-              }
-            }}
-            onClick={(event) => {
-              event.preventDefault();
-              formRef.current?.requestSubmit();
-            }}
-            type="submit"
-          >
-            {mutation.isPending
-              ? 'Сохраняем…'
-              : editingMeasurement
-                ? 'Сохранить изменения'
-                : 'Сохранить замер'}
-          </Button>
-        </div>
-      </form>
-      {rows.isLoading ? (
-        <LoadingState label="Загружаем историю замеров…" />
-      ) : rows.error ? (
-        <ErrorState message={(rows.error as Error).message} retry={() => void rows.refetch()} />
-      ) : !rows.data?.length ? (
-        <EmptyState
-          title="Замеров пока нет"
-          text="После первой записи здесь появится история с датами и единицами измерения."
-        />
-      ) : (
-        <section className="measurement-history" aria-labelledby="measurement-history-title">
-          <div className="measurement-history__heading">
-            <h3 id="measurement-history-title">История замеров</h3>
-            <span>{rows.data.length} записей</span>
+            {numeric.map((key) => (
+              <label className="field" key={key}>
+                <span>
+                  {
+                    {
+                      weight_kg: 'Вес, кг',
+                      chest_cm: 'Грудь, см',
+                      waist_cm: 'Талия, см',
+                      hips_cm: 'Бёдра, см',
+                      biceps_cm: 'Плечо (окружность), см',
+                      thigh_cm: 'Бедро (окружность), см',
+                    }[key]
+                  }
+                </span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  enterKeyHint={key === 'thigh_cm' ? 'done' : 'next'}
+                  step="0.1"
+                  min={numericLimits[key].min}
+                  max={numericLimits[key].max}
+                  value={form[key] ?? ''}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      [key]: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+            ))}
           </div>
-          {rows.data.map((item) => (
-            <article className="measurement-history__row" key={item.id}>
-              <div className="measurement-history__facts">
-                <time dateTime={item.measured_on}>
-                  {formatCalendarDate(item.measured_on, {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                  })}
-                </time>
-                <p>
-                  {numeric
-                    .filter((key) => item[key] != null)
-                    .map(
-                      (key) =>
-                        `${{ weight_kg: 'Вес', chest_cm: 'Грудь', waist_cm: 'Талия', hips_cm: 'Бёдра', biceps_cm: 'Окружность плеча', thigh_cm: 'Окружность бедра' }[key]}: ${item[key]} ${key === 'weight_kg' ? 'кг' : 'см'}`,
-                    )
-                    .join(' · ')}
-                </p>
-                {item.note && <p className="measurement-history__note">{item.note}</p>}
-              </div>
-              <div className="measurement-history__actions">
-                <Button type="button" variant="secondary" onClick={() => editMeasurement(item)}>
-                  Изменить
-                </Button>
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={async () => {
-                    if (
-                      await confirm({
-                        title: 'Удалить замер?',
-                        message: formatCalendarDate(item.measured_on, {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        }),
-                        confirmText: 'Удалить',
-                      })
-                    )
-                      mutation.mutate({ path: `${base}/${item.id}`, method: 'DELETE' });
-                  }}
-                >
-                  Удалить
-                </Button>
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
+          <div className="auth-notice stack" aria-label="Как делать замеры">
+            <strong>Как сравнивать замеры</strong>
+            <span>
+              Снимайте их в похожее время суток, в одинаковых условиях и накладывайте ленту в одном
+              месте. Оценивайте несколько замеров, а не единичное колебание.
+            </span>
+            <small className="muted">
+              Окружность плеча не показывает отдельно размер бицепса, а окружность бедра — размер
+              квадрицепса. Эти значения описывают участок тела целиком.
+            </small>
+          </div>
+          <label className="field">
+            <span>Заметка</span>
+            <textarea
+              value={form.note || ''}
+              maxLength={500}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+            />
+          </label>
+          {submitError && (
+            <p className="measurement-diary__error" role="alert">
+              {submitError} Введённые значения сохранены — исправьте данные или повторите попытку.
+            </p>
+          )}
+          <div className="measurement-diary__save-dock">
+            <Button
+              className="measurement-diary__save"
+              disabled={mutation.isPending}
+              fullWidth
+              onMouseDown={(event) => {
+                const activeElement = document.activeElement;
+                if (
+                  activeElement instanceof HTMLElement &&
+                  formRef.current?.contains(activeElement)
+                ) {
+                  event.preventDefault();
+                }
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                formRef.current?.requestSubmit();
+              }}
+              type="submit"
+            >
+              {mutation.isPending
+                ? 'Сохраняем…'
+                : editingMeasurement
+                  ? 'Сохранить изменения'
+                  : 'Сохранить замер'}
+            </Button>
+          </div>
+        </form>
+        {rows.isLoading ? (
+          <LoadingState label="Загружаем историю замеров…" />
+        ) : rows.error ? (
+          <ErrorState message={(rows.error as Error).message} retry={() => void rows.refetch()} />
+        ) : !rows.data?.length ? (
+          <EmptyState
+            title="Замеров пока нет"
+            text="После первой записи здесь появится история с датами и единицами измерения."
+          />
+        ) : (
+          <section className="measurement-history" aria-labelledby="measurement-history-title">
+            <div className="measurement-history__heading">
+              <h3 id="measurement-history-title">История замеров</h3>
+              <span>{rows.data.length} записей</span>
+            </div>
+            {rows.data.map((item) => (
+              <article className="measurement-history__row" key={item.id}>
+                <div className="measurement-history__facts">
+                  <time dateTime={item.measured_on}>
+                    {formatCalendarDate(item.measured_on, {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                  </time>
+                  <p>
+                    {numeric
+                      .filter((key) => item[key] != null)
+                      .map(
+                        (key) =>
+                          `${{ weight_kg: 'Вес', chest_cm: 'Грудь', waist_cm: 'Талия', hips_cm: 'Бёдра', biceps_cm: 'Окружность плеча', thigh_cm: 'Окружность бедра' }[key]}: ${item[key]} ${key === 'weight_kg' ? 'кг' : 'см'}`,
+                      )
+                      .join(' · ')}
+                  </p>
+                  {item.note && <p className="measurement-history__note">{item.note}</p>}
+                </div>
+                <div className="measurement-history__actions">
+                  <Button type="button" variant="secondary" onClick={() => editMeasurement(item)}>
+                    Изменить
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={async () => {
+                      if (
+                        await confirm({
+                          title: 'Удалить замер?',
+                          message: formatCalendarDate(item.measured_on, {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          }),
+                          confirmText: 'Удалить',
+                        })
+                      )
+                        mutation.mutate({ path: `${base}/${item.id}`, method: 'DELETE' });
+                    }}
+                  >
+                    Удалить
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </section>
+        )}
+      </fieldset>
     </>
   );
   if (embedded) {
