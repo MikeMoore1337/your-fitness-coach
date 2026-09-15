@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Annotated, Literal, Protocol
 from urllib.parse import urlparse
@@ -103,6 +103,27 @@ class AiCoachOutcome(StrEnum):
     INSUFFICIENT_DATA = "insufficient_data"
     INVALID_OUTPUT = "invalid_output"
     CONSENT_REQUIRED = "consent_required"
+
+
+class AiCoachRateLimitScope(StrEnum):
+    """The boundary that blocked a generation request."""
+
+    USER = "user"
+    SERVICE = "service"
+    PROVIDER = "provider"
+
+
+class AiCoachQuotaSnapshot(BaseModel):
+    """Server-owned user quota state; no prompt or answer data is included."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    limit: int = Field(..., ge=1)
+    used: int = Field(..., ge=0)
+    remaining: int = Field(..., ge=0)
+    reset_at: datetime
+    retry_after_seconds: int = Field(..., ge=0)
+    can_send: bool
 
 
 class ChatOutputValidationReason(StrEnum):
@@ -434,6 +455,9 @@ class AiCoachResponse(BaseModel):
     period_start: date | None = None
     period_end: date | None = None
     timezone: str | None = Field(default=None, max_length=64)
+    quota: AiCoachQuotaSnapshot | None = None
+    rate_limit_scope: AiCoachRateLimitScope | None = None
+    rate_limit_retry_after_seconds: int | None = Field(default=None, ge=0)
 
 
 @dataclass(frozen=True)

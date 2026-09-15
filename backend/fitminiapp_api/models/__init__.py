@@ -6,6 +6,8 @@ from fitminiapp_api.models.ai_coach import (
     AiCoachConversationMessage,
     AiCoachMemory,
     AiCoachMemoryConsent,
+    AiCoachQuotaReservation,
+    AiCoachQuotaWindow,
 )
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity, LocalCredential
@@ -103,6 +105,8 @@ __all__ = [
     "AiCoachConversationMessage",
     "AiCoachMemory",
     "AiCoachMemoryConsent",
+    "AiCoachQuotaReservation",
+    "AiCoachQuotaWindow",
     "AuditEvent",
     "AuthActionToken",
     "AuthIdentity",

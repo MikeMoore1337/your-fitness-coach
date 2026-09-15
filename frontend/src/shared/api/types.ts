@@ -164,6 +164,7 @@ export type AiCoachConversationSendResponse = ApiSchemas['AiCoachConversationSen
 export type AiCoachConversationSummary = ApiSchemas['AiCoachConversationSummaryResponse'];
 export type AiCoachMemoryItemResponse = ApiSchemas['AiCoachMemoryItemResponse'];
 export type AiCoachMemoryResponse = ApiSchemas['AiCoachMemoryResponse'];
+export type AiCoachQuotaSnapshot = ApiSchemas['AiCoachQuotaSnapshot'];
 export type AiCoachStatus = ApiSchemas['AiCoachStatusResponse'];
 
 export interface PublicConfig {

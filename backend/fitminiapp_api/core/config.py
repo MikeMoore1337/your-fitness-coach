@@ -219,7 +219,7 @@ class Settings(BaseSettings):
     ai_coach_max_context_chars: int = Field(default=8_000, ge=1_000, le=16_000)
     ai_coach_content_max_age_days: int = Field(default=365, ge=1, le=1_095)
     ai_coach_quota_window_seconds: int = Field(default=86_400, ge=60, le=604_800)
-    ai_coach_per_user_request_limit: int = Field(default=5, ge=1, le=100)
+    ai_coach_per_user_request_limit: int = Field(default=20, ge=1, le=100)
     ai_coach_global_request_limit: int = Field(default=100, ge=1, le=10_000)
     ai_coach_cooldown_seconds: int = Field(default=30, ge=1, le=3_600)
     news_image_provider: Literal["disabled", "cloudflare_workers_ai"] = "disabled"

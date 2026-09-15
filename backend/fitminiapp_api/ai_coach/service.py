@@ -6,6 +6,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
+from math import ceil
 from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
@@ -23,6 +24,8 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachOutcome,
     AiCoachPersonalTool,
     AiCoachPolicy,
+    AiCoachQuotaSnapshot,
+    AiCoachRateLimitScope,
     AiCoachRequest,
     AiCoachResponse,
     AiCoachResponseMetadata,
@@ -33,6 +36,7 @@ from fitminiapp_api.ai_coach.contracts import (
     ProviderResult,
 )
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
+from fitminiapp_api.ai_coach.quota import PersistentAiCoachQuota, ai_coach_quota
 from fitminiapp_api.ai_coach.retrieval import ContextUnavailable, ContextUnsafe, retrieve_context
 from fitminiapp_api.ai_coach.safety import (
     SafetyCategory,
@@ -57,6 +61,14 @@ _INVALID_OUTPUT_LIMITATION = "Ответ не прошёл проверку бе
 _RATE_LIMITED_LIMITATION = "Лимит AI Coach исчерпан. Попробуйте позже."
 
 
+def _quota_user_id(user_key: str) -> int | None:
+    try:
+        value = int(user_key)
+    except TypeError, ValueError:
+        return None
+    return value if value > 0 else None
+
+
 @dataclass(frozen=True)
 class ProviderCapability:
     provider: str
@@ -66,50 +78,6 @@ class ProviderCapability:
     policy_revision: str
     structured_output: bool
     enabled: bool
-
-
-@dataclass
-class _WindowQuota:
-    started_at: float
-    global_count: int
-    per_user_count: dict[str, int]
-
-
-class InMemoryAiCoachQuota:
-    """Bounded process-local quota; no identity or content is sent to the provider."""
-
-    def __init__(self, clock=time.monotonic) -> None:
-        self._clock = clock
-        self._lock = threading.Lock()
-        self._window = _WindowQuota(started_at=clock(), global_count=0, per_user_count={})
-
-    def reserve(self, user_key: str) -> bool:
-        now = self._clock()
-        with self._lock:
-            if now - self._window.started_at >= settings.ai_coach_quota_window_seconds:
-                self._window = _WindowQuota(
-                    started_at=now,
-                    global_count=0,
-                    per_user_count={},
-                )
-            if self._window.global_count >= settings.ai_coach_global_request_limit:
-                return False
-            user_count = self._window.per_user_count.get(user_key, 0)
-            if user_count >= settings.ai_coach_per_user_request_limit:
-                return False
-            self._window.global_count += 1
-            self._window.per_user_count[user_key] = user_count + 1
-            if len(self._window.per_user_count) > 10_000:
-                least_used = min(
-                    self._window.per_user_count,
-                    key=lambda item: self._window.per_user_count[item],
-                )
-                del self._window.per_user_count[least_used]
-            return True
-
-    def reset(self) -> None:
-        with self._lock:
-            self._window = _WindowQuota(started_at=self._clock(), global_count=0, per_user_count={})
 
 
 class ProviderCooldown:
@@ -128,6 +96,17 @@ class ProviderCooldown:
                 self._reason = ""
                 return False
             return True
+
+    def rate_limit_retry_after_seconds(self) -> int | None:
+        with self._lock:
+            if self._reason != ProviderErrorCode.RATE_LIMITED.value:
+                return None
+            remaining = self._until - self._clock()
+            if remaining <= 0:
+                self._until = 0.0
+                self._reason = ""
+                return None
+            return max(1, ceil(remaining))
 
     def mark(self, error: NormalizedProviderError) -> None:
         if error.code in {
@@ -225,15 +204,15 @@ class AiCoachService:
         self,
         *,
         provider: LlmPort | None = None,
-        quota: InMemoryAiCoachQuota | None = None,
+        quota: PersistentAiCoachQuota | None = None,
         cooldown: ProviderCooldown | None = None,
     ) -> None:
         self.provider = provider or GroqDirectAdapter()
-        self.quota = quota or InMemoryAiCoachQuota()
+        self.quota = quota or ai_coach_quota
         self.cooldown = cooldown or ProviderCooldown()
 
     def reset_runtime_state(self) -> None:
-        self.quota.reset()
+        self.quota.reset_runtime_state()
         self.cooldown.reset()
 
     def generate(
@@ -249,6 +228,7 @@ class AiCoachService:
         reason_keys: frozenset[str] = frozenset(),
     ) -> AiCoachResponse:
         started = time.monotonic()
+        quota_user_id = _quota_user_id(user_key)
         safety = classify_request(request)
         attempts = 0
         provider_name: str | None = None
@@ -257,6 +237,10 @@ class AiCoachService:
         usage = None
         outcome = AiCoachOutcome.UNAVAILABLE
         error_code: str | None = None
+        reservation_key: str | None = None
+        reservation_active = False
+        rate_limit_scope: AiCoachRateLimitScope | None = None
+        rate_limit_retry_after_seconds: int | None = None
         try:
             if safety != SafetyCategory.CLEAR:
                 outcome = AiCoachOutcome.SAFETY_REFUSAL
@@ -299,16 +283,65 @@ class AiCoachService:
                     request, request_id, safety, response_metadata=response_metadata
                 )
             if self.cooldown.active():
+                cooldown_retry_after = self.cooldown.rate_limit_retry_after_seconds()
+                if cooldown_retry_after is not None:
+                    outcome = AiCoachOutcome.RATE_LIMITED
+                    error_code = ProviderErrorCode.COOLDOWN_ACTIVE.value
+                    rate_limit_scope = AiCoachRateLimitScope.PROVIDER
+                    rate_limit_retry_after_seconds = cooldown_retry_after
+                    return self._rate_limited_response(
+                        request,
+                        request_id,
+                        safety,
+                        response_metadata=response_metadata,
+                        rate_limit_scope=rate_limit_scope,
+                        rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
+                    )
                 error_code = ProviderErrorCode.COOLDOWN_ACTIVE.value
                 return self._unavailable_response(
                     request, request_id, safety, response_metadata=response_metadata
                 )
-            if not self.quota.reserve(user_key):
-                outcome = AiCoachOutcome.RATE_LIMITED
-                error_code = "quota_exhausted"
-                return self._rate_limited_response(
+            quota_decision = self.quota.reserve(
+                db,
+                user_id=quota_user_id,
+                account_key=user_key,
+                request_key=request_id,
+            )
+            if quota_decision.already_processing or quota_decision.already_consumed:
+                outcome = AiCoachOutcome.UNAVAILABLE
+                error_code = (
+                    "request_in_progress"
+                    if quota_decision.already_processing
+                    else "request_already_completed"
+                )
+                return self._unavailable_response(
                     request, request_id, safety, response_metadata=response_metadata
                 )
+            if quota_decision.request_key_conflict:
+                outcome = AiCoachOutcome.UNAVAILABLE
+                error_code = "request_key_conflict"
+                return self._unavailable_response(
+                    request,
+                    request_id,
+                    safety,
+                    response_metadata=response_metadata,
+                )
+            if not quota_decision.granted:
+                outcome = AiCoachOutcome.RATE_LIMITED
+                error_code = "quota_exhausted"
+                rate_limit_scope = quota_decision.rate_limit_scope
+                rate_limit_retry_after_seconds = quota_decision.retry_after_seconds
+                return self._rate_limited_response(
+                    request,
+                    request_id,
+                    safety,
+                    response_metadata=response_metadata,
+                    quota=quota_decision.user_snapshot,
+                    rate_limit_scope=rate_limit_scope,
+                    rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
+                )
+            reservation_key = quota_decision.request_key
+            reservation_active = True
 
             try:
                 result, attempts = self._call_provider(request, policy, resolved_context_refs)
@@ -318,8 +351,20 @@ class AiCoachService:
                 self.cooldown.mark(failure.error)
                 if failure.error.code == ProviderErrorCode.RATE_LIMITED:
                     outcome = AiCoachOutcome.RATE_LIMITED
+                    rate_limit_scope = AiCoachRateLimitScope.PROVIDER
+                    rate_limit_retry_after_seconds = max(
+                        1,
+                        failure.error.retry_after_seconds
+                        if failure.error.retry_after_seconds is not None
+                        else settings.ai_coach_cooldown_seconds,
+                    )
                     return self._rate_limited_response(
-                        request, request_id, safety, response_metadata=response_metadata
+                        request,
+                        request_id,
+                        safety,
+                        response_metadata=response_metadata,
+                        rate_limit_scope=rate_limit_scope,
+                        rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
                     )
                 if failure.error.code == ProviderErrorCode.INVALID_OUTPUT:
                     outcome = AiCoachOutcome.INVALID_OUTPUT
@@ -350,6 +395,22 @@ class AiCoachService:
                 return self._invalid_output_response(
                     request, request_id, safety, response_metadata=response_metadata
                 )
+            if reservation_active and reservation_key is not None:
+                if not self.quota.consume(db, request_key=reservation_key):
+                    reservation_active = False
+                    outcome = AiCoachOutcome.RATE_LIMITED
+                    error_code = "quota_reservation_expired"
+                    rate_limit_scope = AiCoachRateLimitScope.USER
+                    rate_limit_retry_after_seconds = settings.ai_coach_quota_window_seconds
+                    return self._rate_limited_response(
+                        request,
+                        request_id,
+                        safety,
+                        response_metadata=response_metadata,
+                        rate_limit_scope=rate_limit_scope,
+                        rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
+                    )
+                reservation_active = False
             self.cooldown.reset()
             outcome = AiCoachOutcome.ANSWER
             return self._answer_response(
@@ -359,6 +420,11 @@ class AiCoachService:
                 result,
                 resolved_context_refs,
                 response_metadata=response_metadata,
+                quota=(
+                    self.quota.snapshot(db, user_id=quota_user_id)
+                    if quota_user_id is not None
+                    else None
+                ),
             )
         except ContextUnsafe:
             safety = SafetyCategory.PROMPT_INJECTION
@@ -373,6 +439,9 @@ class AiCoachService:
                 request, request_id, safety, response_metadata=response_metadata
             )
         finally:
+            if reservation_active and reservation_key is not None:
+                self.quota.release(db, request_key=reservation_key)
+            db.commit()
             logger.info(
                 "ai_coach_generation",
                 extra={
@@ -481,6 +550,9 @@ class AiCoachService:
         insights=(),
         limitations=(),
         response_metadata: AiCoachResponseMetadata | None = None,
+        quota: AiCoachQuotaSnapshot | None = None,
+        rate_limit_scope: AiCoachRateLimitScope | None = None,
+        rate_limit_retry_after_seconds: int | None = None,
     ) -> AiCoachResponse:
         return AiCoachResponse(
             outcome=outcome,
@@ -508,6 +580,9 @@ class AiCoachService:
             ),
             period_end=response_metadata.period_end if response_metadata is not None else None,
             timezone=response_metadata.timezone if response_metadata is not None else None,
+            quota=quota,
+            rate_limit_scope=rate_limit_scope,
+            rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
         )
 
     def _unavailable_response(
@@ -517,6 +592,9 @@ class AiCoachService:
         safety: SafetyCategory,
         *,
         response_metadata: AiCoachResponseMetadata | None = None,
+        quota: AiCoachQuotaSnapshot | None = None,
+        rate_limit_scope: AiCoachRateLimitScope | None = None,
+        rate_limit_retry_after_seconds: int | None = None,
     ) -> AiCoachResponse:
         return self._base_response(
             request,
@@ -525,6 +603,9 @@ class AiCoachService:
             AiCoachOutcome.UNAVAILABLE,
             limitations=(_UNAVAILABLE_LIMITATION,),
             response_metadata=response_metadata,
+            quota=quota,
+            rate_limit_scope=rate_limit_scope,
+            rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
         )
 
     def _insufficient_response(
@@ -551,6 +632,9 @@ class AiCoachService:
         safety: SafetyCategory,
         *,
         response_metadata: AiCoachResponseMetadata | None = None,
+        quota: AiCoachQuotaSnapshot | None = None,
+        rate_limit_scope: AiCoachRateLimitScope | None = None,
+        rate_limit_retry_after_seconds: int | None = None,
     ) -> AiCoachResponse:
         return self._base_response(
             request,
@@ -559,6 +643,9 @@ class AiCoachService:
             AiCoachOutcome.RATE_LIMITED,
             limitations=(_RATE_LIMITED_LIMITATION,),
             response_metadata=response_metadata,
+            quota=quota,
+            rate_limit_scope=rate_limit_scope,
+            rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
         )
 
     def _invalid_output_response(
@@ -604,6 +691,7 @@ class AiCoachService:
         context_refs: tuple[ContextRef, ...],
         *,
         response_metadata: AiCoachResponseMetadata | None = None,
+        quota: AiCoachQuotaSnapshot | None = None,
     ) -> AiCoachResponse:
         ref_by_id = {ref.ref_id: ref for ref in context_refs}
         citations = []
@@ -637,6 +725,7 @@ class AiCoachService:
             ),
             limitations=limitations[:6],
             response_metadata=response_metadata,
+            quota=quota,
         )
 
 
@@ -644,7 +733,6 @@ ai_coach_service = AiCoachService()
 
 __all__ = [
     "AiCoachService",
-    "InMemoryAiCoachQuota",
     "ProviderCapability",
     "ProviderCooldown",
     "ai_coach_service",

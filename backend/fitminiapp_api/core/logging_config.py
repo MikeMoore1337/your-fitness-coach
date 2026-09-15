@@ -11,6 +11,9 @@ URL_PATTERN = re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE)
 SAFE_CODE_PATTERN = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,127}\Z")
 SAFE_IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9_.:/-]{1,128}\Z")
 SAFE_REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
+SAFE_TIMESTAMP_PATTERN = re.compile(
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})\Z"
+)
 SAFE_REPORT_REVISION_PATTERN = re.compile(r"[0-9a-f]{64}\Z", re.IGNORECASE)
 SAFE_METHOD_PATTERN = re.compile(r"[A-Z]{3,10}\Z")
 SAFE_ROUTE_PATTERN = re.compile(r"(?:/[A-Za-z0-9_./{}:-]{0,255}|unmatched)\Z")
@@ -20,6 +23,10 @@ SAFE_EVENT_NAMES = frozenset(
         "application_stopped",
         "ai_coach_generation",
         "ai_coach_chat_generation",
+        "ai_coach_quota_rate_limited",
+        "ai_coach_quota_consumed",
+        "ai_coach_quota_released",
+        "ai_coach_quota_finalize_failed",
         "nutrition_scan_started",
         "nutrition_scan_completed",
         "nutrition_scan_failed",
@@ -108,6 +115,12 @@ STRUCTURED_FIELDS = (
     "catalog_quality",
     "visibility",
     "error_code",
+    "rate_limit_scope",
+    "rate_limit_retry_after_seconds",
+    "user_quota_remaining",
+    "user_quota_limit",
+    "quota_window_reset_at",
+    "user_quota_exhausted",
     "safety_category",
     "source_ref",
     "candidate_ref",
@@ -156,6 +169,9 @@ INTEGER_FIELDS = {
     "db_pool_checked_out",
     "db_pool_overflow",
     "body_limit_bytes",
+    "rate_limit_retry_after_seconds",
+    "user_quota_remaining",
+    "user_quota_limit",
     "attempts",
     "retry_count",
     "prompt_tokens",
@@ -216,9 +232,11 @@ CODE_FIELDS = {
     "topic",
     "report_version",
     "report_revision",
+    "rate_limit_scope",
 }
 MODEL_FIELDS = {"configured_model", "actual_model"}
-BOOL_FIELDS = {"generation_success", "repair_attempted", "repair_success"}
+TIMESTAMP_FIELDS = {"quota_window_reset_at"}
+BOOL_FIELDS = {"generation_success", "repair_attempted", "repair_success", "user_quota_exhausted"}
 
 
 class JsonFormatter(logging.Formatter):
@@ -270,6 +288,8 @@ class JsonFormatter(logging.Formatter):
             return None
         if field == "request_id":
             return value if SAFE_REQUEST_ID_PATTERN.fullmatch(value) else None
+        if field in TIMESTAMP_FIELDS:
+            return value if SAFE_TIMESTAMP_PATTERN.fullmatch(value) else None
         if field == "method":
             return value if SAFE_METHOD_PATTERN.fullmatch(value) else None
         if field == "path":

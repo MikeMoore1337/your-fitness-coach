@@ -307,6 +307,16 @@
   border-color: var(--v2-danger);
 }
 
+.ai-coach-chat__failure > div {
+  display: grid;
+  gap: var(--v2-space-1);
+  min-width: 0;
+}
+
+.ai-coach-chat__failure small {
+  color: var(--v2-text-secondary);
+}
+
 .ai-coach-chat__failure button {
   flex: 0 0 auto;
 }
@@ -368,6 +378,27 @@
 .ai-coach-chat__composer-meta {
   justify-content: space-between;
   gap: var(--v2-space-3);
+}
+
+.ai-coach-chat__quota {
+  display: grid;
+  min-width: 0;
+  color: var(--v2-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.ai-coach-chat__quota > span:first-child {
+  color: var(--v2-text-primary);
+  font-weight: 700;
+}
+
+.ai-coach-chat__quota--low > span:first-child {
+  color: var(--v2-accent-text);
+}
+
+.ai-coach-chat__quota--empty > span:first-child {
+  color: var(--v2-danger);
 }
 
 .ai-coach-chat__composer-actions {

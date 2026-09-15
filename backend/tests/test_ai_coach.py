@@ -1412,7 +1412,9 @@ def test_provider_rate_limit_enters_bounded_cooldown(monkeypatch) -> None:
         )
 
     assert first.outcome == "rate_limited"
-    assert second.outcome == "unavailable"
+    assert second.outcome == "rate_limited"
+    assert second.rate_limit_scope == "provider"
+    assert second.rate_limit_retry_after_seconds is not None
     assert provider.calls == 1
 
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AiCoachExperience,
@@ -12,6 +12,7 @@ import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 import type {
   AiCoachConversation,
   AiCoachConversationMessage,
+  AiCoachQuotaSnapshot,
   AiCoachStatus,
 } from '../../../../src/shared/api/types';
 
@@ -30,6 +31,19 @@ const status = {
   generic_available: true,
   personal_available: false,
 } as const;
+
+const quotaSnapshot = (
+  remaining = 20,
+  limit = 20,
+  resetAt = '2026-09-16T00:00:00Z',
+): AiCoachQuotaSnapshot => ({
+  limit,
+  used: limit - remaining,
+  remaining,
+  reset_at: resetAt,
+  retry_after_seconds: 86_400,
+  can_send: remaining > 0,
+});
 
 const memoryResponse = (
   memoryStatus: 'enabled' | 'paused' | 'revoked' = 'revoked',
@@ -134,8 +148,9 @@ function renderSettingsCard(settingsStatus: AiCoachStatus) {
   );
 }
 
-function mockBaseApi() {
+function mockBaseApi(quota = quotaSnapshot()) {
   apiMock.mockImplementation(async (path, options) => {
+    if (path === '/api/v1/ai-coach/quota') return quota;
     if (path === '/api/v1/ai-coach/conversations') return { items: [] };
     if (path === '/api/v1/ai-coach/memory') return memoryResponse();
     if (path === '/api/v1/ai-coach/consent') return consentResponse();
@@ -145,6 +160,7 @@ function mockBaseApi() {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   window.sessionStorage.removeItem('yfc:ai-coach:active-conversation');
   apiMock.mockReset();
 });
@@ -171,11 +187,197 @@ describe('AiCoachExperience', () => {
     expect(screen.queryByText(/report_version|prompt_version|debug/i)).not.toBeInTheDocument();
   });
 
+  it('renders the server-owned quota, refreshes it on focus and keeps the real limit dynamic', async () => {
+    let currentQuota = quotaSnapshot();
+    let quotaCalls = 0;
+    const messages: AiCoachConversationMessage[] = [];
+    apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') {
+        quotaCalls += 1;
+        return currentQuota;
+      }
+      if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST') {
+        return conversation(11);
+      }
+      if (path === '/api/v1/ai-coach/conversations') {
+        return { items: messages.length ? [{ ...conversation(11, messages) }] : [] };
+      }
+      if (path === '/api/v1/ai-coach/memory') return memoryResponse();
+      if (path === '/api/v1/ai-coach/conversations/11') return conversation(11, messages);
+      if (path === '/api/v1/ai-coach/conversations/11/messages') {
+        expect(options?.headers).toEqual({ 'X-Request-ID': expect.any(String) });
+        const body = options?.body as { message: string };
+        const userMessage = chatMessage(11, 'user', body.message);
+        const assistantMessage = chatMessage(12, 'assistant', 'Ответ с учётом квоты.');
+        messages.push(userMessage, assistantMessage);
+        currentQuota = quotaSnapshot(19);
+        return {
+          conversation_id: 11,
+          user_message: userMessage,
+          assistant_message: assistantMessage,
+          outcome: 'answer',
+          data_class: 'generic',
+          answer: assistantMessage.content,
+          citations: [],
+          limitations: [],
+          safety_category: 'clear',
+          failure_category: null,
+          prompt_version: 'ai-coach-chat-v1',
+          request_id: 'request-11',
+          quota: currentQuota,
+        };
+      }
+      throw new Error(`unexpected path ${path} ${options?.method ?? 'GET'}`);
+    });
+    renderExperience();
+    const indicator = await screen.findByTestId('ai-coach-quota');
+    expect(indicator).toHaveAttribute('data-quota-limit', '20');
+    expect(indicator).toHaveAttribute('data-quota-remaining', '20');
+    expect(screen.getByText(/Сброс через/)).toBeInTheDocument();
+
+    window.dispatchEvent(new Event('focus'));
+    await waitFor(() => expect(quotaCalls).toBeGreaterThan(1));
+
+    const input = screen.getByRole('textbox', { name: 'Сообщение AI Coach' });
+    fireEvent.change(input, { target: { value: 'Что делать сегодня?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить' }));
+    await waitFor(() => expect(screen.getByText('Ответ с учётом квоты.')).toBeInTheDocument());
+    expect(screen.getByTestId('ai-coach-quota')).toHaveAttribute('data-quota-remaining', '19');
+  });
+
+  it('keeps the input editable while disabling send at zero quota', async () => {
+    mockBaseApi(quotaSnapshot(0));
+    renderExperience();
+
+    const indicator = await screen.findByTestId('ai-coach-quota');
+    expect(indicator).toHaveAttribute('data-quota-limit', '20');
+    expect(indicator).toHaveAttribute('data-quota-remaining', '0');
+    expect(screen.getByText('Лимит AI Coach исчерпан')).toBeInTheDocument();
+    const input = screen.getByRole('textbox', { name: 'Сообщение AI Coach' });
+    fireEvent.change(input, { target: { value: 'Мой вопрос пока останется в поле' } });
+    expect(input).toHaveValue('Мой вопрос пока останется в поле');
+    expect(screen.getByRole('button', { name: 'Отправить' })).toBeDisabled();
+  });
+
+  it('keeps send enabled for a provider rate limit without changing personal quota', async () => {
+    mockBaseApi();
+    apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
+      if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST') {
+        return conversation(12);
+      }
+      if (path === '/api/v1/ai-coach/conversations') return { items: [] };
+      if (path === '/api/v1/ai-coach/memory') return memoryResponse();
+      if (path === '/api/v1/ai-coach/conversations/12/messages') {
+        const body = options?.body as { message: string };
+        const userMessage = chatMessage(12, 'user', body.message, {
+          status: 'failed',
+          outcome: 'rate_limited',
+          failure_category: 'rate_limit',
+        });
+        return {
+          conversation_id: 12,
+          user_message: userMessage,
+          assistant_message: null,
+          outcome: 'rate_limited',
+          data_class: 'generic',
+          answer: null,
+          citations: [],
+          limitations: [],
+          safety_category: 'clear',
+          failure_category: 'rate_limit',
+          prompt_version: 'ai-coach-chat-v1',
+          request_id: 'provider-rate-limit-request',
+          quota: quotaSnapshot(),
+          rate_limit_scope: 'provider',
+          rate_limit_retry_after_seconds: 30,
+        };
+      }
+      throw new Error(`unexpected path ${path} ${options?.method ?? 'GET'}`);
+    });
+    renderExperience();
+
+    const input = await screen.findByRole('textbox', { name: 'Сообщение AI Coach' });
+    fireEvent.change(input, { target: { value: 'Вопрос во время лимита провайдера' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('ai-coach-chat-failure')).toHaveTextContent(
+        'AI Coach временно достиг лимита сервиса.',
+      ),
+    );
+    expect(screen.getByRole('button', { name: 'Отправить' })).not.toBeDisabled();
+    expect(screen.getByTestId('ai-coach-quota')).toHaveAttribute('data-quota-remaining', '20');
+  });
+
+  it('keeps a provider failure message distinct after conversation reload', async () => {
+    const providerFailure = chatMessage(21, 'user', 'Проверка лимита провайдера', {
+      status: 'failed',
+      outcome: 'rate_limited',
+      failure_category: 'rate_limit',
+      rate_limit_scope: 'provider',
+      rate_limit_retry_after_seconds: 23,
+      limitations: ['Лимит AI Coach исчерпан. Попробуйте позже.'],
+    });
+    mockBaseApi();
+    apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
+      if (path === '/api/v1/ai-coach/conversations') {
+        return { items: [{ ...conversation(21, [providerFailure]), message_count: 1 }] };
+      }
+      if (path === '/api/v1/ai-coach/conversations/21') return conversation(21, [providerFailure]);
+      if (path === '/api/v1/ai-coach/memory') return memoryResponse();
+      throw new Error(`unexpected path ${path} ${options?.method ?? 'GET'}`);
+    });
+    renderExperience();
+
+    expect(await screen.findByText('AI Coach временно достиг лимита сервиса.')).toBeInTheDocument();
+    expect(screen.getByTestId('ai-coach-quota')).toHaveAttribute('data-quota-remaining', '20');
+  });
+
+  it('counts down locally and refreshes quota once at the server reset boundary', async () => {
+    vi.useFakeTimers({ now: new Date('2026-09-15T12:00:00Z') });
+    const resetAt = new Date(Date.now() + 65_000).toISOString();
+    const nextResetAt = new Date(Date.now() + 86_400_000).toISOString();
+    let currentQuota = quotaSnapshot(1, 5, resetAt);
+    let quotaCalls = 0;
+    apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') {
+        quotaCalls += 1;
+        return currentQuota;
+      }
+      if (path === '/api/v1/ai-coach/conversations') return { items: [] };
+      if (path === '/api/v1/ai-coach/memory') return memoryResponse();
+      throw new Error(`unexpected path ${path} ${options?.method ?? 'GET'}`);
+    });
+    renderExperience();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const indicator = screen.getByTestId('ai-coach-quota');
+    expect(indicator).toHaveTextContent('2 мин');
+    currentQuota = quotaSnapshot(5, 5, nextResetAt);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(quotaCalls).toBe(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(6_000);
+    });
+    expect(quotaCalls).toBe(2);
+    expect(indicator).toHaveAttribute('data-quota-remaining', '5');
+  });
+
   it('sends an arbitrary question and renders safe text plus collapsed sources', async () => {
     let messages: AiCoachConversationMessage[] = [];
     const answer =
       'Проверенный текст. <img src="/secret"> [Материал](https://example.org/article) [Чужая ссылка](https://evil.example/secret)';
     apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
       if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST') {
         return conversation(1);
       }
@@ -245,6 +447,7 @@ describe('AiCoachExperience', () => {
     ];
     mockBaseApi();
     apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
       if (path === '/api/v1/ai-coach/conversations') {
         return { items: [{ ...conversation(7, messages), message_count: messages.length }] };
       }
@@ -293,6 +496,7 @@ describe('AiCoachExperience', () => {
   it('preserves typed text and shows a repair failure separately from safety refusal', async () => {
     const messages: AiCoachConversationMessage[] = [];
     apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
       if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST')
         return conversation(3);
       if (path === '/api/v1/ai-coach/conversations') {
@@ -375,6 +579,7 @@ describe('AiCoachExperience', () => {
     const messages: AiCoachConversationMessage[] = [];
     mockBaseApi();
     apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
       if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST') {
         return conversation(4);
       }

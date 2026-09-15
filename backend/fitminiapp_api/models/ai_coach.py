@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -166,12 +167,20 @@ class AiCoachConversationMessage(Base):
             "created_at",
             "id",
         ),
+        Index(
+            "uq_ai_coach_conversation_messages_user_request",
+            "conversation_id",
+            "request_id",
+            unique=True,
+            postgresql_where=text("role = 'user' AND request_id IS NOT NULL"),
+            sqlite_where=text("role = 'user' AND request_id IS NOT NULL"),
+        ),
         CheckConstraint(
             "role IN ('user', 'assistant')",
             name="ck_ai_coach_conversation_messages_role",
         ),
         CheckConstraint(
-            "status IN ('complete', 'failed')",
+            "status IN ('processing', 'complete', 'failed')",
             name="ck_ai_coach_conversation_messages_status",
         ),
         CheckConstraint(
@@ -197,9 +206,85 @@ class AiCoachConversationMessage(Base):
     )
     failure_category: Mapped[str | None] = mapped_column(String(32), nullable=True)
     request_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    rate_limit_scope: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    rate_limit_retry_after_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    data_class: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     citations: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False, default=list)
     limitations: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+
+
+class AiCoachQuotaWindow(Base):
+    """Durable fixed window counters for account and service AI Coach limits."""
+
+    __tablename__ = "ai_coach_quota_windows"
+    __table_args__ = (
+        UniqueConstraint(
+            "quota_kind",
+            "subject_key",
+            name="uq_ai_coach_quota_windows_kind_subject",
+        ),
+        CheckConstraint(
+            "quota_kind IN ('user', 'service')",
+            name="ck_ai_coach_quota_windows_kind",
+        ),
+        CheckConstraint("limit_value >= 1", name="ck_ai_coach_quota_windows_limit"),
+        CheckConstraint("used_count >= 0", name="ck_ai_coach_quota_windows_used"),
+        Index(
+            "ix_ai_coach_quota_windows_user_reset",
+            "user_id",
+            "reset_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    quota_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    subject_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    window_started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    reset_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    limit_value: Mapped[int] = mapped_column(Integer, nullable=False)
+    used_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+
+
+class AiCoachQuotaReservation(Base):
+    """Short-lived, content-free reservation held around one provider operation."""
+
+    __tablename__ = "ai_coach_quota_reservations"
+    __table_args__ = (
+        UniqueConstraint("request_key", name="uq_ai_coach_quota_reservations_request_key"),
+        CheckConstraint(
+            "status IN ('reserved', 'consumed', 'released', 'expired')",
+            name="ck_ai_coach_quota_reservations_status",
+        ),
+        Index(
+            "ix_ai_coach_quota_reservations_window_status_expiry",
+            "service_window_id",
+            "status",
+            "expires_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    user_window_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_coach_quota_windows.id", ondelete="CASCADE"), nullable=False
+    )
+    service_window_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_coach_quota_windows.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="reserved")
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 __all__ = [
@@ -208,4 +293,6 @@ __all__ = [
     "AiCoachConversationMessage",
     "AiCoachMemory",
     "AiCoachMemoryConsent",
+    "AiCoachQuotaReservation",
+    "AiCoachQuotaWindow",
 ]

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -16,6 +17,7 @@ import type {
   AiCoachConversationSummary,
   AiCoachMemoryItemResponse,
   AiCoachMemoryResponse,
+  AiCoachQuotaSnapshot,
   AiCoachResponse,
   AiCoachStatus,
 } from '../../shared/api/types';
@@ -37,6 +39,7 @@ export const aiCoachStatusQueryKey = ['ai-coach', 'status'] as const;
 export const aiCoachConsentQueryKey = ['ai-coach', 'consent'] as const;
 export const aiCoachMemoryQueryKey = ['ai-coach', 'memory'] as const;
 export const aiCoachConversationsQueryKey = ['ai-coach', 'conversations'] as const;
+export const aiCoachQuotaQueryKey = ['ai-coach', 'quota'] as const;
 
 const ACTIVE_CONVERSATION_KEY = 'yfc:ai-coach:active-conversation';
 const CHAT_MESSAGE_MAX_LENGTH = 2_000;
@@ -192,10 +195,85 @@ function storeActiveConversationId(value: number | null): void {
 }
 
 function failureCopy(response: AiCoachConversationSendResponse): string {
+  if (response.rate_limit_scope === 'provider') {
+    return 'AI Coach временно достиг лимита сервиса.';
+  }
+  if (response.rate_limit_scope === 'service') {
+    return 'AI Coach временно перегружен. Попробуйте позже.';
+  }
   if (response.failure_category && CHAT_FAILURE_COPY[response.failure_category]) {
     return CHAT_FAILURE_COPY[response.failure_category] ?? 'Не удалось получить проверенный ответ.';
   }
   return response.limitations[0] ?? 'Не удалось получить проверенный ответ. Попробуйте ещё раз.';
+}
+
+function messageFailureCopy(message: AiCoachConversationMessage): string {
+  if (message.rate_limit_scope === 'provider') {
+    return 'AI Coach временно достиг лимита сервиса.';
+  }
+  if (message.rate_limit_scope === 'service') {
+    return 'AI Coach временно перегружен. Попробуйте позже.';
+  }
+  return message.limitations[0] ?? 'Не удалось получить проверенный ответ. Попробуйте ещё раз.';
+}
+
+function formatQuotaCountdown(resetAt: string, now = Date.now()): string {
+  const resetTime = Date.parse(resetAt);
+  if (!Number.isFinite(resetTime)) return 'скоро';
+  const minutes = Math.max(0, Math.ceil((resetTime - now) / 60_000));
+  if (minutes < 1) return 'меньше минуты';
+  if (minutes < 60) return `${minutes} мин`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours < 24) return remainingMinutes ? `${hours} ч ${remainingMinutes} мин` : `${hours} ч`;
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours ? `${days} д ${remainingHours} ч` : `${days} д`;
+}
+
+function quotaRemainingCopy(remaining: number, limit: number): string {
+  if (remaining === 0) return 'Лимит AI Coach исчерпан';
+  if (remaining === 1) return `Остался 1 запрос из ${limit}`;
+  if (remaining <= 2) return `Осталось ${remaining} запроса из ${limit}`;
+  return `Осталось ${remaining} из ${limit}`;
+}
+
+function QuotaIndicator({ quota, now }: { quota: AiCoachQuotaSnapshot | undefined; now: number }) {
+  if (!quota) {
+    return <span className="ai-coach-chat__quota">Лимит обновляется…</span>;
+  }
+  const state = quota.remaining === 0 ? 'empty' : quota.remaining <= 2 ? 'low' : 'normal';
+  return (
+    <span
+      className={`ai-coach-chat__quota ai-coach-chat__quota--${state}`}
+      data-testid="ai-coach-quota"
+      data-quota-limit={quota.limit}
+      data-quota-remaining={quota.remaining}
+    >
+      <span>{quotaRemainingCopy(quota.remaining, quota.limit)}</span>
+      <span>
+        {quota.remaining === 0 ? 'Новые запросы будут доступны' : 'Сброс через'}{' '}
+        {formatQuotaCountdown(quota.reset_at, now)}
+      </span>
+    </span>
+  );
+}
+
+function newRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+class AiCoachSendError extends Error {
+  readonly conversationId: number;
+
+  constructor(conversationId: number, cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'AI Coach request failed');
+    this.name = 'AiCoachSendError';
+    this.conversationId = conversationId;
+  }
 }
 
 function networkFailureCopy(reason: unknown): string {
@@ -213,6 +291,17 @@ function networkFailureCopy(reason: unknown): string {
     return 'Ответ занял слишком много времени. Попробуйте ещё раз.';
   }
   return 'Не удалось отправить вопрос. Проверьте соединение и попробуйте снова.';
+}
+
+function temporaryRateLimitState(
+  response: AiCoachConversationSendResponse,
+): { scope: 'provider' | 'service'; retryAt: number } | null {
+  const scope = response.rate_limit_scope;
+  if (scope !== 'provider' && scope !== 'service') return null;
+  const retryAfter = response.rate_limit_retry_after_seconds;
+  return typeof retryAfter === 'number' && retryAfter > 0
+    ? { scope, retryAt: Date.now() + retryAfter * 1_000 }
+    : null;
 }
 
 function MessageSources({ message }: { message: AiCoachConversationMessage }) {
@@ -244,12 +333,14 @@ function ChatMessage({
   message,
   onFeedback,
   onRetry,
+  retryBlocked,
   retrying,
 }: {
   feedback: AiCoachHelpfulness | null;
   message: AiCoachConversationMessage;
   onFeedback: (messageId: number, value: AiCoachHelpfulness) => void;
   onRetry: (messageId: number) => void;
+  retryBlocked: boolean;
   retrying: boolean;
 }) {
   const isAssistant = message.role === 'assistant';
@@ -268,13 +359,13 @@ function ChatMessage({
       {message.status === 'failed' && message.limitations.length > 0 && (
         <>
           <p className="ai-coach-message__failure" role="alert">
-            {message.limitations[0]}
+            {messageFailureCopy(message)}
           </p>
           {!isAssistant && (
             <button
               className="ai-coach-message__retry"
               type="button"
-              disabled={retrying}
+              disabled={retrying || retryBlocked}
               onClick={() => onRetry(message.id)}
             >
               {retrying ? 'Повторяем…' : 'Повторить'}
@@ -625,6 +716,20 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
   const [draft, setDraft] = useState('');
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [retryingMessageId, setRetryingMessageId] = useState<number | null>(null);
+  const [sendRetry, setSendRetry] = useState<{
+    conversationId: number;
+    requestId: string;
+  } | null>(null);
+  const [retryRequest, setRetryRequest] = useState<{
+    messageId: number;
+    requestId: string;
+  } | null>(null);
+  const [temporaryRateLimit, setTemporaryRateLimit] = useState<{
+    scope: 'provider' | 'service';
+    retryAt: number;
+  } | null>(null);
+  const [clockTick, setClockTick] = useState(() => Date.now());
+  const refreshedQuotaBoundary = useRef<number | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, AiCoachHelpfulness>>(
     {},
@@ -636,6 +741,58 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
     staleTime: 15_000,
     retry: false,
   });
+  const quota = useQuery<AiCoachQuotaSnapshot>({
+    queryKey: aiCoachQuotaQueryKey,
+    queryFn: () => api<AiCoachQuotaSnapshot>('/api/v1/ai-coach/quota'),
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const { refetch: refetchQuota } = quota;
+  useEffect(() => {
+    const refreshQuota = () => {
+      if (document.visibilityState !== 'hidden') void refetchQuota();
+    };
+    window.addEventListener('focus', refreshQuota);
+    document.addEventListener('visibilitychange', refreshQuota);
+    return () => {
+      window.removeEventListener('focus', refreshQuota);
+      document.removeEventListener('visibilitychange', refreshQuota);
+    };
+  }, [refetchQuota]);
+  useEffect(() => {
+    const resetAt = quota.data ? Date.parse(quota.data.reset_at) : NaN;
+    const serviceRetryAt = temporaryRateLimit?.retryAt ?? NaN;
+    const now = Date.now();
+    const quotaBoundary =
+      Number.isFinite(resetAt) && refreshedQuotaBoundary.current === resetAt
+        ? Number.POSITIVE_INFINITY
+        : resetAt;
+    const nextBoundary = Math.min(
+      Number.isFinite(quotaBoundary) ? quotaBoundary : Number.POSITIVE_INFINITY,
+      Number.isFinite(serviceRetryAt) ? serviceRetryAt : Number.POSITIVE_INFINITY,
+    );
+    if (!Number.isFinite(nextBoundary)) return;
+    const refreshDue =
+      Number.isFinite(resetAt) && resetAt <= now && refreshedQuotaBoundary.current !== resetAt;
+    const delay = refreshDue ? 50 : Math.min(60_000, Math.max(50, nextBoundary - now + 50));
+    const timer = window.setTimeout(() => {
+      const current = Date.now();
+      setClockTick(current);
+      if (
+        Number.isFinite(resetAt) &&
+        resetAt <= current &&
+        refreshedQuotaBoundary.current !== resetAt
+      ) {
+        refreshedQuotaBoundary.current = resetAt;
+        void refetchQuota();
+      }
+      if (Number.isFinite(serviceRetryAt) && serviceRetryAt <= current) {
+        setTemporaryRateLimit(null);
+      }
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [clockTick, quota.data, refetchQuota, temporaryRateLimit]);
   const conversationItems = conversations.data?.items ?? [];
   const currentConversationId = isNewConversation
     ? null
@@ -678,24 +835,36 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
     mutationFn: async ({
       conversationId,
       message,
+      requestId,
     }: {
       conversationId: number | null;
       message: string;
+      requestId: string;
     }) => {
-      const conversationToUse =
-        conversationId === null
-          ? await api<AiCoachConversation>('/api/v1/ai-coach/conversations', {
-              method: 'POST',
-            })
-          : { id: conversationId };
-      const response = await api<AiCoachConversationSendResponse>(
-        `/api/v1/ai-coach/conversations/${conversationToUse.id}/messages`,
-        {
-          method: 'POST',
-          body: { message },
-        },
-      );
-      return { conversationId: conversationToUse.id, response };
+      let conversationIdForError = conversationId;
+      try {
+        const conversationToUse =
+          conversationId === null
+            ? await api<AiCoachConversation>('/api/v1/ai-coach/conversations', {
+                method: 'POST',
+              })
+            : { id: conversationId };
+        conversationIdForError = conversationToUse.id;
+        const response = await api<AiCoachConversationSendResponse>(
+          `/api/v1/ai-coach/conversations/${conversationToUse.id}/messages`,
+          {
+            method: 'POST',
+            body: { message },
+            headers: { 'X-Request-ID': requestId },
+          },
+        );
+        return { conversationId: conversationToUse.id, response };
+      } catch (error) {
+        if (conversationIdForError !== null) {
+          throw new AiCoachSendError(conversationIdForError, error);
+        }
+        throw error;
+      }
     },
     onMutate: ({ message }) => {
       setPendingMessage(message);
@@ -709,9 +878,12 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
     },
     onSuccess: ({ conversationId, response }, variables) => {
       setPendingMessage(null);
+      setSendRetry(null);
       setIsNewConversation(false);
       setActiveConversationId(conversationId);
       storeActiveConversationId(conversationId);
+      if (response.quota) queryClient.setQueryData(aiCoachQuotaQueryKey, response.quota);
+      setTemporaryRateLimit(temporaryRateLimitState(response));
       queryClient.invalidateQueries({ queryKey: aiCoachConversationsQueryKey });
       queryClient.invalidateQueries({ queryKey: ['ai-coach', 'conversation', conversationId] });
       trackProductEvent({
@@ -730,6 +902,12 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
     onError: (reason, variables) => {
       setPendingMessage(null);
       setDraft(variables.message);
+      const failedConversationId =
+        reason instanceof AiCoachSendError ? reason.conversationId : variables.conversationId;
+      if (failedConversationId !== null) {
+        setSendRetry({ conversationId: failedConversationId, requestId: variables.requestId });
+      }
+      void queryClient.invalidateQueries({ queryKey: aiCoachQuotaQueryKey });
       const message = networkFailureCopy(reason);
       setFailure(message);
       trackProductEvent({
@@ -750,20 +928,25 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
     mutationFn: async ({
       conversationId,
       messageId,
+      requestId,
     }: {
       conversationId: number;
       messageId: number;
       message: string;
+      requestId: string;
     }) =>
       api<AiCoachConversationSendResponse>(
         `/api/v1/ai-coach/conversations/${conversationId}/messages/${messageId}/retry`,
-        { method: 'POST' },
+        { method: 'POST', headers: { 'X-Request-ID': requestId } },
       ),
     onMutate: () => {
       setFailure(null);
     },
     onSuccess: (response, variables) => {
       setRetryingMessageId(null);
+      setRetryRequest(null);
+      if (response.quota) queryClient.setQueryData(aiCoachQuotaQueryKey, response.quota);
+      setTemporaryRateLimit(temporaryRateLimitState(response));
       queryClient.invalidateQueries({ queryKey: aiCoachConversationsQueryKey });
       queryClient.invalidateQueries({
         queryKey: ['ai-coach', 'conversation', variables.conversationId],
@@ -784,6 +967,8 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
     },
     onError: (_reason, variables) => {
       setRetryingMessageId(null);
+      setRetryRequest({ messageId: variables.messageId, requestId: variables.requestId });
+      void queryClient.invalidateQueries({ queryKey: aiCoachQuotaQueryKey });
       setDraft(variables.message);
       setFailure('Не удалось повторить ответ. Попробуйте ещё раз.');
     },
@@ -815,11 +1000,16 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
 
   const currentMessages = conversation.data?.messages ?? [];
   const pending = sendMutation.isPending || retryMutation.isPending;
+  const serviceRateLimited = temporaryRateLimit !== null && temporaryRateLimit.retryAt > clockTick;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const message = draft.trim();
-    if (!message || pending) return;
-    sendMutation.mutate({ conversationId: currentConversationId, message });
+    if (!message || pending || quota.data?.can_send === false) return;
+    sendMutation.mutate({
+      conversationId: sendRetry?.conversationId ?? currentConversationId,
+      message,
+      requestId: sendRetry?.requestId ?? newRequestId(),
+    });
   };
   const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -829,6 +1019,7 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
   };
   const chooseQuickPrompt = (message: string) => {
     setDraft(message);
+    setSendRetry(null);
     setFailure(null);
     window.requestAnimationFrame(() => composerRef.current?.focus());
   };
@@ -843,6 +1034,7 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
       conversationId: currentConversationId,
       messageId,
       message: message.content,
+      requestId: retryRequest?.messageId === messageId ? retryRequest.requestId : newRequestId(),
     });
   };
   const startNewConversation = () => {
@@ -851,6 +1043,8 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
     setActiveConversationId(null);
     storeActiveConversationId(null);
     setDraft('');
+    setSendRetry(null);
+    setRetryRequest(null);
     setFailure(null);
   };
   const sendFeedback = (messageId: number, value: AiCoachHelpfulness) => {
@@ -896,6 +1090,8 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
                   setIsNewConversation(false);
                   setActiveConversationId(next);
                   storeActiveConversationId(next);
+                  setSendRetry(null);
+                  setRetryRequest(null);
                   setFailure(null);
                 }}
               >
@@ -949,6 +1145,7 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
             message={message}
             onFeedback={sendFeedback}
             onRetry={retryMessage}
+            retryBlocked={quota.data?.can_send === false || serviceRateLimited}
             retrying={retryingMessageId === message.id}
           />
         ))}
@@ -976,7 +1173,19 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
           data-testid="ai-coach-chat-failure"
           role="alert"
         >
-          <span>{failure}</span>
+          <div>
+            <span>{failure}</span>
+            {temporaryRateLimit && (
+              <small>
+                Повторить можно через{' '}
+                {formatQuotaCountdown(
+                  new Date(temporaryRateLimit.retryAt).toISOString(),
+                  clockTick,
+                )}
+                .
+              </small>
+            )}
+          </div>
           <button type="button" onClick={() => setFailure(null)}>
             Понятно
           </button>
@@ -1025,17 +1234,24 @@ function AiCoachChat({ status }: { status: AiCoachStatus }) {
           placeholder="Напишите вопрос…"
           rows={3}
           value={draft}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setSendRetry(null);
+          }}
           onKeyDown={onComposerKeyDown}
         />
         <div className="ai-coach-chat__composer-meta">
           <span>Enter — отправить, Shift+Enter — новая строка</span>
+          <QuotaIndicator quota={quota.data} now={clockTick} />
           <span>
             {draft.length}/{CHAT_MESSAGE_MAX_LENGTH}
           </span>
         </div>
         <div className="ai-coach-chat__composer-actions">
-          <Button disabled={!draft.trim() || pending} type="submit">
+          <Button
+            disabled={!draft.trim() || pending || quota.data?.can_send === false}
+            type="submit"
+          >
             {pending ? 'Отправляем…' : 'Отправить'}
           </Button>
         </div>

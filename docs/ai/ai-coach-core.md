@@ -67,7 +67,8 @@ safety error. Обычный чат остаётся plain text; legacy structur
 - `insufficient_data` — legacy structured path не получил подходящего проверенного контекста;
 - `safety_refusal` — запрос выходит за безопасную границу;
 - `consent_required` — для персонального вопроса нужно отдельное согласие;
-- `rate_limited` — сработала per-user или global quota;
+- `rate_limited` — сработала user quota или общий service/provider rate limit; scope возвращается
+  отдельно и не выдаёт provider details пользователю;
 - `unavailable` — feature flag, policy, cooldown или provider недоступны;
 - `invalid_output` — форматный текст не удалось безопасно восстановить.
 
@@ -84,14 +85,41 @@ AI Coach выключен по умолчанию. Одного `GROQ_API_KEY` �
 режим дополнительно требует `AI_COACH_PERSONAL_ENABLED=true` и
 `AI_COACH_PERSONAL_DATA_POLICY=verified_personal_user`; эти флаги не включаются автоматически.
 
-Quota и cooldown в текущем сервисе process-local и не требуют shared storage. Для горизонтального
-масштабирования перед отдельным rollout потребуется подтверждённый shared counter. Логи
-`ai_coach_chat_generation` metadata-only: request id, request type/job, trust class, explicit
-context kind, версии, provider/model, outcome, safety/failure category, repair flags, validation
-reason, latency, attempts, generation success, context/history counts и nullable usage.
-Текст запроса, answer, memory, personal facts и raw provider payload в логи не записываются.
+### Пользовательская quota
 
-Миграция `0086_ai_coach_conversations` добавляет только account-owned history. Account export
+Лимит AI Coach хранится в PostgreSQL в account-owned `ai_coach_quota_windows`, а короткая
+reservation — в content-free `ai_coach_quota_reservations`. Это единый источник для процессов,
+workers, вкладок и устройств; `reset_runtime_state()` не сбрасывает данные. По умолчанию
+production target — `20` успешных ответов за rolling window `86400` секунд, но limit и window
+остаются server-configurable. User и service windows блокируются в стабильном порядке, поэтому
+параллельные запросы не oversubscribe quota.
+
+Один пользовательский message резервирует не более одной единицы перед provider-вызовом.
+Reservation учитывается временно и после успешного проверенного ответа переводится в `consumed`;
+provider timeout/5xx/429, malformed или invalid output, internal error, safety rejection,
+validation/context failure и неудачная repair-попытка переводят её в `released`. Одна bounded
+repair/internal retry того же message не создаёт новую единицу. Истёкшие reservations безопасно
+reclaim-ятся после process crash; старые process-local counters не мигрируются, поэтому при
+rollout первая persistent window начинается с первого обращения после deploy.
+
+`GET /api/v1/ai-coach/quota` и conversational response возвращают server-owned snapshot:
+`limit`, `used`, `remaining`, точный `reset_at`, `retry_after_seconds` и `can_send`. При
+исчерпании user quota provider не вызывается. `rate_limit_scope=user|provider|service` отделяет
+личный лимит от provider 429 и общего service limit; provider `Retry-After` используется только
+если он надёжно нормализован и не раскрывается как raw HTTP/provider error.
+
+Логи `ai_coach_chat_generation` и quota-события metadata-only: request id, request type/job,
+trust class, explicit context kind, версии, provider/model, outcome, safety/failure category,
+repair flags, validation reason, latency, attempts, generation success, context/history counts,
+quota remaining/limit/reset и nullable usage. Текст запроса, answer, memory, personal facts,
+raw provider payload и содержимое reservation в логи не записываются.
+
+Миграция `0086_ai_coach_conversations` добавляет только account-owned history, а additive migration
+`0088_ai_coach_durable_quota` добавляет durable quota/reservation и metadata для processing и
+idempotency. Account export
 включает историю и безопасные display metadata; удаление account удаляет messages перед
-conversation shell. Новых environment keys или обязательных credentials для изменения не нужно:
-`env change required: no`.
+conversation shell и quota rows по account cascade. Production helper закрепляет
+`AI_COACH_QUOTA_WINDOW_SECONDS=86400` и `AI_COACH_PER_USER_REQUEST_LIMIT=20`; provider, model,
+credentials, paid/free policy и existing global protective limit не меняются. Для этой env-части
+изменение требуется при следующем production configuration run: `env change required: yes` —
+только эти два ключа в persistent host `.env`.

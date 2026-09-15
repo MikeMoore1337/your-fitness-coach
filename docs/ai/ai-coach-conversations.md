@@ -29,6 +29,7 @@ AI Coach открывается из профиля и показывает:
 | `POST /api/v1/ai-coach/conversations` | Создать новый разговор |
 | `GET /api/v1/ai-coach/conversations/{id}` | Получить собственную историю |
 | `POST /api/v1/ai-coach/conversations/{id}/messages` | Добавить вопрос и получить результат |
+| `GET /api/v1/ai-coach/quota` | Получить текущую server-owned quota |
 | `DELETE /api/v1/ai-coach/conversations/{id}` | Удалить собственный разговор |
 | `POST .../messages/{message_id}/feedback` | Сохранить только helpful/not helpful |
 
@@ -111,8 +112,49 @@ structured output или JSON Schema. Безопасные Markdown и обыч�
 внутренние экраны не возвращаются в UI.
 
 Frontend отключает duplicate send во время запроса, показывает loading, сохраняет введённый текст
-при сетевом/validation failure и не выводит provider exception. Timeout, retry и reload не должны
-создавать второй пользовательский запрос или терять уже сохранённую историю.
+при сетевом/validation failure и не выводит provider exception. `X-Request-ID` — opaque
+idempotency key одного пользовательского turn: повтор с тем же ключом возвращает сохранённый
+результат, конфликт с другим текстом отклоняется, а stale processing lease можно безопасно
+возобновить. Timeout, retry и reload не должны создавать второй пользовательский запрос или
+терять уже сохранённую историю.
+
+## Quota и повторная отправка
+
+`0088_ai_coach_durable_quota` добавляет additive PostgreSQL-таблицы
+`ai_coach_quota_windows` и `ai_coach_quota_reservations`, а также metadata processing для
+сообщений. Quota хранит только account identity, тип окна, timestamps, limit/counter и opaque
+request key; prompt, answer, context и fitness data в quota storage не попадают. Один message
+может занять максимум одну reservation. Она считается только после успешного проверенного ответа;
+provider timeout/5xx/429, invalid или malformed output, internal/safety/validation failure и
+неудачный repair освобождают reservation. Внутренний retry/repair и клиентский replay того же
+`X-Request-ID` не расходуют дополнительную единицу.
+
+`GET /api/v1/ai-coach/quota` и response message содержат одинаковый snapshot:
+
+```json
+{
+  "limit": 20,
+  "used": 4,
+  "remaining": 16,
+  "reset_at": "2026-09-16T12:34:56+03:00",
+  "retry_after_seconds": 12345,
+  "can_send": true
+}
+```
+
+Начальный production target — `20` успешных ответов за `86400` секунд; backend остаётся
+источником истины и может вернуть другой configured limit. `rate_limit_scope=user|provider|service`
+разделяет личное исчерпание от provider 429 и общего service limit. При `user` provider не
+вызывается и UI блокирует только Send, сохраняя редактирование draft. При `provider`/`service`
+личный counter не меняется. Countdown считает время локально от server `reset_at` или bounded
+retry deadline, не делает запрос каждую секунду; refresh выполняется при достижении boundary,
+focus/visibility restore, reload или message result. Expired reservation reclaim-ится после
+restart/crash, а `reset_runtime_state()` не сбрасывает persistent window. Если backend process
+завершился во время `processing`, следующий reload разговора атомарно освобождает reservation и
+показывает повторяемый internal failure без списания. Для idempotent replay сохранённые
+`provider`/`service` scope и bounded retry deadline возвращаются повторно в send/replay и в
+сохранённом failed message при reload, поэтому потерянный response не превращается в новый
+provider call и не выглядит как личное исчерпание.
 
 ## Privacy, telemetry и эксплуатация
 
@@ -128,16 +170,21 @@ message text, answer, memory values, personal facts, raw context или secret. 
 категорию helpfulness и не копирует текст.
 
 Новых обязательных provider, платных сервисов или credentials нет. Существующие AI Coach flags и
-free-only policy сохраняются. Миграция `0087_ai_coach_long_chat_messages` — additive expand без
-backfill; ручная production data migration не требуется. Для изменения: `env change required: no`.
+free-only policy сохраняются. Миграция `0087_ai_coach_long_chat_messages` и новая
+`0088_ai_coach_durable_quota` — additive expand без backfill; старые ephemeral counters не
+мигрируются, а persistent window создаётся при первом обращении после rollout. Ручная data
+migration не требуется. Production configuration run закрепляет
+`AI_COACH_QUOTA_WINDOW_SECONDS=86400` и `AI_COACH_PER_USER_REQUEST_LIMIT=20`; других env/provider/
+credential changes нет: `env change required: yes` только для этих двух ключей в host `.env`.
 
 ## Проверка
 
 Контракт покрывается backend unit/integration тестами для generic, personal consent, follow-up,
 provider failure, output reason codes, sanitization, one-shot repair, safety refusal, isolation,
-export/delete и legacy structured adapter; frontend unit тестами для chat/reload/failure/memory secondary; Playwright browser/mock-TMA
-сценариями для desktop, 390px mobile, TMA safe-area, quick prompts, feedback, follow-up и reload.
-Физическое Telegram-устройство не подменяет browser/mock-TMA проверку. После merge и automatic
-production deployment обязательны отдельные real-provider smoke/evidence для общих вопросов,
-app-help, персонального вопроса и follow-up; evidence хранит только provider/model, latency,
+quota persistence/reset/concurrency/idempotency, export/delete и legacy structured adapter;
+frontend unit тестами для quota/reload/failure/memory secondary; Playwright browser/mock-TMA
+сценариями для desktop, 390px mobile, TMA safe-area, quick prompts, feedback, follow-up, reload
+и quota decrement. Физическое Telegram-устройство не подменяет browser/mock-TMA проверку. После
+merge и automatic production deployment обязательны отдельные real-provider smoke/evidence для
+общих вопросов, app-help, персонального вопроса и follow-up; evidence хранит только provider/model, latency,
 request type и generation success, без raw prompt/answer и personal payload.

@@ -15,6 +15,8 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachJob,
     AiCoachOutcome,
     AiCoachPersonalTool,
+    AiCoachQuotaSnapshot,
+    AiCoachRateLimitScope,
     AiCoachResponse,
 )
 
@@ -219,10 +221,12 @@ class AiCoachConversationMessageResponse(BaseModel):
     id: int
     role: Literal["user", "assistant"]
     content: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_MAX_MESSAGE_LENGTH)
-    status: Literal["complete", "failed"]
+    status: Literal["processing", "complete", "failed"]
     outcome: AiCoachOutcome | None = None
     safety_category: str = Field(..., min_length=1, max_length=48)
     failure_category: ChatFailureCategory | None = None
+    rate_limit_scope: AiCoachRateLimitScope | None = None
+    rate_limit_retry_after_seconds: int | None = Field(default=None, ge=0)
     citations: tuple[AiCoachCitation, ...] = ()
     limitations: tuple[str, ...] = ()
     created_at: datetime
@@ -279,6 +283,9 @@ class AiCoachConversationSendResponse(BaseModel):
     failure_category: ChatFailureCategory | None = None
     prompt_version: str = Field(..., min_length=1, max_length=64)
     request_id: str | None = Field(default=None, max_length=128)
+    quota: AiCoachQuotaSnapshot
+    rate_limit_scope: AiCoachRateLimitScope | None = None
+    rate_limit_retry_after_seconds: int | None = Field(default=None, ge=0)
 
 
 __all__ = [
