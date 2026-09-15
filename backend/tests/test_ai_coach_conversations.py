@@ -874,6 +874,36 @@ def test_production_like_long_safe_draft_is_repaired_once(monkeypatch) -> None:
     assert provider.repair_calls[0][2].value == "too_long"
 
 
+def test_overlong_safe_repair_is_bounded_without_second_provider_call(monkeypatch) -> None:
+    long_draft = "Безопасное объяснение отдыха между подходами. " + (
+        "Длительность зависит от цели и интенсивности тренировки. " * 48
+    )
+    overlong_repair = "Сохраняйте технику и качество повторений. " + (
+        "Отдых подбирают по цели и восстановлению. " * 80
+    )
+    provider = StubTextProvider(
+        calls=[],
+        answer=long_draft,
+        repair_answer=overlong_repair,
+        repair_calls=[],
+    )
+
+    result = _generate_direct_chat(
+        monkeypatch,
+        provider,
+        _direct_chat_request("Сколько отдыхать между подходами и почему?"),
+    )
+
+    assert len(overlong_repair) > 1_600
+    assert result.outcome == "answer"
+    assert result.answer is not None
+    assert len(result.answer) <= 1_600
+    assert result.failure_category is None
+    assert result.repair_attempted is True
+    assert result.repair_success is True
+    assert len(provider.repair_calls) == 1
+
+
 @pytest.mark.parametrize(
     "answer",
     [

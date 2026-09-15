@@ -489,6 +489,58 @@ def sanitize_chat_output(
     return final.normalized if final.reason is None else None
 
 
+def bound_safe_chat_output(
+    answer: str,
+    *,
+    data_class: AiCoachDataClass,
+    locale: Literal["ru", "en"] = "ru",
+) -> str | None:
+    """Bound one safe overlong draft without hiding a safety or format failure."""
+
+    inspection = inspect_chat_output(answer, data_class=data_class, locale=locale)
+    if (
+        inspection.safety_category is not None
+        or inspection.reason
+        not in {
+            ChatOutputValidationReason.TOO_LONG,
+            ChatOutputValidationReason.URL,
+            ChatOutputValidationReason.INTERNAL_LABEL,
+        }
+        or _is_json_container(inspection.normalized)
+    ):
+        return None
+
+    bounded = re.sub(
+        r"\[([^\]\n]{1,120})\]\(\s*(?:https?://|/)[^)\s]*\)",
+        r"\1",
+        inspection.normalized,
+        flags=re.IGNORECASE,
+    )
+    bounded = re.sub(r"https?://[^\s<>\])}]+", "", bounded, flags=re.IGNORECASE)
+    bounded = _replace_internal_routes(bounded, locale=locale)
+    bounded = re.sub(r"[ \t]{2,}", " ", bounded)
+    bounded = re.sub(r"\n{3,}", "\n\n", bounded).strip()
+    if len(bounded) > 1_600:
+        prefix = bounded[:1_600]
+        boundaries = list(
+            re.finditer(
+                r"(?:\n{2,}|[.!?。！？]+(?=\s|$))",
+                prefix,
+            )
+        )
+        if boundaries:
+            bounded = prefix[: boundaries[-1].end()].strip()
+        else:
+            prefix = bounded[:1_599].rstrip()
+            cut = prefix.rfind(" ")
+            if cut >= 800:
+                prefix = prefix[:cut].rstrip()
+            bounded = f"{prefix.rstrip(' ,;:-')}…"
+
+    final = inspect_chat_output(bounded, data_class=data_class, locale=locale)
+    return final.normalized if final.reason is None else None
+
+
 def validate_chat_output(
     answer: str,
     *,

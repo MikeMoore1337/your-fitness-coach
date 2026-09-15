@@ -25,6 +25,7 @@ from fitminiapp_api.ai_coach.contracts import (
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
 from fitminiapp_api.ai_coach.safety import (
     SafetyCategory,
+    bound_safe_chat_output,
     classify_message,
     inspect_chat_output,
     refusal_text,
@@ -381,17 +382,26 @@ class AiCoachChatService:
                             validation_failure_reason=validation_failure_reason,
                         )
                     if repaired_inspection.reason is not None:
-                        outcome = AiCoachOutcome.INVALID_OUTPUT
-                        failure_category = CHAT_FAILURE_REPAIR_FAILED
-                        return self._failure(
-                            request,
-                            outcome=outcome,
-                            safety=safety,
-                            failure_category=failure_category,
-                            repair_attempted=repair_attempted,
-                            validation_failure_reason=validation_failure_reason,
+                        bounded_repair = bound_safe_chat_output(
+                            repaired.response.answer,
+                            data_class=request.data_class,
+                            locale=request.locale,
                         )
-                    answer = repaired_inspection.normalized
+                        if bounded_repair is None:
+                            validation_failure_reason = repaired_inspection.reason
+                            outcome = AiCoachOutcome.INVALID_OUTPUT
+                            failure_category = CHAT_FAILURE_REPAIR_FAILED
+                            return self._failure(
+                                request,
+                                outcome=outcome,
+                                safety=safety,
+                                failure_category=failure_category,
+                                repair_attempted=repair_attempted,
+                                validation_failure_reason=validation_failure_reason,
+                            )
+                        answer = bounded_repair
+                    else:
+                        answer = repaired_inspection.normalized
                     repair_success = True
             self.cooldown.reset()
             outcome = AiCoachOutcome.ANSWER
