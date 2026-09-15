@@ -124,7 +124,7 @@ export function WorkoutCompletionSummary({
     >
       <header className="workout-completion__hero">
         <span className="workout-completion__check" aria-hidden="true">
-          <Icon name="week-strength" style={{ width: 110, height: 110 }} />
+          <Icon name="week-strength" size={24} />
         </span>
         <div>
           <Badge tone="success">Результат сохранён</Badge>
