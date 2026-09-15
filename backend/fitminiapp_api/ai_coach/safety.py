@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import unicodedata
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
@@ -12,6 +13,7 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachDataClass,
     AiCoachInsightKind,
     AiCoachRequest,
+    ChatOutputValidationReason,
     ProviderStructuredResponse,
 )
 
@@ -128,11 +130,36 @@ _PATTERNS: tuple[tuple[SafetyCategory, re.Pattern[str]], ...] = (
     ),
 )
 
+_OUTPUT_PROMPT_LEAKAGE_BLOCKLIST = re.compile(
+    r"(?:chain\s+of\s+thought|hidden\s+reasoning|"
+    r"(?:system|developer)\s+(?:prompt|message|instruction)s?|"
+    r"(?:reveal|show|print)\s+(?:the\s+)?(?:system\s+prompt|developer\s+message)|"
+    r"системн\w*\s+промпт|сообщени\w*\s+разработчика|"
+    r"(?:раскр(?:ой|ыть)|покаж(?:и|ите)|вывед(?:и|ите)).{0,32}(?:системн\w*\s+промпт|"
+    r"промпт|инструкц|сообщени\w*\s+разработчика)|"
+    r"ignore\s+(?:all\s+)?(?:previous|earlier)\s+instructions|"
+    r"игнорируй\s+(?:все\s+)?(?:предыдущие|системные)\s+инструкции)",
+    re.IGNORECASE,
+)
+_OUTPUT_SECRET_LEAKAGE_BLOCKLIST = re.compile(
+    r"(?:api\s*key|access\s+token|bearer\s+token|private\s+key|"
+    r"токен|секрет\w*|парол\w*)",
+    re.IGNORECASE,
+)
+_OUTPUT_PRIVACY_LEAKAGE_BLOCKLIST = re.compile(
+    r"(?:чуж(?:ие|ой|ого)\s+(?:данные|профил\w*|трениров\w*|питани\w*)|"
+    r"данные\s+(?:другого|других|клиента)|client\s+data|private\s+data|"
+    r"(?:user|telegram)_id\s*[:=]|email\s*[:=]|телефон\s*[:=])",
+    re.IGNORECASE,
+)
 _OUTPUT_BLOCKLIST = re.compile(
-    r"(?:chain\s+of\s+thought|hidden\s+reasoning|reasoning|"
-    r"скрыт(?:ые|ых)?\s+рассужд|рассужд|системный\s+промпт|"
-    r"api\s*key|токен|секрет|ignore\s+(?:all\s+)?previous\s+instructions|"
-    r"игнорируй\s+(?:все\s+)?предыдущие\s+инструкции|developer\s+message)",
+    "(?:"
+    + _OUTPUT_PROMPT_LEAKAGE_BLOCKLIST.pattern
+    + "|"
+    + _OUTPUT_SECRET_LEAKAGE_BLOCKLIST.pattern
+    + "|"
+    + _OUTPUT_PRIVACY_LEAKAGE_BLOCKLIST.pattern
+    + ")",
     re.IGNORECASE,
 )
 _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST = re.compile(
@@ -188,6 +215,11 @@ _PERIOD_REPORT_UNSAFE_CLAIM_BLOCKLIST = re.compile(
 _URL_PATTERN = re.compile(r"https?://", re.IGNORECASE)
 _CYRILLIC_PATTERN = re.compile(r"[А-Яа-яЁё]")
 _LATIN_PATTERN = re.compile(r"[A-Za-z]")
+_INTERNAL_ROUTE_PATTERN = re.compile(
+    r"(?<![A-Za-zА-Яа-яЁё0-9_])/(?P<route>today|nutrition|progress|training|api|v1)"
+    r"(?=[/?#\s).,:]|$)",
+    re.IGNORECASE,
+)
 _INTERNAL_LABEL_PATTERN = re.compile(
     r"(?:"
     r"(?<![A-Za-zА-Яа-яЁё0-9_])/(?:today|nutrition|progress|training|api|v1)"
@@ -200,8 +232,31 @@ _INTERNAL_LABEL_PATTERN = re.compile(
 )
 
 
+@dataclass(frozen=True)
+class ChatOutputInspection:
+    """Metadata-only inspection of one untrusted provider text response."""
+
+    normalized: str
+    reason: ChatOutputValidationReason | None = None
+    safety_category: SafetyCategory | None = None
+
+
+class ChatOutputValidationError(ValueError):
+    """Typed, raw-content-free validation error for conversational output."""
+
+    def __init__(
+        self,
+        reason: ChatOutputValidationReason,
+        *,
+        safety_category: SafetyCategory | None = None,
+    ) -> None:
+        self.reason = reason
+        self.safety_category = safety_category
+        super().__init__(reason.value)
+
+
 def normalize_user_text(value: str) -> str:
-    return unicodedata.normalize("NFKC", value).strip()
+    return unicodedata.normalize("NFKC", value).replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
 def classify_message(message: str) -> SafetyCategory:
@@ -310,6 +365,130 @@ def _is_json_container(value: str) -> bool:
     return isinstance(decoded, (dict, list))
 
 
+def _output_safety_category(
+    answer: str,
+    *,
+    data_class: AiCoachDataClass,
+) -> SafetyCategory | None:
+    if _OUTPUT_SECRET_LEAKAGE_BLOCKLIST.search(answer) or _OUTPUT_PRIVACY_LEAKAGE_BLOCKLIST.search(
+        answer
+    ):
+        return SafetyCategory.PRIVACY_EXFILTRATION
+    if _OUTPUT_PROMPT_LEAKAGE_BLOCKLIST.search(answer):
+        return SafetyCategory.PROMPT_INJECTION
+    if _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(answer):
+        if re.search(
+            r"(?:диагноз|диагностир|лечени|лекарств|болезн|травм|симптом|medical|diagnos|treatment|injur)",
+            answer,
+            re.IGNORECASE,
+        ):
+            return SafetyCategory.MEDICAL
+        return SafetyCategory.DRUGS_PERFORMANCE
+    if (
+        data_class == AiCoachDataClass.PERSONALIZED
+        and _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(answer)
+    ):
+        return SafetyCategory.UNSUPPORTED_INFERENCE
+    return None
+
+
+def _output_safety_reason(
+    answer: str,
+    *,
+    data_class: AiCoachDataClass,
+) -> ChatOutputValidationReason:
+    if (
+        _OUTPUT_SECRET_LEAKAGE_BLOCKLIST.search(answer)
+        or _OUTPUT_PRIVACY_LEAKAGE_BLOCKLIST.search(answer)
+        or _OUTPUT_PROMPT_LEAKAGE_BLOCKLIST.search(answer)
+    ):
+        return ChatOutputValidationReason.UNSAFE_CONTENT
+    if _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(answer) or (
+        data_class == AiCoachDataClass.PERSONALIZED
+        and _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(answer)
+    ):
+        return ChatOutputValidationReason.PROHIBITED_CLAIM
+    return ChatOutputValidationReason.UNSAFE_CONTENT
+
+
+def inspect_chat_output(
+    answer: str,
+    *,
+    data_class: AiCoachDataClass,
+    locale: Literal["ru", "en"] = "ru",
+) -> ChatOutputInspection:
+    """Classify provider text before deciding whether to show, sanitize or repair it."""
+
+    normalized = normalize_user_text(answer)
+    output_safety = _output_safety_category(normalized, data_class=data_class)
+    if output_safety is not None:
+        return ChatOutputInspection(
+            normalized=normalized,
+            reason=_output_safety_reason(normalized, data_class=data_class),
+            safety_category=output_safety,
+        )
+    if not normalized:
+        return ChatOutputInspection(normalized, ChatOutputValidationReason.OTHER)
+    if len(normalized) > 1_600:
+        return ChatOutputInspection(normalized, ChatOutputValidationReason.TOO_LONG)
+    if not _has_expected_language(normalized, locale):
+        return ChatOutputInspection(normalized, ChatOutputValidationReason.WRONG_LANGUAGE)
+    if _is_json_container(normalized):
+        return ChatOutputInspection(normalized, ChatOutputValidationReason.JSON_CONTAINER)
+    if _INTERNAL_LABEL_PATTERN.search(normalized):
+        return ChatOutputInspection(normalized, ChatOutputValidationReason.INTERNAL_LABEL)
+    if _URL_PATTERN.search(normalized):
+        return ChatOutputInspection(normalized, ChatOutputValidationReason.URL)
+    return ChatOutputInspection(normalized)
+
+
+def _replace_internal_routes(value: str, *, locale: Literal["ru", "en"]) -> str:
+    labels = {
+        "today": "экран «Сегодня»" if locale == "ru" else "Today screen",
+        "nutrition": "раздел «Питание»" if locale == "ru" else "nutrition section",
+        "progress": "раздел «Прогресс»" if locale == "ru" else "progress section",
+        "training": "раздел «Тренировки»" if locale == "ru" else "training section",
+        "api": "служебный раздел" if locale == "ru" else "internal section",
+        "v1": "служебная версия" if locale == "ru" else "internal version",
+    }
+    return _INTERNAL_ROUTE_PATTERN.sub(
+        lambda match: labels[match.group("route").lower()],
+        value,
+    )
+
+
+def sanitize_chat_output(
+    answer: str,
+    *,
+    data_class: AiCoachDataClass,
+    locale: Literal["ru", "en"] = "ru",
+) -> str | None:
+    """Apply only deterministic, meaning-preserving presentation cleanup."""
+
+    inspection = inspect_chat_output(answer, data_class=data_class, locale=locale)
+    if inspection.reason is None:
+        return inspection.normalized
+    if inspection.reason not in {
+        ChatOutputValidationReason.URL,
+        ChatOutputValidationReason.INTERNAL_LABEL,
+    }:
+        return None
+    sanitized = re.sub(
+        r"\[([^\]\n]{1,120})\]\(\s*(?:https?://|/)[^)\s]*\)",
+        r"\1",
+        inspection.normalized,
+        flags=re.IGNORECASE,
+    )
+    sanitized = re.sub(r"https?://[^\s<>\])}]+", "", sanitized, flags=re.IGNORECASE)
+    sanitized = _replace_internal_routes(sanitized, locale=locale)
+    sanitized = re.sub(r"[ \t]{2,}", " ", sanitized)
+    sanitized = re.sub(r"\n{3,}", "\n\n", sanitized).strip()
+    if not sanitized:
+        return None
+    final = inspect_chat_output(sanitized, data_class=data_class, locale=locale)
+    return final.normalized if final.reason is None else None
+
+
 def validate_chat_output(
     answer: str,
     *,
@@ -318,30 +497,13 @@ def validate_chat_output(
 ) -> str:
     """Validate plain chat text without turning format failures into safety refusals."""
 
-    normalized = unicodedata.normalize("NFKC", answer).strip()
-    if (
-        not normalized
-        or len(normalized) > 1_600
-        or not _has_expected_language(normalized, locale)
-        or _is_json_container(normalized)
-    ):
-        raise ValueError("chat_answer_format_invalid")
-    if (
-        _OUTPUT_BLOCKLIST.search(normalized)
-        or _INTERNAL_LABEL_PATTERN.search(normalized)
-        or _URL_PATTERN.search(normalized)
-    ):
-        raise ValueError("chat_answer_contains_untrusted_content")
-    if data_class != AiCoachDataClass.PERSONALIZED and _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(
-        normalized
-    ):
-        raise ValueError("chat_answer_contains_prohibited_claim")
-    if (
-        data_class == AiCoachDataClass.PERSONALIZED
-        and _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(normalized)
-    ):
-        raise ValueError("chat_answer_contains_unsupported_personal_calculation")
-    return normalized
+    inspection = inspect_chat_output(answer, data_class=data_class, locale=locale)
+    if inspection.reason is not None:
+        raise ChatOutputValidationError(
+            inspection.reason,
+            safety_category=inspection.safety_category,
+        )
+    return inspection.normalized
 
 
 def safe_chat_fallback(
@@ -350,39 +512,9 @@ def safe_chat_fallback(
     data_class: AiCoachDataClass,
     locale: Literal["ru", "en"] = "ru",
 ) -> str | None:
-    """Keep safe prose when a provider added removable transport noise.
+    """Backward-compatible name for deterministic chat presentation cleanup."""
 
-    A fallback is deliberately narrower than normal validation: it only removes URLs and
-    markdown link wrappers. Any prohibited claim, prompt-injection text, wrong-language output or
-    oversized value is discarded instead of being shown as if it had passed validation.
-    """
-
-    normalized = unicodedata.normalize("NFKC", answer).strip()
-    if (
-        not normalized
-        or len(normalized) > 1_600
-        or not _has_expected_language(normalized, locale)
-        or _is_json_container(normalized)
-    ):
-        return None
-    if (
-        _OUTPUT_BLOCKLIST.search(normalized)
-        or _INTERNAL_LABEL_PATTERN.search(normalized)
-        or _OUTPUT_PROHIBITED_CLAIM_BLOCKLIST.search(normalized)
-    ):
-        return None
-    if (
-        data_class == AiCoachDataClass.PERSONALIZED
-        and _OUTPUT_PERSONAL_UNSUPPORTED_CALCULATION_BLOCKLIST.search(normalized)
-    ):
-        return None
-    sanitized = re.sub(r"\[([^\]]{1,120})\]\(https://[^)\s]+\)", r"\1", normalized)
-    sanitized = re.sub(r"https?://[^\s]+", "", sanitized)
-    sanitized = re.sub(r"[ \t]{2,}", " ", sanitized)
-    sanitized = re.sub(r"\n{3,}", "\n\n", sanitized).strip()
-    if not sanitized or len(sanitized) > 1_600 or not _has_expected_language(sanitized, locale):
-        return None
-    return sanitized
+    return sanitize_chat_output(answer, data_class=data_class, locale=locale)
 
 
 def validate_provider_output(

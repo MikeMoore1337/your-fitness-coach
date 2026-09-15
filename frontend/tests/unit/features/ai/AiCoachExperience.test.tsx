@@ -290,7 +290,7 @@ describe('AiCoachExperience', () => {
     expect(screen.getByText('А если одна запись недостаточна?')).toBeInTheDocument();
   });
 
-  it('preserves typed text and separates invalid output from safety refusal', async () => {
+  it('preserves typed text and shows a repair failure separately from safety refusal', async () => {
     apiMock.mockImplementation(async (path, options) => {
       if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST')
         return conversation(3);
@@ -303,17 +303,17 @@ describe('AiCoachExperience', () => {
           user_message: chatMessage(3, 'user', body.message, {
             status: 'failed',
             outcome: 'invalid_output',
-            failure_category: 'structured_validation',
-            limitations: ['Не удалось безопасно проверить ответ. Попробуйте ещё раз.'],
+            failure_category: 'repair_failed',
+            limitations: ['Не удалось сформировать ответ. Повторить.'],
           }),
           assistant_message: null,
           outcome: 'invalid_output',
           data_class: 'generic',
           answer: null,
           citations: [],
-          limitations: ['Не удалось безопасно проверить ответ. Попробуйте ещё раз.'],
+          limitations: ['Не удалось сформировать ответ. Повторить.'],
           safety_category: 'clear',
-          failure_category: 'structured_validation',
+          failure_category: 'repair_failed',
           prompt_version: 'ai-coach-chat-v1',
           request_id: 'request-3',
         };
@@ -326,7 +326,7 @@ describe('AiCoachExperience', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Отправить' }));
     await waitFor(() => expect(screen.getByTestId('ai-coach-chat-failure')).toBeInTheDocument());
     expect(input).toHaveValue('Объясни мне этот материал.');
-    expect(screen.getByText(/безопасно проверить/)).toBeInTheDocument();
+    expect(screen.getByText(/Не удалось сформировать ответ\. Повторить\./)).toBeInTheDocument();
     expect(screen.queryByText('На этот запрос нельзя ответить безопасно')).not.toBeInTheDocument();
   });
 

@@ -97,14 +97,18 @@ endpoints.
 | `insufficient_data` | legacy structured route | Только отдельный периодический/персональный отчёт, не обычный чат |
 | `unavailable` | `provider_failure` или `generation_failure` | Общая безопасная ошибка без raw details |
 | `unavailable` | `timeout` | Сообщение о таймауте и повторная попытка |
-| `rate_limited` | `rate_limited` | Сообщение о лимите |
-| `invalid_output` | `structured_validation` | Ответ не показывается, если его нельзя безопасно очистить |
+| `rate_limited` | `rate_limit` | Сообщение о лимите |
+| `safety_refusal` | `safety_rejection` | Сгенерированный ответ нарушил safety boundary; repair не выполняется |
+| `invalid_output` | `repair_failed` | Форматный ответ не удалось безопасно восстановить после одной попытки |
 
-`safety_category=clear` не является safety error. Если provider добавил только удалимый URL или
-markdown-link noise, validated safe prose сохраняется как текст с outcome `invalid_output`; опасные,
-неподходящие по языку, чрезмерные, JSON/schema-ответы или содержащие запрещённые утверждения
-фрагменты не показываются. Персональные citation-ссылки на внутренние экраны не возвращаются
-в UI.
+`safety_category=clear` не является safety error. Обычный conversational ответ не использует
+structured output или JSON Schema. Безопасные Markdown и обычные английские fitness-термины
+(например, RIR/RPE/Top Set) разрешены. Удалимые URL и известные внутренние route labels
+сначала очищаются детерминированно; слишком длинный, JSON, неправильный по языку или содержащий
+неизвестные служебные поля текст получает не более одной bounded repair-попытки. Если repair не
+удался, answer не показывается. Медицинские/лекарственные утверждения, секреты, prompt leakage
+и privacy leakage всегда fail closed и не передаются в repair. Персональные citation-ссылки на
+внутренние экраны не возвращаются в UI.
 
 Frontend отключает duplicate send во время запроса, показывает loading, сохраняет введённый текст
 при сетевом/validation failure и не выводит provider exception. Timeout, retry и reload не должны
@@ -118,9 +122,10 @@ Frontend отключает duplicate send во время запроса, по�
 personal и memory. Ни один путь не выполняет запись в canonical data.
 
 `ai_coach_chat_generation` содержит только metadata: request id, job, data class, policy/prompt/schema
-versions, provider/model, outcome, safety/failure category, attempts, counts, latency и nullable
-token usage. В логи не попадают message text, answer, memory values, personal facts, raw context или
-secret. Feedback хранит только категорию helpfulness и не копирует текст.
+versions, provider/model, outcome, safety/failure category, `repair_attempted`, `repair_success`,
+`validation_failure_reason`, attempts, counts, latency и nullable token usage. В логи не попадают
+message text, answer, memory values, personal facts, raw context или secret. Feedback хранит только
+категорию helpfulness и не копирует текст.
 
 Новых обязательных provider, платных сервисов или credentials нет. Существующие AI Coach flags и
 free-only policy сохраняются. Миграция `0087_ai_coach_long_chat_messages` — additive expand без
@@ -129,8 +134,8 @@ backfill; ручная production data migration не требуется. Для
 ## Проверка
 
 Контракт покрывается backend unit/integration тестами для generic, personal consent, follow-up,
-provider failure, invalid output, safe fallback, isolation, export/delete и legacy plain-text
-adapter; frontend unit тестами для chat/reload/failure/memory secondary; Playwright browser/mock-TMA
+provider failure, output reason codes, sanitization, one-shot repair, safety refusal, isolation,
+export/delete и legacy structured adapter; frontend unit тестами для chat/reload/failure/memory secondary; Playwright browser/mock-TMA
 сценариями для desktop, 390px mobile, TMA safe-area, quick prompts, feedback, follow-up и reload.
 Физическое Telegram-устройство не подменяет browser/mock-TMA проверку. После merge и automatic
 production deployment обязательны отдельные real-provider smoke/evidence для общих вопросов,

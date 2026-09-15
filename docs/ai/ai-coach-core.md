@@ -41,9 +41,10 @@ Legacy period-report path по-прежнему использует строг�
 внутренний формат отчёта, а не контракт обычного диалога.
 
 Текущий adapter — прямой Groq adapter с fixed HTTPS endpoint и allowlisted
-`openai/gpt-oss-120b`. Provider SDK types не выходят из adapter. Prompt versions, output limits,
-single-call personal policy и bounded retry задаются server-side. Blind failover и новый платный
-provider не добавляются.
+`openai/gpt-oss-120b`. Provider SDK types не выходят из adapter. Prompt versions, provider draft
+cap и пользовательский answer cap задаются server-side. Основная генерация следует bounded retry
+policy; форматный ответ может получить ровно одну отдельную plain-text repair-попытку. Blind
+failover и новый платный provider не добавляются.
 
 История диалога хранится отдельно от durable memory в account-owned таблицах. В provider попадают
 только последние ограниченные сообщения текущего разговора; memory добавляется только для
@@ -53,11 +54,12 @@ provider не добавляются.
 ## Safety и состояния
 
 До provider выполняется классификация медицинских, лекарственных/AAS, unsafe, privacy/exfiltration,
-action и prompt-injection запросов. После provider проверяются язык, длина, запрещённые фрагменты,
-ссылки и безопасный plain-text контракт. `safety_category=clear` не превращается в safety error:
-ошибка провайдера и `invalid_output` отображаются как отдельные технические состояния. Если ответ
-не прошёл валидацию только из-за удалимого URL/markdown link noise, безопасная русская часть
-сохраняется; иначе answer не показывается.
+action и prompt-injection запросов. После provider ответ получает metadata-only reason code:
+`too_long`, `wrong_language`, `json_container`, `internal_label`, `url`, `prohibited_claim`,
+`unsafe_content` или `other`. Безопасные presentation issues восстанавливаются локально либо
+одной plain-text repair-попыткой; safety output (медицина, запрещённые инструкции, секреты,
+prompt/privacy leakage) не repair-ится и fail closed. `safety_category=clear` не превращается в
+safety error. Обычный чат остаётся plain text; legacy structured report path не меняется.
 
 Основные состояния чата:
 
@@ -67,10 +69,12 @@ action и prompt-injection запросов. После provider проверя�
 - `consent_required` — для персонального вопроса нужно отдельное согласие;
 - `rate_limited` — сработала per-user или global quota;
 - `unavailable` — feature flag, policy, cooldown или provider недоступны;
-- `invalid_output` — текст провайдера не прошёл валидацию.
+- `invalid_output` — форматный текст не удалось безопасно восстановить.
 
 Для технических состояний API использует отдельные `failure_category`: `provider_failure`,
-`structured_validation`, `timeout`, `context_failure`, `generation_failure` и `rate_limited`.
+`timeout`, `rate_limit`, `repair_failed`, `presentation_validation_failed`, `internal_error`,
+`safety_rejection`, `context_failure` и `generation_failure`. `structured_validation` сохраняется
+только для исторических/legacy structured rows и не выдаётся обычным conversational path.
 Raw provider errors, stack trace, ключи, prompt и внутренние topology пользователю не выдаются.
 
 ## Конфигурация и эксплуатационные ограничения
@@ -83,8 +87,8 @@ AI Coach выключен по умолчанию. Одного `GROQ_API_KEY` �
 Quota и cooldown в текущем сервисе process-local и не требуют shared storage. Для горизонтального
 масштабирования перед отдельным rollout потребуется подтверждённый shared counter. Логи
 `ai_coach_chat_generation` metadata-only: request id, request type/job, trust class, explicit
-context kind, версии, provider/model, outcome, safety/failure category, latency, attempts,
-generation success, context/history counts и nullable usage.
+context kind, версии, provider/model, outcome, safety/failure category, repair flags, validation
+reason, latency, attempts, generation success, context/history counts и nullable usage.
 Текст запроса, answer, memory, personal facts и raw provider payload в логи не записываются.
 
 Миграция `0086_ai_coach_conversations` добавляет только account-owned history. Account export

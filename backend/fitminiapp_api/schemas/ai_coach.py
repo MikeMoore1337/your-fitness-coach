@@ -191,8 +191,14 @@ ChatFailureCategory = Literal[
     "provider_failure",
     "structured_validation",
     "timeout",
+    "rate_limit",
+    "repair_failed",
+    "presentation_validation_failed",
+    "internal_error",
+    "safety_rejection",
     "context_failure",
     "generation_failure",
+    # Kept for historical conversation rows created before the taxonomy update.
     "rate_limited",
 ]
 

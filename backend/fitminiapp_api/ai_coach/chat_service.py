@@ -16,6 +16,7 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachDataClass,
     AiCoachOutcome,
     ChatLlmPort,
+    ChatOutputValidationReason,
     ContextRef,
     NormalizedProviderError,
     ProviderErrorCode,
@@ -25,9 +26,9 @@ from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
 from fitminiapp_api.ai_coach.safety import (
     SafetyCategory,
     classify_message,
+    inspect_chat_output,
     refusal_text,
-    safe_chat_fallback,
-    validate_chat_output,
+    sanitize_chat_output,
 )
 from fitminiapp_api.core.config import settings
 
@@ -35,10 +36,15 @@ logger = logging.getLogger("app.ai_coach")
 
 CHAT_FAILURE_PROVIDER = "provider_failure"
 CHAT_FAILURE_STRUCTURED_VALIDATION = "structured_validation"
+CHAT_FAILURE_SAFETY_REJECTION = "safety_rejection"
+CHAT_FAILURE_REPAIR_FAILED = "repair_failed"
+CHAT_FAILURE_PRESENTATION_VALIDATION = "presentation_validation_failed"
+CHAT_FAILURE_INTERNAL_ERROR = "internal_error"
 CHAT_FAILURE_TIMEOUT = "timeout"
 CHAT_FAILURE_CONTEXT = "context_failure"
 CHAT_FAILURE_GENERATION = "generation_failure"
-CHAT_FAILURE_RATE_LIMITED = "rate_limited"
+CHAT_FAILURE_RATE_LIMIT = "rate_limit"
+CHAT_FAILURE_RATE_LIMITED = CHAT_FAILURE_RATE_LIMIT
 _INTERNAL_APP_PATHS = ("/today", "/nutrition", "/progress", "/training", "/api", "/v1")
 
 _GENERIC_LIMITATION = (
@@ -132,6 +138,9 @@ class AiCoachChatGeneration:
     failure_category: str | None
     prompt_version: str
     data_class: AiCoachDataClass
+    repair_attempted: bool = False
+    repair_success: bool = False
+    validation_failure_reason: ChatOutputValidationReason | None = None
 
 
 def _safe_groq_route() -> bool:
@@ -185,23 +194,28 @@ class AiCoachChatService:
         ):
             safety = SafetyCategory.CLEAR
         attempts = 0
-        provider_name: str | None = None
-        configured_model: str | None = None
+        provider_name: str | None = getattr(self.provider, "provider_name", None)
+        configured_model: str | None = settings.ai_coach_model
         actual_model: str | None = None
         usage = None
         outcome = AiCoachOutcome.UNAVAILABLE
         error_code: str | None = None
         failure_category: str | None = None
+        repair_attempted = False
+        repair_success = False
+        validation_failure_reason: ChatOutputValidationReason | None = None
+        answer: str | None = None
         try:
             if safety != SafetyCategory.CLEAR:
                 outcome = AiCoachOutcome.SAFETY_REFUSAL
+                failure_category = CHAT_FAILURE_SAFETY_REJECTION
                 return AiCoachChatGeneration(
                     outcome=outcome,
                     answer=refusal_text(safety, locale=request.locale),
                     citations=(),
                     limitations=(),
                     safety_category=safety,
-                    failure_category=None,
+                    failure_category=failure_category,
                     prompt_version=AI_COACH_CHAT_PROMPT_VERSION,
                     data_class=request.data_class,
                 )
@@ -263,10 +277,11 @@ class AiCoachChatService:
                 self.cooldown.mark(failure.error)
                 if failure.error.code == ProviderErrorCode.RATE_LIMITED:
                     outcome = AiCoachOutcome.RATE_LIMITED
-                    failure_category = CHAT_FAILURE_RATE_LIMITED
+                    failure_category = CHAT_FAILURE_RATE_LIMIT
                 elif failure.error.code == ProviderErrorCode.INVALID_OUTPUT:
                     outcome = AiCoachOutcome.INVALID_OUTPUT
-                    failure_category = CHAT_FAILURE_STRUCTURED_VALIDATION
+                    failure_category = CHAT_FAILURE_PROVIDER
+                    validation_failure_reason = ChatOutputValidationReason.OTHER
                 elif failure.error.code == ProviderErrorCode.TIMEOUT:
                     outcome = AiCoachOutcome.UNAVAILABLE
                     failure_category = CHAT_FAILURE_TIMEOUT
@@ -292,27 +307,92 @@ class AiCoachChatService:
             configured_model = result.configured_model
             actual_model = result.actual_model
             usage = result.usage
-            try:
-                answer = validate_chat_output(
-                    result.response.answer,
-                    data_class=request.data_class,
-                    locale=request.locale,
-                )
-            except ValueError:
+            inspection = inspect_chat_output(
+                result.response.answer,
+                data_class=request.data_class,
+                locale=request.locale,
+            )
+            if inspection.reason is None:
+                answer = inspection.normalized
+            else:
+                validation_failure_reason = inspection.reason
+            if inspection.reason is not None and inspection.safety_category is not None:
                 error_code = ProviderErrorCode.INVALID_OUTPUT.value
-                outcome = AiCoachOutcome.INVALID_OUTPUT
-                failure_category = CHAT_FAILURE_STRUCTURED_VALIDATION
+                outcome = AiCoachOutcome.SAFETY_REFUSAL
+                safety = inspection.safety_category
+                failure_category = CHAT_FAILURE_SAFETY_REJECTION
                 return self._failure(
                     request,
                     outcome=outcome,
                     safety=safety,
                     failure_category=failure_category,
-                    answer=safe_chat_fallback(
-                        result.response.answer,
+                    answer=refusal_text(safety, locale=request.locale),
+                    validation_failure_reason=inspection.reason,
+                )
+            elif inspection.reason is not None:
+                error_code = ProviderErrorCode.INVALID_OUTPUT.value
+                answer = sanitize_chat_output(
+                    result.response.answer,
+                    data_class=request.data_class,
+                    locale=request.locale,
+                )
+                if answer is None:
+                    repair_attempted = True
+                    try:
+                        repaired, _ = self._call_repair(
+                            request,
+                            result.response.answer,
+                            inspection.reason or ChatOutputValidationReason.OTHER,
+                        )
+                    except _ChatProviderFailure as failure:
+                        error_code = failure.error.code.value
+                        outcome = AiCoachOutcome.INVALID_OUTPUT
+                        failure_category = CHAT_FAILURE_REPAIR_FAILED
+                        return self._failure(
+                            request,
+                            outcome=outcome,
+                            safety=safety,
+                            failure_category=failure_category,
+                            repair_attempted=repair_attempted,
+                            validation_failure_reason=validation_failure_reason,
+                        )
+                    provider_name = repaired.provider
+                    configured_model = repaired.configured_model
+                    actual_model = repaired.actual_model
+                    usage = repaired.usage
+                    repaired_inspection = inspect_chat_output(
+                        repaired.response.answer,
                         data_class=request.data_class,
                         locale=request.locale,
-                    ),
-                )
+                    )
+                    if repaired_inspection.safety_category is not None:
+                        error_code = ProviderErrorCode.INVALID_OUTPUT.value
+                        outcome = AiCoachOutcome.SAFETY_REFUSAL
+                        safety = repaired_inspection.safety_category
+                        validation_failure_reason = repaired_inspection.reason
+                        failure_category = CHAT_FAILURE_SAFETY_REJECTION
+                        return self._failure(
+                            request,
+                            outcome=outcome,
+                            safety=safety,
+                            failure_category=failure_category,
+                            answer=refusal_text(safety, locale=request.locale),
+                            repair_attempted=repair_attempted,
+                            validation_failure_reason=validation_failure_reason,
+                        )
+                    if repaired_inspection.reason is not None:
+                        outcome = AiCoachOutcome.INVALID_OUTPUT
+                        failure_category = CHAT_FAILURE_REPAIR_FAILED
+                        return self._failure(
+                            request,
+                            outcome=outcome,
+                            safety=safety,
+                            failure_category=failure_category,
+                            repair_attempted=repair_attempted,
+                            validation_failure_reason=validation_failure_reason,
+                        )
+                    answer = repaired_inspection.normalized
+                    repair_success = True
             self.cooldown.reset()
             outcome = AiCoachOutcome.ANSWER
             citations = self._citations(context_refs)
@@ -331,6 +411,9 @@ class AiCoachChatService:
                 failure_category=None,
                 prompt_version=AI_COACH_CHAT_PROMPT_VERSION,
                 data_class=request.data_class,
+                repair_attempted=repair_attempted,
+                repair_success=repair_success,
+                validation_failure_reason=validation_failure_reason,
             )
         finally:
             logger.info(
@@ -349,6 +432,13 @@ class AiCoachChatService:
                     "actual_model": actual_model,
                     "outcome": outcome.value,
                     "generation_success": outcome == AiCoachOutcome.ANSWER,
+                    "repair_attempted": repair_attempted,
+                    "repair_success": repair_success,
+                    "validation_failure_reason": (
+                        validation_failure_reason.value
+                        if validation_failure_reason is not None
+                        else None
+                    ),
                     "safety_category": safety.value,
                     "error_code": error_code,
                     "failure_category": failure_category,
@@ -418,6 +508,27 @@ class AiCoachChatService:
             attempts,
         )
 
+    def _call_repair(
+        self,
+        request: AiCoachChatRequest,
+        answer: str,
+        reason: ChatOutputValidationReason,
+    ) -> tuple[ProviderTextResult, int]:
+        """Call the provider repair path exactly once, without retrying untrusted text."""
+
+        try:
+            result = self.provider.repair_text(request, answer, reason)
+            if not isinstance(result, ProviderTextResult):
+                raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+            return result, 1
+        except NormalizedProviderError as exc:
+            raise _ChatProviderFailure(exc, 1) from exc
+        except Exception as exc:
+            raise _ChatProviderFailure(
+                NormalizedProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE),
+                1,
+            ) from exc
+
     @staticmethod
     def _citations(context_refs: tuple[ContextRef, ...]) -> tuple[AiCoachCitation, ...]:
         citations: list[AiCoachCitation] = []
@@ -448,24 +559,35 @@ class AiCoachChatService:
         safety: SafetyCategory,
         failure_category: str,
         answer: str | None = None,
+        repair_attempted: bool = False,
+        repair_success: bool = False,
+        validation_failure_reason: ChatOutputValidationReason | None = None,
     ) -> AiCoachChatGeneration:
         copy = (
             {
                 CHAT_FAILURE_PROVIDER: "AI Coach временно недоступен. Попробуйте ещё раз позже.",
                 CHAT_FAILURE_STRUCTURED_VALIDATION: "Не удалось безопасно проверить ответ. Попробуйте ещё раз.",
+                CHAT_FAILURE_SAFETY_REJECTION: "Я не могу помочь с этим запросом в таком виде.",
+                CHAT_FAILURE_REPAIR_FAILED: "Не удалось сформировать ответ. Повторить.",
+                CHAT_FAILURE_PRESENTATION_VALIDATION: "Не удалось сформировать ответ. Повторить.",
+                CHAT_FAILURE_INTERNAL_ERROR: "Не удалось сформировать ответ. Повторить.",
                 CHAT_FAILURE_TIMEOUT: "Ответ занял слишком много времени. Попробуйте ещё раз.",
                 CHAT_FAILURE_CONTEXT: "Не удалось получить материалы для ответа. Попробуйте ещё раз.",
                 CHAT_FAILURE_GENERATION: "Не удалось получить проверенный ответ. Попробуйте ещё раз.",
-                CHAT_FAILURE_RATE_LIMITED: "Лимит AI Coach исчерпан. Попробуйте позже.",
+                CHAT_FAILURE_RATE_LIMIT: "Лимит AI Coach исчерпан. Попробуйте позже.",
             }
             if request.locale == "ru"
             else {
                 CHAT_FAILURE_PROVIDER: "AI Coach is temporarily unavailable. Please try again later.",
                 CHAT_FAILURE_STRUCTURED_VALIDATION: "The answer could not be checked safely. Please try again.",
+                CHAT_FAILURE_SAFETY_REJECTION: "I can't help with this request in its current form.",
+                CHAT_FAILURE_REPAIR_FAILED: "A usable answer could not be generated. Try again.",
+                CHAT_FAILURE_PRESENTATION_VALIDATION: "A usable answer could not be generated. Try again.",
+                CHAT_FAILURE_INTERNAL_ERROR: "A usable answer could not be generated. Try again.",
                 CHAT_FAILURE_TIMEOUT: "The answer took too long. Please try again.",
                 CHAT_FAILURE_CONTEXT: "The approved materials could not be loaded. Please try again.",
                 CHAT_FAILURE_GENERATION: "A verified answer could not be generated. Please try again.",
-                CHAT_FAILURE_RATE_LIMITED: "The AI Coach limit has been reached. Please try again later.",
+                CHAT_FAILURE_RATE_LIMIT: "The AI Coach limit has been reached. Please try again later.",
             }
         )
         return AiCoachChatGeneration(
@@ -477,6 +599,9 @@ class AiCoachChatService:
             failure_category=failure_category,
             prompt_version=AI_COACH_CHAT_PROMPT_VERSION,
             data_class=request.data_class,
+            repair_attempted=repair_attempted,
+            repair_success=repair_success,
+            validation_failure_reason=validation_failure_reason,
         )
 
 
@@ -485,8 +610,13 @@ ai_coach_chat_service = AiCoachChatService()
 __all__ = [
     "CHAT_FAILURE_CONTEXT",
     "CHAT_FAILURE_GENERATION",
+    "CHAT_FAILURE_INTERNAL_ERROR",
+    "CHAT_FAILURE_PRESENTATION_VALIDATION",
     "CHAT_FAILURE_PROVIDER",
+    "CHAT_FAILURE_RATE_LIMIT",
     "CHAT_FAILURE_RATE_LIMITED",
+    "CHAT_FAILURE_REPAIR_FAILED",
+    "CHAT_FAILURE_SAFETY_REJECTION",
     "CHAT_FAILURE_STRUCTURED_VALIDATION",
     "CHAT_FAILURE_TIMEOUT",
     "AiCoachChatGeneration",

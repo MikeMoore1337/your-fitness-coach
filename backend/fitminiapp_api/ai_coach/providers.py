@@ -13,6 +13,7 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachPersonalTool,
     AiCoachPolicy,
     AiCoachRequest,
+    ChatOutputValidationReason,
     ContextRef,
     NormalizedProviderError,
     ProviderErrorCode,
@@ -24,6 +25,7 @@ from fitminiapp_api.ai_coach.contracts import (
 )
 from fitminiapp_api.ai_coach.prompts import (
     build_chat_messages,
+    build_chat_repair_messages,
     build_messages,
     provider_output_json_schema,
 )
@@ -84,6 +86,57 @@ def _usage_from_payload(payload: dict[str, Any]) -> ProviderUsage | None:
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         total_tokens=total_tokens,
+    )
+
+
+def _parse_plain_text_response(response: Any, *, started: float) -> ProviderTextResult:
+    retry_after = _safe_retry_after(response.headers.get("retry-after"))
+    if response.status_code != 200:
+        raise _provider_error_for_status(response.status_code, retry_after)
+    if len(response.content) > MAX_PROVIDER_RESPONSE_BYTES:
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+
+    try:
+        raw_payload = response.json()
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT) from exc
+    if not isinstance(raw_payload, dict):
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+
+    choices = raw_payload.get("choices")
+    if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+    choice = choices[0]
+    if choice.get("finish_reason") != "stop":
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+    message = choice.get("message")
+    if not isinstance(message, dict):
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+    if isinstance(message.get("refusal"), str) and message["refusal"].strip():
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+    content = message.get("content")
+    if not isinstance(content, str) or len(content.encode("utf-8")) > MAX_PROVIDER_RESPONSE_BYTES:
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+    try:
+        text_response = ProviderTextResponse(answer=content.strip())
+    except (ValueError, TypeError) as exc:
+        raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT) from exc
+
+    actual_model = raw_payload.get("model")
+    if (
+        not isinstance(actual_model, str)
+        or not actual_model.strip()
+        or len(actual_model) > 128
+        or any(ord(character) < 0x20 for character in actual_model)
+    ):
+        actual_model = None
+    return ProviderTextResult(
+        provider=PROVIDER_NAME,
+        configured_model=settings.ai_coach_model,
+        actual_model=actual_model,
+        response=text_response,
+        usage=_usage_from_payload(raw_payload),
+        latency_ms=max(0, round((time.monotonic() - started) * 1000)),
     )
 
 
@@ -202,20 +255,14 @@ class GroqDirectAdapter:
             latency_ms=max(0, round((time.monotonic() - started) * 1000)),
         )
 
-    def generate_text(
-        self,
-        request: AiCoachChatRequest,
-        context_refs: tuple[ContextRef, ...],
-    ) -> ProviderTextResult:
-        """Generate ordinary chat text without response_format or report JSON."""
-
+    def _generate_plain_text(self, messages: list[dict[str, str]]) -> ProviderTextResult:
         api_key = settings.groq_api_key.get_secret_value().strip()
         if not api_key or settings.ai_coach_provider != "groq":
             raise NormalizedProviderError(ProviderErrorCode.DISABLED)
 
         payload = {
             "model": settings.ai_coach_model,
-            "messages": build_chat_messages(request, context_refs),
+            "messages": messages,
             "max_completion_tokens": settings.ai_coach_max_output_tokens,
             "reasoning_effort": "low",
             "reasoning_format": "hidden",
@@ -244,54 +291,23 @@ class GroqDirectAdapter:
         except httpx.HTTPError as exc:
             raise NormalizedProviderError(ProviderErrorCode.PROVIDER_UNAVAILABLE) from exc
 
-        retry_after = _safe_retry_after(response.headers.get("retry-after"))
-        if response.status_code != 200:
-            raise _provider_error_for_status(response.status_code, retry_after)
-        if len(response.content) > MAX_PROVIDER_RESPONSE_BYTES:
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+        return _parse_plain_text_response(response, started=started)
 
-        try:
-            raw_payload = response.json()
-        except (ValueError, json.JSONDecodeError) as exc:
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT) from exc
-        if not isinstance(raw_payload, dict):
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
+    def generate_text(
+        self,
+        request: AiCoachChatRequest,
+        context_refs: tuple[ContextRef, ...],
+    ) -> ProviderTextResult:
+        """Generate ordinary chat text without response_format or report JSON."""
 
-        choices = raw_payload.get("choices")
-        if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
-        choice = choices[0]
-        if choice.get("finish_reason") != "stop":
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
-        message = choice.get("message")
-        if not isinstance(message, dict):
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
-        if isinstance(message.get("refusal"), str) and message["refusal"].strip():
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
-        content = message.get("content")
-        if (
-            not isinstance(content, str)
-            or len(content.encode("utf-8")) > MAX_PROVIDER_RESPONSE_BYTES
-        ):
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT)
-        try:
-            text_response = ProviderTextResponse(answer=content.strip())
-        except (ValueError, TypeError) as exc:
-            raise NormalizedProviderError(ProviderErrorCode.INVALID_OUTPUT) from exc
+        return self._generate_plain_text(build_chat_messages(request, context_refs))
 
-        actual_model = raw_payload.get("model")
-        if (
-            not isinstance(actual_model, str)
-            or not actual_model.strip()
-            or len(actual_model) > 128
-            or any(ord(character) < 0x20 for character in actual_model)
-        ):
-            actual_model = None
-        return ProviderTextResult(
-            provider=PROVIDER_NAME,
-            configured_model=settings.ai_coach_model,
-            actual_model=actual_model,
-            response=text_response,
-            usage=_usage_from_payload(raw_payload),
-            latency_ms=max(0, round((time.monotonic() - started) * 1000)),
-        )
+    def repair_text(
+        self,
+        request: AiCoachChatRequest,
+        answer: str,
+        reason: ChatOutputValidationReason,
+    ) -> ProviderTextResult:
+        """Make one bounded plain-text repair request; the draft remains untrusted data."""
+
+        return self._generate_plain_text(build_chat_repair_messages(request, answer, reason.value))

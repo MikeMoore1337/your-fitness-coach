@@ -90,6 +90,9 @@ STRUCTURED_FIELDS = (
     "tool_name",
     "context_kind",
     "generation_success",
+    "repair_attempted",
+    "repair_success",
+    "validation_failure_reason",
     "prompt_version",
     "schema_version",
     "policy_revision",
@@ -207,6 +210,7 @@ CODE_FIELDS = {
     "visibility",
     "error_code",
     "safety_category",
+    "validation_failure_reason",
     "source_ref",
     "candidate_ref",
     "topic",
@@ -214,7 +218,7 @@ CODE_FIELDS = {
     "report_revision",
 }
 MODEL_FIELDS = {"configured_model", "actual_model"}
-BOOL_FIELDS = {"generation_success"}
+BOOL_FIELDS = {"generation_success", "repair_attempted", "repair_success"}
 
 
 class JsonFormatter(logging.Formatter):

@@ -27,6 +27,7 @@ AI_COACH_PERIOD_REPORT_OUTPUT_VERSION = "ai-coach-period-report-output-v1"
 AI_COACH_CHAT_PROMPT_VERSION = "ai-coach-chat-v2"
 AI_COACH_CHAT_OUTPUT_VERSION = "ai-coach-chat-text-v1"
 AI_COACH_CHAT_MAX_MESSAGE_LENGTH = 2_000
+AI_COACH_CHAT_PROVIDER_MAX_ANSWER_LENGTH = 8_000
 _BoundedLimitation = Annotated[str, Field(max_length=240)]
 _BoundedAnchor = Annotated[str, Field(min_length=1, max_length=128)]
 AiCoachMemoryCategory = Literal[
@@ -102,6 +103,19 @@ class AiCoachOutcome(StrEnum):
     INSUFFICIENT_DATA = "insufficient_data"
     INVALID_OUTPUT = "invalid_output"
     CONSENT_REQUIRED = "consent_required"
+
+
+class ChatOutputValidationReason(StrEnum):
+    """Safe reason codes for provider text that needs presentation repair."""
+
+    TOO_LONG = "too_long"
+    WRONG_LANGUAGE = "wrong_language"
+    JSON_CONTAINER = "json_container"
+    INTERNAL_LABEL = "internal_label"
+    URL = "url"
+    PROHIBITED_CLAIM = "prohibited_claim"
+    UNSAFE_CONTENT = "unsafe_content"
+    OTHER = "other"
 
 
 class AiCoachMemoryContext(BaseModel):
@@ -344,7 +358,7 @@ class ProviderTextResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    answer: str = Field(..., min_length=1, max_length=1_600)
+    answer: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_PROVIDER_MAX_ANSWER_LENGTH)
 
 
 class ProviderTextResult(BaseModel):
@@ -422,4 +436,11 @@ class ChatLlmPort(Protocol):
         self,
         request: AiCoachChatRequest,
         context_refs: tuple[ContextRef, ...],
+    ) -> ProviderTextResult: ...
+
+    def repair_text(
+        self,
+        request: AiCoachChatRequest,
+        answer: str,
+        reason: ChatOutputValidationReason,
     ) -> ProviderTextResult: ...

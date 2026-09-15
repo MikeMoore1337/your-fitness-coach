@@ -4141,7 +4141,7 @@ export interface components {
             /** Safety Category */
             safety_category: string;
             /** Failure Category */
-            failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "context_failure" | "generation_failure" | "rate_limited") | null;
+            failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "rate_limit" | "repair_failed" | "presentation_validation_failed" | "internal_error" | "safety_rejection" | "context_failure" | "generation_failure" | "rate_limited") | null;
             /**
              * Citations
              * @default []
@@ -4208,7 +4208,7 @@ export interface components {
             /** Safety Category */
             safety_category: string;
             /** Failure Category */
-            failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "context_failure" | "generation_failure" | "rate_limited") | null;
+            failure_category?: ("provider_failure" | "structured_validation" | "timeout" | "rate_limit" | "repair_failed" | "presentation_validation_failed" | "internal_error" | "safety_rejection" | "context_failure" | "generation_failure" | "rate_limited") | null;
             /** Prompt Version */
             prompt_version: string;
             /** Request Id */
