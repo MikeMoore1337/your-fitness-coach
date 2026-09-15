@@ -151,6 +151,10 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "nutrition_label_drafts": (
         "short-lived owner-scoped nutrition drafts; the source image and raw OCR are never persisted"
     ),
+    "ai_coach_quota_windows": "operational AI Coach quota window and usage metadata",
+    "ai_coach_quota_reservations": (
+        "short-lived AI Coach quota reservations and opaque idempotency metadata"
+    ),
 }
 
 
