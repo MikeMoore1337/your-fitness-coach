@@ -159,6 +159,7 @@ export type TrainerClientProgressList = ApiSchemas['TrainerClientProgressListRes
 export type AiCoachResponse = ApiSchemas['AiCoachResponse'];
 export type AiCoachConsentResponse = ApiSchemas['AiCoachConsentResponse'];
 export type AiCoachConversation = ApiSchemas['AiCoachConversationResponse'];
+export type AiCoachConversationClearResponse = ApiSchemas['AiCoachConversationClearResponse'];
 export type AiCoachConversationMessage = ApiSchemas['AiCoachConversationMessageResponse'];
 export type AiCoachConversationSendResponse = ApiSchemas['AiCoachConversationSendResponse'];
 export type AiCoachConversationSummary = ApiSchemas['AiCoachConversationSummaryResponse'];

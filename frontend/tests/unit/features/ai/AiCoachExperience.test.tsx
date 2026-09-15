@@ -1,11 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AiCoachExperience,
   AiCoachSettingsCard,
+  aiCoachQuotaHeaderCopy,
+  getAiCoachQuotaState,
   safeCoachUrl,
 } from '../../../../src/features/ai/AiCoachExperience';
+import {
+  AiCoachWorkspaceProvider,
+  AI_COACH_WORKSPACE_LAYOUT_KEY,
+  clampAiCoachWorkspaceLayout,
+  readAiCoachWorkspaceLayout,
+} from '../../../../src/features/ai/AiCoachWorkspace';
 import { api } from '../../../../src/shared/api/client';
 import { NavigationProvider } from '../../../../src/shared/navigation/router';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
@@ -148,6 +156,23 @@ function renderSettingsCard(settingsStatus: AiCoachStatus) {
   );
 }
 
+function renderWorkspace(settingsStatus: AiCoachStatus = status) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <FeedbackProvider>
+        <NavigationProvider>
+          <AiCoachWorkspaceProvider status={settingsStatus}>
+            <AiCoachSettingsCard status={settingsStatus} />
+          </AiCoachWorkspaceProvider>
+        </NavigationProvider>
+      </FeedbackProvider>
+    </QueryClientProvider>,
+  );
+}
+
 function mockBaseApi(quota = quotaSnapshot()) {
   apiMock.mockImplementation(async (path, options) => {
     if (path === '/api/v1/ai-coach/quota') return quota;
@@ -162,6 +187,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   window.sessionStorage.removeItem('yfc:ai-coach:active-conversation');
+  window.localStorage.removeItem(AI_COACH_WORKSPACE_LAYOUT_KEY);
   apiMock.mockReset();
 });
 
@@ -180,11 +206,106 @@ describe('AiCoachExperience', () => {
     await waitFor(() => expect(screen.getByTestId('ai-coach-chat')).toBeInTheDocument());
     expect(screen.getByRole('textbox', { name: 'Сообщение AI Coach' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Отправить' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Новый чат' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Новый чат' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Что делать сегодня?' })).toBeInTheDocument();
+    expect(screen.getByTestId('ai-coach-quota')).toHaveAttribute('data-quota-remaining', '20');
     expect(screen.queryByText('Публичная помощь')).not.toBeInTheDocument();
     expect(screen.queryByText('Моя сводка')).not.toBeInTheDocument();
     expect(screen.queryByText(/report_version|prompt_version|debug/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps history actions secondary and uses the stored conversation title', async () => {
+    const messages = [
+      chatMessage(1, 'user', 'Сколько отдыхать между подходами?'),
+      chatMessage(2, 'assistant', 'Ответ о восстановлении.'),
+    ];
+    const storedConversation = {
+      ...conversation(1, messages),
+      title: 'Сколько отдыхать между подходами?',
+    };
+    mockBaseApi();
+    apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
+      if (path === '/api/v1/ai-coach/conversations') {
+        if (options?.method === 'DELETE') return { deleted_count: 1 };
+        return {
+          items: [{ ...storedConversation, message_count: messages.length }],
+        };
+      }
+      if (path === '/api/v1/ai-coach/conversations/1') return storedConversation;
+      if (path === '/api/v1/ai-coach/memory') return memoryResponse();
+      throw new Error(`unexpected path ${path} ${options?.method ?? 'GET'}`);
+    });
+
+    renderExperience();
+    const historyButton = await screen.findByRole('button', { name: 'История' });
+    fireEvent.click(historyButton);
+
+    const history = await screen.findByTestId('ai-coach-history-view');
+    expect(within(history).getByRole('button', { name: 'Новый чат' })).toBeInTheDocument();
+    expect(
+      within(history).queryByTestId('ai-coach-history-new-chat-empty'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(history).getByText('Сколько отдыхать между подходами?', { exact: true }),
+    ).toBeInTheDocument();
+    expect(
+      within(history).queryByRole('button', { name: 'Удалить всю историю чатов' }),
+    ).not.toBeInTheDocument();
+    expect(within(history).queryByTestId('ai-coach-history-footer')).not.toBeInTheDocument();
+
+    const menu = within(history).getByTestId('ai-coach-history-menu');
+    expect(menu).not.toHaveAttribute('open');
+    const summary = menu.querySelector('summary');
+    expect(summary).not.toBeNull();
+    if (!summary) throw new Error('History actions menu has no summary');
+    fireEvent.click(summary);
+    expect(menu).toHaveAttribute('open');
+    expect(within(menu).getByTestId('ai-coach-history-clear')).toHaveTextContent(
+      'Удалить всю историю',
+    );
+  });
+
+  it('uses semantic quota states at the exact low boundary and keeps invalid data neutral', () => {
+    expect(getAiCoachQuotaState(quotaSnapshot(7, 20))).toBe('normal');
+    expect(getAiCoachQuotaState(quotaSnapshot(6, 20))).toBe('low');
+    expect(getAiCoachQuotaState(quotaSnapshot(1, 20))).toBe('low');
+    expect(getAiCoachQuotaState(quotaSnapshot(0, 20))).toBe('empty');
+    expect(getAiCoachQuotaState(undefined)).toBe('unknown');
+    expect(getAiCoachQuotaState(quotaSnapshot(0, 0))).toBe('unknown');
+    expect(getAiCoachQuotaState(quotaSnapshot(21, 20))).toBe('unknown');
+
+    expect(aiCoachQuotaHeaderCopy(quotaSnapshot(7, 20))).toBe('Готов · 7 из 20');
+    expect(aiCoachQuotaHeaderCopy(quotaSnapshot(6, 20))).toBe('Осталось 6 из 20');
+    expect(aiCoachQuotaHeaderCopy(quotaSnapshot(0, 20))).toBe('Лимит исчерпан');
+    expect(aiCoachQuotaHeaderCopy(undefined)).toBe('Лимит обновляется…');
+  });
+
+  it('keeps one icon-only send control and grows the shared composer for long drafts', async () => {
+    mockBaseApi();
+    renderExperience();
+
+    const input = await screen.findByRole('textbox', { name: 'Сообщение AI Coach' });
+    const send = screen.getByRole('button', { name: 'Отправить' });
+    expect(input).toHaveAttribute('rows', '1');
+    expect(send).toBeDisabled();
+    expect(send.querySelector('[data-icon="arrow-up"]')).not.toBeNull();
+    expect(screen.queryByTestId('ai-coach-composer-count')).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'Короткий вопрос' } });
+    expect(send).toBeEnabled();
+    expect(screen.queryByTestId('ai-coach-composer-count')).not.toBeInTheDocument();
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'а'.repeat(1_000) } });
+    expect(screen.getByTestId('ai-coach-composer-count')).toHaveTextContent('1000/2000');
+    fireEvent.blur(input);
+    expect(screen.queryByTestId('ai-coach-composer-count')).not.toBeInTheDocument();
+
+    Object.defineProperty(input, 'scrollHeight', { configurable: true, value: 240 });
+    fireEvent.change(input, { target: { value: 'а'.repeat(1_600) } });
+    expect(screen.getByTestId('ai-coach-composer-count')).toHaveTextContent('1600/2000');
+    expect(input).toHaveStyle({ height: '144px', overflowY: 'auto' });
   });
 
   it('renders the server-owned quota, refreshes it on focus and keeps the real limit dynamic', async () => {
@@ -233,7 +354,7 @@ describe('AiCoachExperience', () => {
     const indicator = await screen.findByTestId('ai-coach-quota');
     expect(indicator).toHaveAttribute('data-quota-limit', '20');
     expect(indicator).toHaveAttribute('data-quota-remaining', '20');
-    expect(screen.getByText(/Сброс через/)).toBeInTheDocument();
+    expect(screen.queryByText(/Сброс через/)).not.toBeInTheDocument();
 
     window.dispatchEvent(new Event('focus'));
     await waitFor(() => expect(quotaCalls).toBeGreaterThan(1));
@@ -252,7 +373,7 @@ describe('AiCoachExperience', () => {
     const indicator = await screen.findByTestId('ai-coach-quota');
     expect(indicator).toHaveAttribute('data-quota-limit', '20');
     expect(indicator).toHaveAttribute('data-quota-remaining', '0');
-    expect(screen.getByText('Лимит AI Coach исчерпан')).toBeInTheDocument();
+    expect(screen.getByText('Лимит исчерпан')).toBeInTheDocument();
     const input = screen.getByRole('textbox', { name: 'Сообщение AI Coach' });
     fireEvent.change(input, { target: { value: 'Мой вопрос пока останется в поле' } });
     expect(input).toHaveValue('Мой вопрос пока останется в поле');
@@ -375,7 +496,7 @@ describe('AiCoachExperience', () => {
   it('sends an arbitrary question and renders safe text plus collapsed sources', async () => {
     let messages: AiCoachConversationMessage[] = [];
     const answer =
-      'Проверенный текст. <img src="/secret"> [Материал](https://example.org/article) [Чужая ссылка](https://evil.example/secret)';
+      'Проверенный текст. <img src="/secret"> [Материал](https://example.org/article) [Открыть материал](https://example.org/article) [Чужая ссылка](https://evil.example/secret)';
     apiMock.mockImplementation(async (path, options) => {
       if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
       if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST') {
@@ -436,8 +557,9 @@ describe('AiCoachExperience', () => {
     );
     expect(screen.getByText(/Чужая ссылка/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Чужая ссылка' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Открыть материал' })).not.toBeInTheDocument();
     expect(screen.getByText('Материалы ответа')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '👍' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Полезно' })).toBeInTheDocument();
   });
 
   it('keeps a follow-up history visible after switching and reloading the conversation', async () => {
@@ -623,25 +745,80 @@ describe('AiCoachExperience', () => {
       throw new Error(`unexpected path ${path} ${options?.method ?? 'GET'}`);
     });
     renderExperience({ ...status, personal_available: true });
-    await screen.findByRole('button', { name: 'Разрешить персональные ответы' });
+    const personalSettings = within(await screen.findByTestId('ai-coach-personal-settings'));
+    await personalSettings.findByRole('button', { name: 'Включить' });
     fireEvent.click(screen.getByRole('button', { name: 'Что делать сегодня?' }));
     fireEvent.click(screen.getByRole('button', { name: 'Отправить' }));
     await waitFor(() =>
       expect(screen.getByText('Для этого нужен отдельный доступ к сводке.')).toBeInTheDocument(),
     );
-    expect(screen.getByText('Персональные ответы')).toBeInTheDocument();
+    expect(screen.getByText('Персонализация')).toBeInTheDocument();
     expect(screen.queryByText('Публичная помощь')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Разрешить персональные ответы' }));
+    fireEvent.click(personalSettings.getByRole('button', { name: 'Включить' }));
     await waitFor(() => expect(consentStatus).toBe('granted'));
   });
 
   it('keeps the production settings card free of beta and debug labels', async () => {
     mockBaseApi();
     renderSettingsCard(status);
-    await waitFor(() => expect(screen.getByTestId('ai-coach-experience')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('ai-coach-entry-quota')).toBeInTheDocument());
     expect(screen.getByText('AI Coach', { exact: true })).toBeInTheDocument();
+    expect(screen.getByTestId('ai-coach-profile-title')).toHaveClass(
+      'ai-coach-settings-card__title',
+    );
+    expect(
+      screen.getByTestId('ai-coach-profile-title').querySelector('[data-icon="ai-coach"]'),
+    ).not.toBeNull();
+    expect(screen.getByText('Помощник по тренировкам, питанию и прогрессу')).toBeInTheDocument();
+    expect(screen.getByTestId('ai-coach-entry-quota')).toHaveTextContent('20 из 20 запросов');
+    expect(screen.queryByTestId('ai-coach-experience')).not.toBeInTheDocument();
     expect(
       screen.queryByText(/внутренняя beta|внутренняя проверка|report_version/i),
     ).not.toBeInTheDocument();
+  });
+
+  it('opens one workspace, keeps the draft through settings and restores a minimized chat', async () => {
+    mockBaseApi();
+    window.localStorage.removeItem(AI_COACH_WORKSPACE_LAYOUT_KEY);
+    renderWorkspace({ ...status, personal_available: true });
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Открыть AI Coach' }));
+    const workspace = await screen.findByTestId('ai-coach-workspace');
+    expect(screen.getAllByTestId('ai-coach-workspace')).toHaveLength(1);
+    expect(workspace).toHaveClass('ai-coach-workspace--desktop');
+
+    const input = await within(workspace).findByRole('textbox', { name: 'Сообщение AI Coach' });
+    fireEvent.change(input, { target: { value: 'Черновик вопроса' } });
+    fireEvent.click(within(workspace).getByRole('button', { name: 'Открыть настройки AI Coach' }));
+    expect(within(workspace).getByTestId('ai-coach-workspace-settings')).toBeVisible();
+    fireEvent.click(within(workspace).getByRole('button', { name: 'Вернуться в чат' }));
+    expect(within(workspace).getByRole('textbox', { name: 'Сообщение AI Coach' })).toHaveValue(
+      'Черновик вопроса',
+    );
+
+    fireEvent.click(within(workspace).getByRole('button', { name: 'Свернуть AI Coach' }));
+    expect(workspace).toHaveAttribute('data-minimized', 'true');
+    fireEvent.click(within(workspace).getByRole('button', { name: 'Открыть AI Coach' }));
+    expect(within(workspace).getByRole('textbox', { name: 'Сообщение AI Coach' })).toHaveValue(
+      'Черновик вопроса',
+    );
+  });
+
+  it('clamps invalid stored geometry and exposes a resettable bounded layout', () => {
+    const viewport = { width: 1280, height: 900 };
+    window.localStorage.setItem(
+      AI_COACH_WORKSPACE_LAYOUT_KEY,
+      JSON.stringify({ version: 1, width: -20, height: 10_000, x: -1000, y: 10_000 }),
+    );
+    const stored = readAiCoachWorkspaceLayout(viewport);
+    const layout = clampAiCoachWorkspaceLayout(
+      { width: -20, height: 10_000, x: -1000, y: 10_000 },
+      viewport,
+    );
+    expect(stored).toEqual(layout);
+    expect(layout.width).toBeGreaterThanOrEqual(360);
+    expect(layout.height).toBeLessThanOrEqual(800);
+    expect(layout.x).toBeGreaterThanOrEqual(16);
+    expect(layout.y).toBeLessThanOrEqual(796);
   });
 });

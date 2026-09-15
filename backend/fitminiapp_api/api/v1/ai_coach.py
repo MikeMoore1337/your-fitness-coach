@@ -64,10 +64,12 @@ from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.rate_limit import limiter
 from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.db.session import get_db
+from fitminiapp_api.models.ai_coach import AiCoachConversation
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.ai_coach import (
     AiCoachConsentResponse,
     AiCoachConsentUpdateRequest,
+    AiCoachConversationClearResponse,
     AiCoachConversationFeedbackRequest,
     AiCoachConversationListResponse,
     AiCoachConversationResponse,
@@ -97,6 +99,7 @@ from fitminiapp_api.services.ai_coach_conversations import (
     add_user_message,
     conversation_response,
     create_conversation,
+    delete_conversation_history,
     get_conversation_message,
     get_following_assistant_message,
     get_message_by_request_id,
@@ -618,6 +621,35 @@ def get_ai_coach_conversations(
 ) -> AiCoachConversationListResponse:
     del request
     return AiCoachConversationListResponse(items=list_conversations(db, user_id=current_user.id))
+
+
+@router.delete("/conversations", response_model=AiCoachConversationClearResponse)
+@limiter.limit("5/hour")
+def delete_ai_coach_conversation_history(
+    request: Request,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AiCoachConversationClearResponse:
+    del request
+    conversation_count_before = int(
+        db.query(AiCoachConversation.id)
+        .filter(AiCoachConversation.user_id == current_user.id)
+        .count()
+    )
+    deleted_count = delete_conversation_history(db, user_id=current_user.id)
+    record_audit_event(
+        db,
+        action="ai_coach.conversation_history_cleared",
+        resource_type="ai_coach_conversation_history",
+        actor_user_id=current_user.id,
+        target_user_id=current_user.id,
+        details={
+            "conversation_count_before_clear": conversation_count_before,
+            "conversation_count_after_clear": 0,
+        },
+    )
+    db.commit()
+    return AiCoachConversationClearResponse(deleted_count=deleted_count)
 
 
 @router.post(

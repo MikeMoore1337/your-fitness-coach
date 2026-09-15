@@ -25,6 +25,9 @@ from fitminiapp_api.ai_coach.contracts import (
 from fitminiapp_api.ai_coach.personal_tools import PersonalToolResult
 from fitminiapp_api.ai_coach.retrieval import ContextUnavailable
 from fitminiapp_api.core.config import settings
+from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.models.ai_coach import AiCoachConversationMessageRequest
+from fitminiapp_api.models.audit import AuditEvent
 
 
 def _login(client, telegram_user_id: int) -> dict[str, str]:
@@ -153,6 +156,10 @@ def test_chat_accepts_arbitrary_question_without_period_report_json(
     detail = client.get(f"/api/v1/ai-coach/conversations/{conversation_id}", headers=headers)
     assert detail.status_code == 200
     assert [item["role"] for item in detail.json()["messages"]] == ["user", "assistant"]
+
+    history = client.get("/api/v1/ai-coach/conversations", headers=headers)
+    assert history.status_code == 200
+    assert history.json()["items"][0]["title"] == "Сколько отдыхать между подходами?"
 
 
 def test_chat_calls_provider_for_general_question_without_app_context(client, monkeypatch) -> None:
@@ -1538,6 +1545,110 @@ def test_conversation_isolation_and_delete(client) -> None:
         ).status_code
         == 404
     )
+    assert (
+        client.delete(
+            f"/api/v1/ai-coach/conversations/{conversation_id}",
+            headers=owner_headers,
+        ).status_code
+        == 404
+    )
+
+
+def test_conversation_history_clear_is_scoped_and_preserves_other_ai_coach_state(
+    client, monkeypatch
+) -> None:
+    _enable_chat(monkeypatch)
+    provider = StubTextProvider(calls=[])
+    monkeypatch.setattr(ai_coach_chat_service, "provider", provider)
+    owner_headers = _login(client, 987_140)
+    other_headers = _login(client, 987_141)
+
+    owner_conversation_ids = [_create_conversation(client, owner_headers) for _ in range(2)]
+    other_conversation_id = _create_conversation(client, other_headers)
+    for conversation_id, message in zip(
+        owner_conversation_ids,
+        ("Первый тестовый разговор", "Второй тестовый разговор"),
+        strict=True,
+    ):
+        response = client.post(
+            f"/api/v1/ai-coach/conversations/{conversation_id}/messages",
+            headers=owner_headers,
+            json={"message": message},
+        )
+        assert response.status_code == 200, response.text
+
+    assert (
+        client.put(
+            "/api/v1/ai-coach/consent",
+            headers=owner_headers,
+            json={"enabled": True},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.put(
+            "/api/v1/ai-coach/memory/consent",
+            headers=owner_headers,
+            json={"status": "enabled"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            "/api/v1/ai-coach/memory",
+            headers=owner_headers,
+            json={
+                "category": "ai_interaction_preferences",
+                "value": "Короткие ответы",
+                "confirmation": True,
+            },
+        ).status_code
+        == 200
+    )
+    quota_before = client.get("/api/v1/ai-coach/quota", headers=owner_headers).json()
+    consent_before = client.get("/api/v1/ai-coach/consent", headers=owner_headers).json()
+    memory_before = client.get("/api/v1/ai-coach/memory", headers=owner_headers).json()
+
+    cleared = client.delete("/api/v1/ai-coach/conversations", headers=owner_headers)
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json() == {"deleted_count": 2}
+    assert client.get("/api/v1/ai-coach/conversations", headers=owner_headers).json() == {
+        "items": []
+    }
+    assert [
+        item["id"]
+        for item in client.get("/api/v1/ai-coach/conversations", headers=other_headers).json()[
+            "items"
+        ]
+    ] == [other_conversation_id]
+    assert (
+        client.get(
+            f"/api/v1/ai-coach/conversations/{owner_conversation_ids[0]}",
+            headers=owner_headers,
+        ).status_code
+        == 404
+    )
+    assert client.get("/api/v1/ai-coach/quota", headers=owner_headers).json() == quota_before
+    assert client.get("/api/v1/ai-coach/consent", headers=owner_headers).json() == consent_before
+    assert client.get("/api/v1/ai-coach/memory", headers=owner_headers).json() == memory_before
+    with get_session_context() as db:
+        audit = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.action == "ai_coach.conversation_history_cleared")
+            .order_by(AuditEvent.id.desc())
+            .first()
+        )
+        assert audit is not None
+        assert audit.resource_type == "ai_coach_conversation_history"
+        assert audit.details == {
+            "conversation_count_before_clear": 2,
+            "conversation_count_after_clear": 0,
+        }
+        assert db.query(AiCoachConversationMessageRequest).count() == 0
+
+    empty_clear = client.delete("/api/v1/ai-coach/conversations", headers=owner_headers)
+    assert empty_clear.status_code == 200, empty_clear.text
+    assert empty_clear.json() == {"deleted_count": 0}
 
 
 def test_unsafe_chat_request_is_refused_without_provider_call(client, monkeypatch) -> None:

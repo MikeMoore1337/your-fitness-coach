@@ -248,6 +248,12 @@ class AiCoachConversationListResponse(BaseModel):
     items: tuple[AiCoachConversationSummaryResponse, ...] = ()
 
 
+class AiCoachConversationClearResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deleted_count: int = Field(..., ge=0)
+
+
 class AiCoachConversationSendRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -291,6 +297,7 @@ class AiCoachConversationSendResponse(BaseModel):
 __all__ = [
     "AiCoachConsentResponse",
     "AiCoachConsentUpdateRequest",
+    "AiCoachConversationClearResponse",
     "AiCoachConversationFeedbackRequest",
     "AiCoachConversationListResponse",
     "AiCoachConversationMessageResponse",

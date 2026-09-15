@@ -2,6 +2,7 @@ import { AppLink } from '../shared/navigation/router';
 import { Glass, glassProps } from '../shared/ui/Glass';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import { useModalA11y } from '../shared/ui/useModalA11y';
+import { useOptionalAiCoachWorkspace } from '../features/ai/AiCoachWorkspaceContext';
 
 export interface QuickAddAction {
   key: string;
@@ -83,6 +84,7 @@ export function QuickAddSheet({
   onClose(): void;
   open: boolean;
 }) {
+  const workspace = useOptionalAiCoachWorkspace();
   const panelRef = useModalA11y<HTMLDivElement>(open, onClose);
   if (!open) return null;
 
@@ -128,7 +130,17 @@ export function QuickAddSheet({
               className="app-quick-add-action"
               key={action.key}
               to={action.to}
-              onClick={onClose}
+              onClick={(event) => {
+                if (
+                  action.key === 'ai-coach' &&
+                  action.to.startsWith('/app?section=profile') &&
+                  workspace
+                ) {
+                  event.preventDefault();
+                  workspace.open(event.currentTarget);
+                }
+                onClose();
+              }}
             >
               <span aria-hidden="true" className="app-quick-add-action__icon">
                 <Icon name={action.icon} size={20} />

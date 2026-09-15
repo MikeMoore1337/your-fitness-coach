@@ -442,7 +442,8 @@ export interface paths {
         put?: never;
         /** Create Ai Coach Conversation */
         post: operations["create_ai_coach_conversation_api_v1_ai_coach_conversations_post"];
-        delete?: never;
+        /** Delete Ai Coach Conversation History */
+        delete: operations["delete_ai_coach_conversation_history_api_v1_ai_coach_conversations_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4155,6 +4156,11 @@ export interface components {
         AiCoachConsentUpdateRequest: {
             /** Enabled */
             enabled: boolean;
+        };
+        /** AiCoachConversationClearResponse */
+        AiCoachConversationClearResponse: {
+            /** Deleted Count */
+            deleted_count: number;
         };
         /** AiCoachConversationFeedbackRequest */
         AiCoachConversationFeedbackRequest: {
@@ -11984,6 +11990,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiCoachConversationResponse"];
+                };
+            };
+        };
+    };
+    delete_ai_coach_conversation_history_api_v1_ai_coach_conversations_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachConversationClearResponse"];
                 };
             };
         };
