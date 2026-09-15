@@ -1,3 +1,12 @@
+.demo-capability-fieldset,
+.nutrition-form-fieldset,
+.profile-settings-fieldset {
+  border: 0;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
 .page-stack {
   display: grid;
   gap: 14px;

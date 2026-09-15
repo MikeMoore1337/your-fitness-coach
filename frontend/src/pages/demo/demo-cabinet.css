@@ -7,13 +7,6 @@
   gap: var(--space-5);
 }
 
-.demo-capability-fieldset {
-  border: 0;
-  margin: 0;
-  min-inline-size: 0;
-  padding: 0;
-}
-
 .demo-capability-notice {
   border: 1px solid var(--v2-border);
   border-inline-start: 3px solid var(--v2-lime);

@@ -248,7 +248,7 @@ function ClientProfileEditor({ client, readOnly = false }: { client: Client; rea
           Изменение профиля клиента доступно после входа в рабочий кабинет.
         </p>
       )}
-      <fieldset disabled={readOnly}>
+      <fieldset className="demo-capability-fieldset" disabled={readOnly}>
         <div className="form-grid profile-form-grid">
           <label className="field">
             <span>Имя у тренера</span>
