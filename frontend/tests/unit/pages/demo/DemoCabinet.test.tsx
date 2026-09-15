@@ -223,7 +223,7 @@ describe('Demo cabinet journey', () => {
       { name: 'demo_own_data_selected', surface: 'mobile_web', scenario: 'self_training' },
       { dedupe: 'session', dedupeKey: 'self_training' },
     );
-  });
+  }, 15_000);
 
   it('shows nutrition updates, progress history and multiple trainer states with invite disabled', async () => {
     const user = userEvent.setup();

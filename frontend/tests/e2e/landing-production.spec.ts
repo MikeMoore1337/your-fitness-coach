@@ -261,15 +261,24 @@ test('keyboard, menu, FAQ and canonical public actions stay operable', async ({ 
   expect(Math.min(...mobileReadability.textSizes)).toBeGreaterThanOrEqual(13);
   expect(Math.min(...mobileReadability.numberSizes)).toBeGreaterThanOrEqual(15);
 
-  await expect(page.getByRole('link', { name: /пройдите тренировку/i })).toHaveAttribute(
+  await expect(page.locator('.landing-start__demo-cta')).toHaveAttribute(
     'href',
     '/demo?cabinet=1&scenario=self_training&section=today',
   );
-  await expect(page.getByRole('link', { name: /добавьте питание/i })).toHaveAttribute(
+  const demoScenarioLinks = page.locator('.landing-start__demo nav > a');
+  await expect(demoScenarioLinks).toHaveCount(3);
+  await expect(demoScenarioLinks.nth(0)).toContainText('Тренировка');
+  await expect(demoScenarioLinks.nth(0)).toHaveAttribute(
+    'href',
+    '/demo?cabinet=1&scenario=self_training&section=today',
+  );
+  await expect(demoScenarioLinks.nth(1)).toContainText('Питание и прогресс');
+  await expect(demoScenarioLinks.nth(1)).toHaveAttribute(
     'href',
     '/demo?cabinet=1&scenario=nutrition&section=nutrition',
   );
-  await expect(page.getByRole('link', { name: /посмотрите кабинет тренера/i })).toHaveAttribute(
+  await expect(demoScenarioLinks.nth(2)).toContainText('Работа тренера');
+  await expect(demoScenarioLinks.nth(2)).toHaveAttribute(
     'href',
     '/demo?cabinet=1&scenario=trainer&section=trainer',
   );
