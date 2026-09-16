@@ -27,7 +27,7 @@
 | `94B` | Результат `94A` | | | Только owner `Go/Narrow Go` с locked cases/thresholds/privacy/cost | | |
 | `95A` | | | | Browser print-to-PDF из `67` не закрывает повторяемый delivery job | | |
 | `95B` | Результат `95A` | | | Отдельно доказан temporary share и/или Telegram delivery | | |
-| `96` | Owner/product discovery signal, 2026-09-16 | Current YFC manual cardio/measurement contracts; `single-user/owner signal; broad-market demand not validated` | Owner identifies no-repeat-manual-entry job across iOS/Android health platforms; target platforms and P0/P1/P2 data specified | Discovery may compare one concrete datum/platform/job and define safe provenance; no production Go; no invented market evidence | `NARROW GO FOR DISCOVERY ONLY; final Go/No-Go/defer pending owner checkpoint` | 2026-09-16 |
+| `96` | Owner/product discovery signal, 2026-09-16 | Current YFC manual cardio/measurement contracts; `single-user/owner signal; broad-market demand not validated` | Owner identifies no-repeat-manual-entry job across iOS/Android health platforms; target platforms and P0/P1/P2 data specified | Discovery may compare one concrete datum/platform/job and define safe provenance; no production Go; no invented market evidence | `DEFER UNTIL NATIVE FOUNDATION; not NO-GO; return to implementation backlog after native foundation` | 2026-09-16 |
 | `97` | | | | Есть реальная команда и owner-approved responsibility matrix | | |
 | `98` | | | | Есть измеримое ограничение Web/TMA/PWA, требующее native feasibility | | |
 | `99A` | | | | Есть payer/value contract и измеримые operating/AI/storage costs | | |

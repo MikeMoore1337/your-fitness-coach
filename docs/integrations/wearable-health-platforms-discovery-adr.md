@@ -1,8 +1,8 @@
 # ADR: интеграция YFC с health-платформами — discovery Task 96
 
 **Дата проверки:** 2026-09-16 (Europe/Moscow)
-**Статус:** OWNER CHECKPOINT PENDING
-**Owner decision на запуск:** NARROW GO FOR DISCOVERY ONLY (2026-09-16)
+**Статус:** DISCOVERY COMPLETE; OWNER DECISION RECORDED
+**Owner decision:** DEFER UNTIL NATIVE FOUNDATION (2026-09-16)
 
 Документ фиксирует bounded discovery и не является разрешением на production
 implementation, deployment или переход к Task 97.
@@ -22,8 +22,10 @@ health-приложением. При импорте необходимо сох
 
 1. Текущий React Web/TMA не может напрямую читать Apple HealthKit или Android
    Health Connect. Это inference из официальных native API/capability contracts.
-2. Минимальная будущая архитектура — текущие React/Web/TMA и backend плюс тонкий
-   native bridge или companion для iOS и Android. Полный новый клиент не нужен.
+2. Предпочтительное будущее направление — thin native shell + native HealthKit /
+   Health Connect bridge + existing YFC React/backend. Companion остаётся
+   альтернативой; полноценные native clients требуют отдельного архитектурного
+   обоснования.
 3. Samsung Health следует покрывать через Health Connect. Отдельный Samsung Health
    Data SDK допустим только при доказанном gap.
 4. Huawei Health Kit — отдельный provider path с собственными account, region,
@@ -31,9 +33,10 @@ health-приложением. При импорте необходимо сох
 5. Будущий узкий P0: read-only weight, агрегированные steps, completed
    cardio/workout session, тип, start/end/timezone, duration и distance. HR —
    P1, sleep — P2 discovery-only.
-6. Для текущего release рекомендация — DEFER UNTIL NATIVE APP. Если native
-   foundation появится, на следующий owner checkpoint вынести narrow P0, а не
-   импорт всех health data.
+6. Финальное owner decision: DEFER UNTIL NATIVE FOUNDATION. Это не NO-GO:
+   после появления минимальной native foundation направление возвращается в
+   implementation backlog без повторного полного discovery, если API и policies
+   существенно не изменились.
 
 ## 1. Evidence и текущий baseline YFC
 
@@ -78,12 +81,28 @@ health-приложением. При импорте необходимо сох
 | Workout detection | Может убрать ручной start/finish | False positives и большая privacy surface | Defer |
 | Notifications | Отдельный product job | Другая permission/delivery модель | Out of scope |
 
+### Approved future P0 после native foundation
+
+В первый production scope могут войти только weight, steps, completed
+cardio/workout, activity type, start/end timestamp, timezone, duration, distance,
+source platform/app/device (если device действительно нужен), source record ID,
+provenance, imported_at, deterministic normalized units, deduplication,
+manual/imported distinction, update/delete handling и disconnect/revoke lifecycle.
+Canonical domain contract остаётся source-agnostic; raw platform-specific payload
+не становится основным domain model.
+
+Heart-rate data — отдельный P1 после P0. Sleep, detailed continuous HR streams,
+resting HR и generic automatic workout detection остаются вне первого production
+scope; их можно вернуть только отдельным owner decision с доказанной семантикой.
+
 Безусловно запрещено:
 
 - считать calories устройства source of truth;
-- добавлять burned calories в дневной лимит КБЖУ;
+- добавлять burned calories в дневной лимит КБЖУ или делать automatic eat-back;
 - создавать medical/readiness score;
 - медицински интерпретировать sleep или HR;
+- рассчитывать HR zones иначе чем по утверждённой YFC formula;
+- выводить strength sets/reps из generic activity;
 - считать отсутствие данных нулём;
 - молча перезаписывать manual record;
 - скрывать provenance imported и manual.
@@ -209,22 +228,26 @@ owner decision на implementation kickoff.
 
 | Вариант | Coverage и data | Architecture / Web-TMA limits | Privacy, permissions, store | Sync / provenance | Maintenance, cost, scope, risks |
 |---|---|---|---|---|---|
-| 1. No-Go | Нет импорта; только manual | Текущий Web/TMA без изменений | Нет новых health permissions/store gates | Нет sync/dedupe | Минимальная стоимость; owner job не решён |
-| 2. Defer until native app | Apple + Android остаются будущим направлением | Сначала native foundation; Web/TMA — fallback | Сейчас новых gates нет; позже iOS/Play review обязательны | Sync не строится | Рекомендуемое решение на текущий release; ценность откладывается |
-| 3. Native bridge/companion: Apple Health + Health Connect | HealthKit и HC; Samsung через HC; P0/P1 | Swift + Kotlin connector, существующие React/backend; browser local stores недоступны | Granular permissions, HealthKit capability/purpose strings, Play declaration | Native batch; Apple anchors/observers, HC changes tokens; manual precedence | L для текущей небольшой команды, M только при готовом native shell; высокая device/store support нагрузка |
-| 4. Вариант 3 + Huawei | Добавляет Huawei/HarmonyOS | Третий native/vendor или cloud OAuth path; Huawei Web не отменяет account/region work | HMS scopes, HUAWEI ID, region/review/privacy constraints | Отдельные cursor/pull/subscription/delete semantics | XL относительно текущего stack; самый высокий approval/support риск |
-| 5. Узкий P0 на базе варианта 3 | Weight, steps aggregate, completed cardio/type/time/duration/distance; HR/sleep deferred | Тот же bridge; сначала foreground; real-time не обещается | Только минимальные permissions; manual flow всегда доступен | Bounded initial read, затем cursor; visible source/manual conflict | M/L; предпочтительный будущий slice, но требует двух native platforms |
+| 1. No-Go | Нет импорта; только manual | Текущий Web/TMA без изменений | Нет новых health permissions/store gates | Нет sync/dedupe | Минимальная стоимость; owner job не решён; не выбран владельцем |
+| 2. Thin native shell вокруг текущего YFC | HealthKit и Health Connect; Samsung через HC; сохраняется текущий React/backend | Тонкий iOS/Android shell и native bridge; Web/TMA остаётся основным UI | Granular permissions, HealthKit capability/purpose strings, Play declaration | Native batch; Apple anchors/observers, HC changes tokens; manual precedence | Предпочтительное будущее направление; M/L после native foundation; store/device support остаются |
+| 3. Native companion app | Тот же Apple/Android scope, но connector отделён от основного клиента | Отдельное iOS/Android companion-приложение; deep-link/account-linking и lifecycle сложнее | Те же platform permissions и store gates плюс companion onboarding | Native sync и backend handoff; provenance/dedupe централизуются в backend | M/L; допустимая альтернатива при доказанном lifecycle/account benefit |
+| 4. Полноценные native clients | Полный parity-клиент и health integrations на iOS/Android | Дублирование React-продукта в Swift/Kotlin; отдельное обоснование обязательно | Максимальная поверхность permissions/store/privacy/support | Отдельные client sync paths и риск расхождения domain contracts | XL; сейчас не рекомендуется |
+| 5. Further defer — native foundation отсутствует | Approved direction сохраняется, production sync не строится | Текущий Web/TMA и backend без health bridge; manual fallback | Нет новых health permissions/store gates сейчас | Нет sync/dedupe; future trigger — минимальная native foundation | Финальное решение Task 96; delay зависит от native capacity |
+| 6. Узкий P0 после выбора foundation | Weight, steps aggregate, completed cardio/type/time/duration/distance; HR/sleep deferred | Реализация на выбранной thin-shell или companion foundation; React/backend сохраняются | Только минимальные permissions; manual flow всегда доступен | Bounded initial read, затем cursor; visible source/manual conflict | M/L bounded slice; не разрешён этим ADR к реализации сейчас |
 
 ### Рекомендация
 
-Текущее решение: **DEFER UNTIL NATIVE APP** — не начинать implementation до
-появления native foundation и owner responsibility matrix.
+Текущее решение: **DEFER UNTIL NATIVE FOUNDATION** — это defer, а не NO-GO.
+Production implementation не начинать до появления минимальной native foundation
+и owner responsibility matrix.
 
-Будущее narrow implementation: вариант 5, то есть read-only Apple HealthKit +
-Health Connect, Samsung только через Health Connect, Huawei deferred, P0 only,
-foreground sync first и best-effort background later. Не включать calories,
-readiness, medical semantics, automatic strength-set inference и all-health-data
-import.
+Предпочтительное будущее направление — вариант 2, thin native shell + native
+HealthKit / Health Connect bridge + existing YFC React/backend. Будущий narrow
+implementation — вариант 6: read-only Apple HealthKit + Health Connect, Samsung
+только через Health Connect, Huawei/Garmin/Fitbit/Xiaomi и другие vendor-specific
+integrations deferred, P0 only, foreground sync first и best-effort background
+later. Не включать calories, readiness, medical semantics, automatic strength-set
+inference и all-health-data import.
 
 ## 5. Canonical imported-data contract (proposal only)
 
@@ -368,7 +391,7 @@ harness, а owner разрешил discovery only. Official docs доказыв�
 Это deterministic contract evidence, не real-user/provider/production validation.
 Credentials и real health data для spike не нужны.
 
-## 8. Cost, risks и owner checkpoint
+## 8. Cost, risks и owner decision
 
 Официальные platform docs не дают YFC per-record price. Нельзя считать APIs
 «бесплатными»: developer accounts/programs, signing, store review, partner
@@ -380,22 +403,31 @@ aggregator не входит в scope и не считается разрешё�
 | Path | Scope | Ongoing burden | Основной риск |
 |---|---|---|---|
 | No-Go | S / none | Low | Owner job остаётся нерешённым |
-| Defer | S сейчас; native позже | Low сейчас | Delay и зависимость от native capacity |
-| Option 3 | L для текущей команды; M при готовом native shell | Medium-high | Две native platforms, stores, permissions и sync correctness |
-| Option 4 | XL | High | Третий provider, Huawei region/approval/privacy/support |
-| Option 5 | M/L bounded slice | Medium | Уже́ более узкое покрытие, но всё ещё две native platforms |
+| Further defer | S сейчас; native позже | Low сейчас | Delay и зависимость от native capacity |
+| Thin native shell | M/L после foundation | Medium-high | Две native platforms, stores, permissions и sync correctness |
+| Native companion | M/L | Medium-high | Deep-link/account-linking и отдельный lifecycle |
+| Full native clients | XL | High | Дублирование продукта и расхождение domain contracts |
+| Narrow P0 | M/L bounded slice | Medium | Уже́ более узкое покрытие, но всё ещё две native platforms |
 
-Owner checkpoint:
+Owner decision от 2026-09-16:
 
-1. Финальное disposition: GO, NARROW GO, DEFER или NO-GO.
-2. Если NARROW GO — утвердить вариант 5 и Huawei deferred либо другой exact scope.
-3. Выбрать native shell или companion и назначить owner native maintenance,
-   signing, store review, privacy documents и support.
-4. Подтвердить или изменить 30-дневное initial window.
-5. Решить, требуется ли Huawei audience/data evidence до roadmap entry.
-6. Завершить privacy/legal decision до любого production health-data flow.
+1. Финальное disposition: **DEFER UNTIL NATIVE FOUNDATION**; это не NO-GO.
+2. Approved future candidate: Apple HealthKit + Android Health Connect narrow P0;
+   Samsung — через Health Connect; Huawei и другие vendor-specific integrations
+   deferred.
+3. Preferred future architecture: thin native shell + native HealthKit /
+   Health Connect bridge + existing YFC React/backend. Companion и full native
+   clients остаются альтернативами для нового owner checkpoint.
+4. Перед implementation нужно назначить owner native maintenance, signing, store
+   review, privacy documents и support, а также подтвердить bounded initial window.
+5. Завершить privacy/legal decision до любого production health-data flow;
+   `LEGAL_COUNSEL_REQUIRED: YES` остаётся production gate, но не блокирует closeout
+   Task 96 и не требует юридической работы сейчас.
+6. Следующий implementation trigger: минимальная native foundation готова, exact
+   P0 утверждён, а внешние API/policies не изменились существенно.
 
-До этого checkpoint нельзя начинать production integration, deployment или Task 97.
+До появления native foundation нельзя начинать production integration, deployment
+или Task 97.
 
 ## 9. Trigger Decision Matrix
 
@@ -403,8 +435,8 @@ Owner signal записан в tracked matrix на этой task branch:
 
 | Task/direction | Evidence source | Baseline | Observed problem/demand | Decision rule | Owner decision | Date |
 |---:|---|---|---|---|---|---|
-| 96 | Owner/product discovery signal, 2026-09-16 | Current YFC manual cardio/measurement contracts; single-user/owner signal; broad-market demand not validated | No-repeat-manual-entry job across iOS/Android health platforms; target platforms and P0/P1/P2 specified | Compare one concrete datum/platform/job; define safe provenance; no production Go; no invented market evidence | NARROW GO FOR DISCOVERY ONLY; final Go/No-Go/defer pending owner checkpoint | 2026-09-16 |
+| 96 | Owner/product discovery signal, 2026-09-16 | Current YFC manual cardio/measurement contracts; single-user/owner signal; broad-market demand not validated | No-repeat-manual-entry job across iOS/Android health platforms; target platforms and P0/P1/P2 specified | Compare one concrete datum/platform/job; define safe provenance; no production Go; no invented market evidence | DEFER UNTIL NATIVE FOUNDATION; not NO-GO; return to implementation backlog after native foundation | 2026-09-16 |
 
 ## Discovery disposition
 
-DISCOVERY COMPLETE FOR OWNER REVIEW; IMPLEMENTATION DEFERRED UNTIL OWNER CHECKPOINT.
+DISCOVERY COMPLETE; OWNER DECISION: DEFER UNTIL NATIVE FOUNDATION.
