@@ -3534,6 +3534,35 @@ def test_public_nutrition_serves_kbju_seo_fallback_without_private_routes(client
     assert "?weight" not in response.text
 
 
+def test_public_one_rep_max_serves_canonical_seo_fallback_without_private_routes(
+    client, monkeypatch
+):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/calculators/1rm", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "index, follow"
+    assert (
+        "<title>Калькулятор 1ПМ — рассчитать одноповторный максимум | Your Fitness Coach</title>"
+        in response.text
+    )
+    assert (
+        '<link rel="canonical" href="https://your-fitness-coach.ru/calculators/1rm" />'
+        in response.text
+    )
+    assert '<main class="seo-fallback">' in response.text
+    assert "Калькулятор 1ПМ: оценочный одноповторный максимум" in response.text
+    assert "формулу Бжицки" in response.text
+    assert "/exercises/bench-press" in response.text
+    assert "/knowledge/training/repetitions-in-reserve" in response.text
+    assert "/knowledge/training/progressive-overload" in response.text
+    assert 'href="/calculators/one-rep-max"' not in response.text
+    assert 'href="/calculators/bench-press-1rm"' not in response.text
+    assert "?weight" not in response.text
+
+
 @pytest.mark.parametrize(
     ("method", "path"),
     [
@@ -3693,11 +3722,12 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
         for element in root.findall("{http://www.sitemaps.org/schemas/sitemap/0.9}url")
         for element in element.findall("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
     ]
-    assert len(urls) == 25
+    assert len(urls) == 26
     assert len(urls) == len(set(urls))
     assert {
         "https://your-fitness-coach.ru/",
         "https://your-fitness-coach.ru/articles",
+        "https://your-fitness-coach.ru/calculators/1rm",
         "https://your-fitness-coach.ru/knowledge",
         "https://your-fitness-coach.ru/knowledge/training/repetitions-in-reserve",
         "https://your-fitness-coach.ru/knowledge/nutrition/creatine-monohydrate",
@@ -3722,6 +3752,7 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
     [
         ("/training", "Дневник тренировок: от программы до прогресса"),
         ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
+        ("/calculators/1rm", "Калькулятор 1ПМ: оценочный одноповторный максимум"),
         ("/progress", "Прогресс, который можно проверить"),
         ("/for-trainers", "Кабинет тренера для программ"),
         ("/knowledge", "Материалы, которые помогают понять"),

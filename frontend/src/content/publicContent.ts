@@ -56,7 +56,7 @@ export interface PublicContentPage {
   highlights?: string[];
   workflow?: PublicContentWorkflow;
   sections: PublicContentSection[];
-  interactive?: 'bmi-calculator' | 'kbju-calculator';
+  interactive?: 'bmi-calculator' | 'kbju-calculator' | 'one-rm-calculator';
   related: PublicContentLink[];
   cta?: {
     label: string;

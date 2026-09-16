@@ -122,6 +122,7 @@ describe('PublicContentPage', () => {
   it.each([
     ['/training', /дневник тренировок: от программы до прогресса/i],
     ['/nutrition', /рассчитать кбжу: калории, белки, жиры и углеводы/i],
+    ['/calculators/1rm', /калькулятор 1пм: оценочный одноповторный максимум/i],
     ['/progress', /прогресс, который можно проверить/i],
     ['/for-trainers', /кабинет тренера для программ/i],
     ['/knowledge', /материалы, которые помогают понять/i],
@@ -185,6 +186,40 @@ describe('PublicContentPage', () => {
     } finally {
       window.removeEventListener(PRODUCT_EVENT_NAME, listener);
     }
+  });
+
+  it('renders the public 1RM calculator with canonical links and bounded output', async () => {
+    renderPath('/calculators/1rm');
+
+    const form = screen.getByRole('form', { name: 'Рассчитать 1ПМ онлайн' });
+    fireEvent.change(screen.getByLabelText('Вес в подходе, кг'), {
+      target: { value: '100' },
+    });
+    fireEvent.change(screen.getByLabelText('Повторения в подходе'), {
+      target: { value: '5' },
+    });
+    fireEvent.click(within(form).getByRole('button', { name: 'Рассчитать 1ПМ' }));
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('112,5 кг'));
+    expect(screen.getByRole('link', { name: /техника жима лёжа/i })).toHaveAttribute(
+      'href',
+      '/exercises/bench-press',
+    );
+    expect(screen.getByRole('link', { name: /повторы в запасе/i })).toHaveAttribute(
+      'href',
+      '/knowledge/training/repetitions-in-reserve',
+    );
+    expect(screen.getByRole('link', { name: /увеличение нагрузки/i })).toHaveAttribute(
+      'href',
+      '/knowledge/training/progressive-overload',
+    );
+    expect(screen.getAllByRole('link', { name: 'Перейти к тренировкам' })).toHaveLength(2);
+    expect(document.title).toContain('Калькулятор 1ПМ');
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      `${window.location.origin}/calculators/1rm`,
+    );
+    expect(localStorage.length).toBe(0);
   });
 
   it('publishes truthful article metadata and visible editorial context for a guide', () => {

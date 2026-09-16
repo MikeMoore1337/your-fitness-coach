@@ -33,6 +33,7 @@ import './styles/liquid-glass.css';
 const publicContentRoots = new Set([
   '/training',
   '/nutrition',
+  '/calculators/1rm',
   '/progress',
   '/for-trainers',
   '/knowledge',

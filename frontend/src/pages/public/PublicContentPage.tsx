@@ -20,6 +20,7 @@ import { useWebTheme } from '../../shared/useWebTheme';
 import { applyRouteMetadata } from '../../shared/seo/metadata';
 import PublicBmiCalculator from './PublicBmiCalculator';
 import PublicNutritionCalculator from './PublicNutritionCalculator';
+import PublicOneRepMaxCalculator from './PublicOneRepMaxCalculator';
 import '../../shared/ui/public-shell.css';
 import '../landing/landing.css';
 import './public-content.css';
@@ -557,6 +558,7 @@ export default function PublicContentPage() {
 
           <div className="public-body">
             {page.interactive === 'kbju-calculator' && <PublicNutritionCalculator />}
+            {page.interactive === 'one-rm-calculator' && <PublicOneRepMaxCalculator />}
             {page.sections.map((section, index) => (
               <section id={sectionId(page, index)} key={section.heading}>
                 <h2>{section.heading}</h2>

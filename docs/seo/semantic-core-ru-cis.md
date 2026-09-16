@@ -47,10 +47,11 @@ T0, не evidence отсутствия спроса.
 `frontend/src/content/publicContent.json`, `docs/seo/public-content.md`,
 `docs/seo/growth-analytics-foundation.md` и live host `https://your-fitness-coach.ru/`.
 
-В manifest 24 public entries: landing, 4 product pages, knowledge index, 14 guides, exercise
-index и 3 exercise pages. Live sitemap содержит 25 canonical URLs (включая `/articles`).
-`robots.txt`, `sitemap.xml` и основные public routes отвечают `200`; SEO smoke script подтвердил
-25 canonical sitemap URLs. Private/API routes в sitemap не включаются.
+В baseline этого исследования manifest содержал 24 public entries: landing, 4 product pages,
+knowledge index, 14 guides, exercise index и 3 exercise pages. После Task 241E canonical 1ПМ
+страница добавлена в manifest; текущий sitemap содержит 26 canonical URLs (включая `/articles`).
+`robots.txt`, `sitemap.xml` и основные public routes отвечают `200` в baseline-проверке; обновлённый
+manifest добавляет один canonical URL для Task 241E. Private/API routes в sitemap не включаются.
 
 | Current page | Current intent | Coverage gap | Action for future implementation |
 | --- | --- | --- | --- |
@@ -60,7 +61,7 @@ index и 3 exercise pages. Live sitemap содержит 25 canonical URLs (вк
 | `/progress` | записи результатов, нагрузки, measurements | Не является top-of-funnel calculator/program page | Оставить supporting page; связать с program/trainer flows |
 | `/for-trainers` | trainer workspace: programs, invites, client progress | Commercial CRM language и proof/FAQ могут быть сильнее | Усилить existing page; не создавать `/for-trainers/crm` без отдельного job |
 | `/knowledge` | educational catalog | Частично покрывает RIR, Full Body/Split, KBJU, heart rate, hydration | Использовать как context layer; link only to relevant tools/programs |
-| `/knowledge/...` | durable guides with sources/limits | Нет 1ПМ и volume guides; некоторые intents ведут к future tools | Add guides only beside a useful asset, not article volume for its own sake |
+| `/knowledge/...` | durable guides with sources/limits | Нет volume guides; 1ПМ теперь имеет supporting context, некоторые intents ведут к future tools | Add guides only beside a useful asset, not article volume for its own sake |
 | `/articles` | public article index contract | Current SEO research does not prove article-first opportunity | Не превращать в keyword doorway; not Wave 1 |
 | `/exercises` | allowlisted exercise catalog | Только bench press, lat pulldown, squat; thin expansion risk | Expand one verified canonical page at a time with useful technique/media |
 | `/exercises/<slug>` | technique, errors, safety, domain data | No public add-to-workout action yet | Add CTA only when public-to-product flow exists; otherwise informational |
@@ -143,7 +144,7 @@ contract; Wordstat does not authorize production changes.
 | F KBJU/calorie/protein | 16127 / 4763 | 29.5% | 69 | high | M | high if duplicate URL; strengthen `/nutrition` in Wave 1 |
 | E exercise technique | 2943 / 528 for bench press | 17.9% | 75 | medium | M | improve `/exercises/bench-press`, then bounded expansion |
 | H workout diary/app | 3038 / 456 | 15.0% | 73 | low | S/M | strengthen `/training`; no diary duplicate |
-| A 1ПМ/working weights | 363 / 261 | 71.9% | 87 | low–medium | M | implement `/calculators/1rm`; high formula-variant cannibalization |
+| A 1ПМ/working weights | 363 / 261 | 71.9% | 87 | low–medium | M | `/calculators/1rm` implemented; high formula-variant cannibalization |
 | C 3-day / beginner program | 1351 / 32 for broad Russian program seed | 2.4% | 87 | low–medium | M | one canonical program asset; Full Body wording is secondary |
 | D trainer workspace / CRM | NO_DATA | NO_DATA | 81 | low | S/M | improve `/for-trainers` conditionally; demand remains unknown |
 | B training volume / tonnage | 181 / 2 for tonnage; 5 / NO_DATA for calculator | 1.1% / NO_DATA | 83 | low–medium | M/L | defer; fix definition before tool work |
@@ -157,13 +158,15 @@ Dominant intent is `tool/calculator`, with adjacent informational formula and pe
 Google and Yandex both show multiple calculators, not only articles: Start-fit, Body1, GeneticLab,
 AnatomyStudy, Sport-iv, Inspire2, Zozhnik and other utility pages. The gap is not another formula
 explanation; it is a trustworthy result with explicit formula/limitations, exercise context,
-percentage table, and a future save-to-program path.
+percentage table, and a future save-to-program path. The canonical result is now implemented at
+`/calculators/1rm`; saving remains a separate product contract.
 
 Recommended canonical hypothesis: `/calculators/1rm`. Do not create separate URLs for `жим`,
 `присед`, `становая` until data shows a materially different intent; exercise selector/sections
 should prevent cannibalization. Owner Wordstat shows 363 broad and 261 quoted/fixed-word-count
 for the main seed, a 71.9% ratio: modest volume but unusually pure intent. Product dependency:
-calculator result and `calculator_saved` flow do not exist yet.
+the `calculator_saved` flow does not exist yet; the calculator result is intentionally local and
+action-only.
 
 ### B — training volume and tonnage
 
@@ -287,7 +290,7 @@ keyword footer or link every guide to every tool.
 1. Owner review of this packet and the integrated Wordstat evidence.
 2. A future product/SEO implementation task for the owner-approved `/nutrition` improvement or
    another bounded first-wave asset, with its product and claims contract.
-3. A future task for one canonical 1ПМ asset plus its save-flow contract.
+3. A future task for the canonical 1ПМ save-flow contract, if it is approved separately.
 4. A separate bounded task for one Russian 3-day program asset and public-to-product save semantics.
 5. A later training-volume spike that first fixes the planned-vs-completed volume definition.
 6. Conditional follow-up for cardio only after source, reviewer and claims decisions.

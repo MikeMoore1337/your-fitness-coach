@@ -37,6 +37,32 @@ describe('public content routing', () => {
     expect(publicContent.pages.some((page) => forbiddenPaths.includes(page.path))).toBe(false);
   });
 
+  it('keeps the public 1RM calculator on one canonical SEO page with useful context', () => {
+    const oneRepMaxPage = getPublicContentPage('/calculators/1rm');
+
+    expect(oneRepMaxPage).toMatchObject({
+      title: 'Калькулятор 1ПМ — рассчитать одноповторный максимум | Your Fitness Coach',
+      heading: 'Калькулятор 1ПМ: оценочный одноповторный максимум',
+      interactive: 'one-rm-calculator',
+    });
+    expect(publicContent.pages.filter((page) => page.path === '/calculators/1rm')).toHaveLength(1);
+    expect(oneRepMaxPage?.related.map((link) => link.path)).toEqual([
+      '/exercises/bench-press',
+      '/training',
+      '/knowledge/training/repetitions-in-reserve',
+      '/knowledge/training/progressive-overload',
+    ]);
+    const forbiddenPaths = [
+      '/calculator/1rm',
+      '/calculators/one-rep-max',
+      '/1rm',
+      '/one-rep-max-calculator',
+      '/calculators/bench-press-1rm',
+      '/calculators/squat-1rm',
+    ];
+    expect(publicContent.pages.some((page) => forbiddenPaths.includes(page.path))).toBe(false);
+  });
+
   it('keeps bench press as one canonical technique exemplar with a truthful handoff', () => {
     const benchPage = getPublicContentPage('/exercises/bench-press');
 
