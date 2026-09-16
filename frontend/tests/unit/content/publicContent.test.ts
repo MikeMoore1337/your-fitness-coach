@@ -36,4 +36,22 @@ describe('public content routing', () => {
     ];
     expect(publicContent.pages.some((page) => forbiddenPaths.includes(page.path))).toBe(false);
   });
+
+  it('keeps bench press as one canonical technique exemplar with a truthful handoff', () => {
+    const benchPage = getPublicContentPage('/exercises/bench-press');
+
+    expect(benchPage).toMatchObject({
+      title: 'Жим штанги лёжа — техника выполнения, ошибки и безопасность | Your Fitness Coach',
+      heading: 'Жим штанги лёжа: техника выполнения',
+      cta: {
+        label: 'Открыть тренировки в Your Fitness Coach',
+      },
+    });
+    expect(
+      publicContent.pages.filter((page) => page.path === '/exercises/bench-press'),
+    ).toHaveLength(1);
+    expect(publicContent.pages.some((page) => page.path.includes('bench-press-technique'))).toBe(
+      false,
+    );
+  });
 });

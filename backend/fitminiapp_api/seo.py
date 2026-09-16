@@ -13,7 +13,10 @@ from urllib.parse import quote, urlparse
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.models.news import WebArticle
-from fitminiapp_api.services.public_exercises import public_exercise
+from fitminiapp_api.services.public_exercises import (
+    public_exercise,
+    validate_public_exercise_quality,
+)
 
 INDEX_ROBOTS = "index, follow"
 NOINDEX_ROBOTS = "noindex, nofollow"
@@ -217,6 +220,89 @@ def _safe_https_url(value: object) -> str | None:
     return normalized
 
 
+def _required_string_list(value: object, *, field: str) -> list[str]:
+    if not isinstance(value, list) or not value:
+        raise RuntimeError(f"Public exercise field {field!r} must be a non-empty list")
+    if any(not isinstance(item, str) or not item.strip() for item in value):
+        raise RuntimeError(f"Public exercise field {field!r} must contain non-empty strings")
+    return cast(list[str], value)
+
+
+def _public_asset_url(value: object, *, field: str) -> str:
+    normalized = _required_string(value, field=field).strip()
+    if normalized.startswith("//") or not normalized.startswith("/static/"):
+        raise RuntimeError(f"Public exercise asset URL {field!r} must be same-origin")
+    if any(ord(character) < 0x20 for character in normalized):
+        raise RuntimeError(f"Public exercise asset URL {field!r} contains control characters")
+    return normalized
+
+
+def _positive_dimension(value: object, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise RuntimeError(f"Public exercise media field {field!r} must be a positive integer")
+    return value
+
+
+def _public_exercise_media_markup(exercise: dict[str, object]) -> str:
+    raw_media = exercise.get("media")
+    if raw_media is None:
+        return ""
+    if not isinstance(raw_media, list):
+        raise RuntimeError("Public exercise media must be a list")
+
+    figures: list[str] = []
+    for index, raw_item in enumerate(raw_media):
+        if not isinstance(raw_item, dict):
+            raise RuntimeError(f"Public exercise media item {index} must be an object")
+        item = cast(dict[str, object], raw_item)
+        url = _public_asset_url(item.get("url"), field=f"media[{index}].url")
+        alt = _required_string(item.get("alt"), field=f"media[{index}].alt")
+        phase = _required_string(item.get("phase"), field=f"media[{index}].phase")
+        width = _positive_dimension(item.get("width"), field=f"media[{index}].width")
+        height = _positive_dimension(item.get("height"), field=f"media[{index}].height")
+        raw_sources = item.get("sources")
+        srcset: list[str] = []
+        if isinstance(raw_sources, list):
+            for source_index, raw_source in enumerate(raw_sources):
+                if not isinstance(raw_source, dict):
+                    raise RuntimeError(
+                        f"Public exercise media source {index}:{source_index} must be an object"
+                    )
+                source = cast(dict[str, object], raw_source)
+                source_url = _public_asset_url(
+                    source.get("url"), field=f"media[{index}].sources[{source_index}].url"
+                )
+                source_width = _positive_dimension(
+                    source.get("width"), field=f"media[{index}].sources[{source_index}].width"
+                )
+                srcset.append(f"{html.escape(source_url, quote=True)} {source_width}w")
+        srcset_attribute = f' srcset="{", ".join(srcset)}"' if srcset else ""
+        figures.append(
+            f'<figure class="exercise-guide-image"><img src="{html.escape(url, quote=True)}"'
+            f'{srcset_attribute} sizes="(max-width: 620px) calc(100vw - 48px), '
+            f'(max-width: 1040px) 44vw, 470px" alt="{html.escape(alt, quote=True)}" '
+            f'width="{width}" height="{height}" loading="lazy" decoding="async" />'
+            f"<figcaption>{html.escape(phase)}</figcaption></figure>"
+        )
+    if not figures:
+        return ""
+    return (
+        '<section class="public-exercise-media"><h2>Положения в движении</h2>'
+        "<p>Используйте изображения как визуальную подсказку к шагам, а не как замену "
+        'контролируемому выполнению.</p><div class="exercise-guide-images" '
+        'aria-label="Положения упражнения">' + "".join(figures) + "</div></section>"
+    )
+
+
+def _published_exercise_for_page(page: dict[str, object]) -> dict[str, object]:
+    slug = _required_string(page.get("slug"), field="slug")
+    exercise = public_exercise(slug)
+    if exercise is None:
+        raise RuntimeError(f"Published exercise {slug!r} has no domain record")
+    validate_public_exercise_quality(exercise)
+    return exercise
+
+
 def _breadcrumbs_schema(page: dict[str, object]) -> dict[str, object] | None:
     raw_breadcrumbs = page.get("breadcrumbs")
     if not isinstance(raw_breadcrumbs, list) or len(raw_breadcrumbs) < 2:
@@ -317,6 +403,10 @@ def metadata_for_path(path: str) -> SeoMetadata:
 
     page = public_page_for_path(path)
     if page:
+        if page.get("kind") == "exercise":
+            # An allowlisted manifest entry is indexable only when its canonical domain
+            # record passes the public exercise quality gate.
+            _published_exercise_for_page(page)
         return SeoMetadata(
             title=_required_string(page["title"], field="title"),
             description=_required_string(page["description"], field="description"),
@@ -655,32 +745,67 @@ def render_public_fallback(path: str) -> str:
             f"<section><h2>Опубликованные карточки упражнений</h2><ul>{exercise_links}</ul></section>"
         )
     if page.get("kind") == "exercise" and isinstance(page.get("slug"), str):
-        exercise = public_exercise(cast(str, page["slug"]))
-        if exercise is None:
-            raise RuntimeError(f"Published exercise {page['slug']!r} has no domain record")
+        exercise = _published_exercise_for_page(page)
+        primary = _required_string(exercise.get("primary_muscle"), field="primary_muscle")
+        secondary = _required_string_list(
+            exercise.get("secondary_muscles"), field="secondary_muscles"
+        )
+        equipment = _required_string(exercise.get("equipment"), field="equipment")
+        difficulty = _required_string(exercise.get("difficulty_level"), field="difficulty_level")
+        difficulty_labels = {
+            "beginner": "Начальный уровень",
+            "intermediate": "Средний уровень",
+            "advanced": "Продвинутый уровень",
+        }
+        difficulty_label = difficulty_labels.get(difficulty, difficulty)
         facts = (
-            f"Основная группа: {html.escape(cast(str, exercise['primary_muscle']))}. "
-            f"Оборудование: {html.escape(cast(str, exercise['equipment']))}."
+            f"Основная группа: {html.escape(primary)}. "
+            f"Дополнительные мышцы: {html.escape(', '.join(secondary))}. "
+            f"Оборудование: {html.escape(equipment)}. "
+            f"Сложность: {html.escape(difficulty_label)}."
         )
         parts.append(f"<section><h2>Краткие сведения</h2><p>{facts}</p></section>")
+        media_markup = _public_exercise_media_markup(exercise)
+        if media_markup:
+            parts.append(media_markup)
         steps = "".join(
-            f"<li>{html.escape(step)}</li>" for step in cast(list[str], exercise["technique_steps"])
+            f"<li>{html.escape(step)}</li>"
+            for step in _required_string_list(
+                exercise.get("technique_steps"), field="technique_steps"
+            )
         )
         parts.append(f"<section><h2>Техника выполнения</h2><ol>{steps}</ol></section>")
         parts.append(
             "<section><h2>Дыхание</h2><p>"
-            f"{html.escape(cast(str, exercise['breathing']))}</p></section>"
+            f"{html.escape(_required_string(exercise.get('breathing'), field='breathing'))}</p></section>"
         )
         mistakes = "".join(
-            f"<li>{html.escape(item)}</li>" for item in cast(list[str], exercise["common_mistakes"])
+            f"<li>{html.escape(item)}</li>"
+            for item in _required_string_list(
+                exercise.get("common_mistakes"), field="common_mistakes"
+            )
         )
         parts.append(f"<section><h2>Частые ошибки</h2><ul>{mistakes}</ul></section>")
-        source_url = html.escape(cast(str, exercise["source_url"]), quote=True)
-        source_name = html.escape(cast(str, exercise["source_name"]))
-        source_license = html.escape(cast(str, exercise["source_license"]))
+        safety = "".join(
+            f"<li>{html.escape(item)}</li>"
+            for item in _required_string_list(exercise.get("safety_notes"), field="safety_notes")
+        )
+        parts.append(f"<section><h2>Что важно для безопасности</h2><ul>{safety}</ul></section>")
+        source_url = _safe_https_url(exercise.get("source_url"))
+        source_name = _required_string(exercise.get("source_name"), field="source_name")
+        source_license = _required_string(exercise.get("source_license"), field="source_license")
+        source_markup = html.escape(source_name)
+        if source_url:
+            source_markup = f'<a href="{html.escape(source_url, quote=True)}">{source_markup}</a>'
+        license_url = _safe_https_url(exercise.get("source_license_url"))
+        license_markup = html.escape(source_license)
+        if license_url:
+            license_markup = (
+                f'<a href="{html.escape(license_url, quote=True)}">{license_markup}</a>'
+            )
         parts.append(
-            "<footer><strong>Источник данных и лицензия</strong> "
-            f'<a href="{source_url}">{source_name}</a> — {source_license}</footer>'
+            '<footer class="public-exercise-source"><strong>Источник данных и лицензия</strong> '
+            f"{source_markup} — {license_markup}</footer>"
         )
     sources = page.get("sources")
     if isinstance(sources, list) and sources:

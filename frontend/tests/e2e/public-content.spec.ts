@@ -132,6 +132,85 @@ const publicArticle = {
   research_assistance: true,
 };
 
+const publicBenchExerciseDetail = {
+  slug: 'bench-press',
+  title: 'Жим лежа',
+  primary_muscle: 'Грудь',
+  secondary_muscles: ['Трицепс', 'Передняя дельта'],
+  equipment: 'Штанга',
+  difficulty_level: 'intermediate',
+  technique_steps: [
+    'Сведи и опусти лопатки, поставь стопы устойчиво и сохрани естественный прогиб спины.',
+    'Опускай снаряд под контролем к нижней части груди, удерживая предплечья близко к вертикали.',
+    'Выжми вес по устойчивой траектории, не теряя опору стоп и положение лопаток.',
+  ],
+  breathing: 'Вдох на опускании, выдох после прохождения самой тяжёлой части жима.',
+  common_mistakes: [
+    'Отрыв таза или стоп',
+    'Раскрытые плечи и потеря лопаток',
+    'Удар снарядом о грудь',
+  ],
+  safety_notes: [
+    'Используйте нагрузку и амплитуду, при которых сохраняется описанная техника; при острой боли останови подход.',
+  ],
+  media: [
+    {
+      type: 'image',
+      url: '/static/exercise-guides/bench-press-start.jpg',
+      poster: '/static/exercise-guides/bench-press-start.jpg',
+      phase_id: 'concentric_end',
+      phase: 'Фаза усилия',
+      alt: 'Жим лежа: фаза усилия',
+      source_name: 'free-exercise-db',
+      source_url: 'https://github.com/yuhonas/free-exercise-db',
+      source_license: 'Unlicense (общественное достояние)',
+      source_license_url: 'https://github.com/yuhonas/free-exercise-db/blob/main/LICENSE.md',
+      width: 850,
+      height: 567,
+      byte_size: 72816,
+      sort_order: 0,
+      sources: [
+        {
+          url: '/static/exercise-guides/bench-press-start.jpg',
+          mime_type: 'image/jpeg',
+          width: 850,
+          height: 567,
+          byte_size: 72816,
+        },
+      ],
+    },
+    {
+      type: 'image',
+      url: '/static/exercise-guides/bench-press-active.jpg',
+      poster: '/static/exercise-guides/bench-press-active.jpg',
+      phase_id: 'eccentric_end',
+      phase: 'Фаза возврата',
+      alt: 'Жим лежа: фаза возврата',
+      source_name: 'free-exercise-db',
+      source_url: 'https://github.com/yuhonas/free-exercise-db',
+      source_license: 'Unlicense (общественное достояние)',
+      source_license_url: 'https://github.com/yuhonas/free-exercise-db/blob/main/LICENSE.md',
+      width: 850,
+      height: 567,
+      byte_size: 72202,
+      sort_order: 1,
+      sources: [
+        {
+          url: '/static/exercise-guides/bench-press-active.jpg',
+          mime_type: 'image/jpeg',
+          width: 850,
+          height: 567,
+          byte_size: 72202,
+        },
+      ],
+    },
+  ],
+  source_name: 'free-exercise-db',
+  source_url: 'https://github.com/yuhonas/free-exercise-db',
+  source_license: 'Unlicense (общественное достояние)',
+  source_license_url: 'https://github.com/yuhonas/free-exercise-db/blob/main/LICENSE.md',
+};
+
 test('legacy app knowledge URLs hand off to the equivalent Public Web article', async ({
   page,
 }) => {
@@ -552,43 +631,97 @@ test('a public exercise stays readable on mobile and gets facts from the public 
     await responseGate;
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({
-        slug: 'bench-press',
-        title: 'Жим лежа',
-        primary_muscle: 'Грудь',
-        secondary_muscles: ['Трицепс'],
-        equipment: 'Штанга',
-        difficulty_level: 'intermediate',
-        technique_steps: [
-          'Сведите лопатки и устойчиво поставьте стопы.',
-          'Опустите гриф под контролем и выжмите его вверх.',
-        ],
-        breathing: 'Вдохните перед опусканием, выдохните после трудной части подъёма.',
-        common_mistakes: ['Потеря опоры стоп.', 'Резкий отскок грифа.'],
-        safety_notes: ['Используйте страховку при тяжёлых подходах.'],
-        source_name: 'Your Fitness Coach exercise domain',
-        source_url: 'https://your-fitness-coach.ru/',
-        source_license: 'Собственные данные проекта',
-        source_license_url: null,
-      }),
+      body: JSON.stringify(publicBenchExerciseDetail),
     });
   });
+  for (const imageName of ['bench-press-start.jpg', 'bench-press-active.jpg']) {
+    await page.route(`**/static/exercise-guides/${imageName}`, async (route) => {
+      await route.fulfill({
+        path: path.resolve('..', 'backend', 'assets', 'exercise-guides', imageName),
+      });
+    });
+  }
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/exercises/bench-press');
 
   await expect(page.getByRole('status')).toContainText('Загружаем технику');
   releaseResponse?.();
-  await expect(page.getByRole('heading', { name: 'Техника выполнения' })).toBeVisible();
-  await expect(page.getByText('Трицепс')).toBeVisible();
   await expect(
-    page.getByRole('link', { name: 'Your Fitness Coach exercise domain' }),
-  ).toHaveAttribute('href', 'https://your-fitness-coach.ru/');
+    page.getByRole('heading', { name: 'Техника выполнения', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Трицепс')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Положения в движении' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Жим лежа: фаза усилия' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Что важно для безопасности' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'free-exercise-db' })).toHaveAttribute(
+    'href',
+    'https://github.com/yuhonas/free-exercise-db',
+  );
+  await expect(page.getByText('Unlicense (общественное достояние)')).toBeVisible();
   expect(
     await page.evaluate(() => ({
       content: document.documentElement.scrollWidth,
       viewport: window.innerWidth,
     })),
   ).toEqual({ content: 360, viewport: 360 });
+});
+
+test('bench exemplar stays readable across the public visual matrix', async ({ page }) => {
+  await page.route('**/api/v1/public/exercises/bench-press', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(publicBenchExerciseDetail),
+    });
+  });
+  for (const imageName of ['bench-press-start.jpg', 'bench-press-active.jpg']) {
+    await page.route(`**/static/exercise-guides/${imageName}`, async (route) => {
+      await route.fulfill({
+        path: path.resolve('..', 'backend', 'assets', 'exercise-guides', imageName),
+      });
+    });
+  }
+
+  const states = [
+    { name: '320-light', width: 320, height: 780, colorScheme: 'light' as const },
+    { name: '360-light', width: 360, height: 800, colorScheme: 'light' as const },
+    { name: '390-light', width: 390, height: 844, colorScheme: 'light' as const },
+    { name: '390-dark', width: 390, height: 844, colorScheme: 'dark' as const },
+    { name: '430-dark', width: 430, height: 932, colorScheme: 'dark' as const },
+    { name: '768-light', width: 768, height: 900, colorScheme: 'light' as const },
+    { name: '768-dark', width: 768, height: 900, colorScheme: 'dark' as const },
+    { name: '1366-light', width: 1366, height: 900, colorScheme: 'light' as const },
+    { name: '1440-dark', width: 1440, height: 900, colorScheme: 'dark' as const },
+  ];
+
+  for (const state of states) {
+    await page.setViewportSize({ width: state.width, height: state.height });
+    await page.goto('/exercises/bench-press');
+    await page.evaluate((colorScheme) => {
+      window.localStorage.setItem('app-theme', colorScheme);
+    }, state.colorScheme);
+    await page.reload();
+    await expect(
+      page.getByRole('heading', { level: 1, name: /жим штанги лёжа: техника выполнения/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Техника выполнения', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Положения в движении' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Что важно для безопасности' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Открыть тренировки в Your Fitness Coach' }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() => ({
+        content: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+      })),
+    ).toEqual({ content: state.width, viewport: state.width });
+    await page.screenshot({
+      path: path.join('..', '.artifacts', 'tasks', '241C', 'evidence', `${state.name}.png`),
+      fullPage: true,
+    });
+  }
 });
 
 test('campaign parameters keep one canonical URL and a fetchable social preview', async ({

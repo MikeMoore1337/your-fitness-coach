@@ -39,6 +39,55 @@ vi.mock('../../../../src/shared/api/client', () => ({
         },
       ]);
     }
+    if (path === '/api/v1/public/exercises/bench-press') {
+      return Promise.resolve({
+        slug: 'bench-press',
+        title: 'Жим лежа',
+        primary_muscle: 'Грудь',
+        secondary_muscles: ['Трицепс', 'Передняя дельта'],
+        equipment: 'Штанга',
+        difficulty_level: 'intermediate',
+        technique_steps: [
+          'Сведи и опусти лопатки, поставь стопы устойчиво и сохрани естественный прогиб спины.',
+          'Опускай снаряд под контролем к нижней части груди, удерживая предплечья близко к вертикали.',
+          'Выжми вес по устойчивой траектории, не теряя опору стоп и положение лопаток.',
+        ],
+        breathing: 'Вдох на опускании, выдох после прохождения самой тяжёлой части жима.',
+        common_mistakes: ['Отрыв таза или стоп', 'Раскрытые плечи и потеря лопаток'],
+        safety_notes: ['При острой боли останови подход.'],
+        media: [
+          {
+            type: 'image',
+            url: '/static/exercise-guides/bench-press-start.jpg',
+            poster: '/static/exercise-guides/bench-press-start.jpg',
+            phase_id: 'concentric_end',
+            phase: 'Фаза усилия',
+            alt: 'Жим лежа: фаза усилия',
+            source_name: 'free-exercise-db',
+            source_url: 'https://github.com/yuhonas/free-exercise-db',
+            source_license: 'Unlicense (общественное достояние)',
+            source_license_url: 'https://github.com/yuhonas/free-exercise-db/blob/main/LICENSE.md',
+            width: 850,
+            height: 567,
+            byte_size: 72816,
+            sort_order: 0,
+            sources: [
+              {
+                url: '/static/exercise-guides/bench-press-start.jpg',
+                mime_type: 'image/jpeg',
+                width: 850,
+                height: 567,
+                byte_size: 72816,
+              },
+            ],
+          },
+        ],
+        source_name: 'free-exercise-db',
+        source_url: 'https://github.com/yuhonas/free-exercise-db',
+        source_license: 'Unlicense (общественное достояние)',
+        source_license_url: 'https://github.com/yuhonas/free-exercise-db/blob/main/LICENSE.md',
+      });
+    }
     throw new Error(`Unexpected API path: ${path}`);
   }),
 }));
@@ -266,6 +315,38 @@ describe('PublicContentPage', () => {
     );
     expect(document.querySelectorAll('.public-guide-card')).toHaveLength(3);
     expect(screen.queryByText(/пользовательское упражнение/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the bench exemplar from one public domain record with accessible media and CTA', async () => {
+    renderPath('/exercises/bench-press');
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: /жим штанги лёжа: техника выполнения/i }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Техника выполнения' })).toBeVisible();
+    expect(screen.getByText('Трицепс, Передняя дельта')).toBeVisible();
+    expect(screen.getByText('Средний уровень', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Положения в движении' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Жим лежа: фаза усилия' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Увеличить: Фаза усилия' })).toBeInTheDocument();
+    expect(document.querySelector('.public-exercise-body ol')?.children).toHaveLength(3);
+    expect(screen.getByRole('heading', { name: 'Что важно для безопасности' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'free-exercise-db' })).toHaveAttribute(
+      'href',
+      'https://github.com/yuhonas/free-exercise-db',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Unlicense (общественное достояние)' }),
+    ).toHaveAttribute('href', 'https://github.com/yuhonas/free-exercise-db/blob/main/LICENSE.md');
+    expect(
+      screen.getByRole('heading', { name: 'Открыть тренировки в Your Fitness Coach' }),
+    ).toBeVisible();
+    expect(screen.queryByText(/Добавить жим/i)).not.toBeInTheDocument();
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      `${window.location.origin}/exercises/bench-press`,
+    );
+    expect(document.title).toMatch(/Жим штанги лёжа.*ошибки и безопасность/i);
   });
 
   it('uses the same persisted light and dark theme contract as the landing page', () => {

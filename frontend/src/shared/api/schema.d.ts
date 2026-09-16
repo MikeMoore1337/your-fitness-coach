@@ -9178,6 +9178,8 @@ export interface components {
             common_mistakes: string[];
             /** Safety Notes */
             safety_notes: string[];
+            /** Media */
+            media: components["schemas"]["ExerciseGuideMedia"][];
             /** Source Name */
             source_name: string;
             /** Source Url */

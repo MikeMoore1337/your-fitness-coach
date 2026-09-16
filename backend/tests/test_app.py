@@ -3826,7 +3826,18 @@ def test_public_exercise_api_uses_allowlisted_domain_data_and_excludes_private_r
     assert squat.json()["title"] == "Приседания"
     assert squat.json()["primary_muscle"] == "Квадрицепс"
     assert squat.json()["technique_steps"]
+    assert squat.json()["safety_notes"]
+    assert squat.json()["media"]
     assert squat.json()["source_name"] == "free-exercise-db"
+
+    bench = client.get("/api/v1/public/exercises/bench-press")
+    assert bench.status_code == 200
+    assert bench.json()["difficulty_level"] == "intermediate"
+    assert len(bench.json()["media"]) == 2
+    assert all(
+        item["source_license"] == "Unlicense (общественное достояние)"
+        for item in bench.json()["media"]
+    )
 
     private_slug = client.get("/api/v1/public/exercises/squat-u-private")
     assert private_slug.status_code == 404
@@ -3843,6 +3854,8 @@ def test_public_exercise_route_has_domain_fallback_and_webpage_schema(client, mo
     assert "Основная группа: Квадрицепс" in response.text
     assert "Техника выполнения" in response.text
     assert "Колени заваливаются внутрь" in response.text
+    assert "Что важно для безопасности" in response.text
+    assert "/static/exercise-guides/squat-start.jpg" in response.text
     assert "free-exercise-db" in response.text
     structured_data = re.search(
         r'<script type="application/ld\+json">(.*?)</script>', response.text, re.DOTALL
@@ -3850,6 +3863,45 @@ def test_public_exercise_route_has_domain_fallback_and_webpage_schema(client, mo
     assert structured_data is not None
     payload = json.loads(structured_data.group(1))
     assert [entry["@type"] for entry in payload["@graph"]] == ["WebPage", "BreadcrumbList"]
+
+
+def test_bench_press_public_page_has_one_canonical_seo_exemplar(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/exercises/bench-press", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert (
+        "<title>Жим штанги лёжа — техника выполнения, ошибки и безопасность | "
+        "Your Fitness Coach</title>"
+    ) in response.text
+    assert (
+        '<link rel="canonical" href="https://your-fitness-coach.ru/exercises/bench-press" />'
+        in response.text
+    )
+    assert "<h1>Жим штанги лёжа: техника выполнения</h1>" in response.text
+    assert "Дыхание" in response.text
+    assert "Частые ошибки" in response.text
+    assert "Что важно для безопасности" in response.text
+    assert "/static/exercise-guides/bench-press-start.jpg" in response.text
+    assert "Unlicense (общественное достояние)" in response.text
+    assert "Открыть тренировки в Your Fitness Coach" in response.text
+    assert "exercise_added_from_public_page" not in response.text
+
+    sitemap = client.get("/sitemap.xml", headers={"Host": "your-fitness-coach.ru"})
+    assert sitemap.status_code == 200
+    assert sitemap.text.count("https://your-fitness-coach.ru/exercises/bench-press") == 1
+    assert "/exercises/bench-press-technique" not in sitemap.text
+
+
+def test_public_exercise_metadata_fails_closed_when_domain_quality_is_incomplete(monkeypatch):
+    from fitminiapp_api import seo
+
+    monkeypatch.setattr(seo, "public_exercise", lambda slug: {"slug": slug})
+
+    with pytest.raises(RuntimeError, match="public quality contract"):
+        seo.metadata_for_path("/exercises/bench-press")
 
 
 def test_draft_public_content_is_noindex_and_absent_from_sitemap_source(monkeypatch):
