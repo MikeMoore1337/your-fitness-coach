@@ -68,6 +68,26 @@ def _required_string(value: object, *, field: str) -> str:
     return value
 
 
+def _validate_public_workflow(value: object, *, path: str) -> None:
+    if not isinstance(value, dict):
+        raise RuntimeError(f"Public content workflow for {path!r} must be an object")
+    _required_string(value.get("heading"), field="workflow.heading")
+    raw_steps = value.get("steps")
+    if not isinstance(raw_steps, list) or not raw_steps:
+        raise RuntimeError(f"Public content workflow for {path!r} must contain steps")
+    if path == "/training" and len(raw_steps) != 5:
+        raise RuntimeError("Public training workflow must contain exactly five steps")
+    for index, raw_step in enumerate(raw_steps):
+        if not isinstance(raw_step, dict):
+            raise RuntimeError(f"Public content workflow step {index} must be an object")
+        _required_string(raw_step.get("label"), field=f"workflow.steps[{index}].label")
+        _required_string(raw_step.get("title"), field=f"workflow.steps[{index}].title")
+        _required_string(raw_step.get("description"), field=f"workflow.steps[{index}].description")
+    intro = value.get("intro")
+    if intro is not None:
+        _required_string(intro, field="workflow.intro")
+
+
 @lru_cache
 def public_pages() -> tuple[dict[str, object], ...]:
     payload = json.loads(_public_content_path().read_text(encoding="utf-8"))
@@ -128,6 +148,18 @@ def public_pages() -> tuple[dict[str, object], ...]:
                     raise RuntimeError(
                         f"Public content field '{field}.type' must be Organization or Person"
                     )
+        workflow = page.get("workflow")
+        if workflow is not None:
+            _validate_public_workflow(workflow, path=path)
+        cta = page.get("cta")
+        if cta is not None:
+            if not isinstance(cta, dict):
+                raise RuntimeError(f"Public content CTA for {path!r} must be an object")
+            _required_string(cta.get("label"), field="cta.label")
+            _required_string(cta.get("description"), field="cta.description")
+            placement = cta.get("placement", "footer")
+            if placement not in {"footer", "hero-and-footer"}:
+                raise RuntimeError(f"Unsupported public content CTA placement: {placement!r}")
         seen_paths.add(path)
         pages.append(page)
     return tuple(pages)
@@ -679,6 +711,35 @@ def render_public_fallback(path: str) -> str:
             f"<p>{html.escape(_required_string(page['intro'], field='intro'))}</p>",
         )
     )
+    cta = page.get("cta")
+    app_url = f"{settings.frontend_base_url.rstrip('/')}/app"
+    if isinstance(cta, dict) and cta.get("placement") == "hero-and-footer":
+        typed_cta = cast(dict[str, object], cta)
+        cta_label = _required_string(typed_cta.get("label"), field="cta.label")
+        parts.append(
+            f'<p><a href="{html.escape(app_url, quote=True)}">{html.escape(cta_label)}</a></p>'
+        )
+    raw_workflow = page.get("workflow")
+    if isinstance(raw_workflow, dict):
+        workflow = cast(dict[str, object], raw_workflow)
+        parts.append(
+            '<section class="seo-fallback-workflow" aria-labelledby="seo-fallback-workflow-title">'
+            f'<h2 id="seo-fallback-workflow-title">{html.escape(_required_string(workflow.get("heading"), field="workflow.heading"))}</h2>'
+        )
+        workflow_intro = workflow.get("intro")
+        if isinstance(workflow_intro, str):
+            parts.append(f"<p>{html.escape(workflow_intro)}</p>")
+        parts.append("<ol>")
+        for raw_step in cast(list[object], workflow["steps"]):
+            step = cast(dict[str, object], raw_step)
+            parts.append(
+                "<li>"
+                f"<span>{html.escape(_required_string(step.get('label'), field='workflow.step.label'))}</span>"
+                f"<h3>{html.escape(_required_string(step.get('title'), field='workflow.step.title'))}</h3>"
+                f"<p>{html.escape(_required_string(step.get('description'), field='workflow.step.description'))}</p>"
+                "</li>"
+            )
+        parts.append("</ol></section>")
     if isinstance(page.get("author"), dict) and isinstance(page.get("updated"), str):
         author = cast(dict[str, object], page["author"])
         parts.append(
@@ -829,10 +890,8 @@ def render_public_fallback(path: str) -> str:
             if isinstance(item, dict)
         )
         parts.append(f"<section><h2>Связанные страницы</h2><ul>{links}</ul></section>")
-    cta = page.get("cta")
     if isinstance(cta, dict):
         typed_cta = cast(dict[str, object], cta)
-        app_url = f"{settings.frontend_base_url.rstrip('/')}/app"
         parts.append(
             "<section><h2>"
             f"{html.escape(_required_string(typed_cta.get('label'), field='cta.label'))}"

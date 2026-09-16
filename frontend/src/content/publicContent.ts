@@ -12,6 +12,18 @@ export interface PublicContentSection {
   points?: string[];
 }
 
+export interface PublicContentWorkflowStep {
+  label: string;
+  title: string;
+  description: string;
+}
+
+export interface PublicContentWorkflow {
+  heading: string;
+  intro?: string;
+  steps: PublicContentWorkflowStep[];
+}
+
 export interface PublicContentSource {
   title: string;
   publisher: string;
@@ -42,12 +54,14 @@ export interface PublicContentPage {
   heading: string;
   intro: string;
   highlights?: string[];
+  workflow?: PublicContentWorkflow;
   sections: PublicContentSection[];
   interactive?: 'bmi-calculator' | 'kbju-calculator';
   related: PublicContentLink[];
   cta?: {
     label: string;
     description: string;
+    placement?: 'footer' | 'hero-and-footer';
   };
   breadcrumbs: PublicContentLink[];
   updated?: string;

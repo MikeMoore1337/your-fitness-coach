@@ -199,6 +199,28 @@ function GuideContents({ page }: { page: PublicContentPageData }) {
   );
 }
 
+function PublicWorkflow({ page }: { page: PublicContentPageData }) {
+  if (!page.workflow) return null;
+  return (
+    <section className="public-workflow" aria-labelledby="public-workflow-title">
+      <div className="public-workflow__heading">
+        <p className="landing-kicker">Рабочий путь</p>
+        <h2 id="public-workflow-title">{page.workflow.heading}</h2>
+        {page.workflow.intro && <p>{page.workflow.intro}</p>}
+      </div>
+      <ol>
+        {page.workflow.steps.map((step) => (
+          <li key={step.title}>
+            <span className="public-workflow__label">{step.label}</span>
+            <h3>{step.title}</h3>
+            <p>{step.description}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function KnowledgeDirectory() {
   const guides = publicGuides();
   return (
@@ -473,6 +495,9 @@ export default function PublicContentPage() {
   if (window.Telegram?.WebApp?.initData) return <Redirect to="/app" />;
 
   const appUrl = appUrlForHostname(window.location.hostname);
+  const articleClassName = `public-article public-article--${page.kind}${
+    page.path === '/training' ? ' public-article--training' : ''
+  }`;
 
   return (
     <div
@@ -488,12 +513,23 @@ export default function PublicContentPage() {
       <PublicHeader theme={theme} />
       <main id="public-content" className="public-main" tabIndex={-1}>
         <Breadcrumbs page={page} />
-        <article className={`public-article public-article--${page.kind}`}>
+        <article className={articleClassName}>
           <header className="public-hero">
             <div className="public-hero__copy">
               <p className="landing-kicker">{page.eyebrow}</p>
               <h1>{page.heading}</h1>
               <p className="public-hero__lead">{page.intro}</p>
+              {page.cta?.placement === 'hero-and-footer' && (
+                <div className="public-hero__action">
+                  <a className="landing-button landing-action" href={appUrl}>
+                    {page.cta.label}
+                    <span className="landing-action__arrow" aria-hidden="true">
+                      <Icon name="external-link" size={16} />
+                    </span>
+                  </a>
+                  <span>{page.cta.description}</span>
+                </div>
+              )}
               <GuideMetadata page={page} />
             </div>
             <aside className="public-hero__summary" aria-label="Коротко о странице">
@@ -516,6 +552,8 @@ export default function PublicContentPage() {
           {page.disclaimer && <aside className="public-disclaimer">{page.disclaimer}</aside>}
 
           <GuideContents page={page} />
+
+          <PublicWorkflow page={page} />
 
           <div className="public-body">
             {page.interactive === 'kbju-calculator' && <PublicNutritionCalculator />}
