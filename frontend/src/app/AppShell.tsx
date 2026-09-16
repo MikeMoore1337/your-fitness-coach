@@ -21,6 +21,11 @@ import {
   type QuickAddAction,
 } from './QuickAddSheet';
 import { AiCoachWorkspaceProvider } from '../features/ai/AiCoachWorkspace';
+import {
+  productEventSurface,
+  trackProductEvent,
+  type ProductSection,
+} from '../shared/analytics/productEvents';
 
 export type AppSection = 'today' | 'progress' | 'programs' | 'catalog' | 'nutrition' | 'profile';
 
@@ -60,6 +65,35 @@ export interface DemoAppShellConfig {
 
 function mobileNavigationMatches(): boolean {
   return window.matchMedia?.('(max-width: 899px)').matches ?? window.innerWidth < 900;
+}
+
+function analyticsSectionForLocation(
+  path: string,
+  section: AppSection | undefined,
+): ProductSection {
+  if (path === '/coach') return 'coach';
+  if (path === '/admin') return 'admin';
+  return section ?? 'today';
+}
+
+function analyticsSectionForDestination(to: string): ProductSection | null {
+  try {
+    const destination = new URL(to, window.location.origin);
+    if (destination.pathname === '/coach') return 'coach';
+    if (destination.pathname === '/admin') return 'admin';
+    if (destination.pathname !== '/app') return null;
+    const destinationSection = destination.searchParams.get('section');
+    return destinationSection === 'today' ||
+      destinationSection === 'progress' ||
+      destinationSection === 'programs' ||
+      destinationSection === 'nutrition' ||
+      destinationSection === 'catalog' ||
+      destinationSection === 'profile'
+      ? destinationSection
+      : 'today';
+  } catch {
+    return null;
+  }
 }
 
 function useMobileNavigation(): boolean {
@@ -150,6 +184,7 @@ export function AppShell({
   const user = auth?.user ?? null;
   const logout = auth?.logout;
   const { path } = useNavigation();
+  const analyticsSection = analyticsSectionForLocation(path, section);
   const [moreOpen, setMoreOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const morePresence = useMotionPresence({
@@ -216,6 +251,18 @@ export function AppShell({
   const showPwaInstallPrompt = Boolean(
     !demo && user && shellVisible && path === '/app' && section === 'today',
   );
+
+  const trackSectionNavigation = (to: string) => {
+    if (demo) return;
+    const destinationSection = analyticsSectionForDestination(to);
+    if (!destinationSection || destinationSection === analyticsSection) return;
+    trackProductEvent({
+      name: 'section_navigation_selected',
+      surface: productEventSurface(),
+      from_section: analyticsSection,
+      to_section: destinationSection,
+    });
+  };
 
   const closeMore = (restoreFocus = false) => {
     setMoreOpen(false);
@@ -367,7 +414,11 @@ export function AppShell({
                         : undefined
                     }
                     aria-label={demo?.accountLabel ?? 'Профиль и настройки'}
-                    onClick={() => demo?.onNavigate?.(demo.accountTo ?? '/app?section=profile')}
+                    onClick={() => {
+                      const destination = demo?.accountTo ?? '/app?section=profile';
+                      trackSectionNavigation(destination);
+                      demo?.onNavigate?.(destination);
+                    }}
                   >
                     <AccountIdentity
                       avatarClassName="app-desktop-account-entry__avatar"
@@ -401,7 +452,10 @@ export function AppShell({
                       }`}
                       {...(active ? glassProps('clear', true) : {})}
                       aria-current={active ? 'page' : undefined}
-                      onClick={() => demo?.onNavigate?.(destinationTo)}
+                      onClick={() => {
+                        trackSectionNavigation(destinationTo);
+                        demo?.onNavigate?.(destinationTo);
+                      }}
                     >
                       <AppNavigationIcon name={destination.icon} />
                       <span className="app-bottom-nav__label">{destination.label}</span>
@@ -453,6 +507,7 @@ export function AppShell({
                               className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
                               {...(active ? glassProps('clear', true) : {})}
                               aria-current={active ? 'page' : undefined}
+                              onClick={() => trackSectionNavigation(destination.to)}
                             >
                               <AppNavigationIcon name={destination.icon} />
                               <span className="app-bottom-nav__label">
@@ -614,7 +669,11 @@ export function AppShell({
                             to={destination.to}
                             className="app-more-panel__item"
                             aria-current={active ? 'page' : undefined}
-                            onClick={() => closeMore()}
+                            onClick={() => {
+                              trackSectionNavigation(destination.to);
+                              setMoreOpen(false);
+                              hideMorePresence();
+                            }}
                           >
                             <AppNavigationIcon name={destination.icon} />
                             <span>{destination.label}</span>

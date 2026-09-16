@@ -365,6 +365,17 @@ test('active workout keeps one obvious next action through logging, timer and fi
   const secondSet = page.locator('[data-workout-set-id="202"]');
   await expect(secondSet).toHaveAttribute('aria-current', 'step');
   await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
+  await secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }).fill('35');
+  await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
+  await expect(
+    secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }),
+  ).toHaveValue('35');
+  await expect(
+    secondSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 2' }),
+  ).toHaveValue('8');
+  await expect(
+    secondSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }),
+  ).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('timer').filter({ hasText: 'Отдых' })).toContainText(
     'Дальше: Жим штанги лёжа, подход 2',
   );
@@ -383,10 +394,14 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(thirdSet).toHaveAttribute('aria-current', 'step');
   await thirdSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 3' }).fill('32.5');
   await thirdSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 3' }).fill('10');
-  await Promise.all([
-    waitForCompletedSetPatch(page, 203),
-    thirdSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 3' }).click(),
-  ]);
+  const thirdDone = thirdSet.getByRole('button', {
+    name: 'Завершить: Жим штанги лёжа, подход 3',
+  });
+  await thirdDone.evaluate((element) =>
+    element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' }),
+  );
+  await expect(thirdDone).toBeVisible();
+  await Promise.all([waitForCompletedSetPatch(page, 203), thirdDone.click()]);
 
   await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
   await expect(page.getByText('Синхронизировано')).toBeVisible();

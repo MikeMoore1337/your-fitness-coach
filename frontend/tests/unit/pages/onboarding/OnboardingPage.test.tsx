@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import OnboardingPage from '../../../../src/pages/onboarding/OnboardingPage';
 import {
+  clearProductOnboardingCompletionMarker,
   PRODUCT_EVENT_NAME,
   PRODUCT_EVENT_SCHEMA_VERSION,
 } from '../../../../src/shared/analytics/productEvents';
@@ -40,7 +41,10 @@ describe('OnboardingPage', () => {
     useAuthMock.mockReturnValue({ user: requiredUser, reloadUser: reloadUserMock });
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    clearProductOnboardingCompletionMarker();
+  });
 
   it('saves only the canonical goal and emits body-value-free activation events', async () => {
     const events: unknown[] = [];
@@ -60,7 +64,8 @@ describe('OnboardingPage', () => {
     fireEvent.click(screen.getByLabelText(/^Поддерживать форму/));
     fireEvent.click(screen.getByRole('button', { name: 'Продолжить' }));
 
-    await screen.findByRole('heading', { name: 'С чего хотите начать?' });
+    await waitFor(() => expect(window.location.pathname).toBe('/app'));
+    expect(window.location.search).toBe('?section=today');
     expect(apiMock).toHaveBeenCalledWith('/api/v1/me/profile', {
       method: 'PATCH',
       body: { goal: 'maintenance' },
@@ -99,7 +104,23 @@ describe('OnboardingPage', () => {
     expect(screen.getByRole('heading', { name: 'Какая у вас главная цель?' })).toBeVisible();
   });
 
-  it('resumes the completion screen and opens the selected app section', async () => {
+  it('preserves an allowlisted explicit continuation after the goal is saved', async () => {
+    window.history.replaceState(null, '', '/onboarding?next=%2Fcoach');
+    apiMock.mockResolvedValue({
+      ...requiredUser,
+      onboarding: { status: 'complete', required_fields: ['goal'], missing_fields: [] },
+      profile: { goal: 'maintenance' },
+    });
+    renderPage();
+
+    fireEvent.click(screen.getByLabelText(/^Поддерживать форму/));
+    fireEvent.click(screen.getByRole('button', { name: 'Продолжить' }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/coach'));
+    expect(window.location.search).toBe('');
+  });
+
+  it('keeps the completion screen focused on Today instead of a three-way chooser', async () => {
     useAuthMock.mockReturnValue({
       user: {
         ...requiredUser,
@@ -110,8 +131,10 @@ describe('OnboardingPage', () => {
     });
     renderPage();
 
-    fireEvent.click(screen.getByRole('button', { name: /Настроить питание/ }));
+    expect(await screen.findByRole('heading', { name: 'С чего хотите начать?' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Настроить питание/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Открыть «Сегодня»/ }));
     await waitFor(() => expect(window.location.pathname).toBe('/app'));
-    expect(window.location.search).toBe('?section=nutrition');
+    expect(window.location.search).toBe('?section=today');
   });
 });

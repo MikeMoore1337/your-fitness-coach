@@ -546,13 +546,19 @@ describe('TodayDashboard', () => {
     renderDashboard();
 
     expect(await screen.findByRole('heading', { name: 'С чего начнём?' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveAttribute(
+      'href',
+      '/app?section=programs&start=templates',
+    );
     expect(screen.getByRole('link', { name: 'Создать свою программу' })).toHaveAttribute(
       'href',
       '/app?section=programs&start=create',
     );
-    expect(screen.getByRole('link', { name: 'Выбрать готовую' })).toHaveAttribute(
-      'href',
-      '/app?section=programs&start=templates',
+    expect(screen.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveClass(
+      'button-link',
+    );
+    expect(screen.getByRole('link', { name: 'Создать свою программу' })).toHaveClass(
+      'secondary-link',
     );
     expect(screen.getByText('Сделайте рекомендации точнее')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Заполнить профиль' })).toHaveAttribute(
@@ -685,9 +691,9 @@ describe('TodayDashboard', () => {
       'href',
       '/app?section=progress&workout_id=42&comment_id=9',
     );
-    expect(
-      screen.queryByRole('link', { name: 'Пройти короткую проверку' }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Пройти короткую проверку' })).toHaveClass(
+      'secondary-link',
+    );
   });
 
   it('refreshes date-sensitive context after returning across the local midnight', async () => {

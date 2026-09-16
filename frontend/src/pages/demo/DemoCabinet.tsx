@@ -152,13 +152,6 @@ function demoQuickAddLinks(scenario: DemoScenario): ReadonlyArray<QuickAddAction
       icon: 'checklist',
       to: demoCabinetPath(scenario, 'today'),
     },
-    {
-      key: 'ai-coach',
-      label: 'Открыть AI Coach',
-      detail: 'В демо доступность показана без запуска провайдера',
-      icon: 'ai-coach',
-      to: `${demoCabinetPath(scenario, 'profile')}#profile-ai-coach`,
-    },
   ];
 }
 

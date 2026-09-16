@@ -35,13 +35,45 @@ import {
   productEventSurface,
   trackCoreProductEvent,
   trackGrowthEvent,
+  trackProductEvent,
 } from '../../shared/analytics/productEvents';
 import { PWA_SAFE_UPDATE_EVENT } from '../../shared/pwa/pwaRuntime';
 import { ProgressionGuidance } from './ProgressionGuidance';
+import { useScreenWakeLock } from './useScreenWakeLock';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
 type SetKind = NonNullable<WorkoutSet['set_kind']>;
+type PreviousSetValues = {
+  actual_reps: number | null | undefined;
+  actual_weight: number | null | undefined;
+  duration_minutes: number | null | undefined;
+  distance_km: number | null | undefined;
+};
+type PreviousSetSource = Pick<
+  WorkoutSet,
+  'actual_reps' | 'actual_weight' | 'duration_minutes' | 'distance_km'
+>;
+
+export function resolvePreviousSetValues(
+  set: PreviousSetSource,
+  pending?: Pick<ActiveWorkoutMutation, 'values'>,
+): PreviousSetValues {
+  if (pending) {
+    return {
+      actual_reps: pending.values.actual_reps,
+      actual_weight: pending.values.actual_weight,
+      duration_minutes: pending.values.duration_minutes,
+      distance_km: pending.values.distance_km,
+    };
+  }
+  return {
+    actual_reps: set.actual_reps,
+    actual_weight: set.actual_weight,
+    duration_minutes: set.duration_minutes,
+    distance_km: set.distance_km,
+  };
+}
 
 const rirOptions: readonly { value: RirValue; label: string }[] = [
   { value: '0', label: '0 — больше не смог бы' },
@@ -122,6 +154,7 @@ function WorkoutSetRow({
   disabled,
   isCurrent,
   previousResult,
+  previousValues,
   restSeconds,
   workoutId,
   exerciseTitle,
@@ -133,6 +166,7 @@ function WorkoutSetRow({
   disabled: boolean;
   isCurrent: boolean;
   previousResult: string | null;
+  previousValues?: PreviousSetValues;
   restSeconds: number;
   workoutId: number;
   exerciseTitle: string;
@@ -163,6 +197,14 @@ function WorkoutSetRow({
   const editing = useRef(false);
   const lastCompletionActionAt = useRef(0);
   const serverVersion = set.version ?? 1;
+  const canPrefillReps = reps === '' && previousValues?.actual_reps != null;
+  const canPrefillWeight = weight === '' && previousValues?.actual_weight != null;
+  const canPrefill =
+    isCurrent &&
+    !disabled &&
+    !completed &&
+    previousResult !== null &&
+    (canPrefillReps || canPrefillWeight);
 
   const enqueueSave = (
     next: Partial<{
@@ -269,6 +311,26 @@ function WorkoutSetRow({
 
       {isCurrent && previousResult && (
         <p className="active-workout-set__previous">Предыдущий подход: {previousResult}</p>
+      )}
+      {canPrefill && (
+        <button
+          className="active-workout-set__prefill"
+          type="button"
+          onClick={() => {
+            const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
+            const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
+            editing.current = true;
+            setReps(nextReps);
+            setWeight(nextWeight);
+            enqueueSave({ reps: nextReps, weight: nextWeight });
+            trackProductEvent({
+              name: 'previous_set_reuse_used',
+              surface: productEventSurface(),
+            });
+          }}
+        >
+          Подставить предыдущий результат
+        </button>
       )}
 
       <div className="active-workout-set__controls">
@@ -419,6 +481,7 @@ function CardioWorkoutRow({
   disabled,
   isCurrent,
   previousResult,
+  previousValues,
   exerciseTitle,
   pending,
   syncing,
@@ -428,6 +491,7 @@ function CardioWorkoutRow({
   disabled: boolean;
   isCurrent: boolean;
   previousResult: string | null;
+  previousValues?: PreviousSetValues;
   exerciseTitle: string;
   pending?: ActiveWorkoutMutation;
   syncing: boolean;
@@ -439,22 +503,32 @@ function CardioWorkoutRow({
   ) => void;
 }) {
   const [duration, setDuration] = useState(
-    String(pending?.values.duration_minutes ?? set.duration_minutes ?? ''),
+    String(pending ? (pending.values.duration_minutes ?? '') : (set.duration_minutes ?? '')),
   );
   const [distance, setDistance] = useState(
-    String(pending?.values.distance_km ?? set.distance_km ?? ''),
+    String(pending ? (pending.values.distance_km ?? '') : (set.distance_km ?? '')),
   );
   const [averageHeartRate, setAverageHeartRate] = useState(
-    String(pending?.values.average_heart_rate_bpm ?? set.average_heart_rate_bpm ?? ''),
+    String(
+      pending ? (pending.values.average_heart_rate_bpm ?? '') : (set.average_heart_rate_bpm ?? ''),
+    ),
   );
   const [heartRateZone, setHeartRateZone] = useState(
-    String(pending?.values.heart_rate_zone ?? set.heart_rate_zone ?? ''),
+    String(pending ? (pending.values.heart_rate_zone ?? '') : (set.heart_rate_zone ?? '')),
   );
   const [completed, setCompleted] = useState(pending?.values.is_completed ?? set.is_completed);
   const [validation, setValidation] = useState<string | null>(null);
   const editing = useRef(false);
   const lastCompletionActionAt = useRef(0);
   const serverVersion = set.version ?? 1;
+  const canPrefillDuration = duration === '' && previousValues?.duration_minutes != null;
+  const canPrefillDistance = distance === '' && previousValues?.distance_km != null;
+  const canPrefill =
+    isCurrent &&
+    !disabled &&
+    !completed &&
+    previousResult !== null &&
+    (canPrefillDuration || canPrefillDistance);
 
   const enqueueSave = (
     next: Partial<{
@@ -496,13 +570,21 @@ function CardioWorkoutRow({
       if (!pending) editing.current = false;
       return;
     }
-    setDuration(String(pending?.values.duration_minutes ?? set.duration_minutes ?? ''));
-    setDistance(String(pending?.values.distance_km ?? set.distance_km ?? ''));
-    setAverageHeartRate(
-      String(pending?.values.average_heart_rate_bpm ?? set.average_heart_rate_bpm ?? ''),
+    setDuration(
+      String(pending ? (pending.values.duration_minutes ?? '') : (set.duration_minutes ?? '')),
     );
-    setHeartRateZone(String(pending?.values.heart_rate_zone ?? set.heart_rate_zone ?? ''));
-    setCompleted(pending?.values.is_completed ?? set.is_completed);
+    setDistance(String(pending ? (pending.values.distance_km ?? '') : (set.distance_km ?? '')));
+    setAverageHeartRate(
+      String(
+        pending
+          ? (pending.values.average_heart_rate_bpm ?? '')
+          : (set.average_heart_rate_bpm ?? ''),
+      ),
+    );
+    setHeartRateZone(
+      String(pending ? (pending.values.heart_rate_zone ?? '') : (set.heart_rate_zone ?? '')),
+    );
+    setCompleted(pending ? pending.values.is_completed : set.is_completed);
   }, [
     pending,
     set.average_heart_rate_bpm,
@@ -536,6 +618,30 @@ function CardioWorkoutRow({
 
       {isCurrent && previousResult && (
         <p className="active-workout-set__previous">Предыдущий интервал: {previousResult}</p>
+      )}
+      {canPrefill && (
+        <button
+          className="active-workout-set__prefill"
+          type="button"
+          onClick={() => {
+            const nextDuration = canPrefillDuration
+              ? String(previousValues?.duration_minutes)
+              : duration;
+            const nextDistance = canPrefillDistance
+              ? String(previousValues?.distance_km)
+              : distance;
+            editing.current = true;
+            setDuration(nextDuration);
+            setDistance(nextDistance);
+            enqueueSave({ duration: nextDuration, distance: nextDistance });
+            trackProductEvent({
+              name: 'previous_set_reuse_used',
+              surface: productEventSurface(),
+            });
+          }}
+        >
+          Подставить предыдущий результат
+        </button>
       )}
 
       <div className="active-workout-set__controls active-workout-set__controls--cardio">
@@ -778,6 +884,7 @@ export function TodayWorkout({
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   });
   const activeSync = useActiveWorkoutQueue(user?.id, workout.data);
+  useScreenWakeLock(workout.data?.status === 'in_progress');
   const mutation = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
       api<Workout | void>(path, { method, body }),
@@ -786,6 +893,15 @@ export function TodayWorkout({
         trackCoreProductEvent(
           { name: 'workout_completed', surface: productEventSurface() },
           'workout_completed',
+        );
+        trackProductEvent(
+          {
+            name: 'next_action_completed',
+            surface: productEventSurface(),
+            action_kind: 'active_workout',
+            position: 'primary',
+          },
+          { dedupe: 'session', dedupeKey: 'next-action:active-workout:completed' },
         );
         if (user?.has_workout_history === false) {
           trackGrowthEvent('first_workout_completed', { dedupe: 'session' });
@@ -1149,16 +1265,18 @@ export function TodayWorkout({
                       const previousPending = previousSet
                         ? activeSync.pendingBySet.get(previousSet.id)
                         : undefined;
-                      const previousResult = previousSet
+                      const previousValues = previousSet
+                        ? resolvePreviousSetValues(previousSet, previousPending)
+                        : undefined;
+                      const previousResult = previousValues
                         ? metricType === 'cardio'
                           ? formatCardioResult(
-                              previousPending?.values.duration_minutes ??
-                                previousSet.duration_minutes,
-                              previousPending?.values.distance_km ?? previousSet.distance_km,
+                              previousValues.duration_minutes,
+                              previousValues.distance_km,
                             )
                           : formatSetResult(
-                              previousPending?.values.actual_reps ?? previousSet.actual_reps,
-                              previousPending?.values.actual_weight ?? previousSet.actual_weight,
+                              previousValues.actual_reps,
+                              previousValues.actual_weight,
                             )
                         : null;
                       return metricType === 'cardio' ? (
@@ -1169,6 +1287,7 @@ export function TodayWorkout({
                           exerciseTitle={exercise.exercise_title}
                           isCurrent={currentSet?.set.id === set.id}
                           previousResult={previousResult}
+                          previousValues={previousValues}
                           pending={activeSync.pendingBySet.get(set.id)}
                           syncing={activeSync.syncState === 'syncing'}
                           enqueue={activeSync.enqueue}
@@ -1183,6 +1302,7 @@ export function TodayWorkout({
                           exerciseTitle={exercise.exercise_title}
                           isCurrent={currentSet?.set.id === set.id}
                           previousResult={previousResult}
+                          previousValues={previousValues}
                           pending={activeSync.pendingBySet.get(set.id)}
                           syncing={activeSync.syncState === 'syncing'}
                           enqueue={activeSync.enqueue}

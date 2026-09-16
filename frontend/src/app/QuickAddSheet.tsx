@@ -2,7 +2,11 @@ import { AppLink } from '../shared/navigation/router';
 import { Glass, glassProps } from '../shared/ui/Glass';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import { useModalA11y } from '../shared/ui/useModalA11y';
-import { useOptionalAiCoachWorkspace } from '../features/ai/AiCoachWorkspaceContext';
+import {
+  isQuickAddAnalyticsKind,
+  productEventSurface,
+  trackProductEvent,
+} from '../shared/analytics/productEvents';
 
 export interface QuickAddAction {
   key: string;
@@ -48,13 +52,6 @@ export const DEFAULT_QUICK_ADD_ACTIONS: ReadonlyArray<QuickAddAction> = [
     icon: 'checklist',
     to: '/app?section=today&wellbeing=1',
   },
-  {
-    key: 'ai-coach',
-    label: 'Открыть AI Coach',
-    detail: 'Подсказка и настройки — если функция доступна',
-    icon: 'ai-coach',
-    to: '/app?section=profile#profile-ai-coach',
-  },
 ];
 
 export function QuickAddTrigger({ onOpen }: { onOpen(): void }) {
@@ -84,7 +81,6 @@ export function QuickAddSheet({
   onClose(): void;
   open: boolean;
 }) {
-  const workspace = useOptionalAiCoachWorkspace();
   const panelRef = useModalA11y<HTMLDivElement>(open, onClose);
   if (!open) return null;
 
@@ -130,14 +126,13 @@ export function QuickAddSheet({
               className="app-quick-add-action"
               key={action.key}
               to={action.to}
-              onClick={(event) => {
-                if (
-                  action.key === 'ai-coach' &&
-                  action.to.startsWith('/app?section=profile') &&
-                  workspace
-                ) {
-                  event.preventDefault();
-                  workspace.open(event.currentTarget);
+              onClick={() => {
+                if (isQuickAddAnalyticsKind(action.key)) {
+                  trackProductEvent({
+                    name: 'quick_add_action_selected',
+                    surface: productEventSurface(),
+                    action: action.key,
+                  });
                 }
                 onClose();
               }}

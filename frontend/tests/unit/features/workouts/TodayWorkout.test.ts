@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { Workout } from '../../../../src/shared/api/types';
 import {
   formatSetResult,
   formatWorkoutDuration,
+  resolvePreviousSetValues,
   shouldCollapseCompletedExercise,
 } from '../../../../src/features/workouts/TodayWorkout';
+import type { ActiveWorkoutMutation } from '../../../../src/features/workouts/activeWorkoutQueue';
 
 describe('formatWorkoutDuration', () => {
   it('formats a workout shorter than one hour', () => {
@@ -46,5 +49,41 @@ describe('formatSetResult', () => {
     expect(formatSetResult(8, null)).toBe('8 повт.');
     expect(formatSetResult(null, 40)).toBe('40 кг');
     expect(formatSetResult(null, null)).toBeNull();
+  });
+});
+
+describe('resolvePreviousSetValues', () => {
+  it('keeps nullable pending values instead of restoring stale server values', () => {
+    const set: Pick<
+      Workout['exercises'][number]['sets'][number],
+      'actual_reps' | 'actual_weight' | 'duration_minutes' | 'distance_km'
+    > = {
+      actual_reps: 8,
+      actual_weight: 40,
+      duration_minutes: 25,
+      distance_km: 5,
+    };
+    const pending: Pick<ActiveWorkoutMutation, 'values'> = {
+      values: {
+        actual_reps: null,
+        actual_weight: null,
+        duration_minutes: null,
+        distance_km: null,
+        is_completed: false,
+      },
+    };
+
+    expect(resolvePreviousSetValues(set, pending)).toEqual({
+      actual_reps: null,
+      actual_weight: null,
+      duration_minutes: null,
+      distance_km: null,
+    });
+    expect(resolvePreviousSetValues(set)).toMatchObject({
+      actual_reps: 8,
+      actual_weight: 40,
+      duration_minutes: 25,
+      distance_km: 5,
+    });
   });
 });
