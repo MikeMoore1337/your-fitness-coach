@@ -31,6 +31,10 @@ const representativePages = [
     heading: /дневник тренировок: от программы до прогресса/i,
   },
   {
+    path: '/calculators/1rm',
+    heading: /калькулятор 1пм: оценочный одноповторный максимум/i,
+  },
+  {
     path: '/knowledge',
     heading: /материалы, которые помогают понять следующий шаг/i,
   },
@@ -521,6 +525,108 @@ test('public KBJU calculator works without auth or sensitive transport and stays
       url: `http://127.0.0.1:4173/nutrition`,
       sensitiveStoredKeys: [],
     });
+  }
+
+  expect(apiRequests).toEqual([]);
+});
+
+test('public 1RM calculator stays stateless, bounded and readable in light and dark themes', async ({
+  page,
+}) => {
+  const apiRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/')) apiRequests.push(`${request.method()} ${request.url()}`);
+  });
+  await page.addInitScript(() => {
+    const events: unknown[] = [];
+    Object.defineProperty(window, '__productAnalyticsEvents', { value: events, writable: false });
+    window.addEventListener('yfc:product-event', (event) => {
+      events.push((event as CustomEvent).detail);
+    });
+  });
+
+  const states = [
+    { name: '320-light', width: 320, height: 740, colorScheme: 'light' as const },
+    { name: '360-light', width: 360, height: 800, colorScheme: 'light' as const },
+    { name: '390-light', width: 390, height: 844, colorScheme: 'light' as const },
+    { name: '390-dark', width: 390, height: 844, colorScheme: 'dark' as const },
+    { name: '430-dark', width: 430, height: 932, colorScheme: 'dark' as const },
+    { name: '768-light', width: 768, height: 900, colorScheme: 'light' as const },
+    { name: '768-dark', width: 768, height: 900, colorScheme: 'dark' as const },
+    { name: '1366-light', width: 1366, height: 900, colorScheme: 'light' as const },
+    { name: '1440-dark', width: 1440, height: 900, colorScheme: 'dark' as const },
+  ];
+
+  for (const state of states) {
+    await page.setViewportSize({ width: state.width, height: state.height });
+    await page.goto('/calculators/1rm');
+    await page.evaluate((colorScheme) => {
+      window.localStorage.setItem('app-theme', colorScheme);
+    }, state.colorScheme);
+    await page.reload();
+
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: /калькулятор 1пм: оценочный одноповторный максимум/i,
+      }),
+    ).toBeVisible();
+    const calculator = page.locator('#public-one-rm-calculator');
+    await expect(calculator).toHaveClass(/ym-hide-content/);
+    await expect(page.locator('.public-shell')).toHaveClass(
+      state.colorScheme === 'dark' ? /public-shell--dark/ : /public-shell--light/,
+    );
+    const form = calculator.getByRole('form', { name: 'Рассчитать 1ПМ онлайн' });
+
+    await form.getByRole('button', { name: 'Рассчитать 1ПМ' }).click();
+    await expect(calculator.getByText('Укажите вес от 0,5 до 500 кг.')).toBeVisible();
+    await expect(calculator.getByRole('status')).toHaveCount(0);
+
+    await calculator.getByLabel('Вес в подходе, кг').fill('100');
+    await calculator.getByLabel('Повторения в подходе').fill('5');
+    await form.getByRole('button', { name: 'Рассчитать 1ПМ' }).click();
+    await expect(calculator.getByRole('status')).toContainText('112,5 кг');
+    await expect(calculator.getByRole('row', { name: '95% 107 кг' })).toBeVisible();
+    await expect(calculator.getByRole('row', { name: '70% 79 кг' })).toBeVisible();
+    await expect(calculator.getByRole('row')).toHaveCount(7);
+
+    const pageState = await page.evaluate(() => ({
+      content: document.documentElement.scrollWidth,
+      viewport: window.innerWidth,
+      url: window.location.href,
+      sensitiveStoredKeys: Object.keys(window.localStorage).filter((key) =>
+        /calculator|1rm|weight|repetition|result/i.test(key),
+      ),
+      html: document.documentElement.outerHTML,
+      events: (
+        window as typeof window & {
+          __productAnalyticsEvents: Array<Record<string, unknown>>;
+        }
+      ).__productAnalyticsEvents,
+    }));
+    expect(pageState).toMatchObject({
+      content: state.width,
+      viewport: state.width,
+      url: `http://127.0.0.1:4173/calculators/1rm`,
+      sensitiveStoredKeys: [],
+    });
+    expect(pageState.html).not.toContain('one_rm_');
+    expect(pageState.events.map((event) => event.name)).toContain('calculator_started');
+    expect(pageState.events.map((event) => event.name)).toContain('calculator_result');
+    expect(pageState.events.every((event) => Object.keys(event).length === 5)).toBe(true);
+    expect(JSON.stringify(pageState.events)).not.toContain('100');
+    expect(JSON.stringify(pageState.events)).not.toContain('112');
+
+    if (process.env.TASK_241E_EVIDENCE_DIR) {
+      await page.evaluate(() => {
+        const calculator = document.querySelector<HTMLElement>('#public-one-rm-calculator');
+        if (!calculator) throw new Error('1RM calculator is missing');
+        window.scrollTo({ top: window.scrollY + calculator.getBoundingClientRect().top - 20 });
+      });
+      await calculator.screenshot({
+        path: path.join(process.env.TASK_241E_EVIDENCE_DIR, `${state.name}.png`),
+      });
+    }
   }
 
   expect(apiRequests).toEqual([]);

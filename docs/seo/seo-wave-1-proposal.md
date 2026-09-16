@@ -87,9 +87,9 @@ explains a real product asset or closes a current user question.
 
 ## Implementation dependencies and split
 
-### A future 1RM task can be one bounded vertical slice if it includes
+### The Task 241E 1RM slice includes
 
-- a server-trusted calculation contract and unit/error bounds;
+- a bounded client-side calculation contract and unit/error bounds;
 - public fallback metadata and canonical URL;
 - accessible result state and formula limitations;
 - product action only if save/auth flow is already specified;
@@ -130,7 +130,7 @@ be reported as implemented by this task:
 | `public_program_saved`            | program is saved successfully      | save contract exists        |
 | `exercise_added_from_public_page` | exercise is added from public page | add flow exists             |
 
-`calculator_started` and `calculator_result` are implemented by Task 241B as action-only events;
+`calculator_started` and `calculator_result` are implemented by Tasks 241B and 241E as action-only events;
 their exact trigger and no-payload boundary are documented in `growth-analytics-foundation.md`.
 
 Wave KPI sequence should be `indexed URLs -> non-brand impressions/clicks -> relevant action ->
