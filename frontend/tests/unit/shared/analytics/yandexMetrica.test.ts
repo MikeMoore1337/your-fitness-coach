@@ -36,10 +36,14 @@ describe('Yandex Metrica privacy boundary', () => {
     };
 
     provider.send({ ...base, name: 'registration_completed' });
+    provider.send({ ...base, name: 'calculator_started' });
+    provider.send({ ...base, name: 'calculator_result' });
     provider.send({ ...base, name: 'workout_completed' });
 
     expect(commands).toEqual([
       ['reachGoal', 'registration_completed'],
+      ['reachGoal', 'calculator_started'],
+      ['reachGoal', 'calculator_result'],
       ['params', { yfc_event: 'workout_completed', yfc_surface: 'desktop_web' }],
     ]);
     expect(JSON.stringify(commands)).not.toContain('private');

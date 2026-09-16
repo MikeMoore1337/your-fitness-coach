@@ -18,6 +18,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { useWebTheme } from '../../shared/useWebTheme';
 import { applyRouteMetadata } from '../../shared/seo/metadata';
 import PublicBmiCalculator from './PublicBmiCalculator';
+import PublicNutritionCalculator from './PublicNutritionCalculator';
 import '../../shared/ui/public-shell.css';
 import '../landing/landing.css';
 import './public-content.css';
@@ -501,6 +502,7 @@ export default function PublicContentPage() {
           <GuideContents page={page} />
 
           <div className="public-body">
+            {page.interactive === 'kbju-calculator' && <PublicNutritionCalculator />}
             {page.sections.map((section, index) => (
               <section id={sectionId(page, index)} key={section.heading}>
                 <h2>{section.heading}</h2>

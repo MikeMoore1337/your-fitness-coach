@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 function channelToLinear(channel: number): number {
@@ -369,7 +370,81 @@ test('mobile menu, skip link and contextual navigation work without an auth wall
   await expect(publicNavigation.getByRole('link', { name: 'Питание' })).toBeVisible();
   await publicNavigation.getByRole('link', { name: 'Питание' }).click();
   await expect(page).toHaveURL('/nutrition');
-  await expect(page.getByRole('heading', { level: 1, name: /ориентиры кбжу/i })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 1, name: /рассчитать кбжу: калории/i }),
+  ).toBeVisible();
+});
+
+test('public KBJU calculator works without auth or sensitive transport and stays responsive', async ({
+  page,
+}) => {
+  const apiRequests: string[] = [];
+  const evidenceDirectory = process.env.TASK_241B_EVIDENCE_DIR;
+  page.on('request', (request) => {
+    if (request.url().includes('/api/')) apiRequests.push(`${request.method()} ${request.url()}`);
+  });
+
+  for (const viewport of [
+    { width: 320, height: 740 },
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+    { width: 430, height: 932 },
+    { width: 768, height: 900 },
+    { width: 1366, height: 900 },
+    { width: 1440, height: 900 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/nutrition');
+
+    await expect(page.getByRole('heading', { level: 1, name: /рассчитать кбжу/i })).toBeVisible();
+    const calculator = page.locator('#public-kbju-calculator');
+    await expect(calculator).toHaveClass(/ym-hide-content/);
+    const form = calculator.getByRole('form', { name: 'Рассчитать КБЖУ онлайн' });
+
+    await form.getByRole('button', { name: 'Рассчитать КБЖУ' }).click();
+    await expect(calculator.getByRole('alert')).toContainText('Возраст');
+    await expect(calculator.getByRole('status')).toHaveCount(0);
+
+    await calculator.getByLabel('Возраст, лет').fill('34');
+    await calculator.getByLabel('Вес, кг').fill('78');
+    await calculator.getByLabel('Рост, см').fill('165');
+    await calculator.getByLabel('Силовых тренировок в неделю').fill('3');
+    await calculator.getByText('Уточнить расчёт тренировочной нагрузки').click();
+    await calculator.getByLabel('Длительность силовой, минут').fill('60');
+    await form.getByRole('button', { name: 'Рассчитать КБЖУ' }).click();
+
+    await expect(calculator.getByRole('status')).toContainText('Калории');
+    await expect(calculator.getByRole('status')).toContainText('Белки');
+    await expect(calculator.getByRole('status')).toContainText('Для поддержания');
+    if (evidenceDirectory && [320, 390, 768, 1366, 1440].includes(viewport.width)) {
+      await calculator.screenshot({
+        path: path.join(evidenceDirectory, `kbju-${viewport.width}-light.png`),
+      });
+      await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+      await calculator.screenshot({
+        path: path.join(evidenceDirectory, `kbju-${viewport.width}-dark.png`),
+      });
+      await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+    }
+    expect(
+      await page.evaluate(() => ({
+        content: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+        url: window.location.href,
+        sensitiveStoredKeys: Object.keys(localStorage).filter((key) =>
+          /calculator|nutrition|weight|height|age|calorie|protein|fat|carb/i.test(key),
+        ),
+      })),
+    ).toEqual({
+      content: viewport.width,
+      viewport: viewport.width,
+      url: `http://127.0.0.1:4173/nutrition`,
+      sensitiveStoredKeys: [],
+    });
+  }
+
+  expect(apiRequests).toEqual([]);
 });
 
 test('BMI calculator validates adult metric inputs and stays stateless on narrow screens', async ({
@@ -407,11 +482,15 @@ test('mobile article spacing, justified type, CTA contrast and landing theme beh
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/nutrition');
-  await expect(page.getByRole('heading', { level: 1, name: /ориентиры кбжу/i })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 1, name: /рассчитать кбжу: калории/i }),
+  ).toBeVisible();
 
   const styles = await page.evaluate(() => {
     const hero = getComputedStyle(document.querySelector<HTMLElement>('.public-hero')!);
-    const bodyText = getComputedStyle(document.querySelector<HTMLElement>('.public-body p')!);
+    const bodyText = getComputedStyle(
+      document.querySelector<HTMLElement>('.public-body > section:not(.public-calculator) p')!,
+    );
     const cta = document.querySelector<HTMLElement>('.public-cta')!;
     const ctaStyle = getComputedStyle(cta);
     return {

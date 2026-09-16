@@ -1,7 +1,8 @@
 # SEO Wave 1 proposal
 
-Task 241A, research-only.
-Status: proposal for owner review; no production implementation is included.
+Task 241A, research, and Task 241B, bounded first implementation.
+Status: 241A evidence is integrated; 241B implements the owner-approved public `/nutrition`
+calculator slice. Production status remains governed by the task delivery lifecycle.
 
 ## Decision
 
@@ -18,15 +19,15 @@ is a traffic forecast or production authorization.
 
 ## Ranked Wave 1: 7 primary assets
 
-| Rank | Asset / canonical hypothesis | Type | RU Wordstat evidence | Why now | Product/opportunity separation | Health / cost / cannibalization gate |
-| ---: | --- | --- | --- | --- | --- | --- |
-| 1 | `/nutrition` + knowledge links | Existing page improvement | `калькулятор кбжу`: 16127 broad / 4763 quoted (29.5%) | Strongest observed cluster already has a canonical product page; improve it before creating a second calculator URL | Existing page fit; current `priority_score` 69 is not comparable to the frequency | High YMYL/claims penalty; M; avoid `/calculators/kbju` duplication |
-| 2 | `/exercises/bench-press` | Existing page exemplar | `жим лежа техника`: 2943 / 528 (17.9%) | Material technique demand and a real canonical exercise page; establish the quality pattern first | Existing catalog fit; `priority_score` 75 | Medium claims/safety penalty; M; no mass-generated exercise pages |
-| 3 | `/training` | Existing page improvement | `дневник тренировок`: 3038 / 456 (15.0%) | Good acquisition cluster maps to current program -> workout -> logging -> progress story | Existing product path; `priority_score` 73 | Low claims penalty; S/M; no duplicate diary landing |
-| 4 | `/calculators/1rm` | New interactive calculator | `калькулятор 1пм`: 363 / 261 (71.9%) | Modest volume but unusually pure BOFU intent and clear future save-to-program value | New product contract; `priority_score` 87 | Low–medium claims penalty; M; formula variants remain one canonical URL |
-| 5 | `/programs/full-body-3-days` | New public program asset | `программа тренировок 3 раза в неделю`: 1351 / 32 (2.4%); Full Body seed 20 / `NO_DATA` | Broad Russian program cluster is meaningful; use Full Body as concept/secondary wording | New public program read model; `priority_score` 87 | Low–medium claims penalty; M; no gender/goal/country duplicates |
-| 6 | `/for-trainers` | Existing page improvement | `NO_DATA` — no usable owner export for requested trainer variants | Product fit and commercial SERP justify a focused truthful improvement, not a volume claim | Existing product fit; `priority_score` 81 | Low claims penalty; S/M; no `/for-trainers/crm` without distinct job |
-| 7 | `/exercises` + one verified next expansion | Bounded catalog improvement | Reuse the bench-press evidence pattern; no mass-demand claim | Apply the exemplar structure only to another verified canonical exercise | Existing catalog fit; `priority_score` 75 family proxy | Medium safety/content cost; M; stop if useful canonical content is unavailable |
+| Rank | Asset / canonical hypothesis               | Type                        | RU Wordstat evidence                                                                    | Why now                                                                                                             | Product/opportunity separation                                                    | Health / cost / cannibalization gate                                           |
+| ---: | ------------------------------------------ | --------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+|    1 | `/nutrition` + knowledge links             | Existing page improvement   | `калькулятор кбжу`: 16127 broad / 4763 quoted (29.5%)                                   | Strongest observed cluster already has a canonical product page; improve it before creating a second calculator URL | Existing page fit; current `priority_score` 69 is not comparable to the frequency | High YMYL/claims penalty; M; avoid `/calculators/kbju` duplication             |
+|    2 | `/exercises/bench-press`                   | Existing page exemplar      | `жим лежа техника`: 2943 / 528 (17.9%)                                                  | Material technique demand and a real canonical exercise page; establish the quality pattern first                   | Existing catalog fit; `priority_score` 75                                         | Medium claims/safety penalty; M; no mass-generated exercise pages              |
+|    3 | `/training`                                | Existing page improvement   | `дневник тренировок`: 3038 / 456 (15.0%)                                                | Good acquisition cluster maps to current program -> workout -> logging -> progress story                            | Existing product path; `priority_score` 73                                        | Low claims penalty; S/M; no duplicate diary landing                            |
+|    4 | `/calculators/1rm`                         | New interactive calculator  | `калькулятор 1пм`: 363 / 261 (71.9%)                                                    | Modest volume but unusually pure BOFU intent and clear future save-to-program value                                 | New product contract; `priority_score` 87                                         | Low–medium claims penalty; M; formula variants remain one canonical URL        |
+|    5 | `/programs/full-body-3-days`               | New public program asset    | `программа тренировок 3 раза в неделю`: 1351 / 32 (2.4%); Full Body seed 20 / `NO_DATA` | Broad Russian program cluster is meaningful; use Full Body as concept/secondary wording                             | New public program read model; `priority_score` 87                                | Low–medium claims penalty; M; no gender/goal/country duplicates                |
+|    6 | `/for-trainers`                            | Existing page improvement   | `NO_DATA` — no usable owner export for requested trainer variants                       | Product fit and commercial SERP justify a focused truthful improvement, not a volume claim                          | Existing product fit; `priority_score` 81                                         | Low claims penalty; S/M; no `/for-trainers/crm` without distinct job           |
+|    7 | `/exercises` + one verified next expansion | Bounded catalog improvement | Reuse the bench-press evidence pattern; no mass-demand claim                            | Apply the exemplar structure only to another verified canonical exercise                                            | Existing catalog fit; `priority_score` 75 family proxy                            | Medium safety/content cost; M; stop if useful canonical content is unavailable |
 
 ### What is explicitly not in Wave 1
 
@@ -51,11 +52,11 @@ feature a generic “diary app” if the current UI does not prove that exact br
 
 ### `/nutrition`
 
-Make current calculator assumptions and limitations visible in the public fallback and page copy.
-Link to the KBJU reference and protein/recomposition guide. Keep `КБЖУ`, calories and protein
-variants as sections until a distinct tool contract is proven. The observed demand is strong enough
-to move this page to the top of Wave 1, but it does not authorize a new URL or individualized
-medical/dietological promise language.
+Task 241B makes current calculator assumptions and limitations visible in the public fallback and
+page copy, with the calculation available without authentication. The page links to the KBJU
+reference and food-source guide. `КБЖУ`, calories and protein variants remain on one canonical
+`/nutrition` URL; the observed demand does not authorize a duplicate calculator URL or
+individualized medical/dietological promise language.
 
 ### `/exercises/bench-press`
 
@@ -119,17 +120,18 @@ changes in this research packet.
 ## Future measurement contract
 
 The repository already has implemented product goals for registration, first workout, trainer
-activation, client invite and related actions. The following names are future-only and must not be
-reported as implemented by this task:
+activation, client invite and related actions. The following names remain future-only and must not
+be reported as implemented by this task:
 
-| Event | Intended moment | Gate |
-| --- | --- | --- |
-| `calculator_started` | user begins a public calculator | calculator flow exists and event is typed |
-| `calculator_result` | validated result is shown | result is actually computed |
-| `calculator_saved` | result is successfully saved | authenticated save succeeds |
-| `public_program_opened` | useful public program is opened | public read model exists |
-| `public_program_saved` | program is saved successfully | save contract exists |
-| `exercise_added_from_public_page` | exercise is added from public page | add flow exists |
+| Event                             | Intended moment                    | Gate                        |
+| --------------------------------- | ---------------------------------- | --------------------------- |
+| `calculator_saved`                | result is successfully saved       | authenticated save succeeds |
+| `public_program_opened`           | useful public program is opened    | public read model exists    |
+| `public_program_saved`            | program is saved successfully      | save contract exists        |
+| `exercise_added_from_public_page` | exercise is added from public page | add flow exists             |
+
+`calculator_started` and `calculator_result` are implemented by Task 241B as action-only events;
+their exact trigger and no-payload boundary are documented in `growth-analytics-foundation.md`.
 
 Wave KPI sequence should be `indexed URLs -> non-brand impressions/clicks -> relevant action ->
 registration -> activation`, not traffic alone. Baseline for comparison remains GSC T0:
@@ -150,8 +152,8 @@ add links merely to place keywords on every page.
 ## Recommended follow-up task sequence
 
 1. Owner review of Task 241A and this evidence-informed Wave 1.
-2. 241B (future, not started): implement only the owner-approved first asset and its product/claims
-   contract; this research update does not start it.
+2. 241B: public `/nutrition` calculator and SEO acquisition slice, delivered through the normal
+   task lifecycle.
 3. Separate trainer-page copy/IA task and nutrition/cardio risk-reviewed tasks only as evidence and
    owner decisions support them.
 4. Separate volume-definition spike if the owner later keeps training-volume calculator in scope.

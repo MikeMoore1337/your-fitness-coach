@@ -47,11 +47,11 @@ export const IMPLEMENTED_GROWTH_EVENT_NAMES = [
   'trainer_application_completed',
   'client_invited',
   'share_created',
+  'calculator_started',
+  'calculator_result',
 ] as const;
 
 export const FUTURE_GROWTH_EVENT_NAMES = [
-  'calculator_started',
-  'calculator_result',
   'calculator_saved',
   'public_program_opened',
   'public_program_saved',

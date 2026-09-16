@@ -43,7 +43,7 @@ export interface PublicContentPage {
   intro: string;
   highlights?: string[];
   sections: PublicContentSection[];
-  interactive?: 'bmi-calculator';
+  interactive?: 'bmi-calculator' | 'kbju-calculator';
   related: PublicContentLink[];
   cta?: {
     label: string;
