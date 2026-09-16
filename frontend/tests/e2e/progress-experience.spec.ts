@@ -1205,7 +1205,7 @@ test('nutrition report preserves truthful period context, daily drill-down and r
       .evaluateAll((tabs) => tabs.map((tab) => tab.getBoundingClientRect().height));
     expect(selectorTargets.every((height) => height >= 44)).toBe(true);
     if (viewport.width <= 430) {
-      const selectorScroller = page.locator('.progress-period-controls .ui-tabs');
+      const selectorScroller = page.locator('.progress-period-controls__tabs');
       const selectorScrollState = await selectorScroller.evaluate((element) => {
         const style = getComputedStyle(element);
         return {

@@ -2991,6 +2991,7 @@ test('поля даты остаются внутри анкеты клиент�
   );
 
   await page.getByText('Тренировки, прогресс и замеры', { exact: true }).click();
+  await page.locator('#measurement-diary > summary').click();
 
   const dateField = page.getByLabel('Дата', { exact: true });
   const dateBox = await dateField.boundingBox();

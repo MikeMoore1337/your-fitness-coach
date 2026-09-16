@@ -3819,10 +3819,17 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 }
 
-@media (max-width: 399px) {
+@media (max-width: 359px) {
   .week-strip {
     margin-inline: calc(-1 * max(var(--v2-space-3), var(--yfc-layout-safe-left)))
       calc(-1 * max(var(--v2-space-3), var(--yfc-layout-safe-right)));
+  }
+
+  .week-strip__head,
+  .week-strip__legend-summary,
+  .week-strip__legend {
+    padding-inline: max(var(--v2-space-3), var(--yfc-layout-safe-left))
+      max(var(--v2-space-3), var(--yfc-layout-safe-right));
   }
 }
 
