@@ -120,7 +120,7 @@ describe('PublicContentPage', () => {
   });
 
   it.each([
-    ['/training', /план тренировки, который остаётся перед глазами/i],
+    ['/training', /дневник тренировок: от программы до прогресса/i],
     ['/nutrition', /рассчитать кбжу: калории, белки, жиры и углеводы/i],
     ['/progress', /прогресс, который можно проверить/i],
     ['/for-trainers', /кабинет тренера для программ/i],
@@ -140,6 +140,51 @@ describe('PublicContentPage', () => {
     );
     expect(screen.getByRole('navigation', { name: 'Публичные разделы' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Хлебные крошки' })).toBeInTheDocument();
+  });
+
+  it('renders the training diary workflow, truthful app CTA and canonical related links', () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) =>
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+
+    try {
+      renderPath('/training');
+
+      const workflow = document.querySelector<HTMLElement>('.public-workflow');
+      expect(workflow).not.toBeNull();
+      expect(workflow?.querySelector('ol')).not.toBeNull();
+      expect(
+        Array.from(workflow?.querySelectorAll('h3') ?? []).map((heading) => heading.textContent),
+      ).toEqual(['Программа', 'Занятие', 'Запись подходов', 'История', 'Прогресс']);
+      expect(screen.getByText(/один повторяемый путь/i)).toBeInTheDocument();
+
+      const ctaLinks = screen.getAllByRole('link', { name: 'Начать вести тренировки' });
+      expect(ctaLinks).toHaveLength(2);
+      expect(ctaLinks.every((link) => link.getAttribute('href')?.endsWith('/app'))).toBe(true);
+      expect(ctaLinks.every((link) => !link.getAttribute('href')?.includes('?'))).toBe(true);
+      expect(screen.getByRole('link', { name: /История и прогресс тренировок/ })).toHaveAttribute(
+        'href',
+        '/progress',
+      );
+      expect(screen.getByRole('link', { name: /Каталог упражнений/ })).toHaveAttribute(
+        'href',
+        '/exercises',
+      );
+      expect(screen.getByRole('link', { name: /Техника жима лёжа/ })).toHaveAttribute(
+        'href',
+        '/exercises/bench-press',
+      );
+      expect(screen.getByRole('link', { name: /Прогрессивная нагрузка/ })).toHaveAttribute(
+        'href',
+        '/knowledge/training/progressive-overload',
+      );
+      expect(window.location.search).toBe('');
+      expect(localStorage.length).toBe(0);
+      expect(events).toEqual([]);
+    } finally {
+      window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+    }
   });
 
   it('publishes truthful article metadata and visible editorial context for a guide', () => {

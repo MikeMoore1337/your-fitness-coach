@@ -28,7 +28,7 @@ function contrastRatio(foreground: string, background: string): number {
 const representativePages = [
   {
     path: '/training',
-    heading: /план тренировки, который остаётся перед глазами/i,
+    heading: /дневник тренировок: от программы до прогресса/i,
   },
   {
     path: '/knowledge',

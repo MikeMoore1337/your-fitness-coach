@@ -3720,7 +3720,7 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
 @pytest.mark.parametrize(
     ("path", "heading"),
     [
-        ("/training", "План тренировки, который остаётся перед глазами"),
+        ("/training", "Дневник тренировок: от программы до прогресса"),
         ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
         ("/progress", "Прогресс, который можно проверить"),
         ("/for-trainers", "Кабинет тренера для программ"),
@@ -3756,6 +3756,37 @@ def test_public_content_routes_render_unique_crawlable_pages(client, monkeypatch
     assert heading in response.text
     assert '<a href="/knowledge">База знаний</a>' in response.text
     assert "Личный интерфейс Your Fitness Coach" not in response.text
+
+
+def test_training_public_fallback_renders_diary_workflow_and_truthful_cta(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/training", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert (
+        "<title>Дневник тренировок: программа, подходы и прогресс | Your Fitness Coach</title>"
+        in response.text
+    )
+    assert '<link rel="canonical" href="https://your-fitness-coach.ru/training" />' in response.text
+    assert '<section class="seo-fallback-workflow"' in response.text
+    assert response.text.count("<h1>") == 1
+    assert [
+        response.text.index(f"<h3>{title}</h3>")
+        for title in ("Программа", "Занятие", "Запись подходов", "История", "Прогресс")
+    ] == sorted(
+        response.text.index(f"<h3>{title}</h3>")
+        for title in ("Программа", "Занятие", "Запись подходов", "История", "Прогресс")
+    )
+    assert (
+        '<a href="https://app.your-fitness-coach.ru/app">Начать вести тренировки</a>'
+        in response.text
+    )
+    assert '<a href="/progress">История и прогресс тренировок</a>' in response.text
+    assert '<a href="/exercises/bench-press">Техника жима лёжа</a>' in response.text
+    assert "/training?" not in response.text
+    assert "гарант" not in response.text.lower()
 
 
 def test_public_campaign_url_keeps_clean_canonical_metadata(client, monkeypatch):

@@ -82,6 +82,25 @@
   line-height: 1.65;
 }
 
+.public-hero__action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 20px;
+  margin-top: 28px;
+}
+
+.public-hero__action .landing-button {
+  min-height: 48px;
+}
+
+.public-hero__action > span {
+  max-width: 440px;
+  color: var(--landing-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .public-hero__summary {
   min-height: 300px;
   padding: 30px;
@@ -256,6 +275,73 @@
   color: var(--landing-ink);
 }
 
+.public-workflow {
+  padding: clamp(48px, 7vw, 84px) 0 0;
+}
+
+.public-workflow__heading {
+  max-width: 760px;
+}
+
+.public-workflow__heading h2 {
+  margin: 16px 0 0;
+  font-size: clamp(2.1rem, 4vw, 3.7rem);
+  font-weight: 850;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.public-workflow__heading > p:last-child {
+  max-width: 690px;
+  margin: 20px 0 0;
+  color: var(--landing-muted);
+  font-size: 1.04rem;
+  line-height: 1.6;
+}
+
+.public-workflow ol {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 38px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--landing-border);
+  border-bottom: 1px solid var(--landing-border);
+  list-style: none;
+}
+
+.public-workflow li {
+  min-width: 0;
+  padding: 22px 20px 26px 0;
+}
+
+.public-workflow li + li {
+  padding-left: 20px;
+  border-left: 1px solid var(--landing-border);
+}
+
+.public-workflow__label {
+  color: var(--landing-kicker);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+
+.public-workflow h3 {
+  margin: 14px 0 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.public-workflow li p {
+  margin: 12px 0 0;
+  color: var(--landing-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  text-align: left;
+  text-wrap: pretty;
+}
+
 .public-body {
   max-width: 820px;
   margin: 0 auto;
@@ -307,6 +393,12 @@
 .public-body li {
   position: relative;
   padding-left: 26px;
+}
+
+.public-article--training .public-body p,
+.public-article--training .public-body li {
+  text-align: left;
+  hyphens: none;
 }
 
 .public-body li::before {
@@ -582,6 +674,22 @@
   .public-related-card:last-child {
     grid-column: 1 / -1;
   }
+
+  .public-workflow ol {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .public-workflow li:nth-child(n + 4) {
+    margin-top: 18px;
+    padding-top: 20px;
+    border-top: 1px solid var(--landing-border);
+  }
+
+  .public-workflow li:nth-child(4),
+  .public-workflow li:nth-child(5) {
+    padding-left: 0;
+    border-left: 0;
+  }
 }
 
 @media (max-width: 680px) {
@@ -608,6 +716,16 @@
   .public-hero__lead {
     margin-top: 24px;
     font-size: 1rem;
+  }
+
+  .public-hero__action {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .public-hero__action .landing-button {
+    width: 100%;
   }
 
   .public-hero__summary {
@@ -643,12 +761,58 @@
     padding: 12px 16px;
   }
 
+  .public-article--training .public-hero {
+    gap: 14px;
+    padding-block: 20px 28px;
+  }
+
+  .public-article--training .public-hero__lead {
+    margin-top: 20px;
+    line-height: 1.5;
+  }
+
+  .public-article--training .public-hero__action {
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .public-workflow {
+    padding-top: 40px;
+  }
+
+  .public-workflow ol {
+    grid-template-columns: 1fr;
+    margin-top: 28px;
+  }
+
+  .public-workflow li,
+  .public-workflow li + li,
+  .public-workflow li:nth-child(4),
+  .public-workflow li:nth-child(5) {
+    padding: 20px 0 0;
+    border-top: 0;
+    border-left: 0;
+  }
+
+  .public-workflow li + li {
+    margin-top: 18px;
+    border-top: 1px solid var(--landing-border);
+  }
+
   .public-article--product .public-hero__summary li,
   .public-article--knowledge-index .public-hero__summary li {
     grid-template-columns: 22px 1fr;
     gap: 10px;
     padding-block: 10px;
     font-size: 0.88rem;
+  }
+
+  .public-article--training .public-hero__summary {
+    padding: 16px;
+  }
+
+  .public-article--training .public-hero__summary li {
+    padding-block: 6px;
   }
 
   .public-guide-meta {
