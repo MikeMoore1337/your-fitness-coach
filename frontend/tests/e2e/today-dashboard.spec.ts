@@ -460,7 +460,7 @@ test('started workout finishes into a factual completed state', async ({ page })
   await expect(page.getByRole('heading', { name: 'Тренировка завершена' })).toBeVisible();
 });
 
-test('new and incomplete profile states keep program selection primary', async ({ page }) => {
+test('new and incomplete profile states keep ready program selection primary', async ({ page }) => {
   await mockDashboard(page, {
     workout: 'none',
     activeProgram: false,
@@ -470,27 +470,23 @@ test('new and incomplete profile states keep program selection primary', async (
 
   await expect(page.getByRole('heading', { name: 'С чего начнём?' })).toBeVisible();
   await expect(page.getByText('Сделайте рекомендации точнее')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
-  const chooseReady = page.getByRole('link', { name: 'Выбрать готовую' });
+  const chooseReady = page.getByRole('link', { name: 'Выбрать готовую программу', exact: true });
   await expect(chooseReady).toBeVisible();
+  const createCustom = page.getByRole('link', { name: 'Создать свою программу', exact: true });
+  await expect(createCustom).toBeVisible();
   await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
-  await expect(chooseReady).toHaveCSS('border-top-style', 'solid');
-  await expect(chooseReady).toHaveCSS('border-top-width', '1px');
-  const readyOutline = await chooseReady.evaluate((element) => {
-    const style = window.getComputedStyle(element);
-    return {
-      fontWeight: style.fontWeight,
-      height: element.getBoundingClientRect().height,
-      innerStroke: style.boxShadow,
-    };
-  });
-  expect(readyOutline.fontWeight).toBe('600');
-  expect(readyOutline.height).toBeGreaterThanOrEqual(44);
-  expect(readyOutline.innerStroke).toContain('0.5px');
+  await expect(chooseReady).not.toHaveClass(/secondary-link/);
+  await expect(createCustom).toHaveClass(/secondary-link/);
+  const readyPrimary = await chooseReady.evaluate((element) => ({
+    fontWeight: window.getComputedStyle(element).fontWeight,
+    height: element.getBoundingClientRect().height,
+  }));
+  expect(readyPrimary.fontWeight).toBe('600');
+  expect(readyPrimary.height).toBeGreaterThanOrEqual(44);
   await expect(page.getByRole('link', { name: 'Записать питание' })).not.toBeAttached();
   await expect(page.getByRole('button', { name: 'Добавить активность' })).not.toBeAttached();
   await expect(page.locator('.today-dashboard__facts')).toHaveCSS('border-top-style', 'none');
-  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeAttached();
+  await expect(createCustom).toBeAttached();
   await expect(page.locator('.today-dashboard details details')).toHaveCount(0);
 });
 
@@ -562,7 +558,9 @@ test('rest, completed, weekly review and trainer comment use one primary action'
   });
   await page.reload();
   await expect(page.getByRole('link', { name: 'Открыть комментарий' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Пройти короткую проверку' })).not.toBeAttached();
+  await expect(page.getByRole('link', { name: 'Пройти короткую проверку' })).toHaveClass(
+    /secondary-link/,
+  );
 });
 
 test('secondary API failure does not erase the dashboard', async ({ page }) => {

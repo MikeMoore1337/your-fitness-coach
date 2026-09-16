@@ -1,18 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createProductAnalytics,
+  clearProductOnboardingCompletionMarker,
   clearProductLoginAttempt,
   FUTURE_GROWTH_EVENT_NAMES,
   GROWTH_GOAL_IDS,
   IMPLEMENTED_GROWTH_EVENT_NAMES,
   isProductEvent,
   isProductEventEnvelope,
+  markProductOnboardingCompleted,
   markProductLoginStarted,
   PRODUCT_ANALYTICS_STATUS_NAME,
   PRODUCT_EVENT_NAME,
   PRODUCT_EVENT_SCHEMA_VERSION,
   productAnalyticsEnvironment,
   productEventSurface,
+  trackProductEvent,
   trackGrowthEvent,
   trackProductLoginCompletedIfStarted,
   type ProductAnalyticsStatus,
@@ -43,6 +46,7 @@ function allowedProvider(send: ProductAnalyticsProvider['send'] = vi.fn()) {
 
 afterEach(() => {
   clearProductLoginAttempt();
+  clearProductOnboardingCompletionMarker();
   vi.unstubAllGlobals();
   delete window.Telegram;
 });
@@ -257,6 +261,90 @@ describe('product event contract', () => {
         campaign: 'telegram_editorial_v1',
       }),
     ).toBe(true);
+  });
+
+  it('keeps guided-flow telemetry typed, bounded and free of private context', () => {
+    expect(
+      isProductEvent({
+        name: 'next_action_shown',
+        surface: 'mobile_web',
+        action_kind: 'scheduled_workout',
+        position: 'primary',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'section_navigation_selected',
+        surface: 'desktop_web',
+        from_section: 'today',
+        to_section: 'progress',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'quick_add_action_selected',
+        surface: 'tma',
+        action: 'food',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'quick_add_action_selected',
+        surface: 'tma',
+        action: 'ai-coach',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'section_navigation_selected',
+        surface: 'desktop_web',
+        from_section: 'today',
+        to_section: 'today',
+      }),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'next_action_clicked',
+        surface: 'mobile_web',
+        action_kind: 'trainer_feedback',
+        position: 'primary',
+        comment_body: 'private',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
+  it('measures first useful action once after onboarding without storing content', () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) => {
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    };
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+    markProductOnboardingCompleted();
+    now.mockReturnValue(1_025_000);
+
+    expect(
+      trackProductEvent({
+        name: 'next_action_clicked',
+        surface: 'mobile_web',
+        action_kind: 'ready_program',
+        position: 'primary',
+      }),
+    ).toBe(true);
+    expect(events.map((event) => event.name)).toEqual([
+      'next_action_clicked',
+      'onboarding_first_useful_action',
+    ]);
+    expect(events.at(-1)).toMatchObject({
+      name: 'onboarding_first_useful_action',
+      latency_bucket: '10_30s',
+    });
+    expect(
+      window.sessionStorage.getItem('fit_product_analytics_onboarding_completed_at'),
+    ).toBeNull();
+    now.mockRestore();
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
   });
 
   it('keeps PWA analytics context-free and limits service-worker error categories', () => {

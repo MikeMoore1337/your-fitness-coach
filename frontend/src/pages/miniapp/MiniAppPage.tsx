@@ -659,22 +659,6 @@ export default function MiniAppPage({
                           : 'Сейчас недоступен'}
                     </small>
                   </a>
-                  <span
-                    aria-disabled="true"
-                    className="profile-settings-nav__item profile-settings-nav__item--reserved"
-                  >
-                    <Icon name="sync" size={16} />
-                    <span>Интеграции</span>
-                    <small>Точка входа готовится</small>
-                  </span>
-                  <span
-                    aria-disabled="true"
-                    className="profile-settings-nav__item profile-settings-nav__item--reserved"
-                  >
-                    <Icon name="web-app" size={16} />
-                    <span>Приложение</span>
-                    <small>Тема, PWA и runtime</small>
-                  </span>
                 </nav>
 
                 <ProfileForm key={profileFormKey} />

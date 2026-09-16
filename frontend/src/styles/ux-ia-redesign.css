@@ -268,19 +268,8 @@
   white-space: nowrap;
 }
 
-.app-section--profile
-  .profile-settings-nav
-  .profile-settings-nav__item:hover:not(.profile-settings-nav__item--reserved) {
+.app-section--profile .profile-settings-nav .profile-settings-nav__item:hover {
   background: var(--v2-surface-secondary);
-}
-
-.app-section--profile .profile-settings-nav .profile-settings-nav__item--reserved {
-  color: var(--v2-text-secondary);
-  cursor: default;
-}
-
-.app-section--profile .profile-settings-nav .profile-settings-nav__item--reserved small {
-  color: var(--v2-text-secondary);
 }
 
 .app-section--profile .profile-settings > :where(.profile-primary-card, .profile-settings-group) {

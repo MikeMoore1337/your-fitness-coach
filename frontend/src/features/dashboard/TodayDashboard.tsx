@@ -35,6 +35,12 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { CardioQuickLog } from '../cardio/CardioLogging';
 import { DailyWellbeingCheckIn } from '../wellbeing/DailyWellbeingCheckIn';
 import {
+  nextActionHref,
+  selectNextAction,
+  type NextAction,
+  type NextActionKind,
+} from './nextAction';
+import {
   TRAINING_WEEK_LEGEND,
   WeekStrip,
   type WeekStripActivity,
@@ -380,6 +386,7 @@ function WorkoutOverview({
   onAddActivity,
   onStart,
   canMutateProgress,
+  profileBlocksRecommendation,
 }: {
   today: string;
   workout?: Workout;
@@ -391,18 +398,11 @@ function WorkoutOverview({
   startPending: boolean;
   onOpenDetails(): void;
   onAddActivity(): void;
-  onStart(): void;
+  onStart(workoutId: number): void;
   canMutateProgress: boolean;
+  profileBlocksRecommendation: boolean;
 }) {
   const { user } = useAuth();
-  const trackPrimaryAction = (
-    destination: 'workout' | 'nutrition' | 'weekly_review' | 'programs' | 'progress',
-  ) =>
-    trackProductEvent({
-      name: 'today_primary_action_selected',
-      surface: productEventSurface(),
-      destination,
-    });
   const totalSets =
     workout?.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0) ?? 0;
   const completedSets =
@@ -412,64 +412,162 @@ function WorkoutOverview({
     ) ?? 0;
   const completedToday = !workout && progress.data?.training.last_completed_workout_on === today;
   const nextWorkout = progress.data?.training.next_workout;
-  const weeklyReviewAvailable = Boolean(weeklyReview && !weeklyReview.existing);
-  const feedbackWorkoutId = workout?.id ?? todayScheduleItem?.id;
-  const trainerCommentLink =
-    trainerComment && feedbackWorkoutId
-      ? `/app?section=progress&workout_id=${feedbackWorkoutId}&comment_id=${trainerComment.id}`
-      : null;
+  const plan = selectNextAction({
+    today,
+    hasActiveProgram: Boolean(user?.has_active_program),
+    workout,
+    todayScheduleItem,
+    trainerComment,
+    weeklyReview,
+    lastCompletedWorkoutOn: progress.data?.training.last_completed_workout_on,
+    nextWorkout,
+    profileBlocksRecommendation,
+  });
+  const primaryActionKind = plan.primary.kind;
+  const secondaryActionKinds = plan.secondary.map((item) => item.kind).join('|');
 
-  const completedAction = () => {
-    if (trainerCommentLink) {
-      return (
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('progress')}
-          to={trainerCommentLink}
-        >
-          Открыть комментарий
-        </AppLink>
+  useEffect(() => {
+    trackProductEvent(
+      {
+        name: 'next_action_shown',
+        surface: productEventSurface(),
+        action_kind: primaryActionKind,
+        position: 'primary',
+      },
+      { dedupe: 'session', dedupeKey: `next-action:${primaryActionKind}:primary` },
+    );
+    for (const kind of secondaryActionKinds.split('|').filter(Boolean)) {
+      trackProductEvent(
+        {
+          name: 'next_action_shown',
+          surface: productEventSurface(),
+          action_kind: kind as NextActionKind,
+          position: 'secondary',
+        },
+        { dedupe: 'session', dedupeKey: `next-action:${kind}:secondary` },
       );
     }
-    if (weeklyReviewAvailable) {
+  }, [primaryActionKind, secondaryActionKinds]);
+
+  const trackNextActionClick = (item: NextAction, position: 'primary' | 'secondary') => {
+    trackProductEvent({
+      name: 'next_action_clicked',
+      surface: productEventSurface(),
+      action_kind: item.kind,
+      position,
+    });
+    const destination =
+      item.kind === 'active_workout' || item.kind === 'scheduled_workout'
+        ? 'workout'
+        : item.kind === 'weekly_review'
+          ? 'weekly_review'
+          : item.kind === 'ready_program' || item.kind === 'create_program'
+            ? 'programs'
+            : item.kind === 'nutrition'
+              ? 'nutrition'
+              : item.kind === 'trainer_feedback' || item.kind === 'workout_result'
+                ? 'progress'
+                : null;
+    if (position === 'primary' && destination) {
+      trackProductEvent({
+        name: 'today_primary_action_selected',
+        surface: productEventSurface(),
+        destination,
+      });
+    }
+  };
+
+  const renderActionLink = (item: NextAction, position: 'primary' | 'secondary') => {
+    if (item.target.type === 'activity') {
       return (
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('weekly_review')}
-          to="/app?section=progress&weekly_review=1"
+        <Button
+          disabled={!canMutateProgress}
+          fullWidth
+          key={`${item.kind}-${position}`}
+          variant="secondary"
+          type="button"
+          onClick={() => {
+            trackNextActionClick(item, position);
+            onAddActivity();
+          }}
         >
-          Пройти короткую проверку
-        </AppLink>
+          {item.title}
+        </Button>
       );
     }
     return (
       <AppLink
-        className="button-link"
-        onClick={() => trackPrimaryAction('progress')}
-        to={
-          feedbackWorkoutId
-            ? `/app?section=progress&workout_id=${feedbackWorkoutId}`
-            : '/app?section=progress'
-        }
+        className={position === 'primary' ? 'button-link' : 'button-link secondary-link'}
+        key={`${item.kind}-${position}`}
+        onClick={() => trackNextActionClick(item, position)}
+        to={nextActionHref(item.target)}
       >
-        Посмотреть итог
+        {item.title}
       </AppLink>
     );
   };
 
+  const renderPrimaryWorkoutAction = (item: NextAction) => {
+    const started = workout?.status === 'in_progress';
+    const workoutId = item.target.type === 'today_workout' ? item.target.workoutId : null;
+    return (
+      <Button
+        className="today-pulse-action"
+        fullWidth
+        disabled={startPending}
+        type="button"
+        onClick={() => {
+          trackNextActionClick(item, 'primary');
+          if (started) onOpenDetails();
+          else if (workoutId !== null) onStart(workoutId);
+        }}
+      >
+        {startPending ? 'Начинаем…' : started ? 'Продолжить тренировку' : 'Начать тренировку'}
+      </Button>
+    );
+  };
+
+  const renderActions = (className = 'today-workout-actions') => (
+    <div className={className}>
+      {plan.primary.kind === 'active_workout' || plan.primary.kind === 'scheduled_workout'
+        ? renderPrimaryWorkoutAction(plan.primary)
+        : renderActionLink(plan.primary, 'primary')}
+      {plan.secondary.map((item) => renderActionLink(item, 'secondary'))}
+      {workout?.status === 'planned' && !plan.secondary.length && !detailsOpen && (
+        <Button fullWidth variant="secondary" type="button" onClick={onOpenDetails}>
+          Посмотреть упражнения
+        </Button>
+      )}
+      {workout?.status === 'planned' &&
+        (canMutateProgress ? (
+          <WorkoutAdaptation workout={workout} entryContext="today" />
+        ) : (
+          <p className="muted demo-capability-notice" role="status">
+            Изменение плана тренировки доступно после входа.
+          </p>
+        ))}
+      {!canMutateProgress && plan.secondary.some((item) => item.target.type === 'activity') && (
+        <p className="muted demo-capability-notice" role="status">
+          Добавление активности доступно после входа.
+        </p>
+      )}
+    </div>
+  );
+
+  if (workout?.status === 'completed') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge tone="success">Готово</Badge>
+          <h2 id="today-workout-title">Тренировка завершена</h2>
+          <p>Результат сохранён. Следующее действие — восстановиться и продолжить план.</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
   if (workout) {
-    if (workout.status === 'completed') {
-      return (
-        <>
-          <div className="today-workout-copy">
-            <Badge tone="success">Готово</Badge>
-            <h2 id="today-workout-title">Тренировка завершена</h2>
-            <p>Результат сохранён. Следующее действие — восстановиться и продолжить план.</p>
-          </div>
-          {completedAction()}
-        </>
-      );
-    }
     const started = workout.status === 'in_progress';
     return (
       <>
@@ -497,38 +595,7 @@ function WorkoutOverview({
               : `${workout.exercises.length} упражнений · ${totalSets} подходов`}
           </p>
         </div>
-        <div className="today-workout-actions">
-          <Button
-            className="today-pulse-action"
-            fullWidth
-            disabled={startPending}
-            type="button"
-            onClick={() => {
-              trackPrimaryAction('workout');
-              if (started) onOpenDetails();
-              else onStart();
-            }}
-          >
-            {startPending ? 'Начинаем…' : started ? 'Продолжить тренировку' : 'Начать тренировку'}
-          </Button>
-          {trainerCommentLink ? (
-            <AppLink className="button-link secondary-link" to={trainerCommentLink}>
-              Открыть комментарий тренера
-            </AppLink>
-          ) : !detailsOpen ? (
-            <Button fullWidth variant="secondary" type="button" onClick={onOpenDetails}>
-              Посмотреть упражнения
-            </Button>
-          ) : null}
-          {!started &&
-            (canMutateProgress ? (
-              <WorkoutAdaptation workout={workout} entryContext="today" />
-            ) : (
-              <p className="muted demo-capability-notice" role="status">
-                Изменение плана тренировки доступно после входа.
-              </p>
-            ))}
-        </div>
+        {renderActions()}
       </>
     );
   }
@@ -545,7 +612,59 @@ function WorkoutOverview({
               : 'На сегодня главное действие выполнено.'}
           </p>
         </div>
-        {completedAction()}
+        {renderActions()}
+      </>
+    );
+  }
+
+  if (todayScheduleItem?.status === 'planned') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge>План на сегодня</Badge>
+          <h2 id="today-workout-title">{todayScheduleItem.title}</h2>
+          <p>Тренировка запланирована на сегодня. Откройте её, чтобы начать.</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
+  if (plan.primary.kind === 'trainer_feedback') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge tone="warning">Комментарий тренера</Badge>
+          <h2 id="today-workout-title">Тренер оставил комментарий</h2>
+          <p>{trainerComment ? compactSignal(trainerComment.body) : ''}</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
+  if (plan.primary.kind === 'weekly_review') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge>Итоги недели</Badge>
+          <h2 id="today-workout-title">Неделя готова к проверке</h2>
+          <p>Коротко отметьте нагрузку, восстановление и то, насколько легко было держать план.</p>
+        </div>
+        {renderActions()}
+      </>
+    );
+  }
+
+  if (plan.primary.kind === 'profile') {
+    return (
+      <>
+        <div className="today-workout-copy">
+          <Badge>Основа рекомендаций</Badge>
+          <h2 id="today-workout-title">Дополните профиль</h2>
+          <p>{plan.primary.context}.</p>
+        </div>
+        {renderActions()}
       </>
     );
   }
@@ -560,59 +679,7 @@ function WorkoutOverview({
           <h2 id="today-workout-title">С чего начнём?</h2>
           <p>Настройки можно заполнить позже. Выберите полезное действие прямо сейчас.</p>
         </div>
-        <div className="today-workout-actions today-workout-actions--quick-start">
-          <AppLink
-            className="button-link"
-            onClick={() => trackPrimaryAction('programs')}
-            to="/app?section=programs&start=create"
-          >
-            Создать свою программу
-          </AppLink>
-          <AppLink
-            className="button-link secondary-link"
-            to="/app?section=programs&start=templates"
-          >
-            Выбрать готовую
-          </AppLink>
-        </div>
-      </>
-    );
-  }
-
-  if (trainerCommentLink) {
-    return (
-      <>
-        <div className="today-workout-copy">
-          <Badge tone="warning">Комментарий тренера</Badge>
-          <h2 id="today-workout-title">Тренер оставил комментарий</h2>
-          <p>{trainerComment ? compactSignal(trainerComment.body) : ''}</p>
-        </div>
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('progress')}
-          to={trainerCommentLink}
-        >
-          Открыть комментарий
-        </AppLink>
-      </>
-    );
-  }
-
-  if (weeklyReviewAvailable) {
-    return (
-      <>
-        <div className="today-workout-copy">
-          <Badge>Итоги недели</Badge>
-          <h2 id="today-workout-title">Неделя готова к проверке</h2>
-          <p>Коротко отметьте нагрузку, восстановление и то, насколько легко было держать план.</p>
-        </div>
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('weekly_review')}
-          to="/app?section=progress&weekly_review=1"
-        >
-          Пройти короткую проверку
-        </AppLink>
+        {renderActions('today-workout-actions today-workout-actions--quick-start')}
       </>
     );
   }
@@ -628,29 +695,7 @@ function WorkoutOverview({
             : 'В активном плане пока нет ближайшей тренировки.'}
         </p>
       </div>
-      <div className="today-workout-actions">
-        <AppLink
-          className="button-link"
-          onClick={() => trackPrimaryAction('nutrition')}
-          to="/app?section=nutrition"
-        >
-          Добавить питание
-        </AppLink>
-        <Button
-          disabled={!canMutateProgress}
-          fullWidth
-          variant="secondary"
-          type="button"
-          onClick={onAddActivity}
-        >
-          Добавить активность
-        </Button>
-        {!canMutateProgress && (
-          <p className="muted demo-capability-notice" role="status">
-            Добавление активности доступно после входа.
-          </p>
-        )}
-      </div>
+      {renderActions()}
     </>
   );
 }
@@ -876,11 +921,11 @@ export function TodayDashboard({
     () =>
       Boolean(
         user &&
+        !user.has_active_program &&
         (!user.profile ||
           !user.profile.goal ||
           !user.profile.level ||
-          !user.profile.workouts_per_week ||
-          !user.profile.height_cm),
+          !user.profile.workouts_per_week),
       ),
     [user],
   );
@@ -891,6 +936,15 @@ export function TodayDashboard({
       trackCoreProductEvent(
         { name: 'workout_started', surface: productEventSurface() },
         'workout_started',
+      );
+      trackProductEvent(
+        {
+          name: 'next_action_completed',
+          surface: productEventSurface(),
+          action_kind: 'scheduled_workout',
+          position: 'primary',
+        },
+        { dedupe: 'session', dedupeKey: `next-action:scheduled-workout:${startedWorkout.id}` },
       );
       queryClient.setQueryData(['workout', 'today'], startedWorkout);
       queryClient.setQueryData<WorkoutScheduleItem[]>(['workout', 'week'], (items) =>
@@ -1056,8 +1110,9 @@ export function TodayDashboard({
                 startPending={start.isPending}
                 onOpenDetails={() => setDetailsOpen(true)}
                 onAddActivity={() => setCardioOpenRequest((request) => request + 1)}
-                onStart={() => visibleWorkout && start.mutate(visibleWorkout.id)}
+                onStart={(workoutId) => start.mutate(workoutId)}
                 canMutateProgress={capabilities.canMutateProgress}
+                profileBlocksRecommendation={profileMissing}
               />
             )}
           </section>
@@ -1131,7 +1186,7 @@ export function TodayDashboard({
         <aside className="today-profile-nudge">
           <div>
             <strong>Сделайте рекомендации точнее</strong>
-            <span>Дополните цель, уровень, рост и желаемую частоту тренировок в профиле.</span>
+            <span>Дополните цель, уровень и желаемую частоту тренировок в профиле.</span>
           </div>
           <AppLink className="today-text-link" to="/app?section=profile#profile-fitness">
             Заполнить профиль

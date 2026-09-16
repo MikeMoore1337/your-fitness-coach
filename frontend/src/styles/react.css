@@ -4225,6 +4225,27 @@ button.today-text-link {
   color: var(--muted);
   font-size: 0.75rem;
 }
+.active-workout-set__prefill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: -3px 0 0 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--secondary-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.active-workout-set__prefill:hover {
+  background: var(--secondary-hover);
+}
+.active-workout-set__prefill:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
 .active-workout-set__controls {
   display: grid;
   grid-template-columns: minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(170px, 1.2fr);
@@ -4720,6 +4741,11 @@ button.today-text-link {
     grid-template-columns: minmax(0, 1fr);
   }
   .active-workout-set__previous {
+    margin-left: 0;
+  }
+  .active-workout-set__prefill {
+    width: 100%;
+    justify-content: center;
     margin-left: 0;
   }
   .active-workout-finish .ui-button {

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from '../../../src/app/AppShell';
+import { PRODUCT_EVENT_NAME } from '../../../src/shared/analytics/productEvents';
 
 const logout = vi.fn();
 function stubViewport(initialWidth: number, reducedMotion = false) {
@@ -139,6 +140,26 @@ describe('AppShell', () => {
     }
   });
 
+  it('records section navigation without putting routes or private data in the event', () => {
+    navigation.path = '/app';
+    const events: unknown[] = [];
+    const listener = (event: Event) => events.push((event as CustomEvent).detail);
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+
+    render(<AppShell section="today">Содержимое</AppShell>);
+    fireEvent.click(screen.getByRole('link', { name: 'Прогресс' }));
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        name: 'section_navigation_selected',
+        from_section: 'today',
+        to_section: 'progress',
+      }),
+    );
+    expect(JSON.stringify(events)).not.toContain('/app');
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+  });
+
   it('открывает единую панель быстрых действий и закрывает её Escape', () => {
     navigation.path = '/app';
     render(<AppShell section="today">Содержимое</AppShell>);
@@ -151,10 +172,13 @@ describe('AppShell', () => {
       'href',
       '/app?section=nutrition&quick_add=food',
     );
-    expect(within(dialog).getByRole('link', { name: /Открыть AI Coach/ })).toHaveAttribute(
-      'href',
-      '/app?section=profile#profile-ai-coach',
-    );
+    expect(within(dialog).getAllByRole('link')).toHaveLength(5);
+    expect(
+      within(dialog).queryByRole('link', { name: /Открыть AI Coach/ }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('link', { name: /Добавить еду/ }));
+    expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();

@@ -371,7 +371,7 @@ async function mockFirstRunApi(
           week_end: '2030-01-30',
           submitted_on: '2030-01-30',
           timezone: 'Europe/Moscow',
-          existing: null,
+          existing: { id: 1 },
           summary: {
             ruleset_version: 'weekly-review-summary-v2',
             period_start: '2030-01-24',
@@ -442,7 +442,7 @@ test('brand-new Web user enters Today without a mandatory profile step', async (
   await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Выбрать готовую' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Создать свою программу' }).click();
@@ -454,7 +454,7 @@ test('brand-new Web user enters Today without a mandatory profile step', async (
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Сегодня', exact: true }).click();
-  await page.getByRole('link', { name: 'Выбрать готовую' }).click();
+  await page.getByRole('link', { name: 'Выбрать готовую программу' }).click();
   await expect(page).toHaveURL('/app?section=programs&start=templates');
   const library = page.locator('#program-library');
   await expect(library).toHaveAttribute('open', '');
@@ -527,7 +527,11 @@ test('first-run shell stays usable across required responsive surfaces', async (
     await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(current.width);
-    for (const action of ['Создать свою программу', 'Выбрать готовую', 'Заполнить профиль']) {
+    for (const action of [
+      'Выбрать готовую программу',
+      'Создать свою программу',
+      'Заполнить профиль',
+    ]) {
       const box = await page.getByRole('link', { name: action }).boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(44);
@@ -557,5 +561,5 @@ test('Telegram Mini App uses the same first-run shell for a legacy required user
   await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Включить .* тему/ })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Выбрать готовую' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toBeVisible();
 });

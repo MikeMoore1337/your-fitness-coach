@@ -13,6 +13,23 @@ export type ProductCoreAction =
   | 'food_logged'
   | 'measurement_logged'
   | 'weekly_review_completed';
+export type NextActionAnalyticsKind =
+  | 'active_workout'
+  | 'trainer_feedback'
+  | 'scheduled_workout'
+  | 'weekly_review'
+  | 'ready_program'
+  | 'create_program'
+  | 'workout_result'
+  | 'nutrition'
+  | 'activity'
+  | 'profile';
+export type NextActionPosition = 'primary' | 'secondary';
+export type ProductSection =
+  'today' | 'progress' | 'programs' | 'nutrition' | 'catalog' | 'profile' | 'coach' | 'admin';
+export type QuickAddAnalyticsKind = 'food' | 'water' | 'cardio' | 'measurement' | 'wellbeing';
+export type OnboardingLatencyBucket =
+  'under_10s' | '10_30s' | '30_60s' | '1_5m' | '5_15m' | 'over_15m';
 export type PwaServiceWorkerErrorCategory =
   'registration' | 'update' | 'cache' | 'navigation' | 'install' | 'activate';
 export type LandingTelegramPlacement = 'hero' | 'continuity' | 'footer';
@@ -139,6 +156,7 @@ type ContextFreeProductEventName =
   | 'pwa_standalone_launched'
   | 'pwa_workout_resume_success'
   | 'pwa_workout_resume_failure'
+  | 'previous_set_reuse_used'
   | 'pwa_update_available'
   | 'pwa_update_applied'
   | 'nutrition_label_scan_started'
@@ -223,6 +241,28 @@ export type ProductEvent =
       name: 'today_week_navigated';
       surface: ProductSurface;
       direction: 'workout_day';
+    }
+  | {
+      name: 'next_action_shown' | 'next_action_clicked' | 'next_action_completed';
+      surface: ProductSurface;
+      action_kind: NextActionAnalyticsKind;
+      position: NextActionPosition;
+    }
+  | {
+      name: 'onboarding_first_useful_action';
+      surface: ProductSurface;
+      latency_bucket: OnboardingLatencyBucket;
+    }
+  | {
+      name: 'quick_add_action_selected';
+      surface: ProductSurface;
+      action: QuickAddAnalyticsKind;
+    }
+  | {
+      name: 'section_navigation_selected';
+      surface: ProductSurface;
+      from_section: ProductSection;
+      to_section: ProductSection;
     }
   | {
       name: 'food_log_started' | 'food_logged';
@@ -380,6 +420,7 @@ const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'pwa_standalone_launched',
   'pwa_workout_resume_success',
   'pwa_workout_resume_failure',
+  'previous_set_reuse_used',
   'pwa_update_available',
   'pwa_update_applied',
   'nutrition_label_scan_started',
@@ -438,6 +479,44 @@ const PRODUCT_CORE_ACTIONS = new Set<ProductCoreAction>([
   'measurement_logged',
   'weekly_review_completed',
 ]);
+const NEXT_ACTION_KINDS = new Set<NextActionAnalyticsKind>([
+  'active_workout',
+  'trainer_feedback',
+  'scheduled_workout',
+  'weekly_review',
+  'ready_program',
+  'create_program',
+  'workout_result',
+  'nutrition',
+  'activity',
+  'profile',
+]);
+const NEXT_ACTION_POSITIONS = new Set<NextActionPosition>(['primary', 'secondary']);
+const PRODUCT_SECTIONS = new Set<ProductSection>([
+  'today',
+  'progress',
+  'programs',
+  'nutrition',
+  'catalog',
+  'profile',
+  'coach',
+  'admin',
+]);
+const QUICK_ADD_ACTIONS = new Set<QuickAddAnalyticsKind>([
+  'food',
+  'water',
+  'cardio',
+  'measurement',
+  'wellbeing',
+]);
+const ONBOARDING_LATENCY_BUCKETS = new Set<OnboardingLatencyBucket>([
+  'under_10s',
+  '10_30s',
+  '30_60s',
+  '1_5m',
+  '5_15m',
+  'over_15m',
+]);
 const PWA_SERVICE_WORKER_ERROR_CATEGORIES = new Set<PwaServiceWorkerErrorCategory>([
   'registration',
   'update',
@@ -490,7 +569,24 @@ const BASE_EVENT_KEYS = ['name', 'surface'] as const;
 const ENVELOPE_KEYS = ['schema_version', 'environment', 'occurred_at'] as const;
 const PROVIDER_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
 const LOGIN_ATTEMPT_STORAGE_KEY = 'fit_product_analytics_login_attempt';
+const ONBOARDING_COMPLETED_AT_STORAGE_KEY = 'fit_product_analytics_onboarding_completed_at';
+const MAX_ONBOARDING_FIRST_ACTION_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 let loginAttemptPending = false;
+
+const USEFUL_ACTION_EVENT_NAMES = new Set<ProductEventName>([
+  'next_action_clicked',
+  'next_action_completed',
+  'previous_set_reuse_used',
+  'quick_add_action_selected',
+  'section_navigation_selected',
+  'workout_started',
+  'workout_completed',
+  'food_logged',
+  'measurement_logged',
+  'weekly_review_completed',
+  'cardio_logged',
+  'check_in_logged',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -519,6 +615,15 @@ function eventPropertyKeys(name: string): readonly string[] {
   if (name === 'onboarding_next_action_selected') return ['next_action'];
   if (name === 'today_primary_action_selected') return ['destination'];
   if (name === 'today_week_navigated') return ['direction'];
+  if (
+    name === 'next_action_shown' ||
+    name === 'next_action_clicked' ||
+    name === 'next_action_completed'
+  )
+    return ['action_kind', 'position'];
+  if (name === 'onboarding_first_useful_action') return ['latency_bucket'];
+  if (name === 'quick_add_action_selected') return ['action'];
+  if (name === 'section_navigation_selected') return ['from_section', 'to_section'];
   if (name === 'food_log_started' || name === 'food_logged') return ['entry_method'];
   if (name === 'tma_core_action_completed') return ['action'];
   if (name === 'telegram_news_cta_clicked') return ['destination', 'campaign'];
@@ -577,6 +682,29 @@ function hasValidEventProperties(value: Record<string, unknown>): boolean {
   }
   if (value.name === 'today_week_navigated') {
     return TODAY_WEEK_DIRECTIONS.has(value.direction as string);
+  }
+  if (
+    value.name === 'next_action_shown' ||
+    value.name === 'next_action_clicked' ||
+    value.name === 'next_action_completed'
+  ) {
+    return (
+      NEXT_ACTION_KINDS.has(value.action_kind as NextActionAnalyticsKind) &&
+      NEXT_ACTION_POSITIONS.has(value.position as NextActionPosition)
+    );
+  }
+  if (value.name === 'onboarding_first_useful_action') {
+    return ONBOARDING_LATENCY_BUCKETS.has(value.latency_bucket as OnboardingLatencyBucket);
+  }
+  if (value.name === 'quick_add_action_selected') {
+    return QUICK_ADD_ACTIONS.has(value.action as QuickAddAnalyticsKind);
+  }
+  if (value.name === 'section_navigation_selected') {
+    return (
+      PRODUCT_SECTIONS.has(value.from_section as ProductSection) &&
+      PRODUCT_SECTIONS.has(value.to_section as ProductSection) &&
+      value.from_section !== value.to_section
+    );
   }
   if (value.name === 'food_log_started' || value.name === 'food_logged') {
     return FOOD_ENTRY_METHODS.has(value.entry_method as FoodEntryMethod);
@@ -676,6 +804,56 @@ export function productEventSurface(): ProductSurface {
   return window.matchMedia?.('(max-width: 767px)').matches ? 'mobile_web' : 'desktop_web';
 }
 
+export function isQuickAddAnalyticsKind(value: string): value is QuickAddAnalyticsKind {
+  return QUICK_ADD_ACTIONS.has(value as QuickAddAnalyticsKind);
+}
+
+function onboardingLatencyBucket(elapsedMs: number): OnboardingLatencyBucket {
+  if (elapsedMs < 10_000) return 'under_10s';
+  if (elapsedMs < 30_000) return '10_30s';
+  if (elapsedMs < 60_000) return '30_60s';
+  if (elapsedMs < 5 * 60_000) return '1_5m';
+  if (elapsedMs < 15 * 60_000) return '5_15m';
+  return 'over_15m';
+}
+
+export function markProductOnboardingCompleted(): void {
+  try {
+    window.sessionStorage.setItem(ONBOARDING_COMPLETED_AT_STORAGE_KEY, String(Date.now()));
+  } catch {
+    // Analytics must stay non-blocking when browser storage is unavailable.
+  }
+}
+
+export function clearProductOnboardingCompletionMarker(): void {
+  try {
+    window.sessionStorage.removeItem(ONBOARDING_COMPLETED_AT_STORAGE_KEY);
+  } catch {
+    // Analytics must stay non-blocking when browser storage is unavailable.
+  }
+}
+
+function trackOnboardingFirstUsefulActionIfPending(): void {
+  let completedAt: number | null = null;
+  try {
+    const raw = window.sessionStorage.getItem(ONBOARDING_COMPLETED_AT_STORAGE_KEY);
+    const parsed = raw === null ? Number.NaN : Number(raw);
+    if (Number.isFinite(parsed)) completedAt = parsed;
+  } catch {
+    return;
+  }
+  if (completedAt === null) return;
+
+  const elapsedMs = Math.max(0, Date.now() - completedAt);
+  clearProductOnboardingCompletionMarker();
+  if (elapsedMs > MAX_ONBOARDING_FIRST_ACTION_AGE_MS) return;
+  trackProductEvent({
+    name: 'onboarding_first_useful_action',
+    surface: productEventSurface(),
+    latency_bucket: onboardingLatencyBucket(elapsedMs),
+  });
+}
+
 export function createProductAnalytics({
   target,
   environment,
@@ -751,7 +929,11 @@ export function trackProductEvent(
   event: ProductEvent,
   options?: ProductEventTrackOptions,
 ): boolean {
-  return browserProductAnalytics.track(event, options);
+  const tracked = browserProductAnalytics.track(event, options);
+  if (tracked && USEFUL_ACTION_EVENT_NAMES.has(event.name)) {
+    trackOnboardingFirstUsefulActionIfPending();
+  }
+  return tracked;
 }
 
 export function trackGrowthEvent(
@@ -802,7 +984,7 @@ export function trackCoreProductEvent(
   coreAction: ProductCoreAction,
   options?: ProductEventTrackOptions,
 ): boolean {
-  const tracked = browserProductAnalytics.track(event, options);
+  const tracked = trackProductEvent(event, options);
   if (tracked && event.surface === 'tma') {
     browserProductAnalytics.track({
       name: 'tma_core_action_completed',
