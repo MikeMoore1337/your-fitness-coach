@@ -122,8 +122,20 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
             ),
             _cmd("frontend-unit", "npm", "run", "test", cwd="frontend"),
             _cmd("frontend-build", "npx", "vite", "build", cwd="frontend"),
+            _cmd(
+                "frontend-ui-audit-pr",
+                "npm",
+                "run",
+                "e2e:ui-audit:pr",
+                cwd="frontend",
+            ),
         ),
-        prerequisites=("npm", "frontend/node_modules"),
+        prerequisites=(
+            "npm",
+            "frontend/node_modules",
+            "frontend/playwright.config.ts",
+            "frontend/tests/e2e/ui-quality-gate.spec.ts",
+        ),
     ),
     "frontend-e2e": GroupSpec(
         name="frontend-e2e",
@@ -168,11 +180,20 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
         name="frontend-cross-browser",
         commands=(
             _cmd("frontend-cross-browser", "npm", "run", "e2e:cross-browser", cwd="frontend"),
+            _cmd(
+                "frontend-ui-quality-sweep",
+                "npm",
+                "run",
+                "e2e:ui-audit:sweep",
+                cwd="frontend",
+            ),
         ),
         prerequisites=(
             "npm",
             "frontend/node_modules",
             "frontend/playwright.cross-browser.config.ts",
+            "frontend/playwright.ui-quality-sweep.config.ts",
+            "frontend/tests/e2e/ui-quality-sweep.spec.ts",
         ),
     ),
     "python-tests": GroupSpec(

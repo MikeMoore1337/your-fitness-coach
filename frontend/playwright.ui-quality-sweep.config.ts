@@ -3,18 +3,21 @@ import { getPlaywrightReporters } from './playwright-reporting';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testIgnore: ['**/mobile-ui-regression.spec.ts', '**/ui-quality-sweep.spec.ts'],
-  outputDir: '../.artifacts/runtime/tests/playwright-cross-browser',
-  fullyParallel: true,
+  testMatch: 'ui-quality-sweep.spec.ts',
+  outputDir: '../.artifacts/runtime/tests/playwright-ui-quality-sweep',
+  fullyParallel: false,
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: getPlaywrightReporters(),
   use: {
     baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
-    trace: 'on-first-retry',
+    trace: 'off',
+    serviceWorkers: 'block',
+    locale: 'ru-RU',
+    timezoneId: 'Europe/Moscow',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: process.env.PW_EXTERNAL_SERVER

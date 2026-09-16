@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ExerciseGuide } from '../../shared/api/types';
 import { ChevronIcon, CloseIcon } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 
 type GuideMediaItem = ExerciseGuide['media'][number];
@@ -100,7 +101,7 @@ export function ExerciseGuideMedia({
                     onError={() => markFailed(item.url)}
                   />
                   <span className="exercise-guide-image__zoom" aria-hidden="true">
-                    ⛶
+                    <Icon name="maximize" size={16} />
                   </span>
                 </button>
               )}

@@ -13,6 +13,7 @@ import {
   type PlatformApiController,
   type PlatformApiOptions,
 } from './fixtures/platform-api';
+import { expectUiAuditClean } from './fixtures/ui-audit';
 
 const FIXED_DATE = '2026-09-06';
 const MOBILE_VIEWPORTS = [
@@ -125,6 +126,7 @@ async function assertMobileShellGeometry(page: Page): Promise<void> {
       '#appBottomNav .app-bottom-nav__primary > a, #appBottomNav .app-bottom-nav__primary > button',
     ),
   );
+  await expectUiAuditClean(page, 'mobile shared shell', { checkTouchTargets: true });
 }
 
 for (const theme of ['light', 'dark'] as const) {

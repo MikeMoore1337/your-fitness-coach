@@ -7,16 +7,14 @@ import {
   expectElementsWithinHorizontalViewport,
   expectNoHorizontalOverflow,
 } from './fixtures/mobile-tma';
+import { expectUiAuditClean, UI_AUDIT_VIEWPORTS } from './fixtures/ui-audit';
 
 const DEMO_VIEWPORTS = [
-  { name: 'compact-mobile', width: 360, height: 800, mobile: true },
-  { name: 'baseline-mobile', width: 390, height: 844, mobile: true },
-  { name: 'large-mobile', width: 430, height: 932, mobile: true },
-  { name: 'tablet', width: 768, height: 900, mobile: true },
-  { name: 'desktop', width: 1280, height: 720, mobile: false },
-  { name: 'desktop-wide', width: 1366, height: 768, mobile: false },
-  { name: 'desktop-large', width: 1440, height: 900, mobile: false },
-  { name: 'desktop-xl', width: 1920, height: 1080, mobile: false },
+  ...UI_AUDIT_VIEWPORTS.map((viewport) => ({
+    ...viewport,
+    mobile: viewport.width <= 900,
+  })),
+  { name: 'desktop-1366', width: 1366, height: 768, mobile: false },
 ] as const;
 
 const TASK_274_EVIDENCE_DIR = process.env.TASK_274_EVIDENCE_DIR;
@@ -1242,6 +1240,14 @@ test('production composition keeps responsive geometry, utility and keyboard foc
         page,
         '.demo-cabinet-boundary, .demo-route, .app-section',
       );
+      await expectUiAuditClean(page, `demo today ${viewport.name} ${colorScheme} top`, {
+        checkTouchTargets: viewport.mobile,
+      });
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await expectUiAuditClean(page, `demo today ${viewport.name} ${colorScheme} bottom`, {
+        checkTouchTargets: viewport.mobile,
+      });
+      await page.evaluate(() => window.scrollTo(0, 0));
 
       if (viewport.mobile) {
         const moreButton = page.getByRole('button', { name: 'Сценарии', exact: true });

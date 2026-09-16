@@ -863,6 +863,9 @@ details[open] > summary .disclosure-icon .yfc-icon {
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
+details:not([open]) > :not(summary) {
+  display: none !important;
+}
 .card-disclosure__actions {
   display: flex;
   justify-content: flex-end;
