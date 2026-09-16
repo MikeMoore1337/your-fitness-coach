@@ -6,21 +6,21 @@ Scope: русскоязычный public Web YFC; Россия, Казахста
 
 ## Executive summary
 
-**A. Что имеет смысл запускать первым.** Самые сильные product-led opportunities — инструмент
-1ПМ/рабочих весов, одна полезная программа Full Body на 3 дня и калькулятор тренировочного
-объёма. У всех трёх есть понятный результат, который можно связать с программой и сохранением в
-YFC. Это пока opportunity ranking, а не доказательство объёма: Wordstat не дал authenticated
-выгрузку, поэтому все demand values остаются `UNKNOWN`.
+**A. Что имеет смысл запускать первым.** Owner-provided Yandex Wordstat export теперь
+интегрирован в исследование. Самый большой наблюдаемый кластер — `калькулятор кбжу`
+(Россия: 16 127 broad и 4 763 quoted/fixed-word-count), затем exercise technique и дневник
+тренировок. Это evidence о поисковом сигнале, а не прогноз трафика и не Google Ads exact match.
 
-**B. Что требует Wordstat evidence.** В первую очередь — `калькулятор 1пм`, `калькулятор объёма
-тренировки`, `программа тренировок 3 раза в неделю`, `приложение для фитнес тренера`,
-`калькулятор кбжу`, `калькулятор пульсовых зон` и `дневник тренировок`. SERP подтверждает
-существование intent и конкурирующих utility pages, но не размер спроса.
+**B. Обновлённый порядок Wave 1.** Сначала усилить существующий `/nutrition`, затем сделать
+эталонной страницу `/exercises/bench-press`, усилить `/training`, реализовать 1ПМ и один
+русскоязычный canonical asset для intent `программа тренировок 3 раза в неделю`. `/for-trainers`
+остаётся коммерчески подходящим улучшением, но его Wordstat demand для заявленного seed не
+подтверждён.
 
-**C. Что отложить.** Отдельный heart-rate calculator, самостоятельный diary landing, массовое
-расширение exercise catalog и country-specific pages не должны входить в первую implementation
-wave. Для cardio/nutrition сначала нужны актуальные authoritative sources, reviewer policy и
-claims review; для diary intent текущий `/training` закрывает большую часть product story.
+**C. Что отложить.** `/calculators/training-volume` и тонnage не входят в Wave 1: broad demand
+слабый, а quoted/fixed-word-count signal почти отсутствует. Отдельный heart-rate calculator,
+самостоятельный diary landing и country-specific pages также откладываются. Для cardio/nutrition
+сначала нужны authoritative sources, reviewer policy и claims review.
 
 **D. Что усилить вместо новых URL.** `/training` — дневник, запись подходов и сохранение
 программ; `/nutrition` — текущий КБЖУ flow с прозрачными ограничениями; `/for-trainers` —
@@ -33,9 +33,10 @@ workspace value и путь `trainer activation -> client_invited`; `/knowledge`
 страница на каждую формулировку. `/nutrition` не следует раздваивать на `/calculators/kbju`, пока
 новый URL не получит materially different tool intent и самостоятельную product value.
 
-**F. Что ещё нужно извне.** Owner export из Yandex Wordstat по пяти региональным slices и
-уточнение, какие будущие save flows будут доступны в 241B. GSC baseline `0 clicks / 0 impressions`
-за 28 settled days through 2026-09-11 — только T0, не evidence отсутствия спроса.
+**F. Что ещё нужно извне.** Нужно owner review выводов и отдельные product contracts для
+будущих save flows; Wordstat export сам по себе не авторизует production page creation, merge или
+Task 241B. GSC baseline `0 clicks / 0 impressions` за 28 settled days through 2026-09-11 — только
+T0, не evidence отсутствия спроса.
 
 ## Evidence и ограничения
 
@@ -66,16 +67,47 @@ index и 3 exercise pages. Live sitemap содержит 25 canonical URLs (вк
 
 ### Demand evidence policy
 
-В исследовании нет официальных search-volume numbers. `Yandex Wordstat` без owner authentication
-перенаправляет на Passport; после повторных automated-like queries Yandex SERP показал SmartCaptcha.
-Один initial Yandex snapshot по `калькулятор 1пм` был доступен и показал utility SERP, но число
-`19 млн результатов` не является frequency и в ranking не используется. Google UI snapshots показывают
-organic composition и related queries, но Google Keyword Planner data не собиралась. Поэтому:
+Owner-provided `Yandex Wordstat -> Regions` export покрывает период `15.08.2026–15.09.2026`,
+фильтр устройств `все устройства` и основной регион `Россия`. В CSV `demand_value` сохраняет
+число broad frequency для России как backward-compatible краткое значение. Поля
+`demand_broad_frequency`, `demand_quoted_frequency` и `quoted_broad_ratio` разделяют фактические
+метрики. `NO_DATA` означает отсутствие пригодной выгрузки, а не нулевой спрос.
 
-- `demand_value` в CSV = `UNKNOWN`;
-- `demand_status` = `unknown_wordstat_unavailable`;
-- SERP result count, third-party metrics и snippets не выдаются за frequency;
-- detailed manual export contract находится в `manual-wordstat-input.md`.
+Под кавычками понимается Wordstat operator `"..."`: он фиксирует количество слов, но не
+обязательно порядок и словоформу. В этом исследовании это называется
+`quoted/fixed-word-count frequency`, а не exact match в смысле Google Ads. Если quoted export не
+получен, broad остаётся валидным, а quoted и ratio получают `NO_DATA`.
+
+Для строк с owner evidence используются статусы `observed_broad_and_quoted` или
+`observed_broad_only`; для остальных seed variants — `no_export_available`. Ни одно отсутствие
+данных не превращается в `0`, `UNKNOWN` или субъективный score 0–5.
+
+Один initial Yandex snapshot по `калькулятор 1пм` был доступен и показал utility SERP, но число
+`19 млн результатов` не является frequency и в ranking не используется. Google UI snapshots
+показывают organic composition и related queries, но Google Keyword Planner data не собиралась.
+Detailed input/import contract находится в `manual-wordstat-input.md`.
+
+### Owner Wordstat evidence matrix
+
+Значения в ячейках — `broad / quoted/fixed-word-count` для указанного региона. `NO_DATA` не
+означает ноль. Региональные значения не усредняются и не подменяют основной Russia row в CSV.
+
+| Seed | Россия | Москва и МО | Москва | Санкт-Петербург и ЛО | Санкт-Петербург | Казахстан | Беларусь | СНГ без России |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `калькулятор 1пм` | 363 / 261 | 90 / 70 | 39 / 26 | 27 / 21 | 22 / 18 | 1 / NO_DATA | NO_DATA | 15 / 14 |
+| `программа тренировок 3 раза в неделю` | 1351 / 32 | 247 / 10 | 137 / 4 | 86 / NO_DATA | 75 / NO_DATA | 7 / 1 | 35 / NO_DATA | 47 / NO_DATA |
+| `full body 3 раза в неделю` | 20 / NO_DATA | 4 / NO_DATA | 3 / NO_DATA | 5 / NO_DATA | 4 / NO_DATA | 1 / NO_DATA | NO_DATA | NO_DATA |
+| `дневник тренировок` | 3038 / 456 | 832 / 195 | 630 / 184 | 389 / 105 | 350 / 102 | 16 / 3 | 58 / 10 | 79 / 13 |
+| `калькулятор кбжу` | 16127 / 4763 | 3715 / 1194 | 2217 / 787 | 1255 / 387 | 967 / 300 | 135 / 57 | 304 / 79 | 461 / 148 |
+| `жим лежа техника` | 2943 / 528 | 651 / 100 | 402 / 73 | 232 / 53 | 182 / 47 | 13 / 3 | 26 / 4 | 48 / 8 |
+| `программа тренировок для новичка` | 604 / 34 | 124 / 8 | 82 / 8 | 45 / 3 | 33 / 1 | 5 / 1 | 3 / NO_DATA | 9 / NO_DATA |
+| `тоннаж тренировки` | 181 / 2 | 33 / 1 | 21 / 1 | 8 / NO_DATA | 7 / NO_DATA | 2 / NO_DATA | NO_DATA | 3 / NO_DATA |
+| `калькулятор объёма тренировки` | 5 / NO_DATA | NO_DATA | NO_DATA | NO_DATA | NO_DATA | NO_DATA | NO_DATA | NO_DATA |
+| `приложение для фитнес тренера` | NO_DATA | NO_DATA | NO_DATA | NO_DATA | NO_DATA | NO_DATA | NO_DATA | NO_DATA |
+
+The owner export contains smaller but non-zero Russian-language signals in Kazakhstan and Belarus
+for several major clusters, especially KBJU, diary and programs. This supports one RU/CIS
+canonical surface, not `/kz` or `/by` clones.
 
 ### SERP observation dates
 
@@ -99,21 +131,23 @@ The numeric `priority_score` is an implementation-opportunity proxy, **not searc
      + 0.05 geo_breadth) / 5
 ```
 
-`Search demand` is recorded separately as qualitative SERP signal plus `UNKNOWN` demand confidence.
-Scores are 0–5. Health/claims complexity is a penalty applied to the tier decision, not disguised
-as a demand score. A cluster cannot become a confirmed launch decision until Wordstat export and
-owner review are available.
+`Search demand` is recorded separately as the Wordstat evidence above. Scores are 0–5 and remain
+an opportunity proxy, not demand. `priority_score` in the CSV is that product/opportunity proxy;
+it must not be compared numerically with 16 127, 2 943 or any other Wordstat frequency.
+Health/claims penalty, implementation cost and cannibalization risk remain separate decision
+dimensions. A cluster can be proposed for implementation only after owner review and its product
+contract; Wordstat does not authorize production changes.
 
-| Cluster | SERP signal | Product fit | Conversion | Attainability | Readiness | Linking | Geo | Health risk | Opportunity proxy |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |
-| A 1ПМ/working weights | many calculator/formula results; calculator intent clear | 5 | 5 | 4 | 3 | 5 | 4 | low–medium | 87 |
-| C Full Body / beginner program | article + video + template mix; strong program action | 5 | 5 | 4 | 3 | 5 | 4 | low–medium | 87 |
-| B training volume | several interactive calculators and tonnage tools | 5 | 4 | 4 | 3 | 5 | 4 | low–medium | 83 |
-| D trainer workspace / CRM | commercial products and feature-led landing pages | 5 | 5 | 3 | 3 | 4 | 4 | low | 81 |
-| E exercise technique | broad informational/video SERP; current YFC catalog is credible base | 4 | 3 | 3 | 3 | 5 | 5 | medium | 75 |
-| H workout diary/app | app stores, roundups and product pages; high competition | 4 | 4 | 2 | 3 | 4 | 5 | low | 73 |
-| F KBJU/calorie/protein | calculators mixed with nutrition/medical trust domains | 4 | 4 | 3 | 2 | 4 | 5 | high | 69 |
-| G pulse zones | interactive tools exist, but claims/medical context is sensitive | 3 | 3 | 3 | 2 | 4 | 4 | high | 60 |
+| Cluster | RU Wordstat evidence | Quoted/broad | Product/opportunity score | Health/claims penalty | Implementation cost | Cannibalization / decision |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| F KBJU/calorie/protein | 16127 / 4763 | 29.5% | 69 | high | M | high if duplicate URL; strengthen `/nutrition` in Wave 1 |
+| E exercise technique | 2943 / 528 for bench press | 17.9% | 75 | medium | M | improve `/exercises/bench-press`, then bounded expansion |
+| H workout diary/app | 3038 / 456 | 15.0% | 73 | low | S/M | strengthen `/training`; no diary duplicate |
+| A 1ПМ/working weights | 363 / 261 | 71.9% | 87 | low–medium | M | implement `/calculators/1rm`; high formula-variant cannibalization |
+| C 3-day / beginner program | 1351 / 32 for broad Russian program seed | 2.4% | 87 | low–medium | M | one canonical program asset; Full Body wording is secondary |
+| D trainer workspace / CRM | NO_DATA | NO_DATA | 81 | low | S/M | improve `/for-trainers` conditionally; demand remains unknown |
+| B training volume / tonnage | 181 / 2 for tonnage; 5 / NO_DATA for calculator | 1.1% / NO_DATA | 83 | low–medium | M/L | defer; fix definition before tool work |
+| G pulse zones | NO_DATA | NO_DATA | 60 | high | M/L | defer for claims/source review |
 
 ## Cluster conclusions
 
@@ -127,33 +161,40 @@ percentage table, and a future save-to-program path.
 
 Recommended canonical hypothesis: `/calculators/1rm`. Do not create separate URLs for `жим`,
 `присед`, `становая` until data shows a materially different intent; exercise selector/sections
-should prevent cannibalization. Product dependency: calculator result and `calculator_saved` flow
-do not exist yet.
+should prevent cannibalization. Owner Wordstat shows 363 broad and 261 quoted/fixed-word-count
+for the main seed, a 71.9% ratio: modest volume but unusually pure intent. Product dependency:
+calculator result and `calculator_saved` flow do not exist yet.
 
 ### B — training volume and tonnage
 
 Intent is mostly `tool/calculator` plus informational planning (`sets per muscle group`). SERP has
-interactive tools from AnatomyStudy, Start-fit, OnlyPump, Calcal and Sport-iv. YFC can differentiate
-with a transparent definition of volume, per-exercise/per-week views, and direct program context,
-not a generic tonnage number. Need a separate contract for what YFC can calculate from planned versus
-completed sets; do not imply an evidence-based optimal range without sources.
+interactive tools from AnatomyStudy, Start-fit, OnlyPump, Calcal and Sport-iv. Owner Wordstat is
+weak for the direct calculator seed (5 broad and no quoted export) and modest for `тоннаж тренировки`
+(181 broad and 2 quoted), so this is not Wave 1. YFC can still differentiate later with a transparent
+definition of volume, per-exercise/per-week views, and direct program context, not a generic tonnage
+number. Need a separate contract for planned versus completed sets; do not imply an evidence-based
+optimal range without sources.
 
 ### C — 3-day and beginner programs
 
-Intent splits into `program/template` and informational advice. `Full Body 3 раза в неделю` is the
-cleanest first candidate because it has a bounded schedule and a clear save action. Google SERP
-contains InstructorPRO, Maxler, Dzen/Championat, Reddit and video results; the page must be more
-useful than a text list by exposing days, exercises, progression notes and a future `public_program_saved`
-flow. Keep beginner, mass and weight-loss variants under one information architecture until Wordstat
-proves separate dominant intents.
+Intent splits into `program/template` and informational advice. The broader Russian seed
+`программа тренировок 3 раза в неделю` has 1 351 broad but only 32 quoted/fixed-word-count, while
+`full body 3 раза в неделю` has 20 broad and no quoted export. Build one Russian canonical program
+asset and use Full Body as concept/secondary wording, not as the primary acquisition phrase. Google
+SERP contains InstructorPRO, Maxler, Dzen/Championat, Reddit and video results; the page must be
+more useful than a text list by exposing days, exercises, progression notes and a future
+`public_program_saved` flow. Keep beginner, mass and weight-loss variants under one information
+architecture until stronger evidence supports separate intents.
 
 ### D — trainer workspace / CRM
 
 Intent is `commercial investigation` / `transactional product`. Fitness1C, Rubitime, YCLIENTS,
 Fitbase, Bitrix24 and similar products compete on booking, CRM, analytics and client management.
 YFC's differentiator is a focused trainer workflow for programs, progress and invite—not a promise
-of bookings, payments or full club CRM. Strengthen `/for-trainers` with concrete current actions and
-proof; a `/for-trainers/crm` page would be misleading while the product scope remains narrower.
+of bookings, payments or full club CRM. No usable Wordstat export was obtained for either requested
+trainer seed, so demand remains `NO_DATA`; keep the opportunity based on product fit and commercial
+SERP only. Strengthen `/for-trainers` with concrete current actions and proof; a `/for-trainers/crm`
+page would be misleading while the product scope remains narrower.
 
 ### E — exercise technique
 
@@ -161,15 +202,19 @@ SERP is informational and media-heavy: Fitness3000, Sport-Express, Nef, PlanetaS
 videos compete with technique/how-to pages. Existing YFC exercise cards are a sound canonical base
 because their data comes from the shared domain catalog. Expand only when the entry has technique,
 breathing, common errors, safety limits, equipment/variant and genuinely useful media or diagrams.
-The `Добавить упражнение в тренировку` CTA is a future dependency, not a current promise.
+Owner Wordstat makes `жим лежа техника` a material opportunity (2 943 broad and 528
+quoted/fixed-word-count). Make the existing bench-press canonical page the first exemplar, then
+reuse the structure for other verified exercises. The `Добавить упражнение в тренировку` CTA is a
+future dependency, not a current promise.
 
 ### F — KBJU, calorie and protein tools
 
 Intent is tool-led but high-trust: Alena RightFood, Smart Eat, XFIT, WillFood, PowerTeam and
 nutrition/medical sources appear. `/nutrition` already owns a product-calculator story and should be
 strengthened before a second canonical URL. Any new page needs transparent assumptions, source/reviewer
-policy, health limitations and no individualized medical claim. First-wave status: supporting
-improvement, not an independent launch.
+policy, health limitations and no individualized medical claim. This is the strongest observed
+cluster (16 127 broad and 4 763 quoted/fixed-word-count, 29.5%). First-wave action is to strengthen
+`/nutrition`; do not automatically create `/calculators/kbju`.
 
 ### G — pulse zones
 
@@ -184,20 +229,29 @@ SERP mixes app stores, roundups, Reddit and product pages: GymUp, Gymate, Forma,
 Britetodo, RBC Style. It is commercially attractive but broad and saturated. Current `/training`
 already explains programs and recorded sets; strengthen it around `план -> записать -> увидеть
 прогресс` and link from program pages. A separate diary landing would duplicate intent until a
-distinct public entry and save funnel are implemented.
+distinct public entry and save funnel are implemented. Owner Wordstat shows 3 038 broad and 456
+quoted/fixed-word-count, so the existing `/training` improvement moves into the first three actions.
 
 ## Top 10 opportunity clusters
 
-1. `калькулятор 1пм` / `рассчитать рабочий вес` — tool result plus future save.
-2. `full body 3 раза в неделю` — bounded program with clear product action.
-3. `калькулятор объема тренировки` / `тоннаж тренировки` — plan/completed-volume utility.
-4. `приложение для фитнес тренера` / `CRM для фитнес тренера` — focused trainer workspace.
-5. `жим лежа техника` and verified exercise technique pages — canonical catalog expansion.
-6. `программа тренировок для новичка` — should share the program IA with Full Body, not duplicate it.
-7. `дневник тренировок` / `запись рабочих весов` — strengthen `/training` before a new landing.
-8. `калькулятор кбжу` / `сколько белка нужно` — strengthen `/nutrition` with health-safe source policy.
-9. `калькулятор пульсовых зон` — real tool gap, but deferred for claims risk.
-10. adjacent `проценты от 1пм` / `формула 1пм` — sections of the 1ПМ asset, not separate pages.
+The list combines actual RU Wordstat evidence with product fit and implementation constraints. It is
+not a ranking of raw frequency alone; `NO_DATA` opportunities remain explicitly uncertain.
+
+1. `калькулятор кбжу` — 16 127 broad / 4 763 quoted; strengthen `/nutrition` with YMYL safeguards.
+2. `жим лежа техника` — 2 943 / 528; make `/exercises/bench-press` the first exercise exemplar.
+3. `дневник тренировок` — 3 038 / 456; strengthen `/training`, not a duplicate landing.
+4. `калькулятор 1пм` — 363 / 261; high-intent BOFU tool with unusually pure quoted ratio.
+5. `программа тренировок 3 раза в неделю` — 1 351 / 32; one Russian canonical program asset.
+6. `программа тренировок для новичка` — 604 / 34; supporting intent inside the same program IA.
+7. `приложение для фитнес тренера` / `CRM для фитнес тренера` — `NO_DATA`; commercial-fit improvement
+   of `/for-trainers`, not a demand-confirmed launch.
+8. `тоннаж тренировки` — 181 / 2; useful later only after a sound planned/completed-volume contract.
+9. `full body 3 раза в неделю` — 20 / `NO_DATA`; secondary wording for the Russian program asset.
+10. `калькулятор объема тренировки` — 5 / `NO_DATA`; keep in backlog, outside Wave 1.
+
+Pulse-zone queries remain outside this evidence-informed Top 10 because no owner export was supplied
+and the health/claims penalty is high. Adjacent `проценты от 1пм` and `формула 1пм` remain sections
+of the 1ПМ asset, not separate pages.
 
 ## Product-led linking graph
 
@@ -230,11 +284,13 @@ keyword footer or link every guide to every tool.
 
 ## Recommended next tasks (not started here)
 
-1. Owner review of this packet and Wordstat export.
-2. A future product/SEO implementation task for one canonical 1ПМ asset plus its save-flow contract.
-3. A separate bounded task for one Full Body program asset and public-to-product save semantics.
-4. A later training-volume spike that first fixes the planned-vs-completed volume definition.
-5. Conditional follow-up for nutrition/cardio only after source, reviewer and claims decisions.
+1. Owner review of this packet and the integrated Wordstat evidence.
+2. A future product/SEO implementation task for the owner-approved `/nutrition` improvement or
+   another bounded first-wave asset, with its product and claims contract.
+3. A future task for one canonical 1ПМ asset plus its save-flow contract.
+4. A separate bounded task for one Russian 3-day program asset and public-to-product save semantics.
+5. A later training-volume spike that first fixes the planned-vs-completed volume definition.
+6. Conditional follow-up for cardio only after source, reviewer and claims decisions.
 
 Task 241B is intentionally not started by this research task.
 
@@ -243,7 +299,7 @@ Task 241B is intentionally not started by this research task.
 - Live YFC: https://your-fitness-coach.ru/
 - YFC public-content contract: `docs/seo/public-content.md`
 - YFC growth/analytics contract: `docs/seo/growth-analytics-foundation.md`
-- Wordstat entry point: https://wordstat.yandex.ru/ (authentication unavailable in this session)
+- Wordstat entry point and owner export source: https://wordstat.yandex.ru/ (period 2026-08-15..2026-09-15; `Regions`; all devices)
 - Google UI snapshots, examples: https://www.google.com/search?q=%D0%BA%D0%B0%D0%BB%D1%8C%D0%BA%D1%83%D0%BB%D1%8F%D1%82%D0%BE%D1%80+1%D0%BF%D0%BC&hl=ru&gl=ru and https://www.google.com/search?q=full+body+3+%D1%80%D0%B0%D0%B7%D0%B0+%D0%B2+%D0%BD%D0%B5%D0%B4%D0%B5%D0%BB%D1%8E&hl=ru&gl=ru
 - Yandex UI snapshot: https://yandex.ru/search/?text=%D0%BA%D0%B0%D0%BB%D1%8C%D0%BA%D1%83%D0%BB%D1%8F%D1%82%D0%BE%D1%80+1%D0%BF%D0%BC&lr=2
 - Competitor URLs and query-level evidence are listed in `serp-competitor-matrix-ru-cis.md`.

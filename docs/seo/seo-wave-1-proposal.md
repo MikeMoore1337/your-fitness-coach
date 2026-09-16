@@ -5,30 +5,35 @@ Status: proposal for owner review; no production implementation is included.
 
 ## Decision
 
-Wave 1 should contain seven assets, but only three are new product-led candidates. The other four
-are existing-page improvements or bounded catalog work. This keeps the wave useful without creating
-near-duplicate URLs before Wordstat evidence and product contracts exist.
+Owner-provided Yandex Wordstat evidence is integrated for the period `15.08.2026–15.09.2026`,
+device filter `все устройства`, with Russia as the primary geography. The quoted metric means
+Wordstat's quoted/fixed-word-count frequency: the `"..."` operator fixes the word count but not
+necessarily order or word form. It is not Google Ads exact match.
 
-Demand is `UNKNOWN` for every candidate because authenticated Yandex Wordstat data was unavailable.
-The ranking below is therefore an opportunity proxy using product fit, conversion intent, SERP
-attainability, content readiness, linking potential and geography. It is not a promise of traffic.
+Wave 1 contains seven assets, but only two are new product-led candidates. The other five are
+existing-page improvements or bounded catalog work. The ordering below combines actual Wordstat
+evidence with product fit, health/claims penalty, implementation cost and cannibalization risk.
+Wordstat demand and the existing `priority_score` opportunity proxy are shown separately; neither
+is a traffic forecast or production authorization.
 
 ## Ranked Wave 1: 7 primary assets
 
-| Rank | Asset / canonical hypothesis | Type | Why now | Primary CTA | Product integration required | Complexity | Content/source requirements | SERP gap | Success metric |
-| ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `/calculators/1rm` | New interactive calculator | Strongest clear tool/BOFU intent; Google and Yandex both show utility SERP | `Сохранить результат в программу` | 1RM calculation contract, formula/limits, `calculator_started`, `calculator_result`, later `calculator_saved` | M | Formula provenance, exercise/unit validation, uncertainty and technique disclaimer | Competitors stop at formula or result; few connect result to YFC program | calculator result rate; save rate; registration -> first workout |
-| 2 | `/programs/full-body-3-days` | New public program asset | Bounded schedule, strong program intent, natural bridge to exercises and training | `Открыть программу` / later `Сохранить в YFC` | Public program read model, exercise references, `public_program_opened`, later `public_program_saved` | M | Original Russian program, progression/limits, audience assumptions, no guaranteed result | SERP has articles/videos but not a coherent editable product path | open -> registration; open -> save; first workout |
-| 3 | `/calculators/training-volume` | New interactive tool | Existing competitors prove tool intent; product has training data that can become useful | `Посмотреть объём программы` | Explicit planned-vs-completed volume model; no unsupported “optimal” claims | M/L | Define sets × reps × load, aggregation, source-backed interpretation | Most tools output tonnage without explaining data meaning or next action | calculator completion; repeat use; program engagement |
-| 4 | `/for-trainers` | Existing page improvement | Commercial investigation is valuable and current YFC already has programs/progress/invites | `Включить режим тренера` | Existing `trainer_application_started/completed`, `client_invited` only | S/M | Current feature proof, workflow screenshots only if real, honest scope/FAQ | Competitors are broader CRM/booking suites; YFC can be more focused and truthful | trainer activation; activation -> client_invited |
-| 5 | `/exercises` + one verified expansion | Existing catalog improvement | Exercise SERP is broad, media-led, and current public catalog is a canonical domain source | `Добавить упражнение в тренировку` only when flow exists | Public-to-product add action is future; shared exercise catalog remains source | M | Technique, breathing, errors, safety, equipment/variants, lawful media | Competitors have volume but inconsistent canonical data; do not mass-generate pages | non-brand impressions; page engagement; add action after implementation |
-| 6 | `/training` | Existing page improvement | Owns workout diary/app intent better than a duplicate diary landing | `Начать тренировку` | Existing `first_workout_started`; no new future event until flow is proven | S/M | Explain plan -> record -> progress path, current features only | App SERP is saturated; YFC should prove one integrated job | landing -> registration; registration -> first workout |
-| 7 | `/nutrition` + knowledge links | Existing page improvement | Existing calculator and KBJU guides already own product context; avoids YMYL cannibalization | Current nutrition action; future save only after contract | Existing nutrition flow; source/reviewer contract before new calculator URL | M | Assumptions, limits, authoritative sources, no individualized medical claims | Competitors have calculators but trust/limits are inconsistent | nutrition action completion; registration/activation |
+| Rank | Asset / canonical hypothesis | Type | RU Wordstat evidence | Why now | Product/opportunity separation | Health / cost / cannibalization gate |
+| ---: | --- | --- | --- | --- | --- | --- |
+| 1 | `/nutrition` + knowledge links | Existing page improvement | `калькулятор кбжу`: 16127 broad / 4763 quoted (29.5%) | Strongest observed cluster already has a canonical product page; improve it before creating a second calculator URL | Existing page fit; current `priority_score` 69 is not comparable to the frequency | High YMYL/claims penalty; M; avoid `/calculators/kbju` duplication |
+| 2 | `/exercises/bench-press` | Existing page exemplar | `жим лежа техника`: 2943 / 528 (17.9%) | Material technique demand and a real canonical exercise page; establish the quality pattern first | Existing catalog fit; `priority_score` 75 | Medium claims/safety penalty; M; no mass-generated exercise pages |
+| 3 | `/training` | Existing page improvement | `дневник тренировок`: 3038 / 456 (15.0%) | Good acquisition cluster maps to current program -> workout -> logging -> progress story | Existing product path; `priority_score` 73 | Low claims penalty; S/M; no duplicate diary landing |
+| 4 | `/calculators/1rm` | New interactive calculator | `калькулятор 1пм`: 363 / 261 (71.9%) | Modest volume but unusually pure BOFU intent and clear future save-to-program value | New product contract; `priority_score` 87 | Low–medium claims penalty; M; formula variants remain one canonical URL |
+| 5 | `/programs/full-body-3-days` | New public program asset | `программа тренировок 3 раза в неделю`: 1351 / 32 (2.4%); Full Body seed 20 / `NO_DATA` | Broad Russian program cluster is meaningful; use Full Body as concept/secondary wording | New public program read model; `priority_score` 87 | Low–medium claims penalty; M; no gender/goal/country duplicates |
+| 6 | `/for-trainers` | Existing page improvement | `NO_DATA` — no usable owner export for requested trainer variants | Product fit and commercial SERP justify a focused truthful improvement, not a volume claim | Existing product fit; `priority_score` 81 | Low claims penalty; S/M; no `/for-trainers/crm` without distinct job |
+| 7 | `/exercises` + one verified next expansion | Bounded catalog improvement | Reuse the bench-press evidence pattern; no mass-demand claim | Apply the exemplar structure only to another verified canonical exercise | Existing catalog fit; `priority_score` 75 family proxy | Medium safety/content cost; M; stop if useful canonical content is unavailable |
 
 ### What is explicitly not in Wave 1
 
 - standalone `/calculators/kbju`: first strengthen `/nutrition` and decide whether a distinct tool
   exists;
+- `/calculators/training-volume` and a standalone tonnage calculator: direct calculator evidence is
+  only 5 broad with no quoted export; tonnage is 181 broad / 2 quoted and needs a domain contract;
 - `/calculators/heart-rate-zones`: defer for claims/health-risk and reviewer contract;
 - `/workout-diary` or `/fitness-app`: duplicate risk while `/training` is underused;
 - country-specific pages for Russia/Kazakhstan/Belarus without regional intent evidence;
@@ -48,8 +53,15 @@ feature a generic “diary app” if the current UI does not prove that exact br
 
 Make current calculator assumptions and limitations visible in the public fallback and page copy.
 Link to the KBJU reference and protein/recomposition guide. Keep `КБЖУ`, calories and protein
-variants as sections until Wordstat and product contracts prove a separate canonical tool. Avoid
+variants as sections until a distinct tool contract is proven. The observed demand is strong enough
+to move this page to the top of Wave 1, but it does not authorize a new URL or individualized
 medical/dietological promise language.
+
+### `/exercises/bench-press`
+
+Use the existing canonical exercise page as the first exemplar for `техника` intent: technique,
+breathing, common errors, safety limits, equipment/variants, useful media or diagrams, and clear
+source/license state. Do not imply a public add-to-workout action until that product flow exists.
 
 ### `/for-trainers`
 
@@ -60,8 +72,9 @@ YFC to claim features that are absent.
 
 ### `/exercises` and existing cards
 
-Improve information architecture and internal links before adding volume. Expand only records that
-have verified technique, breathing, errors, safety, equipment, difficulty and source/license state.
+Use the bench-press page as the quality gate before bounded expansion. Improve information
+architecture and internal links before adding volume. Expand only records that have verified
+technique, breathing, errors, safety, equipment, difficulty and source/license state.
 The exercise page can later own an `Добавить упражнение` action, but Wave 1 research must not imply
 that action exists.
 
@@ -136,9 +149,9 @@ add links merely to place keywords on every page.
 
 ## Recommended follow-up task sequence
 
-1. Owner review of Task 241A and manual Wordstat export.
-2. 241B (future, not started): implement the owner-approved first product-led asset, likely 1RM or
-   Full Body depending on volume evidence and product contract.
-3. Separate volume-definition spike if the owner keeps training-volume calculator in scope.
-4. Separate trainer-page copy/IA task and nutrition/cardio risk-reviewed tasks only as evidence
-   supports them.
+1. Owner review of Task 241A and this evidence-informed Wave 1.
+2. 241B (future, not started): implement only the owner-approved first asset and its product/claims
+   contract; this research update does not start it.
+3. Separate trainer-page copy/IA task and nutrition/cardio risk-reviewed tasks only as evidence and
+   owner decisions support them.
+4. Separate volume-definition spike if the owner later keeps training-volume calculator in scope.
