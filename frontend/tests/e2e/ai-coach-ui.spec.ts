@@ -689,10 +689,11 @@ test('AI Coach is one floating desktop workspace with continuity and bounded con
   await workspace.getByRole('button', { name: 'Закрыть AI Coach' }).click();
   await expect(workspace).toHaveCount(0);
   await page.getByTestId('quick-add-trigger').click();
-  await page.getByTestId('quick-add-sheet').getByRole('link', { name: 'Открыть AI Coach' }).click();
-  await expect(workspace).toBeVisible();
-  await workspace.getByRole('button', { name: 'Закрыть AI Coach' }).click();
-  await expect(workspace).toHaveCount(0);
+  const quickAddSheet = page.getByTestId('quick-add-sheet');
+  await expect(quickAddSheet.getByRole('link', { name: 'Открыть AI Coach' })).toHaveCount(0);
+  await expect(quickAddSheet).not.toContainText('AI Coach');
+  await quickAddSheet.getByRole('button', { name: 'Закрыть быстрые действия' }).click();
+  await expect(quickAddSheet).toHaveCount(0);
   await page.goto('/app?section=profile');
   await page.reload();
   await expect(page.getByTestId('ai-coach-entry-profile')).toBeVisible();

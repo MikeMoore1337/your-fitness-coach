@@ -1211,7 +1211,8 @@ test('клиент входит и видит экран тренировки', 
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'С чего начнём?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Неделя готова к проверке' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'С чего начнём?' })).toHaveCount(0);
 });
 
 test('цветовая система сохраняет иерархию в светлой и тёмной темах', async ({ page }) => {
