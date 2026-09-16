@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { ExerciseGuideMedia } from '../../features/exercises/ExerciseGuideMedia';
 import {
   categoryForSlug,
   getPublicContentPage,
@@ -331,6 +332,14 @@ function PublicExerciseDetails({ page }: { page: PublicContentPageData }) {
             <dd>{exercise.primary_muscle}</dd>
           </div>
           <div>
+            <dt>Дополнительные мышцы</dt>
+            <dd>
+              {exercise.secondary_muscles.length > 0
+                ? exercise.secondary_muscles.join(', ')
+                : 'Не указаны'}
+            </dd>
+          </div>
+          <div>
             <dt>Оборудование</dt>
             <dd>{exercise.equipment}</dd>
           </div>
@@ -339,10 +348,17 @@ function PublicExerciseDetails({ page }: { page: PublicContentPageData }) {
             <dd>{difficultyLabels[exercise.difficulty_level]}</dd>
           </div>
         </dl>
-        {exercise.secondary_muscles.length > 0 && (
-          <p>Дополнительно работают: {exercise.secondary_muscles.join(', ')}.</p>
-        )}
       </section>
+      {exercise.media.length > 0 && (
+        <section className="public-exercise-media" aria-labelledby="public-exercise-media-title">
+          <h2 id="public-exercise-media-title">Положения в движении</h2>
+          <p>
+            Используйте изображения как визуальную подсказку к шагам, а не как замену
+            контролируемому выполнению.
+          </p>
+          <ExerciseGuideMedia items={exercise.media} />
+        </section>
+      )}
       <section>
         <h2>Техника выполнения</h2>
         <ol>

@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from fitminiapp_api.schemas.program import ExerciseGuideMedia
+
 
 class PublicExerciseSummary(BaseModel):
     slug: str
@@ -17,6 +19,7 @@ class PublicExerciseDetail(PublicExerciseSummary):
     breathing: str
     common_mistakes: list[str]
     safety_notes: list[str]
+    media: list[ExerciseGuideMedia]
     source_name: str
     source_url: str
     source_license: str

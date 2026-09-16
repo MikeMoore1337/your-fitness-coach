@@ -1068,7 +1068,7 @@
 
 .public-exercise-facts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--v2-space-3);
   margin: var(--v2-space-4) 0;
 }
@@ -1104,9 +1104,23 @@
   overflow-wrap: anywhere;
 }
 
+.public-exercise-media > p {
+  margin-bottom: 28px;
+}
+
+.public-exercise-media .exercise-guide-images__legend {
+  margin-top: 0;
+}
+
 @media (min-width: 681px) {
   .public-page--design-v2 :where(.public-breadcrumbs, .public-hero) {
     padding-inline: clamp(var(--v2-space-4), 4vw, var(--v2-space-6));
+  }
+}
+
+@media (max-width: 900px) and (min-width: 681px) {
+  .public-exercise-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
