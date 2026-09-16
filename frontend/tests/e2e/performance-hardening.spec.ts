@@ -187,7 +187,7 @@ test('Client navigation preserves metadata owned by a lazy public route', async 
   await expect(
     page.getByRole('heading', {
       level: 1,
-      name: /план тренировки, который остаётся перед глазами/i,
+      name: /дневник тренировок: от программы до прогресса/i,
     }),
   ).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
