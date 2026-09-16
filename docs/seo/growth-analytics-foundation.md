@@ -28,10 +28,12 @@ deploy владелец вручную выполняет:
 
   ```html
   <html>
-      <head>
-          <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-      </head>
-      <body>Verification: bce1658cc6fe44e5</body>
+    <head>
+      <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    </head>
+    <body>
+      Verification: bce1658cc6fe44e5
+    </body>
   </html>
   ```
 
@@ -81,25 +83,45 @@ Registry и goal IDs находятся в `frontend/src/shared/analytics/produc
 goals context-free: в goal нет параметров, а событие достигается только после соответствующего
 успешного действия.
 
-| Goal ID | Успешный источник |
-| --- | --- |
-| `registration_started` | отправка email-регистрации |
-| `registration_completed` | успешный ответ регистрации |
-| `onboarding_completed` | успешное сохранение onboarding |
-| `first_workout_started` | успешный старт первой тренировки |
-| `first_workout_completed` | успешное завершение первой тренировки |
-| `first_food_entry_added` | успешное добавление первой записи дневника |
-| `program_added` | успешное создание программы |
-| `trainer_application_started` | подтверждённое действие включения режима тренера |
-| `trainer_application_completed` | успешное включение режима тренера |
-| `client_invited` | успешное создание invite link |
-| `share_created` | успешное создание report handoff |
+| Goal ID                         | Успешный источник                                        |
+| ------------------------------- | -------------------------------------------------------- |
+| `registration_started`          | отправка email-регистрации                               |
+| `registration_completed`        | успешный ответ регистрации                               |
+| `onboarding_completed`          | успешное сохранение onboarding                           |
+| `first_workout_started`         | успешный старт первой тренировки                         |
+| `first_workout_completed`       | успешное завершение первой тренировки                    |
+| `first_food_entry_added`        | успешное добавление первой записи дневника               |
+| `program_added`                 | успешное создание программы                              |
+| `trainer_application_started`   | подтверждённое действие включения режима тренера         |
+| `trainer_application_completed` | успешное включение режима тренера                        |
+| `client_invited`                | успешное создание invite link                            |
+| `share_created`                 | успешное создание report handoff                         |
+| `calculator_started`            | первое meaningful действие в публичном калькуляторе КБЖУ |
+| `calculator_result`             | показ валидного результата публичного калькулятора КБЖУ  |
 
 Следующие имена поддержаны только типами/registry для будущей реализации и не должны объявляться
 реализованными до появления соответствующего успешного product flow:
 
-`calculator_started`, `calculator_result`, `calculator_saved`, `public_program_opened`,
+`calculator_saved`, `public_program_opened`,
 `public_program_saved`, `exercise_added_from_public_page`.
+
+### Воронка публичного калькулятора КБЖУ
+
+Task 241B реализует только два action-only события для канонического `/nutrition`:
+
+- `calculator_started` отправляется один раз после первого изменения поля или попытки отправки
+  формы;
+- `calculator_result` отправляется один раз после показа валидного результата в текущем просмотре
+  страницы;
+- оба события содержат только typed `name` и безопасный `surface`; значения пола, возраста, роста,
+  веса, активности, цели и результата не попадают в событие, URL, журнал или provider payload;
+- `calculator_saved` остаётся будущим событием: публичная форма ничего не сохраняет.
+
+Рабочая последовательность измерения: `calculator_started` → `calculator_result` → переход в
+Your Fitness Coach → регистрация → активация. Для отчёта сопоставляются доли `result / started`,
+переходы на приложение и последующая регистрация/активация; эти события не объявляются прогнозом
+трафика или качества результата. До появления устойчивой выборки сравнение органики ведётся с
+GSC T0: 0 кликов и 0 показов за устоявшиеся 28 дней по 2026-09-11.
 
 ## First-touch attribution
 

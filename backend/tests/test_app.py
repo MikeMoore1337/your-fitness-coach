@@ -3506,6 +3506,34 @@ def test_root_serves_public_landing_spa(client):
     assert "no-store" in response.headers["cache-control"]
 
 
+def test_public_nutrition_serves_kbju_seo_fallback_without_private_routes(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/nutrition", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "index, follow"
+    assert (
+        "<title>Калькулятор КБЖУ — рассчитать калории, белки, жиры и углеводы | "
+        "Your Fitness Coach</title>" in response.text
+    )
+    assert (
+        '<link rel="canonical" href="https://your-fitness-coach.ru/nutrition" />' in response.text
+    )
+    assert '<main class="seo-fallback">' in response.text
+    assert "Рассчитать КБЖУ: калории, белки, жиры и углеводы" in response.text
+    assert "Mifflin–St Jeor" in response.text
+    assert "/knowledge/nutrition/kbju-as-a-reference" in response.text
+    assert 'href="/calculators/kbju"' not in response.text
+    assert 'href="/calculator-kbju"' not in response.text
+    assert 'href="/kbju"' not in response.text
+    assert 'href="/kz"' not in response.text
+    assert 'href="/by"' not in response.text
+    assert 'href="/ru"' not in response.text
+    assert "?weight" not in response.text
+
+
 @pytest.mark.parametrize(
     ("method", "path"),
     [
@@ -3693,7 +3721,7 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
     ("path", "heading"),
     [
         ("/training", "План тренировки, который остаётся перед глазами"),
-        ("/nutrition", "Ориентиры КБЖУ без обещаний"),
+        ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
         ("/progress", "Прогресс, который можно проверить"),
         ("/for-trainers", "Кабинет тренера для программ"),
         ("/knowledge", "Материалы, которые помогают понять"),

@@ -820,13 +820,90 @@
   outline: none;
 }
 
+.public-calculator__fields select {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: var(--radius-control);
+  background: var(--landing-paper);
+  color: var(--landing-ink);
+  font: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+
 .public-calculator__fields input:focus-visible {
+  border-color: var(--landing-ink);
+  box-shadow: 0 0 0 3px rgba(182, 242, 56, 0.38);
+}
+
+.public-calculator__fields select:focus-visible {
   border-color: var(--landing-ink);
   box-shadow: 0 0 0 3px rgba(182, 242, 56, 0.38);
 }
 
 .public-calculator__fields input[aria-invalid='true'] {
   border-color: #b42318;
+}
+
+.public-calculator__fields select[aria-invalid='true'] {
+  border-color: #b42318;
+}
+
+.public-calculator__field--wide {
+  grid-column: span 2;
+}
+
+.public-calculator__fields label > small {
+  color: var(--landing-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.public-calculator__details {
+  margin-top: 26px;
+  padding: 18px 20px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--landing-paper) 72%, transparent);
+}
+
+.public-calculator__details summary {
+  cursor: pointer;
+  color: var(--landing-ink);
+  font-size: 0.95rem;
+  font-weight: 800;
+  list-style: none;
+}
+
+.public-calculator__details summary::-webkit-details-marker {
+  display: none;
+}
+
+.public-calculator__details summary::after {
+  content: '+';
+  float: right;
+  color: var(--landing-kicker);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.public-calculator__details[open] summary::after {
+  content: '−';
+}
+
+.public-calculator__details > p {
+  margin: 14px 0 0;
+  color: var(--landing-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.public-calculator__details > .public-calculator__fields {
+  margin-top: 20px;
 }
 
 .public-calculator__submit {
@@ -850,6 +927,16 @@
   font-weight: 750;
 }
 
+.public-calculator__error ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-weight: 500;
+}
+
+.public-calculator__error li + li {
+  margin-top: 4px;
+}
+
 .public-calculator__result {
   display: grid;
   gap: 8px;
@@ -857,6 +944,34 @@
   padding: 22px;
   border-left: 4px solid var(--landing-green);
   background: var(--landing-paper);
+}
+
+.public-kbju-calculator__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.public-kbju-calculator__metrics > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: var(--radius-control);
+}
+
+.public-kbju-calculator__metrics span {
+  color: var(--landing-muted);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.public-kbju-calculator__metrics strong {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.05rem, 2vw, 1.4rem);
+  letter-spacing: -0.03em;
 }
 
 .public-calculator__result > span {
@@ -886,6 +1001,65 @@
   color: var(--landing-muted);
   font-size: 0.82rem;
   line-height: 1.55;
+}
+
+.public-kbju-calculator__cardio {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--landing-border);
+}
+
+.public-kbju-calculator__cardio-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.public-kbju-calculator__cardio-heading strong {
+  display: block;
+  color: var(--landing-ink);
+  font-size: 0.95rem;
+}
+
+.public-kbju-calculator__cardio-heading p {
+  margin: 6px 0 0;
+  color: var(--landing-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.public-calculator__secondary {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--landing-ink);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.public-calculator__secondary:hover,
+.public-calculator__secondary:focus-visible {
+  border-color: var(--landing-ink);
+  background: var(--landing-paper);
+}
+
+.public-kbju-calculator__cardio-item {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--landing-card-border);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--landing-paper) 58%, transparent);
+}
+
+.public-kbju-calculator__cardio-item .public-calculator__fields {
+  margin-top: 16px;
 }
 
 .public-exercise-body {
@@ -945,6 +1119,23 @@
 
   .public-calculator__fields {
     grid-template-columns: 1fr;
+  }
+
+  .public-calculator__field--wide {
+    grid-column: auto;
+  }
+
+  .public-kbju-calculator__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .public-kbju-calculator__cardio-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .public-calculator__secondary {
+    width: 100%;
   }
 
   .public-exercise-facts {

@@ -50,6 +50,47 @@ describe('nutrition calculator', () => {
     });
   });
 
+  it('supports the female equation and the documented adult boundaries', () => {
+    const result = calculateNutritionEstimate(
+      payload({
+        sex: 'female',
+        weight_kg: 20,
+        height_cm: 100,
+        age: 18,
+        strength_trainings_per_week: 0,
+        cardio_trainings: [],
+      }),
+    );
+
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.estimate.bmr).toBe(574);
+    expect(result.estimate.calories).toBeGreaterThan(0);
+    expect(Number.isFinite(result.estimate.carbs)).toBe(true);
+  });
+
+  it('rejects values outside every public numeric boundary', () => {
+    const result = calculateNutritionEstimate(
+      payload({
+        weight_kg: 19,
+        height_cm: 99,
+        age: 17,
+        strength_trainings_per_week: 14.5,
+      }),
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        'Вес: допустимо от 20 до 350',
+        'Рост: допустимо от 100 до 250',
+        'Возраст: допустимо от 18 до 100',
+        'Силовые тренировки: допустимо от 0 до 14',
+        'Количество силовых тренировок должно быть целым',
+      ]),
+    );
+  });
+
   it.each([
     ['mostly_sitting', 'up_to_4000', 1976],
     ['mostly_sitting', 'over_14000', 2305],

@@ -1,9 +1,13 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import PublicContentPage from '../../../../src/pages/public/PublicContentPage';
 import { NavigationProvider } from '../../../../src/shared/navigation/router';
 import { applyRouteMetadata } from '../../../../src/shared/seo/metadata';
+import {
+  PRODUCT_EVENT_NAME,
+  type ProductEventEnvelope,
+} from '../../../../src/shared/analytics/productEvents';
 
 vi.mock('../../../../src/shared/api/client', () => ({
   api: vi.fn((path: string) => {
@@ -68,7 +72,7 @@ describe('PublicContentPage', () => {
 
   it.each([
     ['/training', /план тренировки, который остаётся перед глазами/i],
-    ['/nutrition', /ориентиры кбжу без обещаний/i],
+    ['/nutrition', /рассчитать кбжу: калории, белки, жиры и углеводы/i],
     ['/progress', /прогресс, который можно проверить/i],
     ['/for-trainers', /кабинет тренера для программ/i],
     ['/knowledge', /материалы, которые помогают понять/i],
@@ -197,6 +201,61 @@ describe('PublicContentPage', () => {
     expect(localStorage.getItem('public-bmi-calculator')).toBeNull();
   });
 
+  it('renders a stateless public KBJU calculator with privacy-safe growth events', async () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) =>
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+
+    try {
+      renderPath('/nutrition');
+
+      const calculator = document.querySelector<HTMLElement>('#public-kbju-calculator');
+      expect(calculator).toHaveClass('ym-hide-content');
+      expect(screen.getByText('Уточнить расчёт тренировочной нагрузки')).toBeInTheDocument();
+      const form = screen.getByRole('form', { name: 'Рассчитать КБЖУ онлайн' });
+
+      fireEvent.click(within(form).getByRole('button', { name: 'Рассчитать КБЖУ' }));
+      expect(screen.getByRole('alert')).toHaveTextContent(/проверьте данные/i);
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Возраст, лет')).toHaveAttribute('aria-invalid', 'true');
+
+      fireEvent.change(screen.getByLabelText('Возраст, лет'), { target: { value: '34' } });
+      fireEvent.change(screen.getByLabelText('Вес, кг'), { target: { value: '78' } });
+      fireEvent.change(screen.getByLabelText('Рост, см'), { target: { value: '165' } });
+      fireEvent.change(screen.getByLabelText('Силовых тренировок в неделю'), {
+        target: { value: '4' },
+      });
+      fireEvent.click(screen.getByText('Уточнить расчёт тренировочной нагрузки'));
+      fireEvent.change(screen.getByLabelText('Длительность силовой, минут'), {
+        target: { value: '60' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Добавить кардио' }));
+      expect(screen.getByText('Кардио 1')).toBeInTheDocument();
+      fireEvent.click(within(form).getByRole('button', { name: 'Рассчитать КБЖУ' }));
+
+      await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Калории'));
+      expect(screen.getByRole('status')).toHaveTextContent('Белки');
+      expect(screen.getByRole('status')).toHaveTextContent('Для поддержания');
+      expect(window.location.search).toBe('');
+      expect(localStorage.length).toBe(0);
+      expect(events.map((event) => event.name)).toEqual([
+        'calculator_started',
+        'calculator_result',
+      ]);
+      expect(events.every((event) => Object.keys(event).length === 5)).toBe(true);
+
+      fireEvent.click(within(form).getByRole('button', { name: 'Рассчитать КБЖУ' }));
+      expect(events.map((event) => event.name)).toEqual([
+        'calculator_started',
+        'calculator_result',
+      ]);
+      expect(events.some((event) => event.name === 'calculator_saved')).toBe(false);
+    } finally {
+      window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+    }
+  });
+
   it('renders only allowlisted public exercise cards from the domain API', async () => {
     renderPath('/exercises');
 
@@ -248,6 +307,8 @@ describe('PublicContentPage', () => {
         name: 'Питание',
       }),
     );
-    expect(screen.getByRole('heading', { level: 1, name: /ориентиры кбжу/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 1, name: /рассчитать кбжу: калории/i }),
+    ).toBeInTheDocument();
   });
 });
