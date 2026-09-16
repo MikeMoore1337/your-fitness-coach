@@ -37,7 +37,102 @@ vi.mock('../../../../src/shared/api/client', () => ({
           equipment: 'Штанга',
           difficulty_level: 'intermediate',
         },
+        {
+          slug: 'deadlift',
+          title: 'Становая тяга',
+          primary_muscle: 'Ягодицы и задняя поверхность бедра',
+          secondary_muscles: [],
+          equipment: 'Штанга',
+          difficulty_level: 'advanced',
+        },
+        {
+          slug: 'overhead-press',
+          title: 'Жим штанги стоя',
+          primary_muscle: 'Плечи',
+          secondary_muscles: [],
+          equipment: 'Штанга',
+          difficulty_level: 'advanced',
+        },
       ]);
+    }
+    if (path === '/api/v1/public/programs/full-body-3-days') {
+      return Promise.resolve({
+        slug: 'full-body-3-days',
+        title: 'Фуллбади 3 дня',
+        goal: 'recomposition',
+        level: 'beginner',
+        split_type: 'full_body',
+        days: [
+          {
+            day_number: 1,
+            title: 'Фуллбади A',
+            exercises: [
+              {
+                slug: 'squat',
+                title: 'Приседания',
+                primary_muscle: 'Квадрицепс',
+                equipment: 'Штанга',
+                difficulty_level: 'intermediate',
+                prescribed_sets: 4,
+                prescribed_reps: '6-8',
+                rest_seconds: 150,
+              },
+              {
+                slug: 'bench-press',
+                title: 'Жим лежа',
+                primary_muscle: 'Грудь',
+                equipment: 'Штанга',
+                difficulty_level: 'intermediate',
+                prescribed_sets: 4,
+                prescribed_reps: '6-8',
+                rest_seconds: 150,
+              },
+            ],
+          },
+          {
+            day_number: 2,
+            title: 'Фуллбади B',
+            exercises: [
+              {
+                slug: 'deadlift',
+                title: 'Становая тяга',
+                primary_muscle: 'Ягодицы и задняя поверхность бедра',
+                equipment: 'Штанга',
+                difficulty_level: 'advanced',
+                prescribed_sets: 3,
+                prescribed_reps: '3-5',
+                rest_seconds: 180,
+              },
+              {
+                slug: 'overhead-press',
+                title: 'Жим штанги стоя',
+                primary_muscle: 'Плечи',
+                equipment: 'Штанга',
+                difficulty_level: 'advanced',
+                prescribed_sets: 4,
+                prescribed_reps: '6-8',
+                rest_seconds: 150,
+              },
+            ],
+          },
+          {
+            day_number: 3,
+            title: 'Фуллбади C',
+            exercises: [
+              {
+                slug: 'front-squat',
+                title: 'Фронтальные приседания',
+                primary_muscle: 'Квадрицепс',
+                equipment: 'Штанга',
+                difficulty_level: 'advanced',
+                prescribed_sets: 4,
+                prescribed_reps: '6-8',
+                rest_seconds: 150,
+              },
+            ],
+          },
+        ],
+      });
     }
     if (path === '/api/v1/public/exercises/bench-press') {
       return Promise.resolve({
@@ -121,6 +216,7 @@ describe('PublicContentPage', () => {
 
   it.each([
     ['/training', /дневник тренировок: от программы до прогресса/i],
+    ['/programs/full-body-3-days', /программа тренировок 3 раза в неделю: full body на 3 дня/i],
     ['/nutrition', /рассчитать кбжу: калории, белки, жиры и углеводы/i],
     ['/calculators/1rm', /калькулятор 1пм: оценочный одноповторный максимум/i],
     ['/progress', /прогресс, который можно проверить/i],
@@ -183,6 +279,41 @@ describe('PublicContentPage', () => {
       expect(window.location.search).toBe('');
       expect(localStorage.length).toBe(0);
       expect(events).toEqual([]);
+    } finally {
+      window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+    }
+  });
+
+  it('renders the canonical three-day program without future save or add events', async () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) =>
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+
+    try {
+      renderPath('/programs/full-body-3-days');
+
+      expect(await screen.findByRole('heading', { name: 'Фуллбади 3 дня' })).toBeVisible();
+      expect(document.querySelectorAll('.public-program-day')).toHaveLength(3);
+      expect(screen.getAllByRole('heading', { name: /Фуллбади [ABC]/ })).toHaveLength(3);
+      expect(screen.getByRole('link', { name: 'Приседания' })).toHaveAttribute(
+        'href',
+        '/exercises/squat',
+      );
+      expect(screen.getAllByText('4 подхода').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Отдых: 3 мин').length).toBeGreaterThan(0);
+      expect(screen.getAllByRole('link', { name: 'Выбрать программу в приложении' })).toHaveLength(
+        2,
+      );
+      expect(
+        screen
+          .getAllByRole('link', { name: 'Выбрать программу в приложении' })
+          .every((link) => link.getAttribute('href')?.endsWith('/app?section=programs')),
+      ).toBe(true);
+      expect(events).toEqual([]);
+      expect(screen.getAllByText(/не сохраняет программу автоматически/i).length).toBeGreaterThan(
+        0,
+      );
     } finally {
       window.removeEventListener(PRODUCT_EVENT_NAME, listener);
     }
@@ -290,7 +421,7 @@ describe('PublicContentPage', () => {
     expect(screen.getByText(/Опубликовано: 4/i)).toBeVisible();
     expect(screen.getAllByText(/Опубликовано: 1/i)).toHaveLength(2);
     expect(screen.getByText(/Опубликовано: 2/i)).toBeVisible();
-    expect(screen.getByText(/Опубликовано: 3/i)).toBeVisible();
+    expect(screen.getByText(/Опубликовано: 5/i)).toBeVisible();
     expect(screen.getByText(/Опубликовано: 6/i)).toBeVisible();
     expect(
       screen.getByRole('link', { name: /full body и split: выберите схему/i }),
@@ -393,7 +524,7 @@ describe('PublicContentPage', () => {
       'href',
       '/exercises/bench-press',
     );
-    expect(document.querySelectorAll('.public-guide-card')).toHaveLength(3);
+    expect(document.querySelectorAll('.public-guide-card')).toHaveLength(5);
     expect(screen.queryByText(/пользовательское упражнение/i)).not.toBeInTheDocument();
   });
 

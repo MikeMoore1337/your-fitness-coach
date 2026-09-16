@@ -5,9 +5,14 @@ from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.news import WebArticle
 from fitminiapp_api.schemas.articles import WebArticleCard, WebArticleResponse
-from fitminiapp_api.schemas.public import PublicExerciseDetail, PublicExerciseSummary
+from fitminiapp_api.schemas.public import (
+    PublicExerciseDetail,
+    PublicExerciseSummary,
+    PublicProgramResponse,
+)
 from fitminiapp_api.seo import NOINDEX_ROBOTS
 from fitminiapp_api.services.public_exercises import public_exercise, public_exercises
+from fitminiapp_api.services.public_programs import public_program
 from fitminiapp_api.services.web_articles import (
     article_card,
     article_public_response,
@@ -40,6 +45,18 @@ def get_public_exercise(slug: str) -> dict[str, object]:
     if exercise is None:
         raise HTTPException(status_code=404, detail="Упражнение не опубликовано")
     return exercise
+
+
+@router.get("/public/programs/{slug}", response_model=PublicProgramResponse)
+def get_public_program(slug: str) -> dict[str, object]:
+    program = public_program(slug)
+    if program is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Программа не опубликована",
+            headers={"X-Robots-Tag": NOINDEX_ROBOTS},
+        )
+    return program
 
 
 @router.get("/public/articles", response_model=list[WebArticleCard])

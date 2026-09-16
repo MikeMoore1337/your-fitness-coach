@@ -7,6 +7,11 @@ from fitminiapp_api.services.public_exercises import (
     public_exercises,
     validate_public_exercise_quality,
 )
+from fitminiapp_api.services.public_programs import (
+    public_program,
+    public_program_quality_errors,
+    validate_public_program,
+)
 
 
 @pytest.mark.parametrize(
@@ -52,3 +57,37 @@ def test_bench_press_public_record_uses_existing_media_provenance():
     assert isinstance(media, list)
     assert len(media) == 2
     assert all(item["source_name"] == "free-exercise-db" for item in media)
+
+
+def test_full_body_public_program_reuses_canonical_three_day_seed():
+    program = public_program("full-body-3-days")
+
+    assert program is not None
+    assert public_program_quality_errors(program) == ()
+    assert [day["title"] for day in program["days"]] == [
+        "Фуллбади A",
+        "Фуллбади B",
+        "Фуллбади C",
+    ]
+    assert len(program["days"]) == 3
+    assert program["days"][0]["exercises"][0] == {
+        "slug": "squat",
+        "title": "Приседания",
+        "primary_muscle": "Квадрицепс",
+        "equipment": "Штанга",
+        "difficulty_level": "intermediate",
+        "prescribed_sets": 4,
+        "prescribed_reps": "6-8",
+        "rest_seconds": 150,
+    }
+
+
+def test_public_program_quality_gate_rejects_non_three_day_shape():
+    program = public_program("full-body-3-days")
+    assert program is not None
+    broken = dict(program)
+    broken["days"] = list(program["days"])[:2]
+
+    assert "days" in public_program_quality_errors(broken)
+    with pytest.raises(RuntimeError, match="public quality contract"):
+        validate_public_program(broken)

@@ -3722,12 +3722,13 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
         for element in root.findall("{http://www.sitemaps.org/schemas/sitemap/0.9}url")
         for element in element.findall("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
     ]
-    assert len(urls) == 26
+    assert len(urls) == 29
     assert len(urls) == len(set(urls))
     assert {
         "https://your-fitness-coach.ru/",
         "https://your-fitness-coach.ru/articles",
         "https://your-fitness-coach.ru/calculators/1rm",
+        "https://your-fitness-coach.ru/programs/full-body-3-days",
         "https://your-fitness-coach.ru/knowledge",
         "https://your-fitness-coach.ru/knowledge/training/repetitions-in-reserve",
         "https://your-fitness-coach.ru/knowledge/nutrition/creatine-monohydrate",
@@ -3741,6 +3742,8 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
         "https://your-fitness-coach.ru/exercises/bench-press",
         "https://your-fitness-coach.ru/exercises/lat-pulldown",
         "https://your-fitness-coach.ru/exercises/squat",
+        "https://your-fitness-coach.ru/exercises/deadlift",
+        "https://your-fitness-coach.ru/exercises/overhead-press",
     }.issubset(urls)
     assert all(
         segment not in sitemap.text for segment in ("/app", "/admin", "/coach", "/join", "/login")
@@ -3751,6 +3754,7 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
     ("path", "heading"),
     [
         ("/training", "Дневник тренировок: от программы до прогресса"),
+        ("/programs/full-body-3-days", "Программа тренировок 3 раза в неделю: Full Body на 3 дня"),
         ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
         ("/calculators/1rm", "Калькулятор 1ПМ: оценочный одноповторный максимум"),
         ("/progress", "Прогресс, который можно проверить"),
@@ -3880,6 +3884,8 @@ def test_public_exercise_api_uses_allowlisted_domain_data_and_excludes_private_r
         "bench-press",
         "lat-pulldown",
         "squat",
+        "deadlift",
+        "overhead-press",
     ]
     assert all("created_by_user_id" not in item for item in catalog.json())
 
@@ -3903,6 +3909,59 @@ def test_public_exercise_api_uses_allowlisted_domain_data_and_excludes_private_r
 
     private_slug = client.get("/api/v1/public/exercises/squat-u-private")
     assert private_slug.status_code == 404
+
+
+def test_public_program_api_and_fallback_expose_only_canonical_schedule(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    program = client.get("/api/v1/public/programs/full-body-3-days")
+    assert program.status_code == 200
+    payload = program.json()
+    assert payload["slug"] == "full-body-3-days"
+    assert len(payload["days"]) == 3
+    assert payload["days"][0]["exercises"][0] == {
+        "slug": "squat",
+        "title": "Приседания",
+        "primary_muscle": "Квадрицепс",
+        "equipment": "Штанга",
+        "difficulty_level": "intermediate",
+        "prescribed_sets": 4,
+        "prescribed_reps": "6-8",
+        "rest_seconds": 150,
+    }
+    assert "owner_user_id" not in payload
+
+    missing = client.get("/api/v1/public/programs/not-published")
+    assert missing.status_code == 404
+    assert missing.headers["x-robots-tag"] == "noindex, nofollow"
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get(
+        "/programs/full-body-3-days",
+        headers={"Host": "your-fitness-coach.ru"},
+    )
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "index, follow"
+    assert (
+        '<link rel="canonical" href="https://your-fitness-coach.ru/programs/full-body-3-days" />'
+        in response.text
+    )
+    assert response.text.count("<h1>") == 1
+    assert "Фуллбади A" in response.text
+    assert "Приседания" in response.text
+    assert "4 подхода" in response.text
+    assert "?section=programs" in response.text
+    structured_data = re.search(
+        r'<script type="application/ld\+json">(.*?)</script>', response.text, re.DOTALL
+    )
+    assert structured_data is not None
+    assert [entry["@type"] for entry in json.loads(structured_data.group(1))["@graph"]] == [
+        "WebPage",
+        "BreadcrumbList",
+    ]
+    assert "FAQPage" not in structured_data.group(1)
+    assert "aggregateRating" not in structured_data.group(1)
+    assert "public_program_saved" not in response.text
 
 
 def test_public_exercise_route_has_domain_fallback_and_webpage_schema(client, monkeypatch):

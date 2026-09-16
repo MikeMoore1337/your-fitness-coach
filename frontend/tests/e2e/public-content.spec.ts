@@ -31,6 +31,14 @@ const representativePages = [
     heading: /дневник тренировок: от программы до прогресса/i,
   },
   {
+    path: '/for-trainers',
+    heading: /кабинет тренера для программ/i,
+  },
+  {
+    path: '/exercises',
+    heading: /техника упражнений из общего каталога/i,
+  },
+  {
     path: '/calculators/1rm',
     heading: /калькулятор 1пм: оценочный одноповторный максимум/i,
   },
@@ -215,6 +223,87 @@ const publicBenchExerciseDetail = {
   source_license_url: 'https://github.com/yuhonas/free-exercise-db/blob/main/LICENSE.md',
 };
 
+const publicFullBodyProgram = {
+  slug: 'full-body-3-days',
+  title: 'Фуллбади 3 дня',
+  goal: 'recomposition',
+  level: 'beginner',
+  split_type: 'full_body',
+  days: [
+    {
+      day_number: 1,
+      title: 'Фуллбади A',
+      exercises: [
+        ['squat', 'Приседания', 'Квадрицепс', 'Штанга', 4, '6-8', 150],
+        ['bench-press', 'Жим лежа', 'Грудь', 'Штанга', 4, '6-8', 150],
+        ['seated-cable-row', 'Тяга горизонтального блока', 'Спина', 'Кроссовер', 3, '10-12', 90],
+        [
+          'romanian-deadlift',
+          'Румынская тяга',
+          'Задняя поверхность бедра',
+          'Штанга',
+          3,
+          '8-10',
+          120,
+        ],
+        ['plank', 'Планка', 'Мышцы корпуса', 'Без оборудования', 3, '30-60 сек', 60],
+      ],
+    },
+    {
+      day_number: 2,
+      title: 'Фуллбади B',
+      exercises: [
+        ['deadlift', 'Становая тяга', 'Ягодицы', 'Штанга', 3, '3-5', 180],
+        ['overhead-press', 'Жим штанги стоя', 'Плечи', 'Штанга', 4, '6-8', 150],
+        ['lat-pulldown', 'Вертикальная тяга', 'Спина', 'Тренажер', 3, '10-12', 90],
+        ['leg-press', 'Жим ногами', 'Квадрицепс', 'Тренажер', 3, '10-12', 120],
+        ['hanging-leg-raise', 'Подъем ног в висе', 'Мышцы корпуса', 'Турник', 3, '10-15', 60],
+      ],
+    },
+    {
+      day_number: 3,
+      title: 'Фуллбади C',
+      exercises: [
+        ['front-squat', 'Фронтальные приседания', 'Квадрицепс', 'Штанга', 4, '6-8', 150],
+        [
+          'incline-dumbbell-press',
+          'Жим гантелей на наклонной скамье',
+          'Грудь',
+          'Гантели',
+          3,
+          '8-10',
+          120,
+        ],
+        ['barbell-row', 'Тяга штанги в наклоне', 'Спина', 'Штанга', 4, '6-8', 150],
+        ['hip-thrust', 'Ягодичный мост', 'Ягодицы', 'Штанга', 3, '8-10', 120],
+        ['face-pull', 'Тяга к лицу', 'Плечи', 'Кроссовер', 3, '12-15', 60],
+      ],
+    },
+  ].map((day) => ({
+    ...day,
+    exercises: day.exercises.map(
+      ([
+        slug,
+        title,
+        primary_muscle,
+        equipment,
+        prescribed_sets,
+        prescribed_reps,
+        rest_seconds,
+      ]) => ({
+        slug,
+        title,
+        primary_muscle,
+        equipment,
+        difficulty_level: 'intermediate',
+        prescribed_sets,
+        prescribed_reps,
+        rest_seconds,
+      }),
+    ),
+  })),
+};
+
 test('legacy app knowledge URLs hand off to the equivalent Public Web article', async ({
   page,
 }) => {
@@ -278,6 +367,21 @@ test('landing emits a privacy-safe acquisition event without changing the deskto
 });
 
 test('публичные страницы сохраняют hierarchy и не создают overflow', async ({ page }) => {
+  await page.route('**/api/v1/public/exercises', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(
+        ['bench-press', 'lat-pulldown', 'squat', 'deadlift', 'overhead-press'].map((slug) => ({
+          slug,
+          title: slug,
+          primary_muscle: 'Группа мышц',
+          secondary_muscles: [],
+          equipment: 'Штанга',
+          difficulty_level: 'intermediate',
+        })),
+      ),
+    });
+  });
   for (const viewport of [
     { width: 1440, height: 900 },
     { width: 768, height: 900 },
@@ -329,6 +433,87 @@ test('публичные страницы сохраняют hierarchy и не �
         expect(heroGutters.left).toBeGreaterThanOrEqual(40);
         expect(heroGutters.right).toBeGreaterThanOrEqual(40);
       }
+    }
+  }
+});
+
+test('canonical three-day program stays useful, stateless and responsive', async ({ page }) => {
+  await page.route('**/api/v1/public/programs/full-body-3-days', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(publicFullBodyProgram),
+    });
+  });
+  await page.addInitScript(() => {
+    const events: unknown[] = [];
+    Object.defineProperty(window, '__productAnalyticsEvents', { value: events, writable: false });
+    window.addEventListener('yfc:product-event', (event) => {
+      events.push((event as CustomEvent).detail);
+    });
+  });
+
+  const evidenceDirectory = process.env.TASK_286_EVIDENCE_DIR;
+  const states = [
+    { name: '320-light', width: 320, height: 740, colorScheme: 'light' as const },
+    { name: '360-light', width: 360, height: 800, colorScheme: 'light' as const },
+    { name: '390-light', width: 390, height: 844, colorScheme: 'light' as const },
+    { name: '390-dark', width: 390, height: 844, colorScheme: 'dark' as const },
+    { name: '430-light', width: 430, height: 932, colorScheme: 'light' as const },
+    { name: '430-dark', width: 430, height: 932, colorScheme: 'dark' as const },
+    { name: '768-light', width: 768, height: 900, colorScheme: 'light' as const },
+    { name: '768-dark', width: 768, height: 900, colorScheme: 'dark' as const },
+    { name: '1366-light', width: 1366, height: 900, colorScheme: 'light' as const },
+    { name: '1366-dark', width: 1366, height: 900, colorScheme: 'dark' as const },
+    { name: '1440-light', width: 1440, height: 900, colorScheme: 'light' as const },
+    { name: '1440-dark', width: 1440, height: 900, colorScheme: 'dark' as const },
+  ];
+
+  for (const state of states) {
+    await page.setViewportSize({ width: state.width, height: state.height });
+    await page.goto('/programs/full-body-3-days');
+    await page.evaluate((colorScheme) => {
+      window.localStorage.setItem('app-theme', colorScheme);
+    }, state.colorScheme);
+    await page.reload();
+
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: /программа тренировок 3 раза в неделю: full body на 3 дня/i,
+      }),
+    ).toBeVisible();
+    await expect(page.locator('.public-program-day')).toHaveCount(3);
+    await expect(page.getByRole('link', { name: 'Приседания' })).toHaveAttribute(
+      'href',
+      '/exercises/squat',
+    );
+    await expect(
+      page.getByRole('link', { name: 'Выбрать программу в приложении' }).first(),
+    ).toHaveAttribute('href', /\/app\?section=programs$/);
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      'http://127.0.0.1:4173/programs/full-body-3-days',
+    );
+    await expect(page.locator('.public-shell')).toHaveClass(
+      state.colorScheme === 'dark' ? /public-shell--dark/ : /public-shell--light/,
+    );
+    expect(
+      await page.evaluate(() => ({
+        content: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+        events: (
+          window as typeof window & {
+            __productAnalyticsEvents: Array<Record<string, unknown>>;
+          }
+        ).__productAnalyticsEvents,
+      })),
+    ).toMatchObject({ content: state.width, viewport: state.width, events: [] });
+    if (evidenceDirectory) {
+      await page.screenshot({
+        path: path.join(evidenceDirectory, `${state.name}.png`),
+        fullPage: true,
+      });
     }
   }
 });

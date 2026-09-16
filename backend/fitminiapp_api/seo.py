@@ -17,6 +17,10 @@ from fitminiapp_api.services.public_exercises import (
     public_exercise,
     validate_public_exercise_quality,
 )
+from fitminiapp_api.services.public_programs import (
+    public_program,
+    validate_public_program,
+)
 
 INDEX_ROBOTS = "index, follow"
 NOINDEX_ROBOTS = "noindex, nofollow"
@@ -75,8 +79,8 @@ def _validate_public_workflow(value: object, *, path: str) -> None:
     raw_steps = value.get("steps")
     if not isinstance(raw_steps, list) or not raw_steps:
         raise RuntimeError(f"Public content workflow for {path!r} must contain steps")
-    if path == "/training" and len(raw_steps) != 5:
-        raise RuntimeError("Public training workflow must contain exactly five steps")
+    if path in {"/training", "/for-trainers"} and len(raw_steps) != 5:
+        raise RuntimeError(f"Public workflow for {path} must contain exactly five steps")
     for index, raw_step in enumerate(raw_steps):
         if not isinstance(raw_step, dict):
             raise RuntimeError(f"Public content workflow step {index} must be an object")
@@ -116,11 +120,22 @@ def public_pages() -> tuple[dict[str, object], ...]:
         if status not in {"draft", "review", "published", "archived"}:
             raise RuntimeError(f"Unsupported public content status: {status!r}")
         kind = page["kind"]
-        if kind in {"guide", "exercise", "exercise-index"}:
+        if kind in {"guide", "exercise", "exercise-index", "program"}:
             _required_string(content_id, field="id")
             _required_string(page.get("slug"), field="slug")
             if "status" not in page:
                 raise RuntimeError(f"Public content {content_id!r} must declare a status")
+        if kind == "program":
+            raw_program = page.get("program")
+            if not isinstance(raw_program, dict):
+                raise RuntimeError(
+                    f"Public program {content_id!r} must declare a program reference"
+                )
+            program_ref = cast(dict[str, object], raw_program)
+            program_slug = _required_string(program_ref.get("slug"), field="program.slug")
+            page_slug = _required_string(page.get("slug"), field="slug")
+            if program_slug != page_slug:
+                raise RuntimeError(f"Public program {content_id!r} slug must match its page slug")
         if kind == "guide":
             for field in ("published", "updated", "reviewed"):
                 _required_string(page.get(field), field=field)
@@ -335,6 +350,91 @@ def _published_exercise_for_page(page: dict[str, object]) -> dict[str, object]:
     return exercise
 
 
+def _published_program_for_page(page: dict[str, object]) -> dict[str, object]:
+    raw_program = page.get("program")
+    if not isinstance(raw_program, dict):
+        raise RuntimeError("Published program page has no program reference")
+    program_ref = cast(dict[str, object], raw_program)
+    slug = _required_string(program_ref.get("slug"), field="program.slug")
+    program = public_program(slug)
+    if program is None:
+        raise RuntimeError(f"Published program {slug!r} has no canonical domain record")
+    validate_public_program(program)
+    return program
+
+
+def _rest_label(value: object) -> str:
+    if isinstance(value, int) and value % 60 == 0:
+        return f"{value // 60} мин"
+    return f"{value} сек"
+
+
+def _public_program_markup(program: dict[str, object]) -> str:
+    title = _required_string(program.get("title"), field="program.title")
+    raw_days = program.get("days")
+    if not isinstance(raw_days, list):
+        raise RuntimeError("Public program days must be a list")
+
+    day_markup: list[str] = []
+    for raw_day in raw_days:
+        if not isinstance(raw_day, dict):
+            raise RuntimeError("Public program day must be an object")
+        day = cast(dict[str, object], raw_day)
+        day_number = day.get("day_number")
+        day_title = html.escape(_required_string(day.get("title"), field="program.day.title"))
+        raw_exercises = day.get("exercises")
+        if not isinstance(raw_exercises, list):
+            raise RuntimeError("Public program exercises must be a list")
+        exercise_markup: list[str] = []
+        for raw_exercise in raw_exercises:
+            if not isinstance(raw_exercise, dict):
+                raise RuntimeError("Public program exercise must be an object")
+            exercise = cast(dict[str, object], raw_exercise)
+            slug = _required_string(exercise.get("slug"), field="program.exercise.slug")
+            exercise_title = _required_string(exercise.get("title"), field="program.exercise.title")
+            exercise_path = f"/exercises/{slug}"
+            escaped_title = html.escape(exercise_title)
+            if public_page_for_path(exercise_path):
+                name_markup = (
+                    f'<a href="{html.escape(exercise_path, quote=True)}">{escaped_title}</a>'
+                )
+            else:
+                name_markup = f"<strong>{escaped_title}</strong>"
+            exercise_markup.append(
+                "<li>"
+                f"{name_markup}"
+                '<span class="seo-fallback-program__facts">'
+                f"{html.escape(str(exercise.get('prescribed_sets')))} подхода · "
+                f"{html.escape(_required_string(exercise.get('prescribed_reps'), field='program.exercise.prescribed_reps'))} повторений · "
+                f"Отдых: {html.escape(_rest_label(exercise.get('rest_seconds')))}"
+                "</span>"
+                "</li>"
+            )
+        day_markup.append(
+            '<article class="seo-fallback-program__day">'
+            f"<p>День {html.escape(str(day_number))}</p>"
+            f"<h3>{day_title}</h3>"
+            f"<ol>{''.join(exercise_markup)}</ol>"
+            "</article>"
+        )
+
+    goal = _required_string(program.get("goal"), field="program.goal")
+    level = _required_string(program.get("level"), field="program.level")
+    split_type = _required_string(program.get("split_type"), field="program.split_type")
+    return (
+        '<section class="seo-fallback-program" aria-labelledby="seo-fallback-program-title">'
+        '<p class="landing-kicker">Канонический шаблон</p>'
+        f'<h2 id="seo-fallback-program-title">{html.escape(title)}</h2>'
+        "<dl>"
+        f"<div><dt>Цель</dt><dd>{html.escape(goal)}</dd></div>"
+        f"<div><dt>Уровень</dt><dd>{html.escape(level)}</dd></div>"
+        f"<div><dt>Схема</dt><dd>{html.escape(split_type)}</dd></div>"
+        "</dl>"
+        f'<div class="seo-fallback-program__days">{"".join(day_markup)}</div>'
+        "</section>"
+    )
+
+
 def _breadcrumbs_schema(page: dict[str, object]) -> dict[str, object] | None:
     raw_breadcrumbs = page.get("breadcrumbs")
     if not isinstance(raw_breadcrumbs, list) or len(raw_breadcrumbs) < 2:
@@ -439,6 +539,8 @@ def metadata_for_path(path: str) -> SeoMetadata:
             # An allowlisted manifest entry is indexable only when its canonical domain
             # record passes the public exercise quality gate.
             _published_exercise_for_page(page)
+        if page.get("kind") == "program":
+            _published_program_for_page(page)
         return SeoMetadata(
             title=_required_string(page["title"], field="title"),
             description=_required_string(page["description"], field="description"),
@@ -713,6 +815,8 @@ def render_public_fallback(path: str) -> str:
     )
     cta = page.get("cta")
     app_url = f"{settings.frontend_base_url.rstrip('/')}/app"
+    if page.get("kind") == "program":
+        app_url += "?section=programs"
     if isinstance(cta, dict) and cta.get("placement") == "hero-and-footer":
         typed_cta = cast(dict[str, object], cta)
         cta_label = _required_string(typed_cta.get("label"), field="cta.label")
@@ -868,6 +972,8 @@ def render_public_fallback(path: str) -> str:
             '<footer class="public-exercise-source"><strong>Источник данных и лицензия</strong> '
             f"{source_markup} — {license_markup}</footer>"
         )
+    if page.get("kind") == "program":
+        parts.append(_public_program_markup(_published_program_for_page(page)))
     sources = page.get("sources")
     if isinstance(sources, list) and sources:
         parts.append("<section><h2>Источники</h2><ol>")

@@ -18,7 +18,7 @@ from fitminiapp_api.services.program_seed_data import EXERCISE_CATALOG, exercise
 # A deliberately small editorial allowlist. It prevents the public surface from
 # turning the whole exercise catalogue into thin pages and excludes every
 # user-created or personalized exercise by construction.
-PUBLIC_EXERCISE_SLUGS = ("bench-press", "lat-pulldown", "squat")
+PUBLIC_EXERCISE_SLUGS = ("bench-press", "lat-pulldown", "squat", "deadlift", "overhead-press")
 _REQUIRED_TEXT_FIELDS = (
     "slug",
     "title",

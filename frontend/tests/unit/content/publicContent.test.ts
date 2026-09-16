@@ -63,6 +63,34 @@ describe('public content routing', () => {
     expect(publicContent.pages.some((page) => forbiddenPaths.includes(page.path))).toBe(false);
   });
 
+  it('documents the real five-step trainer acquisition workflow', () => {
+    const trainerPage = getPublicContentPage('/for-trainers');
+
+    expect(trainerPage?.workflow?.steps.map((step) => step.title)).toEqual([
+      'Включить режим',
+      'Пригласить клиента',
+      'Подтвердить связь',
+      'Назначить программу',
+      'Смотреть факты',
+    ]);
+    expect(trainerPage?.cta?.label).toBe('Включить режим тренера');
+    expect(JSON.stringify(trainerPage)).not.toMatch(/NO_DATA|тысяч|клиент(?:ов|а) в месяц/i);
+  });
+
+  it('keeps the three-day training program on one canonical public route', () => {
+    const programPage = getPublicContentPage('/programs/full-body-3-days');
+
+    expect(programPage).toMatchObject({
+      kind: 'program',
+      slug: 'full-body-3-days',
+      program: { slug: 'full-body-3-days' },
+      heading: 'Программа тренировок 3 раза в неделю: Full Body на 3 дня',
+    });
+    expect(
+      publicContent.pages.filter((page) => page.path === '/programs/full-body-3-days'),
+    ).toHaveLength(1);
+  });
+
   it('keeps bench press as one canonical technique exemplar with a truthful handoff', () => {
     const benchPage = getPublicContentPage('/exercises/bench-press');
 
