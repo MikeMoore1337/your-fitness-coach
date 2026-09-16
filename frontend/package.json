@@ -19,6 +19,8 @@
     "e2e:mobile-regression": "playwright test --config=playwright.mobile-regression.config.ts",
     "e2e:mobile-regression:extended": "playwright test --config=playwright.mobile-regression.extended.config.ts",
     "e2e:cross-browser": "playwright test --config=playwright.cross-browser.config.ts",
+    "e2e:ui-audit:pr": "playwright test ui-quality-gate.spec.ts --project=chromium --workers=1",
+    "e2e:ui-audit:sweep": "playwright test --config=playwright.ui-quality-sweep.config.ts",
     "e2e:tma-smoke": "npm run build && playwright test tma-smoke.spec.ts demo-mode.spec.ts",
     "perf:check": "node ../scripts/check_frontend_performance.mjs",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test && vite build",

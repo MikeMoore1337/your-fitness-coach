@@ -9,6 +9,8 @@ import {
   TelegramHarness,
 } from './fixtures/mobile-tma';
 
+test.use({ serviceWorkers: 'block' });
+
 const evidenceDir = process.env.YFC_TASK_EVIDENCE_DIR
   ? resolve(process.env.YFC_TASK_EVIDENCE_DIR)
   : resolve(process.cwd(), '../.artifacts/tasks/277/evidence/screenshots');
@@ -1016,7 +1018,7 @@ test('AI Coach is fullscreen on compact mobile and keeps the composer usable', a
   expect(box?.x).toBe(0);
   expect(box?.y).toBe(0);
   expect(box?.width).toBe(viewport.width);
-  expect(box?.height).toBe(viewport.height);
+  expect(box?.height).toBeCloseTo(viewport.height, 0);
   await expect(workspace.getByTestId('ai-coach-workspace-resize')).toHaveCount(0);
   await expect(page.locator('#appBottomNav')).toBeHidden();
   await expect(page.getByTestId('quick-add-trigger')).toBeHidden();

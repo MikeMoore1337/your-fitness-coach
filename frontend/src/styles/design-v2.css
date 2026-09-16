@@ -46,9 +46,17 @@ body:has(.app-shell--design-v2) {
 }
 
 .progress-report-back {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: var(--v2-space-2);
+  padding: 10px 12px;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
   color: var(--v2-text-primary);
   font-weight: 700;
   text-underline-offset: 4px;
+  text-decoration: none;
 }
 
 .progress-report-controls {
@@ -1673,6 +1681,7 @@ body:has(.app-shell--design-v2) {
 /* Nutrition diary core */
 .nutrition-diary--design-v2 {
   gap: var(--v2-space-4);
+  margin-inline: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -3380,17 +3389,20 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
 .app-section--progress .progress-period-controls__tabs {
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
 }
 
 .app-section--progress .progress-period-controls .ui-tabs {
   display: flex;
+  width: max-content;
+  min-width: 100%;
   justify-content: flex-start;
-  max-width: 100%;
+  max-width: none;
   padding: 3px;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
+  overflow: visible;
 }
 
 .app-section--progress .progress-period-controls .ui-tab {
@@ -3804,6 +3816,23 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .app-section--progress .progress-bento__trend-head > strong {
     font-size: 1rem;
+  }
+}
+
+@media (max-width: 399px) {
+  .week-strip {
+    margin-inline: calc(-1 * max(var(--v2-space-3), var(--yfc-layout-safe-left)))
+      calc(-1 * max(var(--v2-space-3), var(--yfc-layout-safe-right)));
+  }
+}
+
+@media (min-width: 640px) and (max-width: 899px) {
+  .today-dashboard--design-v2 .today-nutrition h2 {
+    margin-bottom: 10px;
+  }
+
+  .today-dashboard--design-v2 .today-nutrition__water {
+    margin-top: 8px;
   }
 }
 
@@ -9034,8 +9063,12 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 }
 
 .coach-client-quick-actions a {
+  display: inline-flex;
+  min-width: 44px;
   min-height: 44px;
-  padding: 11px 0;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 6px;
   color: var(--v2-text-primary);
   font-size: 0.82rem;
   font-weight: 700;

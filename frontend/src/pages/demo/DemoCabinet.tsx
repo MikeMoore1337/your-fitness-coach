@@ -27,6 +27,7 @@ import { productEventSurface, trackProductEvent } from '../../shared/analytics/p
 import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { DemoRuntimeProvider } from '../../shared/runtime/runtime';
 import { Button, ErrorState, LoadingState, Surface } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import DemoAuthProvider from './DemoAuthProvider';
 import MiniAppPage from '../miniapp/MiniAppPage';
@@ -201,7 +202,9 @@ function DemoRoute({
             key={step.key}
             aria-current={index + 1 === route.currentStep ? 'step' : undefined}
           >
-            <span aria-hidden="true">{step.complete ? '✓' : index + 1}</span>
+            <span aria-hidden="true">
+              {step.complete ? <Icon name="check" size={16} /> : index + 1}
+            </span>
             <strong>{step.label}</strong>
           </li>
         ))}

@@ -155,7 +155,10 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert "ALLURE_R2" not in workflow
     assert "allure-report-worker" not in workflow
     assert not (root / "deploy" / "allure-report-worker").exists()
-    assert "testIgnore: ['**/mobile-ui-regression.spec.ts']" in cross_browser
+    assert (
+        "testIgnore: ['**/mobile-ui-regression.spec.ts', '**/ui-quality-sweep.spec.ts']"
+        in cross_browser
+    )
     assert '--run-id "${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"' in workflow
 
 

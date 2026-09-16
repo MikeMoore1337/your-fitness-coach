@@ -352,6 +352,109 @@
   }
 }
 
+@media (max-width: 399px) {
+  .demo-cabinet {
+    gap: var(--space-3);
+  }
+
+  .demo-cabinet-boundary {
+    gap: var(--space-3);
+    padding-block: var(--space-2);
+  }
+
+  .demo-cabinet-boundary__actions .ui-button {
+    padding-inline: var(--space-2);
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+}
+
+/* Keep the guided Demo intro compact once the narrow mobile content can share rows. */
+@media (min-width: 400px) and (max-width: 899px) {
+  .demo-cabinet {
+    gap: var(--space-3);
+  }
+
+  .demo-cabinet-boundary {
+    gap: var(--space-3);
+    padding-block: var(--space-2);
+  }
+
+  .demo-route__header,
+  .demo-route__next {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .demo-route__header .ui-button,
+  .demo-route__next .ui-button {
+    width: auto;
+  }
+
+  .demo-route__next p {
+    min-width: 0;
+  }
+
+  .demo-cabinet .today-workout-copy:has(.today-workout-photo) {
+    min-height: 190px;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 899px) {
+  .demo-cabinet {
+    gap: var(--space-1);
+  }
+
+  .demo-cabinet-boundary {
+    align-items: center;
+    display: grid;
+    gap: var(--space-1);
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-block: var(--space-1);
+  }
+
+  .demo-cabinet-boundary > strong {
+    grid-column: 1 / -1;
+  }
+
+  .demo-cabinet-boundary__scenario {
+    align-items: center;
+    display: inline-flex;
+    flex-direction: row;
+    width: auto;
+  }
+
+  .demo-cabinet-boundary__actions {
+    width: auto;
+  }
+
+  .demo-cabinet-boundary__actions .ui-button {
+    flex: 0 0 auto;
+  }
+
+  .demo-route {
+    gap: var(--space-1);
+    padding-block: var(--space-2);
+  }
+
+  .demo-route__header,
+  .demo-route__next {
+    gap: var(--space-1);
+  }
+
+  .demo-cabinet .today-workout-spotlight {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.45fr);
+  }
+
+  .demo-cabinet .today-workout-copy:has(.today-workout-photo) {
+    min-height: 160px;
+  }
+
+  .demo-cabinet .today-dashboard__training {
+    gap: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .demo-cabinet,
   .demo-cabinet > * {

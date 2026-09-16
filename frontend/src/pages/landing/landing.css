@@ -527,6 +527,22 @@
     width: 100%;
   }
 }
+@media (max-width: 375px) {
+  /* Keep the 44px theme, login and menu controls usable when the wordmark and controls cannot share one row. */
+  .landing-page.public-shell .public-shell__header {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'brand' 'actions';
+    row-gap: 8px;
+    padding-block: 10px;
+  }
+  .landing-page.public-shell .public-shell__brand {
+    grid-area: brand;
+  }
+  .landing-page.public-shell .public-shell__header-actions {
+    grid-area: actions;
+    justify-self: end;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .landing-chapter[data-motion-phase='enter'] {
     animation: none;

@@ -183,12 +183,18 @@
 }
 
 .app-section--programs .ux-plan-management-link {
-  display: block;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
   width: fit-content;
   margin-inline: auto;
   color: var(--v2-text-primary);
   font-weight: 800;
   text-underline-offset: 4px;
+  text-decoration: none;
 }
 
 .app-section--progress .ux-progress-category-nav {
