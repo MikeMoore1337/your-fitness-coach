@@ -122,6 +122,25 @@ def test_online_migration_rejects_index_on_existing_table(tmp_path: Path) -> Non
         validate_added_migration(path)
 
 
+def test_online_migration_accepts_concurrent_index_on_existing_table(tmp_path: Path) -> None:
+    path = _migration(
+        tmp_path / "0065_existing_concurrent_index.py",
+        'online_rollout_phase = "expand"\n'
+        'online_rollout_notes = "Concurrent index build avoids a table-wide write lock."\n\n'
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        '    if bind.dialect.name == "postgresql":\n'
+        "        with op.get_context().autocommit_block():\n"
+        '            op.create_index("ix_users_name", "users", ["name"], '
+        "postgresql_concurrently=True, if_not_exists=True)\n"
+        "    else:\n"
+        '        op.create_index("ix_users_name", "users", ["name"], '
+        "postgresql_concurrently=True, if_not_exists=True)\n",
+    )
+
+    validate_added_migration(path)
+
+
 @pytest.mark.parametrize("operation", ["drop_table", "drop_column", "alter_column"])
 def test_online_migration_rejects_destructive_contract_operation(
     tmp_path: Path, operation: str

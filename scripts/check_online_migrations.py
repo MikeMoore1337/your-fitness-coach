@@ -181,7 +181,106 @@ def _op_calls(upgrade: ast.AST) -> list[ast.Call]:
     ]
 
 
+def _parent_links(root: ast.AST) -> dict[ast.AST, tuple[ast.AST, str]]:
+    links: dict[ast.AST, tuple[ast.AST, str]] = {}
+    for parent in ast.walk(root):
+        for field_name, value in ast.iter_fields(parent):
+            if isinstance(value, ast.AST):
+                links[value] = (parent, field_name)
+            elif isinstance(value, list):
+                for child in value:
+                    if isinstance(child, ast.AST):
+                        links[child] = (parent, field_name)
+    return links
+
+
+def _is_direct_op_call(call: ast.Call, attribute: str) -> bool:
+    return (
+        isinstance(call.func, ast.Attribute)
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "op"
+        and call.func.attr == attribute
+    )
+
+
+def _has_true_keyword(call: ast.Call, name: str) -> bool:
+    return any(
+        keyword.arg == name
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value is True
+        for keyword in call.keywords
+    )
+
+
+def _is_autocommit_block_call(call: ast.Call) -> bool:
+    return (
+        isinstance(call.func, ast.Attribute)
+        and call.func.attr == "autocommit_block"
+        and isinstance(call.func.value, ast.Call)
+        and _is_direct_op_call(call.func.value, "get_context")
+    )
+
+
+def _is_postgresql_dialect_name(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == "name"
+        and isinstance(node.value, ast.Attribute)
+        and node.value.attr == "dialect"
+        and isinstance(node.value.value, ast.Name)
+        and node.value.value.id == "bind"
+    )
+
+
+def _is_postgresql_dialect_check(node: ast.AST) -> bool:
+    if (
+        not isinstance(node, ast.Compare)
+        or len(node.ops) != 1
+        or not isinstance(node.ops[0], ast.Eq)
+    ):
+        return False
+    if len(node.comparators) != 1:
+        return False
+    left, right = node.left, node.comparators[0]
+    return (
+        _is_postgresql_dialect_name(left)
+        and isinstance(right, ast.Constant)
+        and right.value == "postgresql"
+    ) or (
+        _is_postgresql_dialect_name(right)
+        and isinstance(left, ast.Constant)
+        and left.value == "postgresql"
+    )
+
+
+def _is_within_autocommit_block(call: ast.Call, links: dict[ast.AST, tuple[ast.AST, str]]) -> bool:
+    current: ast.AST = call
+    while current in links:
+        parent, _field_name = links[current]
+        if isinstance(parent, ast.With) and any(
+            _is_autocommit_block_call(item.context_expr) for item in parent.items
+        ):
+            return True
+        current = parent
+    return False
+
+
+def _is_in_non_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST, str]]) -> bool:
+    current: ast.AST = call
+    while current in links:
+        parent, field_name = links[current]
+        if (
+            isinstance(parent, ast.If)
+            and field_name == "orelse"
+            and _is_postgresql_dialect_check(parent.test)
+        ):
+            return True
+        current = parent
+    return False
+
+
 def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object) -> None:
+    links = _parent_links(upgrade)
     created_tables = {
         call.args[0].value
         for call in _op_calls(upgrade)
@@ -198,7 +297,8 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
             if phase == "expand":
                 allowed = (
                     owner == "op"
-                    and function.attr in {"add_column", "create_table", "create_index"}
+                    and function.attr
+                    in {"add_column", "create_table", "create_index", "get_bind", "get_context"}
                 ) or (
                     owner == "sa"
                     and (
@@ -209,6 +309,8 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 )
             elif phase == "backfill":
                 allowed = owner == "op" and function.attr == "execute"
+        if _is_autocommit_block_call(call):
+            allowed = True
         if not allowed:
             raise OnlineMigrationError(
                 f"{path} calls a helper or operation outside the {phase!r} online allowlist"
@@ -225,10 +327,18 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 if len(call.args) > 1 and isinstance(call.args[1], ast.Constant)
                 else None
             )
-            if table_name not in created_tables:
+            if table_name not in created_tables and not (
+                _has_true_keyword(call, "postgresql_concurrently")
+                and _has_true_keyword(call, "if_not_exists")
+                and (
+                    _is_within_autocommit_block(call, links)
+                    or _is_in_non_postgresql_branch(call, links)
+                )
+            ):
                 raise OnlineMigrationError(
                     f"{path} contains lock-prone operations: create_index is allowed only for "
-                    "a new empty table in the same migration"
+                    "a new empty table in the same migration or a PostgreSQL-concurrent "
+                    "index in an autocommit block"
                 )
 
 
@@ -376,7 +486,13 @@ def validate_added_migration(path: Path) -> None:
         operation = call.func.attr if isinstance(call.func, ast.Attribute) else ""
         if phase == "expand" and operation == "add_column":
             _validate_nullable_add_column(path, call)
-        elif phase == "expand" and operation not in {"add_column", "create_table", "create_index"}:
+        elif phase == "expand" and operation not in {
+            "add_column",
+            "create_table",
+            "create_index",
+            "get_bind",
+            "get_context",
+        }:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for online expand"
             )
