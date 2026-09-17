@@ -132,6 +132,7 @@ class FoodDiaryEntry(Base):
             "updated_at",
         ),
         Index("ix_food_diary_entries_copy_operation", "copy_operation_id", "id"),
+        Index("ix_food_diary_entries_batch_operation", "batch_operation_id", "id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -144,6 +145,9 @@ class FoodDiaryEntry(Base):
     )
     copy_operation_id: Mapped[int | None] = mapped_column(
         ForeignKey("food_diary_copy_operations.id", ondelete="SET NULL"), nullable=True
+    )
+    batch_operation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("food_diary_batch_operations.id", ondelete="SET NULL"), nullable=True
     )
     copied_from_entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("food_diary_entries.id", ondelete="SET NULL"), nullable=True
@@ -310,6 +314,47 @@ class FoodDiaryCopyOperation(Base):
     source_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     target_date: Mapped[date] = mapped_column(Date, nullable=False)
     target_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=now_msk_naive,
+    )
+
+
+class FoodDiaryBatchOperation(Base):
+    __tablename__ = "food_diary_batch_operations"
+    __table_args__ = (
+        CheckConstraint(
+            "operation_kind IN ('meal_template', 'natural_input')",
+            name="ck_food_diary_batch_operations_kind",
+        ),
+        CheckConstraint(
+            "meal_type IN ('breakfast', 'lunch', 'dinner', 'snacks')",
+            name="ck_food_diary_batch_operations_meal_type",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key",
+            name="uq_food_diary_batch_operations_user_key",
+        ),
+        Index(
+            "ix_food_diary_batch_operations_user_created",
+            "user_id",
+            "created_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    operation_kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    template_id: Mapped[int | None] = mapped_column(
+        ForeignKey("nutrition_meal_templates.id", ondelete="SET NULL"), nullable=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    diary_date: Mapped[date] = mapped_column(Date, nullable=False)
+    meal_type: Mapped[str] = mapped_column(String(16), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

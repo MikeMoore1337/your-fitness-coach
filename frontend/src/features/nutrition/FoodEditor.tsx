@@ -13,6 +13,7 @@ export { isValidGtin } from './nutritionFoodUtils';
 interface FoodEditorProps {
   userId?: number | 'anonymous';
   barcode?: string;
+  initialName?: string;
   food?: Food;
   onCancel: () => void;
   onSaved: (food: Food) => void;
@@ -40,9 +41,9 @@ type PhotoConflict = {
   recognized: string;
 };
 
-function initialDraft(food?: Food, barcode = ''): FoodDraft {
+function initialDraft(food?: Food, barcode = '', initialName = ''): FoodDraft {
   return {
-    name: food?.name ?? '',
+    name: food?.name ?? initialName,
     brand: food?.brand ?? '',
     barcode: food?.barcode ?? barcode,
     classification: 'personal',
@@ -131,12 +132,13 @@ function saveError(error: unknown): string {
 export function FoodEditor({
   userId = 'anonymous',
   barcode = '',
+  initialName = '',
   food,
   onCancel,
   onSaved,
 }: FoodEditorProps) {
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState(() => initialDraft(food, barcode));
+  const [draft, setDraft] = useState(() => initialDraft(food, barcode, initialName));
   const [errors, setErrors] = useState<FoodErrors>({});
   const [photoScanOpen, setPhotoScanOpen] = useState(false);
   const [photoConflicts, setPhotoConflicts] = useState<PhotoConflict[]>([]);

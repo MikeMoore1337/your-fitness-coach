@@ -7,6 +7,7 @@ import type {
   Food,
   FoodBarcodeLookup,
   FoodDiaryEntry,
+  FoodDiaryBatchResponse,
   FoodList,
   FoodSearch,
   NutritionLabelConfirmResponse,
@@ -42,6 +43,8 @@ import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { BarcodeLookup } from './BarcodeLookup';
 import { FoodEditor } from './FoodEditor';
 import { NutritionLabelScanner } from './NutritionLabelScanner';
+import { MealTemplateBrowser } from './MealTemplateBrowser';
+import { NaturalFoodInput } from './NaturalFoodInput';
 import { RecipeBrowser } from './RecipeBrowser';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -53,7 +56,15 @@ const mealLabels: Record<MealType, string> = {
   snacks: 'перекусы',
 };
 type PickerSource = 'mine' | 'recent' | 'frequent' | 'favorites';
-type PickerView = 'browse' | 'quick-add' | 'food-editor' | 'recipes' | 'barcode' | 'label-scan';
+type PickerView =
+  | 'browse'
+  | 'quick-add'
+  | 'food-editor'
+  | 'recipes'
+  | 'templates'
+  | 'natural'
+  | 'barcode'
+  | 'label-scan';
 
 function nutritionFoodPath(entryMethod: FoodEntryMethod): NutritionFoodAddPath {
   if (entryMethod === 'label_scan') return 'photo';
@@ -386,6 +397,7 @@ function ExternalResults({
 export function FoodPickerDialog({
   diaryDate,
   mealType,
+  mealEntries = [],
   initialView = 'browse',
   disabled = false,
   demoSafeMode = false,
@@ -394,6 +406,7 @@ export function FoodPickerDialog({
 }: {
   diaryDate: string;
   mealType: MealType;
+  mealEntries?: FoodDiaryEntry[];
   initialView?: 'browse' | 'quick-add';
   disabled?: boolean;
   demoSafeMode?: boolean;
@@ -701,6 +714,16 @@ export function FoodPickerDialog({
       }
     },
   });
+  const handleBatchCompleted = async (response: FoodDiaryBatchResponse) => {
+    response.entries.forEach((entry) => onAdded?.(entry));
+    await invalidateNutritionSummaries(queryClient);
+    toast(
+      response.replayed
+        ? 'Эта запись уже была добавлена'
+        : `Добавлено в ${mealLabels[response.meal_type]}`,
+    );
+    onClose();
+  };
   const updateDraft = (changes: Partial<AddDraft>) => {
     addEntry.reset();
     setDraft({ ...draft, ...changes, requestId: newEntryRequestId() });
@@ -774,6 +797,8 @@ export function FoodPickerDialog({
         'quick-add': 'Быстрый ввод',
         'food-editor': editingFood ? 'Изменить продукт' : 'Новый продукт',
         recipes: 'Рецепты',
+        templates: 'Шаблоны приёмов',
+        natural: 'Список продуктов',
         barcode: 'Штрихкод',
         'label-scan': 'Сканирование этикетки',
       } as const
@@ -1033,6 +1058,42 @@ export function FoodPickerDialog({
               </Button>
             </div>
           </form>
+        ) : view === 'natural' ? (
+          <div className="nutrition-picker__browse">
+            <button
+              className="nutrition-picker__back"
+              type="button"
+              onClick={() => setView('browse')}
+            >
+              <Icon name="arrow-left" size={16} /> К продуктам
+            </button>
+            <NaturalFoodInput
+              diaryDate={diaryDate}
+              mealType={mealType}
+              userId={user?.id ?? 'anonymous'}
+              demoSafeMode={demoSafeMode}
+              onCompleted={handleBatchCompleted}
+              onCancel={() => setView('browse')}
+            />
+          </div>
+        ) : view === 'templates' ? (
+          <div className="nutrition-picker__browse">
+            <button
+              className="nutrition-picker__back"
+              type="button"
+              onClick={() => setView('browse')}
+            >
+              <Icon name="arrow-left" size={16} /> К продуктам
+            </button>
+            <MealTemplateBrowser
+              diaryDate={diaryDate}
+              mealType={mealType}
+              mealEntries={mealEntries}
+              demoSafeMode={demoSafeMode}
+              onCompleted={handleBatchCompleted}
+              onCancel={() => setView('browse')}
+            />
+          </div>
         ) : view === 'food-editor' ? (
           <div className="nutrition-picker__browse">
             <FoodEditor
@@ -1202,6 +1263,24 @@ export function FoodPickerDialog({
             <details className="nutrition-picker__secondary-tools">
               <summary>Другие способы добавления</summary>
               <div className="nutrition-picker__tools" aria-label="Другие способы добавления">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={demoSafeMode}
+                  title={demoSafeMode ? 'Доступно после входа' : undefined}
+                  onClick={() => setView('natural')}
+                >
+                  Вставить список
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={demoSafeMode}
+                  title={demoSafeMode ? 'Доступно после входа' : undefined}
+                  onClick={() => setView('templates')}
+                >
+                  Шаблоны приёмов
+                </Button>
                 <Button
                   type="button"
                   variant="secondary"

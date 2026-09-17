@@ -855,6 +855,9 @@ export function NutritionDiary({
         <FoodPickerDialog
           diaryDate={selectedDate}
           mealType={addingTo.mealType}
+          mealEntries={
+            diary.data?.meals.find((meal) => meal.meal_type === addingTo.mealType)?.entries ?? []
+          }
           initialView={addingTo.initialView}
           disabled={diary.data?.status === 'fasted'}
           demoSafeMode={demoSafeMode}

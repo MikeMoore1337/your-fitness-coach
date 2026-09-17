@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from fitminiapp_api.core.timezone import get_user_timezone_name, today_for_user
 from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import (
+    FoodDiaryBatchOperation,
     FoodDiaryCopyOperation,
     FoodDiaryDayStatus,
     FoodDiaryEntry,
@@ -36,6 +37,7 @@ from fitminiapp_api.schemas.food_diary import (
     FoodDiaryTargets,
     MealType,
 )
+from fitminiapp_api.schemas.nutrition_power import FoodDiaryBatchItem, FoodDiaryBatchResponse
 from fitminiapp_api.services.diary_nutrition import diary_entry_nutrition
 from fitminiapp_api.services.foods import (
     FoodError,
@@ -133,7 +135,7 @@ def _entry_snapshot_as_food(entry: FoodDiaryEntry) -> Food:
         nutrition_basis_kind=entry.nutrition_basis_kind or "per_100_g",
         nutrition_basis_amount=entry.nutrition_basis_amount or Decimal("100"),
         nutrition_basis_unit=entry.nutrition_basis_unit or "g",
-        canonical_facts=entry.nutrition_snapshot,
+        canonical_facts=(entry.nutrition_snapshot if entry.entry_kind == "food" else None),
     )
 
 
@@ -179,7 +181,34 @@ def _copy_recipe_snapshot(
     entry.nutrition_basis_kind = "per_100_g"
     entry.nutrition_basis_amount = Decimal("100")
     entry.nutrition_basis_unit = "g"
-    entry.nutrition_snapshot = None
+
+    def decimal_value(value: Decimal | None) -> str | None:
+        return str(value) if value is not None else None
+
+    entry.nutrition_snapshot = {
+        "kind": "recipe",
+        "recipe_id": recipe.id,
+        "recipe_name": recipe.name,
+        "ingredients_weight_g": decimal_value(calculation.ingredients_weight_g),
+        "final_weight_g": decimal_value(recipe.final_weight_g),
+        "effective_weight_g": decimal_value(calculation.effective_weight_g),
+        "totals": {
+            "energy_kcal": decimal_value(calculation.totals.energy_kcal),
+            "protein_g": decimal_value(calculation.totals.protein_g),
+            "fat_g": decimal_value(calculation.totals.fat_g),
+            "carbs_g": decimal_value(calculation.totals.carbs_g),
+            "fiber_g": decimal_value(calculation.totals.fiber_g),
+        },
+        "nutrients_per_100g": {
+            "energy_kcal_per_100g": decimal_value(
+                calculation.nutrients_per_100g.energy_kcal_per_100g
+            ),
+            "protein_g_per_100g": decimal_value(calculation.nutrients_per_100g.protein_g_per_100g),
+            "fat_g_per_100g": decimal_value(calculation.nutrients_per_100g.fat_g_per_100g),
+            "carbs_g_per_100g": decimal_value(calculation.nutrients_per_100g.carbs_g_per_100g),
+            "fiber_g_per_100g": decimal_value(calculation.nutrients_per_100g.fiber_g_per_100g),
+        },
+    }
 
 
 def _entry_nutrition(entry: FoodDiaryEntry) -> FoodDiaryNutrition:
@@ -358,6 +387,149 @@ def create_food_diary_entry(
         return _serialize_entry(existing)
     db.refresh(entry)
     return _serialize_entry(entry)
+
+
+def _batch_response(
+    db: Session,
+    operation: FoodDiaryBatchOperation,
+    *,
+    replayed: bool,
+) -> FoodDiaryBatchResponse:
+    entries = (
+        db.query(FoodDiaryEntry)
+        .filter(FoodDiaryEntry.batch_operation_id == operation.id)
+        .order_by(FoodDiaryEntry.id.asc())
+        .all()
+    )
+    return FoodDiaryBatchResponse(
+        operation_kind=cast(Literal["meal_template", "natural_input"], operation.operation_kind),
+        diary_date=operation.diary_date,
+        meal_type=cast(MealType, operation.meal_type),
+        entries=[_serialize_entry(entry) for entry in entries],
+        replayed=replayed,
+    )
+
+
+def _batch_request_fingerprint(
+    operation_kind: Literal["meal_template", "natural_input"],
+    diary_date: date,
+    meal_type: MealType,
+    items: list[FoodDiaryBatchItem],
+    template_id: int | None,
+) -> str:
+    canonical = json.dumps(
+        {
+            "operation_kind": operation_kind,
+            "diary_date": diary_date.isoformat(),
+            "meal_type": meal_type,
+            "template_id": template_id,
+            "items": [item.model_dump(mode="json") for item in items],
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _existing_batch_operation(
+    db: Session,
+    user: User,
+    idempotency_key: str,
+    fingerprint: str,
+) -> FoodDiaryBatchResponse | None:
+    operation = (
+        db.query(FoodDiaryBatchOperation)
+        .filter(
+            FoodDiaryBatchOperation.user_id == user.id,
+            FoodDiaryBatchOperation.idempotency_key == idempotency_key,
+        )
+        .first()
+    )
+    if operation is None:
+        return None
+    if operation.request_fingerprint != fingerprint:
+        raise FoodDiaryConflictError("Idempotency-Key was already used for another request")
+    return _batch_response(db, operation, replayed=True)
+
+
+def create_food_diary_batch(
+    db: Session,
+    user: User,
+    *,
+    diary_date: date,
+    meal_type: MealType,
+    items: list[FoodDiaryBatchItem],
+    idempotency_key: str,
+    operation_kind: Literal["meal_template", "natural_input"],
+    template_id: int | None = None,
+) -> FoodDiaryBatchResponse:
+    key = _normalize_idempotency_key(idempotency_key)
+    fingerprint = _batch_request_fingerprint(
+        operation_kind,
+        diary_date,
+        meal_type,
+        items,
+        template_id,
+    )
+    replay = _existing_batch_operation(db, user, key, fingerprint)
+    if replay is not None:
+        return replay
+
+    _validate_diary_date(user, diary_date)
+    _ensure_day_accepts_entries(db, user, diary_date)
+    operation = FoodDiaryBatchOperation(
+        user_id=user.id,
+        operation_kind=operation_kind,
+        template_id=template_id,
+        idempotency_key=key,
+        request_fingerprint=fingerprint,
+        diary_date=diary_date,
+        meal_type=meal_type,
+    )
+    db.add(operation)
+    try:
+        db.flush()
+        for item in items:
+            entry = FoodDiaryEntry(
+                user_id=user.id,
+                batch_operation_id=operation.id,
+                diary_date=diary_date,
+                meal_type=meal_type,
+                logged_at=None,
+                amount=item.amount,
+                amount_unit=item.amount_unit,
+            )
+            if item.food_id is not None:
+                food = _visible_food(db, user, item.food_id)
+                calculation = _calculate_amount(food, item.amount, item.amount_unit)
+                _copy_food_snapshot(entry, food)
+                entry.weight_g = calculation.weight_g
+                _set_nutrition_amount(entry, calculation)
+            else:
+                recipe = _owned_recipe(db, user, cast(int, item.recipe_id))
+                try:
+                    recipe_calculation = calculate_recipe(recipe)
+                except RecipeError as exc:
+                    raise FoodDiaryError(str(exc)) from exc
+                calculation = _calculate_amount(
+                    _recipe_as_food(recipe_calculation), item.amount, "g"
+                )
+                _copy_recipe_snapshot(entry, recipe, recipe_calculation)
+                entry.weight_g = calculation.weight_g
+                _set_nutrition_amount(entry, calculation)
+            db.add(entry)
+        db.commit()
+    except FoodDiaryError:
+        db.rollback()
+        raise
+    except IntegrityError:
+        db.rollback()
+        replay = _existing_batch_operation(db, user, key, fingerprint)
+        if replay is None:
+            raise FoodDiaryConflictError("batch diary request could not be completed")
+        return replay
+    return _batch_response(db, operation, replayed=False)
 
 
 def update_food_diary_entry(

@@ -24,6 +24,8 @@ export type NutritionFoodContributionOutcome = 'created' | 'reused' | 'duplicate
 export type NutritionFoodRepeatScope = 'product' | 'meal' | 'day';
 export type NutritionFoodRepeatOutcome = 'started' | 'completed';
 export type NutritionFoodCompletenessStatus = 'complete' | 'incomplete' | 'unlogged' | 'fasted';
+export type NutritionPowerFlow = 'meal_template' | 'natural_input';
+export type NutritionPowerOutcome = 'success' | 'validation_error' | 'unavailable';
 export type ProductCoreAction =
   | 'program_activated'
   | 'workout_started'
@@ -330,6 +332,18 @@ export type ProductEvent =
       status: NutritionFoodCompletenessStatus;
     }
   | {
+      name: 'nutrition_power_flow_completed';
+      surface: ProductSurface;
+      flow: NutritionPowerFlow;
+      outcome: NutritionPowerOutcome;
+    }
+  | {
+      name: 'nutrition_power_flow_timing';
+      surface: ProductSurface;
+      flow: NutritionPowerFlow;
+      duration_bucket: OnboardingLatencyBucket;
+    }
+  | {
       name: 'tma_core_action_completed';
       surface: 'tma';
       action: ProductCoreAction;
@@ -574,6 +588,12 @@ const NUTRITION_FOOD_COMPLETENESS_STATUSES = new Set<NutritionFoodCompletenessSt
   'unlogged',
   'fasted',
 ]);
+const NUTRITION_POWER_FLOWS = new Set<NutritionPowerFlow>(['meal_template', 'natural_input']);
+const NUTRITION_POWER_OUTCOMES = new Set<NutritionPowerOutcome>([
+  'success',
+  'validation_error',
+  'unavailable',
+]);
 const PRODUCT_CORE_ACTIONS = new Set<ProductCoreAction>([
   'program_activated',
   'workout_started',
@@ -736,6 +756,8 @@ function eventPropertyKeys(name: string): readonly string[] {
   if (name === 'nutrition_food_flow_timing') return ['path', 'duration_bucket'];
   if (name === 'nutrition_food_repeat_used') return ['scope', 'outcome'];
   if (name === 'nutrition_food_completeness_set') return ['status'];
+  if (name === 'nutrition_power_flow_completed') return ['flow', 'outcome'];
+  if (name === 'nutrition_power_flow_timing') return ['flow', 'duration_bucket'];
   if (name === 'tma_core_action_completed') return ['action'];
   if (name === 'telegram_news_cta_clicked') return ['destination', 'campaign'];
   if (name === 'article_viewed') return ['content_key'];
@@ -852,6 +874,18 @@ function hasValidEventProperties(value: Record<string, unknown>): boolean {
   if (value.name === 'nutrition_food_completeness_set') {
     return NUTRITION_FOOD_COMPLETENESS_STATUSES.has(
       value.status as NutritionFoodCompletenessStatus,
+    );
+  }
+  if (value.name === 'nutrition_power_flow_completed') {
+    return (
+      NUTRITION_POWER_FLOWS.has(value.flow as NutritionPowerFlow) &&
+      NUTRITION_POWER_OUTCOMES.has(value.outcome as NutritionPowerOutcome)
+    );
+  }
+  if (value.name === 'nutrition_power_flow_timing') {
+    return (
+      NUTRITION_POWER_FLOWS.has(value.flow as NutritionPowerFlow) &&
+      ONBOARDING_LATENCY_BUCKETS.has(value.duration_bucket as OnboardingLatencyBucket)
     );
   }
   if (value.name === 'tma_core_action_completed') {

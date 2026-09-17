@@ -11,6 +11,7 @@ from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity, LocalCredential
 from fitminiapp_api.models.food import Food, FoodFavorite
 from fitminiapp_api.models.food_diary import (
+    FoodDiaryBatchOperation,
     FoodDiaryCopyOperation,
     FoodDiaryDayStatus,
     FoodDiaryEntry,
@@ -19,6 +20,11 @@ from fitminiapp_api.models.notification import (
     Notification,
     NotificationDelivery,
     WebPushSubscription,
+)
+from fitminiapp_api.models.nutrition_power import (
+    FoodSearchAlias,
+    NutritionMealTemplate,
+    NutritionMealTemplateItem,
 )
 from fitminiapp_api.models.recipe import Recipe, RecipeIngredient
 from fitminiapp_api.models.token import RefreshToken
@@ -145,6 +151,33 @@ def test_account_export_includes_current_nutrition_domains_and_omits_secrets() -
                 fiber_g_per_100g=Decimal("4"),
             )
         )
+        meal_template = NutritionMealTemplate(
+            owner_user_id=owner.id,
+            name="Мой шаблон экспорта",
+        )
+        db.add(meal_template)
+        db.flush()
+        db.add(
+            NutritionMealTemplateItem(
+                template_id=meal_template.id,
+                position=0,
+                item_kind="food",
+                food_id=own_food.id,
+                recipe_id=None,
+                amount=Decimal("80"),
+                amount_unit="g",
+                source_name="Мой экспортируемый продукт",
+                source_brand="Личный бренд",
+            )
+        )
+        db.add(
+            FoodSearchAlias(
+                user_id=owner.id,
+                alias="мой рис",
+                normalized_alias="мой рис",
+                food_id=own_food.id,
+            )
+        )
         copy_operation = FoodDiaryCopyOperation(
             user_id=owner.id,
             idempotency_key="SECRET_IDEMPOTENCY_KEY",
@@ -158,6 +191,17 @@ def test_account_export_includes_current_nutrition_domains_and_omits_secrets() -
         )
         db.add(copy_operation)
         db.flush()
+        db.add(
+            FoodDiaryBatchOperation(
+                user_id=owner.id,
+                operation_kind="meal_template",
+                template_id=meal_template.id,
+                idempotency_key="SECRET_BATCH_IDEMPOTENCY_KEY",
+                request_fingerprint="SECRET_BATCH_REQUEST_FINGERPRINT",
+                diary_date=date(2026, 8, 19),
+                meal_type="lunch",
+            )
+        )
         db.add(
             FoodDiaryEntry(
                 user_id=owner.id,
@@ -245,6 +289,15 @@ def test_account_export_includes_current_nutrition_domains_and_omits_secrets() -
     assert payload["private_foods"][0]["name"] == "Мой экспортируемый продукт"
     assert payload["food_favorites"][0]["food"]["name"] == "Мой экспортируемый продукт"
     assert payload["recipes"][0]["ingredients"][0]["food_name"] == "Снимок ингредиента"
+    assert payload["nutrition_meal_templates"][0]["name"] == "Мой шаблон экспорта"
+    assert (
+        payload["nutrition_meal_templates"][0]["items"][0]["source_name"]
+        == "Мой экспортируемый продукт"
+    )
+    assert payload["food_search_aliases"][0]["alias"] == "мой рис"
+    assert payload["food_diary_batch_operations"][0]["operation_kind"] == "meal_template"
+    assert "idempotency_key" not in payload["food_diary_batch_operations"][0]
+    assert "request_fingerprint" not in payload["food_diary_batch_operations"][0]
     assert payload["food_diary_entries"][0]["food_name"] == "Снимок дневника"
     assert payload["food_diary_entries"][0]["energy_kcal_per_100g"] == Decimal("205")
     assert payload["food_diary_day_statuses"][0]["status"] == "complete"
@@ -259,6 +312,8 @@ def test_account_export_includes_current_nutrition_domains_and_omits_secrets() -
         "SECRET_SESSION_FAMILY",
         "SECRET_IDEMPOTENCY_KEY",
         "SECRET_REQUEST_FINGERPRINT",
+        "SECRET_BATCH_IDEMPOTENCY_KEY",
+        "SECRET_BATCH_REQUEST_FINGERPRINT",
         "SECRET_MANAGED_CLIENT_NAME",
         "SECRET_ENDPOINT_CAPABILITY",
         "SECRET_ENDPOINT_HASH",

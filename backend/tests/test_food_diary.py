@@ -643,6 +643,7 @@ def test_food_diary_migration_upgrades_from_food_domain_head(tmp_path: Path) -> 
             "nutrition_snapshot",
             "nutrition_amount",
             "nutrition_weight_g",
+            "batch_operation_id",
             "nutrition_energy_kcal_per_100g",
             "nutrition_protein_g_per_100g",
             "nutrition_fat_g_per_100g",
