@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../shared/api/client';
 import type { Food, UserFoodCreate } from '../../shared/api/types';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { Button, Field, Input } from '../../shared/ui/common';
 import { NutritionLabelScanner } from './NutritionLabelScanner';
 import type { NutritionLabelPrefill } from './NutritionLabelReview';
@@ -21,6 +22,8 @@ interface FoodDraft {
   name: string;
   brand: string;
   barcode: string;
+  classification: 'personal' | 'commercial';
+  basis: 'per_100_g' | 'per_100_ml' | 'per_serving';
   energy: string;
   protein: string;
   fat: string;
@@ -42,6 +45,8 @@ function initialDraft(food?: Food, barcode = ''): FoodDraft {
     name: food?.name ?? '',
     brand: food?.brand ?? '',
     barcode: food?.barcode ?? barcode,
+    classification: 'personal',
+    basis: (food?.nutrition_basis_kind as FoodDraft['basis'] | undefined) ?? 'per_100_g',
     energy: food?.energy_kcal_per_100g ?? '',
     protein: food?.protein_g_per_100g ?? '',
     fat: food?.fat_g_per_100g ?? '',
@@ -100,6 +105,11 @@ function validateFood(draft: FoodDraft): { errors: FoodErrors; payload?: UserFoo
       name,
       brand: draft.brand.trim().replace(/\s+/g, ' ') || null,
       barcode: barcode || null,
+      classification: draft.classification,
+      nutrition_basis_kind: draft.basis,
+      nutrition_basis_amount: draft.basis === 'per_serving' ? 1 : 100,
+      nutrition_basis_unit:
+        draft.basis === 'per_100_ml' ? 'ml' : draft.basis === 'per_serving' ? 'serving' : 'g',
       energy_kcal_per_100g: energy.value!,
       protein_g_per_100g: protein.value!,
       fat_g_per_100g: fat.value!,
@@ -114,7 +124,7 @@ function validateFood(draft: FoodDraft): { errors: FoodErrors; payload?: UserFoo
 
 function saveError(error: unknown): string {
   if (error instanceof ApiError && error.status === 409)
-    return 'Свой продукт с таким штрихкодом уже существует.';
+    return 'Продукт с такими данными уже существует. Проверьте название, бренд и значения.';
   return 'Не удалось сохранить продукт. Проверьте данные и попробуйте снова.';
 }
 
@@ -142,6 +152,13 @@ export function FoodEditor({
         body: payload,
       }),
     onSuccess: async (saved) => {
+      if (saved.catalog_contribution_outcome) {
+        trackProductEvent({
+          name: 'nutrition_food_catalog_contribution_outcome',
+          surface: productEventSurface(),
+          outcome: saved.catalog_contribution_outcome,
+        });
+      }
       await queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] });
       onSaved(saved);
     },
@@ -155,6 +172,7 @@ export function FoodEditor({
     name: prefill.name,
     brand: prefill.brand,
     barcode: prefill.barcode,
+    basis: prefill.sourceBasis === 'ambiguous' ? 'per_100_g' : prefill.sourceBasis,
     ...(prefill.nutrientsCanPopulate100g
       ? {
           energy: prefill.nutrients.energy_kcal ?? '',
@@ -188,6 +206,8 @@ export function FoodEditor({
       name: 'названии',
       brand: 'бренде',
       barcode: 'штрихкоде',
+      classification: 'типе продукта',
+      basis: 'основе пищевой ценности',
       energy: 'калорийности',
       protein: 'белках',
       fat: 'жирах',
@@ -207,7 +227,7 @@ export function FoodEditor({
         const recognized = updates[key];
         if (!recognized?.trim()) continue;
         if (replaceConflicts || !current[key].trim() || valuesMatch(current[key], recognized)) {
-          next[key] = recognized;
+          Object.assign(next, { [key]: recognized });
         }
       }
       return next;
@@ -232,6 +252,8 @@ export function FoodEditor({
       ] as const,
     [],
   );
+  const basisLabel =
+    draft.basis === 'per_100_ml' ? '100 мл' : draft.basis === 'per_serving' ? 'порцию' : '100 г';
 
   if (photoScanOpen) {
     return (
@@ -256,12 +278,19 @@ export function FoodEditor({
         event.preventDefault();
         const result = validateFood(draft);
         setErrors(result.errors);
-        if (result.payload) mutation.mutate(result.payload);
+        if (result.payload) {
+          trackProductEvent({
+            name: 'nutrition_food_classification_selected',
+            surface: productEventSurface(),
+            classification: draft.classification,
+          });
+          mutation.mutate(result.payload);
+        }
       }}
     >
       <div className="nutrition-editor__intro">
         <h3>{title}</h3>
-        <p>Значения указываются на 100 г. Обязательные поля отмечены звёздочкой.</p>
+        <p>Проверьте основу и значения перед сохранением. Обязательные поля отмечены звёздочкой.</p>
         <Button
           type="button"
           variant="secondary"
@@ -307,6 +336,49 @@ export function FoodEditor({
           уточните основу.
         </p>
       )}
+      <fieldset className="nutrition-editor__classification">
+        <legend>Что это за продукт?</legend>
+        <label className="nutrition-label-review__choice">
+          <input
+            type="radio"
+            name="own-food-classification"
+            value="personal"
+            checked={draft.classification === 'personal'}
+            onChange={() => {
+              trackProductEvent({
+                name: 'nutrition_food_classification_selected',
+                surface: productEventSurface(),
+                classification: 'personal',
+              });
+              field('classification', 'personal');
+            }}
+          />
+          <span>
+            <strong>Мой продукт или домашняя еда</strong>
+            <small>Сохранится только в вашем списке продуктов.</small>
+          </span>
+        </label>
+        <label className="nutrition-label-review__choice">
+          <input
+            type="radio"
+            name="own-food-classification"
+            value="commercial"
+            checked={draft.classification === 'commercial'}
+            onChange={() => {
+              trackProductEvent({
+                name: 'nutrition_food_classification_selected',
+                surface: productEventSurface(),
+                classification: 'commercial',
+              });
+              field('classification', 'commercial');
+            }}
+          />
+          <span>
+            <strong>Продукт из магазина</strong>
+            <small>Проверенные вами данные помогут дополнить общий каталог.</small>
+          </span>
+        </label>
+      </fieldset>
       <div className="nutrition-editor__grid">
         <Field label="Название *" labelFor="own-food-name" error={errors.name}>
           <Input
@@ -325,12 +397,23 @@ export function FoodEditor({
             onChange={(event) => field('brand', event.target.value)}
           />
         </Field>
-        {macroFields.map(([key, label, hint]) => (
+        <Field label="Основа пищевой ценности" labelFor="own-food-basis">
+          <select
+            id="own-food-basis"
+            value={draft.basis}
+            onChange={(event) => field('basis', event.target.value as FoodDraft['basis'])}
+          >
+            <option value="per_100_g">На 100 г</option>
+            <option value="per_100_ml">На 100 мл</option>
+            <option value="per_serving">На порцию</option>
+          </select>
+        </Field>
+        {macroFields.map(([key, label]) => (
           <Field
             key={key}
             label={`${label} *`}
             labelFor={`own-food-${key}`}
-            hint={hint}
+            hint={`на ${basisLabel}`}
             error={errors[key]}
           >
             <Input

@@ -5,6 +5,7 @@ import type {
   NutritionLabelDraft,
   NutritionLabelFactsEdit,
 } from '../../shared/api/types';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { Button, Field, Input, Select } from '../../shared/ui/common';
 import { isValidGtin } from './nutritionFoodUtils';
 
@@ -57,7 +58,7 @@ export type NutritionLabelReviewValues = {
   name: string;
   brand: string;
   barcode: string;
-  visibility: NutritionLabelConfirmRequest['visibility'];
+  classification: NonNullable<NutritionLabelConfirmRequest['classification']>;
   nutrition: NutritionLabelFactsEdit;
 };
 
@@ -294,8 +295,8 @@ export function NutritionLabelReview({
     nutrition.package_amount ? String(nutrition.package_amount.amount) : '',
   );
   const [packageUnit, setPackageUnit] = useState<'g' | 'ml'>(nutrition.package_amount?.unit ?? 'g');
-  const [visibility, setVisibility] =
-    useState<NutritionLabelConfirmRequest['visibility']>('private');
+  const [classification, setClassification] =
+    useState<NonNullable<NutritionLabelConfirmRequest['classification']>>('personal');
   const [formError, setFormError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<NutritionLabelField, string>>>({});
   const correctionReportedRef = useRef(false);
@@ -305,8 +306,6 @@ export function NutritionLabelReview({
     correctionReportedRef.current = true;
     onCorrection?.();
   };
-
-  const validBarcode = isValidGtin(barcode.replace(/\s+/g, ''));
 
   const warningLabels = useMemo(
     () => Array.from(new Set(draft.warnings.map(warningLabel))),
@@ -372,11 +371,16 @@ export function NutritionLabelReview({
           NUTRITION_LABEL_FIELDS.map((field) => [field, parseNumber(values[field] ?? '')]),
         ),
       } as NutritionLabelFactsEdit;
+      trackProductEvent({
+        name: 'nutrition_food_classification_selected',
+        surface: productEventSurface(),
+        classification,
+      });
       onSubmit({
         name: normalizedName,
         brand: brand.trim().replace(/\s+/g, ' '),
         barcode: normalizedBarcode,
-        visibility: validBarcode ? visibility : 'private',
+        classification,
         nutrition: nutritionEdit,
       });
       return;
@@ -511,7 +515,7 @@ export function NutritionLabelReview({
           <Field
             label="Штрихкод"
             labelFor="nutrition-label-barcode"
-            hint="корректный GTIN открывает общий каталог"
+            hint="необязательно, если он есть на упаковке"
           >
             <Input
               id="nutrition-label-barcode"
@@ -522,7 +526,6 @@ export function NutritionLabelReview({
                 reportCorrection();
                 const nextBarcode = event.target.value.replace(/\D/g, '');
                 setBarcode(nextBarcode);
-                if (!isValidGtin(nextBarcode)) setVisibility('private');
                 setFormError('');
               }}
               placeholder="необязательно"
@@ -668,46 +671,49 @@ export function NutritionLabelReview({
       </details>
 
       <fieldset className="nutrition-label-review__fieldset nutrition-label-review__visibility">
-        <legend>Кому доступен продукт</legend>
+        <legend>Что это за продукт?</legend>
         <label className="nutrition-label-review__choice">
           <input
             type="radio"
-            name="nutrition-label-visibility"
-            value="private"
-            checked={visibility === 'private' || !validBarcode}
+            name="nutrition-label-classification"
+            value="personal"
+            checked={classification === 'personal'}
             onChange={() => {
               reportCorrection();
-              setVisibility('private');
+              trackProductEvent({
+                name: 'nutrition_food_classification_selected',
+                surface: productEventSurface(),
+                classification: 'personal',
+              });
+              setClassification('personal');
             }}
           />
           <span>
-            <strong>Сохранить только для себя</strong>
-            <small>Продукт останется в вашем личном каталоге.</small>
+            <strong>Мой продукт или домашняя еда</strong>
+            <small>Карточка останется только в вашем списке продуктов.</small>
           </span>
         </label>
-        {validBarcode ? (
-          <label className="nutrition-label-review__choice">
-            <input
-              type="radio"
-              name="nutrition-label-visibility"
-              value="share_to_yfc_catalog"
-              checked={visibility === 'share_to_yfc_catalog'}
-              onChange={() => {
-                reportCorrection();
-                setVisibility('share_to_yfc_catalog');
-              }}
-            />
-            <span>
-              <strong>Добавить в каталог YFC</strong>
-              <small>Другие пользователи увидят карточку без вашего фото и имени.</small>
-            </span>
-          </label>
-        ) : (
-          <p className="nutrition-label-review__visibility-hint">
-            Для общего каталога нужен корректный GTIN-8, UPC-A, EAN-13 или GTIN-14. Сейчас выбран
-            личный каталог.
-          </p>
-        )}
+        <label className="nutrition-label-review__choice">
+          <input
+            type="radio"
+            name="nutrition-label-classification"
+            value="commercial"
+            checked={classification === 'commercial'}
+            onChange={() => {
+              reportCorrection();
+              trackProductEvent({
+                name: 'nutrition_food_classification_selected',
+                surface: productEventSurface(),
+                classification: 'commercial',
+              });
+              setClassification('commercial');
+            }}
+          />
+          <span>
+            <strong>Продукт из магазина</strong>
+            <small>Проверенные вами данные попадут в общий каталог без фото и имени автора.</small>
+          </span>
+        </label>
       </fieldset>
 
       {(formError || submitError) && (

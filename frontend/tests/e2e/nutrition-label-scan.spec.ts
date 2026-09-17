@@ -321,7 +321,7 @@ for (const current of cases) {
     const breakfast = page.getByRole('region', { name: 'Завтрак' });
     await breakfast.getByRole('button', { name: /Добавить/ }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: 'Сканировать пищевую ценность' }).click();
+    await dialog.getByRole('button', { name: 'По фото этикетки' }).click();
     await expect(
       dialog.getByRole('heading', { name: 'Сканировать пищевую ценность' }),
     ).toBeVisible();
@@ -349,7 +349,7 @@ for (const current of cases) {
       });
     }
 
-    await dialog.getByRole('radio', { name: /Добавить в каталог YFC/ }).check();
+    await dialog.getByRole('radio', { name: /Продукт из магазина/ }).check();
     await dialog.getByRole('button', { name: 'Подтвердить и сохранить продукт' }).click();
 
     await expect(dialog.getByRole('heading', { name: 'Шоколад с орехами' })).toBeVisible();
@@ -359,7 +359,7 @@ for (const current of cases) {
       name: 'Шоколад с орехами',
       brand: 'YFC Test',
       barcode: '3017620422003',
-      visibility: 'share_to_yfc_catalog',
+      classification: 'commercial',
       nutrition: { source_basis: 'per_100_g', energy_kcal: 480, protein_g: 8 },
     });
     expect(labelApi.diaryPayload()).toBeNull();

@@ -13,6 +13,9 @@ FoodStatus = Literal["draft", "active", "disabled"]
 ServingUnit = Literal["g", "ml", "piece", "serving"]
 NutritionBasisKind = Literal["per_100_g", "per_100_ml", "per_serving"]
 FoodCatalogQuality = Literal["private", "verified", "community_unverified"]
+FoodClassification = Literal["personal", "commercial"]
+FoodCatalogContributionState = Literal["private", "accepted", "duplicate", "conflict"]
+FoodCatalogContributionOutcome = Literal["created", "reused", "duplicate", "conflict"]
 FoodProviderStatus = Literal[
     "not_requested",
     "not_needed",
@@ -114,6 +117,21 @@ class UserFoodCreate(FoodValuesInput):
     fat_g_per_100g: Decimal = Field(ge=0, le=100)
     carbs_g_per_100g: Decimal = Field(ge=0, le=100)
     external_source: ExternalFoodImportSource | None = None
+    classification: FoodClassification = "personal"
+    nutrition_basis_kind: NutritionBasisKind = "per_100_g"
+    nutrition_basis_amount: Decimal = Field(default=Decimal("100"), gt=0, max_digits=10)
+    nutrition_basis_unit: Literal["g", "ml", "serving"] = "g"
+
+    @model_validator(mode="after")
+    def validate_nutrition_basis(self) -> UserFoodCreate:
+        expected = {
+            "per_100_g": (Decimal("100"), "g"),
+            "per_100_ml": (Decimal("100"), "ml"),
+            "per_serving": (Decimal("1"), "serving"),
+        }[self.nutrition_basis_kind]
+        if self.nutrition_basis_amount != expected[0] or self.nutrition_basis_unit != expected[1]:
+            raise ValueError("nutrition basis amount and unit do not match the selected basis")
+        return self
 
 
 class UserFoodUpdate(BaseModel):
@@ -128,6 +146,9 @@ class UserFoodUpdate(BaseModel):
     standard_serving_amount: Decimal | None = Field(default=None, gt=0, max_digits=10)
     standard_serving_unit: ServingUnit | None = None
     standard_serving_weight_g: Decimal | None = Field(default=None, gt=0, max_digits=10)
+    nutrition_basis_kind: NutritionBasisKind | None = None
+    nutrition_basis_amount: Decimal | None = Field(default=None, gt=0, max_digits=10)
+    nutrition_basis_unit: Literal["g", "ml", "serving"] | None = None
 
     @field_validator("name")
     @classmethod
@@ -167,6 +188,8 @@ class FoodResponse(BaseModel):
     canonical_facts: dict | None = None
     nutrition_provenance: dict | None = None
     catalog_quality: FoodCatalogQuality = "verified"
+    catalog_contribution_state: FoodCatalogContributionState | None = None
+    catalog_contribution_outcome: FoodCatalogContributionOutcome | None = None
     provenance: FoodProvenance
     trust_level: FoodTrustLevel
     canonical_complete: bool = True

@@ -220,7 +220,7 @@ describe('NutritionLabelScanner', () => {
     expect(confirmCalls).toHaveLength(1);
     expect(confirmCall?.[1].body).toMatchObject({
       revision: draft.revision,
-      visibility: 'private',
+      classification: 'personal',
       nutrition: expect.objectContaining({ source_basis: 'per_100_g', energy_kcal: 240 }),
     });
     resolveSaved();

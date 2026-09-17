@@ -12,7 +12,6 @@ import type {
   FoodDiaryEntry,
   FoodDiaryMeal,
   FoodDiaryNutrition,
-  HydrationDay,
 } from '../../shared/api/types';
 import {
   Badge,
@@ -129,79 +128,6 @@ function MacroProgress({
       <QuantitativeProgress label={label} maximum={targetNumber} unit={unit} value={totalNumber} />
       <small>{targetStatus(remainingNumber, targetNumber, unit)}</small>
     </div>
-  );
-}
-
-function DayBalance({
-  day,
-  hydration,
-  hydrationUnavailable,
-}: {
-  day: FoodDiaryDay;
-  hydration?: HydrationDay;
-  hydrationUnavailable: boolean;
-}) {
-  const foodTarget = day.targets ? Number(day.targets.energy_kcal) : null;
-  const hydrationTarget = hydration?.goal?.enabled ? hydration.goal.target_ml : null;
-  return (
-    <section
-      className="nutrition-section-card nutrition-day-balance"
-      aria-labelledby="nutrition-balance-title"
-    >
-      <header className="nutrition-section-card__header">
-        <div>
-          <span className="eyebrow">Сводка дня</span>
-          <h2 id="nutrition-balance-title">Баланс дня</h2>
-        </div>
-        <p>Еда и жидкость — рядом, без смешивания показателей.</p>
-      </header>
-      <div className="nutrition-day-balance__metrics">
-        <div>
-          {foodTarget ? (
-            <QuantitativeProgress
-              label="Еда"
-              maximum={foodTarget}
-              unit="ккал"
-              value={Number(day.totals.energy_kcal)}
-            />
-          ) : (
-            <div className="nutrition-day-balance__value">
-              <span>Еда</span>
-              <strong>{formatNumber(day.totals.energy_kcal)} ккал</strong>
-              <small>Ориентир не задан</small>
-            </div>
-          )}
-        </div>
-        <div>
-          {hydration && hydrationTarget ? (
-            <QuantitativeProgress
-              label="Жидкость"
-              maximum={hydrationTarget}
-              unit="мл"
-              value={hydration.total_ml}
-            />
-          ) : (
-            <div className="nutrition-day-balance__value">
-              <span>Жидкость</span>
-              <strong>
-                {hydration
-                  ? `${formatNumber(hydration.total_ml)} мл`
-                  : hydrationUnavailable
-                    ? 'Недоступно'
-                    : 'Загружается…'}
-              </strong>
-              <small>
-                {hydration
-                  ? 'Ориентир не задан'
-                  : hydrationUnavailable
-                    ? 'Проверьте карточку «Напитки»'
-                    : 'Получаем записи напитков'}
-              </small>
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -614,6 +540,11 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
           surface: productEventSurface(),
         });
       }
+      trackProductEvent({
+        name: 'nutrition_food_completeness_set',
+        surface: productEventSurface(),
+        status,
+      });
       queryClient.setQueryData(queryKeys.nutrition.diaryDate(day.diary_date), updated);
       await invalidateNutritionSummaries(queryClient);
       toast('Полнота дня обновлена');
@@ -635,8 +566,8 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
     >
       <div className="nutrition-completeness__copy">
         <div>
-          <span className="eyebrow">Статус дневника</span>
-          <h2 id="nutrition-completeness-title">Полнота данных</h2>
+          <span className="eyebrow">Проверка дневника</span>
+          <h2 id="nutrition-completeness-title">Это всё за сегодня?</h2>
         </div>
         <Badge tone={day.status === 'complete' || day.status === 'fasted' ? 'success' : undefined}>
           {day.status_is_explicit ? 'Подтверждено' : 'Не подтверждено'}
@@ -783,11 +714,6 @@ export function NutritionDiary({
     queryKey: queryKeys.nutrition.diaryDate(selectedDate),
     queryFn: () => api<FoodDiaryDay>(`/api/v1/nutrition/diary?diary_date=${selectedDate}`),
   });
-  const hydration = useQuery({
-    queryKey: queryKeys.nutrition.hydrationDate(selectedDate),
-    queryFn: () => api<HydrationDay>(`/api/v1/nutrition/hydration?diary_date=${selectedDate}`),
-    enabled: false,
-  });
   const dateLabel = formatDate(selectedDate, today);
   const meals = useMemo(() => normalizeMeals(diary.data?.meals ?? []), [diary.data?.meals]);
   const newEntryIds = useMemo(
@@ -807,19 +733,19 @@ export function NutritionDiary({
           <Button
             className="nutrition-diary__primary-action"
             type="button"
-            onClick={() =>
-              setAddingTo({ mealType: defaultMealType(timeZone), initialView: 'quick-add' })
-            }
+            aria-label="Добавить продукт в текущий приём пищи"
+            onClick={() => setAddingTo({ mealType: defaultMealType(timeZone) })}
           >
-            <Icon name="plus" size={16} /> Быстрый ввод
+            <Icon name="plus" size={16} /> Добавить продукт
           </Button>
           <Button
             variant="secondary"
             type="button"
-            aria-label="Найти продукт для текущего приёма пищи"
-            onClick={() => setAddingTo({ mealType: defaultMealType(timeZone) })}
+            onClick={() =>
+              setAddingTo({ mealType: defaultMealType(timeZone), initialView: 'quick-add' })
+            }
           >
-            Найти продукт
+            Быстрый ввод
           </Button>
         </div>
       </header>
@@ -840,12 +766,8 @@ export function NutritionDiary({
       )}
       {diary.data && (
         <>
+          <DaySummary day={diary.data} />
           <DayCompleteness day={diary.data} readOnly={readOnlyEntries} />
-          <DayBalance
-            day={diary.data}
-            hydration={hydration.data}
-            hydrationUnavailable={hydration.isError}
-          />
           <section
             className="nutrition-section-card nutrition-food-card"
             aria-labelledby="nutrition-food-title"
@@ -924,7 +846,6 @@ export function NutritionDiary({
               ))}
             </div>
           </section>
-          <DaySummary day={diary.data} />
         </>
       )}
 

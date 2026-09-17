@@ -9,7 +9,7 @@ const cases = [
 ] as const;
 
 for (const current of cases) {
-  test(`external food can be selected after barcode-first search hierarchy (${current.label})`, async ({
+  test(`external food can be selected after local search hierarchy (${current.label})`, async ({
     page,
   }) => {
     await page.setViewportSize(current.viewport);
@@ -93,19 +93,9 @@ for (const current of cases) {
     await page.goto('/app?section=nutrition');
     const breakfast = page.getByRole('region', { name: /Завтрак/ });
     await breakfast.getByRole('button', { name: /Добавить/ }).click();
-    const barcodeEntry = page.getByRole('button', { name: 'Поиск по штрихкоду' });
-    const nameSearch = page.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
-    await expect(barcodeEntry).toBeVisible();
+    const nameSearch = page.getByRole('searchbox', { name: 'Найти продукт' });
     await expect(nameSearch).toBeVisible();
-    expect(
-      await barcodeEntry.evaluate((barcode, search) => {
-        const searchNode = document.querySelector(search as string);
-        return Boolean(
-          searchNode &&
-          barcode.compareDocumentPosition(searchNode) & Node.DOCUMENT_POSITION_FOLLOWING,
-        );
-      }, '#nutrition-food-search'),
-    ).toBe(true);
+    await expect(page.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
     await nameSearch.fill('нутелла');
 
     await expect(page.getByText('Nutella hazelnut spread')).toBeVisible();

@@ -13,7 +13,12 @@ from fitminiapp_api.nutrition_label.contracts import (
     SourceBasis,
     StrictModel,
 )
-from fitminiapp_api.schemas.food import FoodResponse, validate_gtin
+from fitminiapp_api.schemas.food import (
+    FoodCatalogContributionOutcome,
+    FoodClassification,
+    FoodResponse,
+    validate_gtin,
+)
 
 LabelVisibility = Literal["private", "share_to_yfc_catalog"]
 LabelDraftStatus = Literal["draft", "confirmed", "cancelled", "expired"]
@@ -56,7 +61,11 @@ class NutritionLabelConfirmRequest(StrictModel):
     name: str = Field(min_length=1, max_length=256)
     brand: str | None = Field(default=None, max_length=128)
     barcode: str | None = None
-    visibility: LabelVisibility
+    # ``visibility`` remains an API compatibility field for older clients. New
+    # clients send the user-facing classification instead; the service resolves
+    # it to the internal visibility value before any catalog write.
+    visibility: LabelVisibility | None = None
+    classification: FoodClassification | None = None
     nutrition: NutritionLabelFactsEdit
 
     @field_validator("name")
@@ -80,9 +89,18 @@ class NutritionLabelConfirmRequest(StrictModel):
 
     @model_validator(mode="after")
     def validate_visibility(self) -> NutritionLabelConfirmRequest:
-        if self.visibility == "share_to_yfc_catalog" and self.barcode is None:
-            raise ValueError("sharing requires a valid GTIN barcode")
+        if self.classification is not None and self.visibility is not None:
+            expected = "share_to_yfc_catalog" if self.classification == "commercial" else "private"
+            if self.visibility != expected:
+                raise ValueError("classification and visibility disagree")
         return self
+
+    def resolved_visibility(self) -> LabelVisibility:
+        if self.classification == "commercial":
+            return "share_to_yfc_catalog"
+        if self.classification == "personal":
+            return "private"
+        return self.visibility or "private"
 
 
 class NutritionLabelDraftResponse(StrictModel):
@@ -102,6 +120,7 @@ class NutritionLabelConfirmResponse(StrictModel):
     food: FoodResponse
     visibility: LabelVisibility
     contribution_state: Literal["private", "accepted", "duplicate", "conflict"]
+    contribution_outcome: FoodCatalogContributionOutcome | None = None
     catalog_quality: Literal["private", "verified", "community_unverified"]
     provenance: str
     diary_entry_created: Literal[False] = False

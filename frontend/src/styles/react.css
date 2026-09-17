@@ -7447,6 +7447,24 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 .nutrition-target-settings {
   scroll-margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.nutrition-target-settings > summary {
+  min-height: 46px;
+  padding: 14px 16px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+.nutrition-target-settings > summary:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+.nutrition-target-settings__body {
+  padding: 0 16px 16px;
 }
 .nutrition-picker {
   align-items: center;
@@ -7678,6 +7696,26 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   padding-inline: 8px;
   font-size: 0.78rem;
 }
+.nutrition-picker__secondary-tools {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-subtle);
+}
+.nutrition-picker__secondary-tools > summary {
+  min-height: 42px;
+  padding: 12px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.nutrition-picker__secondary-tools > summary:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+.nutrition-picker__secondary-tools .nutrition-picker__tools {
+  padding: 0 10px 10px;
+}
 .nutrition-provider-fallback,
 .nutrition-barcode__found {
   display: grid;
@@ -7743,6 +7781,22 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+.nutrition-editor__classification {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.nutrition-editor__classification > legend {
+  padding-inline: 5px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 800;
 }
 .nutrition-editor__actions {
   display: flex;

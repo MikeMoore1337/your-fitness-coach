@@ -13,9 +13,12 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from fitminiapp_api.models.food import Food, FoodFavorite
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.user import User
 from fitminiapp_api.nutrition_label.contracts import CanonicalDraft, validate_canonical_draft
 from fitminiapp_api.schemas.food import (
+    FoodCatalogContributionOutcome,
+    FoodCatalogContributionState,
     FoodCatalogQuality,
     FoodListResponse,
     FoodNutrientsInput,
@@ -27,6 +30,16 @@ from fitminiapp_api.schemas.food import (
     ServingUnit,
     UserFoodCreate,
     UserFoodUpdate,
+)
+from fitminiapp_api.services.food_catalog_contributions import (
+    MANUAL_FOOD_SOURCE_VERSION,
+    add_catalog_contribution,
+    canonical_facts_match,
+    catalog_payload,
+    contribution_for_digest,
+    find_shared_food,
+    manual_food_values,
+    payload_digest,
 )
 
 ENERGY_QUANTUM = Decimal("0.01")
@@ -255,8 +268,100 @@ def calculate_food_amount(
 
 
 def create_user_food(db: Session, owner: User, payload: UserFoodCreate) -> Food:
+    values, canonical = manual_food_values(payload)
     external_source = payload.external_source
-    values = payload.model_dump(exclude={"external_source"})
+    if payload.classification == "commercial" and external_source is None:
+        product_payload = catalog_payload(
+            name=payload.name,
+            brand=payload.brand,
+            barcode=payload.barcode,
+            canonical=canonical,
+        )
+        digest = payload_digest(product_payload)
+        existing = find_shared_food(
+            db,
+            name=payload.name,
+            brand=payload.brand,
+            barcode=payload.barcode,
+            canonical=canonical,
+        )
+        if existing is not None:
+            if contribution_for_digest(db, food_id=existing.id, digest=digest) is not None:
+                existing._catalog_contribution_state = "duplicate"
+                existing._catalog_contribution_outcome = "duplicate"
+                return existing
+            if canonical_facts_match(existing, canonical):
+                if payload.barcode is not None and existing.barcode is None:
+                    existing.barcode = payload.barcode
+                add_catalog_contribution(
+                    db,
+                    food=existing,
+                    user=owner,
+                    canonical_payload=product_payload,
+                    digest=digest,
+                    state="accepted",
+                    source_version=MANUAL_FOOD_SOURCE_VERSION,
+                )
+                db.flush()
+                existing._catalog_contribution_state = "accepted"
+                existing._catalog_contribution_outcome = "reused"
+                return existing
+            # Preserve the canonical shared record and the conflict evidence,
+            # while returning a private usable fallback to the contributor.
+            add_catalog_contribution(
+                db,
+                food=existing,
+                user=owner,
+                canonical_payload=product_payload,
+                digest=digest,
+                state="conflict",
+                source_version=MANUAL_FOOD_SOURCE_VERSION,
+            )
+            fallback_payload = payload.model_copy(update={"classification": "personal"})
+            fallback = _create_personal_food(db, owner, fallback_payload)
+            fallback._catalog_contribution_state = "conflict"
+            fallback._catalog_contribution_outcome = "conflict"
+            return fallback
+
+        food = Food(
+            **values,
+            food_type="branded",
+            owner_user_id=None,
+            provenance="user_confirmed_package",
+            source_name="yfc_community",
+            source_version=MANUAL_FOOD_SOURCE_VERSION,
+            trust_level="unverified",
+            catalog_quality="community_unverified",
+            status="active",
+        )
+        db.add(food)
+        db.flush()
+        add_catalog_contribution(
+            db,
+            food=food,
+            user=owner,
+            canonical_payload=product_payload,
+            digest=digest,
+            state="accepted",
+            source_version=MANUAL_FOOD_SOURCE_VERSION,
+        )
+        db.flush()
+        food._catalog_contribution_state = "accepted"
+        food._catalog_contribution_outcome = "created"
+        return food
+    return _create_personal_food(db, owner, payload, values=values)
+
+
+def _create_personal_food(
+    db: Session,
+    owner: User,
+    payload: UserFoodCreate,
+    *,
+    values: dict[str, object] | None = None,
+) -> Food:
+    if values is None:
+        values, _ = manual_food_values(payload)
+    external_source = payload.external_source
     food = Food(
         **values,
         food_type="user",
@@ -270,10 +375,12 @@ def create_user_food(db: Session, owner: User, payload: UserFoodCreate) -> Food:
         ),
         external_id=external_source.external_id if external_source is not None else None,
         trust_level="unverified",
+        catalog_quality="private",
         status="active",
     )
     db.add(food)
     db.flush()
+    food._catalog_contribution_state = "private"
     return food
 
 
@@ -324,6 +431,8 @@ def _serialize_food(
     *,
     is_favorite: bool = False,
     last_used_at: datetime | None = None,
+    catalog_contribution_state: FoodCatalogContributionState | None = None,
+    catalog_contribution_outcome: FoodCatalogContributionOutcome | None = None,
 ) -> FoodResponse:
     return FoodResponse(
         id=food.id,
@@ -336,14 +445,18 @@ def _serialize_food(
         carbs_g_per_100g=cast(Decimal, food.carbs_g_per_100g),
         fiber_g_per_100g=food.fiber_g_per_100g,
         nutrition_basis_kind=cast(NutritionBasisKind, food.nutrition_basis_kind),
-        nutrition_basis_amount=food.nutrition_basis_amount,
+        nutrition_basis_amount=food.nutrition_basis_amount or Decimal("100"),
         nutrition_basis_unit=cast(Literal["g", "ml", "serving"], food.nutrition_basis_unit),
         canonical_facts=food.canonical_facts,
         nutrition_provenance=food.nutrition_provenance,
         catalog_quality=cast(FoodCatalogQuality, food.catalog_quality),
+        catalog_contribution_state=catalog_contribution_state,
+        catalog_contribution_outcome=catalog_contribution_outcome,
         provenance=cast(FoodProvenance, food.provenance),
         trust_level=cast(FoodTrustLevel, food.trust_level),
-        canonical_complete=food.canonical_complete,
+        canonical_complete=(
+            food.canonical_complete if food.canonical_complete is not None else True
+        ),
         standard_serving_amount=food.standard_serving_amount,
         standard_serving_unit=cast(ServingUnit | None, food.standard_serving_unit),
         standard_serving_weight_g=food.standard_serving_weight_g,
@@ -363,16 +476,37 @@ def _visible_food_condition(current_user: User):
 
 
 def _food_metadata_query(db: Session, current_user: User):
-    recent = (
+    recent_day = (
         db.query(
             FoodDiaryEntry.food_id.label("food_id"),
-            func.max(FoodDiaryEntry.updated_at).label("last_used_at"),
+            func.max(FoodDiaryEntry.diary_date).label("last_used_diary_date"),
         )
         .filter(
             FoodDiaryEntry.user_id == current_user.id,
             FoodDiaryEntry.food_id.is_not(None),
         )
         .group_by(FoodDiaryEntry.food_id)
+        .subquery()
+    )
+    recent = (
+        db.query(
+            FoodDiaryEntry.food_id.label("food_id"),
+            func.max(FoodDiaryEntry.updated_at).label("last_used_at"),
+            func.max(FoodDiaryEntry.logged_at).label("last_used_diary_time"),
+        )
+        .add_columns(recent_day.c.last_used_diary_date)
+        .join(
+            recent_day,
+            and_(
+                FoodDiaryEntry.food_id == recent_day.c.food_id,
+                FoodDiaryEntry.diary_date == recent_day.c.last_used_diary_date,
+            ),
+        )
+        .filter(
+            FoodDiaryEntry.user_id == current_user.id,
+            FoodDiaryEntry.food_id.is_not(None),
+        )
+        .group_by(FoodDiaryEntry.food_id, recent_day.c.last_used_diary_date)
         .subquery()
     )
     favorites = (
@@ -383,30 +517,53 @@ def _food_metadata_query(db: Session, current_user: User):
         .filter(FoodFavorite.user_id == current_user.id)
         .subquery()
     )
+    frequency = (
+        db.query(
+            FoodDiaryEntry.food_id.label("food_id"),
+            func.count(FoodDiaryEntry.id).label("entry_count"),
+        )
+        .filter(
+            FoodDiaryEntry.user_id == current_user.id,
+            FoodDiaryEntry.food_id.is_not(None),
+        )
+        .group_by(FoodDiaryEntry.food_id)
+        .subquery()
+    )
+    contributions = (
+        db.query(NutritionCatalogContribution.food_id.label("food_id"))
+        .filter(NutritionCatalogContribution.contributor_user_id == current_user.id)
+        .filter(NutritionCatalogContribution.state.in_(("accepted", "duplicate")))
+        .distinct()
+        .subquery()
+    )
     query = (
         db.query(
             Food,
             favorites.c.food_id.label("favorite_food_id"),
             favorites.c.favorite_created_at,
             recent.c.last_used_at,
+            frequency.c.entry_count,
+            contributions.c.food_id.label("contributed_food_id"),
         )
         .outerjoin(favorites, favorites.c.food_id == Food.id)
         .outerjoin(recent, recent.c.food_id == Food.id)
+        .outerjoin(frequency, frequency.c.food_id == Food.id)
+        .outerjoin(contributions, contributions.c.food_id == Food.id)
         .filter(_visible_food_condition(current_user))
     )
-    return query, favorites, recent
+    return query, favorites, recent, frequency, contributions
 
 
 def _serialize_rows(
-    rows: Sequence[tuple[Food, int | None, datetime | None, datetime | None]],
+    rows: Sequence[tuple],
 ) -> list[FoodResponse]:
     return [
         _serialize_food(
-            food,
-            is_favorite=favorite_food_id is not None,
-            last_used_at=last_used_at,
+            row[0],
+            is_favorite=row[1] is not None,
+            last_used_at=row[3],
         )
-        for food, favorite_food_id, _favorite_created_at, last_used_at in rows
+        for row in rows
     ]
 
 
@@ -420,13 +577,25 @@ def create_user_food_response(
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise FoodConflictError("a personal food with this barcode already exists") from exc
+        raise FoodConflictError(
+            "a food with this barcode or catalog identity already exists"
+        ) from exc
     db.refresh(food)
-    return _serialize_food(food)
+    return _serialize_food(
+        food,
+        catalog_contribution_state=cast(
+            FoodCatalogContributionState | None,
+            getattr(food, "_catalog_contribution_state", None),
+        ),
+        catalog_contribution_outcome=cast(
+            FoodCatalogContributionOutcome | None,
+            getattr(food, "_catalog_contribution_outcome", None),
+        ),
+    )
 
 
 def get_food_response(db: Session, current_user: User, food_id: int) -> FoodResponse:
-    query, _, _ = _food_metadata_query(db, current_user)
+    query, *_ = _food_metadata_query(db, current_user)
     row = query.filter(Food.id == food_id).first()
     if row is None:
         raise FoodNotFoundError("food not found")
@@ -438,7 +607,7 @@ def get_food_by_barcode_response(
     current_user: User,
     barcode: str,
 ) -> FoodResponse | None:
-    query, _, _ = _food_metadata_query(db, current_user)
+    query, *_ = _food_metadata_query(db, current_user)
     row = (
         query.filter(Food.barcode == barcode)
         .order_by(
@@ -463,7 +632,10 @@ def update_user_food(
     if not changes:
         raise FoodError("at least one field must be provided")
 
-    editable_fields = set(UserFoodCreate.model_fields) - {"external_source"}
+    editable_fields = set(UserFoodCreate.model_fields) - {
+        "external_source",
+        "classification",
+    }
     merged = {field: getattr(food, field) for field in editable_fields}
     merged.update(changes)
     try:
@@ -471,8 +643,12 @@ def update_user_food(
     except ValueError as exc:
         raise FoodError(str(exc)) from exc
 
-    for field, value in validated.model_dump(exclude={"external_source"}).items():
-        setattr(food, field, value)
+    validated_values, canonical = manual_food_values(validated)
+    for field, value in validated_values.items():
+        if hasattr(food, field):
+            setattr(food, field, value)
+    food.canonical_facts = canonical.model_dump(mode="json")
+    food.canonical_complete = True
     try:
         db.commit()
     except IntegrityError as exc:
@@ -519,7 +695,7 @@ def list_favorite_foods(
     limit: int,
     offset: int,
 ) -> FoodListResponse:
-    query, favorites, _ = _food_metadata_query(db, current_user)
+    query, favorites, _, _, _ = _food_metadata_query(db, current_user)
     filtered = query.filter(favorites.c.food_id.is_not(None))
     total = filtered.count()
     rows = (
@@ -547,11 +723,85 @@ def list_recent_foods(
     limit: int,
     offset: int,
 ) -> FoodListResponse:
-    query, _, recent = _food_metadata_query(db, current_user)
+    query, _, recent, _, _ = _food_metadata_query(db, current_user)
     filtered = query.filter(recent.c.last_used_at.is_not(None))
     total = filtered.count()
     rows = (
-        filtered.order_by(recent.c.last_used_at.desc(), Food.name.asc(), Food.id.asc())
+        filtered.order_by(
+            recent.c.last_used_diary_date.desc(),
+            recent.c.last_used_diary_time.desc().nulls_last(),
+            recent.c.last_used_at.desc(),
+            Food.name.asc(),
+            Food.id.asc(),
+        )
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return FoodListResponse(
+        items=_serialize_rows(rows),
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def list_frequent_foods(
+    db: Session,
+    current_user: User,
+    *,
+    limit: int,
+    offset: int,
+) -> FoodListResponse:
+    query, _, recent, frequency, _ = _food_metadata_query(db, current_user)
+    filtered = query.filter(frequency.c.food_id.is_not(None))
+    total = filtered.count()
+    rows = (
+        filtered.order_by(
+            frequency.c.entry_count.desc().nulls_last(),
+            recent.c.last_used_diary_date.desc(),
+            recent.c.last_used_diary_time.desc().nulls_last(),
+            recent.c.last_used_at.desc(),
+            Food.name.asc(),
+            Food.id.asc(),
+        )
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return FoodListResponse(
+        items=_serialize_rows(rows),
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def list_personal_foods(
+    db: Session,
+    current_user: User,
+    *,
+    limit: int,
+    offset: int,
+) -> FoodListResponse:
+    query, _, recent, frequency, contributions = _food_metadata_query(db, current_user)
+    filtered = query.filter(
+        or_(
+            and_(Food.food_type == "user", Food.owner_user_id == current_user.id),
+            contributions.c.food_id.is_not(None),
+        )
+    )
+    total = filtered.count()
+    rows = (
+        filtered.order_by(
+            recent.c.last_used_diary_date.desc(),
+            recent.c.last_used_diary_time.desc().nulls_last(),
+            recent.c.last_used_at.desc(),
+            frequency.c.entry_count.desc(),
+            Food.created_at.desc(),
+            Food.name.asc(),
+            Food.id.asc(),
+        )
         .offset(offset)
         .limit(limit)
         .all()
@@ -580,7 +830,11 @@ def search_foods(
     exact = escaped
     prefix = f"{escaped}%"
     contains = f"%{escaped}%"
-    query, favorites, recent = _food_metadata_query(db, current_user)
+    query, favorites, recent, frequency, contributions = _food_metadata_query(db, current_user)
+    personal = or_(
+        and_(Food.food_type == "user", Food.owner_user_id == current_user.id),
+        contributions.c.food_id.is_not(None),
+    )
     is_postgresql = db.get_bind().dialect.name == "postgresql"
     similarity = func.similarity(Food.search_text, normalized)
     match_condition: ColumnElement[bool] = Food.search_text.like(contains, escape="\\")
@@ -603,16 +857,20 @@ def search_foods(
         ]
 
         def fuzzy_order(row):
-            food, favorite_food_id, favorite_created_at, last_used_at = row
+            food = row[0]
+            favorite_created_at = row[2]
+            last_used_at = row[3]
+            entry_count = row[4]
+            is_personal = bool(row[5] is not None or food.food_type == "user")
             category = (
                 0
-                if last_used_at is not None
+                if is_personal and food.name.casefold() == normalized
                 else 1
-                if favorite_food_id is not None
+                if entry_count is not None or last_used_at is not None or row[1] is not None
                 else 2
-                if food.food_type == "user"
+                if food.name.casefold() == normalized
                 else 3
-                if food.food_type == "system"
+                if food.food_type == "user"
                 else 4
             )
             quality_rank = (
@@ -625,6 +883,7 @@ def search_foods(
             return (
                 category,
                 quality_rank,
+                -(entry_count or 0),
                 -(last_used_at.timestamp() if last_used_at is not None else 0),
                 -(favorite_created_at.timestamp() if favorite_created_at is not None else 0),
                 food.name,
@@ -640,19 +899,28 @@ def search_foods(
         )
     exact_name = Food.name.ilike(exact, escape="\\")
     priority_rank = case(
-        (and_(Food.food_type == "user", exact_name), 0),
-        (recent.c.last_used_at.is_not(None), 1),
-        (favorites.c.food_id.is_not(None), 2),
-        (exact_name, 3),
-        (Food.search_text.like(prefix, escape="\\"), 4),
-        (Food.food_type == "user", 5),
-        (Food.catalog_quality == "verified", 6),
-        (Food.food_type == "system", 7),
-        else_=8,
+        (and_(personal, exact_name), 0),
+        (
+            or_(
+                frequency.c.entry_count.is_not(None),
+                recent.c.last_used_at.is_not(None),
+                favorites.c.food_id.is_not(None),
+            ),
+            1,
+        ),
+        (exact_name, 2),
+        (Food.search_text.like(prefix, escape="\\"), 3),
+        (Food.food_type == "user", 4),
+        (Food.catalog_quality == "verified", 5),
+        (Food.food_type == "system", 6),
+        else_=7,
     )
     rows = (
         filtered.order_by(
             priority_rank.asc(),
+            frequency.c.entry_count.desc().nulls_last(),
+            recent.c.last_used_diary_date.desc(),
+            recent.c.last_used_diary_time.desc().nulls_last(),
             recent.c.last_used_at.desc(),
             favorites.c.favorite_created_at.desc(),
             *((similarity.desc(),) if is_postgresql else ()),
