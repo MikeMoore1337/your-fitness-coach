@@ -48,12 +48,20 @@ from fitminiapp_api.nutrition_label.parser import (
     build_draft_from_ocr,
     score_nutrition_candidate,
 )
-from fitminiapp_api.schemas.food import FoodResponse, validate_gtin
+from fitminiapp_api.schemas.food import (
+    FoodCatalogContributionOutcome,
+    FoodResponse,
+    validate_gtin,
+)
 from fitminiapp_api.schemas.nutrition_label import (
     LabelDraftStatus,
     NutritionLabelConfirmRequest,
     NutritionLabelConfirmResponse,
     NutritionLabelDraftResponse,
+)
+from fitminiapp_api.services.food_catalog_contributions import (
+    canonical_facts_match,
+    find_shared_food,
 )
 from fitminiapp_api.services.foods import get_food_response
 
@@ -617,6 +625,7 @@ def _make_food(
     canonical: CanonicalDraft,
     *,
     shared: bool,
+    visibility: str,
 ) -> Food:
     projection = _legacy_projection(canonical)
     serving = _food_serving_projection(canonical)
@@ -644,7 +653,7 @@ def _make_food(
         nutrition_provenance=_nutrition_provenance(
             canonical,
             barcode=request.barcode,
-            visibility=request.visibility,
+            visibility=visibility,
         ),
         canonical_complete=True,
         food_type="branded" if shared else "user",
@@ -659,17 +668,7 @@ def _make_food(
 
 
 def _same_canonical_facts(food: Food, canonical: CanonicalDraft) -> bool:
-    if not isinstance(food.canonical_facts, dict):
-        return False
-    try:
-        stored = validate_canonical_draft(food.canonical_facts)
-    except ValueError:
-        return False
-    return (
-        stored.normalized_facts.model_dump(mode="json")
-        == canonical.normalized_facts.model_dump(mode="json")
-        and stored.source_basis == canonical.source_basis
-    )
+    return canonical_facts_match(food, canonical)
 
 
 def _add_contribution(
@@ -722,21 +721,22 @@ def confirm_label_draft(
     except (ValueError, TypeError) as exc:
         raise NutritionLabelError("invalid_confirmation_payload") from exc
 
+    visibility = request.resolved_visibility()
+    request = request.model_copy(update={"visibility": visibility})
     existing_shared = None
-    if request.visibility == "share_to_yfc_catalog":
-        barcode = validate_gtin(request.barcode)
-        if barcode is None:
-            raise NutritionLabelError("sharing_requires_valid_gtin")
-        existing_shared = (
-            db.query(Food)
-            .filter(Food.barcode == barcode, Food.food_type != "user", Food.status == "active")
-            .with_for_update()
-            .first()
+    shared = visibility == "share_to_yfc_catalog"
+    if shared:
+        request.barcode = validate_gtin(request.barcode)
+        existing_shared = find_shared_food(
+            db,
+            name=request.name,
+            brand=request.brand,
+            barcode=request.barcode,
+            canonical=canonical,
         )
-        request.barcode = barcode
-    shared = request.visibility == "share_to_yfc_catalog"
     digest = _json_digest(_payload_for_digest(canonical, request))
     contribution_state = "private"
+    contribution_outcome: FoodCatalogContributionOutcome | None = None
     if shared and existing_shared is not None:
         existing_contribution = (
             db.query(NutritionCatalogContribution)
@@ -748,10 +748,14 @@ def confirm_label_draft(
         )
         if existing_contribution is not None:
             contribution_state = "duplicate"
+            contribution_outcome = "duplicate"
             food = existing_shared
         elif _same_canonical_facts(existing_shared, canonical):
             contribution_state = "accepted"
+            contribution_outcome = "reused"
             food = existing_shared
+            if request.barcode is not None and food.barcode is None:
+                food.barcode = request.barcode
             _add_contribution(
                 db,
                 food=food,
@@ -771,21 +775,33 @@ def confirm_label_draft(
                 state="conflict",
                 digest=digest,
             )
-            row.status = "confirmed"
-            row.revision += 1
-            row.canonical_payload = canonical.model_dump(mode="json")
-            row.product_name = request.name
-            row.product_brand = request.brand
-            row.product_barcode = request.barcode
-            row.confirmed_visibility = request.visibility
-            db.commit()
-            raise NutritionLabelConflictError("contribution_conflict")
+            # Do not overwrite the existing shared facts.  Keep the author
+            # productive with an owner-scoped fallback while preserving the
+            # conflict contribution for later catalog moderation.
+            food = _make_food(
+                user,
+                request,
+                canonical,
+                shared=False,
+                visibility="private",
+            )
+            db.add(food)
+            db.flush()
+            contribution_state = "conflict"
+            contribution_outcome = "conflict"
     else:
-        food = _make_food(user, request, canonical, shared=shared)
+        food = _make_food(
+            user,
+            request,
+            canonical,
+            shared=shared,
+            visibility=visibility,
+        )
         db.add(food)
         db.flush()
         if shared:
             contribution_state = "accepted"
+            contribution_outcome = "created"
             _add_contribution(
                 db,
                 food=food,
@@ -802,7 +818,7 @@ def confirm_label_draft(
     row.product_name = request.name
     row.product_brand = request.brand
     row.product_barcode = request.barcode
-    row.confirmed_visibility = request.visibility
+    row.confirmed_visibility = visibility
     row.confirmed_food_id = food.id
     try:
         db.commit()
@@ -818,19 +834,20 @@ def confirm_label_draft(
         extra={
             "outcome": contribution_state,
             "catalog_quality": food.catalog_quality,
-            "visibility": request.visibility,
+            "visibility": visibility,
         },
     )
     return NutritionLabelConfirmResponse(
         food=response_food,
-        visibility=request.visibility,
+        visibility=visibility,
         contribution_state=cast(
             Literal["private", "accepted", "duplicate", "conflict"], contribution_state
         ),
+        contribution_outcome=contribution_outcome,
         catalog_quality=cast(
             Literal["private", "verified", "community_unverified"], food.catalog_quality
         ),
-        provenance=food.provenance,
+        provenance=food.provenance or "user",
     )
 
 

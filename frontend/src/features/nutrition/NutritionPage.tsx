@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { NutritionTarget } from '../../shared/api/types';
 import { AppLink } from '../../shared/navigation/router';
 import { NutritionDiary } from './NutritionDiary';
@@ -29,6 +30,16 @@ export function NutritionPage({
   returnPath?: string;
   timeZone?: string | null;
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(() => {
+    const openFromHash = () => {
+      if (window.location.hash === '#nutrition-target-settings') setSettingsOpen(true);
+    };
+    openFromHash();
+    window.addEventListener('hashchange', openFromHash);
+    return () => window.removeEventListener('hashchange', openFromHash);
+  }, []);
+
   return (
     <div className="nutrition-experience">
       {returnPath && (
@@ -47,14 +58,22 @@ export function NutritionPage({
         readOnlyEntries={readOnlyEntries}
         timeZone={timeZone}
       />
-      <div id="nutrition-target-settings" className="nutrition-target-settings">
-        <NutritionForm
-          initial={initial}
-          readOnly={readOnlyTargets}
-          timeZone={timeZone}
-          onSaved={onSaved}
-        />
-      </div>
+      <details
+        id="nutrition-target-settings"
+        className="nutrition-target-settings"
+        open={settingsOpen}
+        onToggle={(event) => setSettingsOpen(event.currentTarget.open)}
+      >
+        <summary>Настройки питания</summary>
+        <div className="nutrition-target-settings__body">
+          <NutritionForm
+            initial={initial}
+            readOnly={readOnlyTargets}
+            timeZone={timeZone}
+            onSaved={onSaved}
+          />
+        </div>
+      </details>
     </div>
   );
 }

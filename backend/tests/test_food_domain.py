@@ -270,6 +270,7 @@ def test_food_migration_upgrades_from_previous_head(tmp_path: Path) -> None:
             "canonical_provenance",
             "canonical_complete",
             "catalog_quality",
+            "catalog_identity",
         }
         assert {column["name"] for column in schema.get_columns("foods")} == {
             column.name

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import Path
 
@@ -13,8 +13,9 @@ from fitminiapp_api import main as main_module
 from fitminiapp_api.core import timezone as timezone_module
 from fitminiapp_api.db.performance import begin_sql_metrics, current_sql_metrics, reset_sql_metrics
 from fitminiapp_api.db.session import get_session_context
-from fitminiapp_api.models.food import Food
+from fitminiapp_api.models.food import Food, normalize_food_catalog_identity
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
 from fitminiapp_api.models.user import User
 from fitminiapp_api.services.foods import search_foods
 
@@ -222,13 +223,20 @@ def test_favorites_recent_order_and_cross_user_isolation(client) -> None:
         first_entry = db.get(FoodDiaryEntry, entry_ids[0])
         second_entry = db.get(FoodDiaryEntry, entry_ids[1])
         assert first_entry is not None and second_entry is not None
-        first_entry.updated_at = datetime(2026, 8, 18, 10, 0)
-        second_entry.updated_at = datetime(2026, 8, 18, 11, 0)
+        first_entry.diary_date = date(2026, 8, 18)
+        first_entry.logged_at = time(23, 0)
+        first_entry.updated_at = datetime(2026, 8, 20, 10, 0)
+        second_entry.diary_date = date(2026, 8, 19)
+        second_entry.logged_at = time(7, 0)
+        second_entry.updated_at = datetime(2026, 8, 1, 11, 0)
 
     recent = client.get("/api/v1/nutrition/foods/recent", headers=owner_headers)
     assert recent.status_code == 200
     assert [item["id"] for item in recent.json()["items"]] == [second_id, first_id]
     assert foreign_id not in {item["id"] for item in recent.json()["items"]}
+    frequent = client.get("/api/v1/nutrition/foods/frequent", headers=owner_headers)
+    assert frequent.status_code == 200
+    assert [item["id"] for item in frequent.json()["items"]] == [second_id, first_id]
     search = client.get(
         "/api/v1/nutrition/foods/search",
         headers=owner_headers,
@@ -249,6 +257,152 @@ def test_favorites_recent_order_and_cross_user_isolation(client) -> None:
     assert (
         client.get("/api/v1/nutrition/foods/favorites", headers=owner_headers).json()["total"] == 0
     )
+
+
+def test_commercial_food_reuses_shared_identity_and_keeps_conflicts_private(client) -> None:
+    owner_headers = _auth(client, 17_003)
+    other_headers = _auth(client, 17_004)
+    commercial = _food_payload(
+        name="Йогурт клубника",
+        brand="YFC Test",
+        classification="commercial",
+        barcode=None,
+    )
+
+    first = client.post("/api/v1/nutrition/foods", headers=owner_headers, json=commercial)
+    assert first.status_code == 201, first.text
+    first_body = first.json()
+    assert first_body["food_type"] == "branded"
+    assert first_body["catalog_quality"] == "community_unverified"
+    assert first_body["catalog_contribution_state"] == "accepted"
+    assert first_body["catalog_contribution_outcome"] == "created"
+
+    duplicate = client.post("/api/v1/nutrition/foods", headers=other_headers, json=commercial)
+    assert duplicate.status_code == 201, duplicate.text
+    duplicate_body = duplicate.json()
+    assert duplicate_body["id"] == first_body["id"]
+    assert duplicate_body["catalog_contribution_state"] == "duplicate"
+    assert duplicate_body["catalog_contribution_outcome"] == "duplicate"
+
+    gtin_bridge = client.post(
+        "/api/v1/nutrition/foods",
+        headers=other_headers,
+        json={**commercial, "barcode": "4006381333931"},
+    )
+    assert gtin_bridge.status_code == 201, gtin_bridge.text
+    assert gtin_bridge.json()["id"] == first_body["id"]
+    assert gtin_bridge.json()["catalog_contribution_outcome"] == "reused"
+    assert gtin_bridge.json()["barcode"] == "4006381333931"
+
+    variant = client.post(
+        "/api/v1/nutrition/foods",
+        headers=other_headers,
+        json={**commercial, "name": "Йогурт ваниль"},
+    )
+    assert variant.status_code == 201, variant.text
+    assert variant.json()["id"] != first_body["id"]
+    assert variant.json()["catalog_contribution_outcome"] == "created"
+
+    visible = client.get(
+        "/api/v1/nutrition/foods/search",
+        headers=other_headers,
+        params={"q": "йогурт клубника"},
+    )
+    assert visible.status_code == 200
+    assert visible.json()["items"][0]["id"] == first_body["id"]
+
+    conflict = client.post(
+        "/api/v1/nutrition/foods",
+        headers=other_headers,
+        json={**commercial, "energy_kcal_per_100g": "99"},
+    )
+    assert conflict.status_code == 201, conflict.text
+    conflict_body = conflict.json()
+    assert conflict_body["id"] != first_body["id"]
+    assert conflict_body["food_type"] == "user"
+    assert conflict_body["catalog_quality"] == "private"
+    assert conflict_body["catalog_contribution_state"] == "conflict"
+    assert conflict_body["catalog_contribution_outcome"] == "conflict"
+    assert (
+        client.get(
+            f"/api/v1/nutrition/foods/{conflict_body['id']}", headers=owner_headers
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/nutrition/foods/{conflict_body['id']}", headers=other_headers
+        ).status_code
+        == 200
+    )
+
+    with get_session_context() as db:
+        shared = db.get(Food, first_body["id"])
+        assert shared is not None
+        assert shared.energy_kcal_per_100g == Decimal("88.40")
+        contribution_states = [
+            row.state
+            for row in db.query(NutritionCatalogContribution)
+            .order_by(NutritionCatalogContribution.id)
+            .all()
+        ]
+        assert contribution_states == ["accepted", "accepted", "accepted", "conflict"]
+
+    personal = client.post(
+        "/api/v1/nutrition/foods",
+        headers=owner_headers,
+        json=_food_payload(name="Моя каша", classification="personal", barcode=None),
+    )
+    assert personal.status_code == 201, personal.text
+    personal_id = personal.json()["id"]
+    assert personal.json()["food_type"] == "user"
+    assert personal.json()["catalog_quality"] == "private"
+    assert personal_id in {
+        item["id"]
+        for item in client.get("/api/v1/nutrition/foods/mine", headers=owner_headers).json()[
+            "items"
+        ]
+    }
+    assert personal_id not in {
+        item["id"]
+        for item in client.get("/api/v1/nutrition/foods/mine", headers=other_headers).json()[
+            "items"
+        ]
+    }
+
+    gtin_payload = _food_payload(
+        name="Молочный напиток",
+        brand="GTIN Test",
+        classification="commercial",
+        barcode="4006381333931",
+    )
+    gtin_first = client.post("/api/v1/nutrition/foods", headers=owner_headers, json=gtin_payload)
+    assert gtin_first.status_code == 201, gtin_first.text
+    gtin_second = client.post(
+        "/api/v1/nutrition/foods",
+        headers=other_headers,
+        json={**gtin_payload, "name": "Другое название"},
+    )
+    assert gtin_second.status_code == 201, gtin_second.text
+    assert gtin_second.json()["id"] == gtin_first.json()["id"]
+
+
+def test_catalog_identity_does_not_collide_on_user_separators() -> None:
+    first = normalize_food_catalog_identity(
+        "Продукт|Ваниль",
+        "Бренд",
+        "per_100_g",
+        Decimal("100"),
+        "g",
+    )
+    second = normalize_food_catalog_identity(
+        "Ваниль",
+        "Бренд|Продукт",
+        "per_100_g",
+        Decimal("100"),
+        "g",
+    )
+    assert first != second
 
 
 def test_local_search_ranking_normalization_pagination_and_query_bound(client) -> None:
@@ -442,5 +596,46 @@ def test_food_library_migration_upgrades_from_diary_head(tmp_path: Path) -> None
         assert "search_text" not in {
             column["name"] for column in inspect(connection).get_columns("foods")
         }
+
+    engine.dispose()
+
+
+def test_catalog_identity_migration_is_additive_and_reversible(tmp_path: Path) -> None:
+    migration_path = (
+        Path(main_module.__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "0089_nutrition_catalog_identity.py"
+    )
+    spec = importlib.util.spec_from_file_location("catalog_identity_migration", migration_path)
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    assert migration.down_revision == "0088_ai_coach_durable_quota"
+
+    engine = create_engine(f"sqlite:///{(tmp_path / 'catalog-identity.db').as_posix()}")
+    metadata = MetaData()
+    Table(
+        "foods",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("food_type", String(16), nullable=False),
+        Column("source_name", String(64), nullable=True),
+    )
+    metadata.create_all(engine)
+
+    with engine.begin() as connection:
+        migration.op = Operations(MigrationContext.configure(connection))
+        migration.upgrade()
+        schema = inspect(connection)
+        assert "catalog_identity" in {column["name"] for column in schema.get_columns("foods")}
+        assert {index["name"] for index in schema.get_indexes("foods")} == {
+            "ix_foods_catalog_identity",
+            "uq_foods_community_catalog_identity",
+        }
+        migration.downgrade()
+        schema = inspect(connection)
+        assert "catalog_identity" not in {column["name"] for column in schema.get_columns("foods")}
+        assert not schema.get_indexes("foods")
 
     engine.dispose()

@@ -593,11 +593,10 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
 
   const cardTitles = [
-    page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
-    page.locator('.nutrition-day-balance h2'),
-    page.locator('.nutrition-food-card__header h2'),
     nutritionDaySummary(page).getByRole('heading', { name: 'КБЖУ', exact: true }),
-    page.locator('.hydration-card h2'),
+    page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
+    page.locator('.nutrition-food-card__header h2'),
+    page.getByRole('heading', { name: 'Мои кружки и бутылки', exact: true }),
   ];
   const titlePositions: number[] = [];
   for (const heading of cardTitles) {
@@ -605,9 +604,6 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
     titlePositions.push((await heading.boundingBox())?.y ?? 0);
   }
   expect(titlePositions).toEqual([...titlePositions].sort((left, right) => left - right));
-  const balance = page.locator('.nutrition-day-balance');
-  await expect(balance.getByRole('progressbar', { name: /Еда:/ })).toBeVisible();
-  await expect(balance.getByRole('progressbar', { name: /Жидкость:/ })).toBeVisible();
   const foodCard = page.locator('.nutrition-food-card');
   const firstMeal = foodCard.getByRole('region', { name: 'Завтрак', exact: true });
   await expect(firstMeal).toHaveCount(1);
@@ -630,10 +626,9 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   const mobileCards = [
     page.getByRole('navigation', { name: 'Неделя дневника' }),
-    page.locator('.nutrition-completeness'),
-    page.locator('.nutrition-day-balance'),
-    page.locator('.nutrition-food-card'),
     nutritionDaySummary(page),
+    page.locator('.nutrition-completeness'),
+    page.locator('.nutrition-food-card'),
     page.locator('.hydration-card'),
   ];
   const mobileCardPositions: number[] = [];
@@ -806,7 +801,7 @@ for (const current of russianSearchVisualCases) {
     await page.goto('/app?section=nutrition');
     const breakfast = page.getByRole('region', { name: 'Завтрак' });
     await breakfast.getByRole('button', { name: /Добавить/ }).click();
-    await page.getByRole('searchbox', { name: 'Поиск по названию или бренду' }).fill('рис');
+    await page.getByRole('searchbox', { name: 'Найти продукт' }).fill('рис');
     await expect(page.getByText('Рис белый приготовленный, без добавления масла')).toBeVisible();
     await expect(page.getByText('Рис бурый приготовленный, без добавления масла')).toBeVisible();
     await expect(page.getByText('Рис дикий приготовленный, без добавления масла')).toBeVisible();
@@ -825,7 +820,7 @@ test('Russian search shows separate preparation states with their own macros', a
   await page.goto('/app?section=nutrition');
   const breakfast = page.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  await page.getByRole('searchbox', { name: 'Поиск по названию или бренду' }).fill('картофель');
+  await page.getByRole('searchbox', { name: 'Найти продукт' }).fill('картофель');
 
   await expect(
     page.getByText('Картофель запечённый, способ приготовления не указан'),
@@ -852,7 +847,7 @@ test('Russian preparation states and oil variants apply beyond potatoes', async 
   await page.goto('/app?section=nutrition');
   const breakfast = page.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  await page.getByRole('searchbox', { name: 'Поиск по названию или бренду' }).fill('яйцо');
+  await page.getByRole('searchbox', { name: 'Найти продукт' }).fill('яйцо');
 
   await expect(page.getByText('Яйцо целое варёное или пашот')).toBeVisible();
   await expect(page.getByText('Яйцо целое жареное без добавления масла')).toBeVisible();
@@ -978,11 +973,14 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   const addButton = breakfast.getByRole('button', { name: /Добавить/ });
   await addButton.focus();
   await page.keyboard.press('Enter');
-  const barcodeEntry = page.getByRole('button', { name: 'Поиск по штрихкоду' });
-  const search = page.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
-  await expect(barcodeEntry).toBeFocused();
+  const photoEntry = page.getByRole('button', { name: 'По фото этикетки' });
+  const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+  await expect(search).toBeFocused();
+  await expect(photoEntry).toBeVisible();
   await expect(search).toBeVisible();
-  await expect(page.getByRole('button', { name: /Свой продукт/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
+  await page.getByText('Другие способы добавления').click();
   await expect(page.getByRole('button', { name: 'Рецепты' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
   await page.keyboard.press('Escape');
@@ -1046,7 +1044,7 @@ test('Russian search supplements local food with USDA generic result and persist
 
   const breakfast = page.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  const search = page.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
+  const search = page.getByRole('searchbox', { name: 'Найти продукт' });
   await search.fill('рис');
 
   await expect(page.getByRole('button', { name: 'Добавить Рис домашний' })).toBeVisible();

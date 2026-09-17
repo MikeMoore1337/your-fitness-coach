@@ -176,8 +176,7 @@ describe('NutritionDiary', () => {
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
     ).toEqual(
       expect.arrayContaining([
-        'Полнота данных',
-        'Баланс дня',
+        'Это всё за сегодня?',
         'Еда',
         'Завтрак',
         'Обед',
@@ -191,9 +190,9 @@ describe('NutritionDiary', () => {
       .getAllByRole('heading', { level: 2 })
       .map((heading) => heading.textContent)
       .filter((heading) =>
-        ['Полнота данных', 'Баланс дня', 'Еда', 'КБЖУ', 'Напитки'].includes(heading ?? ''),
+        ['Это всё за сегодня?', 'Еда', 'КБЖУ', 'Напитки'].includes(heading ?? ''),
       );
-    expect(sectionOrder).toEqual(['Полнота данных', 'Баланс дня', 'Еда', 'КБЖУ', 'Напитки']);
+    expect(sectionOrder).toEqual(['КБЖУ', 'Это всё за сегодня?', 'Еда', 'Напитки']);
     expect(screen.getByRole('progressbar', { name: /Калории: 420 из 2.+000 ккал/ })).toBeVisible();
     expect(screen.getByText('Б 18,5')).toBeVisible();
 
@@ -634,7 +633,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    const search = screen.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
+    const search = screen.getByRole('searchbox', { name: 'Найти продукт' });
     fireEvent.change(search, { target: { value: 'ов' } });
     await act(() => vi.advanceTimersByTimeAsync(250));
     await waitFor(() => expect(staleSignal).toBeDefined());
@@ -719,11 +718,8 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    const barcodeEntry = screen.getByRole('button', { name: 'Поиск по штрихкоду' });
-    const nameSearch = screen.getByRole('searchbox', { name: 'Поиск по названию или бренду' });
-    expect(
-      barcodeEntry.compareDocumentPosition(nameSearch) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    const nameSearch = screen.getByRole('searchbox', { name: 'Найти продукт' });
+    expect(screen.queryByRole('button', { name: /штрихкод/i })).not.toBeInTheDocument();
     fireEvent.change(nameSearch, {
       target: { value: 'нутелла' },
     });
@@ -829,7 +825,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск по названию или бренду' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Найти продукт' }), {
       target: { value: 'рис' },
     });
     await act(() => vi.advanceTimersByTimeAsync(250));
@@ -894,7 +890,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Поиск по названию или бренду' }), {
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Найти продукт' }), {
       target: { value: 'овсяная каша' },
     });
     await act(() => vi.advanceTimersByTimeAsync(250));
@@ -927,7 +923,7 @@ describe('NutritionDiary', () => {
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Свой продукт/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ввести вручную/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Создать продукт' }));
     expect(await screen.findByText('Введите название продукта')).toBeVisible();
     expect(apiMock).not.toHaveBeenCalledWith('/api/v1/nutrition/foods', expect.anything());
@@ -1081,144 +1077,43 @@ describe('NutritionDiary', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
-  it('handles barcode not found and continues with a prefilled manual product', async () => {
+  it('keeps barcode lookup out of the primary add paths', async () => {
     apiMock.mockImplementation((path: string) => {
       if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
       if (path.startsWith('/api/v1/nutrition/foods/recent'))
         return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
       if (path.startsWith('/api/v1/nutrition/foods/favorites'))
         return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
-      if (path.endsWith('/foods/barcode/3017620422003'))
-        return Promise.resolve({
-          barcode: '3017620422003',
-          status: 'not_found',
-          source: null,
-          local_item: null,
-          external_item: null,
-          provider_status: 'unavailable',
-        });
       throw new Error(`Unexpected API call: ${path}`);
     });
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Поиск по штрихкоду' }));
-    expect(screen.queryByRole('button', { name: 'Сканировать камерой' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Найти' })).toHaveClass('ui-button--primary');
-    fireEvent.change(screen.getByRole('textbox', { name: 'Штрихкод' }), {
-      target: { value: '3017620422003' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
-    expect(await screen.findByText('Продукт не найден')).toBeVisible();
-    expect(screen.queryByText(/timeout|429/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Создать свой продукт' }));
-    expect(screen.getByRole('textbox', { name: 'Штрихкод' })).toHaveValue('3017620422003');
+    expect(screen.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+    expect(screen.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /штрихкод/i })).not.toBeInTheDocument();
   });
 
-  it('uses local barcode results and keeps external results read-only with attribution', async () => {
-    const externalFood = {
-      name: 'Шоколадная паста',
-      brand: 'Example',
-      barcode: '3017620422003',
-      energy_kcal_per_100g: '539.00',
-      protein_g_per_100g: '6.300',
-      fat_g_per_100g: '30.900',
-      carbs_g_per_100g: '57.500',
-      fiber_g_per_100g: null,
-      standard_serving_amount: null,
-      standard_serving_unit: null,
-      standard_serving_weight_g: null,
-      external_id: '3017620422003',
-      source: {
-        provider: 'open_food_facts',
-        attribution: 'Open Food Facts contributors',
-        source_url: 'https://world.openfoodfacts.org/product/3017620422003',
-        license: 'ODbL-1.0',
-        license_url: 'https://opendatacommons.org/licenses/odbl/1-0/',
-      },
-    };
+  it('keeps the manual and photo entry paths separate from catalog search', async () => {
     apiMock.mockImplementation((path: string) => {
       if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
       if (path.startsWith('/api/v1/nutrition/foods/recent'))
-        return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+        return Promise.resolve({ items: [food], total: 1, limit: 12, offset: 0 });
       if (path.startsWith('/api/v1/nutrition/foods/favorites'))
         return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
-      if (path.endsWith('/foods/barcode/4006381333931'))
-        return Promise.resolve({
-          barcode: '4006381333931',
-          status: 'found',
-          source: 'local',
-          local_item: food,
-          external_item: null,
-          provider_status: 'not_needed',
-        });
-      if (path.endsWith('/foods/barcode/3017620422003'))
-        return Promise.resolve({
-          barcode: '3017620422003',
-          status: 'found',
-          source: 'external',
-          local_item: null,
-          external_item: externalFood,
-          provider_status: 'available',
-        });
       throw new Error(`Unexpected API call: ${path}`);
     });
     renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Поиск по штрихкоду' }));
-    expect(screen.queryByRole('button', { name: 'Сканировать камерой' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Найти' })).toHaveClass('ui-button--primary');
-    const barcode = screen.getByRole('textbox', { name: 'Штрихкод' });
-    fireEvent.change(barcode, { target: { value: '4006381333931' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать продукт' }));
-    expect(await screen.findByRole('heading', { name: 'Овсяная каша' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: /Выбрать другое/ }));
-
-    fireEvent.change(screen.getByRole('textbox', { name: 'Штрихкод' }), {
-      target: { value: '3017620422003' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
-    expect(await screen.findByText('Шоколадная паста')).toBeVisible();
-    expect(screen.getByRole('link', { name: /Open Food Facts contributors/ })).toHaveAttribute(
-      'href',
-      'https://opendatacommons.org/licenses/odbl/1-0/',
-    );
-    expect(screen.queryByRole('button', { name: /Выбрать продукт/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+    expect(screen.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /штрихкод/i })).not.toBeInTheDocument();
   });
 
-  it('explains denied camera permission and preserves manual barcode input', async () => {
-    const originalMediaDevices = navigator.mediaDevices;
-    const originalDetector = (globalThis as typeof globalThis & { BarcodeDetector?: unknown })
-      .BarcodeDetector;
-    Object.defineProperty(globalThis, 'BarcodeDetector', {
-      configurable: true,
-      value: class {
-        detect() {
-          return Promise.resolve([]);
-        }
-      },
-    });
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: vi.fn().mockRejectedValue(new DOMException('Denied', 'NotAllowedError')),
-      },
-    });
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockImplementation((query: string) => ({
-        matches: query === '(hover: none) and (pointer: coarse)',
-        media: query,
-        onchange: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    );
+  it('keeps camera controls out of the primary add flow', async () => {
     apiMock.mockImplementation((path: string) => {
       if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
       if (path.startsWith('/api/v1/nutrition/foods/recent'))
@@ -1227,31 +1122,11 @@ describe('NutritionDiary', () => {
         return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
       throw new Error(`Unexpected API call: ${path}`);
     });
-    try {
-      renderDiary();
-      await screen.findAllByText('Пока без записей');
-      fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-      fireEvent.click(screen.getByRole('button', { name: 'Поиск по штрихкоду' }));
-      const scan = screen.getByRole('button', { name: 'Сканировать камерой' });
-      expect(scan).toHaveClass('ui-button--primary');
-      expect(screen.getByRole('button', { name: 'Найти' })).toHaveClass('ui-button--secondary');
-      fireEvent.click(scan);
-      expect(
-        await screen.findByText(
-          'Доступ к камере запрещён. Разрешите его в настройках браузера или введите код вручную.',
-        ),
-      ).toBeVisible();
-      expect(screen.getByRole('textbox', { name: 'Штрихкод' })).toBeEnabled();
-    } finally {
-      Object.defineProperty(navigator, 'mediaDevices', {
-        configurable: true,
-        value: originalMediaDevices,
-      });
-      Object.defineProperty(globalThis, 'BarcodeDetector', {
-        configurable: true,
-        value: originalDetector,
-      });
-      vi.unstubAllGlobals();
-    }
+    renderDiary();
+    await screen.findAllByText('Пока без записей');
+    fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
+    expect(screen.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /камера|штрихкод/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
   });
 });

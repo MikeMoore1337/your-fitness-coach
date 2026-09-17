@@ -577,6 +577,7 @@ def test_private_confirmation_creates_private_food_but_never_diary_entry(
     body = confirmed.json()
     assert body["visibility"] == "private"
     assert body["contribution_state"] == "private"
+    assert body["contribution_outcome"] is None
     assert body["catalog_quality"] == "private"
     assert body["food"]["food_type"] == "user"
     assert body["food"]["provenance"] == "user"
@@ -703,6 +704,7 @@ def test_shared_confirmation_is_community_unverified_and_visible_by_barcode(
     body = confirmed.json()
     assert body["catalog_quality"] == "community_unverified"
     assert body["provenance"] == "user_confirmed_package"
+    assert body["contribution_outcome"] == "created"
     assert body["food"]["food_type"] == "branded"
     assert body["food"]["barcode"] == "4006381333931"
 
@@ -787,7 +789,9 @@ def test_local_fuzzy_search_ranks_verified_catalog_above_community_candidate() -
     assert [item.brand for item in response.items] == ["Verified", "Community"]
 
 
-def test_shared_confirmation_requires_gtin_before_catalog_write(client, monkeypatch) -> None:
+def test_shared_confirmation_allows_missing_gtin_with_exact_catalog_identity(
+    client, monkeypatch
+) -> None:
     telegram_user_id = 128_106
     headers = _auth(client, telegram_user_id)
     _enable_scan(monkeypatch, _user_id(telegram_user_id))
@@ -801,13 +805,17 @@ def test_shared_confirmation_requires_gtin_before_catalog_write(client, monkeypa
     response = client.post(
         f"/api/v1/nutrition/label-scans/{draft['draft_id']}/confirm",
         headers=headers,
-        json=_confirm_payload(visibility="share_to_yfc_catalog", barcode="123"),
+        json=_confirm_payload(visibility="share_to_yfc_catalog", barcode=None),
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 201, response.text
+    assert response.json()["visibility"] == "share_to_yfc_catalog"
+    assert response.json()["contribution_outcome"] == "created"
+    assert response.json()["catalog_quality"] == "community_unverified"
+    assert response.json()["food"]["barcode"] is None
     with get_session_context() as db:
-        assert db.query(NutritionCatalogContribution).count() == 0
-        assert db.query(Food).filter(Food.provenance == "user_confirmed_package").count() == 0
+        assert db.query(NutritionCatalogContribution).count() == 1
+        assert db.query(Food).filter(Food.provenance == "user_confirmed_package").count() == 1
 
 
 def test_diary_uses_per_100_ml_snapshot_without_fabricating_grams(client) -> None:

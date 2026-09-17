@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { FoodDiaryCopyResponse } from '../../shared/api/types';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { invalidateNutritionSummaries } from '../../shared/queryKeys';
 import { Button, CloseIcon, Field, Input, Select } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
@@ -52,6 +53,19 @@ export function CopyDiaryDialog({
     subject.scope === 'day' ? 'breakfast' : subject.sourceMeal,
   );
   const submittingRef = useRef(false);
+  useEffect(() => {
+    trackProductEvent({
+      name: 'nutrition_food_add_path_selected',
+      surface: productEventSurface(),
+      path: 'repeat',
+    });
+    trackProductEvent({
+      name: 'nutrition_food_repeat_used',
+      surface: productEventSurface(),
+      scope: subject.scope,
+      outcome: 'started',
+    });
+  }, [subject.scope]);
   const mutation = useMutation({
     mutationFn: ({ key }: { key: string }) => {
       const common = { source_date: subject.sourceDate, target_date: targetDate };
@@ -73,6 +87,12 @@ export function CopyDiaryDialog({
       });
     },
     onSuccess: async (result) => {
+      trackProductEvent({
+        name: 'nutrition_food_repeat_used',
+        surface: productEventSurface(),
+        scope: subject.scope,
+        outcome: 'completed',
+      });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods', 'recent'] }),
         invalidateNutritionSummaries(queryClient),

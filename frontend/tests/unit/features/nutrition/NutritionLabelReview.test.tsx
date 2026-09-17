@@ -140,7 +140,7 @@ describe('NutritionLabelReview', () => {
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
-        visibility: 'private',
+        classification: 'personal',
         nutrition: expect.objectContaining({ source_basis: 'per_100_g', energy_kcal: 250 }),
       }),
     );
@@ -201,7 +201,7 @@ describe('NutritionLabelReview', () => {
     expect(screen.getByRole('textbox', { name: 'Натрий' })).toHaveValue('');
   });
 
-  it('offers shared catalog visibility only for a valid GTIN', () => {
+  it('offers a simple commercial classification for a valid GTIN', () => {
     const onSubmit = vi.fn();
     render(
       <NutritionLabelReview
@@ -213,10 +213,10 @@ describe('NutritionLabelReview', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('radio', { name: /Добавить в каталог YFC/ }));
+    fireEvent.click(screen.getByRole('radio', { name: /Продукт из магазина/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Подтвердить и сохранить продукт' }));
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ visibility: 'share_to_yfc_catalog' }),
+      expect.objectContaining({ classification: 'commercial' }),
     );
   });
 
@@ -225,7 +225,7 @@ describe('NutritionLabelReview', () => {
       name: 'Батончик',
       brand: '',
       barcode: '',
-      visibility: 'private',
+      classification: 'personal',
       nutrition: {
         source_basis: 'per_serving',
         serving_size: { amount: 25, unit: 'g' },

@@ -2619,6 +2619,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/foods/frequent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Frequent Foods */
+        get: operations["get_frequent_foods_api_v1_nutrition_foods_frequent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/foods/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Personal Foods */
+        get: operations["get_personal_foods_api_v1_nutrition_foods_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/foods/favorites": {
         parameters: {
             query?: never;
@@ -7132,6 +7166,10 @@ export interface components {
              * @enum {string}
              */
             catalog_quality: "private" | "verified" | "community_unverified";
+            /** Catalog Contribution State */
+            catalog_contribution_state?: ("private" | "accepted" | "duplicate" | "conflict") | null;
+            /** Catalog Contribution Outcome */
+            catalog_contribution_outcome?: ("created" | "reused" | "duplicate" | "conflict") | null;
             /**
              * Provenance
              * @enum {string}
@@ -7711,11 +7749,10 @@ export interface components {
             brand?: string | null;
             /** Barcode */
             barcode?: string | null;
-            /**
-             * Visibility
-             * @enum {string}
-             */
-            visibility: "private" | "share_to_yfc_catalog";
+            /** Visibility */
+            visibility?: ("private" | "share_to_yfc_catalog") | null;
+            /** Classification */
+            classification?: ("personal" | "commercial") | null;
             nutrition: components["schemas"]["NutritionLabelFactsEdit"];
         };
         /** NutritionLabelConfirmResponse */
@@ -7731,6 +7768,8 @@ export interface components {
              * @enum {string}
              */
             contribution_state: "private" | "accepted" | "duplicate" | "conflict";
+            /** Contribution Outcome */
+            contribution_outcome?: ("created" | "reused" | "duplicate" | "conflict") | null;
             /**
              * Catalog Quality
              * @enum {string}
@@ -10091,6 +10130,29 @@ export interface components {
             /** Standard Serving Weight G */
             standard_serving_weight_g?: number | string | null;
             external_source?: components["schemas"]["ExternalFoodImportSource"] | null;
+            /**
+             * Classification
+             * @default personal
+             * @enum {string}
+             */
+            classification: "personal" | "commercial";
+            /**
+             * Nutrition Basis Kind
+             * @default per_100_g
+             * @enum {string}
+             */
+            nutrition_basis_kind: "per_100_g" | "per_100_ml" | "per_serving";
+            /**
+             * Nutrition Basis Amount
+             * @default 100
+             */
+            nutrition_basis_amount: number | string;
+            /**
+             * Nutrition Basis Unit
+             * @default g
+             * @enum {string}
+             */
+            nutrition_basis_unit: "g" | "ml" | "serving";
         };
         /** UserFoodUpdate */
         UserFoodUpdate: {
@@ -10116,6 +10178,12 @@ export interface components {
             standard_serving_unit?: ("g" | "ml" | "piece" | "serving") | null;
             /** Standard Serving Weight G */
             standard_serving_weight_g?: number | string | null;
+            /** Nutrition Basis Kind */
+            nutrition_basis_kind?: ("per_100_g" | "per_100_ml" | "per_serving") | null;
+            /** Nutrition Basis Amount */
+            nutrition_basis_amount?: number | string | null;
+            /** Nutrition Basis Unit */
+            nutrition_basis_unit?: ("g" | "ml" | "serving") | null;
         };
         /** UserProfileResponse */
         UserProfileResponse: {
@@ -16586,6 +16654,70 @@ export interface operations {
         };
     };
     get_recent_foods_api_v1_nutrition_foods_recent_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_frequent_foods_api_v1_nutrition_foods_frequent_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_personal_foods_api_v1_nutrition_foods_mine_get: {
         parameters: {
             query?: {
                 limit?: number;

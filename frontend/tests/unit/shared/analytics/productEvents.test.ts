@@ -313,6 +313,75 @@ describe('product event contract', () => {
     ).toBe(false);
   });
 
+  it('keeps nutrition telemetry aggregate-only and bounded to declared outcomes', () => {
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_add_path_selected',
+        surface: 'mobile_web',
+        path: 'manual',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_search_result',
+        surface: 'mobile_web',
+        outcome: 'no_result',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_source_selected',
+        surface: 'tma',
+        source: 'shared',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_classification_selected',
+        surface: 'mobile_web',
+        classification: 'commercial',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_catalog_contribution_outcome',
+        surface: 'mobile_web',
+        outcome: 'conflict',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_flow_timing',
+        surface: 'mobile_web',
+        path: 'photo',
+        duration_bucket: '30_60s',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_repeat_used',
+        surface: 'mobile_web',
+        scope: 'product',
+        outcome: 'completed',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_completeness_set',
+        surface: 'mobile_web',
+        status: 'incomplete',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_food_search_result',
+        surface: 'mobile_web',
+        outcome: 'success',
+        query: 'Овсянка',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
   it('measures first useful action once after onboarding without storing content', () => {
     const events: ProductEventEnvelope[] = [];
     const listener = (event: Event) => {

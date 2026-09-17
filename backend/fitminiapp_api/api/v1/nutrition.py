@@ -103,6 +103,8 @@ from fitminiapp_api.services.foods import (
     delete_user_food,
     get_food_response,
     list_favorite_foods,
+    list_frequent_foods,
+    list_personal_foods,
     list_recent_foods,
     set_food_favorite,
     update_user_food,
@@ -489,6 +491,26 @@ def get_recent_foods(
     db: Session = Depends(get_db),
 ):
     return list_recent_foods(db, current_user, limit=limit, offset=offset)
+
+
+@router.get("/foods/frequent", response_model=FoodListResponse)
+def get_frequent_foods(
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return list_frequent_foods(db, current_user, limit=limit, offset=offset)
+
+
+@router.get("/foods/mine", response_model=FoodListResponse)
+def get_personal_foods(
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return list_personal_foods(db, current_user, limit=limit, offset=offset)
 
 
 @router.get("/foods/favorites", response_model=FoodListResponse)

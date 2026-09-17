@@ -63,26 +63,6 @@ async function expectLimeStartBoundary(locator: Locator) {
   expect(colors.boundary).toBe(colors.lime);
 }
 
-async function installBarcodeCameraCapability(page: Page) {
-  await page.addInitScript(() => {
-    Object.defineProperty(globalThis, 'BarcodeDetector', {
-      configurable: true,
-      value: undefined,
-    });
-    Object.defineProperty(navigator, 'mediaDevices', {
-      configurable: true,
-      value: {
-        getUserMedia: async () => {
-          throw new DOMException(
-            'Evidence harness does not open a real camera.',
-            'NotAllowedError',
-          );
-        },
-      },
-    });
-  });
-}
-
 test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on one platform contract', async ({
   browserName,
   mobilePage,
@@ -2134,16 +2114,15 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   const breakfast = tmaPage.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
   await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
-  await tmaPage.getByRole('button', { name: 'Поиск по штрихкоду', exact: true }).click();
-  await tmaPage.getByRole('textbox', { name: 'Штрихкод' }).fill('3017620422003');
-  await tmaPage.getByRole('button', { name: 'Найти', exact: true }).click();
+  await tmaPage.getByRole('searchbox', { name: 'Найти продукт' }).fill('овсянка');
   await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();
-  await tmaPage.getByRole('button', { name: 'Выбрать продукт' }).click();
+  await tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
   await tmaPage.getByRole('button', { name: 'Добавить в дневник' }).click();
   await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
   await tmaPage.getByRole('button', { name: 'Избранное' }).click();
   await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+  await tmaPage.getByText('Другие способы добавления', { exact: true }).click();
   await tmaPage
     .getByRole('dialog')
     .getByRole('button', { name: 'Быстрый ввод', exact: true })
@@ -2263,8 +2242,9 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   ]);
 
   for (const currentPage of [tmaPage, mobilePage]) {
+    await currentPage.locator('details.nutrition-target-settings > summary').click();
     await currentPage
-      .locator('#nutrition-target-settings')
+      .locator('details.nutrition-target-settings')
       .getByRole('heading', { name: 'КБЖУ', exact: true })
       .click();
     if (currentPage === mobilePage) {
@@ -2345,18 +2325,23 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   expect(api.manualTargetSaves()).toBe(2);
   expect(api.targetHistoryLength()).toBe(3);
 
-  const targetCard = tmaPage.locator('#nutrition-target-settings > details');
+  const targetCard = tmaPage.locator('details.nutrition-target-settings');
   if ((await targetCard.getAttribute('open')) === null) {
-    await tmaPage
-      .locator('#nutrition-target-settings')
-      .getByRole('heading', { name: 'КБЖУ', exact: true })
-      .click();
+    await targetCard.locator(':scope > summary').click();
   }
   for (const viewport of Object.values(MOBILE_CONTEXTS)) {
     await tmaPage.setViewportSize(viewport);
     await tma.setViewport(viewport.height, viewport.height);
+    if ((await targetCard.getAttribute('open')) === null) {
+      await targetCard.locator(':scope > summary').click();
+    }
+    await expect(targetCard).toHaveAttribute('open', '');
+    const formCard = targetCard.locator('details').filter({ hasText: 'Рассчитайте ориентир' });
+    if ((await formCard.getAttribute('open')) === null) {
+      await formCard.locator(':scope > summary').click();
+    }
     await expectNoHorizontalOverflow(tmaPage);
-    await expectTouchTargets(tmaPage.locator('.nutrition-target-mode > button'));
+    await expectTouchTargets(formCard.locator('.nutrition-target-mode > button'));
   }
 });
 
@@ -2394,8 +2379,9 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
     }
 
     await page.goto('/app?section=nutrition');
+    await page.locator('details.nutrition-target-settings > summary').click();
     await page
-      .locator('#nutrition-target-settings')
+      .locator('details.nutrition-target-settings')
       .getByRole('heading', { name: 'КБЖУ', exact: true })
       .click();
     if (current.surface === 'tma-mock') {
@@ -2451,7 +2437,7 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
       ),
     ).toBe(true);
 
-    const targetCard = page.locator('#nutrition-target-settings > details');
+    const targetCard = page.locator('details.nutrition-target-settings');
     await targetCard.scrollIntoViewIfNeeded();
     await targetCard.screenshot({
       path: `../.artifacts/screenshots/task-55/${current.surface}-${current.width}x${current.height}-${current.theme}.png`,
@@ -2495,8 +2481,9 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await expect(rirDetails).not.toHaveAttribute('open', '');
 
   await tmaPage.getByRole('link', { name: 'Питание', exact: true }).click();
+  await tmaPage.locator('details.nutrition-target-settings > summary').click();
   await tmaPage
-    .locator('#nutrition-target-settings')
+    .locator('details.nutrition-target-settings')
     .getByRole('heading', { name: 'КБЖУ', exact: true })
     .click();
   await tmaPage.getByRole('button', { name: 'Рассчитать ориентиры' }).click();
@@ -2556,7 +2543,7 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
       theme: 'dark' as const,
     },
     {
-      label: 'nutrition-barcode',
+      label: 'nutrition-search',
       viewport: MOBILE_CONTEXTS.large,
       path: '/app?section=nutrition',
       theme: 'dark' as const,
@@ -2567,7 +2554,6 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
     for (const surface of ['mobile-web', 'mock-tma'] as const) {
       const context = await browser.newContext({ viewport: scenario.viewport, hasTouch: true });
       const page = await context.newPage();
-      if (scenario.label === 'nutrition-barcode') await installBarcodeCameraCapability(page);
       if (surface === 'mock-tma') {
         await installTelegramHarness(page, {
           colorScheme: scenario.theme,
@@ -2612,27 +2598,15 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
           await expectLimeStartBoundary(confidence);
         }
       }
-      if (scenario.label === 'nutrition-barcode') {
+      if (scenario.label === 'nutrition-search') {
         await page
           .getByRole('region', { name: 'Завтрак' })
           .getByRole('button', { name: /Добавить/ })
           .click();
-        await page.getByRole('button', { name: 'Поиск по штрихкоду', exact: true }).click();
-        const barcodeInput = page.getByRole('textbox', { name: 'Штрихкод' });
-        const manualSearch = page.getByRole('button', { name: 'Найти', exact: true });
-        await expect(barcodeInput).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Сканировать камерой' })).toHaveClass(
-          /ui-button--primary/,
-        );
-        await expect(manualSearch).toHaveClass(/ui-button--secondary/);
-        const [inputBox, searchBox] = await Promise.all([
-          barcodeInput.boundingBox(),
-          manualSearch.boundingBox(),
-        ]);
-        expect(inputBox).not.toBeNull();
-        expect(searchBox).not.toBeNull();
-        expect(Math.abs(inputBox!.y - searchBox!.y)).toBeLessThanOrEqual(1);
-        expect(Math.abs(inputBox!.height - searchBox!.height)).toBeLessThanOrEqual(1);
+        await expect(page.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+        await expect(page.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+        await expect(page.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
       }
       await expectNoHorizontalOverflow(page);
       await page.screenshot({
@@ -2672,24 +2646,20 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
     await page.close();
   }
 
-  const desktopBarcode = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  await installBarcodeCameraCapability(desktopBarcode);
-  await installPlatformApi(desktopBarcode, { browserSession: true });
-  await desktopBarcode.goto('/app?section=nutrition');
-  await desktopBarcode
+  const desktopNutrition = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await installPlatformApi(desktopNutrition, { browserSession: true });
+  await desktopNutrition.goto('/app?section=nutrition');
+  await desktopNutrition
     .getByRole('region', { name: 'Завтрак' })
     .getByRole('button', { name: /Добавить/ })
     .click();
-  await desktopBarcode.getByRole('button', { name: 'Поиск по штрихкоду', exact: true }).click();
-  await expect(
-    desktopBarcode.getByRole('button', { name: 'Сканировать камерой' }),
-  ).not.toBeAttached();
-  await expect(desktopBarcode.getByRole('button', { name: 'Найти', exact: true })).toHaveClass(
-    /ui-button--primary/,
-  );
-  await expectNoHorizontalOverflow(desktopBarcode);
-  await desktopBarcode.screenshot({
-    path: '../.artifacts/screenshots/task-72/desktop-web-1280x900-light-nutrition-barcode.png',
+  await expect(desktopNutrition.getByRole('button', { name: 'По фото этикетки' })).toBeVisible();
+  await expect(desktopNutrition.getByRole('searchbox', { name: 'Найти продукт' })).toBeVisible();
+  await expect(desktopNutrition.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
+  await expect(desktopNutrition.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
+  await expectNoHorizontalOverflow(desktopNutrition);
+  await desktopNutrition.screenshot({
+    path: '../.artifacts/screenshots/task-72/desktop-web-1280x900-light-nutrition-search.png',
   });
-  await desktopBarcode.close();
+  await desktopNutrition.close();
 });

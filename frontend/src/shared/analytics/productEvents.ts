@@ -5,7 +5,25 @@ export const PRODUCT_EVENT_SCHEMA_VERSION = 2 as const;
 export type ProductAnalyticsEnvironment = 'production' | 'staging' | 'development' | 'test';
 export type ProductSurface = 'desktop_web' | 'mobile_web' | 'tma';
 export type FoodEntryMethod =
-  'quick_add' | 'recent' | 'favorite' | 'search' | 'recipe' | 'barcode' | 'custom' | 'label_scan';
+  | 'quick_add'
+  | 'recent'
+  | 'favorite'
+  | 'frequent'
+  | 'personal'
+  | 'search'
+  | 'recipe'
+  | 'barcode'
+  | 'custom'
+  | 'label_scan';
+export type NutritionFoodAddPath = 'photo' | 'search' | 'manual' | 'repeat' | 'quick_add';
+export type NutritionFoodSearchOutcome = 'success' | 'no_result';
+export type NutritionFoodSource =
+  'personal' | 'frequent' | 'recent' | 'favorite' | 'shared' | 'local' | 'external';
+export type NutritionFoodClassification = 'commercial' | 'personal';
+export type NutritionFoodContributionOutcome = 'created' | 'reused' | 'duplicate' | 'conflict';
+export type NutritionFoodRepeatScope = 'product' | 'meal' | 'day';
+export type NutritionFoodRepeatOutcome = 'started' | 'completed';
+export type NutritionFoodCompletenessStatus = 'complete' | 'incomplete' | 'unlogged' | 'fasted';
 export type ProductCoreAction =
   | 'program_activated'
   | 'workout_started'
@@ -270,6 +288,48 @@ export type ProductEvent =
       entry_method: FoodEntryMethod;
     }
   | {
+      name: 'nutrition_food_add_path_selected';
+      surface: ProductSurface;
+      path: NutritionFoodAddPath;
+    }
+  | {
+      name: 'nutrition_food_search_result';
+      surface: ProductSurface;
+      outcome: NutritionFoodSearchOutcome;
+    }
+  | {
+      name: 'nutrition_food_source_selected';
+      surface: ProductSurface;
+      source: NutritionFoodSource;
+    }
+  | {
+      name: 'nutrition_food_classification_selected';
+      surface: ProductSurface;
+      classification: NutritionFoodClassification;
+    }
+  | {
+      name: 'nutrition_food_catalog_contribution_outcome';
+      surface: ProductSurface;
+      outcome: NutritionFoodContributionOutcome;
+    }
+  | {
+      name: 'nutrition_food_flow_timing';
+      surface: ProductSurface;
+      path: NutritionFoodAddPath;
+      duration_bucket: OnboardingLatencyBucket;
+    }
+  | {
+      name: 'nutrition_food_repeat_used';
+      surface: ProductSurface;
+      scope: NutritionFoodRepeatScope;
+      outcome: NutritionFoodRepeatOutcome;
+    }
+  | {
+      name: 'nutrition_food_completeness_set';
+      surface: ProductSurface;
+      status: NutritionFoodCompletenessStatus;
+    }
+  | {
       name: 'tma_core_action_completed';
       surface: 'tma';
       action: ProductCoreAction;
@@ -470,6 +530,49 @@ const FOOD_ENTRY_METHODS = new Set<FoodEntryMethod>([
   'barcode',
   'custom',
   'label_scan',
+  'personal',
+  'frequent',
+]);
+const NUTRITION_FOOD_ADD_PATHS = new Set<NutritionFoodAddPath>([
+  'photo',
+  'search',
+  'manual',
+  'repeat',
+  'quick_add',
+]);
+const NUTRITION_FOOD_SEARCH_OUTCOMES = new Set<NutritionFoodSearchOutcome>([
+  'success',
+  'no_result',
+]);
+const NUTRITION_FOOD_SOURCES = new Set<NutritionFoodSource>([
+  'personal',
+  'frequent',
+  'recent',
+  'favorite',
+  'shared',
+  'local',
+  'external',
+]);
+const NUTRITION_FOOD_CLASSIFICATIONS = new Set<NutritionFoodClassification>([
+  'commercial',
+  'personal',
+]);
+const NUTRITION_FOOD_CONTRIBUTION_OUTCOMES = new Set<NutritionFoodContributionOutcome>([
+  'created',
+  'reused',
+  'duplicate',
+  'conflict',
+]);
+const NUTRITION_FOOD_REPEAT_SCOPES = new Set<NutritionFoodRepeatScope>(['product', 'meal', 'day']);
+const NUTRITION_FOOD_REPEAT_OUTCOMES = new Set<NutritionFoodRepeatOutcome>([
+  'started',
+  'completed',
+]);
+const NUTRITION_FOOD_COMPLETENESS_STATUSES = new Set<NutritionFoodCompletenessStatus>([
+  'complete',
+  'incomplete',
+  'unlogged',
+  'fasted',
 ]);
 const PRODUCT_CORE_ACTIONS = new Set<ProductCoreAction>([
   'program_activated',
@@ -625,6 +728,14 @@ function eventPropertyKeys(name: string): readonly string[] {
   if (name === 'quick_add_action_selected') return ['action'];
   if (name === 'section_navigation_selected') return ['from_section', 'to_section'];
   if (name === 'food_log_started' || name === 'food_logged') return ['entry_method'];
+  if (name === 'nutrition_food_add_path_selected') return ['path'];
+  if (name === 'nutrition_food_search_result') return ['outcome'];
+  if (name === 'nutrition_food_source_selected') return ['source'];
+  if (name === 'nutrition_food_classification_selected') return ['classification'];
+  if (name === 'nutrition_food_catalog_contribution_outcome') return ['outcome'];
+  if (name === 'nutrition_food_flow_timing') return ['path', 'duration_bucket'];
+  if (name === 'nutrition_food_repeat_used') return ['scope', 'outcome'];
+  if (name === 'nutrition_food_completeness_set') return ['status'];
   if (name === 'tma_core_action_completed') return ['action'];
   if (name === 'telegram_news_cta_clicked') return ['destination', 'campaign'];
   if (name === 'article_viewed') return ['content_key'];
@@ -708,6 +819,40 @@ function hasValidEventProperties(value: Record<string, unknown>): boolean {
   }
   if (value.name === 'food_log_started' || value.name === 'food_logged') {
     return FOOD_ENTRY_METHODS.has(value.entry_method as FoodEntryMethod);
+  }
+  if (value.name === 'nutrition_food_add_path_selected') {
+    return NUTRITION_FOOD_ADD_PATHS.has(value.path as NutritionFoodAddPath);
+  }
+  if (value.name === 'nutrition_food_search_result') {
+    return NUTRITION_FOOD_SEARCH_OUTCOMES.has(value.outcome as NutritionFoodSearchOutcome);
+  }
+  if (value.name === 'nutrition_food_source_selected') {
+    return NUTRITION_FOOD_SOURCES.has(value.source as NutritionFoodSource);
+  }
+  if (value.name === 'nutrition_food_classification_selected') {
+    return NUTRITION_FOOD_CLASSIFICATIONS.has(value.classification as NutritionFoodClassification);
+  }
+  if (value.name === 'nutrition_food_catalog_contribution_outcome') {
+    return NUTRITION_FOOD_CONTRIBUTION_OUTCOMES.has(
+      value.outcome as NutritionFoodContributionOutcome,
+    );
+  }
+  if (value.name === 'nutrition_food_flow_timing') {
+    return (
+      NUTRITION_FOOD_ADD_PATHS.has(value.path as NutritionFoodAddPath) &&
+      ONBOARDING_LATENCY_BUCKETS.has(value.duration_bucket as OnboardingLatencyBucket)
+    );
+  }
+  if (value.name === 'nutrition_food_repeat_used') {
+    return (
+      NUTRITION_FOOD_REPEAT_SCOPES.has(value.scope as NutritionFoodRepeatScope) &&
+      NUTRITION_FOOD_REPEAT_OUTCOMES.has(value.outcome as NutritionFoodRepeatOutcome)
+    );
+  }
+  if (value.name === 'nutrition_food_completeness_set') {
+    return NUTRITION_FOOD_COMPLETENESS_STATUSES.has(
+      value.status as NutritionFoodCompletenessStatus,
+    );
   }
   if (value.name === 'tma_core_action_completed') {
     return value.surface === 'tma' && PRODUCT_CORE_ACTIONS.has(value.action as ProductCoreAction);

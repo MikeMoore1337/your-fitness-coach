@@ -1,5 +1,7 @@
+import json
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -25,8 +27,44 @@ def normalize_food_search_text(name: str, brand: str | None) -> str:
     return normalized.casefold().replace("ё", "е")
 
 
+def normalize_food_catalog_identity(
+    name: str,
+    brand: str | None,
+    nutrition_basis_kind: str,
+    nutrition_basis_amount: Decimal | str | None,
+    nutrition_basis_unit: str,
+) -> str:
+    """Build the exact identity used for community commercial foods.
+
+    The identity deliberately does not use fuzzy matching.  Product names carry
+    variant/flavour/size information and the basis is part of the identity, so a
+    different product is never silently merged with an existing catalog item.
+    """
+
+    normalized_name = " ".join(name.split()).casefold().replace("ё", "е")
+    normalized_brand = " ".join((brand or "").split()).casefold().replace("ё", "е")
+    amount = Decimal(str(nutrition_basis_amount or "0")).normalize()
+    return json.dumps(
+        (
+            normalized_brand,
+            normalized_name,
+            nutrition_basis_kind,
+            format(amount, "f"),
+            nutrition_basis_unit,
+        ),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
+
 class Food(Base):
     __tablename__ = "foods"
+
+    if TYPE_CHECKING:
+        # Response-only state attached by the food write service and never persisted.
+        _catalog_contribution_state: str
+        _catalog_contribution_outcome: str
+
     __table_args__ = (
         CheckConstraint("length(trim(name)) > 0", name="ck_foods_name_not_blank"),
         CheckConstraint(
@@ -134,6 +172,7 @@ class Food(Base):
         ),
         Index("ix_foods_owner_status", "owner_user_id", "status"),
         Index("ix_foods_status_type_name", "status", "food_type", "name"),
+        Index("ix_foods_catalog_identity", "catalog_identity"),
         Index(
             "ix_foods_search_text_trgm",
             "search_text",
@@ -163,6 +202,19 @@ class Food(Base):
             postgresql_where=text("provenance = 'external'"),
             sqlite_where=text("provenance = 'external'"),
         ),
+        Index(
+            "uq_foods_community_catalog_identity",
+            "catalog_identity",
+            unique=True,
+            postgresql_where=text(
+                "catalog_identity IS NOT NULL AND food_type = 'branded' "
+                "AND source_name = 'yfc_community'"
+            ),
+            sqlite_where=text(
+                "catalog_identity IS NOT NULL AND food_type = 'branded' "
+                "AND source_name = 'yfc_community'"
+            ),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -170,6 +222,7 @@ class Food(Base):
     brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
     barcode: Mapped[str | None] = mapped_column(String(14), nullable=True)
     search_text: Mapped[str] = mapped_column(String(1024), nullable=False, default="")
+    catalog_identity: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     energy_kcal_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     protein_g_per_100g: Mapped[Decimal | None] = mapped_column(Numeric(8, 3), nullable=True)
@@ -265,6 +318,18 @@ class FoodFavorite(Base):
 @event.listens_for(Food, "before_update")
 def _set_food_search_text(_mapper: object, _connection: object, target: Food) -> None:
     target.search_text = normalize_food_search_text(target.name, target.brand)
+    if (
+        target.food_type == "branded"
+        and target.source_name == "yfc_community"
+        and target.catalog_identity is None
+    ):
+        target.catalog_identity = normalize_food_catalog_identity(
+            target.name,
+            target.brand,
+            target.nutrition_basis_kind or "per_100_g",
+            target.nutrition_basis_amount or Decimal("100"),
+            target.nutrition_basis_unit or "g",
+        )
     if target.provenance is None:
         target.legacy_provenance = target.legacy_provenance or "internal"
     elif target.provenance == "user_confirmed_package":
