@@ -14,6 +14,7 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.check_in import WeeklyCheckInHistoryResponse
+from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
 from fitminiapp_api.schemas.feedback import (
     WorkoutCommentCreate,
     WorkoutCommentResponse,
@@ -53,6 +54,7 @@ from fitminiapp_api.services.analytics import (
     build_workout_timeline,
 )
 from fitminiapp_api.services.audit import record_audit_event
+from fitminiapp_api.services.coach_attention import build_coach_attention
 from fitminiapp_api.services.coach_clients import (
     create_coach_invite_link,
     get_client_managed_by_coach,
@@ -206,6 +208,17 @@ def coach_clients(
     db: Session = Depends(get_db),
 ):
     return list_clients(db, current_user)
+
+
+@router.get("/attention", response_model=CoachAttentionResponse)
+def coach_attention(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachAttentionResponse:
+    return CoachAttentionResponse.model_validate(
+        build_coach_attention(db, current_user, limit=limit)
+    )
 
 
 @router.get(

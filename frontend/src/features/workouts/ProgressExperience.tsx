@@ -21,6 +21,7 @@ import {
 import { NutritionPeriodReport, type ControlledNutritionPeriod } from './NutritionReport';
 import { Icon } from '../../shared/ui/Icon';
 import { CardioHistory } from '../cardio/CardioLogging';
+import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import {
   nutritionPeriodForProgress,
   parseProgressSelection,
@@ -1223,6 +1224,13 @@ export function ProgressExperience({
           )}
         </div>
       </header>
+      <AiCoachContextualEntry
+        context={{
+          surface: 'progress',
+          periodDays: selection.kind === 'preset' ? selection.days : 30,
+        }}
+        entryPoint="progress"
+      />
 
       {summary.isLoading ? (
         <LoadingState label="Собираем динамику за период…" />

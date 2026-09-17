@@ -440,10 +440,7 @@ async function openAiCoachSurface(
 async function openWorkspace(page: Page): Promise<Locator> {
   const workspace = page.getByTestId('ai-coach-workspace');
   if ((await workspace.count()) === 0) {
-    await page
-      .getByTestId('ai-coach-entry-profile')
-      .getByRole('link', { name: 'Открыть AI Coach' })
-      .click();
+    await page.getByTestId('ai-coach-entry-profile').getByTestId('ai-coach-profile-link').click();
   }
   await expect(workspace).toBeVisible();
   await expect(workspace.getByTestId('ai-coach-experience')).toBeVisible();
@@ -464,6 +461,213 @@ async function captureEvidence(page: Page, label: string): Promise<void> {
   await page.screenshot({ path: resolve(evidenceDir, `${label}.png`), fullPage: false });
 }
 
+test('Task 284 visual evidence checkpoint covers the revised AI hierarchy and workspace geometry', async ({
+  browser,
+}) => {
+  const desktopViewport = { width: 1440, height: 900 };
+  const desktopContext = await browser.newContext({ viewport: desktopViewport });
+  const desktopPage = await desktopContext.newPage();
+  await openAiCoachSurface(desktopPage, 'light', desktopViewport);
+  const lightWorkspace = await openWorkspace(desktopPage);
+  await captureEvidence(desktopPage, 'task-284-A-desktop-light-ai-empty');
+
+  const lightInput = lightWorkspace.getByRole('textbox', { name: 'Сообщение AI Coach' });
+  await lightInput.fill('Как лучше восстановиться после тренировки?');
+  await lightWorkspace.getByRole('button', { name: 'Отправить' }).click();
+  await expect(
+    lightWorkspace.getByText('Проверенный ответ по материалам YFC.', { exact: false }),
+  ).toBeVisible();
+  await captureEvidence(desktopPage, 'task-284-B-desktop-light-ai-conversation');
+  await lightWorkspace.locator('.ai-coach-chat__composer').screenshot({
+    path: resolve(evidenceDir, 'task-284-E-composer-close-up.png'),
+  });
+  await desktopContext.close();
+
+  const darkContext = await browser.newContext({ viewport: desktopViewport });
+  const darkPage = await darkContext.newPage();
+  await openAiCoachSurface(darkPage, 'dark', desktopViewport);
+  const darkWorkspace = await openWorkspace(darkPage);
+  const darkInput = darkWorkspace.getByRole('textbox', { name: 'Сообщение AI Coach' });
+  await darkInput.fill('Как выбрать темп на тренировке?');
+  await darkWorkspace.getByRole('button', { name: 'Отправить' }).click();
+  await expect(
+    darkWorkspace.getByText('Проверенный ответ по материалам YFC.', { exact: false }),
+  ).toBeVisible();
+  await captureEvidence(darkPage, 'task-284-C-desktop-dark-ai-conversation');
+  await darkContext.close();
+
+  const mobileViewport = { width: 390, height: 844 };
+  const mobileContext = await browser.newContext({ viewport: mobileViewport, hasTouch: true });
+  const mobilePage = await mobileContext.newPage();
+  await openAiCoachSurface(mobilePage, 'dark', mobileViewport, true, true);
+  const mobileWorkspace = mobilePage.getByTestId('ai-coach-workspace');
+  await expect(mobileWorkspace).toBeVisible();
+  await expect(mobileWorkspace.getByRole('textbox', { name: 'Сообщение AI Coach' })).toBeVisible();
+  await expect(mobileWorkspace).toBeFocused();
+  await expect(mobileWorkspace.getByRole('button', { name: 'Закрыть AI Coach' })).not.toBeFocused();
+  await captureEvidence(mobilePage, 'task-284-D-mobile-390-dark-tma-ai-open');
+  await mobileContext.close();
+
+  const contextualContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const contextualPage = await contextualContext.newPage();
+  await contextualPage.addInitScript(() => {
+    localStorage.setItem('app-theme', 'light');
+  });
+  await installPlatformApi(contextualPage, { browserSession: true, fixedDate: '2026-09-06' });
+  await installAiCoachApi(contextualPage);
+
+  await contextualPage.goto('/app?section=today');
+  await contextualPage.getByRole('button', { name: 'Посмотреть упражнения' }).click();
+  await contextualPage.getByTestId('ai-coach-contextual-entry-workout').screenshot({
+    path: resolve(evidenceDir, 'task-284-G-context-workout.png'),
+  });
+  await contextualPage
+    .getByTestId('ai-coach-contextual-entry-workout')
+    .getByRole('link', { name: 'Спросить про тренировку' })
+    .click();
+  const contextualWorkspace = contextualPage.getByTestId('ai-coach-workspace');
+  await expect(contextualWorkspace).toBeVisible();
+  await expect(
+    contextualWorkspace.getByRole('textbox', { name: 'Сообщение AI Coach' }),
+  ).toBeFocused();
+  await captureEvidence(contextualPage, 'task-284-H-desktop-1280-workout-contextual-reflow');
+  await contextualPage.getByRole('button', { name: 'Закрыть AI Coach' }).click();
+  await expect(contextualPage.getByTestId('ai-coach-workspace')).toHaveCount(0);
+
+  for (const surface of [
+    {
+      path: '/app?section=nutrition',
+      testId: 'ai-coach-contextual-entry-nutrition',
+      name: 'nutrition',
+    },
+    { path: '/app?section=programs', testId: 'ai-coach-contextual-entry-program', name: 'program' },
+    {
+      path: '/app?section=progress',
+      testId: 'ai-coach-contextual-entry-progress',
+      name: 'progress',
+    },
+  ]) {
+    await contextualPage.goto(surface.path);
+    await contextualPage.getByTestId(surface.testId).screenshot({
+      path: resolve(evidenceDir, `task-284-G-context-${surface.name}.png`),
+    });
+  }
+  await contextualContext.close();
+});
+
+test('Task 284 owner visual remediation keeps Profile rows aligned and dark selection readable', async ({
+  browser,
+}) => {
+  const viewport = { width: 1440, height: 900 };
+  const lightContext = await browser.newContext({ viewport });
+  const lightPage = await lightContext.newPage();
+  await openAiCoachSurface(lightPage, 'light', viewport);
+  await lightPage.getByTestId('ai-coach-entry-profile').scrollIntoViewIfNeeded();
+  await captureEvidence(lightPage, 'task-284-I-profile-settings-light');
+  await expect(lightPage.getByTestId('ai-coach-entry-profile')).not.toContainText(
+    'Открыть AI Coach',
+  );
+  await expect(lightPage.getByTestId('ai-coach-entry-profile')).toContainText(
+    'Помощник по тренировкам, питанию и прогрессу',
+  );
+  await expect(lightPage.getByTestId('ai-coach-entry-quota')).toContainText('20 из 20 запросов');
+  await expect(
+    lightPage.getByTestId('ai-coach-entry-profile').locator('.disclosure-icon'),
+  ).toBeVisible();
+  const lightSelection = await lightPage.getByTestId('ai-coach-entry-profile').evaluate((node) => {
+    const style = window.getComputedStyle(node, '::selection');
+    return { background: style.backgroundColor, color: style.color };
+  });
+  expect(lightSelection.background).toBe('rgb(178, 245, 32)');
+  expect(lightSelection.color).not.toBe('rgb(245, 245, 245)');
+  const aiRowHeight = await lightPage
+    .getByTestId('ai-coach-entry-profile')
+    .evaluate((node) => node.getBoundingClientRect().height);
+  const neighborRowHeights = await lightPage
+    .locator('.profile-settings > details.card-disclosure')
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+  expect(neighborRowHeights.length).toBeGreaterThanOrEqual(2);
+  expect(aiRowHeight).toBe(neighborRowHeights[0]);
+  const lightRow = lightPage.getByTestId('ai-coach-entry-profile');
+  const lightRowBox = await lightRow.boundingBox();
+  if (!lightRowBox) throw new Error('Profile AI Coach row has no geometry');
+  await lightRow.click({ position: { x: lightRowBox.width - 36, y: lightRowBox.height / 2 } });
+  const lightWorkspace = lightPage.getByTestId('ai-coach-workspace');
+  await expect(lightWorkspace).toBeVisible();
+  await lightWorkspace.getByRole('button', { name: 'Закрыть AI Coach' }).click();
+  await expect(lightWorkspace).toHaveCount(0);
+  const lightProfileLink = lightPage.getByTestId('ai-coach-profile-link');
+  await lightProfileLink.focus();
+  await expect(lightProfileLink).toBeFocused();
+  await lightProfileLink.press('Enter');
+  await expect(lightWorkspace).toBeVisible();
+  await lightWorkspace.getByRole('button', { name: 'Закрыть AI Coach' }).click();
+  await expect(lightWorkspace).toHaveCount(0);
+  await lightContext.close();
+
+  const darkContext = await browser.newContext({ viewport });
+  const darkPage = await darkContext.newPage();
+  await openAiCoachSurface(darkPage, 'dark', viewport);
+  await darkPage.getByTestId('ai-coach-entry-profile').scrollIntoViewIfNeeded();
+  await captureEvidence(darkPage, 'task-284-J-profile-settings-dark');
+  const selectedCopy = darkPage.getByText('Помощник по тренировкам, питанию и прогрессу', {
+    exact: true,
+  });
+  await selectedCopy.selectText();
+  await captureEvidence(darkPage, 'task-284-K-profile-settings-dark-selection');
+  const darkSelection = await darkPage.getByTestId('ai-coach-entry-profile').evaluate((node) => {
+    const style = window.getComputedStyle(node, '::selection');
+    return { background: style.backgroundColor, color: style.color };
+  });
+  expect(darkSelection.background).toBe('rgb(178, 245, 32)');
+  expect(darkSelection.color).toBe('rgb(9, 11, 11)');
+
+  const representativeSelection = await darkPage.evaluate(() =>
+    ['body', 'h1', 'a', 'input', 'textarea'].map((selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return { selector, background: null, color: null };
+      const style = window.getComputedStyle(element, '::selection');
+      return { selector, background: style.backgroundColor, color: style.color };
+    }),
+  );
+  expect(representativeSelection).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        selector: 'body',
+        background: 'rgb(178, 245, 32)',
+        color: 'rgb(9, 11, 11)',
+      }),
+      expect.objectContaining({
+        selector: 'h1',
+        background: 'rgb(178, 245, 32)',
+        color: 'rgb(9, 11, 11)',
+      }),
+      expect.objectContaining({
+        selector: 'a',
+        background: 'rgb(178, 245, 32)',
+        color: 'rgb(9, 11, 11)',
+      }),
+      expect.objectContaining({
+        selector: 'input',
+        background: 'rgb(178, 245, 32)',
+        color: 'rgb(9, 11, 11)',
+      }),
+      expect.objectContaining({
+        selector: 'textarea',
+        background: 'rgb(178, 245, 32)',
+        color: 'rgb(9, 11, 11)',
+      }),
+    ]),
+  );
+
+  const workspace = await openWorkspace(darkPage);
+  await workspace.screenshot({
+    path: resolve(evidenceDir, 'task-284-L-ai-coach-workspace-regression.png'),
+  });
+  await expect(workspace.getByRole('textbox', { name: 'Сообщение AI Coach' })).toBeVisible();
+  await darkContext.close();
+});
+
 test('AI Coach is one floating desktop workspace with continuity and bounded controls', async ({
   browser,
 }) => {
@@ -474,9 +678,9 @@ test('AI Coach is one floating desktop workspace with continuity and bounded con
 
   const entry = page.getByTestId('ai-coach-entry-profile');
   await expect(entry).not.toContainText('Сообщение AI Coach');
+  await expect(entry).not.toContainText('Открыть AI Coach');
   await expect(page.getByTestId('ai-coach-entry-quota')).toContainText('20 из 20 запросов');
   const profileTitle = page.getByTestId('ai-coach-profile-title');
-  await expect(profileTitle).toHaveCSS('display', 'inline-flex');
   await expect(profileTitle).toHaveCSS('align-items', 'center');
   await expect(profileTitle.locator('[data-icon="ai-coach"]')).toHaveCount(1);
   await expect(page.getByTestId('ai-coach-experience')).toHaveCount(0);
@@ -570,12 +774,17 @@ test('AI Coach is one floating desktop workspace with continuity and bounded con
   if (!workspaceAfterAnswer || !composerBox || !messageAreaBox) {
     throw new Error('AI Coach chat regions have no geometry');
   }
-  expect(composerBox.y + composerBox.height).toBeGreaterThanOrEqual(
-    workspaceAfterAnswer.y + workspaceAfterAnswer.height - 2,
-  );
-  expect(composerBox.y + composerBox.height).toBeLessThanOrEqual(
-    workspaceAfterAnswer.y + workspaceAfterAnswer.height,
-  );
+  const composerLeftInset = composerBox.x - workspaceAfterAnswer.x;
+  const composerRightInset =
+    workspaceAfterAnswer.x + workspaceAfterAnswer.width - (composerBox.x + composerBox.width);
+  const composerBottomInset =
+    workspaceAfterAnswer.y + workspaceAfterAnswer.height - (composerBox.y + composerBox.height);
+  expect(
+    Math.abs(composerLeftInset - composerRightInset),
+    JSON.stringify({ workspaceAfterAnswer, composerBox, composerLeftInset, composerRightInset }),
+  ).toBeLessThanOrEqual(2);
+  expect(composerBottomInset).toBeGreaterThanOrEqual(8);
+  expect(composerBottomInset).toBeLessThanOrEqual(32);
   expect(messageAreaBox.y + messageAreaBox.height).toBeLessThanOrEqual(composerBox.y + 1);
   await expect(messageArea).toHaveCSS('overflow-y', 'auto');
   await expect(workspace.locator('.ai-coach-workspace__body')).toHaveCSS('overflow', 'hidden');
@@ -593,7 +802,7 @@ test('AI Coach is one floating desktop workspace with continuity and bounded con
   );
 
   const beforeResize = await workspace.boundingBox();
-  const resizeHandle = workspace.getByTestId('ai-coach-workspace-resize');
+  const resizeHandle = workspace.getByTestId('ai-coach-workspace-resize-bottom-right');
   const resizeBox = await resizeHandle.boundingBox();
   if (!beforeResize || !resizeBox) throw new Error('AI Coach resize handle has no geometry');
   await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2);
@@ -612,12 +821,13 @@ test('AI Coach is one floating desktop workspace with continuity and bounded con
   const persistedBox = await workspace.boundingBox();
   const resizedComposerBox = await composer.boundingBox();
   if (!resizedComposerBox || !persistedBox) throw new Error('Resized AI Coach has no geometry');
-  expect(resizedComposerBox.y + resizedComposerBox.height).toBeGreaterThanOrEqual(
-    persistedBox.y + persistedBox.height - 2,
-  );
-  expect(resizedComposerBox.y + resizedComposerBox.height).toBeLessThanOrEqual(
-    persistedBox.y + persistedBox.height,
-  );
+  const resizedLeftInset = resizedComposerBox.x - persistedBox.x;
+  const resizedRightInset =
+    persistedBox.x + persistedBox.width - (resizedComposerBox.x + resizedComposerBox.width);
+  const resizedBottomInset =
+    persistedBox.y + persistedBox.height - (resizedComposerBox.y + resizedComposerBox.height);
+  expect(Math.abs(resizedLeftInset - resizedRightInset)).toBeLessThanOrEqual(2);
+  expect(resizedBottomInset).toBeGreaterThanOrEqual(8);
   await captureEvidence(page, 'ai-coach-desktop-resized');
 
   await input.fill('Как оценивать восстановление после тренировки?');
@@ -661,10 +871,7 @@ test('AI Coach is one floating desktop workspace with continuity and bounded con
   await page.locator('#appAccountProfileLink').click();
   await expect(page).toHaveURL(/section=profile/);
   await expect(workspace).toHaveAttribute('data-minimized', 'true');
-  await page
-    .getByTestId('ai-coach-entry-profile')
-    .getByRole('link', { name: 'Открыть AI Coach' })
-    .click();
+  await page.getByTestId('ai-coach-entry-profile').getByTestId('ai-coach-profile-link').click();
   await expect(workspace).not.toHaveAttribute('data-minimized', 'true');
   await expect(workspace.getByTestId('ai-coach-message-user')).toHaveCount(3);
 
@@ -710,6 +917,108 @@ test('AI Coach is one floating desktop workspace with continuity and bounded con
     .getByRole('button', { name: 'Сбросить' })
     .click();
   await context.close();
+});
+
+test('AI Coach desktop workspace resizes through all eight invisible edge and corner zones', async ({
+  browser,
+}) => {
+  const directions = [
+    'top',
+    'right',
+    'bottom',
+    'left',
+    'top-left',
+    'top-right',
+    'bottom-left',
+    'bottom-right',
+  ] as const;
+
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+  ]) {
+    for (const direction of directions) {
+      const context = await browser.newContext({ viewport });
+      const page = await context.newPage();
+      await page.addInitScript(() => {
+        localStorage.setItem(
+          'yfc:ai-coach:workspace-layout:v1',
+          JSON.stringify({
+            version: 1,
+            height: 600,
+            minimized: false,
+            width: 420,
+            x: 500,
+            y: 100,
+          }),
+        );
+      });
+      await openAiCoachSurface(page, 'light', viewport, false, true);
+      const workspace = await openWorkspace(page);
+      const zones = workspace.getByTestId('ai-coach-workspace-resize-zones');
+      await expect(zones).toBeVisible();
+      await expect(workspace.getByTestId('ai-coach-workspace-resize')).toHaveCount(1);
+
+      const zone = workspace.getByTestId(`ai-coach-workspace-resize-${direction}`);
+      const zoneBox = await zone.boundingBox();
+      if (!zoneBox) throw new Error(`${direction} resize zone has no geometry`);
+      const decoration = await zone.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          borderTopWidth: style.borderTopWidth,
+          height: element.getBoundingClientRect().height,
+          width: element.getBoundingClientRect().width,
+        };
+      });
+      expect(decoration.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+      expect(decoration.borderTopWidth).toBe('0px');
+      expect(decoration.width).toBeGreaterThanOrEqual(direction.includes('-') ? 16 : 8);
+      const keyboardResize = workspace.getByTestId('ai-coach-workspace-resize');
+      await keyboardResize.focus();
+      await expect(keyboardResize).toBeFocused();
+      const keyboardBefore = await workspace.boundingBox();
+      if (!keyboardBefore) throw new Error('Keyboard resize changed no workspace geometry');
+      await page.keyboard.press('ArrowRight');
+      await expect
+        .poll(async () => (await workspace.boundingBox())?.width ?? keyboardBefore.width)
+        .toBeGreaterThan(keyboardBefore.width);
+
+      const activeZoneBox = await zone.boundingBox();
+      const before = await workspace.boundingBox();
+      if (!activeZoneBox || !before) throw new Error(`${direction} resize zone moved unexpectedly`);
+      const deltaX = direction.includes('left') ? -48 : direction.includes('right') ? 48 : 0;
+      const deltaY = direction.includes('top') ? -48 : direction.includes('bottom') ? 48 : 0;
+      const startX = activeZoneBox.x + activeZoneBox.width / 2;
+      const startY = activeZoneBox.y + activeZoneBox.height / 2;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + deltaX, startY + deltaY, { steps: 4 });
+      await page.mouse.up();
+
+      const after = await workspace.boundingBox();
+      if (!after) throw new Error(`${direction} resize produced no workspace geometry`);
+      if (deltaX !== 0) {
+        expect(after.width, `${direction}: ${JSON.stringify({ before, after })}`).toBeGreaterThan(
+          before.width + 20,
+        );
+        if (direction.includes('left')) expect(after.x).toBeLessThan(before.x - 20);
+        else expect(after.x).toBeCloseTo(before.x, 0);
+      }
+      if (deltaY !== 0) {
+        expect(after.height, `${direction}: ${JSON.stringify({ before, after })}`).toBeGreaterThan(
+          before.height + 20,
+        );
+        if (direction.includes('top')) expect(after.y).toBeLessThan(before.y - 20);
+        else expect(after.y).toBeCloseTo(before.y, 0);
+      }
+      expect(after.x).toBeGreaterThanOrEqual(16);
+      expect(after.y).toBeGreaterThanOrEqual(16);
+      expect(after.x + after.width).toBeLessThanOrEqual(viewport.width - 16);
+      expect(after.y + after.height).toBeLessThanOrEqual(viewport.height - 88);
+      await context.close();
+    }
+  }
 });
 
 test('AI Coach history supports switching, scoped deletion, and clear-all confirmations', async ({
@@ -1021,6 +1330,7 @@ test('AI Coach is fullscreen on compact mobile and keeps the composer usable', a
   expect(box?.width).toBe(viewport.width);
   expect(box?.height).toBeCloseTo(viewport.height, 0);
   await expect(workspace.getByTestId('ai-coach-workspace-resize')).toHaveCount(0);
+  await expect(workspace.getByTestId('ai-coach-workspace-resize-zones')).toHaveCount(0);
   await expect(page.locator('#appBottomNav')).toBeHidden();
   await expect(page.getByTestId('quick-add-trigger')).toBeHidden();
   const experience = workspace.getByTestId('ai-coach-experience');
@@ -1070,12 +1380,27 @@ test('AI Coach is fullscreen on compact mobile and keeps the composer usable', a
   if (!mobileWorkspaceBox || !mobileComposerBox || !mobileSendBox) {
     throw new Error('Mobile composer has no geometry');
   }
-  expect(mobileComposerBox.y + mobileComposerBox.height).toBeCloseTo(
-    mobileWorkspaceBox.y + mobileWorkspaceBox.height,
-    0,
+  const mobileLeftInset = mobileComposerBox.x - mobileWorkspaceBox.x;
+  const mobileRightInset =
+    mobileWorkspaceBox.x +
+    mobileWorkspaceBox.width -
+    (mobileComposerBox.x + mobileComposerBox.width);
+  const mobileBottomInset =
+    mobileWorkspaceBox.y +
+    mobileWorkspaceBox.height -
+    (mobileComposerBox.y + mobileComposerBox.height);
+  expect(
+    Math.abs(mobileLeftInset - mobileRightInset),
+    JSON.stringify({ mobileWorkspaceBox, mobileComposerBox, mobileLeftInset, mobileRightInset }),
+  ).toBeLessThanOrEqual(2);
+  expect(mobileBottomInset).toBeGreaterThanOrEqual(8);
+  expect(mobileBottomInset).toBeLessThanOrEqual(40);
+  expect(mobileSendBox.x).toBeGreaterThanOrEqual(mobileComposerBox.x + 4);
+  expect(mobileSendBox.x + mobileSendBox.width).toBeLessThanOrEqual(
+    mobileComposerBox.x + mobileComposerBox.width - 4,
   );
   expect(mobileSendBox.y + mobileSendBox.height).toBeLessThanOrEqual(
-    mobileWorkspaceBox.y + mobileWorkspaceBox.height,
+    mobileComposerBox.y + mobileComposerBox.height - 4,
   );
   await captureEvidence(page, 'ai-coach-mobile-light-active');
 

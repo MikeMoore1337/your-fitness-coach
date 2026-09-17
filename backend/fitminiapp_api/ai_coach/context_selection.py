@@ -25,6 +25,7 @@ from fitminiapp_api.ai_coach.personal_tools import (
 )
 from fitminiapp_api.ai_coach.retrieval import retrieve_context_for_message
 from fitminiapp_api.models.user import User
+from fitminiapp_api.schemas.ai_coach import AiCoachContextDescriptor
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 
 _PERSONAL_PATTERN = re.compile(
@@ -242,18 +243,82 @@ def _personal_job(tool: AiCoachPersonalTool) -> AiCoachJob:
     return AiCoachJob.METRIC_EXPLANATION
 
 
+def _explicit_context_result(
+    db: Session,
+    user: User,
+    context: AiCoachContextDescriptor,
+) -> PersonalToolResult:
+    if context.surface == "today":
+        return get_workout_context_tool(db, user, focus="today")
+    if context.surface == "workout":
+        workout_id = context.resource_id
+        if workout_id is None:
+            raise ValueError("workout context requires a resource")
+        return get_workout_context_tool(
+            db,
+            user,
+            focus="workout",
+            workout_id=workout_id,
+        )
+    if context.surface == "nutrition":
+        period_days = context.period_days
+        if period_days is None:
+            raise ValueError("nutrition context requires a period")
+        return get_nutrition_summary_tool(
+            db,
+            user,
+            period_days,
+            include_profile_goals=False,
+        )
+    if context.surface == "progress":
+        period_days = context.period_days
+        if period_days is None:
+            raise ValueError("progress context requires a period")
+        return run_personal_tool(
+            db,
+            user,
+            AiCoachPersonalTool.GET_PROGRESS_SUMMARY,
+            period_days,
+        )
+    return get_workout_context_tool(db, user, focus="program")
+
+
+def _explicit_context_kind(context: AiCoachContextDescriptor) -> AiCoachChatContextKind:
+    if context.surface == "nutrition":
+        return AiCoachChatContextKind.NUTRITION_SUMMARY
+    if context.surface == "program":
+        return AiCoachChatContextKind.ACTIVE_PROGRAM
+    if context.surface == "today":
+        return AiCoachChatContextKind.ACTIVE_PROGRAM
+    return AiCoachChatContextKind.RECENT_WORKOUTS
+
+
 def select_chat_context(
     db: Session,
     user: User,
     *,
     message: str,
     history: tuple[AiCoachConversationTurn, ...] = (),
+    context: AiCoachContextDescriptor | None = None,
 ) -> ChatContextSelection:
     """Choose public or current-user read-only context without exposing raw records."""
 
+    if context is not None:
+        result = _explicit_context_result(db, user, context)
+        return ChatContextSelection(
+            data_class=AiCoachDataClass.PERSONALIZED,
+            job=_personal_job(result.tool),
+            context_id=f"personal:context:{context.surface}",
+            context_refs=result.context_refs,
+            context_kind=_explicit_context_kind(context),
+            tool_name=result.tool,
+            fallback_path=result.fallback_path,
+            data_sufficiency=result.data_sufficiency,
+        )
+
     if message_requires_personal_context(message, history):
-        result = _personal_result(db, user, message, history=history)
-        if result is None:
+        personal_result = _personal_result(db, user, message, history=history)
+        if personal_result is None:
             return ChatContextSelection(
                 data_class=AiCoachDataClass.PERSONALIZED,
                 job=AiCoachJob.METRIC_EXPLANATION,
@@ -263,13 +328,13 @@ def select_chat_context(
             )
         return ChatContextSelection(
             data_class=AiCoachDataClass.PERSONALIZED,
-            job=_personal_job(result.tool),
-            context_id=f"personal:{result.tool.value}",
-            context_refs=result.context_refs,
-            context_kind=_personal_context_kind(message, result, history=history),
-            tool_name=result.tool,
-            fallback_path=result.fallback_path,
-            data_sufficiency=result.data_sufficiency,
+            job=_personal_job(personal_result.tool),
+            context_id=f"personal:{personal_result.tool.value}",
+            context_refs=personal_result.context_refs,
+            context_kind=_personal_context_kind(message, personal_result, history=history),
+            tool_name=personal_result.tool,
+            fallback_path=personal_result.fallback_path,
+            data_sufficiency=personal_result.data_sufficiency,
         )
 
     job = _generic_job(message)

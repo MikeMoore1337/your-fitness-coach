@@ -28,6 +28,45 @@
   flex: 0 0 auto;
 }
 
+.ai-coach-contextual-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-3) var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-left: 3px solid var(--v2-lime);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.ai-coach-contextual-entry__copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-1);
+}
+
+.ai-coach-contextual-entry__copy .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v2-space-1);
+}
+
+.ai-coach-contextual-entry__copy strong,
+.ai-coach-contextual-entry__copy p {
+  margin: 0;
+}
+
+.ai-coach-contextual-entry__copy p {
+  color: var(--v2-text-secondary);
+  font-size: 0.875rem;
+}
+
+.ai-coach-contextual-entry .button-link {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .ai-coach-experience {
   display: grid;
   gap: var(--v2-space-4);
@@ -304,6 +343,42 @@
   background: var(--v2-surface-secondary);
 }
 
+.ai-coach-chat__context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-2) var(--v2-space-3);
+  border: 1px solid var(--v2-border);
+  border-left: 3px solid var(--v2-lime);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.ai-coach-chat__context > div {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-1);
+}
+
+.ai-coach-chat__context strong {
+  overflow-wrap: anywhere;
+}
+
+.ai-coach-chat__context button {
+  min-height: var(--touch-target);
+  flex: 0 0 auto;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: transparent;
+  color: var(--v2-text-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .ai-coach-chat__failure {
   display: flex;
   align-items: center;
@@ -358,7 +433,7 @@
   flex: 0 0 auto;
   display: grid;
   gap: var(--v2-space-1);
-  margin: var(--v2-space-1) calc(var(--v2-space-4) * -1) calc(var(--v2-space-4) * -1);
+  margin: var(--v2-space-1) 0 0;
   padding: 0.35rem 0.35rem max(0.35rem, var(--yfc-layout-safe-bottom, 0px));
   border: 1px solid var(--v2-border);
   border-radius: var(--v2-region-radius);
@@ -383,7 +458,7 @@
   min-width: 0;
   min-height: 3rem;
   max-height: 9rem;
-  padding: 0.65rem 0.35rem 0.65rem 0.55rem;
+  padding: 0.65rem 0.55rem;
   border: 0;
   background: transparent;
   color: var(--v2-text-primary);
@@ -411,8 +486,8 @@
   height: 44px;
   min-height: 44px;
   align-self: flex-end;
-  border-color: transparent;
-  border-radius: var(--v2-control-radius);
+  border: 0;
+  border-radius: 50%;
   background: var(--v2-lime);
   color: var(--v2-on-lime);
 }
@@ -422,7 +497,7 @@
 }
 
 .ai-coach-chat__send:disabled {
-  border-color: var(--v2-border);
+  border-color: transparent;
   background: var(--v2-surface-strong);
   color: var(--v2-text-secondary);
   opacity: 1;
@@ -599,18 +674,22 @@
 }
 
 .ai-coach-experience :where(button, textarea, select, input, summary, a):focus-visible,
-.ai-coach-entry :where(button, a):focus-visible {
+.ai-coach-entry :where(button, a):focus-visible,
+.ai-coach-contextual-entry :where(button, a):focus-visible,
+.ai-coach-chat__context button:focus-visible {
   outline: var(--focus-width) solid var(--color-focus);
   outline-offset: var(--focus-offset);
 }
 
 .ai-coach-experience a,
-.ai-coach-entry a {
+.ai-coach-entry a,
+.ai-coach-contextual-entry a {
   color: var(--v2-accent-text);
 }
 
 @media (max-width: 600px) {
   .ai-coach-entry,
+  .ai-coach-contextual-entry,
   .ai-coach-chat__welcome,
   .ai-coach-memory__header,
   .ai-coach-memory__item,
@@ -620,6 +699,7 @@
   }
 
   .ai-coach-entry .button-link,
+  .ai-coach-contextual-entry .button-link,
   .ai-coach-chat__toolbar-actions,
   .ai-coach-memory__actions,
   .ai-coach-state button {
@@ -639,14 +719,20 @@
   }
 
   .ai-coach-chat__composer {
-    margin-right: calc(var(--v2-space-3) * -1);
-    margin-left: calc(var(--v2-space-3) * -1);
-    padding-right: var(--v2-space-3);
-    padding-left: var(--v2-space-3);
+    margin: var(--v2-space-1) 0 0;
   }
 
   .ai-coach-memory__actions,
   .ai-coach-memory__actions .ui-button {
+    width: 100%;
+  }
+
+  .ai-coach-chat__context {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ai-coach-chat__context button {
     width: 100%;
   }
 
@@ -709,13 +795,21 @@
   pointer-events: auto;
 }
 
+@media (min-width: 900px) {
+  /* Keep the primary workout workspace in flow beside contextual AI when both are open. */
+  body:has(.ai-coach-workspace--desktop[data-context-surface='workout']) .today-workout-focus {
+    padding-right: var(--ai-coach-workspace-right-reserve, 0px);
+  }
+}
+
 .ai-coach-workspace__header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--v2-space-3);
   min-width: 0;
-  padding: var(--v2-space-3) var(--v2-space-3) var(--v2-space-3) var(--v2-space-4);
+  padding: var(--v2-space-2) var(--v2-space-2) var(--v2-space-2) var(--v2-space-3);
   border-bottom: 1px solid var(--v2-border);
   background: var(--v2-surface-secondary);
 }
@@ -743,6 +837,8 @@
 }
 
 .ai-coach-workspace__header-actions {
+  position: relative;
+  z-index: 6;
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
@@ -821,7 +917,7 @@
   overflow: hidden;
   overscroll-behavior: contain;
   padding: var(--v2-space-4);
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
 }
 
 .ai-coach-workspace__view {
@@ -857,7 +953,8 @@
 }
 
 .ai-coach-workspace .ai-coach-chat__welcome {
-  padding: var(--v2-space-3);
+  gap: var(--v2-space-1);
+  padding: var(--v2-space-1) 0;
 }
 
 .ai-coach-workspace .ai-coach-chat__welcome p {
@@ -865,15 +962,14 @@
 }
 
 .ai-coach-workspace .ai-coach-chat__disclaimer {
-  max-width: 9rem;
+  max-width: 32rem;
   font-size: 0.75rem;
-  text-align: right;
+  text-align: left;
 }
 
 .ai-coach-workspace .ai-coach-chat__composer {
   position: static;
-  margin-right: calc(var(--v2-space-4) * -1);
-  margin-left: calc(var(--v2-space-4) * -1);
+  margin: var(--v2-space-1) 0 0;
 }
 
 .ai-coach-workspace .ai-coach-chat__messages {
@@ -944,22 +1040,103 @@
   margin: var(--v2-space-1) 0 0;
 }
 
-.ai-coach-workspace__resize-handle {
+.ai-coach-workspace__resize-zones {
   position: absolute;
-  right: 0.45rem;
-  bottom: 0.45rem;
-  z-index: 3;
-  width: 1rem;
-  height: 1rem;
-  border-right: 2px solid var(--v2-border-strong);
-  border-bottom: 2px solid var(--v2-border-strong);
-  cursor: nwse-resize;
-  touch-action: none;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
 }
 
-.ai-coach-workspace__resize-handle:focus-visible {
-  outline: var(--focus-width) solid var(--color-focus);
-  outline-offset: var(--focus-offset);
+.ai-coach-workspace__resize-zone {
+  position: absolute;
+  display: block;
+  pointer-events: auto;
+  background: transparent;
+  border: 0;
+  touch-action: none;
+  user-select: none;
+}
+
+.ai-coach-workspace__resize-zone--top,
+.ai-coach-workspace__resize-zone--bottom {
+  right: 12px;
+  left: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.ai-coach-workspace__resize-zone--top {
+  top: 0;
+}
+
+.ai-coach-workspace__resize-zone--bottom {
+  bottom: 0;
+}
+
+.ai-coach-workspace__resize-zone--left,
+.ai-coach-workspace__resize-zone--right {
+  top: 12px;
+  bottom: 12px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.ai-coach-workspace__resize-zone--left {
+  left: 0;
+}
+
+.ai-coach-workspace__resize-zone--right {
+  right: 0;
+}
+
+.ai-coach-workspace__resize-zone:is(
+  .ai-coach-workspace__resize-zone--top-left,
+  .ai-coach-workspace__resize-zone--top-right,
+  .ai-coach-workspace__resize-zone--bottom-left,
+  .ai-coach-workspace__resize-zone--bottom-right
+) {
+  width: 16px;
+  height: 16px;
+}
+
+.ai-coach-workspace__resize-zone--top-left {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+
+.ai-coach-workspace__resize-zone--top-right {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+}
+
+.ai-coach-workspace__resize-zone--bottom-left {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+}
+
+.ai-coach-workspace__resize-zone--bottom-right {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+}
+
+.ai-coach-workspace__keyboard-resize {
+  position: absolute;
+  z-index: 1;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .ai-coach-workspace__loading {
@@ -1011,6 +1188,11 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
   box-shadow: none;
 }
 
+.ai-coach-workspace--mobile .ai-coach-workspace__resize-zones,
+.ai-coach-workspace--mobile .ai-coach-workspace__keyboard-resize {
+  display: none;
+}
+
 .ai-coach-workspace--mobile .ai-coach-workspace__header {
   padding-top: max(var(--v2-space-3), var(--yfc-layout-safe-top, env(safe-area-inset-top, 0px)));
   padding-right: max(
@@ -1025,7 +1207,10 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
     var(--v2-space-3),
     var(--yfc-layout-safe-right, env(safe-area-inset-right, 0px))
   );
-  padding-bottom: 0;
+  padding-bottom: max(
+    var(--v2-space-3),
+    var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px))
+  );
   padding-left: max(var(--v2-space-3), var(--yfc-layout-safe-left, env(safe-area-inset-left, 0px)));
 }
 
@@ -1043,15 +1228,8 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
 }
 
 .ai-coach-workspace--mobile .ai-coach-workspace__body .ai-coach-chat__composer {
-  margin-right: calc(var(--v2-space-3) * -1);
-  margin-left: calc(var(--v2-space-3) * -1);
-  margin-bottom: 0;
-  padding-right: var(--v2-space-3);
-  padding-bottom: max(
-    var(--v2-space-3),
-    var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px))
-  );
-  padding-left: var(--v2-space-3);
+  margin: var(--v2-space-1) 0 0;
+  padding-bottom: 0.35rem;
 }
 
 .ai-coach-workspace--mobile .ai-coach-workspace__settings {
@@ -1083,56 +1261,89 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
   }
 }
 
-/* Conversation-first refinement for the shared Task 277 workspace. */
-.ai-coach-entry--profile {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--v2-space-3);
-  padding: var(--v2-space-3) 0 0;
-  border-top: 1px solid var(--v2-border);
+/* Profile entry follows the same compact navigation row as neighboring settings sections. */
+.app-section--profile .profile-settings-group.ai-coach-settings-card {
+  padding: var(--v2-space-5);
 }
 
-.ai-coach-entry--profile > div {
+.ai-coach-settings-card__link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: var(--v2-space-3);
+  min-height: 66px;
+  color: var(--v2-text-primary);
+  text-decoration: none;
+}
+
+.ai-coach-settings-card__link:hover {
+  color: var(--v2-text-primary);
+}
+
+.ai-coach-settings-card__link:focus-visible {
+  outline: 3px solid var(--v2-focus);
+  outline-offset: 3px;
+  border-radius: var(--v2-control-radius);
+}
+
+.ai-coach-settings-card__content {
   display: grid;
   min-width: 0;
   gap: var(--v2-space-1);
-}
-
-.ai-coach-entry--profile strong {
-  margin: 0;
-}
-
-.ai-coach-entry--profile small {
-  color: var(--v2-text-secondary);
-  font-size: 0.75rem;
 }
 
 .ai-coach-settings-card__title {
   display: inline-flex;
   align-items: center;
   gap: var(--v2-space-2);
+  margin: 0;
+  color: var(--v2-text-primary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .ai-coach-settings-card__title .yfc-icon {
   flex: 0 0 auto;
 }
 
-.ai-coach-entry--profile .ai-coach-entry__quota--normal,
-.ai-coach-entry--profile .ai-coach-entry__quota--unknown {
+.ai-coach-settings-card__meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0 var(--v2-space-2);
+  color: var(--v2-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.ai-coach-settings-card__meta > span:first-child {
+  font-weight: 400;
+}
+
+.ai-coach-settings-card__meta > small {
+  color: var(--v2-text-secondary);
+  font-size: inherit;
+  font-weight: 400;
+}
+
+.ai-coach-settings-card__meta > span[aria-hidden='true'] {
   color: var(--v2-text-secondary);
 }
 
-.ai-coach-entry--profile .ai-coach-entry__quota--low {
+.ai-coach-settings-card .ai-coach-entry__quota--normal,
+.ai-coach-settings-card .ai-coach-entry__quota--unknown {
+  color: var(--v2-text-secondary);
+}
+
+.ai-coach-settings-card .ai-coach-entry__quota--low {
   color: var(--v2-warning);
 }
 
-.ai-coach-entry--profile .ai-coach-entry__quota--empty {
+.ai-coach-settings-card .ai-coach-entry__quota--empty {
   color: var(--v2-danger);
-}
-
-.ai-coach-entry--profile .button-link {
-  flex: 0 0 auto;
 }
 
 .ai-coach-chat {
@@ -1606,6 +1817,49 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
   flex: 0 0 44px;
   width: 44px;
   height: 44px;
+  min-width: 44px;
+  padding: 4px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: var(--v2-text-secondary);
+}
+
+.ai-coach-workspace__header-actions .ui-icon-button:hover:not(:disabled),
+.ai-coach-workspace__header-actions .ui-icon-button:active:not(:disabled) {
+  background: var(--v2-surface);
+  color: var(--v2-text-primary);
+}
+
+.ai-coach-workspace__header-actions .ui-icon-button:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: var(--focus-offset);
+}
+
+:root .ai-coach-workspace__header-actions .ui-icon-button[data-glass][data-glass-variant] {
+  --glass-fill: transparent;
+  --glass-filter: none;
+  --glass-material-image: none;
+  --glass-border-opacity: 0;
+  --glass-rim-light: transparent;
+  --glass-rim-shade: transparent;
+  --glass-shadow-opacity: 0;
+  background-color: transparent;
+  background-image: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+:root
+  .ai-coach-workspace__header-actions
+  .ui-icon-button[data-glass][data-glass-interactive]:hover:not(:disabled),
+:root
+  .ai-coach-workspace__header-actions
+  .ui-icon-button[data-glass][data-glass-interactive]:active:not(:disabled) {
+  --glass-fill: var(--v2-surface-secondary);
+  background-color: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
 }
 
 .ai-coach-workspace__history-slot {
@@ -1647,6 +1901,60 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
   min-width: 0;
   padding: 0 0.25rem;
   font-size: 0.75rem;
+}
+
+.ai-coach-workspace .ai-coach-chat__quick-prompts {
+  gap: var(--v2-space-1);
+}
+
+.ai-coach-workspace .ai-coach-chat__quick-prompts button {
+  min-height: 44px;
+  padding: 0.4rem 0.65rem;
+  border-color: var(--v2-border);
+  background: transparent;
+  color: var(--v2-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.ai-coach-workspace .ai-coach-chat__quick-prompts button:hover,
+.ai-coach-workspace .ai-coach-chat__quick-prompts button:focus-visible {
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
+}
+
+.ai-coach-workspace .ai-coach-chat__send {
+  border: 0;
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.ai-coach-workspace .ai-coach-chat__send:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: var(--focus-offset);
+}
+
+.ai-coach-workspace .ai-coach-chat__send:disabled {
+  border: 0;
+}
+
+:root .ai-coach-workspace .ai-coach-chat__send[data-glass][data-glass-variant] {
+  --glass-fill: var(--v2-lime);
+  --glass-filter: none;
+  --glass-material-image: none;
+  --glass-border-opacity: 0;
+  --glass-rim-light: transparent;
+  --glass-rim-shade: transparent;
+  --glass-shadow-opacity: 0;
+  background-color: var(--v2-lime);
+  background-image: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+:root .ai-coach-workspace .ai-coach-chat__send[data-glass][data-glass-variant]:disabled {
+  --glass-fill: var(--v2-surface-strong);
+  background-color: var(--v2-surface-strong);
+  color: var(--v2-text-secondary);
 }
 
 .ai-coach-chat__keyboard-hint {
@@ -1882,13 +2190,12 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
 }
 
 @media (max-width: 600px) {
-  .ai-coach-entry--profile {
-    align-items: stretch;
-    flex-direction: column;
+  .app-section--profile .profile-settings-group.ai-coach-settings-card {
+    padding: var(--v2-space-4);
   }
 
-  .ai-coach-entry--profile .button-link {
-    align-self: flex-start;
+  .ai-coach-settings-card__link {
+    min-height: 90px;
   }
 
   .ai-coach-settings-section__header {

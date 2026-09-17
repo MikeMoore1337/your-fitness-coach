@@ -56,7 +56,11 @@ export type LandingTelegramPlacement = 'hero' | 'continuity' | 'footer';
 export type EditorialCtaDestination = 'tma' | 'web' | 'landing' | 'article';
 export type EditorialCtaCampaign = 'telegram_editorial_v1';
 export type PublicArticleCtaDestination = 'tma' | 'web' | 'landing';
-export type AiCoachEntryPoint = 'today' | 'progress' | 'nutrition' | 'profile';
+export type AiCoachEntryPoint =
+  'today' | 'workout' | 'nutrition' | 'program' | 'progress' | 'profile';
+export type CoachAttentionKind =
+  'workout_feedback' | 'weekly_check_in' | 'missed_workout' | 'skipped_workout' | 'without_program';
+export type CoachAttentionLatencyBucket = 'under_250ms' | '250_1000ms' | 'over_1s';
 export type AiCoachMode = 'generic' | 'personal';
 export type AiCoachOutcome =
   | 'answer'
@@ -376,6 +380,16 @@ export type ProductEvent =
       entry_point: AiCoachEntryPoint;
     }
   | {
+      name: 'coach_attention_shown' | 'coach_attention_opened' | 'coach_attention_resolved';
+      surface: ProductSurface;
+      kind: CoachAttentionKind;
+    }
+  | {
+      name: 'coach_attention_load_timing';
+      surface: ProductSurface;
+      latency_bucket: CoachAttentionLatencyBucket;
+    }
+  | {
       name: 'ai_coach_request_started';
       surface: ProductSurface;
       mode: AiCoachMode;
@@ -650,9 +664,23 @@ const PWA_SERVICE_WORKER_ERROR_CATEGORIES = new Set<PwaServiceWorkerErrorCategor
 ]);
 const AI_COACH_ENTRY_POINTS = new Set<AiCoachEntryPoint>([
   'today',
+  'workout',
   'progress',
   'nutrition',
+  'program',
   'profile',
+]);
+const COACH_ATTENTION_KINDS = new Set<CoachAttentionKind>([
+  'workout_feedback',
+  'weekly_check_in',
+  'missed_workout',
+  'skipped_workout',
+  'without_program',
+]);
+const COACH_ATTENTION_LATENCY_BUCKETS = new Set<CoachAttentionLatencyBucket>([
+  'under_250ms',
+  '250_1000ms',
+  'over_1s',
 ]);
 const AI_COACH_MODES = new Set<AiCoachMode>(['generic', 'personal']);
 const AI_COACH_OUTCOMES = new Set<AiCoachOutcome>([
@@ -764,6 +792,13 @@ function eventPropertyKeys(name: string): readonly string[] {
   if (name === 'article_cta_clicked') return ['content_key', 'destination'];
   if (name === 'pwa_service_worker_error') return ['category'];
   if (name === 'ai_coach_entry_opened') return ['entry_point'];
+  if (
+    name === 'coach_attention_shown' ||
+    name === 'coach_attention_opened' ||
+    name === 'coach_attention_resolved'
+  )
+    return ['kind'];
+  if (name === 'coach_attention_load_timing') return ['latency_bucket'];
   if (name === 'ai_coach_request_started') return ['mode'];
   if (name === 'ai_coach_response_received') return ['mode', 'outcome'];
   if (name === 'ai_coach_request_failed') return ['mode', 'failure'];
@@ -914,6 +949,16 @@ function hasValidEventProperties(value: Record<string, unknown>): boolean {
   }
   if (value.name === 'ai_coach_entry_opened') {
     return AI_COACH_ENTRY_POINTS.has(value.entry_point as AiCoachEntryPoint);
+  }
+  if (
+    value.name === 'coach_attention_shown' ||
+    value.name === 'coach_attention_opened' ||
+    value.name === 'coach_attention_resolved'
+  ) {
+    return COACH_ATTENTION_KINDS.has(value.kind as CoachAttentionKind);
+  }
+  if (value.name === 'coach_attention_load_timing') {
+    return COACH_ATTENTION_LATENCY_BUCKETS.has(value.latency_bucket as CoachAttentionLatencyBucket);
   }
   if (value.name === 'ai_coach_request_started') {
     return AI_COACH_MODES.has(value.mode as AiCoachMode);

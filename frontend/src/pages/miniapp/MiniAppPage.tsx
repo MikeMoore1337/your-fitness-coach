@@ -16,6 +16,7 @@ import { AppLink, focusedContextReturn, useNavigation } from '../../shared/navig
 import { Badge, Button, Card } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { AiCoachSettingsCard, useAiCoachStatus } from '../../features/ai/AiCoachExperience';
+import { AiCoachContextualEntry } from '../../features/ai/AiCoachContextualEntry';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { programProfileReadiness } from '../../features/profile/programReadiness';
@@ -484,48 +485,51 @@ export default function MiniAppPage({
             </>
           )}
           {section === 'programs' && (
-            <fieldset
-              className="demo-capability-fieldset"
-              disabled={!capabilities.canMutatePrograms}
-            >
-              {!capabilities.canMutatePrograms && (
-                <p className="muted demo-capability-notice">
-                  Управление программой недоступно в демо-режиме. Просмотр использует ту же
-                  production-поверхность.
-                </p>
-              )}
-              {programManagementOpen ? (
-                <TemplatesList
-                  key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
-                  defaultLibraryOpen={programStart === 'templates'}
-                  mode="full"
-                  readOnly={!capabilities.canMutatePrograms}
-                >
-                  <ProgramBuilder
-                    key={programStart === 'create' ? 'create-start' : 'create-default'}
-                    defaultOpen={programStart === 'create'}
-                  />
-                </TemplatesList>
-              ) : (
-                <>
-                  <TemplatesList mode="summary" readOnly={!capabilities.canMutatePrograms} />
-                  <SchedulePanel
-                    focusedCommentId={requestedFeedback?.commentId}
-                    focusedExerciseId={requestedFeedback?.workoutExerciseId}
-                    focusedWorkoutId={scheduleFocusId}
-                    timeZone={user?.profile?.timezone}
-                  />
-                  {capabilities.canMutatePrograms && (
-                    <AppLink
-                      className="ux-plan-management-link"
-                      to="/app?section=programs&view=manage"
-                    >
-                      Открыть управление программой
-                    </AppLink>
-                  )}
-                </>
-              )}
-            </fieldset>
+            <>
+              <AiCoachContextualEntry context={{ surface: 'program' }} entryPoint="program" />
+              <fieldset
+                className="demo-capability-fieldset"
+                disabled={!capabilities.canMutatePrograms}
+              >
+                {!capabilities.canMutatePrograms && (
+                  <p className="muted demo-capability-notice">
+                    Управление программой недоступно в демо-режиме. Просмотр использует ту же
+                    production-поверхность.
+                  </p>
+                )}
+                {programManagementOpen ? (
+                  <TemplatesList
+                    key={programStart === 'templates' ? 'templates-start' : 'templates-default'}
+                    defaultLibraryOpen={programStart === 'templates'}
+                    mode="full"
+                    readOnly={!capabilities.canMutatePrograms}
+                  >
+                    <ProgramBuilder
+                      key={programStart === 'create' ? 'create-start' : 'create-default'}
+                      defaultOpen={programStart === 'create'}
+                    />
+                  </TemplatesList>
+                ) : (
+                  <>
+                    <TemplatesList mode="summary" readOnly={!capabilities.canMutatePrograms} />
+                    <SchedulePanel
+                      focusedCommentId={requestedFeedback?.commentId}
+                      focusedExerciseId={requestedFeedback?.workoutExerciseId}
+                      focusedWorkoutId={scheduleFocusId}
+                      timeZone={user?.profile?.timezone}
+                    />
+                    {capabilities.canMutatePrograms && (
+                      <AppLink
+                        className="ux-plan-management-link"
+                        to="/app?section=programs&view=manage"
+                      >
+                        Открыть управление программой
+                      </AppLink>
+                    )}
+                  </>
+                )}
+              </fieldset>
+            </>
           )}
           {section === 'catalog' && <ExerciseCatalog canCreate={capabilities.canCreateCatalog} />}
           {section === 'nutrition' && (

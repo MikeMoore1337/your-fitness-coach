@@ -6,6 +6,7 @@ import '../../styles/design-v2.css';
 import { useAuth } from '../../app/AuthProvider';
 import { Diary } from '../../features/diary/Diary';
 import { ClientAnalytics } from '../../features/coach/ClientAnalytics';
+import { CoachAttentionCenter } from '../../features/coach/CoachAttentionCenter';
 import { TrainerModeSwitch } from '../../features/trainer/TrainerModeSwitch';
 import { ExerciseCatalog } from '../../features/exercises/ExerciseCatalog';
 import { NutritionForm } from '../../features/nutrition/NutritionForm';
@@ -628,14 +629,18 @@ function ProgramAssignmentDisclosure({ client }: { client: Client }) {
 
 function CoachClientDetail({
   client,
+  focusedAttention,
   focusedProgramId,
+  focusedWorkoutId,
   onBack,
   onOpenCatalog,
   programs,
   summary,
 }: {
   client: Client;
+  focusedAttention: 'weekly_check_in' | null;
   focusedProgramId: number | null;
+  focusedWorkoutId: number | null;
   onBack: () => void;
   onOpenCatalog: () => void;
   programs: CoachAssignedProgram[];
@@ -755,13 +760,15 @@ function CoachClientDetail({
         id="coach-client-progress"
         title="Тренировки, прогресс и замеры"
         description={adherenceText(summary)}
-        open={Boolean(focusedProgramId)}
+        open={Boolean(focusedAttention || focusedProgramId || focusedWorkoutId)}
       >
         <ClientAnalytics
           clientId={client.id}
           clientName={clientDisplayName(client)}
           canComment={client.status === 'active'}
           canSchedule={capabilities.canManageCoach}
+          focusedCheckIn={focusedAttention === 'weekly_check_in'}
+          focusedWorkoutId={focusedWorkoutId}
         />
         <Diary
           key={`diary-${client.id}`}
@@ -839,6 +846,16 @@ export default function CoachPage({
     const clientId = Number(value);
     return Number.isSafeInteger(clientId) && clientId > 0 ? clientId : null;
   })();
+  const initialWorkoutId = (() => {
+    const value = new URLSearchParams(window.location.search).get('workout_id');
+    if (!value || !/^\d+$/.test(value)) return null;
+    const workoutId = Number(value);
+    return Number.isSafeInteger(workoutId) && workoutId > 0 ? workoutId : null;
+  })();
+  const initialAttentionFocus =
+    new URLSearchParams(window.location.search).get('focus') === 'weekly_check_in'
+      ? ('weekly_check_in' as const)
+      : null;
   const [selectedId, setSelectedId] = useState<number | null>(initialClientId);
   const [clientDetailOpen, setClientDetailOpen] = useState(Boolean(initialClientId));
   useTelegramOverlayBackButton(clientDetailOpen, () => setClientDetailOpen(false));
@@ -855,6 +872,10 @@ export default function CoachPage({
   const [clientFilter, setClientFilter] = useState<CoachClientFilter>('all');
   const [programSearch, setProgramSearch] = useState('');
   const [focusedProgramId, setFocusedProgramId] = useState<number | null>(null);
+  const [focusedWorkoutId, setFocusedWorkoutId] = useState<number | null>(initialWorkoutId);
+  const [focusedAttention, setFocusedAttention] = useState<'weekly_check_in' | null>(
+    initialAttentionFocus,
+  );
   const [inviteLink, setInviteLink] = useState<InviteLink | null>(null);
   const [inviteCreating, setInviteCreating] = useState(false);
   const clients = useQuery({
@@ -1016,6 +1037,7 @@ export default function CoachPage({
       >
         {tab === 'clients' && (
           <>
+            <CoachAttentionCenter enabled={Boolean(user?.is_coach)} />
             <CoachWorkspaceDashboard
               clients={clients.data ?? []}
               loading={activeClients.length > 0 && clientSummaries.isPending}
@@ -1192,6 +1214,8 @@ export default function CoachPage({
                               });
                               setSelectedId(client.id);
                               setFocusedProgramId(null);
+                              setFocusedWorkoutId(null);
+                              setFocusedAttention(null);
                               setClientDetailOpen(true);
                             }}
                           >
@@ -1258,7 +1282,9 @@ export default function CoachPage({
                 <CoachClientDetail
                   key={selected.id}
                   client={selected}
+                  focusedAttention={focusedAttention}
                   focusedProgramId={focusedProgramId}
+                  focusedWorkoutId={focusedWorkoutId}
                   onBack={() => setClientDetailOpen(false)}
                   onOpenCatalog={() => setTab('catalog')}
                   programs={selectedPrograms}
@@ -1330,6 +1356,8 @@ export default function CoachPage({
                           });
                           setSelectedId(item.client_id);
                           setFocusedProgramId(item.id);
+                          setFocusedWorkoutId(null);
+                          setFocusedAttention(null);
                           setClientDetailOpen(true);
                           setTab('clients');
                         }}
@@ -1343,6 +1371,8 @@ export default function CoachPage({
                           disabled={!capabilities.canMutatePrograms || !capabilities.canManageCoach}
                           onClick={() => {
                             setSelectedId(item.client_id);
+                            setFocusedWorkoutId(null);
+                            setFocusedAttention(null);
                             setClientDetailOpen(true);
                             setTab('catalog');
                           }}

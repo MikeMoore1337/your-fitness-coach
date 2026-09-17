@@ -189,6 +189,40 @@ class AiCoachStatusResponse(BaseModel):
     personal_available: bool
 
 
+AiCoachContextSurface = Literal["today", "workout", "nutrition", "program", "progress"]
+
+
+class AiCoachContextDescriptor(BaseModel):
+    """A small client hint resolved against the authenticated user's data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface: AiCoachContextSurface
+    resource_id: int | None = Field(default=None, gt=0)
+    period_days: Literal[7, 30, 90] | None = None
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> AiCoachContextDescriptor:
+        if self.surface == "workout":
+            if self.resource_id is None or self.period_days is not None:
+                raise ValueError("Контекст тренировки требует только resource_id")
+        elif self.surface in {"nutrition", "progress"}:
+            if self.resource_id is not None or self.period_days is None:
+                raise ValueError("Контекст сводки требует только period_days")
+        elif self.resource_id is not None or self.period_days is not None:
+            raise ValueError("Этот экран не принимает resource_id или period_days")
+        return self
+
+
+class AiCoachContextAttachment(BaseModel):
+    """High-level context label returned to the composer, without resource data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    surface: AiCoachContextSurface
+    label: str = Field(..., min_length=1, max_length=80)
+
+
 ChatFailureCategory = Literal[
     "provider_failure",
     "structured_validation",
@@ -258,6 +292,7 @@ class AiCoachConversationSendRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     message: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_MAX_MESSAGE_LENGTH)
+    context: AiCoachContextDescriptor | None = None
 
     @field_validator("message")
     @classmethod
@@ -266,6 +301,12 @@ class AiCoachConversationSendRequest(BaseModel):
         if not normalized or any(ord(char) < 0x20 and char not in "\t" for char in normalized):
             raise ValueError("message must be a single safe text value")
         return normalized
+
+
+class AiCoachConversationRetryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    context: AiCoachContextDescriptor | None = None
 
 
 class AiCoachConversationFeedbackRequest(BaseModel):
@@ -292,16 +333,20 @@ class AiCoachConversationSendResponse(BaseModel):
     quota: AiCoachQuotaSnapshot
     rate_limit_scope: AiCoachRateLimitScope | None = None
     rate_limit_retry_after_seconds: int | None = Field(default=None, ge=0)
+    context: AiCoachContextAttachment | None = None
 
 
 __all__ = [
     "AiCoachConsentResponse",
     "AiCoachConsentUpdateRequest",
+    "AiCoachContextAttachment",
+    "AiCoachContextDescriptor",
     "AiCoachConversationClearResponse",
     "AiCoachConversationFeedbackRequest",
     "AiCoachConversationListResponse",
     "AiCoachConversationMessageResponse",
     "AiCoachConversationResponse",
+    "AiCoachConversationRetryRequest",
     "AiCoachConversationSendRequest",
     "AiCoachConversationSendResponse",
     "AiCoachConversationSummaryResponse",

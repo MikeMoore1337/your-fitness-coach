@@ -1524,6 +1524,8 @@ def handle_demo_transport(
                 item["client_name"] = {"alexey": "Алексей", "maria": "Мария", "ivan": "Иван"}[slug]
                 items.append(item)
             return {"items": items, "total": len(items), "limit": 100, "offset": 0}
+        if path == "/api/v1/coach/attention":
+            return {"items": [], "total": 0, "generated_at": _iso(_now(session))}
         if len(parts) >= 4 and parts[:2] == ["coach", "clients"] and parts[2].isdigit():
             client_id = int(parts[2])
             slug = _client_slug(client_id)

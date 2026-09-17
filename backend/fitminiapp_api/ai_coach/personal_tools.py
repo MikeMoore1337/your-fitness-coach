@@ -909,11 +909,14 @@ def _get_workout_context_tool(
     user: User,
     *,
     focus: str,
+    workout_id: int | None = None,
 ) -> PersonalToolResult:
     """Return a small, read-only slice for today or the latest recorded workout."""
 
     today = today_for_user(user)
-    timeline = build_workout_timeline(db, user, limit=12)
+    timeline = build_workout_timeline(db, user, limit=12, workout_id=workout_id)
+    if workout_id is not None and not timeline:
+        raise PersonalToolUnavailable("workout_context_not_found")
     nearby: list[dict[str, object]] = []
     for workout in timeline:
         scheduled_date = workout.get("scheduled_date")
@@ -997,11 +1000,12 @@ def get_workout_context_tool(
     user: User,
     *,
     focus: str,
+    workout_id: int | None = None,
 ) -> PersonalToolResult:
     """Return a bounded workout slice or a safe context-unavailable result."""
 
     try:
-        return _get_workout_context_tool(db, user, focus=focus)
+        return _get_workout_context_tool(db, user, focus=focus, workout_id=workout_id)
     except PersonalToolUnsafe:
         raise
     except PersonalToolUnavailable:

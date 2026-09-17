@@ -32,10 +32,15 @@ import {
   type AiCoachHelpfulness,
 } from '../../shared/analytics/productEvents';
 import { AppLink } from '../../shared/navigation/router';
-import { Badge, Button, Card, IconButton, LoadingState } from '../../shared/ui/common';
+import { Badge, Button, DisclosureIcon, IconButton, LoadingState } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useOptionalAiCoachWorkspace } from './AiCoachWorkspaceContext';
+import {
+  aiCoachContextLabel,
+  toApiAiCoachContext,
+  type AiCoachContextDescriptor,
+} from './aiCoachContext';
 import './ai-coach.css';
 
 export const AI_COACH_UI_VERSION = 'ai-coach-ui-v2';
@@ -1075,11 +1080,15 @@ export function AiCoachPersonalConsentPanel({ status }: { status: AiCoachStatus 
 }
 
 function AiCoachChat({
+  context,
   historyTarget,
+  onClearContext,
   showPersonalConsent = true,
   status,
 }: {
+  context?: AiCoachContextDescriptor | null;
   historyTarget?: HTMLElement | null;
+  onClearContext?: () => void;
   showPersonalConsent?: boolean;
   status: AiCoachStatus;
 }) {
@@ -1200,10 +1209,12 @@ function AiCoachChat({
       conversationId,
       message,
       requestId,
+      context,
     }: {
       conversationId: number | null;
       message: string;
       requestId: string;
+      context?: AiCoachContextDescriptor | null;
     }) => {
       let conversationIdForError = conversationId;
       try {
@@ -1218,7 +1229,10 @@ function AiCoachChat({
           `/api/v1/ai-coach/conversations/${conversationToUse.id}/messages`,
           {
             method: 'POST',
-            body: { message },
+            body: {
+              message,
+              ...(context ? { context: toApiAiCoachContext(context) } : {}),
+            },
             headers: { 'X-Request-ID': requestId },
           },
         );
@@ -1237,7 +1251,7 @@ function AiCoachChat({
       trackProductEvent({
         name: 'ai_coach_request_started',
         surface: productEventSurface(),
-        mode: 'generic',
+        mode: context ? 'personal' : 'generic',
       });
     },
     onSuccess: ({ conversationId, response }, variables) => {
@@ -1277,7 +1291,7 @@ function AiCoachChat({
       trackProductEvent({
         name: 'ai_coach_request_failed',
         surface: productEventSurface(),
-        mode: 'generic',
+        mode: variables.context ? 'personal' : 'generic',
         failure:
           reason &&
           typeof reason === 'object' &&
@@ -1293,15 +1307,21 @@ function AiCoachChat({
       conversationId,
       messageId,
       requestId,
+      context: requestContext,
     }: {
       conversationId: number;
       messageId: number;
       message: string;
       requestId: string;
+      context?: AiCoachContextDescriptor | null;
     }) =>
       api<AiCoachConversationSendResponse>(
         `/api/v1/ai-coach/conversations/${conversationId}/messages/${messageId}/retry`,
-        { method: 'POST', headers: { 'X-Request-ID': requestId } },
+        {
+          method: 'POST',
+          body: requestContext ? { context: toApiAiCoachContext(requestContext) } : undefined,
+          headers: { 'X-Request-ID': requestId },
+        },
       ),
     onMutate: () => {
       setFailure(null);
@@ -1442,6 +1462,11 @@ function AiCoachChat({
   }, [historyOpen]);
 
   useLayoutEffect(() => {
+    if (!context) return;
+    composerRef.current?.focus();
+  }, [context, conversations.isLoading]);
+
+  useLayoutEffect(() => {
     const textarea = composerRef.current;
     if (!textarea) return;
     textarea.style.height = 'auto';
@@ -1459,6 +1484,7 @@ function AiCoachChat({
       conversationId: sendRetry?.conversationId ?? currentConversationId,
       message,
       requestId: sendRetry?.requestId ?? newRequestId(),
+      context,
     });
   };
   const onComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1485,6 +1511,7 @@ function AiCoachChat({
       messageId,
       message: message.content,
       requestId: retryRequest?.messageId === messageId ? retryRequest.requestId : newRequestId(),
+      context,
     });
   };
   const startNewConversation = () => {
@@ -1676,6 +1703,20 @@ function AiCoachChat({
 
           {showPersonalConsent && <AiCoachPersonalConsentPanel status={status} />}
 
+          {context && (
+            <div className="ai-coach-chat__context" data-testid="ai-coach-context-attachment">
+              <div>
+                <span className="eyebrow">Контекст запроса</span>
+                <strong>{aiCoachContextLabel(context)}</strong>
+              </div>
+              {onClearContext && (
+                <button type="button" onClick={onClearContext}>
+                  Убрать контекст
+                </button>
+              )}
+            </div>
+          )}
+
           <form className="ai-coach-chat__composer" onSubmit={submit}>
             <label className="sr-only" htmlFor="ai-coach-chat-message">
               Сообщение AI Coach
@@ -1684,6 +1725,7 @@ function AiCoachChat({
               <textarea
                 ref={composerRef}
                 id="ai-coach-chat-message"
+                data-ai-coach-contextual-focus={context ? true : undefined}
                 maxLength={CHAT_MESSAGE_MAX_LENGTH}
                 placeholder="Напишите вопрос…"
                 rows={1}
@@ -1793,67 +1835,73 @@ export function AiCoachSettingsCard({
 
   if (!status?.ui_enabled) return null;
   return (
-    <Card
-      className={`profile-settings-group ai-coach-settings-card${defaultOpen ? ' is-deep-linked' : ''}`}
-      collapsible={false}
-      family="neutral"
+    <section
+      className={`card profile-settings-group ai-coach-settings-card${defaultOpen ? ' is-deep-linked' : ''}`}
+      data-testid="ai-coach-entry-profile"
       id="profile-ai-coach"
-      title={
-        <span className="ai-coach-settings-card__title" data-testid="ai-coach-profile-title">
-          <Icon name="ai-coach" size={20} />
-          <span>AI Coach</span>
-        </span>
-      }
     >
-      <div className="ai-coach-entry--profile" data-testid="ai-coach-entry-profile">
-        <div>
-          <strong>Помощник по тренировкам, питанию и прогрессу</strong>
-          {quota.data && (
-            <small
-              className={`ai-coach-entry__quota ai-coach-entry__quota--${quotaState}`}
-              data-quota-limit={quota.data.limit}
-              data-quota-remaining={quota.data.remaining}
-              data-quota-state={quotaState}
-              data-testid="ai-coach-entry-quota"
-            >
-              {quotaState === 'empty'
-                ? 'Лимит исчерпан'
-                : quotaState === 'unknown'
-                  ? 'Лимит обновляется…'
-                  : `${quota.data.remaining} из ${quota.data.limit} запросов`}
-            </small>
-          )}
-        </div>
-        <AppLink
-          className="button-link secondary-link"
-          to="/app?section=profile#profile-ai-coach"
-          onClick={(event) => {
-            if (workspace) {
-              event.preventDefault();
-              workspace.open(event.currentTarget);
-            }
-            trackProductEvent({
-              name: 'ai_coach_entry_opened',
-              surface: productEventSurface(),
-              entry_point: 'profile',
-            });
-          }}
-        >
-          Открыть AI Coach
-        </AppLink>
-      </div>
-    </Card>
+      <AppLink
+        aria-describedby="ai-coach-profile-description"
+        className="ai-coach-settings-card__link"
+        data-testid="ai-coach-profile-link"
+        to="/app?section=profile#profile-ai-coach"
+        onClick={(event) => {
+          if (workspace) {
+            event.preventDefault();
+            workspace.open(event.currentTarget);
+          }
+          trackProductEvent({
+            name: 'ai_coach_entry_opened',
+            surface: productEventSurface(),
+            entry_point: 'profile',
+          });
+        }}
+      >
+        <span className="ai-coach-settings-card__content">
+          <h2 className="ai-coach-settings-card__title" data-testid="ai-coach-profile-title">
+            <Icon name="ai-coach" size={20} />
+            <span>AI Coach</span>
+          </h2>
+          <span className="ai-coach-settings-card__meta" id="ai-coach-profile-description">
+            <span>Помощник по тренировкам, питанию и прогрессу</span>
+            {quota.data && (
+              <>
+                <span aria-hidden="true">·</span>
+                <small
+                  className={`ai-coach-entry__quota ai-coach-entry__quota--${quotaState}`}
+                  data-quota-limit={quota.data.limit}
+                  data-quota-remaining={quota.data.remaining}
+                  data-quota-state={quotaState}
+                  data-testid="ai-coach-entry-quota"
+                >
+                  {quotaState === 'empty'
+                    ? 'Лимит исчерпан'
+                    : quotaState === 'unknown'
+                      ? 'Лимит обновляется…'
+                      : `${quota.data.remaining} из ${quota.data.limit} запросов`}
+                </small>
+              </>
+            )}
+          </span>
+        </span>
+        <DisclosureIcon />
+      </AppLink>
+    </section>
   );
 }
 
 export function AiCoachExperience({
+  context,
   historyTarget,
+  onClearContext,
   showMemorySettings = true,
   showPersonalConsent = true,
   status: providedStatus,
 }: {
   entryPoint: AiCoachEntryPoint;
+  context?: AiCoachContextDescriptor | null;
   historyTarget?: HTMLElement | null;
+  onClearContext?: () => void;
   showMemorySettings?: boolean;
   showPersonalConsent?: boolean;
   status?: AiCoachStatus;
@@ -1870,7 +1918,9 @@ export function AiCoachExperience({
   return (
     <section className="ai-coach-experience" data-testid="ai-coach-experience">
       <AiCoachChat
+        context={context}
         historyTarget={historyTarget}
+        onClearContext={onClearContext}
         status={status}
         showPersonalConsent={showPersonalConsent}
       />

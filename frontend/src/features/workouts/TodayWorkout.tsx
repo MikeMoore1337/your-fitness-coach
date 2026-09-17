@@ -40,6 +40,7 @@ import {
 import { PWA_SAFE_UPDATE_EVENT } from '../../shared/pwa/pwaRuntime';
 import { ProgressionGuidance } from './ProgressionGuidance';
 import { useScreenWakeLock } from './useScreenWakeLock';
+import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -1119,6 +1120,12 @@ export function TodayWorkout({
             Начать тренировку
           </Button>
         )}
+
+        <AiCoachContextualEntry
+          actionLabel="Спросить про тренировку"
+          context={{ surface: 'workout', resourceId: data.id }}
+          entryPoint="workout"
+        />
 
         {(data.status === 'planned' || started) &&
           (capabilities.canMutatePrograms ? (

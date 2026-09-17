@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
-import type { WorkoutProgress, WorkoutTimelineItem } from '../../shared/api/types';
+import type {
+  WeeklyCheckInHistory,
+  WorkoutProgress,
+  WorkoutTimelineItem,
+} from '../../shared/api/types';
 import { queryKeys } from '../../shared/queryKeys';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import {
@@ -75,11 +79,15 @@ export function ClientAnalytics({
   clientName,
   canComment = true,
   canSchedule = true,
+  focusedCheckIn = false,
+  focusedWorkoutId = null,
 }: {
   clientId: number;
   clientName: string;
   canComment?: boolean;
   canSchedule?: boolean;
+  focusedCheckIn?: boolean;
+  focusedWorkoutId?: number | null;
 }) {
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
@@ -91,6 +99,13 @@ export function ClientAnalytics({
     queryKey: ['coach', 'client', clientId, 'workouts'],
     queryFn: () =>
       api<WorkoutTimelineItem[]>(`/api/v1/coach/clients/${clientId}/workouts?limit=30`),
+  });
+  const checkIns = useQuery({
+    queryKey: ['coach', 'client', clientId, 'weekly-check-ins'],
+    queryFn: () =>
+      api<WeeklyCheckInHistory>(`/api/v1/coach/clients/${clientId}/weekly-check-ins?limit=1`),
+    enabled: focusedCheckIn,
+    retry: false,
   });
   const scheduleMutation = useMutation({
     mutationFn: ({ workoutId, date, time }: { workoutId: number; date: string; time: string }) =>
@@ -108,8 +123,57 @@ export function ClientAnalytics({
     onError: (reason) => toast((reason as Error).message, 'error'),
   });
 
+  useEffect(() => {
+    if (!focusedWorkoutId || !timeline.data) return;
+    const details = document.getElementById(`coach-workout-${focusedWorkoutId}`);
+    if (!(details instanceof HTMLDetailsElement)) return;
+    details.open = true;
+    details.scrollIntoView({ block: 'start' });
+  }, [focusedWorkoutId, timeline.data]);
+
+  const checkIn = checkIns.data?.items?.[0];
+
   return (
     <div className="stack">
+      {focusedCheckIn && (
+        <section className="coach-weekly-check-in" aria-labelledby="coach-weekly-check-in-title">
+          <h3 id="coach-weekly-check-in-title">Недельный итог клиента</h3>
+          {checkIns.isLoading ? (
+            <LoadingState label="Загружаем недельный итог…" />
+          ) : checkIns.error ? (
+            <ErrorState
+              message="Не удалось загрузить недельный итог. Остальные данные клиента доступны."
+              retry={() => void checkIns.refetch()}
+            />
+          ) : !checkIn ? (
+            <EmptyState title="Недельный итог не найден" />
+          ) : (
+            <div className="coach-weekly-check-in__content">
+              <p className="muted">
+                {formatDate(checkIn.week_start)} — {formatDate(checkIn.week_end)}
+              </p>
+              <div className="metric-grid">
+                <div className="metric">
+                  <span>Тренировки</span>
+                  <strong>
+                    {checkIn.summary.training.completed_workouts} из{' '}
+                    {checkIn.summary.training.planned_workouts}
+                  </strong>
+                </div>
+                <div className="metric">
+                  <span>Объём</span>
+                  <strong>{Math.round(checkIn.summary.progression.training_volume_kg)} кг</strong>
+                </div>
+                <div className="metric">
+                  <span>Новые результаты</span>
+                  <strong>{checkIn.summary.progression.new_personal_records}</strong>
+                </div>
+              </div>
+              {checkIn.note && <p className="coach-weekly-check-in__note">{checkIn.note}</p>}
+            </div>
+          )}
+        </section>
+      )}
       {progress.isLoading ? (
         <LoadingState label="Считаем показатели…" />
       ) : progress.error ? (
@@ -182,7 +246,11 @@ export function ClientAnalytics({
         ) : (
           <div className="list-grid top-gap">
             {timeline.data.map((workout) => (
-              <details className="card compact-disclosure" key={workout.id}>
+              <details
+                className="card compact-disclosure"
+                id={`coach-workout-${workout.id}`}
+                key={workout.id}
+              >
                 <summary>
                   <span>
                     <strong>{workout.title}</strong>

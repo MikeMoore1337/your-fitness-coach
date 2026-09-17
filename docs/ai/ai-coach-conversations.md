@@ -11,6 +11,8 @@ AI Coach открывается из профиля и показывает:
 - обычные сообщения пользователя и AI Coach в одном последовательном потоке;
 - composer с Enter для отправки и Shift+Enter для новой строки;
 - быстрые вопросы про сегодня, итог за 30 дней, прогресс, отдых и дневник;
+- contextual entry points из экранов тренировки, питания, программы и прогресса; на Today
+  остаётся общий direct entry без постоянного contextual CTA;
 - свёрнутые материалы ответа и компактную оценку полезности;
 - вторичную секцию отдельной memory, а не memory как основной сценарий.
 
@@ -23,15 +25,22 @@ AI Coach открывается из профиля и показывает:
 
 Основные операции:
 
-| Операция | Назначение |
-| --- | --- |
-| `GET /api/v1/ai-coach/conversations` | Список собственных разговоров с bounded summary |
-| `POST /api/v1/ai-coach/conversations` | Создать новый разговор |
-| `GET /api/v1/ai-coach/conversations/{id}` | Получить собственную историю |
-| `POST /api/v1/ai-coach/conversations/{id}/messages` | Добавить вопрос и получить результат |
-| `GET /api/v1/ai-coach/quota` | Получить текущую server-owned quota |
-| `DELETE /api/v1/ai-coach/conversations/{id}` | Удалить собственный разговор |
-| `POST .../messages/{message_id}/feedback` | Сохранить только helpful/not helpful |
+| Операция                                            | Назначение                                      |
+| --------------------------------------------------- | ----------------------------------------------- |
+| `GET /api/v1/ai-coach/conversations`                | Список собственных разговоров с bounded summary |
+| `POST /api/v1/ai-coach/conversations`               | Создать новый разговор                          |
+| `GET /api/v1/ai-coach/conversations/{id}`           | Получить собственную историю                    |
+| `POST /api/v1/ai-coach/conversations/{id}/messages` | Добавить вопрос и получить результат            |
+| `GET /api/v1/ai-coach/quota`                        | Получить текущую server-owned quota             |
+| `DELETE /api/v1/ai-coach/conversations/{id}`        | Удалить собственный разговор                    |
+| `POST .../messages/{message_id}/feedback`           | Сохранить только helpful/not helpful            |
+
+Тренерский attention-центр использует отдельный bounded read-only маршрут
+`GET /api/v1/coach/attention?limit=50`. Он возвращает только конкретные состояния связанных
+клиентов: новую обратную связь по завершённой тренировке, недельный итог, пропущенную или
+просроченную тренировку либо отсутствие активной программы. Дедупликация и разрешение строятся
+по authoritative state; старый heuristic «нет тренировки семь дней» не является источником
+этого списка. Ошибка attention-центра не блокирует остальные разделы кабинета.
 
 История хранится в `ai_coach_conversations` и `ai_coach_conversation_messages`, принадлежит
 account и ограничена 50 разговорами/100 сообщениями. Ввод обычного чата ограничен 2000
@@ -71,6 +80,14 @@ Backend не принимает от клиента готовый prompt или
    отвечает естественно: называет отсутствующий факт или задаёт короткий вопрос. Глобального
    hardcoded отказа из-за missing data в обычном чате нет.
 
+Contextual entry текущего UI передаёт только typed descriptor: `program`, `workout` с авторизуемым
+`resource_id` либо `nutrition`/`progress` с периодом `7|30|90`. Legacy-значение `today` остаётся
+допустимым в typed contract для обратной совместимости, но постоянный Today contextual CTA его
+не эмитит. Backend повторно проверяет
+владельца ресурса и сам строит bounded personal context. В URL нет id тренировки, комментария,
+имени или готового prompt; до явной отправки composer остаётся редактируемым. При quota,
+provider или service failure выбранный high-level context и draft сохраняются.
+
 Текущие источники истины для app-help и public knowledge — implementation/routes/screens YFC,
 опубликованный `frontend/src/content/publicContent.json` и текущие published `WebArticle` rows.
 Для personal knowledge источники — существующие canonical services и read-only tools:
@@ -91,16 +108,16 @@ endpoints.
 
 Внешние ошибки нормализуются в безопасные состояния:
 
-| API outcome | failure category | Поведение UI |
-| --- | --- | --- |
-| `safety_refusal` | отсутствует | Понятный отказ по конкретной категории |
-| `consent_required` | отсутствует | Предложение явно включить personal consent |
-| `insufficient_data` | legacy structured route | Только отдельный периодический/персональный отчёт, не обычный чат |
-| `unavailable` | `provider_failure` или `generation_failure` | Общая безопасная ошибка без raw details |
-| `unavailable` | `timeout` | Сообщение о таймауте и повторная попытка |
-| `rate_limited` | `rate_limit` | Сообщение о лимите |
-| `safety_refusal` | `safety_rejection` | Сгенерированный ответ нарушил safety boundary; repair не выполняется |
-| `invalid_output` | `repair_failed` | Форматный ответ не удалось безопасно восстановить после одной попытки |
+| API outcome         | failure category                            | Поведение UI                                                          |
+| ------------------- | ------------------------------------------- | --------------------------------------------------------------------- |
+| `safety_refusal`    | отсутствует                                 | Понятный отказ по конкретной категории                                |
+| `consent_required`  | отсутствует                                 | Предложение явно включить personal consent                            |
+| `insufficient_data` | legacy structured route                     | Только отдельный периодический/персональный отчёт, не обычный чат     |
+| `unavailable`       | `provider_failure` или `generation_failure` | Общая безопасная ошибка без raw details                               |
+| `unavailable`       | `timeout`                                   | Сообщение о таймауте и повторная попытка                              |
+| `rate_limited`      | `rate_limit`                                | Сообщение о лимите                                                    |
+| `safety_refusal`    | `safety_rejection`                          | Сгенерированный ответ нарушил safety boundary; repair не выполняется  |
+| `invalid_output`    | `repair_failed`                             | Форматный ответ не удалось безопасно восстановить после одной попытки |
 
 `safety_category=clear` не является safety error. Обычный conversational ответ не использует
 structured output или JSON Schema. Безопасные Markdown и обычные английские fitness-термины
@@ -173,6 +190,10 @@ versions, provider/model, outcome, safety/failure category, `repair_attempted`, 
 `validation_failure_reason`, attempts, counts, latency и nullable token usage. В логи не попадают
 message text, answer, memory values, personal facts, raw context или secret. Feedback хранит только
 категорию helpfulness и не копирует текст.
+
+Attention telemetry ограничена enum `kind`, surface и агрегированным latency bucket для
+`shown`, `opened` и `resolved`; client id, имя, комментарий, source id и содержимое AI Coach не
+отправляются.
 
 Новых обязательных provider, платных сервисов или credentials нет. Существующие AI Coach flags и
 free-only policy сохраняются. Миграция `0087_ai_coach_long_chat_messages` и новая

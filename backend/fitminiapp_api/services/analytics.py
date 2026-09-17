@@ -39,15 +39,25 @@ def _completed_set_volume(workout_set) -> float:
     return float((workout_set.actual_reps or 0) * (workout_set.actual_weight or 0))
 
 
-def _load_workouts(db: Session, user: User) -> list[UserWorkout]:
-    return (
+def _load_workouts(
+    db: Session,
+    user: User,
+    *,
+    workout_id: int | None = None,
+) -> list[UserWorkout]:
+    query = (
         db.query(UserWorkout)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .options(
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
             joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets),
         )
-        .filter(UserProgram.user_id == user.id)
+    )
+    filters = [UserProgram.user_id == user.id]
+    if workout_id is not None:
+        filters.append(UserWorkout.id == workout_id)
+    return (
+        query.filter(*filters)
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
     )
@@ -594,9 +604,15 @@ def _build_training_analytics(
     }
 
 
-def build_workout_timeline(db: Session, user: User, limit: int = 30) -> list[dict]:
+def build_workout_timeline(
+    db: Session,
+    user: User,
+    limit: int = 30,
+    *,
+    workout_id: int | None = None,
+) -> list[dict]:
     display_map = get_visible_exercise_display_map(db, user)
-    workouts = list(reversed(_load_workouts(db, user)))[:limit]
+    workouts = list(reversed(_load_workouts(db, user, workout_id=workout_id)))[:limit]
     result: list[dict] = []
     for workout in workouts:
         completed_sets = 0

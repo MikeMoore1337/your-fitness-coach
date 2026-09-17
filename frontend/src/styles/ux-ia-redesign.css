@@ -3,7 +3,7 @@
 .app-quick-add-trigger {
   position: fixed;
   right: max(18px, var(--yfc-layout-safe-right, 0px));
-  bottom: calc(96px + max(8px, var(--yfc-layout-safe-bottom, 0px)));
+  bottom: calc(104px + max(8px, var(--yfc-layout-safe-bottom, 0px)));
   z-index: 9010;
   display: inline-flex;
   min-height: 48px;

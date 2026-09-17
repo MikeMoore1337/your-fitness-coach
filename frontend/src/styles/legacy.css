@@ -704,6 +704,23 @@ p {
     color: var(--text);
 }
 
+::-moz-selection {
+    background: var(--accent-line);
+    color: var(--text);
+}
+
+:root[data-color-scheme="dark"]::selection,
+:root[data-color-scheme="dark"] *::selection {
+    background: var(--v2-lime);
+    color: var(--v2-on-lime);
+}
+
+:root[data-color-scheme="dark"]::-moz-selection,
+:root[data-color-scheme="dark"] *::-moz-selection {
+    background: var(--v2-lime);
+    color: var(--v2-on-lime);
+}
+
 .muted {
     color: var(--muted);
 }

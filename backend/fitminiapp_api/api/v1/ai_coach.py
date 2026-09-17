@@ -69,10 +69,13 @@ from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.ai_coach import (
     AiCoachConsentResponse,
     AiCoachConsentUpdateRequest,
+    AiCoachContextAttachment,
+    AiCoachContextDescriptor,
     AiCoachConversationClearResponse,
     AiCoachConversationFeedbackRequest,
     AiCoachConversationListResponse,
     AiCoachConversationResponse,
+    AiCoachConversationRetryRequest,
     AiCoachConversationSendRequest,
     AiCoachConversationSendResponse,
     AiCoachGenerateRequest,
@@ -268,6 +271,24 @@ def _chat_context_failure_generation(
     )
 
 
+def _context_attachment(
+    context: AiCoachContextDescriptor | None,
+) -> AiCoachContextAttachment | None:
+    if context is None:
+        return None
+    if context.surface == "today":
+        label = "Сегодня"
+    elif context.surface == "workout":
+        label = "Эта тренировка"
+    elif context.surface == "nutrition":
+        label = f"Питание за {context.period_days} дней"
+    elif context.surface == "progress":
+        label = f"Прогресс за {context.period_days} дней"
+    else:
+        label = "Активная программа"
+    return AiCoachContextAttachment(surface=context.surface, label=label)
+
+
 def _chat_request_for_selection(
     *,
     message: str,
@@ -299,9 +320,10 @@ def _generate_chat(
     message: str,
     history: tuple[AiCoachConversationTurn, ...],
     request_id: str | None,
+    context: AiCoachContextDescriptor | None = None,
 ) -> AiCoachChatGeneration:
     safety_category = classify_message(message)
-    personal_needed = message_requires_personal_context(message, history)
+    personal_needed = context is not None or message_requires_personal_context(message, history)
     # A capability question can mention a user's own screen (for example, "my progress")
     # without requesting personal data. Let the explicit intent selector resolve that case;
     # all other safety categories remain fail-closed.
@@ -341,6 +363,7 @@ def _generate_chat(
             current_user,
             message=message,
             history=history,
+            context=context,
         )
         request = _chat_request_for_selection(
             message=message,
@@ -354,6 +377,7 @@ def _generate_chat(
             current_user,
             message=message,
             history=history,
+            context=context,
         )
         request = _chat_request_for_selection(
             message=message,
@@ -394,6 +418,7 @@ def _generate_conversation_message(
     message: str,
     history: tuple[AiCoachConversationTurn, ...],
     request_id: str | None,
+    context: AiCoachContextDescriptor | None = None,
 ) -> AiCoachChatGeneration:
     try:
         return _generate_chat(
@@ -402,6 +427,7 @@ def _generate_conversation_message(
             message=message,
             history=history,
             request_id=request_id,
+            context=context,
         )
     except PersonalToolUnsafe:
         return _chat_state_generation(
@@ -432,6 +458,7 @@ def _persist_conversation_generation(
     user_message,
     generation: AiCoachChatGeneration,
     request_id: str | None,
+    context: AiCoachContextAttachment | None = None,
 ) -> AiCoachConversationSendResponse:
     mark_user_message_result(
         user_message,
@@ -480,6 +507,7 @@ def _persist_conversation_generation(
         quota=quota_snapshot,
         rate_limit_scope=generation.rate_limit_scope,
         rate_limit_retry_after_seconds=generation.rate_limit_retry_after_seconds,
+        context=context,
     )
 
 
@@ -546,6 +574,7 @@ def _persisted_conversation_response(
     db: Session,
     conversation,
     user_message,
+    context: AiCoachContextAttachment | None = None,
 ) -> AiCoachConversationSendResponse:
     assistant_message = get_following_assistant_message(
         db,
@@ -609,6 +638,7 @@ def _persisted_conversation_response(
         quota=quota_snapshot,
         rate_limit_scope=rate_limit_scope,
         rate_limit_retry_after_seconds=user_message.rate_limit_retry_after_seconds,
+        context=context,
     )
 
 
@@ -746,6 +776,7 @@ def send_ai_coach_conversation_message(
         conversation_id=conversation_id,
     )
     request_id = _request_key(request)
+    context_attachment = _context_attachment(payload.context)
     existing = get_message_by_request_id(
         db,
         conversation_id=conversation.id,
@@ -773,6 +804,7 @@ def send_ai_coach_conversation_message(
                 db=db,
                 conversation=conversation,
                 user_message=existing,
+                context=context_attachment,
             )
     history = tuple(
         AiCoachConversationTurn.model_validate(item)
@@ -825,6 +857,7 @@ def send_ai_coach_conversation_message(
                     db=db,
                     conversation=conversation,
                     user_message=existing,
+                    context=context_attachment,
                 )
     generation = _generate_conversation_message(
         db=db,
@@ -832,6 +865,7 @@ def send_ai_coach_conversation_message(
         message=payload.message,
         history=history,
         request_id=request_id,
+        context=payload.context,
     )
     return _persist_conversation_generation(
         db=db,
@@ -839,6 +873,7 @@ def send_ai_coach_conversation_message(
         user_message=user_message,
         generation=generation,
         request_id=request_id,
+        context=context_attachment,
     )
 
 
@@ -851,6 +886,7 @@ def retry_ai_coach_conversation_message(
     conversation_id: int,
     message_id: int,
     request: Request,
+    payload: AiCoachConversationRetryRequest | None = None,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> AiCoachConversationSendResponse:
@@ -860,6 +896,7 @@ def retry_ai_coach_conversation_message(
         conversation_id=conversation_id,
     )
     request_id = _request_key(request)
+    context_attachment = _context_attachment(payload.context if payload is not None else None)
     idempotent_message = get_message_by_request_id(
         db,
         conversation_id=conversation.id,
@@ -885,6 +922,7 @@ def retry_ai_coach_conversation_message(
                 db=db,
                 conversation=conversation,
                 user_message=idempotent_message,
+                context=context_attachment,
             )
     user_message = get_conversation_message(
         db,
@@ -920,6 +958,7 @@ def retry_ai_coach_conversation_message(
         message=content,
         history=history,
         request_id=request_id,
+        context=payload.context if payload is not None else None,
     )
     return _persist_conversation_generation(
         db=db,
@@ -927,6 +966,7 @@ def retry_ai_coach_conversation_message(
         user_message=user_message,
         generation=generation,
         request_id=request_id,
+        context=context_attachment,
     )
 
 
