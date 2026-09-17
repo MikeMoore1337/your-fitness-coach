@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/programs/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Program */
+        get: operations["get_public_program_api_v1_public_programs__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/articles": {
         parameters: {
             query?: never;
@@ -9207,6 +9224,61 @@ export interface components {
              */
             difficulty_level: "beginner" | "intermediate" | "advanced";
         };
+        /** PublicProgramDay */
+        PublicProgramDay: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Exercises */
+            exercises: components["schemas"]["PublicProgramExercise"][];
+        };
+        /** PublicProgramExercise */
+        PublicProgramExercise: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Primary Muscle */
+            primary_muscle: string;
+            /** Equipment */
+            equipment: string;
+            /**
+             * Difficulty Level
+             * @enum {string}
+             */
+            difficulty_level: "beginner" | "intermediate" | "advanced";
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Rest Seconds */
+            rest_seconds: number;
+        };
+        /** PublicProgramResponse */
+        PublicProgramResponse: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Goal
+             * @enum {string}
+             */
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "beginner" | "intermediate" | "advanced";
+            /**
+             * Split Type
+             * @enum {string}
+             */
+            split_type: "full_body" | "upper_lower" | "push_pull_legs" | "body_part" | "hybrid";
+            /** Days */
+            days: components["schemas"]["PublicProgramDay"][];
+        };
         /** RecipeCreate */
         RecipeCreate: {
             /** Name */
@@ -11229,6 +11301,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicExerciseDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_program_api_v1_public_programs__slug__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicProgramResponse"];
                 };
             };
             /** @description Validation Error */

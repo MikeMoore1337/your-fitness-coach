@@ -10,7 +10,11 @@ import {
   type PublicContentPage as PublicContentPageData,
 } from '../../content/publicContent';
 import { api } from '../../shared/api/client';
-import type { PublicExerciseDetail, PublicExerciseSummary } from '../../shared/api/types';
+import type {
+  PublicExerciseDetail,
+  PublicExerciseSummary,
+  PublicProgram,
+} from '../../shared/api/types';
 import { appUrlForHostname } from '../../shared/navigation/appUrl';
 import { AppLink, Redirect, useNavigation } from '../../shared/navigation/router';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
@@ -430,6 +434,120 @@ function PublicExerciseDetails({ page }: { page: PublicContentPageData }) {
   );
 }
 
+const programGoalLabels: Record<PublicProgram['goal'], string> = {
+  fat_loss: 'Снижение веса',
+  recomposition: 'Рекомпозиция',
+  maintenance: 'Поддержание',
+  muscle_gain: 'Набор мышц',
+  strength: 'Сила',
+};
+
+const programLevelLabels: Record<PublicProgram['level'], string> = {
+  beginner: 'Начальный',
+  intermediate: 'Средний',
+  advanced: 'Продвинутый',
+};
+
+const programSplitLabels: Record<PublicProgram['split_type'], string> = {
+  full_body: 'Всё тело',
+  upper_lower: 'Верх / низ',
+  push_pull_legs: 'Толкай / тяни / ноги',
+  body_part: 'По группам мышц',
+  hybrid: 'Гибридная схема',
+};
+
+function formatRest(seconds: number): string {
+  return seconds % 60 === 0 ? `${seconds / 60} мин` : `${seconds} сек`;
+}
+
+function PublicProgramDetails({ page }: { page: PublicContentPageData }) {
+  const slug = page.program?.slug;
+  const details = useQuery({
+    queryKey: ['public', 'programs', slug],
+    queryFn: () => api<PublicProgram>(`/api/v1/public/programs/${slug}`),
+    enabled: Boolean(slug),
+  });
+
+  if (!slug) return null;
+  if (details.isLoading) {
+    return (
+      <section className="public-program" aria-label="Структура публичной программы">
+        <p role="status">Загружаем структуру программы…</p>
+      </section>
+    );
+  }
+  if (details.error || !details.data) {
+    return (
+      <section className="public-program" aria-label="Структура публичной программы">
+        <div role="alert" className="public-inline-error">
+          <p>Структура программы временно недоступна. Попробуйте ещё раз.</p>
+          <button type="button" className="landing-button" onClick={() => void details.refetch()}>
+            Повторить
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const program = details.data;
+  const publishedExercisePaths = new Set(publicExercisePages().map((item) => item.path));
+  return (
+    <section className="public-program" aria-labelledby="public-program-title">
+      <div className="public-section-heading">
+        <p className="landing-kicker">Состав шаблона</p>
+        <h2 id="public-program-title">{program.title}</h2>
+      </div>
+      <dl className="public-program-facts">
+        <div>
+          <dt>Цель</dt>
+          <dd>{programGoalLabels[program.goal]}</dd>
+        </div>
+        <div>
+          <dt>Уровень</dt>
+          <dd>{programLevelLabels[program.level]}</dd>
+        </div>
+        <div>
+          <dt>Схема</dt>
+          <dd>{programSplitLabels[program.split_type]}</dd>
+        </div>
+      </dl>
+      <div className="public-program-days">
+        {program.days.map((day) => (
+          <article className="public-program-day" key={day.day_number}>
+            <header>
+              <p>День {String(day.day_number).padStart(2, '0')}</p>
+              <h3>{day.title}</h3>
+            </header>
+            <ol>
+              {day.exercises.map((exercise) => {
+                const exercisePath = `/exercises/${exercise.slug}`;
+                const name = publishedExercisePaths.has(exercisePath) ? (
+                  <AppLink to={exercisePath}>{exercise.title}</AppLink>
+                ) : (
+                  <strong>{exercise.title}</strong>
+                );
+                return (
+                  <li key={exercise.slug}>
+                    <div className="public-program-exercise__name">{name}</div>
+                    <div className="public-program-exercise__facts">
+                      <span>{exercise.prescribed_sets} подхода</span>
+                      <span>{exercise.prescribed_reps} повторений</span>
+                      <span>Отдых: {formatRest(exercise.rest_seconds)}</span>
+                    </div>
+                    <p>
+                      {exercise.primary_muscle} · {exercise.equipment}
+                    </p>
+                  </li>
+                );
+              })}
+            </ol>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function RelatedContent({ page }: { page: PublicContentPageData }) {
   return (
     <section className="public-related" aria-labelledby="public-related-title">
@@ -495,7 +613,8 @@ export default function PublicContentPage() {
   if (!page || page.kind === 'landing') return <NotFoundPage />;
   if (window.Telegram?.WebApp?.initData) return <Redirect to="/app" />;
 
-  const appUrl = appUrlForHostname(window.location.hostname);
+  const appUrlBase = appUrlForHostname(window.location.hostname);
+  const appUrl = page.kind === 'program' ? `${appUrlBase}?section=programs` : appUrlBase;
   const articleClassName = `public-article public-article--${page.kind}${
     page.path === '/training' ? ' public-article--training' : ''
   }`;
@@ -555,6 +674,8 @@ export default function PublicContentPage() {
           <GuideContents page={page} />
 
           <PublicWorkflow page={page} />
+
+          {page.kind === 'program' && <PublicProgramDetails page={page} />}
 
           <div className="public-body">
             {page.interactive === 'kbju-calculator' && <PublicNutritionCalculator />}

@@ -39,7 +39,8 @@ export interface PublicContentSource {
 }
 
 export interface PublicContentPage {
-  kind: 'landing' | 'product' | 'knowledge-index' | 'guide' | 'exercise-index' | 'exercise';
+  kind:
+    'landing' | 'product' | 'program' | 'knowledge-index' | 'guide' | 'exercise-index' | 'exercise';
   id?: string;
   slug?: string;
   status?: 'draft' | 'review' | 'published' | 'archived';
@@ -53,6 +54,9 @@ export interface PublicContentPage {
   eyebrow: string;
   heading: string;
   intro: string;
+  program?: {
+    slug: string;
+  };
   highlights?: string[];
   workflow?: PublicContentWorkflow;
   sections: PublicContentSection[];

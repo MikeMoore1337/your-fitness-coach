@@ -8,6 +8,7 @@ export type Exercise = ApiSchemas['ExerciseCatalogItem'];
 export type ExerciseGuide = ApiSchemas['ExerciseGuide'];
 export type PublicExerciseSummary = ApiSchemas['PublicExerciseSummary'];
 export type PublicExerciseDetail = ApiSchemas['PublicExerciseDetail'];
+export type PublicProgram = ApiSchemas['PublicProgramResponse'];
 export type ArticleKind =
   | 'evergreen_explainer'
   | 'practical_guide'
