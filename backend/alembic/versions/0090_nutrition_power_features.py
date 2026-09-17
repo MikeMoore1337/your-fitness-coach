@@ -14,8 +14,10 @@ depends_on: str | Sequence[str] | None = None
 online_rollout_phase = "expand"
 online_rollout_notes = (
     "Adds owner-scoped nutrition templates and aliases plus a content-free idempotency registry. "
-    "All new references are nullable or cascade/set-null; the diary batch foreign key is added "
-    "without rewriting existing entries."
+    "All new references are declared while creating empty tables; the existing diary table gets "
+    "only a nullable lineage column and index because the online expand gate forbids adding a "
+    "constraint to a populated table. The trusted batch service validates owner and operation "
+    "ownership before writing the lineage id."
 )
 
 
@@ -23,7 +25,16 @@ def upgrade() -> None:
     op.create_table(
         "nutrition_meal_templates",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("owner_user_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "owner_user_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "users.id",
+                name="nutrition_meal_templates_owner_user_id_fkey",
+                ondelete="CASCADE",
+            ),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(length=128), nullable=False),
         sa.Column(
             "created_at",
@@ -41,12 +52,6 @@ def upgrade() -> None:
             "length(trim(name)) > 0",
             name="ck_nutrition_meal_templates_name_not_blank",
         ),
-        sa.ForeignKeyConstraint(
-            ["owner_user_id"],
-            ["users.id"],
-            name="nutrition_meal_templates_owner_user_id_fkey",
-            ondelete="CASCADE",
-        ),
         sa.PrimaryKeyConstraint("id", name="nutrition_meal_templates_pkey"),
     )
     op.create_index(
@@ -57,11 +62,38 @@ def upgrade() -> None:
     op.create_table(
         "nutrition_meal_template_items",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("template_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "template_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "nutrition_meal_templates.id",
+                name="nutrition_meal_template_items_template_id_fkey",
+                ondelete="CASCADE",
+            ),
+            nullable=False,
+        ),
         sa.Column("position", sa.Integer(), nullable=False),
         sa.Column("item_kind", sa.String(length=16), nullable=False),
-        sa.Column("food_id", sa.Integer(), nullable=True),
-        sa.Column("recipe_id", sa.Integer(), nullable=True),
+        sa.Column(
+            "food_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "foods.id",
+                name="nutrition_meal_template_items_food_id_fkey",
+                ondelete="SET NULL",
+            ),
+            nullable=True,
+        ),
+        sa.Column(
+            "recipe_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "recipes.id",
+                name="nutrition_meal_template_items_recipe_id_fkey",
+                ondelete="SET NULL",
+            ),
+            nullable=True,
+        ),
         sa.Column("amount", sa.Numeric(precision=10, scale=3), nullable=False),
         sa.Column("amount_unit", sa.String(length=16), nullable=False),
         sa.Column("source_name", sa.String(length=256), nullable=False),
@@ -95,24 +127,6 @@ def upgrade() -> None:
             "length(trim(source_name)) > 0",
             name="ck_nutrition_meal_template_items_source_name_not_blank",
         ),
-        sa.ForeignKeyConstraint(
-            ["template_id"],
-            ["nutrition_meal_templates.id"],
-            name="nutrition_meal_template_items_template_id_fkey",
-            ondelete="CASCADE",
-        ),
-        sa.ForeignKeyConstraint(
-            ["food_id"],
-            ["foods.id"],
-            name="nutrition_meal_template_items_food_id_fkey",
-            ondelete="SET NULL",
-        ),
-        sa.ForeignKeyConstraint(
-            ["recipe_id"],
-            ["recipes.id"],
-            name="nutrition_meal_template_items_recipe_id_fkey",
-            ondelete="SET NULL",
-        ),
         sa.PrimaryKeyConstraint("id", name="nutrition_meal_template_items_pkey"),
         sa.UniqueConstraint(
             "template_id",
@@ -128,10 +142,28 @@ def upgrade() -> None:
     op.create_table(
         "food_search_aliases",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "users.id",
+                name="food_search_aliases_user_id_fkey",
+                ondelete="CASCADE",
+            ),
+            nullable=False,
+        ),
         sa.Column("alias", sa.String(length=128), nullable=False),
         sa.Column("normalized_alias", sa.String(length=128), nullable=False),
-        sa.Column("food_id", sa.Integer(), nullable=True),
+        sa.Column(
+            "food_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "foods.id",
+                name="food_search_aliases_food_id_fkey",
+                ondelete="SET NULL",
+            ),
+            nullable=True,
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(),
@@ -152,18 +184,6 @@ def upgrade() -> None:
             "length(trim(normalized_alias)) > 0",
             name="ck_food_search_aliases_normalized_not_blank",
         ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-            name="food_search_aliases_user_id_fkey",
-            ondelete="CASCADE",
-        ),
-        sa.ForeignKeyConstraint(
-            ["food_id"],
-            ["foods.id"],
-            name="food_search_aliases_food_id_fkey",
-            ondelete="SET NULL",
-        ),
         sa.PrimaryKeyConstraint("id", name="food_search_aliases_pkey"),
         sa.UniqueConstraint(
             "user_id",
@@ -180,9 +200,27 @@ def upgrade() -> None:
     op.create_table(
         "food_diary_batch_operations",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "users.id",
+                name="food_diary_batch_operations_user_id_fkey",
+                ondelete="CASCADE",
+            ),
+            nullable=False,
+        ),
         sa.Column("operation_kind", sa.String(length=24), nullable=False),
-        sa.Column("template_id", sa.Integer(), nullable=True),
+        sa.Column(
+            "template_id",
+            sa.Integer(),
+            sa.ForeignKey(
+                "nutrition_meal_templates.id",
+                name="food_diary_batch_operations_template_id_fkey",
+                ondelete="SET NULL",
+            ),
+            nullable=True,
+        ),
         sa.Column("idempotency_key", sa.String(length=128), nullable=False),
         sa.Column("request_fingerprint", sa.String(length=64), nullable=False),
         sa.Column("diary_date", sa.Date(), nullable=False),
@@ -201,18 +239,6 @@ def upgrade() -> None:
             "meal_type IN ('breakfast', 'lunch', 'dinner', 'snacks')",
             name="ck_food_diary_batch_operations_meal_type",
         ),
-        sa.ForeignKeyConstraint(
-            ["user_id"],
-            ["users.id"],
-            name="food_diary_batch_operations_user_id_fkey",
-            ondelete="CASCADE",
-        ),
-        sa.ForeignKeyConstraint(
-            ["template_id"],
-            ["nutrition_meal_templates.id"],
-            name="food_diary_batch_operations_template_id_fkey",
-            ondelete="SET NULL",
-        ),
         sa.PrimaryKeyConstraint("id", name="food_diary_batch_operations_pkey"),
         sa.UniqueConstraint(
             "user_id",
@@ -225,30 +251,32 @@ def upgrade() -> None:
         "food_diary_batch_operations",
         ["user_id", "created_at", "id"],
     )
-    with op.batch_alter_table("food_diary_entries") as batch_op:
-        batch_op.add_column(sa.Column("batch_operation_id", sa.Integer(), nullable=True))
-        batch_op.create_foreign_key(
-            "food_diary_entries_batch_operation_id_fkey",
-            "food_diary_batch_operations",
-            ["batch_operation_id"],
-            ["id"],
-            ondelete="SET NULL",
-        )
-    op.create_index(
-        "ix_food_diary_entries_batch_operation",
-        "food_diary_entries",
-        ["batch_operation_id", "id"],
+    op.add_column(
+        "food_diary_entries", sa.Column("batch_operation_id", sa.Integer(), nullable=True)
     )
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        with op.get_context().autocommit_block():
+            op.create_index(
+                "ix_food_diary_entries_batch_operation",
+                "food_diary_entries",
+                ["batch_operation_id", "id"],
+                if_not_exists=True,
+                postgresql_concurrently=True,
+            )
+    else:
+        op.create_index(
+            "ix_food_diary_entries_batch_operation",
+            "food_diary_entries",
+            ["batch_operation_id", "id"],
+            if_not_exists=True,
+            postgresql_concurrently=True,
+        )
 
 
 def downgrade() -> None:
     op.drop_index("ix_food_diary_entries_batch_operation", table_name="food_diary_entries")
-    with op.batch_alter_table("food_diary_entries") as batch_op:
-        batch_op.drop_constraint(
-            "food_diary_entries_batch_operation_id_fkey",
-            type_="foreignkey",
-        )
-        batch_op.drop_column("batch_operation_id")
+    op.drop_column("food_diary_entries", "batch_operation_id")
     op.drop_index(
         "ix_food_diary_batch_operations_user_created",
         table_name="food_diary_batch_operations",

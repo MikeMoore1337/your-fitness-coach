@@ -146,9 +146,10 @@ class FoodDiaryEntry(Base):
     copy_operation_id: Mapped[int | None] = mapped_column(
         ForeignKey("food_diary_copy_operations.id", ondelete="SET NULL"), nullable=True
     )
-    batch_operation_id: Mapped[int | None] = mapped_column(
-        ForeignKey("food_diary_batch_operations.id", ondelete="SET NULL"), nullable=True
-    )
+    # The online expand migration adds this nullable lineage scalar without a foreign-key
+    # rewrite on the populated diary table. The trusted batch service validates the owner and
+    # operation before assigning it; a later maintenance migration may add the DB constraint.
+    batch_operation_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     copied_from_entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("food_diary_entries.id", ondelete="SET NULL"), nullable=True
     )
