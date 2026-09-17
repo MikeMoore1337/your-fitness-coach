@@ -4,6 +4,7 @@ import { AppLink } from '../../shared/navigation/router';
 import { NutritionDiary } from './NutritionDiary';
 import { NutritionForm } from './NutritionForm';
 import type { MealType } from './FoodPickerDialog';
+import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 
 export function NutritionPage({
   initial,
@@ -42,6 +43,10 @@ export function NutritionPage({
 
   return (
     <div className="nutrition-experience">
+      <AiCoachContextualEntry
+        context={{ surface: 'nutrition', periodDays: 7 }}
+        entryPoint="nutrition"
+      />
       {returnPath && (
         <nav aria-label="Возврат к отчёту по питанию" className="nutrition-report-return">
           <AppLink className="button-link secondary-link" to={returnPath}>

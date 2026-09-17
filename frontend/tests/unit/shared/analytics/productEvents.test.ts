@@ -263,6 +263,39 @@ describe('product event contract', () => {
     ).toBe(true);
   });
 
+  it('keeps coach attention telemetry aggregate-only', () => {
+    for (const kind of [
+      'workout_feedback',
+      'weekly_check_in',
+      'missed_workout',
+      'skipped_workout',
+      'without_program',
+    ] as const) {
+      expect(isProductEvent({ name: 'coach_attention_shown', surface: 'desktop_web', kind })).toBe(
+        true,
+      );
+      expect(isProductEvent({ name: 'coach_attention_opened', surface: 'mobile_web', kind })).toBe(
+        true,
+      );
+      expect(isProductEvent({ name: 'coach_attention_resolved', surface: 'tma', kind })).toBe(true);
+    }
+    expect(
+      isProductEvent({
+        name: 'coach_attention_load_timing',
+        surface: 'desktop_web',
+        latency_bucket: '250_1000ms',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_attention_opened',
+        surface: 'desktop_web',
+        kind: 'workout_feedback',
+        client_id: 42,
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
   it('keeps guided-flow telemetry typed, bounded and free of private context', () => {
     expect(
       isProductEvent({

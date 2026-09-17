@@ -29,10 +29,11 @@ import {
   type AiCoachWorkspaceController,
   type AiCoachWorkspacePanel,
 } from './AiCoachWorkspaceContext';
+import type { AiCoachContextDescriptor } from './aiCoachContext';
 
 export const AI_COACH_WORKSPACE_LAYOUT_KEY = 'yfc:ai-coach:workspace-layout:v1';
 export const AI_COACH_WORKSPACE_BREAKPOINT = 900;
-export const AI_COACH_WORKSPACE_DEFAULT_WIDTH = 460;
+export const AI_COACH_WORKSPACE_DEFAULT_WIDTH = 420;
 export const AI_COACH_WORKSPACE_DEFAULT_HEIGHT = 660;
 
 const AI_COACH_WORKSPACE_MIN_WIDTH = 360;
@@ -50,10 +51,24 @@ export interface AiCoachWorkspaceLayout {
   y: number;
 }
 
-interface WorkspaceViewport {
+export interface WorkspaceViewport {
   height: number;
   width: number;
 }
+
+export type AiCoachWorkspaceResizeDirection =
+  'top' | 'right' | 'bottom' | 'left' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
+export const AI_COACH_WORKSPACE_RESIZE_DIRECTIONS: readonly AiCoachWorkspaceResizeDirection[] = [
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+];
 
 type WorkspacePointerSession =
   | {
@@ -65,6 +80,7 @@ type WorkspacePointerSession =
     }
   | {
       kind: 'resize';
+      direction: AiCoachWorkspaceResizeDirection;
       pointerId: number;
       startLayout: AiCoachWorkspaceLayout;
       startX: number;
@@ -116,7 +132,10 @@ export function clampAiCoachWorkspaceLayout(
   );
   const maxHeight = Math.max(
     AI_COACH_WORKSPACE_MIN_HEIGHT,
-    Math.min(AI_COACH_WORKSPACE_MAX_HEIGHT, viewport.height - AI_COACH_WORKSPACE_EDGE_GAP * 2),
+    Math.min(
+      AI_COACH_WORKSPACE_MAX_HEIGHT,
+      viewport.height - AI_COACH_WORKSPACE_EDGE_GAP * 2 - AI_COACH_WORKSPACE_BOTTOM_RESERVE,
+    ),
   );
   const width = bounded(
     finiteOrNull(value.width) ?? AI_COACH_WORKSPACE_DEFAULT_WIDTH,
@@ -148,6 +167,83 @@ export function clampAiCoachWorkspaceLayout(
     x: bounded(finiteOrNull(value.x) ?? defaultX, AI_COACH_WORKSPACE_EDGE_GAP, maxX),
     y: bounded(finiteOrNull(value.y) ?? defaultY, AI_COACH_WORKSPACE_EDGE_GAP, maxY),
   };
+}
+
+function maxWidthWithinViewport(viewport: WorkspaceViewport, anchorX: number): number {
+  const viewportMax = Math.min(
+    AI_COACH_WORKSPACE_MAX_WIDTH,
+    viewport.width - AI_COACH_WORKSPACE_EDGE_GAP * 2,
+  );
+  return Math.max(
+    AI_COACH_WORKSPACE_MIN_WIDTH,
+    Math.min(viewportMax, viewport.width - AI_COACH_WORKSPACE_EDGE_GAP - anchorX),
+  );
+}
+
+function maxHeightWithinViewport(viewport: WorkspaceViewport, anchorY: number): number {
+  const viewportMax = Math.min(
+    AI_COACH_WORKSPACE_MAX_HEIGHT,
+    viewport.height - AI_COACH_WORKSPACE_EDGE_GAP * 2 - AI_COACH_WORKSPACE_BOTTOM_RESERVE,
+  );
+  return Math.max(
+    AI_COACH_WORKSPACE_MIN_HEIGHT,
+    Math.min(viewportMax, viewport.height - AI_COACH_WORKSPACE_BOTTOM_RESERVE - anchorY),
+  );
+}
+
+export function resizeAiCoachWorkspaceLayout(
+  value: AiCoachWorkspaceLayout,
+  direction: AiCoachWorkspaceResizeDirection,
+  deltaX: number,
+  deltaY: number,
+  viewport: WorkspaceViewport = readWorkspaceViewport(),
+): AiCoachWorkspaceLayout {
+  const resizeLeft = direction.includes('left');
+  const resizeRight = direction.includes('right');
+  const resizeTop = direction.includes('top');
+  const resizeBottom = direction.includes('bottom');
+  let { height, width, x, y } = value;
+
+  if (resizeLeft) {
+    const right = value.x + value.width;
+    width = bounded(
+      value.width - deltaX,
+      AI_COACH_WORKSPACE_MIN_WIDTH,
+      Math.min(
+        maxWidthWithinViewport(viewport, AI_COACH_WORKSPACE_EDGE_GAP),
+        right - AI_COACH_WORKSPACE_EDGE_GAP,
+      ),
+    );
+    x = right - width;
+  } else if (resizeRight) {
+    width = bounded(
+      value.width + deltaX,
+      AI_COACH_WORKSPACE_MIN_WIDTH,
+      maxWidthWithinViewport(viewport, value.x),
+    );
+  }
+
+  if (resizeTop) {
+    const bottom = value.y + value.height;
+    height = bounded(
+      value.height - deltaY,
+      AI_COACH_WORKSPACE_MIN_HEIGHT,
+      Math.min(
+        AI_COACH_WORKSPACE_MAX_HEIGHT,
+        viewport.height - AI_COACH_WORKSPACE_EDGE_GAP * 2,
+        bottom - AI_COACH_WORKSPACE_EDGE_GAP,
+      ),
+    );
+    y = bottom - height;
+  } else if (resizeBottom) {
+    height = bounded(
+      value.height + deltaY,
+      AI_COACH_WORKSPACE_MIN_HEIGHT,
+      maxHeightWithinViewport(viewport, value.y),
+    );
+  }
+
+  return clampAiCoachWorkspaceLayout({ ...value, height, width, x, y }, viewport);
 }
 
 export function readAiCoachWorkspaceLayout(
@@ -258,6 +354,8 @@ function AiCoachWorkspacePortal({
   updateLayout,
   persistLayout,
   status,
+  context,
+  onClearContext,
   viewport,
 }: {
   close(): void;
@@ -271,6 +369,8 @@ function AiCoachWorkspacePortal({
   restore(): void;
   setPanel(next: AiCoachWorkspacePanel): void;
   status?: AiCoachStatus;
+  context: AiCoachContextDescriptor | null;
+  onClearContext(): void;
   focusRevision: number;
   updateLayout(next: AiCoachWorkspaceLayout, persist?: boolean): void;
   viewport: WorkspaceViewport;
@@ -281,6 +381,7 @@ function AiCoachWorkspacePortal({
   const [pointerSession, setPointerSession] = useState<WorkspacePointerSession | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const focusedRevisionRef = useRef<number | null>(null);
   const layoutRef = useRef(layout);
   const viewportRef = useRef(viewport);
   const [historySlot, setHistorySlot] = useState<HTMLDivElement | null>(null);
@@ -294,6 +395,20 @@ function AiCoachWorkspacePortal({
   useEffect(() => {
     viewportRef.current = viewport;
   }, [viewport]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!isOpen || mobile || minimized || context?.surface !== 'workout') {
+      root.style.removeProperty('--ai-coach-workspace-right-reserve');
+      return;
+    }
+
+    const rightReserve = Math.max(0, viewport.width - layout.x + AI_COACH_WORKSPACE_EDGE_GAP);
+    root.style.setProperty('--ai-coach-workspace-right-reserve', `${rightReserve}px`);
+    return () => {
+      root.style.removeProperty('--ai-coach-workspace-right-reserve');
+    };
+  }, [context?.surface, isOpen, layout.x, minimized, mobile, viewport.width]);
 
   const handleBack = useCallback(() => {
     if (panel === 'settings') {
@@ -309,15 +424,27 @@ function AiCoachWorkspacePortal({
   useEffect(() => {
     if (!isOpen || minimized || !status) return;
     const frame = window.requestAnimationFrame(() => {
+      const isInitialMobileChatFocus =
+        mobile && panel === 'chat' && focusedRevisionRef.current !== focusRevision;
+      focusedRevisionRef.current = focusRevision;
+      const contextualTarget = panelRef.current?.querySelector<HTMLElement>(
+        '[data-ai-coach-contextual-focus]',
+      );
+      if (context && !contextualTarget) return;
       const target =
-        panelRef.current?.querySelector<HTMLElement>('[data-ai-coach-workspace-initial-focus]') ??
-        panelRef.current?.querySelector<HTMLElement>(
-          'button:not([disabled]), textarea, [tabindex="-1"]',
-        );
+        contextualTarget ??
+        (isInitialMobileChatFocus
+          ? panelRef.current
+          : (panelRef.current?.querySelector<HTMLElement>(
+              '[data-ai-coach-workspace-initial-focus]',
+            ) ??
+            panelRef.current?.querySelector<HTMLElement>(
+              'button:not([disabled]), textarea, [tabindex="-1"]',
+            )));
       (target ?? panelRef.current)?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [focusRevision, isOpen, minimized, panel, status]);
+  }, [context, focusRevision, isOpen, minimized, mobile, panel, status]);
 
   useEffect(() => {
     if (!isOpen || minimized || !bodyRef.current) return;
@@ -348,8 +475,11 @@ function AiCoachWorkspacePortal({
               { ...start, x: start.x + deltaX, y: start.y + deltaY },
               viewportRef.current,
             )
-          : clampAiCoachWorkspaceLayout(
-              { ...start, width: start.width + deltaX, height: start.height + deltaY },
+          : resizeAiCoachWorkspaceLayout(
+              start,
+              pointerSession.direction,
+              deltaX,
+              deltaY,
               viewportRef.current,
             );
       updateLayout(next);
@@ -372,10 +502,22 @@ function AiCoachWorkspacePortal({
   const beginPointerSession = (
     event: ReactPointerEvent<HTMLDivElement>,
     kind: WorkspacePointerSession['kind'],
+    direction: AiCoachWorkspaceResizeDirection = 'bottom-right',
   ) => {
     if (mobile || event.button !== 0 || !isOpen || minimized) return;
     if ((event.target as HTMLElement).closest('button, a, input, select, textarea')) return;
     event.preventDefault();
+    if (kind === 'resize') {
+      setPointerSession({
+        direction,
+        kind,
+        pointerId: event.pointerId,
+        startLayout: layoutRef.current,
+        startX: event.clientX,
+        startY: event.clientY,
+      });
+      return;
+    }
     setPointerSession({
       kind,
       pointerId: event.pointerId,
@@ -398,12 +540,11 @@ function AiCoachWorkspacePortal({
     if (!delta) return;
     event.preventDefault();
     updateLayout(
-      clampAiCoachWorkspaceLayout(
-        {
-          ...layoutRef.current,
-          height: layoutRef.current.height + delta[1],
-          width: layoutRef.current.width + delta[0],
-        },
+      resizeAiCoachWorkspaceLayout(
+        layoutRef.current,
+        'bottom-right',
+        delta[0],
+        delta[1],
         viewportRef.current,
       ),
       true,
@@ -490,6 +631,7 @@ function AiCoachWorkspacePortal({
           minimized ? ' is-minimized' : ''
         }`}
         data-minimized={minimized || undefined}
+        data-context-surface={context?.surface}
         data-testid="ai-coach-workspace"
         ref={panelRef}
         role={mobile ? 'dialog' : 'region'}
@@ -611,6 +753,8 @@ function AiCoachWorkspacePortal({
               showMemorySettings={false}
               showPersonalConsent={false}
               status={status}
+              context={context}
+              onClearContext={onClearContext}
             />
           </div>
           <div className="ai-coach-workspace__view" hidden={panel !== 'settings'}>
@@ -618,15 +762,31 @@ function AiCoachWorkspacePortal({
           </div>
         </div>
         {!mobile && !minimized && (
-          <div
-            aria-label="Изменить размер окна AI Coach"
-            className="ai-coach-workspace__resize-handle"
-            data-testid="ai-coach-workspace-resize"
-            role="button"
-            tabIndex={0}
-            onKeyDown={resizeWithKeyboard}
-            onPointerDown={(event) => beginPointerSession(event, 'resize')}
-          />
+          <>
+            <div
+              className="ai-coach-workspace__resize-zones"
+              data-testid="ai-coach-workspace-resize-zones"
+            >
+              {AI_COACH_WORKSPACE_RESIZE_DIRECTIONS.map((direction) => (
+                <div
+                  aria-hidden="true"
+                  className={`ai-coach-workspace__resize-zone ai-coach-workspace__resize-zone--${direction}`}
+                  data-resize-direction={direction}
+                  data-testid={`ai-coach-workspace-resize-${direction}`}
+                  key={direction}
+                  onPointerDown={(event) => beginPointerSession(event, 'resize', direction)}
+                />
+              ))}
+            </div>
+            <div
+              aria-label="Изменить размер окна AI Coach с клавиатуры"
+              className="ai-coach-workspace__keyboard-resize"
+              data-testid="ai-coach-workspace-resize"
+              role="button"
+              tabIndex={0}
+              onKeyDown={resizeWithKeyboard}
+            />
+          </>
         )}
       </section>
     </aside>,
@@ -665,6 +825,7 @@ export function AiCoachWorkspaceProvider({
   );
   const [isOpen, setIsOpen] = useState(false);
   const [panel, setPanel] = useState<AiCoachWorkspacePanel>('chat');
+  const [context, setContext] = useState<AiCoachContextDescriptor | null>(null);
   const [focusRevision, setFocusRevision] = useState(0);
   const layoutRef = useRef(layout);
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -693,9 +854,14 @@ export function AiCoachWorkspaceProvider({
   }, [updateLayout]);
 
   const open = useCallback(
-    (trigger?: HTMLElement | null, nextPanel: AiCoachWorkspacePanel = 'chat') => {
+    (
+      trigger?: HTMLElement | null,
+      nextPanel: AiCoachWorkspacePanel = 'chat',
+      nextContext?: AiCoachContextDescriptor,
+    ) => {
       triggerRef.current =
         trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+      setContext(nextContext ?? null);
       setPanel(nextPanel);
       setFocusRevision((revision) => revision + 1);
       if (layoutRef.current.minimized) {
@@ -709,11 +875,14 @@ export function AiCoachWorkspaceProvider({
   const close = useCallback(() => {
     setIsOpen(false);
     setPanel('chat');
+    setContext(null);
     const trigger = triggerRef.current;
     window.requestAnimationFrame(() => {
       if (trigger?.isConnected) trigger.focus();
     });
   }, []);
+
+  const clearContext = useCallback(() => setContext(null), []);
 
   const minimize = useCallback(() => {
     if (isWorkspaceMobile(viewportRef.current)) return;
@@ -726,6 +895,7 @@ export function AiCoachWorkspaceProvider({
 
   const controller = useMemo<AiCoachWorkspaceController>(
     () => ({
+      clearContext,
       close,
       isMinimized: layout.minimized,
       isOpen,
@@ -735,7 +905,7 @@ export function AiCoachWorkspaceProvider({
       restore,
       setPanel,
     }),
-    [close, isOpen, layout.minimized, minimize, open, resetLayout, restore],
+    [clearContext, close, isOpen, layout.minimized, minimize, open, resetLayout, restore],
   );
 
   return (
@@ -754,6 +924,8 @@ export function AiCoachWorkspaceProvider({
           resetLayout={resetLayout}
           restore={restore}
           setPanel={setPanel}
+          context={context}
+          onClearContext={clearContext}
           focusRevision={focusRevision}
           updateLayout={updateLayout}
           viewport={viewport}

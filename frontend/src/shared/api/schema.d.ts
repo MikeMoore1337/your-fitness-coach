@@ -1434,6 +1434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Attention */
+        get: operations["coach_attention_api_v1_coach_attention_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/assigned-programs": {
         parameters: {
             query?: never;
@@ -4332,6 +4349,34 @@ export interface components {
             /** Enabled */
             enabled: boolean;
         };
+        /**
+         * AiCoachContextAttachment
+         * @description High-level context label returned to the composer, without resource data.
+         */
+        AiCoachContextAttachment: {
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "today" | "workout" | "nutrition" | "program" | "progress";
+            /** Label */
+            label: string;
+        };
+        /**
+         * AiCoachContextDescriptor
+         * @description A small client hint resolved against the authenticated user's data.
+         */
+        AiCoachContextDescriptor: {
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "today" | "workout" | "nutrition" | "program" | "progress";
+            /** Resource Id */
+            resource_id?: number | null;
+            /** Period Days */
+            period_days?: (7 | 30 | 90) | null;
+        };
         /** AiCoachConversationClearResponse */
         AiCoachConversationClearResponse: {
             /** Deleted Count */
@@ -4415,10 +4460,15 @@ export interface components {
              */
             messages: components["schemas"]["AiCoachConversationMessageResponse"][];
         };
+        /** AiCoachConversationRetryRequest */
+        AiCoachConversationRetryRequest: {
+            context?: components["schemas"]["AiCoachContextDescriptor"] | null;
+        };
         /** AiCoachConversationSendRequest */
         AiCoachConversationSendRequest: {
             /** Message */
             message: string;
+            context?: components["schemas"]["AiCoachContextDescriptor"] | null;
         };
         /** AiCoachConversationSendResponse */
         AiCoachConversationSendResponse: {
@@ -4452,6 +4502,7 @@ export interface components {
             rate_limit_scope?: components["schemas"]["AiCoachRateLimitScope"] | null;
             /** Rate Limit Retry After Seconds */
             rate_limit_retry_after_seconds?: number | null;
+            context?: components["schemas"]["AiCoachContextAttachment"] | null;
         };
         /** AiCoachConversationSummaryResponse */
         AiCoachConversationSummaryResponse: {
@@ -5637,6 +5688,61 @@ export interface components {
             next_workout_date?: string | null;
             /** Current Revision Number */
             current_revision_number: number;
+        };
+        /** CoachAttentionClient */
+        CoachAttentionClient: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** CoachAttentionItem */
+        CoachAttentionItem: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "workout_feedback" | "weekly_check_in" | "missed_workout" | "skipped_workout" | "without_program";
+            client: components["schemas"]["CoachAttentionClient"];
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "workout" | "weekly_check_in" | "client";
+            /** Source Id */
+            source_id: number;
+            /** Source State */
+            source_state: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "review_workout" | "review_check_in" | "assign_program";
+            /** Destination */
+            destination: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CoachAttentionResponse */
+        CoachAttentionResponse: {
+            /** Items */
+            items?: components["schemas"]["CoachAttentionItem"][];
+            /** Total */
+            total: number;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
         };
         /** CoachInviteLinkResponse */
         CoachInviteLinkResponse: {
@@ -12668,7 +12774,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AiCoachConversationRetryRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -14627,6 +14737,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClientResponse"][];
+                };
+            };
+        };
+    };
+    coach_attention_api_v1_coach_attention_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachAttentionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

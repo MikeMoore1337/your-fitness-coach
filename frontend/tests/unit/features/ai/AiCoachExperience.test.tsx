@@ -13,7 +13,9 @@ import {
   AI_COACH_WORKSPACE_LAYOUT_KEY,
   clampAiCoachWorkspaceLayout,
   readAiCoachWorkspaceLayout,
+  resizeAiCoachWorkspaceLayout,
 } from '../../../../src/features/ai/AiCoachWorkspace';
+import type { AiCoachContextDescriptor } from '../../../../src/features/ai/aiCoachContext';
 import { api } from '../../../../src/shared/api/client';
 import { NavigationProvider } from '../../../../src/shared/navigation/router';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
@@ -126,7 +128,10 @@ const conversation = (
   messages,
 });
 
-function renderExperience(experienceStatus: AiCoachStatus = status) {
+function renderExperience(
+  experienceStatus: AiCoachStatus = status,
+  context?: AiCoachContextDescriptor,
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -134,7 +139,7 @@ function renderExperience(experienceStatus: AiCoachStatus = status) {
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
         <NavigationProvider>
-          <AiCoachExperience entryPoint="profile" status={experienceStatus} />
+          <AiCoachExperience context={context} entryPoint="profile" status={experienceStatus} />
         </NavigationProvider>
       </FeedbackProvider>
     </QueryClientProvider>,
@@ -212,6 +217,69 @@ describe('AiCoachExperience', () => {
     expect(screen.queryByText('Публичная помощь')).not.toBeInTheDocument();
     expect(screen.queryByText('Моя сводка')).not.toBeInTheDocument();
     expect(screen.queryByText(/report_version|prompt_version|debug/i)).not.toBeInTheDocument();
+  });
+
+  it('sends a bounded context descriptor and renders its high-level attachment', async () => {
+    let sentBody: { message: string; context?: { surface: string; resource_id?: number } } | null =
+      null;
+    let messages: AiCoachConversationMessage[] = [];
+    apiMock.mockImplementation(async (path, options) => {
+      if (path === '/api/v1/ai-coach/quota') return quotaSnapshot();
+      if (path === '/api/v1/ai-coach/conversations' && options?.method === 'POST') {
+        return conversation(1);
+      }
+      if (path === '/api/v1/ai-coach/conversations') {
+        return {
+          items: messages.length ? [{ ...conversation(1, messages), message_count: 2 }] : [],
+        };
+      }
+      if (path === '/api/v1/ai-coach/memory') return memoryResponse();
+      if (path === '/api/v1/ai-coach/consent') return consentResponse();
+      if (path === '/api/v1/ai-coach/conversations/1/messages') {
+        const body = options?.body as {
+          message: string;
+          context?: { surface: string; resource_id?: number };
+        };
+        sentBody = body;
+        messages = [
+          chatMessage(1, 'user', body.message),
+          chatMessage(2, 'assistant', 'Ответ с выбранным контекстом.'),
+        ];
+        return {
+          conversation_id: 1,
+          user_message: messages[0],
+          assistant_message: messages[1],
+          outcome: 'answer',
+          data_class: 'personalized',
+          answer: 'Ответ с выбранным контекстом.',
+          citations: [],
+          limitations: [],
+          safety_category: 'clear',
+          failure_category: null,
+          prompt_version: 'ai-coach-chat-v1',
+          request_id: 'request-1',
+          quota: quotaSnapshot(),
+          context: { surface: 'workout', label: 'Эта тренировка' },
+        };
+      }
+      if (path === '/api/v1/ai-coach/conversations/1') return conversation(1, messages);
+      throw new Error(`unexpected path ${path} ${options?.method ?? 'GET'}`);
+    });
+    renderExperience(status, { surface: 'workout', resourceId: 42 });
+
+    const input = await screen.findByRole('textbox', { name: 'Сообщение AI Coach' });
+    expect(input).toHaveFocus();
+    expect(screen.getByTestId('ai-coach-context-attachment')).toHaveTextContent('Эта тренировка');
+    fireEvent.change(input, { target: { value: 'Разбери эту тренировку' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Отправить' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('Ответ с выбранным контекстом.')).toBeInTheDocument(),
+    );
+    expect(sentBody).toEqual({
+      message: 'Разбери эту тренировку',
+      context: { surface: 'workout', resource_id: 42 },
+    });
   });
 
   it('keeps history actions secondary and uses the stored conversation title', async () => {
@@ -771,6 +839,20 @@ describe('AiCoachExperience', () => {
     ).not.toBeNull();
     expect(screen.getByText('Помощник по тренировкам, питанию и прогрессу')).toBeInTheDocument();
     expect(screen.getByTestId('ai-coach-entry-quota')).toHaveTextContent('20 из 20 запросов');
+    expect(screen.getByTestId('ai-coach-profile-link')).toHaveAttribute(
+      'href',
+      '/app?section=profile#profile-ai-coach',
+    );
+    expect(
+      screen.getByTestId('ai-coach-profile-link').querySelector('[data-icon="ai-coach"]'),
+    ).not.toBeNull();
+    expect(
+      screen
+        .getByTestId('ai-coach-profile-link')
+        .querySelector('.disclosure-icon [data-icon="disclosure-closed"]'),
+    ).not.toBeNull();
+    expect(screen.queryByText('Открыть AI Coach')).not.toBeInTheDocument();
+    expect(screen.getByText('Помощник по тренировкам, питанию и прогрессу').tagName).toBe('SPAN');
     expect(screen.queryByTestId('ai-coach-experience')).not.toBeInTheDocument();
     expect(
       screen.queryByText(/внутренняя beta|внутренняя проверка|report_version/i),
@@ -782,7 +864,7 @@ describe('AiCoachExperience', () => {
     window.localStorage.removeItem(AI_COACH_WORKSPACE_LAYOUT_KEY);
     renderWorkspace({ ...status, personal_available: true });
 
-    fireEvent.click(await screen.findByRole('link', { name: 'Открыть AI Coach' }));
+    fireEvent.click(await screen.findByTestId('ai-coach-profile-link'));
     const workspace = await screen.findByTestId('ai-coach-workspace');
     expect(screen.getAllByTestId('ai-coach-workspace')).toHaveLength(1);
     expect(workspace).toHaveClass('ai-coach-workspace--desktop');
@@ -820,5 +902,70 @@ describe('AiCoachExperience', () => {
     expect(layout.height).toBeLessThanOrEqual(800);
     expect(layout.x).toBeGreaterThanOrEqual(16);
     expect(layout.y).toBeLessThanOrEqual(796);
+  });
+
+  it.each([
+    ['top', 0, -40, 500, 60, 420, 640],
+    ['right', 40, 0, 500, 100, 460, 600],
+    ['bottom', 0, 40, 500, 100, 420, 640],
+    ['left', -40, 0, 460, 100, 460, 600],
+    ['top-left', -40, -40, 460, 60, 460, 640],
+    ['top-right', 40, -40, 500, 60, 460, 640],
+    ['bottom-left', -40, 40, 460, 100, 460, 640],
+    ['bottom-right', 40, 40, 500, 100, 460, 640],
+  ] as const)(
+    'resizes from the %s edge without moving the opposite anchor',
+    (direction, deltaX, deltaY, x, y, width, height) => {
+      const layout = resizeAiCoachWorkspaceLayout(
+        { height: 600, minimized: false, width: 420, x: 500, y: 100 },
+        direction,
+        deltaX,
+        deltaY,
+        { width: 1280, height: 900 },
+      );
+
+      expect(layout).toMatchObject({ height, width, x, y });
+    },
+  );
+
+  it('clamps every resize direction to viewport edges, minimums, maximums and the reserved bottom area', () => {
+    const viewport = { width: 1280, height: 900 };
+    const start = { height: 600, minimized: false, width: 420, x: 500, y: 100 };
+
+    for (const direction of [
+      'top',
+      'right',
+      'bottom',
+      'left',
+      'top-left',
+      'top-right',
+      'bottom-left',
+      'bottom-right',
+    ] as const) {
+      const layout = resizeAiCoachWorkspaceLayout(
+        start,
+        direction,
+        direction.includes('left') ? -10_000 : 10_000,
+        direction.includes('top') ? -10_000 : 10_000,
+        viewport,
+      );
+      expect(layout.width).toBeGreaterThanOrEqual(360);
+      expect(layout.width).toBeLessThanOrEqual(560);
+      expect(layout.height).toBeGreaterThanOrEqual(480);
+      expect(layout.height).toBeLessThanOrEqual(800);
+      expect(layout.x).toBeGreaterThanOrEqual(16);
+      expect(layout.y).toBeGreaterThanOrEqual(16);
+      expect(layout.x + layout.width).toBeLessThanOrEqual(viewport.width - 16);
+      expect(layout.y + layout.height).toBeLessThanOrEqual(viewport.height - 88);
+    }
+  });
+
+  it('shrinks the desktop workspace when the viewport height must preserve the FAB reserve', () => {
+    const viewport = { width: 1280, height: 720 };
+    const layout = clampAiCoachWorkspaceLayout({}, viewport);
+
+    expect(layout.height).toBe(600);
+    expect(layout.y).toBe(32);
+    expect(layout.y + layout.height).toBeLessThanOrEqual(viewport.height - 88);
   });
 });

@@ -9,6 +9,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 
 export const workoutCompletionFeedbackLabels: Record<string, string> = {
   easier_than_expected: 'Легче ожидаемого',
@@ -132,6 +133,11 @@ export function WorkoutCompletionSummary({
           <p>{workout.title}</p>
         </div>
       </header>
+      <AiCoachContextualEntry
+        actionLabel="Разобрать с AI Coach"
+        context={{ surface: 'workout', resourceId: workout.id }}
+        entryPoint="workout"
+      />
 
       <dl className="workout-completion__facts" aria-label="Ключевые факты тренировки">
         <div>

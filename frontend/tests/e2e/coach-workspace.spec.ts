@@ -580,9 +580,12 @@ test('mobile использует список и отдельный конте�
   await expect(page.getByRole('button', { name: 'К списку клиентов' })).toBeVisible();
   await expect(page.getByRole('tablist', { name: 'Разделы тренера' })).toBeHidden();
   const headerBox = await page.locator('.coach-workspace-header').boundingBox();
-  const dashboardEyebrowBox = await page.locator('.coach-dashboard .eyebrow').boundingBox();
+  const attentionEyebrowBox = await page
+    .locator('.coach-attention-center .eyebrow')
+    .first()
+    .boundingBox();
   expect(
-    (dashboardEyebrowBox?.y ?? 0) - ((headerBox?.y ?? 0) + (headerBox?.height ?? 0)),
+    (attentionEyebrowBox?.y ?? 0) - ((headerBox?.y ?? 0) + (headerBox?.height ?? 0)),
   ).toBeLessThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 

@@ -5,6 +5,7 @@ import pytest
 
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.user import User
+from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
 from fitminiapp_api.schemas.feedback import WorkoutCommentResponse
 from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse
 from fitminiapp_api.schemas.hydration import HydrationDayResponse, HydrationEntryResponse
@@ -388,6 +389,10 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
         ClientResponse.model_validate(item)
     for item in _transport(client, trainer_token, "/api/v1/coach/assigned-programs").json():
         CoachAssignedProgramResponse.model_validate(item)
+    attention = CoachAttentionResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/attention").json()
+    )
+    assert attention.items == []
     timeline = _transport(client, trainer_token, "/api/v1/coach/clients/51002/workouts?limit=30")
     WorkoutTimelineItem.model_validate(timeline.json()[0])
     comment = _transport(

@@ -3374,6 +3374,13 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 }
 
+@media (max-width: 360px) and (max-height: 640px) {
+  /* Оставляем справа безопасную зону для глобального FAB на коротких экранах. */
+  .today-dashboard--design-v2 .today-workout-actions .today-pulse-action {
+    width: calc(100% - 60px);
+  }
+}
+
 /* Task 111: one period contract and compact factual progress bento. */
 .app-section--progress .progress-experience--bento {
   gap: var(--v2-space-5);
@@ -8785,6 +8792,101 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   text-align: right;
 }
 
+.coach-attention-center {
+  display: grid;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-left: 3px solid var(--v2-lime);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.coach-attention-center__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+}
+
+.coach-attention-center__heading h2 {
+  margin: var(--v2-space-1) 0 0;
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+}
+
+.coach-attention-center__list {
+  display: grid;
+  gap: var(--v2-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coach-attention-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--v2-space-3);
+  padding-top: var(--v2-space-3);
+  border-top: 1px solid var(--v2-border);
+}
+
+.coach-attention-item__copy {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-1);
+}
+
+.coach-attention-item__copy strong,
+.coach-attention-item__copy p {
+  margin: 0;
+}
+
+.coach-attention-item__copy p {
+  color: var(--v2-text-secondary);
+}
+
+.coach-attention-item .button-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v2-space-1);
+  white-space: nowrap;
+}
+
+.coach-weekly-check-in {
+  display: grid;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-left: 3px solid var(--v2-lime);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.coach-weekly-check-in h3 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+
+.coach-weekly-check-in__content {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.coach-weekly-check-in__content > p {
+  margin: 0;
+}
+
+.coach-weekly-check-in__note {
+  padding: var(--v2-space-3);
+  border-left: 2px solid var(--v2-border-strong);
+  background: var(--v2-surface);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .coach-fact-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -9526,6 +9628,16 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     text-align: left;
   }
 
+  .coach-attention-item {
+    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .coach-attention-item .button-link {
+    justify-content: center;
+    width: 100%;
+  }
+
   .coach-zero-state {
     grid-template-columns: 1fr;
     padding: var(--v2-space-4);
@@ -9733,6 +9845,10 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .coach-summary-warning {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .coach-attention-center {
+    padding: var(--v2-space-3);
   }
 
   .coach-client-detail__header,

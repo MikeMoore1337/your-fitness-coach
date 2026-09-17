@@ -16,6 +16,7 @@ export const queryKeys = {
       ['workout', 'nutrition-report', subject, period, dateFrom ?? null, dateTo ?? null] as const,
   },
   trainer: {
+    attention: ['coach', 'attention'] as const,
     clients: ['coach', 'clients'] as const,
     clientAnalytics: (clientId: number) => ['coach', 'client', clientId, 'analytics'] as const,
     clientSummary: (clientId: number) => ['coach', 'client', clientId, 'summary'] as const,
