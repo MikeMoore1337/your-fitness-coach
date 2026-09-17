@@ -21,6 +21,21 @@ interface IngredientDraft {
   amount: string;
   unit: 'g' | 'serving';
   servingWeight: string | null;
+  nutritionPer100: NutritionPer100;
+}
+
+interface NutritionPer100 {
+  energy: number | null;
+  protein: number | null;
+  fat: number | null;
+  carbs: number | null;
+  fiber: number | null;
+}
+
+interface RecipePreview {
+  ingredientsWeight: number;
+  total: NutritionPer100;
+  per100: NutritionPer100;
 }
 
 function numberLabel(value: string | null, digits = 0): string {
@@ -36,6 +51,32 @@ function ingredientFromFood(food: Food): IngredientDraft {
     amount: food.standard_serving_weight_g ? '1' : '100',
     unit: food.standard_serving_weight_g ? 'serving' : 'g',
     servingWeight: food.standard_serving_weight_g,
+    nutritionPer100: {
+      energy: food.energy_kcal_per_100g === null ? null : Number(food.energy_kcal_per_100g),
+      protein: food.protein_g_per_100g === null ? null : Number(food.protein_g_per_100g),
+      fat: food.fat_g_per_100g === null ? null : Number(food.fat_g_per_100g),
+      carbs: food.carbs_g_per_100g === null ? null : Number(food.carbs_g_per_100g),
+      fiber: food.fiber_g_per_100g === null ? null : Number(food.fiber_g_per_100g),
+    },
+  };
+}
+
+function ingredientNutritionPer100(
+  nutrition: Recipe['ingredients'][number]['nutrition'],
+  weight: string,
+): NutritionPer100 {
+  const weightNumber = Number(weight);
+  if (!Number.isFinite(weightNumber) || weightNumber <= 0) {
+    return { energy: null, protein: null, fat: null, carbs: null, fiber: null };
+  }
+  const per100 = (value: string | null): number | null =>
+    value === null ? null : (Number(value) * 100) / weightNumber;
+  return {
+    energy: per100(nutrition.energy_kcal),
+    protein: per100(nutrition.protein_g),
+    fat: per100(nutrition.fat_g),
+    carbs: per100(nutrition.carbs_g),
+    fiber: per100(nutrition.fiber_g),
   };
 }
 
@@ -51,10 +92,63 @@ function ingredientsFromRecipe(recipe?: Recipe): IngredientDraft[] {
             amount: ingredient.amount,
             unit: ingredient.amount_unit,
             servingWeight: ingredient.serving_weight_g,
+            nutritionPer100: ingredientNutritionPer100(ingredient.nutrition, ingredient.weight_g),
           },
         ]
       : [],
   );
+}
+
+function sumNutritionValue(
+  current: number | null,
+  value: number | null,
+  factor: number,
+): number | null {
+  if (current === null || value === null) return null;
+  return current + value * factor;
+}
+
+function buildRecipePreview(ingredients: IngredientDraft[], finalWeight: string): RecipePreview {
+  const total: NutritionPer100 = { energy: 0, protein: 0, fat: 0, carbs: 0, fiber: 0 };
+  let ingredientsWeight = 0;
+  for (const ingredient of ingredients) {
+    const amount = Number(ingredient.amount.replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const weight =
+      ingredient.unit === 'serving' ? amount * Number(ingredient.servingWeight || 0) : amount;
+    if (!Number.isFinite(weight) || weight <= 0) continue;
+    ingredientsWeight += weight;
+    const factor = weight / 100;
+    total.energy = sumNutritionValue(total.energy, ingredient.nutritionPer100.energy, factor);
+    total.protein = sumNutritionValue(total.protein, ingredient.nutritionPer100.protein, factor);
+    total.fat = sumNutritionValue(total.fat, ingredient.nutritionPer100.fat, factor);
+    total.carbs = sumNutritionValue(total.carbs, ingredient.nutritionPer100.carbs, factor);
+    total.fiber = sumNutritionValue(total.fiber, ingredient.nutritionPer100.fiber, factor);
+  }
+  const parsedFinalWeight = finalWeight.trim() ? Number(finalWeight.replace(',', '.')) : null;
+  const effectiveWeight =
+    parsedFinalWeight !== null && Number.isFinite(parsedFinalWeight) && parsedFinalWeight > 0
+      ? parsedFinalWeight
+      : ingredientsWeight;
+  const toPer100 = (value: number | null): number | null =>
+    value === null || effectiveWeight <= 0 ? null : (value * 100) / effectiveWeight;
+  return {
+    ingredientsWeight,
+    total,
+    per100: {
+      energy: toPer100(total.energy),
+      protein: toPer100(total.protein),
+      fat: toPer100(total.fat),
+      carbs: toPer100(total.carbs),
+      fiber: toPer100(total.fiber),
+    },
+  };
+}
+
+function previewNumber(value: number | null): string {
+  return value === null || !Number.isFinite(value)
+    ? '—'
+    : new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(value);
 }
 
 function RecipeEditor({
@@ -118,17 +212,9 @@ function RecipeEditor({
       current.map((item) => (item.foodId === foodId ? { ...item, ...patch } : item)),
     );
   };
-  const ingredientsWeight = useMemo(
-    () =>
-      ingredients.reduce((sum, ingredient) => {
-        const amount = Number(ingredient.amount.replace(',', '.'));
-        if (!Number.isFinite(amount)) return sum;
-        return (
-          sum +
-          (ingredient.unit === 'serving' ? amount * Number(ingredient.servingWeight || 0) : amount)
-        );
-      }, 0),
-    [ingredients],
+  const preview = useMemo(
+    () => buildRecipePreview(ingredients, finalWeight),
+    [finalWeight, ingredients],
   );
 
   return (
@@ -286,8 +372,35 @@ function RecipeEditor({
           <p className="nutrition-picker__empty">В составе пока нет продуктов.</p>
         )}
       </div>
+      <div
+        className="nutrition-recipe-editor__preview"
+        aria-label="Предпросмотр питательности рецепта"
+      >
+        <div className="nutrition-recipe-editor__preview-heading">
+          <strong>Предпросмотр</strong>
+          <span>Расчёт обновляется при изменении состава и веса.</span>
+        </div>
+        <div className="nutrition-recipe-editor__preview-grid">
+          <div>
+            <span>Итого</span>
+            <strong>{previewNumber(preview.total.energy)} ккал</strong>
+            <small>
+              Б {previewNumber(preview.total.protein)} · Ж {previewNumber(preview.total.fat)} · У{' '}
+              {previewNumber(preview.total.carbs)}
+            </small>
+          </div>
+          <div>
+            <span>На 100 г готового блюда</span>
+            <strong>{previewNumber(preview.per100.energy)} ккал</strong>
+            <small>
+              Б {previewNumber(preview.per100.protein)} · Ж {previewNumber(preview.per100.fat)} · У{' '}
+              {previewNumber(preview.per100.carbs)}
+            </small>
+          </div>
+        </div>
+      </div>
       <p className="nutrition-recipe-editor__weight">
-        Вес ингредиентов: <strong>{numberLabel(String(ingredientsWeight), 1)} г</strong>
+        Вес ингредиентов: <strong>{numberLabel(String(preview.ingredientsWeight), 1)} г</strong>
         {finalWeight && Number(finalWeight) > 0
           ? ` · готовое блюдо: ${numberLabel(finalWeight, 1)} г`
           : ''}

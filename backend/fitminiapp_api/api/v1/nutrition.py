@@ -61,6 +61,21 @@ from fitminiapp_api.schemas.nutrition_label import (
     NutritionLabelConfirmResponse,
     NutritionLabelDraftResponse,
 )
+from fitminiapp_api.schemas.nutrition_power import (
+    FoodDiaryBatchResponse,
+    FoodSearchAliasCreate,
+    FoodSearchAliasListResponse,
+    FoodSearchAliasResponse,
+    FoodSearchAliasUpdate,
+    NaturalInputCommitRequest,
+    NaturalInputPreviewRequest,
+    NaturalInputPreviewResponse,
+    NutritionMealTemplateCreate,
+    NutritionMealTemplateInsertRequest,
+    NutritionMealTemplateListResponse,
+    NutritionMealTemplateResponse,
+    NutritionMealTemplateUpdate,
+)
 from fitminiapp_api.schemas.recipe import (
     RecipeCreate,
     RecipeListResponse,
@@ -137,6 +152,23 @@ from fitminiapp_api.services.nutrition_label import (
     create_label_draft,
     get_label_draft,
 )
+from fitminiapp_api.services.nutrition_power import (
+    NutritionPowerConflictError,
+    NutritionPowerError,
+    NutritionPowerNotFoundError,
+    commit_natural_input,
+    create_food_search_alias,
+    create_meal_template,
+    delete_food_search_alias,
+    delete_meal_template,
+    get_meal_template_response,
+    insert_meal_template,
+    list_food_search_aliases,
+    list_meal_templates,
+    preview_natural_input,
+    update_food_search_alias,
+    update_meal_template,
+)
 from fitminiapp_api.services.recipes import (
     RecipeError,
     RecipeNotFoundError,
@@ -169,6 +201,14 @@ def _raise_diary_http_error(exc: FoodDiaryError) -> None:
 def _raise_recipe_http_error(exc: RecipeError) -> None:
     if isinstance(exc, RecipeNotFoundError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _raise_nutrition_power_http_error(exc: NutritionPowerError) -> None:
+    if isinstance(exc, NutritionPowerNotFoundError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, NutritionPowerConflictError):
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
@@ -650,6 +690,140 @@ def remove_recipe(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post(
+    "/templates",
+    response_model=NutritionMealTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_nutrition_meal_template(
+    payload: NutritionMealTemplateCreate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return create_meal_template(db, current_user, payload)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+
+
+@router.get("/templates", response_model=NutritionMealTemplateListResponse)
+def get_nutrition_meal_templates(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return list_meal_templates(db, current_user, limit=limit, offset=offset)
+
+
+@router.get("/templates/{template_id}", response_model=NutritionMealTemplateResponse)
+def get_nutrition_meal_template(
+    template_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_meal_template_response(db, current_user, template_id)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+
+
+@router.patch("/templates/{template_id}", response_model=NutritionMealTemplateResponse)
+def patch_nutrition_meal_template(
+    template_id: int,
+    payload: NutritionMealTemplateUpdate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_meal_template(db, current_user, template_id, payload)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+
+
+@router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_nutrition_meal_template(
+    template_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        delete_meal_template(db, current_user, template_id)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/templates/{template_id}/entries",
+    response_model=FoodDiaryBatchResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_nutrition_meal_template(
+    template_id: int,
+    payload: NutritionMealTemplateInsertRequest,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return insert_meal_template(db, current_user, template_id, payload, idempotency_key)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.get("/food-aliases", response_model=FoodSearchAliasListResponse)
+def get_food_search_aliases(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return list_food_search_aliases(db, current_user)
+
+
+@router.post(
+    "/food-aliases",
+    response_model=FoodSearchAliasResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def save_food_search_alias(
+    payload: FoodSearchAliasCreate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return create_food_search_alias(db, current_user, payload)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+
+
+@router.patch("/food-aliases/{alias_id}", response_model=FoodSearchAliasResponse)
+def patch_food_search_alias(
+    alias_id: int,
+    payload: FoodSearchAliasUpdate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_food_search_alias(db, current_user, alias_id, payload)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+
+
+@router.delete("/food-aliases/{alias_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_food_search_alias(
+    alias_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        delete_food_search_alias(db, current_user, alias_id)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/diary", response_model=FoodDiaryDayResponse)
 def get_diary_day(
     diary_date: date | None = None,
@@ -658,6 +832,40 @@ def get_diary_day(
 ):
     try:
         return get_food_diary_day(db, current_user, diary_date)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
+    "/diary/natural-input/preview",
+    response_model=NaturalInputPreviewResponse,
+)
+def preview_nutrition_natural_input(
+    payload: NaturalInputPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_natural_input(db, current_user, payload.text)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
+
+
+@router.post(
+    "/diary/natural-input/commit",
+    response_model=FoodDiaryBatchResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def commit_nutrition_natural_input(
+    payload: NaturalInputCommitRequest,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return commit_natural_input(db, current_user, payload, idempotency_key)
+    except NutritionPowerError as exc:
+        _raise_nutrition_power_http_error(exc)
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
 

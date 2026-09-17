@@ -28,6 +28,7 @@ from fitminiapp_api.models.exercise import (
 from fitminiapp_api.models.feedback import WorkoutComment
 from fitminiapp_api.models.food import Food, FoodFavorite
 from fitminiapp_api.models.food_diary import (
+    FoodDiaryBatchOperation,
     FoodDiaryCopyOperation,
     FoodDiaryDayStatus,
     FoodDiaryEntry,
@@ -41,6 +42,10 @@ from fitminiapp_api.models.notification import (
 )
 from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
+from fitminiapp_api.models.nutrition_power import (
+    FoodSearchAlias,
+    NutritionMealTemplate,
+)
 from fitminiapp_api.models.program import (
     HiddenProgramTemplate,
     ProgramTemplate,
@@ -68,7 +73,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 14
+ACCOUNT_EXPORT_SCHEMA_VERSION = 15
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -93,9 +98,13 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "food_favorites": "food_favorites",
     "recipes": "recipes",
     "recipe_ingredients": "recipes",
+    "nutrition_meal_templates": "nutrition_meal_templates",
+    "nutrition_meal_template_items": "nutrition_meal_templates",
+    "food_search_aliases": "food_search_aliases",
     "food_diary_entries": "food_diary_entries",
     "food_diary_day_statuses": "food_diary_day_statuses",
     "food_diary_copy_operations": "food_diary_copy_operations",
+    "food_diary_batch_operations": "food_diary_batch_operations",
     "program_templates": "program_templates",
     "program_template_days": "program_templates",
     "program_template_exercises": "program_templates",
@@ -365,6 +374,29 @@ def _serialize_recipe_ingredient(ingredient: RecipeIngredient) -> dict[str, obje
         "amount_unit": ingredient.amount_unit,
         "weight_g": ingredient.weight_g,
         **_fields(ingredient, SNAPSHOT_NUTRIENT_FIELDS),
+    }
+
+
+def _serialize_meal_template(template: NutritionMealTemplate) -> dict[str, object]:
+    return {
+        "id": template.id,
+        "name": template.name,
+        "created_at": template.created_at,
+        "updated_at": template.updated_at,
+        "items": [
+            {
+                "id": item.id,
+                "position": item.position,
+                "item_kind": item.item_kind,
+                "food_id": item.food_id,
+                "recipe_id": item.recipe_id,
+                "amount": item.amount,
+                "amount_unit": item.amount_unit,
+                "source_name": item.source_name,
+                "source_brand": item.source_brand,
+            }
+            for item in template.items
+        ],
     }
 
 
@@ -685,6 +717,19 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(Recipe.created_at.asc(), Recipe.id.asc())
         .all()
     )
+    meal_templates = (
+        db.query(NutritionMealTemplate)
+        .options(selectinload(NutritionMealTemplate.items))
+        .filter(NutritionMealTemplate.owner_user_id == user.id)
+        .order_by(NutritionMealTemplate.created_at.asc(), NutritionMealTemplate.id.asc())
+        .all()
+    )
+    food_search_aliases = (
+        db.query(FoodSearchAlias)
+        .filter(FoodSearchAlias.user_id == user.id)
+        .order_by(FoodSearchAlias.created_at.asc(), FoodSearchAlias.id.asc())
+        .all()
+    )
     diary_entries = (
         db.query(FoodDiaryEntry)
         .filter(FoodDiaryEntry.user_id == user.id)
@@ -701,6 +746,12 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         db.query(FoodDiaryCopyOperation)
         .filter(FoodDiaryCopyOperation.user_id == user.id)
         .order_by(FoodDiaryCopyOperation.created_at.asc(), FoodDiaryCopyOperation.id.asc())
+        .all()
+    )
+    diary_batch_operations = (
+        db.query(FoodDiaryBatchOperation)
+        .filter(FoodDiaryBatchOperation.user_id == user.id)
+        .order_by(FoodDiaryBatchOperation.created_at.asc(), FoodDiaryBatchOperation.id.asc())
         .all()
     )
     program_templates = (
@@ -1079,6 +1130,14 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             }
             for recipe in recipes
         ],
+        "nutrition_meal_templates": [_serialize_meal_template(row) for row in meal_templates],
+        "food_search_aliases": [
+            _fields(
+                row,
+                ("id", "alias", "normalized_alias", "food_id", "created_at", "updated_at"),
+            )
+            for row in food_search_aliases
+        ],
         "food_diary_entries": [
             {
                 **_fields(
@@ -1088,6 +1147,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                         "food_id",
                         "recipe_id",
                         "copy_operation_id",
+                        "batch_operation_id",
                         "copied_from_entry_id",
                         "diary_date",
                         "meal_type",
@@ -1126,6 +1186,13 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ),
             )
             for row in diary_copy_operations
+        ],
+        "food_diary_batch_operations": [
+            _fields(
+                row,
+                ("id", "operation_kind", "template_id", "diary_date", "meal_type", "created_at"),
+            )
+            for row in diary_batch_operations
         ],
         "program_templates": [_serialize_program_template(row) for row in program_templates],
         "hidden_program_templates": [

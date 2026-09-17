@@ -382,6 +382,42 @@ describe('product event contract', () => {
     ).toBe(false);
   });
 
+  it('allows only aggregate nutrition power outcomes and duration buckets', () => {
+    expect(
+      isProductEvent({
+        name: 'nutrition_power_flow_completed',
+        surface: 'mobile_web',
+        flow: 'natural_input',
+        outcome: 'success',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_power_flow_timing',
+        surface: 'tma',
+        flow: 'meal_template',
+        duration_bucket: '10_30s',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'nutrition_power_flow_completed',
+        surface: 'mobile_web',
+        flow: 'natural_input',
+        outcome: 'success',
+        input_text: 'творог 180 г',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'nutrition_power_flow_timing',
+        surface: 'mobile_web',
+        flow: 'natural_input',
+        duration_bucket: '180_seconds',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
   it('measures first useful action once after onboarding without storing content', () => {
     const events: ProductEventEnvelope[] = [];
     const listener = (event: Event) => {

@@ -28,6 +28,7 @@ from fitminiapp_api.models.exercise import (
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.food import Food, FoodFavorite
 from fitminiapp_api.models.food_diary import (
+    FoodDiaryBatchOperation,
     FoodDiaryCopyOperation,
     FoodDiaryDayStatus,
     FoodDiaryEntry,
@@ -59,6 +60,11 @@ from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
 from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
     NutritionLabelDraft,
+)
+from fitminiapp_api.models.nutrition_power import (
+    FoodSearchAlias,
+    NutritionMealTemplate,
+    NutritionMealTemplateItem,
 )
 from fitminiapp_api.models.oauth_transaction import OAuthTransaction
 from fitminiapp_api.models.program import (
@@ -128,10 +134,12 @@ __all__ = [
     "ExerciseMuscle",
     "FirstTouchAttribution",
     "Food",
+    "FoodDiaryBatchOperation",
     "FoodDiaryCopyOperation",
     "FoodDiaryDayStatus",
     "FoodDiaryEntry",
     "FoodFavorite",
+    "FoodSearchAlias",
     "HermesWebArticleSubmission",
     "HiddenProgramTemplate",
     "HydrationEntry",
@@ -154,6 +162,8 @@ __all__ = [
     "NotificationSetting",
     "NutritionCatalogContribution",
     "NutritionLabelDraft",
+    "NutritionMealTemplate",
+    "NutritionMealTemplateItem",
     "NutritionTarget",
     "OAuthTransaction",
     "Payment",
