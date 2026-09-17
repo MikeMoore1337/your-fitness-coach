@@ -2533,7 +2533,14 @@ test('поля профиля и питания выровнены на деск
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await openAppDestination(page, 'Питание');
-  await openCard(page, 'КБЖУ');
+  const nutritionSettings = page.locator('details.nutrition-target-settings');
+  await expect(nutritionSettings).toHaveCount(1);
+  await nutritionSettings.locator(':scope > summary').click();
+  await expect(nutritionSettings).toHaveAttribute('open', '');
+  const nutritionTargetCard = nutritionSettings.locator('details.card-disclosure');
+  await expect(nutritionTargetCard).toHaveCount(1);
+  await nutritionTargetCard.locator(':scope > summary').click();
+  await expect(nutritionTargetCard).toHaveAttribute('open', '');
   const nutritionControlTops = await page
     .locator('.nutrition-form-grid')
     .first()

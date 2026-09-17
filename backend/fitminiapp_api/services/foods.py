@@ -758,7 +758,7 @@ def list_frequent_foods(
     total = filtered.count()
     rows = (
         filtered.order_by(
-            frequency.c.entry_count.desc(),
+            frequency.c.entry_count.desc().nulls_last(),
             recent.c.last_used_diary_date.desc(),
             recent.c.last_used_diary_time.desc().nulls_last(),
             recent.c.last_used_at.desc(),
@@ -918,7 +918,7 @@ def search_foods(
     rows = (
         filtered.order_by(
             priority_rank.asc(),
-            frequency.c.entry_count.desc(),
+            frequency.c.entry_count.desc().nulls_last(),
             recent.c.last_used_diary_date.desc(),
             recent.c.last_used_diary_time.desc().nulls_last(),
             recent.c.last_used_at.desc(),
