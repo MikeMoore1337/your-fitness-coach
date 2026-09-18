@@ -75,37 +75,60 @@ truth and never part of the application runtime.
   automatic graph rebuilds for every task. Graphify findings must not expand the current task scope.
 - Installation and usage details live in `docs/graphify-development.md`.
 
-# Working principles
+# Implementation minimalism
 
-- Inspect the existing implementation, relevant tests and documentation before changing it.
-- Make the smallest complete change that solves the actual problem.
-- Preserve public behavior unless a behavioral change is intentional.
-- Reuse existing components, utilities, dependencies, patterns and abstractions first.
-- Do not add a dependency when the current stack can reasonably solve the problem.
-- Do not perform unrelated refactoring in a focused task.
-- Do not leave dead code, debug logging, temporary compatibility hacks, commented-out
-  implementations or unfinished TODOs created by the task.
-- Do not hide failures by weakening validation, types, tests, linting or other tooling.
+Understand the task and trace the real affected flow before choosing a solution. Before adding new
+code, stop at the first option that fully satisfies the task:
+
+1. reuse an existing YFC component/helper/service/pattern;
+2. use the Python/JS standard library or a native browser/platform/database capability;
+3. use an already-installed dependency;
+4. write the smallest complete new implementation.
+
+For bug fixes, prefer the shared root-cause fix after checking relevant callers rather than patching
+only the reported symptom. Do not add speculative abstractions, dependencies, infrastructure,
+compatibility layers or unrelated refactors. Preserve public behavior unless the task intentionally
+changes it.
+
+Minimalism never justifies removing required validation, authorization, error handling, security,
+accessibility, typing or tests. Do not hide failures by weakening checks. Do not leave task-created
+dead code, debug logging, commented-out implementations or unfinished TODOs.
 
 Never use skipped/deleted tests, broad `# noqa`, unnecessary `type: ignore`, `@ts-ignore`,
 `@ts-nocheck`, ESLint disables, empty/swallowed exceptions, arbitrary sleeps, or `Any`/`any`
-merely to make checks pass. If an exception is genuinely required, keep it narrow and explain
-why where appropriate.
+merely to make checks pass. If an exception is genuinely required, keep it narrow and explain why.
+
+# Ponytail anti-overengineering layer
+
+Ponytail is optional host-side Codex tooling, not a YFC dependency or source of truth. Agent Flow
+records a per-task Ponytail mode and `run_task_delivery.py` passes it through
+`PONYTAIL_DEFAULT_MODE`. If a compatible Ponytail plugin is installed in the Codex host, its
+SessionStart hook may consume that variable. If the plugin is absent, use the YFC minimalism ladder
+above directly and continue normally.
+
+- ordinary implementation defaults to `full`;
+- cross-cutting/architecture/security/deployment implementation defaults to `lite`;
+- tasks without an implementation pass use `off`;
+- `ultra` is never inferred automatically;
+- an explicit task field `Ponytail: off|lite|full|ultra` (or `Ponytail mode:`) overrides inference;
+- never auto-install Ponytail, run `@ponytail-review`/audit/debt, or create an extra LLM review loop;
+- Ponytail cannot override task scope, YFC lifecycle, Agent Flow, Graphify, deterministic CI or
+  security/legal/human gates.
+
+Compatibility guidance is documented in `docs/ponytail-development.md`.
 
 # Architecture and scope
 
 - Keep business rules out of transport and presentation layers where practical.
 - Enforce authorization and critical validation on trusted server-side boundaries.
-- Avoid duplicate sources of truth and unclear ownership of state.
-- Prefer explicit data flow and clear module/component responsibilities.
-- Do not introduce microservices, queues, Redis, Kubernetes, CQRS, Event Sourcing or similar
-  infrastructure without a concrete requirement.
-- Prefer improving the current modular architecture over replacing it with a more complex one.
-- Do not rewrite a working subsystem solely to adopt newer technology.
+- Avoid duplicate sources of truth; prefer explicit data flow and clear ownership.
+- Improve the current modular architecture before considering new infrastructure. Do not introduce
+  microservices, queues, Redis, Kubernetes, CQRS, Event Sourcing or similar systems without a
+  concrete task requirement, and do not rewrite a working subsystem merely to adopt newer technology.
 
-For cross-cutting changes, identify all affected surfaces before implementation: backend,
-frontend, Telegram Mini App, bot, database, generated API types, tests,
-deployment/configuration and documentation.
+For cross-cutting changes, identify all affected surfaces before implementation: backend, frontend,
+Telegram Mini App, bot, database, generated API types, tests, deployment/configuration and
+documentation.
 
 For ordinary feature/fix work, reuse the current shared frontend `WeekStrip` for user-facing
 seven-day week contexts instead of creating page-local duplicates. This is a current production

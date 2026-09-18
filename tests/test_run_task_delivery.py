@@ -93,6 +93,38 @@ def test_worker_launch_passes_active_delivery_artifacts_to_child(
         assert callable(observed["kwargs"]["preexec_fn"])
 
 
+def test_worker_launch_sets_ponytail_mode_from_agent_flow(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    worktree = tmp_path / "worktree"
+    artifacts = tmp_path / "artifacts"
+    worktree.mkdir()
+    artifacts.mkdir()
+    observed: dict[str, Any] = {}
+
+    monkeypatch.setenv("PONYTAIL_DEFAULT_MODE", "ultra")
+    monkeypatch.setattr(delivery.shutil, "which", lambda name: "codex")
+    monkeypatch.setattr(delivery, "_worker_prompt", lambda *args, **kwargs: "prompt")
+    monkeypatch.setattr(delivery, "_reconcile_worker_state", lambda path: None)
+
+    def fake_run(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["env"] = kwargs["env"]
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(delivery.subprocess, "run", fake_run)
+
+    assert (
+        delivery._launch_worker(
+            "357",
+            {"lease": {"worktree": str(worktree)}},
+            artifacts,
+            agent_flow={"ponytail": {"mode": "lite"}},
+        )
+        == 0
+    )
+    assert observed["env"]["PONYTAIL_DEFAULT_MODE"] == "lite"
+
+
 class _FakeSupervisedWorker:
     pid = 700
 

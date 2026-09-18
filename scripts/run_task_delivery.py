@@ -2107,6 +2107,12 @@ def _launch_worker(
     worker_state_path = (worker_state_path or artifacts / "worker-state.json").resolve()
     worker_env = os.environ.copy()
     worker_env[ACTIVE_DELIVERY_ARTIFACTS_ENV] = str(artifacts.resolve())
+    if agent_flow is not None:
+        ponytail = agent_flow.get("ponytail")
+        if isinstance(ponytail, Mapping):
+            mode = ponytail.get("mode")
+            if isinstance(mode, str) and mode in {"off", "lite", "full", "ultra"}:
+                worker_env["PONYTAIL_DEFAULT_MODE"] = mode
     parent_identity = _current_process_instance_identity()
     worker_command = [
         codex,

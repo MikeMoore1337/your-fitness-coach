@@ -22,6 +22,8 @@ Change a small Python helper with targeted tests.
     assert [item["name"] for item in plan["worker_role_passes"]] == ["implementer"]
     assert plan["routing"]["source"] == "explicit-task-contract"
     assert plan["graphify"]["bootstrap_required"] is False
+    assert plan["ponytail"]["mode"] == "full"
+    assert plan["ponytail"]["source"] == "deterministic-inference"
     assert plan["execution"]["single_production_writer"] is True
     assert plan["controller_managed_roles"][0]["name"] == "integration-release"
 
@@ -40,6 +42,7 @@ Assess wearable platform feasibility and document evidence. Do not implement pro
 
     assert [item["name"] for item in plan["worker_role_passes"]] == ["researcher"]
     assert plan["execution"]["production_writer"] is None
+    assert plan["ponytail"]["mode"] == "off"
     assert plan["execution"]["spawn_extra_codex_processes"] is False
 
 
@@ -63,6 +66,7 @@ React frontend, and a PostgreSQL/Alembic migration.
     assert plan["routing"]["cross_cutting"] is True
     assert plan["routing"]["detected_surfaces"] == ["backend", "frontend", "database"]
     assert plan["graphify"]["bootstrap_required"] is True
+    assert plan["ponytail"]["mode"] == "lite"
 
 
 def test_explicit_roles_override_inferred_orchestrator_and_qa() -> None:
@@ -145,6 +149,70 @@ Change a helper. Private note: {secret_marker}
     assert len(plan["task_fingerprint_sha256"]) == 64
 
 
+def test_explicit_ponytail_ultra_override_is_respected() -> None:
+    plan = build_agent_flow(
+        "305",
+        """
+# Task
+
+- **Тип:** Feature
+- **Основная роль:** implementer
+- **Ponytail:** ultra
+
+Change one isolated helper.
+""",
+    )
+
+    assert plan["ponytail"]["mode"] == "ultra"
+    assert plan["ponytail"]["source"] == "explicit-task-field"
+
+
+def test_explicit_ponytail_off_override_is_respected() -> None:
+    plan = build_agent_flow(
+        "306",
+        """
+# Task
+
+- **Тип:** Feature
+- **Основная роль:** implementer
+- **Ponytail mode:** off
+
+Change one isolated helper.
+""",
+    )
+
+    assert plan["ponytail"]["mode"] == "off"
+    assert plan["ponytail"]["source"] == "explicit-task-field"
+
+
+def test_ultra_is_never_inferred() -> None:
+    ordinary = build_agent_flow(
+        "307",
+        """
+# Task
+
+- **Тип:** Feature
+
+Change a small Python helper.
+""",
+    )
+    cross_cutting = build_agent_flow(
+        "308",
+        """
+# Task
+
+- **Тип:** Feature
+
+Cross-cutting architecture change in FastAPI backend and React frontend.
+""",
+    )
+
+    assert ordinary["ponytail"]["mode"] == "full"
+    assert cross_cutting["ponytail"]["mode"] == "lite"
+    assert ordinary["ponytail"]["mode"] != "ultra"
+    assert cross_cutting["ponytail"]["mode"] != "ultra"
+
+
 def test_rendered_prompt_contains_bounded_contract_and_graphify_rule() -> None:
     plan = build_agent_flow(
         "304",
@@ -163,3 +231,6 @@ Cross-cutting architecture change in FastAPI backend and React frontend.
     assert '"bootstrap_required": true' in prompt
     assert "Only implementer may write production code" in prompt
     assert "Do not synthesize reviewer/security-review agents" in prompt
+    assert "never install it automatically" in prompt
+    assert "ponytail-review/audit loops" in prompt
+    assert "@ponytail-review" not in prompt
