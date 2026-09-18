@@ -276,7 +276,7 @@ function ProgressInsights({ summary }: { summary: ProgressSummary }) {
     good.push(`Кардио: ${cardio.completed_sessions} завершённых сессий`);
   }
   if (!good.length && adherence.overall_percent != null) {
-    good.push(`Общий adherence: ${formatNumber(adherence.overall_percent)}%`);
+    good.push(`Выполнение плана: ${formatNumber(adherence.overall_percent)}%`);
   }
 
   if (training.planned_workouts > training.completed_workouts) {
@@ -297,7 +297,7 @@ function ProgressInsights({ summary }: { summary: ProgressSummary }) {
   }
 
   return (
-    <section className="progress-insights" aria-label="Короткие выводы">
+    <>
       <div className="progress-insights__column progress-insights__column--good">
         <h3>Что идёт хорошо</h3>
         <ul>
@@ -315,10 +315,10 @@ function ProgressInsights({ summary }: { summary: ProgressSummary }) {
             .slice(0, 3)
             .map((item) => (
               <li key={item}>{item}</li>
-            ))}
+          ))}
         </ul>
       </div>
-    </section>
+    </>
   );
 }
 
@@ -333,7 +333,7 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
     { detail: 'Исходные записи', label: 'История', value: 'history' },
   ];
   return (
-    <nav className="progress-category-nav" aria-label="Разделы прогресса">
+    <nav className="progress-category-nav section-navigation" aria-label="Разделы прогресса">
       {categories.map((category) => (
         <AppLink
           aria-current={view === category.value ? 'page' : undefined}
@@ -343,6 +343,7 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
         >
           <strong>{category.label}</strong>
           <small>{category.detail}</small>
+          <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
         </AppLink>
       ))}
     </nav>
@@ -368,68 +369,77 @@ function SummaryOverview({ summary, search }: { search: string; summary: Progres
         </div>
         <Badge>{summary.period_days} дн.</Badge>
       </div>
-      <div className="progress-overview__metrics" aria-label="Ключевые показатели">
-        <ProgressMetricCard
-          detail={weight ? formatChange(weight.change, 'кг') : 'Мало данных'}
-          label="Тело"
-          to={progressViewPath(search, 'body')}
-          value={latestWeight}
-        />
-        <ProgressMetricCard
-          detail={`${formatNumber(summary.training.frequency_per_week, 1)} в неделю · ${summary.training.new_personal_records} PR`}
-          label="Тренировки"
-          to={progressViewPath(search, 'training')}
-          value={`${summary.training.completed_workouts} / ${summary.training.planned_workouts}`}
-        />
-        <ProgressMetricCard
-          detail={
-            summary.nutrition.visible
-              ? `${confirmedNutritionDays} подтверждённых дней · ${progressPercent(summary.adherence.protein)} белок`
-              : 'Недоступно для этой роли'
-          }
-          label="Питание"
-          to={progressViewPath(search, 'nutrition')}
-          value={
-            !summary.nutrition.visible
-              ? 'Недоступно'
-              : summary.nutrition.average_calories == null
-                ? 'Мало данных'
-                : `${formatNumber(summary.nutrition.average_calories, 0)} ккал`
-          }
-        />
-        <ProgressMetricCard
-          detail={`${formatNumber(summary.cardio.duration_minutes, 0)} мин · ${progressPercent(summary.adherence.cardio)}`}
-          label="Кардио"
-          to={progressViewPath(search, 'cardio')}
-          value={`${summary.cardio.completed_sessions} сессий`}
-        />
-      </div>
-      <ProgressTrendPanel summary={summary} />
-      <ProgressInsights summary={summary} />
-      <details className="progress-overview__adherence">
-        <summary>
-          <span>
-            <strong>Общий adherence</strong>
-            <small>
-              {summary.adherence.overall_percent == null ? (
-                'Мало данных'
-              ) : (
-                <>
-                  <strong>{formatNumber(summary.adherence.overall_percent)}%</strong> по доступным
-                  компонентам
-                </>
-              )}
-            </small>
-          </span>
-          <DisclosureIcon />
-        </summary>
-        <div>
-          <ComplianceRow label="Тренировки" component={summary.adherence.workouts} />
-          <ComplianceRow label="Калории" component={summary.adherence.calories} />
-          <ComplianceRow label="Белок" component={summary.adherence.protein} />
-          <ComplianceRow label="Кардио" component={summary.adherence.cardio} />
+      <div className="progress-overview__primary-grid">
+        <ProgressTrendPanel summary={summary} />
+        <div className="progress-overview__right-stack">
+          <div className="progress-overview__metrics" aria-label="Ключевые показатели">
+            <ProgressMetricCard
+              detail={weight ? formatChange(weight.change, 'кг') : 'Мало данных'}
+              label="Тело"
+              to={progressViewPath(search, 'body')}
+              value={latestWeight}
+            />
+            <ProgressMetricCard
+              detail={`${formatNumber(summary.training.frequency_per_week, 1)} в неделю · ${summary.training.new_personal_records} PR`}
+              label="Тренировки"
+              to={progressViewPath(search, 'training')}
+              value={`${summary.training.completed_workouts} / ${summary.training.planned_workouts}`}
+            />
+            <ProgressMetricCard
+              detail={
+                summary.nutrition.visible
+                  ? `${confirmedNutritionDays} подтверждённых дней · ${progressPercent(summary.adherence.protein)} белок`
+                  : 'Недоступно для этой роли'
+              }
+              label="Питание"
+              to={progressViewPath(search, 'nutrition')}
+              value={
+                !summary.nutrition.visible
+                  ? 'Недоступно'
+                  : summary.nutrition.average_calories == null
+                    ? 'Мало данных'
+                    : `${formatNumber(summary.nutrition.average_calories, 0)} ккал`
+              }
+            />
+            <ProgressMetricCard
+              detail={`${formatNumber(summary.cardio.duration_minutes, 0)} мин · ${progressPercent(summary.adherence.cardio)}`}
+              label="Кардио"
+              to={progressViewPath(search, 'cardio')}
+              value={`${summary.cardio.completed_sessions} сессий`}
+            />
+          </div>
+          <section
+            className="progress-insights progress-overview__analysis-row"
+            aria-label="Короткие выводы и выполнение плана"
+          >
+            <ProgressInsights summary={summary} />
+            <details className="progress-overview__adherence">
+              <summary>
+                <span>
+                  <strong>Выполнение плана</strong>
+                  <small>
+                    {summary.adherence.overall_percent == null ? (
+                      'Мало данных'
+                    ) : (
+                      <>
+                        <strong>{formatNumber(summary.adherence.overall_percent)}%</strong> по доступным
+                        компонентам
+                      </>
+                    )}
+                  </small>
+                </span>
+                <DisclosureIcon />
+              </summary>
+              <div>
+                <ComplianceRow label="Тренировки" component={summary.adherence.workouts} />
+                <ComplianceRow label="Калории" component={summary.adherence.calories} />
+                <ComplianceRow label="Белок" component={summary.adherence.protein} />
+                <ComplianceRow label="Кардио" component={summary.adherence.cardio} />
+              </div>
+            </details>
+          </section>
         </div>
-      </details>
+      </div>
     </section>
   );
 }
@@ -987,7 +997,8 @@ function ProgressPeriodControls({
   const [customDateTo, setCustomDateTo] = useState(initialRange.dateTo);
   const [customError, setCustomError] = useState('');
   const range = selectionDateRange(selection, today);
-  const selectedValue = selection.kind === 'custom' ? 'custom' : String(selection.days);
+  const selectedValue =
+    customOpen || selection.kind === 'custom' ? 'custom' : String(selection.days);
   const onTabChange = (value: string) => {
     if (value === 'custom') {
       const nextRange = selectionDateRange(selection, today);
@@ -1224,14 +1235,6 @@ export function ProgressExperience({
           )}
         </div>
       </header>
-      <AiCoachContextualEntry
-        context={{
-          surface: 'progress',
-          periodDays: selection.kind === 'preset' ? selection.days : 30,
-        }}
-        entryPoint="progress"
-      />
-
       {summary.isLoading ? (
         <LoadingState label="Собираем динамику за период…" />
       ) : summary.error ? (
@@ -1296,6 +1299,13 @@ export function ProgressExperience({
       ) : null}
 
       {summary.error && view === 'training' && <TrainingSection analytics={analytics} />}
+      <AiCoachContextualEntry
+        context={{
+          surface: 'progress',
+          periodDays: selection.kind === 'preset' ? selection.days : 30,
+        }}
+        entryPoint="progress"
+      />
     </div>
   );
 }

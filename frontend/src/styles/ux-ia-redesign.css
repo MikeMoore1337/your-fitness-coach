@@ -182,19 +182,9 @@
   white-space: nowrap;
 }
 
-.app-section--programs .ux-plan-management-link {
-  display: inline-flex;
-  min-height: 44px;
-  align-items: center;
-  padding: 10px 12px;
-  border: 1px solid var(--v2-border);
-  border-radius: var(--v2-control-radius);
-  width: fit-content;
-  margin-inline: auto;
-  color: var(--v2-text-primary);
-  font-weight: 800;
-  text-underline-offset: 4px;
-  text-decoration: none;
+.app-section--programs .demo-capability-fieldset {
+  display: grid;
+  gap: var(--v2-space-5);
 }
 
 .app-section--progress .ux-progress-category-nav {
@@ -831,5 +821,312 @@
   .app-quick-add-trigger,
   .app-quick-add-action {
     transition: none;
+  }
+}
+
+/* Shared section navigation keeps profile rows and progress tiles in one visual system. */
+.app-section--progress .progress-category-nav.section-navigation,
+.app-section--profile .profile-settings-nav.section-navigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-2);
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a,
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item {
+  display: grid;
+  min-width: 0;
+  min-height: 58px;
+  align-content: center;
+  gap: 2px 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
+  text-decoration: none;
+}
+
+.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item {
+  grid-template-columns: 20px minmax(0, 1fr) 16px;
+  grid-template-rows: auto auto;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item > .section-navigation__leading-icon {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a {
+  grid-template-columns: minmax(0, 1fr) 16px;
+  grid-template-rows: auto auto;
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a > strong,
+.app-section--progress .progress-category-nav.section-navigation > a > small {
+  grid-column: 1;
+}
+
+.app-section--progress .progress-category-nav.section-navigation
+  > a > .section-navigation__chevron,
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item > .section-navigation__chevron {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-self: end;
+  color: var(--v2-text-secondary);
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a > .section-navigation__chevron {
+  grid-column: 2;
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a > strong,
+.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item > span {
+  min-width: 0;
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a > small,
+.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item > small {
+  overflow: hidden;
+  color: var(--v2-text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a > strong,
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a:hover,
+.app-section--progress .progress-category-nav.section-navigation > a.is-active,
+.app-section--progress .progress-category-nav.section-navigation > a[aria-current='page'],
+.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item:hover,
+.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item.is-active,
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item[aria-current='location'] {
+  border-color: var(--v2-lime);
+  background: var(--v2-surface-strong);
+}
+
+.app-section--progress .progress-category-nav.section-navigation > a:focus-visible,
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item:focus-visible {
+  outline: 3px solid var(--v2-focus);
+  outline-offset: 3px;
+}
+
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item,
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item:nth-child(2n),
+.app-section--profile .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item:last-child {
+  border: 1px solid var(--v2-border);
+}
+
+@media (max-width: 899px) {
+  .app-section--progress .progress-category-nav.section-navigation,
+  .app-section--profile .profile-settings-nav.section-navigation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .app-section--progress .progress-category-nav.section-navigation,
+  .app-section--profile .profile-settings-nav.section-navigation {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .app-section--progress .progress-category-nav.section-navigation,
+  .app-section--profile .profile-settings-nav.section-navigation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .app-section--progress .progress-category-nav.section-navigation > a,
+  .app-section--profile .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item {
+    min-height: 56px;
+    padding: 7px 8px;
+    gap: 1px 6px;
+  }
+
+  .app-section--progress .progress-category-nav.section-navigation > a > small,
+  .app-section--profile .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item > small {
+    font-size: 0.68rem;
+  }
+}
+
+@media (min-width: 641px) {
+  .app-section--progress .progress-overview {
+    align-items: start;
+  }
+
+  .app-section--progress .progress-insights {
+    align-self: start;
+    align-items: start;
+  }
+}
+
+@media (max-width: 430px) {
+  .app-section--profile .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item > small {
+    display: none;
+  }
+
+  .app-section--profile .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item {
+    grid-template-rows: auto;
+  }
+}
+
+@media (min-width: 900px) {
+  .today-dashboard--design-v2 .today-nutrition__food-group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .today-dashboard--design-v2 .today-nutrition__food-group .today-summary-card__action {
+    justify-self: start;
+  }
+}
+
+/* Today keeps a readable secondary rail on wider screens and stacks it below the main action on tablet. */
+@media (min-width: 900px) {
+  .app-section--today .today-dashboard__overview {
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  }
+
+  .app-section--today .today-dashboard__facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 521px) and (max-width: 899px) {
+  .app-section--today .today-dashboard__facts {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+}
+
+/* Progress overview keeps Dynamics dominant and stacks all secondary analysis on the right. */
+.app-section--progress .progress-overview {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-section--progress .progress-overview__primary-grid {
+  display: grid;
+  gap: var(--v2-space-4);
+  min-width: 0;
+  align-items: start;
+}
+
+.app-section--progress .progress-overview__primary-grid > .progress-trend-panel,
+.app-section--progress .progress-overview__right-stack {
+  min-width: 0;
+  align-self: start;
+}
+
+.app-section--progress .progress-overview__right-stack {
+  display: grid;
+  gap: var(--v2-space-3);
+  align-content: start;
+}
+
+.app-section--progress .progress-overview__analysis-row {
+  align-items: start;
+}
+
+@media (min-width: 641px) {
+  .app-section--progress .progress-overview__primary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-section--progress .progress-overview__primary-grid > .progress-trend-panel {
+    grid-area: trend;
+  }
+
+  .app-section--progress .progress-overview__right-stack {
+    grid-area: right;
+  }
+
+  .app-section--progress .progress-overview__right-stack > .progress-overview__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(116px, auto);
+    align-content: start;
+  }
+
+  .app-section--progress .progress-overview__analysis-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-section--progress .progress-overview__analysis-row > .progress-overview__adherence {
+    grid-column: 1 / -1;
+    min-width: 0;
+    align-self: start;
+    padding-inline: 14px;
+    border: 1px solid var(--v2-border);
+    border-left: 3px solid var(--v2-border-strong);
+    border-radius: var(--v2-control-radius);
+    background: var(--v2-surface-secondary);
+  }
+}
+
+@media (min-width: 1101px) {
+  .app-section--progress .progress-overview__primary-grid {
+    grid-template-columns: minmax(0, 0.76fr) minmax(0, 1fr);
+    grid-template-areas: 'trend right';
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1100px) {
+  .app-section--progress .progress-overview__primary-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'trend' 'right';
+  }
+}
+
+@media (max-width: 640px) {
+  .app-section--progress .progress-overview__primary-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'metrics' 'trend' 'insights';
+  }
+
+  .app-section--progress .progress-overview__right-stack {
+    display: contents;
+  }
+
+  .app-section--progress .progress-overview__right-stack > .progress-overview__metrics {
+    grid-area: metrics;
+  }
+
+  .app-section--progress .progress-overview__primary-grid > .progress-trend-panel {
+    grid-area: trend;
+  }
+
+  .app-section--progress .progress-overview__right-stack > .progress-overview__analysis-row {
+    grid-area: insights;
   }
 }
