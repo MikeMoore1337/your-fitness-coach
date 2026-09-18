@@ -1,4 +1,4 @@
-# YFC Design Guardrails v6
+# YFC Design Guardrails v7
 
 Этот файл определяет минимальные устойчивые рамки дизайна. Он намеренно не является подробной дизайн-системой.
 
@@ -62,6 +62,17 @@
 - поддерживать ощущение энергии, прогресса и sport-tech precision.
 
 "Вау" допустим и в частых продуктовых сценариях - workout, nutrition, progress, logging - если он встроен в действие и не превращается в помеху.
+
+## Apple-style references
+
+Apple-like interaction/material principles и Liquid Glass могут использоваться как reference layer,
+но не как отдельная бренд-система. При таком direction:
+
+- YFC остаётся sport-tech, а не iOS clone;
+- lime/black/white brand core сохраняется;
+- Apple-like materials должны усиливать hierarchy/interaction, а не покрывать glass-эффектом каждый layer;
+- physical motion, sheets, gestures и springs должны быть interruptible, responsive и иметь reduced-motion alternative;
+- `$apple-design` используется условно вместе с YFC design skills, а не вместо них.
 
 ## Pattern neutrality
 
