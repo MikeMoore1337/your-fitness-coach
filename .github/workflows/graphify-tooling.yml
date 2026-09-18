@@ -36,7 +36,7 @@ jobs:
           uv tool install "graphifyy==0.9.63"
           python -m pip install "pytest>=9.1,<10"
       - name: Run wrapper tests
-        run: python -m pytest tests/test_graphify_yfc.py -q
+        run: python -m pytest -c /dev/null tests/test_graphify_yfc.py -q
       - name: Build local code graph
         run: python scripts/graphify_yfc.py extract . --code-only --no-cluster
       - name: Verify graph scope and representative queries
