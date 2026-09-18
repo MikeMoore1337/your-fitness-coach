@@ -3,53 +3,73 @@
 Graphify используется только как локальный индекс кода для навигации, архитектурных вопросов и
 impact analysis. Он не входит в runtime Your Fitness Coach и не является источником истины.
 
-Поддерживаемая версия: `graphifyy==0.9.63` (актуальный upstream release проверен 18.09.2026).
+Поддерживаемая версия: `graphifyy==0.9.63`.
 
-## Установка
+## Обычный запуск
 
-Graphify устанавливается отдельно от окружений backend/bot/frontend:
+В нормальной работе Graphify вручную устанавливать и отдельно строить не нужно. Канонический
+bootstrap:
+
+```bash
+python scripts/graphify_yfc.py bootstrap
+```
+
+Он идемпотентно:
+
+1. ищет `graphify` в `PATH` и в каталоге `uv tool dir --bin`;
+2. проверяет точную поддерживаемую версию;
+3. при отсутствии Graphify устанавливает `graphifyy==0.9.63` через `uv tool install`;
+4. при другой версии переустанавливает pinned-версию;
+5. при отсутствии graph строит code-only AST graph;
+6. при существующем graph повторяет code-only `extract`, который использует manifest/cache для инкрементальной обработки.
+
+Первичная установка требует доступ к сети/PyPI. Построение и обновление code-only graph не требуют
+LLM, API key или внешнего AI provider.
+
+В Codex bootstrap запускается один раз перед нетривиальным широким
+architecture/dependency/relationship/impact analysis. Для точечной правки в уже известном файле
+Graphify не нужен.
+
+Если bootstrap недоступен из-за отсутствующего `uv`, сети или другой локальной проблемы, это само
+по себе не блокирует обычную задачу: нужно перейти к прямому чтению актуальных source/tests/migrations/docs.
+
+## Канонический output
+
+Обёртка всегда направляет graph и query log в:
+
+```
+.artifacts/shared/graphify/
+```
+
+Каталог исключён из Git. `graphify-out/` создавать или коммитить нельзя.
+
+## Ручная установка и восстановление
+
+Обычно этот раздел не нужен, потому что bootstrap выполняет установку сам.
 
 ```bash
 uv tool install "graphifyy==0.9.63"
-```
-
-Повторная установка той же поддерживаемой версии:
-
-```bash
 uv tool install --force "graphifyy==0.9.63"
-```
-
-Удаление:
-
-```bash
 uv tool uninstall graphifyy
 ```
 
-Команды одинаковы в POSIX shell и PowerShell. Если `graphify` не найден после установки, выполните
-`uv tool update-shell` и откройте новый терминал.
+Если `graphify` после ручной установки не находится в `PATH`, обёртка всё равно пытается найти его
+через `uv tool dir --bin`.
 
-## Канонический запуск YFC
+## Запросы
 
-Всегда используйте обёртку репозитория, а не прямой `graphify`:
+После bootstrap используются обычные scoped-команды:
 
 ```bash
-python scripts/graphify_yfc.py extract . --code-only --no-cluster
 python scripts/graphify_yfc.py query "what code is affected by changing workout programs?"
 python scripts/graphify_yfc.py explain "FastAPI"
 python scripts/graphify_yfc.py explain "QueryClient"
 python scripts/graphify_yfc.py path "FastAPI" "health"
 ```
 
-Обёртка направляет graph и query log в `.artifacts/shared/graphify/`. Каталог уже исключён из Git.
-Не создавайте и не коммитьте `graphify-out/`.
-
-Для первого headless build используйте `extract . --code-only`: YFC содержит Markdown и другие
-документы, а обычная mixed-corpus extraction может потребовать LLM/provider. Code-only режим строит
-AST-граф локально без API key. Для обновления существующего code graph можно использовать:
-
-```bash
-python scripts/graphify_yfc.py update . --no-cluster
-```
+Для обновления существующего graph используйте тот же bootstrap. Отдельный `graphify update` в YFC
+не используется: canonical output находится внутри `.artifacts/`, поэтому повторный code-only
+`extract` является проверенным безопасным путём с сохранением ignore-правил.
 
 ## Границы использования
 
@@ -57,9 +77,8 @@ python scripts/graphify_yfc.py update . --no-cluster
 - Не передавайте `--no-gitignore`: `.artifacts/`, `.env*`, private backlog и generated output должны
   оставаться вне corpus.
 - Не запускайте `graphify install --project`, strict mode или Graphify git hooks для YFC.
-- Для широких architecture/dependency/relationship/impact вопросов сначала используйте scoped
-  `query`, `path`, `explain`, если graph актуален.
-- Для известного точного файла/символа Graphify не нужен.
+- Не включайте semantic/LLM extraction в автоматический bootstrap.
+- Для широких вопросов используйте scoped `query`, `path`, `explain`, если graph актуален.
 - Перед изменением кода проверяйте реальные source/tests/migrations/docs. При stale, ambiguous или
   incomplete graph переходите к исходникам.
-- Не перестраивайте graph в каждой task без причины и не расширяйте scope задачи по результатам graph.
+- Не запускайте bootstrap для каждой мелкой правки и не расширяйте scope задачи по результатам graph.
