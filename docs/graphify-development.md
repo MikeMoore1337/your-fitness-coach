@@ -21,7 +21,7 @@ python scripts/graphify_yfc.py bootstrap
 3. при отсутствии Graphify устанавливает `graphifyy==0.9.63` через `uv tool install`;
 4. при другой версии переустанавливает pinned-версию;
 5. при отсутствии graph строит code-only AST graph;
-6. при существующем graph запускает инкрементальный `graphify update`.
+6. при существующем graph повторяет code-only `extract`, который использует manifest/cache для инкрементальной обработки.
 
 Первичная установка требует доступ к сети/PyPI. Построение и обновление code-only graph не требуют
 LLM, API key или внешнего AI provider.
@@ -67,11 +67,9 @@ python scripts/graphify_yfc.py explain "QueryClient"
 python scripts/graphify_yfc.py path "FastAPI" "health"
 ```
 
-Для ручного обновления существующего graph доступна команда:
-
-```bash
-python scripts/graphify_yfc.py update . --no-cluster
-```
+Для обновления существующего graph используйте тот же bootstrap. Отдельный `graphify update` в YFC
+не используется: canonical output находится внутри `.artifacts/`, поэтому повторный code-only
+`extract` является проверенным безопасным путём с сохранением ignore-правил.
 
 ## Границы использования
 

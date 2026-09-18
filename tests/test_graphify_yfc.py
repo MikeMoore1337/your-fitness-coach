@@ -97,9 +97,7 @@ def test_ensure_graphify_repairs_version_drift(monkeypatch) -> None:
     monkeypatch.setattr(graphify_yfc, "_run", fake_run)
 
     assert graphify_yfc.ensure_graphify() == "/tools/graphify"
-    assert calls == [
-        ["/tools/uv", "tool", "install", "--force", graphify_yfc.INSTALL_SPEC]
-    ]
+    assert calls == [["/tools/uv", "tool", "install", "--force", graphify_yfc.INSTALL_SPEC]]
 
 
 def test_bootstrap_builds_missing_graph(monkeypatch, tmp_path: Path) -> None:
@@ -120,12 +118,10 @@ def test_bootstrap_builds_missing_graph(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(graphify_yfc, "_run", fake_run)
 
     assert graphify_yfc.bootstrap() == 0
-    assert calls == [
-        ["/tools/graphify", "extract", ".", "--code-only", "--no-cluster"]
-    ]
+    assert calls == [["/tools/graphify", "extract", ".", "--code-only", "--no-cluster"]]
 
 
-def test_bootstrap_updates_existing_graph(monkeypatch, tmp_path: Path) -> None:
+def test_bootstrap_refreshes_existing_graph(monkeypatch, tmp_path: Path) -> None:
     output = tmp_path / ".artifacts" / "shared" / "graphify"
     graph = output / "graph.json"
     graph.parent.mkdir(parents=True)
@@ -143,7 +139,7 @@ def test_bootstrap_updates_existing_graph(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(graphify_yfc, "_run", fake_run)
 
     assert graphify_yfc.bootstrap() == 0
-    assert calls == [["/tools/graphify", "update", ".", "--no-cluster"]]
+    assert calls == [["/tools/graphify", "extract", ".", "--code-only", "--no-cluster"]]
 
 
 def test_bootstrap_degrades_cleanly_when_tooling_is_unavailable(monkeypatch, capsys) -> None:

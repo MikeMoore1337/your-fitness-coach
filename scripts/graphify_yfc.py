@@ -144,12 +144,9 @@ def bootstrap() -> int:
         return 127
 
     GRAPHIFY_OUTPUT.mkdir(parents=True, exist_ok=True)
-    if GRAPHIFY_GRAPH.is_file():
-        command = [executable, "update", ".", "--no-cluster"]
-        action = "updated"
-    else:
-        command = [executable, "extract", ".", "--code-only", "--no-cluster"]
-        action = "built"
+    graph_existed = GRAPHIFY_GRAPH.is_file()
+    command = [executable, "extract", ".", "--code-only", "--no-cluster"]
+    action = "refreshed" if graph_existed else "built"
 
     completed = _run(command, environment=child_environment())
     if completed.returncode != 0:
@@ -160,10 +157,7 @@ def bootstrap() -> int:
             file=sys.stderr,
         )
         return 1
-    print(
-        f"Graphify ready: {action} {GRAPHIFY_GRAPH} "
-        f"with graphify {SUPPORTED_GRAPHIFY_VERSION}."
-    )
+    print(f"Graphify ready: {action} {GRAPHIFY_GRAPH} with graphify {SUPPORTED_GRAPHIFY_VERSION}.")
     return 0
 
 
