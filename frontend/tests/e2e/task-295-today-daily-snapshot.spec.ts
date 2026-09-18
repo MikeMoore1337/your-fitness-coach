@@ -265,6 +265,32 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
   await expectNoHorizontalOverflow(page);
   await capture(page, 'today-390-sparse-light.png');
 
+  for (const width of [390, 430, 440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await openApp(page, 'today');
+    const action = page.getByRole('link', { name: 'Открыть дневник питания' });
+    const group = page.locator('.today-nutrition__food-group');
+    const [actionBox, groupBox] = await Promise.all([action.boundingBox(), group.boundingBox()]);
+    expect(actionBox).not.toBeNull();
+    expect(groupBox).not.toBeNull();
+    expect(actionBox!.x + actionBox!.width).toBeGreaterThanOrEqual(
+      groupBox!.x + groupBox!.width - 31,
+    );
+    expect(actionBox!.height).toBeGreaterThanOrEqual(44);
+    const [fabBox, bottomNavBox] = await Promise.all([
+      page.locator('.app-quick-add-trigger').boundingBox(),
+      page.locator('#appBottomNav').boundingBox(),
+    ]);
+    expect(fabBox).not.toBeNull();
+    expect(bottomNavBox).not.toBeNull();
+    if (width < 440) {
+      expect(overlaps(actionBox!, fabBox!)).toBe(false);
+      expect(overlaps(actionBox!, bottomNavBox!)).toBe(false);
+    }
+    await expectNoHorizontalOverflow(page);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
   await openApp(page, 'progress');
   const metrics = page.locator('.progress-overview__metrics .progress-overview__metric');
   await expect(metrics).toHaveCount(4);
