@@ -2092,7 +2092,7 @@ test('профиль сохраняет иерархию Design V2 в light/dark
   await expect(saveProfile).toBeEnabled();
   await expect(page.getByLabel('Имя')).toHaveValue('Черновик профиля');
 
-  await page.getByRole('link', { name: 'Доступ и безопасность' }).click();
+  await page.getByRole('link', { name: 'Безопасность' }).click();
   await expect(page.getByRole('heading', { name: 'Доступ и безопасность' })).toBeInViewport();
   const [securityHeading, dangerZone] = await Promise.all([
     page.getByRole('heading', { name: 'Доступ и безопасность' }).boundingBox(),

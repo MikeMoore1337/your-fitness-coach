@@ -18,7 +18,7 @@ test('account lifecycle restores export, guards unlink and keeps destructive con
   });
   await tmaPage.goto('/app?section=profile');
   await expect(tmaPage.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
-  await tmaPage.getByRole('link', { name: 'Доступ и безопасность' }).click();
+  await tmaPage.getByRole('link', { name: 'Безопасность' }).click();
 
   const exportRegion = tmaPage.getByRole('region', { name: 'Копия данных' });
   await expect(exportRegion.getByText('Готово')).toBeVisible();
@@ -63,7 +63,7 @@ test('account lifecycle restores export, guards unlink and keeps destructive con
   await expect(deleteTrigger).toBeFocused();
 
   await tmaPage.reload();
-  await tmaPage.getByRole('link', { name: 'Доступ и безопасность' }).click();
+  await tmaPage.getByRole('link', { name: 'Безопасность' }).click();
   await expect(
     tmaPage.getByRole('region', { name: 'Копия данных' }).getByText('Готово'),
   ).toBeVisible();
@@ -87,7 +87,7 @@ test('account export expired and error states keep one safe recovery action on M
       authProviders: ['telegram'],
     });
     await page.goto('/app?section=profile');
-    await page.getByRole('link', { name: 'Доступ и безопасность' }).click();
+    await page.getByRole('link', { name: 'Безопасность' }).click();
     const exportRegion = page.getByRole('region', { name: 'Копия данных' });
     await expect(
       exportRegion.getByText(state === 'expired' ? 'Срок истёк' : 'Ошибка'),
@@ -138,7 +138,7 @@ test('account lifecycle layout matches Mobile Web and dark TMA at the same viewp
   });
   await Promise.all([mobile.goto('/app?section=profile'), tma.goto('/app?section=profile')]);
   for (const page of [mobile, tma]) {
-    await page.getByRole('link', { name: 'Доступ и безопасность' }).click();
+    await page.getByRole('link', { name: 'Безопасность' }).click();
     await page.mouse.move(0, 0);
     await expect(page.getByRole('region', { name: 'Копия данных' })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
@@ -245,7 +245,7 @@ test('captures account lifecycle owner checkpoint across required viewports and 
       authProviders: item.providers,
     });
     await page.goto('/app?section=profile');
-    await page.getByRole('link', { name: 'Доступ и безопасность' }).click();
+    await page.getByRole('link', { name: 'Безопасность' }).click();
     const exportRegion = page.getByRole('region', { name: 'Копия данных' });
     await expect(exportRegion).toBeVisible();
     if (item.identityGuard) {

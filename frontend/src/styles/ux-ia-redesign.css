@@ -1150,3 +1150,112 @@
     grid-area: insights;
   }
 }
+
+/* Task 295: keep Today facts compact while exposing only recorded nutrition/activity data. */
+.app-section--today .today-activity-grid {
+  grid-column: 1 / -1;
+}
+
+.today-nutrition__remaining {
+  display: block;
+  margin-top: 4px;
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+}
+
+.today-nutrition__macros {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.today-nutrition__macros > div {
+  min-width: 0;
+}
+
+.today-nutrition__macros dt,
+.today-nutrition__macros dd {
+  margin: 0;
+}
+
+.today-nutrition__macros dt {
+  color: var(--v2-text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+.today-nutrition__macros dd {
+  margin-top: 2px;
+  color: var(--v2-text-primary);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.today-nutrition__action-label-compact {
+  display: none;
+}
+
+@media (max-width: 430px) {
+  .app-section--progress .progress-overview__metric[data-progress-state='sparse'] {
+    min-height: 0;
+    padding-block: 10px;
+  }
+
+  .app-section--progress .progress-overview__right-stack > .progress-overview__metrics {
+    grid-auto-rows: auto;
+  }
+
+  .app-section--progress .progress-overview__metric {
+    scroll-margin-bottom: calc(160px + max(8px, var(--yfc-layout-safe-bottom, 0px)));
+  }
+
+  .app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item {
+    grid-template-columns: 20px minmax(0, 1fr) 16px;
+    grid-template-rows: auto;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .app-section--profile
+    .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item
+    > .section-navigation__leading-icon,
+  .app-section--profile
+    .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item
+    > span,
+  .app-section--profile
+    .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item
+    > .section-navigation__chevron {
+    grid-row: 1;
+  }
+
+  .app-section--profile
+    .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item
+    > span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    line-height: 1.15;
+  }
+
+  .today-nutrition__food-group .today-summary-card__action {
+    justify-self: start;
+    margin-right: calc(48px + max(0px, var(--yfc-layout-safe-right, 0px)));
+    white-space: nowrap;
+  }
+
+  .today-nutrition__action-label-full {
+    display: none;
+  }
+
+  .today-nutrition__action-label-compact {
+    display: inline;
+  }
+}

@@ -491,7 +491,7 @@ test('Task 294 uses one shared navigation treatment in Profile and Progress', as
   }));
   expect(profileNavigationMetrics.columns).toBe(2);
   expect(Math.max(...profileNavigationMetrics.itemHeights)).toBeLessThanOrEqual(60);
-  const profileFitnessLink = profileNavigation.getByRole('link', { name: 'Цели и параметры' });
+  const profileFitnessLink = profileNavigation.getByRole('link', { name: 'Цели' });
   await profileFitnessLink.click();
   await expect(profileFitnessLink).toHaveClass(/is-active/);
   await expect(profileFitnessLink).toHaveAttribute('aria-current', 'location');
