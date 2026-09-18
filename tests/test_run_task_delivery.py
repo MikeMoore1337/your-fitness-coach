@@ -1547,10 +1547,12 @@ def test_continuous_cleanup_failure_posts_central_queue_stop(
             {
                 "worker_role_passes": [{"name": "implementer"}],
                 "graphify": {"bootstrap_required": False},
+                "agent_budget": _agent_budget(),
             },
             tmp_path / "agent-flow.json",
         ),
     )
+    monkeypatch.setattr(delivery, "_prepare_skill_safety", lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"))
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 0)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(delivery, "_verify_closeout", lambda started: None)
@@ -1608,10 +1610,12 @@ def test_continuous_worker_exit_after_finish_posts_central_queue_stop(
             {
                 "worker_role_passes": [{"name": "implementer"}],
                 "graphify": {"bootstrap_required": False},
+                "agent_budget": _agent_budget(),
             },
             tmp_path / "agent-flow.json",
         ),
     )
+    monkeypatch.setattr(delivery, "_prepare_skill_safety", lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"))
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 23)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(
@@ -1679,10 +1683,12 @@ def test_terminal_state_publication_failure_posts_central_queue_stop(
             {
                 "worker_role_passes": [{"name": "implementer"}],
                 "graphify": {"bootstrap_required": False},
+                "agent_budget": _agent_budget(),
             },
             tmp_path / "agent-flow.json",
         ),
     )
+    monkeypatch.setattr(delivery, "_prepare_skill_safety", lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"))
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 0)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(delivery, "_queue_budget_from_controller_history", lambda history: {})

@@ -30,7 +30,7 @@ _NEGATION_PREFIXES = (
 _INSTRUCTION_BYPASS = re.compile(
     r"(?is)\b(?:ignore|disregard|override|bypass)\b.{0,100}"
     r"\b(?:previous|system|developer|repository|higher[- ]priority|project)\b.{0,80}"
-    r"\b(?:instruction|rule|prompt|policy)\b"
+    r"\b(?:instructions?|rules?|prompts?|polic(?:y|ies))\b"
 )
 _SECRET_READ = re.compile(
     r"(?i)(?:cat|type|get-content|read_file|open)\s+[^\n]{0,100}"
@@ -53,7 +53,7 @@ _DESTRUCTIVE = re.compile(
 )
 _PERSISTENCE = re.compile(
     r"(?i)(?:\.git[/\\]hooks[/\\]|crontab\s+-|systemctl\s+enable|"
-    r"/etc/(?:cron|systemd)|startup[/\\]|schtasks\s+/create|"
+    r"/etc/(?:cron|systemd)|(?:appdata|programdata)[^\n]{0,120}startup[/\\]|schtasks\s+/create|"
     r"(?:>>|tee\s+-?a?)\s*(?:~[/\\])?\.(?:bashrc|zshrc|profile))"
 )
 _NETWORK_OR_INSTALL = re.compile(

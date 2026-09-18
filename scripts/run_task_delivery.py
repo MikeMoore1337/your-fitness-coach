@@ -2568,7 +2568,7 @@ def _deliver_one(
                     blocker=blocker,
                 ),
             )
-        raise DeliveryError(f"{blocker}; inspect {artifacts / 'events.jsonl'}")
+        raise DeliveryError(f"{blocker[:1].upper() + blocker[1:]}; inspect {artifacts / 'events.jsonl'}")
     if history is None or history.get("state") != "finished":
         state = history.get("state") if history else "missing"
         if status_issue is not None:
