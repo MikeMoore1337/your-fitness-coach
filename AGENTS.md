@@ -55,6 +55,22 @@ they exist.
   there or rename them in bulk without an exact inventory and durable-reference review.
 - Never commit `.artifacts/` contents.
 
+# Graphify codebase navigation
+
+Graphify is an optional local development index. It is derived navigation data, never a source of
+truth and never part of the application runtime.
+
+- Use the repository wrapper `python scripts/graphify_yfc.py ...`; generated project data belongs
+  only in `.artifacts/shared/graphify/`.
+- For broad architecture, dependency, relationship, or impact-analysis questions, when a current
+  graph exists, prefer scoped `query`, `path`, and `explain` before repository-wide raw search.
+- Skip Graphify for a trivial exact-file edit when the relevant location is already known.
+- Before modifying code, verify current source, tests, migrations, and active documentation. If the
+  graph is stale, ambiguous, or incomplete, inspect the underlying files directly.
+- Do not enable strict source-read blocking, project install/hooks, or automatic rebuilds for every
+  task. Graphify findings must not expand the current task scope.
+- Installation and usage details live in `docs/graphify-development.md`.
+
 # Working principles
 
 - Inspect the existing implementation, relevant tests and documentation before changing it.
