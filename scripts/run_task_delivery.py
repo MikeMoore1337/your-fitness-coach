@@ -26,6 +26,11 @@ from typing import Any
 from uuid import uuid4
 
 try:
+    from scripts.agent_flow import (
+        AgentFlowError,
+        build_agent_flow_from_path,
+        render_agent_flow_prompt,
+    )
     from scripts.artifact_manager import ArtifactError, ArtifactManager
     from scripts.issue_workflow import (
         CONTINUE_QUEUE_TOKEN,
@@ -50,6 +55,7 @@ try:
         find_task_document,
     )
 except ModuleNotFoundError:
+    from agent_flow import AgentFlowError, build_agent_flow_from_path, render_agent_flow_prompt
     from artifact_manager import ArtifactError, ArtifactManager
     from issue_workflow import (
         CONTINUE_QUEUE_TOKEN,
@@ -1300,7 +1306,9 @@ def _worker_prompt(
     started: dict[str, Any],
     *,
     issue_contract: Mapping[str, Any] | None = None,
+    agent_flow: Mapping[str, Any] | None = None,
 ) -> str:
+    agent_flow_context = render_agent_flow_prompt(agent_flow) if agent_flow is not None else ""
     issue_context = ""
     if issue_contract is not None:
         issue_context = (
@@ -1365,9 +1373,53 @@ def _worker_prompt(
         "Для continuous queue максимум 3 review-fix cycles и 3 CI-fix cycles на task, scope "
         "expansion не допускается; превышение означает HUMAN_REQUIRED.\n"
         "Не запускай следующую product task.\n\n"
+        + agent_flow_context
         + issue_context
         + f"Controller context:\n{started.get('prompt', '')}"
     )
+
+
+def _prepare_agent_flow(
+    task_id: str,
+    started: Mapping[str, Any],
+    artifacts: Path,
+    *,
+    issue_contract: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], Path]:
+    lease = started.get("lease")
+    if not isinstance(lease, Mapping):
+        raise DeliveryError("Controller start payload has no lease for Agent Flow routing")
+    raw_task_path = lease.get("canonical_task_path")
+    if not isinstance(raw_task_path, str) or not raw_task_path.strip():
+        raise DeliveryError("Controller lease has no canonical task path for Agent Flow routing")
+
+    try:
+        plan = build_agent_flow_from_path(
+            task_id,
+            Path(raw_task_path).resolve(),
+            issue_contract=issue_contract,
+        )
+    except AgentFlowError as error:
+        raise DeliveryError(f"Agent Flow routing failed: {error}") from error
+
+    manager = ArtifactManager(REPOSITORY_ROOT / ".artifacts", repo_root=REPOSITORY_ROOT)
+    evidence_path = manager.allocate(
+        task_id,
+        "evidence",
+        Path("evidence") / "agent-flow" / f"{artifacts.name}.json",
+        purpose="deterministic task Agent Flow routing plan",
+        command="scripts/run_task_delivery.py",
+        owner="run_task_delivery",
+        create=False,
+    )
+    try:
+        evidence_path.write_text(
+            json.dumps(plan, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as error:
+        raise DeliveryError(f"Cannot write Agent Flow evidence {evidence_path}: {error}") from error
+    return plan, evidence_path
 
 
 def _artifact_root(task_id: str) -> Path:
@@ -2043,6 +2095,7 @@ def _launch_worker(
     artifacts: Path,
     *,
     issue_contract: Mapping[str, Any] | None = None,
+    agent_flow: Mapping[str, Any] | None = None,
     worker_state_path: Path | None = None,
 ) -> int:
     codex = shutil.which("codex")
@@ -2068,7 +2121,12 @@ def _launch_worker(
         "--json",
         "-o",
         str(result_path),
-        _worker_prompt(task_id, started, issue_contract=issue_contract),
+        _worker_prompt(
+            task_id,
+            started,
+            issue_contract=issue_contract,
+            agent_flow=agent_flow,
+        ),
     ]
     supervisor_command = [
         sys.executable,
@@ -2208,6 +2266,19 @@ def _deliver_one(
     worker_state_path = artifacts / "worker-state.json"
     if queue_claim is not None:
         queue_claim.set_worker_state_path(worker_state_path)
+    agent_flow, agent_flow_path = _prepare_agent_flow(
+        task_id,
+        started,
+        artifacts,
+        issue_contract=issue_contract,
+    )
+    _event(
+        "AGENT_FLOW_PLANNED",
+        task_id=task_id,
+        roles=[item["name"] for item in agent_flow["worker_role_passes"]],
+        graphify=agent_flow["graphify"]["bootstrap_required"],
+        evidence=str(agent_flow_path),
+    )
     _event(
         "STARTED",
         task_id=task_id,
@@ -2220,6 +2291,7 @@ def _deliver_one(
         started,
         artifacts,
         issue_contract=issue_contract,
+        agent_flow=agent_flow,
         worker_state_path=worker_state_path,
     )
     history = _history(task_id)

@@ -170,6 +170,25 @@ Repository skills live under `.agents/skills/`.
   reproducible `BLOCKER/HIGH`, not a broad skill checklist.
 - Repository/backlog rules take precedence over generic skill guidance when they conflict.
 
+# Agent Flow v1
+
+Normal task delivery uses deterministic routing from `scripts/agent_flow.py` before the Codex
+worker starts. The resulting bounded plan is stored under task-scoped
+`.artifacts/tasks/<TASK_ID>/evidence/agent-flow/` and embedded into the worker prompt.
+
+- Explicit `Основная роль` / `Дополнительные роли lifecycle` in the task remain authoritative.
+- Without an explicit role contract, ordinary work defaults to `implementer`; routing may
+  conservatively infer `researcher`, `orchestrator` or `qa-verifier` only on their documented
+  triggers.
+- Agent Flow v1 keeps one Codex worker and one production writer by default. It does not install an
+  agent framework or spawn parallel production writers inside one task.
+- `integration-release` is controller-managed. Automatic reviewer/security-reviewer/adversarial
+  agents remain prohibited by the normal lifecycle.
+- When the plan requires Graphify, bootstrap it once before broad architecture inspection and then
+  verify real source/tests/migrations/docs before writes. A tooling-only Graphify failure may fall
+  back to direct source inspection when safe.
+- The routing trace must never copy the full private task body or private GitHub Issue scope.
+
 # Agent roles and subagents
 
 Reusable role contracts live under `.agents/roles/`.
