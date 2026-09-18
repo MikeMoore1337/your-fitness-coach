@@ -600,12 +600,10 @@ test('Today keeps hierarchy and has no horizontal overflow at required widths', 
     expect(progressBox).not.toBeNull();
     const summaryGap = progressBox!.y - (nutritionBox!.y + nutritionBox!.height);
     if (viewport.width >= 900) {
-      expect(Math.abs(progressBox!.y - nutritionBox!.y)).toBeLessThanOrEqual(1);
-      expect(progressBox!.x - (nutritionBox!.x + nutritionBox!.width)).toBeGreaterThanOrEqual(11);
-    } else {
-      expect(summaryGap).toBeGreaterThanOrEqual(11);
-      expect(summaryGap).toBeLessThanOrEqual(13);
+      expect(Math.abs(progressBox!.x - nutritionBox!.x)).toBeLessThanOrEqual(1);
     }
+    expect(summaryGap).toBeGreaterThanOrEqual(11);
+    expect(summaryGap).toBeLessThanOrEqual(13);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
   }
 });

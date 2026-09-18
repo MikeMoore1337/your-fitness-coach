@@ -277,43 +277,51 @@ function NutritionSummary({ date, today }: { date: string; today: string }) {
   const caloriesLabel = date === today ? 'Калории за сегодня' : `Калории за ${dateLabel}`;
   return (
     <section className="today-nutrition" aria-label={nutritionTitle}>
-      <h2>{nutritionTitle}</h2>
+      <h2>
+        <Icon name="nav-nutrition" size={16} />
+        {nutritionTitle}
+      </h2>
       <div className="today-nutrition__content">
-        <Icon name="nav-nutrition" style={{ width: 72, height: 72 }} />
-        <div className="today-nutrition__values">
-          {diary.data.meals.some((meal) => meal.entries.length > 0) && (
-            <p aria-label={foodSummary}>
-              <strong>{formatAmount(diary.data.totals.energy_kcal)}</strong>
-              {diary.data.targets ? ` / ${formatAmount(diary.data.targets.energy_kcal)}` : ''} ккал
-            </p>
-          )}
-          {!diary.data.meals.some((meal) => meal.entries.length > 0) && <p>{foodSummary}</p>}
-          {diary.data.meals.some((meal) => meal.entries.length > 0) &&
-            diary.data.targets &&
-            Number(diary.data.targets.energy_kcal) > 0 && (
-              <progress
-                aria-label={caloriesLabel}
-                max={diary.data.targets.energy_kcal}
-                value={diary.data.totals.energy_kcal}
-              />
+        <div className="today-nutrition__food-group">
+          <div className="today-nutrition__values">
+            {diary.data.meals.some((meal) => meal.entries.length > 0) && (
+              <p aria-label={foodSummary}>
+                <strong>{formatAmount(diary.data.totals.energy_kcal)}</strong>
+                {diary.data.targets
+                  ? ` / ${formatAmount(diary.data.targets.energy_kcal)}`
+                  : ''}{' '}
+                ккал
+              </p>
             )}
+            {!diary.data.meals.some((meal) => meal.entries.length > 0) && <p>{foodSummary}</p>}
+            {diary.data.meals.some((meal) => meal.entries.length > 0) &&
+              diary.data.targets &&
+              Number(diary.data.targets.energy_kcal) > 0 && (
+                <progress
+                  aria-label={caloriesLabel}
+                  max={diary.data.targets.energy_kcal}
+                  value={diary.data.totals.energy_kcal}
+                />
+              )}
+          </div>
           <AppLink
             className="today-summary-card__action"
             to={`/app?section=nutrition&date=${date}`}
+            aria-label="Открыть дневник питания"
           >
             Открыть дневник питания
           </AppLink>
         </div>
-      </div>
-      <div className="today-nutrition__water">
-        <span>{hydrationSummary}</span>
-        <AppLink
-          className="today-summary-card__action"
-          to={`/app?section=nutrition&date=${date}&hydration=quick`}
-          aria-label="+ Вода"
-        >
-          <Icon name="plus" size={16} /> Вода
-        </AppLink>
+        <div className="today-nutrition__water">
+          <span>{hydrationSummary}</span>
+          <AppLink
+            className="today-summary-card__action"
+            to={`/app?section=nutrition&date=${date}&hydration=quick`}
+            aria-label="+ Вода"
+          >
+            <Icon name="plus" size={16} /> Вода
+          </AppLink>
+        </div>
       </div>
     </section>
   );

@@ -734,9 +734,10 @@ export function NutritionDiary({
             className="nutrition-diary__primary-action"
             type="button"
             aria-label="Добавить продукт в текущий приём пищи"
+            data-testid="nutrition-add-product"
             onClick={() => setAddingTo({ mealType: defaultMealType(timeZone) })}
           >
-            <Icon name="plus" size={16} /> Добавить продукт
+            <Icon name="plus" size={16} /> <span>Добавить продукт</span>
           </Button>
           <Button
             variant="secondary"

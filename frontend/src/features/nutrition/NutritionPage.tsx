@@ -43,10 +43,6 @@ export function NutritionPage({
 
   return (
     <div className="nutrition-experience">
-      <AiCoachContextualEntry
-        context={{ surface: 'nutrition', periodDays: 7 }}
-        entryPoint="nutrition"
-      />
       {returnPath && (
         <nav aria-label="Возврат к отчёту по питанию" className="nutrition-report-return">
           <AppLink className="button-link secondary-link" to={returnPath}>
@@ -79,6 +75,10 @@ export function NutritionPage({
           />
         </div>
       </details>
+      <AiCoachContextualEntry
+        context={{ surface: 'nutrition', periodDays: 7 }}
+        entryPoint="nutrition"
+      />
     </div>
   );
 }

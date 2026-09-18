@@ -1720,8 +1720,14 @@ body:has(.app-shell--design-v2) {
 }
 
 .nutrition-diary--design-v2 .nutrition-diary__primary-action {
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--v2-space-2);
   min-height: 44px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .nutrition-diary--design-v2 .nutrition-completeness {
@@ -1841,7 +1847,7 @@ body:has(.app-shell--design-v2) {
   top: var(--v2-space-4);
   gap: var(--v2-space-5);
   padding: var(--v2-space-5);
-  border: 0;
+  border: 1px solid var(--v2-border);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface-secondary);
 }
@@ -3410,23 +3416,25 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
 }
 
 .app-section--progress .progress-period-controls .ui-tabs {
   display: flex;
-  width: max-content;
-  min-width: 100%;
-  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
+  justify-content: stretch;
   max-width: none;
   padding: 3px;
   overflow: visible;
 }
 
 .app-section--progress .progress-period-controls .ui-tab {
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 44px;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .app-section--progress .progress-period-controls__meta {
@@ -3857,11 +3865,19 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .today-dashboard--design-v2 .today-nutrition__water {
-    margin-top: 8px;
+    margin-top: 0;
   }
 }
 
 @media (max-width: 379px) {
+  .today-nutrition__food-group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .today-nutrition__food-group .today-summary-card__action {
+    justify-self: start;
+  }
+
   .app-section--progress .progress-bento.progress-summary {
     padding: var(--v2-space-3);
   }
@@ -4391,7 +4407,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   --accent-alt: var(--v2-accent-text);
   --accent-alt-soft: var(--v2-surface-secondary);
   --accent-alt-line: var(--v2-border);
-  --button-text: var(--v2-surface);
+  --button-text: var(--v2-on-lime);
   --link-color: var(--v2-accent-text);
   --focus-ring: var(--v2-focus);
   --page-bg: var(--v2-canvas);
@@ -9907,33 +9923,42 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 
 /* Editorial workout imagery belongs to the real workout card; actions remain in flow. */
 .today-nutrition {
-  padding: 16px 0;
-  border-block: 1px solid var(--v2-border);
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
 }
 .today-nutrition h2 {
-  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
   font: 600 1.3rem var(--font-display);
 }
 .today-nutrition__content {
-  display: flex;
+  display: grid;
+  gap: var(--v2-space-3);
+}
+.today-nutrition__food-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
+  gap: 10px 12px;
 }
 .today-nutrition__values {
-  flex: 1;
   min-width: 0;
 }
 .today-nutrition__values p {
-  margin: 0 0 8px;
+  margin: 0;
 }
 .today-nutrition__values strong {
-  font: 700 2rem var(--font-display);
+  font: 700 1.5rem var(--font-display);
 }
 .today-nutrition progress {
   display: block;
   width: 100%;
   height: 7px;
-  margin-bottom: 12px;
+  margin-top: 8px;
   border: 0;
   appearance: none;
   background: var(--v2-border);
@@ -9948,11 +9973,13 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   background: var(--v2-lime);
 }
 .today-nutrition__water {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 0;
+  padding-top: var(--v2-space-3);
+  border-top: 1px solid var(--v2-border);
   color: var(--v2-text-secondary);
   font-size: 0.85rem;
 }

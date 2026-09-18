@@ -264,6 +264,10 @@ export default function MiniAppPage({
     target: WorkoutNavigationTarget;
   } | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(initialInviteToken);
+  const [activeProfileNavTarget, setActiveProfileNavTarget] = useState<string | null>(() => {
+    const targetId = window.location.hash.slice(1);
+    return targetId.startsWith('profile-') ? targetId : null;
+  });
   const scheduleFocusId =
     requestedFeedback?.workoutId ??
     (focusedWorkout?.target === 'schedule' ? focusedWorkout.id : null);
@@ -349,12 +353,25 @@ export default function MiniAppPage({
     if (summary instanceof HTMLElement) summary.click();
   };
   const openProfileSection = (detailsId: string, targetId = detailsId) => {
+    setActiveProfileNavTarget(targetId);
     const details = document.getElementById(detailsId);
     revealDetails(details instanceof HTMLDetailsElement ? details : null);
     window.requestAnimationFrame(() =>
       document.getElementById(targetId)?.scrollIntoView({ block: 'start' }),
     );
   };
+
+  useEffect(() => {
+    if (section !== 'profile') return;
+
+    const syncProfileNavTarget = () => {
+      const targetId = window.location.hash.slice(1);
+      setActiveProfileNavTarget(targetId.startsWith('profile-') ? targetId : null);
+    };
+    syncProfileNavTarget();
+    window.addEventListener('hashchange', syncProfileNavTarget);
+    return () => window.removeEventListener('hashchange', syncProfileNavTarget);
+  }, [section]);
 
   useEffect(() => {
     if (section !== 'profile') return;
@@ -486,7 +503,6 @@ export default function MiniAppPage({
           )}
           {section === 'programs' && (
             <>
-              <AiCoachContextualEntry context={{ surface: 'program' }} entryPoint="program" />
               <fieldset
                 className="demo-capability-fieldset"
                 disabled={!capabilities.canMutatePrograms}
@@ -518,17 +534,10 @@ export default function MiniAppPage({
                       focusedWorkoutId={scheduleFocusId}
                       timeZone={user?.profile?.timezone}
                     />
-                    {capabilities.canMutatePrograms && (
-                      <AppLink
-                        className="ux-plan-management-link"
-                        to="/app?section=programs&view=manage"
-                      >
-                        Открыть управление программой
-                      </AppLink>
-                    )}
                   </>
                 )}
               </fieldset>
+              <AiCoachContextualEntry context={{ surface: 'program' }} entryPoint="program" />
             </>
           )}
           {section === 'catalog' && <ExerciseCatalog canCreate={capabilities.canCreateCatalog} />}
@@ -584,76 +593,119 @@ export default function MiniAppPage({
                 )}
 
                 <nav
-                  className={`profile-settings-nav${
+                  className={`profile-settings-nav section-navigation${
                     aiCoachStatus.data?.ui_enabled ? ' profile-settings-nav--ai-enabled' : ''
                   }`}
                   aria-label="Разделы профиля"
                 >
                   <a
-                    className="profile-settings-nav__item"
+                    className={`profile-settings-nav__item${
+                      activeProfileNavTarget === 'profile-personal' ? ' is-active' : ''
+                    }`}
                     href="#profile-personal"
+                    aria-current={
+                      activeProfileNavTarget === 'profile-personal' ? 'location' : undefined
+                    }
                     aria-label="Личные данные"
                     aria-describedby="profile-nav-personal-description"
                     onClick={() => openProfileSection('profile-personal')}
                   >
-                    <Icon name="nav-profile" size={16} />
+                    <Icon
+                      className="section-navigation__leading-icon"
+                      name="nav-profile"
+                      size={16}
+                    />
                     <span>Личные данные</span>
                     <small id="profile-nav-personal-description">
                       Имя, параметры, часовой пояс
                     </small>
+                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
-                    className="profile-settings-nav__item"
+                    className={`profile-settings-nav__item${
+                      activeProfileNavTarget === 'profile-fitness' ? ' is-active' : ''
+                    }`}
                     href="#profile-fitness"
+                    aria-current={
+                      activeProfileNavTarget === 'profile-fitness' ? 'location' : undefined
+                    }
                     aria-label="Цели и параметры"
                     aria-describedby="profile-nav-fitness-description"
                     onClick={() => openProfileSection('profile-personal', 'profile-fitness')}
                   >
-                    <Icon name="nav-plan" size={16} />
+                    <Icon className="section-navigation__leading-icon" name="nav-plan" size={16} />
                     <span>Цели и параметры</span>
                     <small id="profile-nav-fitness-description">Цель, уровень и частота</small>
+                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
-                    className="profile-settings-nav__item"
+                    className={`profile-settings-nav__item${
+                      activeProfileNavTarget === 'profile-trainer' ? ' is-active' : ''
+                    }`}
                     href="#profile-trainer"
+                    aria-current={
+                      activeProfileNavTarget === 'profile-trainer' ? 'location' : undefined
+                    }
                     aria-label="Тренер и приглашения"
                     aria-describedby="profile-nav-trainer-description"
                     onClick={() => openProfileSection('profile-trainer')}
                   >
-                    <Icon name="nav-coach" size={16} />
+                    <Icon className="section-navigation__leading-icon" name="nav-coach" size={16} />
                     <span>Тренер и приглашения</span>
                     <small id="profile-nav-trainer-description">Приглашения и режим тренера</small>
+                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
-                    className="profile-settings-nav__item"
+                    className={`profile-settings-nav__item${
+                      activeProfileNavTarget === 'profile-notifications' ? ' is-active' : ''
+                    }`}
                     href="#profile-notifications"
+                    aria-current={
+                      activeProfileNavTarget === 'profile-notifications' ? 'location' : undefined
+                    }
                     aria-label="Уведомления"
                     aria-describedby="profile-nav-notifications-description"
                     onClick={() => openProfileSection('profile-notifications')}
                   >
-                    <Icon name="nav-today" size={16} />
+                    <Icon className="section-navigation__leading-icon" name="nav-today" size={16} />
                     <span>Уведомления</span>
                     <small id="profile-nav-notifications-description">Напоминания и время</small>
+                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
-                    className="profile-settings-nav__item"
+                    className={`profile-settings-nav__item${
+                      activeProfileNavTarget === 'profile-security' ? ' is-active' : ''
+                    }`}
                     href="#profile-security"
+                    aria-current={
+                      activeProfileNavTarget === 'profile-security' ? 'location' : undefined
+                    }
                     aria-label="Доступ и безопасность"
                     aria-describedby="profile-nav-security-description"
                     onClick={() => openProfileSection('profile-security')}
                   >
-                    <Icon name="account-security" size={16} />
+                    <Icon
+                      className="section-navigation__leading-icon"
+                      name="account-security"
+                      size={16}
+                    />
                     <span>Доступ и безопасность</span>
                     <small id="profile-nav-security-description">Вход, копия данных, аккаунт</small>
+                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
-                    className="profile-settings-nav__item"
+                    className={`profile-settings-nav__item${
+                      activeProfileNavTarget === 'profile-ai-coach' ? ' is-active' : ''
+                    }`}
                     href="#profile-ai-coach"
+                    aria-current={
+                      activeProfileNavTarget === 'profile-ai-coach' ? 'location' : undefined
+                    }
                     aria-label="AI Coach"
                     aria-describedby="profile-nav-ai-description"
                     onClick={() => openProfileSection('profile-ai-coach')}
                   >
-                    <Icon name="ai-coach" size={16} />
+                    <Icon className="section-navigation__leading-icon" name="ai-coach" size={16} />
                     <span>AI Coach</span>
                     <small id="profile-nav-ai-description">
                       {aiCoachStatus.isLoading
@@ -662,6 +714,7 @@ export default function MiniAppPage({
                           ? 'Доступность и личный контекст'
                           : 'Сейчас недоступен'}
                     </small>
+                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                 </nav>
 
