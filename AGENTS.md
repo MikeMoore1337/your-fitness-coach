@@ -183,7 +183,7 @@ Repository skills live under `.agents/skills/`.
   does not by itself require a separate `$accessibility-engineer` pass.
 - `$motion-design-engineer` is the specialized skill for substantial motion/gesture/data-animation work.
 - `$apple-design` is conditional-only for explicit Apple/Liquid Glass/native-feel materials or physical gesture/spring interactions. It is a reference layer under YFC `$product-designer` and `$motion-design-engineer`, never a replacement for the YFC brand/design authority.
-  `$ui-prototyper` is explicit-only for isolated design exploration and must not start automatically.
+- `$ui-prototyper` is explicit-only for isolated design exploration and must not start automatically.
 - `$llm-engineer` is the canonical AI/AI Coach engineering skill; do not create a parallel `ai-engineer`.
 - `$ru-legal-risk` is mandatory for a dedicated Russian legal-risk audit and conditional for an
   ordinary task only when its factual diff changes personal/health data, providers, payments,
