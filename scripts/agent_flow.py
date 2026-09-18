@@ -60,7 +60,9 @@ ARCHITECTURE_PATTERN = re.compile(
     r"multi[- ]stream|сквозн",
     re.IGNORECASE,
 )
-MULTI_STREAM_PATTERN = re.compile(r"multi[- ]stream|несколько поток|independent streams", re.IGNORECASE)
+MULTI_STREAM_PATTERN = re.compile(
+    r"multi[- ]stream|несколько поток|independent streams", re.IGNORECASE
+)
 USER_FACING_PATTERN = re.compile(
     r"user[- ]facing|пользователь|\bui\b|\bux\b|visual|responsive|mobile|"
     r"лендинг|интерфейс",
@@ -163,9 +165,7 @@ def build_agent_flow(
         task_text
     )
     surfaces = _detected_surfaces(task_text)
-    core_surfaces = tuple(
-        surface for surface in surfaces if surface in CORE_CROSS_CUTTING_SURFACES
-    )
+    core_surfaces = tuple(surface for surface in surfaces if surface in CORE_CROSS_CUTTING_SURFACES)
     architecture_signal = bool(ARCHITECTURE_PATTERN.search(task_text))
     cross_cutting = len(core_surfaces) >= 2
     research = bool(RESEARCH_PATTERN.search(_task_type(task_text) or task_text[:2000]))
@@ -245,9 +245,7 @@ def build_agent_flow(
         },
         "graphify": {
             "bootstrap_required": graphify_required,
-            "command": (
-                "python scripts/graphify_yfc.py bootstrap" if graphify_required else None
-            ),
+            "command": ("python scripts/graphify_yfc.py bootstrap" if graphify_required else None),
             "failure_policy": "fallback-to-direct-source-inspection",
         },
         "worker_role_passes": roles,
