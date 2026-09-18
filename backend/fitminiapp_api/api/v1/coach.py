@@ -40,6 +40,7 @@ from fitminiapp_api.schemas.progress import (
 )
 from fitminiapp_api.schemas.user import UserProfileUpdate
 from fitminiapp_api.schemas.workout import (
+    BodyMeasurementDefinitionResponse,
     BodyMeasurementResponse,
     BodyMeasurementSave,
     TrainingAnalyticsResponse,
@@ -66,8 +67,10 @@ from fitminiapp_api.services.measurements import (
     MeasurementError,
     MeasurementNotFoundError,
     delete_measurement,
+    list_custom_measurement_definitions,
     list_measurements,
     save_measurement,
+    serialize_custom_measurement_definition,
     serialize_measurement,
 )
 from fitminiapp_api.services.notifications import cancel_workout_reminder, queue_notification
@@ -679,6 +682,27 @@ def coach_client_measurements(
 ):
     client = _managed_client(db, current_user, client_id)
     return [serialize_measurement(row) for row in list_measurements(db, client, limit=limit)]
+
+
+@router.get(
+    "/clients/{client_id}/measurements/custom-definitions",
+    response_model=list[BodyMeasurementDefinitionResponse],
+)
+def coach_client_measurement_definitions(
+    client_id: int,
+    include_archived: bool = Query(default=True),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+):
+    client = _managed_client(db, current_user, client_id)
+    return [
+        serialize_custom_measurement_definition(row)
+        for row in list_custom_measurement_definitions(
+            db,
+            client,
+            include_archived=include_archived,
+        )
+    ]
 
 
 @router.post(

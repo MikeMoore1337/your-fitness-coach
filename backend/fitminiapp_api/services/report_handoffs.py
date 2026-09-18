@@ -161,8 +161,10 @@ def _build_handoff_report(
     return _sanitize_report(payload, period=period)
 
 
-def _report_revision(report: dict) -> str:
+def _report_revision(report: dict, client_comment: str | None = None) -> str:
     revision_payload = {key: value for key, value in report.items() if key != "generated_at"}
+    if client_comment is not None:
+        revision_payload["client_comment"] = client_comment
     return _hash_payload(revision_payload)
 
 
@@ -175,19 +177,21 @@ def _request_fingerprint(
     period_start: date,
     period_end: date,
     timezone: str,
+    client_comment: str | None,
 ) -> str:
-    return _hash_payload(
-        {
-            "sender_user_id": sender_id,
-            "trainer_user_id": trainer_id,
-            "relationship_id": relationship_id,
-            "period": period.value,
-            "period_start": period_start.isoformat(),
-            "period_end": period_end.isoformat(),
-            "timezone": timezone,
-            "report_contract_version": REPORT_HANDOFF_CONTRACT_VERSION,
-        }
-    )
+    fingerprint_payload = {
+        "sender_user_id": sender_id,
+        "trainer_user_id": trainer_id,
+        "relationship_id": relationship_id,
+        "period": period.value,
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "timezone": timezone,
+        "report_contract_version": REPORT_HANDOFF_CONTRACT_VERSION,
+    }
+    if client_comment is not None:
+        fingerprint_payload["client_comment"] = client_comment
+    return _hash_payload(fingerprint_payload)
 
 
 def _section_ids(report: dict) -> list[str]:
@@ -230,6 +234,7 @@ def _handoff_response(
             "created_at": handoff.created_at,
             "delivery_status": _notification_delivery_status(db, handoff),
             "delivery_attempt": handoff.delivery_attempt,
+            "client_comment": handoff.client_comment,
             "live": True,
         }
     )
@@ -340,6 +345,7 @@ def create_report_handoff(
         period_start=bounds.start,
         period_end=bounds.end,
         timezone=timezone,
+        client_comment=payload.client_comment,
     )
     existing_by_key = (
         db.query(ReportHandoff)
@@ -361,7 +367,7 @@ def create_report_handoff(
         period_start=bounds.start,
         period_end=bounds.end,
     )
-    revision = _report_revision(report)
+    revision = _report_revision(report, payload.client_comment)
     existing = _find_existing_handoff(
         db,
         sender_id=sender.id,
@@ -386,6 +392,7 @@ def create_report_handoff(
         report_contract_version=REPORT_HANDOFF_CONTRACT_VERSION,
         included_section_ids=_section_ids(report),
         report_revision=revision,
+        client_comment=payload.client_comment,
         idempotency_key=normalized_key,
         request_fingerprint=fingerprint,
         delivery_status="pending",
@@ -461,7 +468,8 @@ def get_report_handoff_view(
     return ReportHandoffViewResponse(
         handoff=_handoff_response(db, handoff, trainer),
         report=report,
-        data_changed_since_send=_report_revision(report) != handoff.report_revision,
+        data_changed_since_send=_report_revision(report, handoff.client_comment)
+        != handoff.report_revision,
     )
 
 

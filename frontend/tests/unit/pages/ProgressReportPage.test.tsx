@@ -16,7 +16,7 @@ function renderPage() {
   );
 }
 
-function installApi() {
+function installApi(report = makeProgressReportFixture()) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     if (String(input).includes('/download-link')) {
       return new Response(
@@ -28,8 +28,21 @@ function installApi() {
         { status: 200 },
       );
     }
-    return new Response(JSON.stringify(makeProgressReportFixture()), { status: 200 });
+    return new Response(JSON.stringify(report), { status: 200 });
   });
+}
+
+function makeBodyOnlyReport(summaryLineCount: 0 | 1 | 2) {
+  const report = makeProgressReportFixture('empty');
+  const populated = makeProgressReportFixture('full');
+  const bodyTrend = populated.body.trends[0];
+  if (summaryLineCount >= 1) {
+    report.body = { ...report.body, trends: bodyTrend ? [bodyTrend] : [] };
+  }
+  if (summaryLineCount >= 2) {
+    report.training = { ...report.training, planned_workouts: 1, completed_workouts: 1 };
+  }
+  return report;
 }
 
 afterEach(() => {
@@ -40,6 +53,20 @@ afterEach(() => {
 });
 
 describe('ProgressReportPage', () => {
+  it.each([0, 1, 2] as const)(
+    'renders exactly the factual summary items for the %s-line state',
+    async (summaryLineCount) => {
+      installApi(makeBodyOnlyReport(summaryLineCount));
+      renderPage();
+
+      await screen.findByRole('heading', { name: /Александр Петров/ });
+      const summary = document.querySelector('.progress-report-factual-summary');
+      expect(summary).not.toBeNull();
+      expect(summary?.querySelectorAll('dl > div')).toHaveLength(summaryLineCount);
+      expect(summary?.textContent).not.toContain('custom:');
+    },
+  );
+
   it('shows factual report sections and invokes browser print outside TMA', async () => {
     installApi();
     const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
@@ -47,6 +74,9 @@ describe('ProgressReportPage', () => {
 
     expect(await screen.findByRole('heading', { name: /Александр Константинович/ })).toBeVisible();
     expect(screen.getByText('84')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Фактическая сводка' })).toBeVisible();
+    expect(screen.getAllByText('Живот').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Живот: 84 см/)).toBeVisible();
     expect(screen.getByRole('table', { name: 'Таблица замеров массы' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Сон и настроение' })).toBeVisible();
     expect(screen.getByText(/заметки не включены в агрегаты, PDF и доступ тренера/)).toBeVisible();

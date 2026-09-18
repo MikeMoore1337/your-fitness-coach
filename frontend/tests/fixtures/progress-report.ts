@@ -148,6 +148,8 @@ export function makeProgressReportFixture(state: ReportState = 'full'): Progress
         ? [
             {
               metric: 'weight_kg',
+              label: 'Вес',
+              unit: 'kg',
               first_value: 82.4,
               latest_value: 80.9,
               change: -1.5,
@@ -160,6 +162,8 @@ export function makeProgressReportFixture(state: ReportState = 'full'): Progress
             },
             {
               metric: 'waist_cm',
+              label: 'Талия',
+              unit: 'cm',
               first_value: 86.1,
               latest_value: 84.2,
               change: -1.9,
@@ -172,6 +176,25 @@ export function makeProgressReportFixture(state: ReportState = 'full'): Progress
                 { measured_on: '2026-07-28', value: 86.1 },
                 { measured_on: '2026-08-10', value: 85 },
                 { measured_on: '2026-08-23', value: 84.2 },
+              ],
+            },
+            {
+              metric: 'custom:17',
+              label: 'Живот',
+              unit: 'cm',
+              definition_id: 17,
+              first_value: 86,
+              latest_value: 84,
+              change: -2,
+              first_measured_on: '2026-07-28',
+              latest_measured_on: '2026-08-23',
+              point_count: 3,
+              span_days: 26,
+              interpretation_status: 'available',
+              points: [
+                { measured_on: '2026-07-28', value: 86 },
+                { measured_on: '2026-08-10', value: 85 },
+                { measured_on: '2026-08-23', value: 84 },
               ],
             },
           ]

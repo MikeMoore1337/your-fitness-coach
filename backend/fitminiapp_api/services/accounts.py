@@ -58,6 +58,8 @@ from fitminiapp_api.models.support import BotSupportCase
 from fitminiapp_api.models.token import RefreshToken
 from fitminiapp_api.models.user import (
     BodyMeasurement,
+    BodyMeasurementCustomValue,
+    BodyMeasurementDefinition,
     CoachClient,
     CoachClientInvite,
     CoachRoleApplication,
@@ -364,7 +366,18 @@ def delete_user_cascade(db: Session, user: User) -> None:
     )
     db.query(Payment).filter(Payment.user_id == user.id).delete(synchronize_session=False)
     db.query(Subscription).filter(Subscription.user_id == user.id).delete(synchronize_session=False)
+    measurement_ids = [
+        row.id
+        for row in db.query(BodyMeasurement.id).filter(BodyMeasurement.user_id == user.id).all()
+    ]
+    if measurement_ids:
+        db.query(BodyMeasurementCustomValue).filter(
+            BodyMeasurementCustomValue.measurement_id.in_(measurement_ids)
+        ).delete(synchronize_session=False)
     db.query(BodyMeasurement).filter(BodyMeasurement.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(BodyMeasurementDefinition).filter(BodyMeasurementDefinition.user_id == user.id).delete(
         synchronize_session=False
     )
     db.query(CardioSession).filter(CardioSession.user_id == user.id).delete(

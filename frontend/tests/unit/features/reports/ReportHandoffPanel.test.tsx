@@ -80,11 +80,38 @@ describe('ReportHandoffPanel', () => {
     expect(postCall?.[0]).toBe('/api/v1/report-handoffs');
     expect(postCall?.[1]).toEqual(
       expect.objectContaining({
-        body: JSON.stringify({ period: 'days_30' }),
+        body: JSON.stringify({ period: 'days_30', client_comment: null }),
         headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
       }),
     );
     expect(postCall?.[1]?.body).not.toContain('Ирина');
+  });
+
+  it('передаёт комментарий тренеру отдельно от фактов отчёта', async () => {
+    const handoff = {
+      ...makeHandoff('delivered'),
+      client_comment: 'Уделите внимание восстановлению.',
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === '/api/v1/report-handoffs') {
+        if (init?.method === 'POST') return new Response(JSON.stringify(handoff), { status: 201 });
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+
+    renderPanel();
+    fireEvent.change(screen.getByLabelText(/Комментарий тренеру/), {
+      target: { value: 'Уделите внимание восстановлению.' },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Отправить отчёт тренеру' }));
+
+    await waitFor(() => expect(screen.getByText(/Доставлено в центр уведомлений/)).toBeVisible());
+    const postCall = fetchMock.mock.calls.find(([, options]) => options?.method === 'POST');
+    expect(JSON.parse(String(postCall?.[1]?.body))).toEqual(
+      expect.objectContaining({ client_comment: 'Уделите внимание восстановлению.' }),
+    );
   });
 
   it('повторяет только неудачную доставку с новым ключом попытки', async () => {

@@ -16,9 +16,12 @@ describe('ContextualHelp', () => {
       </ContextualHelp>,
     );
 
-    const summary = screen.getByText('Что это?');
-    const details = summary.closest('details');
+    const summaryText = screen.getByText('Что это?');
+    const summary = summaryText.closest('summary') as HTMLElement;
+    const details = summary.closest('details') as HTMLDetailsElement;
+    expect(summary).toBeInTheDocument();
     expect(details).not.toHaveAttribute('open');
+    expect(summary?.querySelector('.disclosure-icon')).toBeInTheDocument();
 
     fireEvent.click(summary);
     expect(details).toHaveAttribute('open');

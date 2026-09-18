@@ -11,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -80,6 +81,7 @@ class ReportHandoff(Base):
         JSON, nullable=False, default=list, server_default="[]"
     )
     report_revision: Mapped[str] = mapped_column(String(64), nullable=False)
+    client_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     notification_id: Mapped[int | None] = mapped_column(

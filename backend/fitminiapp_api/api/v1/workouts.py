@@ -35,6 +35,9 @@ from fitminiapp_api.schemas.progress import (
     ProgressSummaryResponse,
 )
 from fitminiapp_api.schemas.workout import (
+    BodyMeasurementDefinitionCreate,
+    BodyMeasurementDefinitionResponse,
+    BodyMeasurementDefinitionUpdate,
     BodyMeasurementResponse,
     BodyMeasurementSave,
     TrainingAnalyticsResponse,
@@ -71,12 +74,19 @@ from fitminiapp_api.services.coach_clients import get_client_managed_by_coach
 from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.measurements import (
+    CustomMeasurementDefinitionError,
     MeasurementError,
     MeasurementNotFoundError,
+    archive_custom_measurement_definition,
+    create_custom_measurement_definition,
     delete_measurement,
+    list_custom_measurement_definitions,
     list_measurements,
+    restore_custom_measurement_definition,
     save_measurement,
+    serialize_custom_measurement_definition,
     serialize_measurement,
+    update_custom_measurement_definition,
 )
 from fitminiapp_api.services.notifications import cancel_workout_reminder, queue_notification
 from fitminiapp_api.services.nutrition_reports import (
@@ -1283,6 +1293,91 @@ def save_body_measurement(
     except MeasurementError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_measurement(row)
+
+
+@router.get(
+    "/diary/custom-definitions",
+    response_model=list[BodyMeasurementDefinitionResponse],
+)
+def body_measurement_definitions(
+    include_archived: bool = Query(default=False),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return [
+        serialize_custom_measurement_definition(row)
+        for row in list_custom_measurement_definitions(
+            db,
+            current_user,
+            include_archived=include_archived,
+        )
+    ]
+
+
+@router.post(
+    "/diary/custom-definitions",
+    response_model=BodyMeasurementDefinitionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_body_measurement_definition(
+    payload: BodyMeasurementDefinitionCreate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row = create_custom_measurement_definition(db, current_user, payload)
+    except CustomMeasurementDefinitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return serialize_custom_measurement_definition(row)
+
+
+@router.patch(
+    "/diary/custom-definitions/{definition_id}",
+    response_model=BodyMeasurementDefinitionResponse,
+)
+def update_body_measurement_definition(
+    definition_id: int,
+    payload: BodyMeasurementDefinitionUpdate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row = update_custom_measurement_definition(db, current_user, definition_id, payload)
+    except CustomMeasurementDefinitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return serialize_custom_measurement_definition(row)
+
+
+@router.delete(
+    "/diary/custom-definitions/{definition_id}",
+    response_model=BodyMeasurementDefinitionResponse,
+)
+def archive_body_measurement_definition(
+    definition_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row = archive_custom_measurement_definition(db, current_user, definition_id)
+    except CustomMeasurementDefinitionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_custom_measurement_definition(row)
+
+
+@router.post(
+    "/diary/custom-definitions/{definition_id}/restore",
+    response_model=BodyMeasurementDefinitionResponse,
+)
+def restore_body_measurement_definition(
+    definition_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        row = restore_custom_measurement_definition(db, current_user, definition_id)
+    except CustomMeasurementDefinitionError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_custom_measurement_definition(row)
 
 
 @router.delete("/diary/{measurement_id}", status_code=status.HTTP_204_NO_CONTENT)

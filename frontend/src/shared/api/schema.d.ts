@@ -1727,6 +1727,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/clients/{client_id}/measurements/custom-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Client Measurement Definitions */
+        get: operations["coach_client_measurement_definitions_api_v1_coach_clients__client_id__measurements_custom_definitions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/clients/{client_id}/measurements/{measurement_id}": {
         parameters: {
             query?: never;
@@ -2253,6 +2270,59 @@ export interface paths {
         put?: never;
         /** Save Body Measurement */
         post: operations["save_body_measurement_api_v1_workouts_diary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/diary/custom-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Body Measurement Definitions */
+        get: operations["body_measurement_definitions_api_v1_workouts_diary_custom_definitions_get"];
+        put?: never;
+        /** Create Body Measurement Definition */
+        post: operations["create_body_measurement_definition_api_v1_workouts_diary_custom_definitions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/diary/custom-definitions/{definition_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Archive Body Measurement Definition */
+        delete: operations["archive_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Body Measurement Definition */
+        patch: operations["update_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/workouts/diary/custom-definitions/{definition_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Body Measurement Definition */
+        post: operations["restore_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4946,6 +5016,68 @@ export interface components {
             /** Reason */
             reason?: ("not_enjoyable" | "uncomfortable" | "not_confident" | "other") | null;
         };
+        /** BodyMeasurementCustomValueResponse */
+        BodyMeasurementCustomValueResponse: {
+            /** Definition Id */
+            definition_id: number;
+            /** Label */
+            label: string;
+            /**
+             * Unit
+             * @default cm
+             * @constant
+             */
+            unit: "cm";
+            /** Value */
+            value: number;
+            /**
+             * Archived
+             * @default false
+             */
+            archived: boolean;
+        };
+        /** BodyMeasurementCustomValueSave */
+        BodyMeasurementCustomValueSave: {
+            /** Definition Id */
+            definition_id: number;
+            /** Value */
+            value?: number | null;
+        };
+        /** BodyMeasurementDefinitionCreate */
+        BodyMeasurementDefinitionCreate: {
+            /** Label */
+            label: string;
+        };
+        /** BodyMeasurementDefinitionResponse */
+        BodyMeasurementDefinitionResponse: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /**
+             * Unit
+             * @default cm
+             * @constant
+             */
+            unit: "cm";
+            /** Archived */
+            archived: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** BodyMeasurementDefinitionUpdate */
+        BodyMeasurementDefinitionUpdate: {
+            /** Label */
+            label: string;
+        };
         /** BodyMeasurementGuidance */
         BodyMeasurementGuidance: {
             /**
@@ -4988,6 +5120,8 @@ export interface components {
             note?: string | null;
             /** Created At */
             created_at?: string | null;
+            /** Custom Values */
+            custom_values?: components["schemas"]["BodyMeasurementCustomValueResponse"][];
         };
         /** BodyMeasurementSave */
         BodyMeasurementSave: {
@@ -5007,6 +5141,8 @@ export interface components {
             thigh_cm?: number | null;
             /** Note */
             note?: string | null;
+            /** Custom Values */
+            custom_values?: components["schemas"]["BodyMeasurementCustomValueSave"][];
         };
         /** BodyMetricPoint */
         BodyMetricPoint: {
@@ -5020,11 +5156,21 @@ export interface components {
         };
         /** BodyMetricTrend */
         BodyMetricTrend: {
+            /** Metric */
+            metric: string;
             /**
-             * Metric
+             * Label
+             * @default
+             */
+            label: string;
+            /**
+             * Unit
+             * @default cm
              * @enum {string}
              */
-            metric: "weight_kg" | "chest_cm" | "waist_cm" | "hips_cm" | "biceps_cm" | "thigh_cm";
+            unit: "kg" | "cm";
+            /** Definition Id */
+            definition_id?: number | null;
             /** First Value */
             first_value: number;
             /** Latest Value */
@@ -7830,6 +7976,33 @@ export interface components {
             biceps_cm?: number | null;
             /** Thigh Cm */
             thigh_cm?: number | null;
+            /** Custom Measurements */
+            custom_measurements?: components["schemas"]["LatestCustomBodyMeasurement"][];
+        };
+        /** LatestCustomBodyMeasurement */
+        LatestCustomBodyMeasurement: {
+            /** Definition Id */
+            definition_id: number;
+            /** Label */
+            label: string;
+            /**
+             * Unit
+             * @default cm
+             * @constant
+             */
+            unit: "cm";
+            /** Value */
+            value: number;
+            /**
+             * Measured On
+             * Format: date
+             */
+            measured_on: string;
+            /**
+             * Archived
+             * @default false
+             */
+            archived: boolean;
         };
         /** LoggedSetItem */
         LoggedSetItem: {
@@ -10036,6 +10209,8 @@ export interface components {
             date_from?: string | null;
             /** Date To */
             date_to?: string | null;
+            /** Client Comment */
+            client_comment?: string | null;
         };
         /** ReportHandoffProgressReport */
         ReportHandoffProgressReport: {
@@ -10103,6 +10278,8 @@ export interface components {
             delivery_status: "delivered" | "pending" | "failed";
             /** Delivery Attempt */
             delivery_attempt: number;
+            /** Client Comment */
+            client_comment?: string | null;
             /**
              * Live
              * @default true
@@ -15331,6 +15508,39 @@ export interface operations {
             };
         };
     };
+    coach_client_measurement_definitions_api_v1_coach_clients__client_id__measurements_custom_definitions_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_coach_client_measurement_api_v1_coach_clients__client_id__measurements__measurement_id__delete: {
         parameters: {
             query?: never;
@@ -16416,6 +16626,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BodyMeasurementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    body_measurement_definitions_api_v1_workouts_diary_custom_definitions_get: {
+        parameters: {
+            query?: {
+                include_archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_body_measurement_definition_api_v1_workouts_diary_custom_definitions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BodyMeasurementDefinitionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BodyMeasurementDefinitionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_body_measurement_definition_api_v1_workouts_diary_custom_definitions__definition_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                definition_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyMeasurementDefinitionResponse"];
                 };
             };
             /** @description Validation Error */

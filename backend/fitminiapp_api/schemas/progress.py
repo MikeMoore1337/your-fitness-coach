@@ -197,7 +197,10 @@ class BodyMetricPoint(BaseModel):
 
 
 class BodyMetricTrend(BaseModel):
-    metric: Literal["weight_kg", "chest_cm", "waist_cm", "hips_cm", "biceps_cm", "thigh_cm"]
+    metric: str
+    label: str = ""
+    unit: Literal["kg", "cm"] = "cm"
+    definition_id: int | None = Field(default=None, ge=1)
     first_value: float
     latest_value: float
     change: float | None = None
@@ -211,6 +214,15 @@ class BodyMetricTrend(BaseModel):
     points: list[BodyMetricPoint]
 
 
+class LatestCustomBodyMeasurement(BaseModel):
+    definition_id: int = Field(ge=1)
+    label: str
+    unit: Literal["cm"] = "cm"
+    value: float
+    measured_on: date
+    archived: bool = False
+
+
 class LatestBodyMeasurement(BaseModel):
     measured_on: date
     weight_kg: float | None = None
@@ -219,6 +231,7 @@ class LatestBodyMeasurement(BaseModel):
     hips_cm: float | None = None
     biceps_cm: float | None = None
     thigh_cm: float | None = None
+    custom_measurements: list[LatestCustomBodyMeasurement] = Field(default_factory=list)
 
 
 class BodyMeasurementGuidance(BaseModel):

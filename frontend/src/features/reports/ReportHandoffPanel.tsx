@@ -101,6 +101,7 @@ function ReportHandoffPanelContent({
   trainer,
 }: ReportHandoffPanelProps) {
   const queryClient = useQueryClient();
+  const [clientComment, setClientComment] = useState('');
   const [handoffKey, setHandoffKey] = useState(idempotencyKey);
   const [retryKey, setRetryKey] = useState<string | null>(null);
   const [lastHandoff, setLastHandoff] = useState<ReportHandoff | null>(null);
@@ -118,6 +119,7 @@ function ReportHandoffPanelContent({
         body: {
           period,
           ...(period === 'custom' ? { date_from: dateFrom, date_to: dateTo } : {}),
+          client_comment: clientComment.trim() || null,
         },
         headers: { 'Idempotency-Key': key },
       }),
@@ -237,6 +239,23 @@ function ReportHandoffPanelContent({
         )}
       </fieldset>
 
+      <label className="progress-report-handoff__comment">
+        <span>
+          Комментарий тренеру <small>(необязательно)</small>
+        </span>
+        <textarea
+          aria-describedby="report-handoff-comment-hint"
+          maxLength={2000}
+          value={clientComment}
+          onChange={(event) => setClientComment(event.target.value)}
+          placeholder="Например: на что обратить внимание при разборе периода"
+        />
+        <small id="report-handoff-comment-hint">
+          Это ваш текст для тренера. Он хранится отдельно от фактов отчёта и не участвует в
+          аналитике.
+        </small>
+      </label>
+
       <div className="progress-report-handoff__actions">
         <Button
           disabled={!trainer || loading || isPending || lastHandoff?.delivery_status === 'pending'}
@@ -288,6 +307,7 @@ function ReportHandoffPanelContent({
                   {statusLabel(item.delivery_status)} ·{' '}
                   {formatCreatedAt(item.created_at, item.timezone)}
                 </small>
+                {item.client_comment && <small>Комментарий приложен отдельно от фактов</small>}
                 {item.delivery_status === 'failed' && (
                   <Button
                     aria-label={`Повторить отправку отчёта за период ${item.period_start} — ${item.period_end}`}

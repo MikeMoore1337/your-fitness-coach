@@ -102,15 +102,26 @@ def _safe(value: Any) -> str:
     return escape(str(value), quote=False)
 
 
-def _body_metric(metric: str) -> tuple[str, str]:
-    return {
+def _body_metric(metric: str, *, label: Any = None, unit: Any = None) -> tuple[str, str]:
+    fallback_label, fallback_suffix = {
         "weight_kg": ("Масса", " кг"),
         "chest_cm": ("Грудь", " см"),
         "waist_cm": ("Талия", " см"),
         "hips_cm": ("Бёдра", " см"),
         "biceps_cm": ("Бицепс", " см"),
         "thigh_cm": ("Бедро", " см"),
-    }.get(metric, (metric, ""))
+    }.get(
+        metric,
+        ("Пользовательский показатель" if metric.startswith("custom:") else "Замер", " см"),
+    )
+    display_label = label.strip() if isinstance(label, str) and label.strip() else fallback_label
+    display_unit = unit.strip() if isinstance(unit, str) and unit.strip() else None
+    suffix = (
+        {"kg": " кг", "cm": " см"}.get(display_unit, fallback_suffix)
+        if display_unit is not None
+        else fallback_suffix
+    )
+    return display_label, suffix
 
 
 def _wellbeing_value(value: int, metric: str) -> str:
@@ -318,7 +329,11 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
             ]
         ]
         for trend in trends:
-            metric_name, unit = _body_metric(str(trend["metric"]))
+            metric_name, unit = _body_metric(
+                str(trend["metric"]),
+                label=trend.get("label"),
+                unit=trend.get("unit"),
+            )
             trend_rows.append(
                 [
                     Paragraph(_safe(metric_name), body),

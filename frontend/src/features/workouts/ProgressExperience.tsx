@@ -41,7 +41,7 @@ import {
 type BodyTrend = ProgressSummary['body']['trends'][number];
 type AdherenceComponent = ProgressSummary['adherence']['workouts'];
 
-const bodyMetricLabels: Record<BodyTrend['metric'], string> = {
+const bodyMetricLabels: Record<string, string> = {
   weight_kg: 'Вес',
   chest_cm: 'Грудь',
   waist_cm: 'Талия',
@@ -50,14 +50,18 @@ const bodyMetricLabels: Record<BodyTrend['metric'], string> = {
   thigh_cm: 'Окружность бедра',
 };
 
-const bodyMetricUnits: Record<BodyTrend['metric'], string> = {
-  weight_kg: 'кг',
-  chest_cm: 'см',
-  waist_cm: 'см',
-  hips_cm: 'см',
-  biceps_cm: 'см',
-  thigh_cm: 'см',
+const bodyMetricUnits: Record<BodyTrend['unit'], string> = {
+  kg: 'кг',
+  cm: 'см',
 };
+
+function bodyMetricLabel(trend: BodyTrend): string {
+  return trend.label || bodyMetricLabels[trend.metric] || 'Замер';
+}
+
+function bodyMetricUnit(trend: BodyTrend): string {
+  return bodyMetricUnits[trend.unit];
+}
 
 function formatNumber(value: number, maximumFractionDigits = 1): string {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits }).format(value);
@@ -167,17 +171,18 @@ function ProgressTrendRows({
   selectedMetric: BodyTrend['metric'] | null;
   trends: BodyTrend[];
 }) {
+  if (selectedMetric === null) return null;
   const compactTrends = trends.filter((trend) => trend.metric !== selectedMetric);
   if (!compactTrends.length) return null;
   return (
     <ul className="progress-overview__trend-list" aria-label="Другие замеры тела">
       {compactTrends.map((trend) => (
         <li key={trend.metric}>
-          <span>{bodyMetricLabels[trend.metric]}</span>
+          <span>{bodyMetricLabel(trend)}</span>
           <strong>
-            {formatNumber(trend.latest_value)} {bodyMetricUnits[trend.metric]}
+            {formatNumber(trend.latest_value)} {bodyMetricUnit(trend)}
           </strong>
-          <small>{formatChange(trend.change, bodyMetricUnits[trend.metric])}</small>
+          <small>{formatChange(trend.change, bodyMetricUnit(trend))}</small>
         </li>
       ))}
     </ul>
@@ -194,10 +199,13 @@ function ProgressTrendPanel({
   showConfidence?: boolean;
 }) {
   const trends = summary.body.trends;
-  const defaultMetric =
-    trends.find((trend) => trend.metric === 'weight_kg')?.metric ?? trends[0]?.metric ?? null;
+  const defaultMetric = trends.find((trend) => trend.metric === 'weight_kg')?.metric ?? null;
   const [selectedMetric, setSelectedMetric] = useState<BodyTrend['metric'] | null>(defaultMetric);
-  const selectedTrend = trends.find((trend) => trend.metric === selectedMetric) ?? trends[0];
+  const activeMetric =
+    selectedMetric !== null && trends.some((trend) => trend.metric === selectedMetric)
+      ? selectedMetric
+      : defaultMetric;
+  const selectedTrend = trends.find((trend) => trend.metric === activeMetric);
 
   return (
     <section className={`progress-trend-panel${detail ? ' progress-trend-panel--detail' : ''}`}>
@@ -208,10 +216,8 @@ function ProgressTrendPanel({
         </div>
         {selectedTrend && (
           <strong className="progress-trend-panel__value">
-            {formatNumber(selectedTrend.latest_value)} {bodyMetricUnits[selectedTrend.metric]}
-            <small>
-              {formatChange(selectedTrend.change, bodyMetricUnits[selectedTrend.metric])}
-            </small>
+            {formatNumber(selectedTrend.latest_value)} {bodyMetricUnit(selectedTrend)}
+            <small>{formatChange(selectedTrend.change, bodyMetricUnit(selectedTrend))}</small>
           </strong>
         )}
       </div>
@@ -220,14 +226,14 @@ function ProgressTrendPanel({
           <div className="progress-trend-switcher" role="tablist" aria-label="Показатель графика">
             {trends.map((trend) => (
               <button
-                aria-selected={selectedTrend?.metric === trend.metric}
-                className={selectedTrend?.metric === trend.metric ? 'is-active' : ''}
+                aria-selected={activeMetric === trend.metric}
+                className={activeMetric === trend.metric ? 'is-active' : ''}
                 key={trend.metric}
                 onClick={() => setSelectedMetric(trend.metric)}
                 role="tab"
                 type="button"
               >
-                {bodyMetricLabels[trend.metric]}
+                {bodyMetricLabel(trend)}
               </button>
             ))}
           </div>
@@ -236,7 +242,7 @@ function ProgressTrendPanel({
           ) : (
             <EmptyState title="Мало данных" text="За выбранный период нет замеров тела." />
           )}
-          <ProgressTrendRows selectedMetric={selectedTrend?.metric ?? null} trends={trends} />
+          <ProgressTrendRows selectedMetric={activeMetric} trends={trends} />
           {showConfidence && (
             <DataConfidence
               className="data-confidence--compact"
@@ -722,13 +728,13 @@ function TrainingSection({
 }
 
 function BodyChart({ trend }: { trend: BodyTrend }) {
-  const unit = bodyMetricUnits[trend.metric];
+  const unit = bodyMetricUnit(trend);
   return (
     <TimeSeriesChart
-      ariaLabel={`${bodyMetricLabels[trend.metric]}: ${trend.points
+      ariaLabel={`${bodyMetricLabel(trend)}: ${trend.points
         .map((point) => `${formatDate(point.measured_on)} — ${formatNumber(point.value)} ${unit}`)
         .join(', ')}`}
-      metric={bodyMetricLabels[trend.metric]}
+      metric={bodyMetricLabel(trend)}
       period={`${formatDate(trend.first_measured_on)} — ${formatDate(trend.latest_measured_on)}`}
       points={trend.points.map((point) => ({
         key: point.measured_on,
@@ -848,7 +854,7 @@ function BodySection({
             const interpretation = trendInterpretationText(trend, body.guidance);
             return interpretation ? (
               <p className="progress-note" key={`${trend.metric}-interpretation`}>
-                <strong>{bodyMetricLabels[trend.metric]}:</strong> {interpretation}
+                <strong>{bodyMetricLabel(trend)}:</strong> {interpretation}
               </p>
             ) : null;
           })}

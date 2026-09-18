@@ -1,7 +1,11 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
-import type { BodyMeasurement, BodyMeasurementSave } from '../../shared/api/types';
+import type {
+  BodyMeasurement,
+  BodyMeasurementDefinition,
+  BodyMeasurementSave,
+} from '../../shared/api/types';
 import { LIVE_DATA_REFETCH_INTERVAL_MS } from '../../shared/sync';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Button, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
@@ -43,12 +47,22 @@ export function Diary({
   const base = clientId
     ? `/api/v1/coach/clients/${clientId}/measurements`
     : '/api/v1/workouts/diary';
+  const definitionsBase = clientId
+    ? `/api/v1/coach/clients/${clientId}/measurements/custom-definitions?include_archived=true`
+    : '/api/v1/workouts/diary/custom-definitions?include_archived=true';
   const rows = useQuery({
     queryKey: queryKeys.measurements.subject(clientId),
     queryFn: () => api<BodyMeasurement[]>(base),
     refetchInterval: LIVE_DATA_REFETCH_INTERVAL_MS,
     refetchOnWindowFocus: true,
   });
+  const definitions = useQuery({
+    queryKey: queryKeys.measurements.definitions(clientId),
+    queryFn: () => api<BodyMeasurementDefinition[]>(definitionsBase),
+    refetchOnWindowFocus: true,
+  });
+  const [definitionLabel, setDefinitionLabel] = useState('');
+  const [editingDefinitionId, setEditingDefinitionId] = useState<number | null>(null);
   const mutation = useMutation({
     mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
       api(path, { method, body }),
@@ -75,6 +89,19 @@ export function Diary({
       setSubmitError(message);
       toast(message, 'error');
     },
+  });
+  const definitionMutation = useMutation({
+    mutationFn: ({ path, method, body }: { path: string; method: string; body?: unknown }) =>
+      api(path, { method, body }),
+    onSuccess: async () => {
+      setDefinitionLabel('');
+      setEditingDefinitionId(null);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.measurements.definitions(clientId),
+      });
+      toast('Список показателей обновлён');
+    },
+    onError: (reason) => toast((reason as Error).message, 'error'),
   });
   const numeric = [
     'weight_kg',
@@ -110,11 +137,40 @@ export function Diary({
       biceps_cm: item.biceps_cm,
       thigh_cm: item.thigh_cm,
       note: item.note,
+      custom_values: (item.custom_values ?? []).map((value) => ({
+        definition_id: value.definition_id,
+        value: value.value,
+      })),
     });
     requestAnimationFrame(() => {
       formRef.current?.scrollIntoView?.({ block: 'center' });
       formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
     });
+  };
+  const activeDefinitions = (definitions.data ?? []).filter((definition) => !definition.archived);
+  const setCustomValue = (definitionId: number, value: number | null) => {
+    const customValues = (form.custom_values ?? []).filter(
+      (item) => item.definition_id !== definitionId,
+    );
+    customValues.push({ definition_id: definitionId, value });
+    setForm({ ...form, custom_values: customValues });
+  };
+  const saveDefinition = () => {
+    const label = definitionLabel.trim();
+    if (!label) return;
+    if (editingDefinitionId === null) {
+      definitionMutation.mutate({
+        path: '/api/v1/workouts/diary/custom-definitions',
+        method: 'POST',
+        body: { label },
+      });
+    } else {
+      definitionMutation.mutate({
+        path: `/api/v1/workouts/diary/custom-definitions/${editingDefinitionId}`,
+        method: 'PATCH',
+        body: { label },
+      });
+    }
   };
   const content = (
     <>
@@ -191,6 +247,31 @@ export function Diary({
                 />
               </label>
             ))}
+            {activeDefinitions.map((definition) => {
+              const currentValue = form.custom_values?.find(
+                (item) => item.definition_id === definition.id,
+              )?.value;
+              return (
+                <label className="field" key={definition.id}>
+                  <span>{definition.label}, см</span>
+                  <input
+                    aria-label={`${definition.label}, см`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    min={0.1}
+                    max={300}
+                    value={currentValue ?? ''}
+                    onChange={(e) =>
+                      setCustomValue(
+                        definition.id,
+                        e.target.value === '' ? null : Number(e.target.value),
+                      )
+                    }
+                  />
+                </label>
+              );
+            })}
           </div>
           <div className="auth-notice stack" aria-label="Как делать замеры">
             <strong>Как сравнивать замеры</strong>
@@ -244,6 +325,120 @@ export function Diary({
             </Button>
           </div>
         </form>
+        {!clientId && !readOnly && (
+          <section className="measurement-custom-fields" aria-labelledby="custom-measurement-title">
+            <header className="measurement-custom-fields__header">
+              <div>
+                <span className="progress-section__eyebrow">Только для вас</span>
+                <h3 id="custom-measurement-title">Свои показатели</h3>
+                <p>
+                  Добавляйте только те дополнительные замеры, которые хотите вести в сантиметрах.
+                </p>
+              </div>
+            </header>
+            <form
+              className="measurement-custom-fields__form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveDefinition();
+              }}
+            >
+              <label className="field">
+                <span>{editingDefinitionId === null ? 'Новый показатель' : 'Новое название'}</span>
+                <input
+                  aria-label="Название пользовательского показателя"
+                  autoComplete="off"
+                  className="measurement-custom-fields__label-input"
+                  enterKeyHint="done"
+                  maxLength={64}
+                  type="text"
+                  value={definitionLabel}
+                  onChange={(event) => setDefinitionLabel(event.target.value)}
+                />
+              </label>
+              <Button
+                disabled={definitionMutation.isPending || !definitionLabel.trim()}
+                type="submit"
+              >
+                {editingDefinitionId === null ? 'Добавить показатель' : 'Сохранить название'}
+              </Button>
+              {editingDefinitionId !== null && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setEditingDefinitionId(null);
+                    setDefinitionLabel('');
+                  }}
+                >
+                  Отменить
+                </Button>
+              )}
+            </form>
+            {definitionMutation.error && (
+              <p className="measurement-diary__error" role="alert">
+                {(definitionMutation.error as Error).message}
+              </p>
+            )}
+            {definitions.error ? (
+              <p className="measurement-diary__error" role="alert">
+                {(definitions.error as Error).message}
+              </p>
+            ) : (
+              <ul className="measurement-custom-fields__list">
+                {(definitions.data ?? []).map((definition) => (
+                  <li key={definition.id}>
+                    <span>
+                      <strong>{definition.label}</strong> · см
+                      {definition.archived && <small>Архивирован</small>}
+                    </span>
+                    <div>
+                      {!definition.archived && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => {
+                            setEditingDefinitionId(definition.id);
+                            setDefinitionLabel(definition.label);
+                          }}
+                        >
+                          Переименовать
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={async () => {
+                          if (definition.archived) {
+                            definitionMutation.mutate({
+                              path: `/api/v1/workouts/diary/custom-definitions/${definition.id}/restore`,
+                              method: 'POST',
+                            });
+                            return;
+                          }
+                          if (
+                            await confirm({
+                              title: 'Архивировать показатель?',
+                              message: `${definition.label}. История сохранится, новые записи будут скрыты.`,
+                              confirmText: 'Архивировать',
+                            })
+                          ) {
+                            definitionMutation.mutate({
+                              path: `/api/v1/workouts/diary/custom-definitions/${definition.id}`,
+                              method: 'DELETE',
+                            });
+                          }
+                        }}
+                      >
+                        {definition.archived ? 'Восстановить' : 'Архивировать'}
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
         {rows.isLoading ? (
           <LoadingState label="Загружаем историю замеров…" />
         ) : rows.error ? (
@@ -270,13 +465,17 @@ export function Diary({
                     })}
                   </time>
                   <p>
-                    {numeric
-                      .filter((key) => item[key] != null)
-                      .map(
-                        (key) =>
-                          `${{ weight_kg: 'Вес', chest_cm: 'Грудь', waist_cm: 'Талия', hips_cm: 'Бёдра', biceps_cm: 'Окружность плеча', thigh_cm: 'Окружность бедра' }[key]}: ${item[key]} ${key === 'weight_kg' ? 'кг' : 'см'}`,
-                      )
-                      .join(' · ')}
+                    {[
+                      ...numeric
+                        .filter((key) => item[key] != null)
+                        .map(
+                          (key) =>
+                            `${{ weight_kg: 'Вес', chest_cm: 'Грудь', waist_cm: 'Талия', hips_cm: 'Бёдра', biceps_cm: 'Окружность плеча', thigh_cm: 'Окружность бедра' }[key]}: ${item[key]} ${key === 'weight_kg' ? 'кг' : 'см'}`,
+                        ),
+                      ...(item.custom_values ?? []).map(
+                        (value) => `${value.label}: ${value.value} см`,
+                      ),
+                    ].join(' · ')}
                   </p>
                   {item.note && <p className="measurement-history__note">{item.note}</p>}
                 </div>

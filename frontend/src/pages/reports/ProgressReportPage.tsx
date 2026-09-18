@@ -325,6 +325,14 @@ const bodyMetricLabels: Record<string, string> = {
   waist_cm: 'Талия',
 };
 
+function bodyMetricLabel(trend: ProgressReport['body']['trends'][number]): string {
+  return trend.label || bodyMetricLabels[trend.metric] || 'Замер';
+}
+
+function bodyMetricUnit(trend: ProgressReport['body']['trends'][number]): string {
+  return trend.unit === 'kg' ? 'кг' : 'см';
+}
+
 function WeightChart({ report }: { report: ProgressReport }) {
   const trend = report.body.trends.find((item) => item.metric === 'weight_kg');
   if (!trend) {
@@ -370,6 +378,42 @@ function PrintPageHeader({
       </span>
     </header>
   );
+}
+
+function factualSummaryLines(report: ProgressReport): Array<{ label: string; value: string }> {
+  const lines: Array<{ label: string; value: string }> = [];
+  if (report.training.planned_workouts > 0) {
+    lines.push({
+      label: 'Тренировки',
+      value: `${report.training.completed_workouts} завершено из ${report.training.planned_workouts}`,
+    });
+  }
+  if (report.cardio.completed_sessions > 0) {
+    lines.push({
+      label: 'Кардио',
+      value: `${report.cardio.completed_sessions} сессий · ${report.cardio.duration_minutes} мин`,
+    });
+  }
+  if (report.nutrition.summary.logged_days > 0) {
+    lines.push({
+      label: 'Питание',
+      value: `${report.nutrition.summary.logged_days} дней · ${formatNumber(report.nutrition.summary.coverage_percent)}% покрытия`,
+    });
+  }
+  const bodyValues = report.body.trends.map((trend) => {
+    const change =
+      trend.change == null
+        ? ''
+        : ` (${trend.change > 0 ? '+' : ''}${formatNumber(trend.change)} ${bodyMetricUnit(trend)})`;
+    return `${bodyMetricLabel(trend)}: ${formatNumber(trend.latest_value)} ${bodyMetricUnit(trend)}${change}`;
+  });
+  if (bodyValues.length > 0) {
+    lines.push({ label: 'Замеры тела', value: bodyValues.join(' · ') });
+  }
+  if (report.check_ins.length > 0) {
+    lines.push({ label: 'Еженедельные отметки', value: `${report.check_ins.length}` });
+  }
+  return lines;
 }
 
 function ReportContent({
@@ -427,6 +471,29 @@ function ReportContent({
       </section>
 
       {controls}
+
+      <section
+        className="progress-report-factual-summary"
+        aria-labelledby="report-factual-summary-title"
+      >
+        <header>
+          <span className="eyebrow">Коротко</span>
+          <h2 id="report-factual-summary-title">Фактическая сводка</h2>
+          <p>Только записанные значения за выбранный период, без итоговой оценки здоровья.</p>
+        </header>
+        {factualSummaryLines(report).length > 0 ? (
+          <dl>
+            {factualSummaryLines(report).map((line) => (
+              <div key={line.label}>
+                <dt>{line.label}</dt>
+                <dd>{line.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p>За выбранный период пока нет заполненных фактов.</p>
+        )}
+      </section>
 
       <section className="progress-report-section" aria-labelledby="report-training-title">
         <header>
@@ -587,17 +654,19 @@ function ReportContent({
               {circumference.length ? (
                 circumference.map((trend) => (
                   <tr key={trend.metric}>
-                    <th scope="row">{bodyMetricLabels[trend.metric]}</th>
+                    <th scope="row">{bodyMetricLabel(trend)}</th>
                     <td>
-                      {formatNumber(trend.first_value)} см · {formatDate(trend.first_measured_on)}
+                      {formatNumber(trend.first_value)} {bodyMetricUnit(trend)} ·{' '}
+                      {formatDate(trend.first_measured_on)}
                     </td>
                     <td>
-                      {formatNumber(trend.latest_value)} см · {formatDate(trend.latest_measured_on)}
+                      {formatNumber(trend.latest_value)} {bodyMetricUnit(trend)} ·{' '}
+                      {formatDate(trend.latest_measured_on)}
                     </td>
                     <td>
                       {trend.change == null
                         ? 'Недостаточно точек'
-                        : `${formatNumber(trend.change)} см`}
+                        : `${formatNumber(trend.change)} ${bodyMetricUnit(trend)}`}
                     </td>
                   </tr>
                 ))
@@ -917,6 +986,12 @@ export default function ProgressReportPage() {
             </p>
             {handoffView.data.data_changed_since_send && (
               <p>Данные изменились после отправки; сейчас показаны актуальные факты.</p>
+            )}
+            {handoffView.data.handoff.client_comment && (
+              <div className="progress-report-handoff-banner__comment">
+                <span>Комментарий клиента</span>
+                <p>{handoffView.data.handoff.client_comment}</p>
+              </div>
             )}
           </div>
         </section>

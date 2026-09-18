@@ -285,6 +285,27 @@ body:has(.app-shell--design-v2) {
   color: var(--v2-text-secondary);
 }
 
+.progress-report-handoff__comment {
+  display: grid;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.progress-report-handoff__comment > span {
+  font-weight: 800;
+}
+
+.progress-report-handoff__comment > span small,
+.progress-report-handoff__comment > small {
+  color: var(--v2-text-secondary);
+  font-weight: 400;
+}
+
+.progress-report-handoff__comment textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
 .progress-report-handoff__actions {
   display: flex;
   flex-wrap: wrap;
@@ -346,6 +367,21 @@ body:has(.app-shell--design-v2) {
 
 .progress-report-handoff-banner p {
   color: var(--v2-text-secondary);
+}
+
+.progress-report-handoff-banner__comment {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--v2-border-strong, var(--v2-border));
+  background: var(--v2-surface);
+}
+
+.progress-report-handoff-banner__comment span {
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .progress-report-document {
@@ -411,6 +447,53 @@ body:has(.app-shell--design-v2) {
 
 .progress-report-confidence .data-confidence {
   height: 100%;
+}
+
+.progress-report-factual-summary {
+  display: grid;
+  gap: 16px;
+  margin-block: 28px;
+  padding: 18px;
+  border: 1px solid var(--v2-border);
+  border-left: 3px solid var(--v2-lime);
+  background: var(--v2-surface-secondary);
+}
+
+.progress-report-factual-summary > header,
+.progress-report-factual-summary dl,
+.progress-report-factual-summary dl > div {
+  display: grid;
+  gap: 4px;
+}
+
+.progress-report-factual-summary h2,
+.progress-report-factual-summary p,
+.progress-report-factual-summary dl,
+.progress-report-factual-summary dt,
+.progress-report-factual-summary dd {
+  margin: 0;
+}
+
+.progress-report-factual-summary p,
+.progress-report-factual-summary dt {
+  color: var(--v2-text-secondary);
+}
+
+.progress-report-factual-summary dl {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 1px;
+  background: var(--v2-border);
+}
+
+.progress-report-factual-summary dl > div {
+  min-width: 0;
+  padding: 12px;
+  background: var(--v2-surface);
+}
+
+.progress-report-factual-summary dd {
+  overflow-wrap: anywhere;
+  font-weight: 700;
 }
 
 .progress-report-section,
@@ -634,6 +717,10 @@ body:has(.app-shell--design-v2) {
   .progress-report-confidence {
     grid-template-columns: 1fr;
     margin-block: 18px 28px;
+  }
+
+  .progress-report-factual-summary dl {
+    grid-template-columns: 1fr;
   }
 
   .progress-report-facts {

@@ -502,8 +502,12 @@
 
 .app-section--progress .progress-overview__adherence summary,
 .app-section--progress .progress-priority--compact summary {
+  display: flex;
   min-height: 48px;
+  width: 100%;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   cursor: pointer;
   list-style: none;
 }
@@ -516,7 +520,15 @@
 .app-section--progress .progress-overview__adherence summary > span,
 .app-section--progress .progress-priority--compact summary > span {
   display: grid;
+  flex: 1 1 auto;
   gap: 2px;
+  min-width: 0;
+}
+
+.app-section--progress .progress-overview__adherence summary > .disclosure-icon,
+.app-section--progress .progress-priority--compact summary > .disclosure-icon {
+  flex: 0 0 28px;
+  align-self: center;
 }
 
 .app-section--progress .progress-overview__adherence summary small,
@@ -573,6 +585,7 @@
 }
 
 .app-section--progress .progress-priority--compact {
+  display: block;
   padding: 0 14px;
   border: 1px solid var(--v2-border);
   border-radius: var(--v2-control-radius);

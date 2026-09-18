@@ -16,6 +16,9 @@ from fitminiapp_api.models.program import (
     UserWorkoutSet,
 )
 from fitminiapp_api.models.user import BodyMeasurement, CoachClient, User
+from fitminiapp_api.schemas.progress import NutritionReportPeriod
+from fitminiapp_api.services import progress_report_pdf
+from fitminiapp_api.services.progress_reports import build_progress_report
 
 
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
@@ -198,6 +201,71 @@ def test_progress_report_reuses_canonical_facts_without_internal_ids(client) -> 
     assert "Содержимое дневника" not in response.text
     assert "user_id" not in response.text
     assert '"id"' not in response.text
+
+
+def test_progress_report_download_uses_custom_definition_label_in_pdf(client, monkeypatch) -> None:
+    headers = _auth(client, 67_051)
+    user_id = _user_id(67_051)
+    _seed_report_data(user_id)
+    definition = client.post(
+        "/api/v1/workouts/diary/custom-definitions",
+        json={"label": "Пользовательский показатель"},
+        headers=headers,
+    )
+    assert definition.status_code == 201, definition.text
+    measurement = client.post(
+        "/api/v1/workouts/diary",
+        json={
+            "measured_on": today_msk().isoformat(),
+            "custom_values": [{"definition_id": definition.json()["id"], "value": 86}],
+        },
+        headers=headers,
+    )
+    assert measurement.status_code == 200, measurement.text
+
+    rendered_paragraphs: list[str] = []
+    original_paragraph = progress_report_pdf.Paragraph
+
+    def capture_paragraph(text, style, *args, **kwargs):
+        rendered_paragraphs.append(str(text))
+        return original_paragraph(text, style, *args, **kwargs)
+
+    monkeypatch.setattr(progress_report_pdf, "Paragraph", capture_paragraph)
+    created = client.post(
+        "/api/v1/workouts/progress/report/download-link",
+        params={"period": "days_30"},
+        headers=headers,
+    )
+    assert created.status_code == 200, created.text
+    downloaded = client.get(created.json()["url"])
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.content.startswith(b"%PDF-")
+    assert any("Пользовательский показатель" in paragraph for paragraph in rendered_paragraphs)
+    assert all("custom:" not in paragraph for paragraph in rendered_paragraphs)
+
+    with get_session_context() as db:
+        user = db.get(User, user_id)
+        assert user is not None
+        report = build_progress_report(
+            db,
+            user,
+            NutritionReportPeriod.DAYS_30,
+        )
+    custom_trend = next(
+        trend
+        for trend in report["body"]["trends"]
+        if trend["definition_id"] == definition.json()["id"]
+    )
+    assert custom_trend["label"] == "Пользовательский показатель"
+    assert custom_trend["latest_value"] == 86
+
+
+def test_progress_report_pdf_uses_neutral_label_for_missing_custom_definition_label() -> None:
+    assert progress_report_pdf._body_metric(
+        "custom:1",
+        label="",
+        unit="cm",
+    ) == ("Пользовательский показатель", " см")
 
 
 def test_progress_report_validates_bounds_and_trainer_access_revocation(client) -> None:
