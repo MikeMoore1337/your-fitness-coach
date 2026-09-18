@@ -60,15 +60,19 @@ they exist.
 Graphify is an optional local development index. It is derived navigation data, never a source of
 truth and never part of the application runtime.
 
-- Use the repository wrapper `python scripts/graphify_yfc.py ...`; generated project data belongs
-  only in `.artifacts/shared/graphify/`.
-- For broad architecture, dependency, relationship, or impact-analysis questions, when a current
-  graph exists, prefer scoped `query`, `path`, and `explain` before repository-wide raw search.
-- Skip Graphify for a trivial exact-file edit when the relevant location is already known.
-- Before modifying code, verify current source, tests, migrations, and active documentation. If the
-  graph is stale, ambiguous, or incomplete, inspect the underlying files directly.
-- Do not enable strict source-read blocking, project install/hooks, or automatic rebuilds for every
-  task. Graphify findings must not expand the current task scope.
+- For non-trivial architecture, dependency, relationship or impact analysis, run
+  `python scripts/graphify_yfc.py bootstrap` once in the current environment before broad search.
+  The bootstrap verifies/installs the pinned external tool and builds or incrementally updates the
+  local code-only graph under `.artifacts/shared/graphify/`.
+- After bootstrap, prefer scoped `query`, `path`, and `explain` before repository-wide raw search.
+- Skip Graphify and its bootstrap for a trivial exact-file edit when the relevant location is known.
+- A bootstrap failure caused by unavailable uv/network/local tooling is not by itself an ordinary
+  task blocker when direct source inspection can safely replace it. Fall back to current source,
+  tests, migrations and active documentation, and report the tooling limitation when material.
+- Before modifying code, verify current source, tests, migrations and active documentation. If the
+  graph is stale, ambiguous or incomplete, inspect the underlying files directly.
+- Do not enable semantic/LLM extraction, strict source-read blocking, project install/hooks, or
+  automatic graph rebuilds for every task. Graphify findings must not expand the current task scope.
 - Installation and usage details live in `docs/graphify-development.md`.
 
 # Working principles
