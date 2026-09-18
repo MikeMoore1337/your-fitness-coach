@@ -40,3 +40,10 @@ repos:
           - mypy==2.3.0
         pass_filenames: false
         files: ^(backend/fitminiapp_api|scripts/run_mypy\.py|pyproject\.toml)
+
+      - id: skill-safety
+        name: deterministic external skill safety
+        entry: python scripts/skill_safety.py scan-all
+        language: system
+        pass_filenames: false
+        files: ^(\.agents/skills/|scripts/skill_safety\.py)

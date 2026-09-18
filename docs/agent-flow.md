@@ -25,8 +25,8 @@ Agent Flow v1 добавляет deterministic-маршрутизацию рол
 ```
 
 Trace содержит только ограниченные routing-данные: fingerprint task, обнаруженные поверхности,
-выбранные роли, решение по Graphify и execution policy. Полный текст приватной task и scope из
-GitHub Issue в trace не копируются.
+выбранные роли, решение по Graphify, `agent_budget` и execution policy. Полный текст приватной task
+и scope из GitHub Issue в trace не копируются.
 
 ## Graphify
 
@@ -52,8 +52,38 @@ YFC minimalism ladder from `AGENTS.md`.
 
 Ponytail is never used to add a review loop. See `docs/ponytail-development.md`.
 
+## Agent budget и live worker guard
+
+Каждый plan содержит `agent_budget`.
+
+- ordinary implementation: до 160 completed tool actions;
+- research/cross-cutting/architecture/security/deployment: до 240;
+- safe read-only parallelism: максимум 2 subagents одновременно и 10 collab tool calls;
+- если routing не разрешил read-only parallelism, subagent/collab budget равен нулю;
+- одинаковая ошибка одного action 4 раза без progress блокируется;
+- одинаковый action 8 раз без progress блокируется;
+- короткий 2-3 step cycle, повторённый 4 раза без progress, блокируется.
+
+Progress для loop history - успешный `file_change`. Guard читает только структурированный
+`codex exec --json` stream, а в evidence пишет counters/reason codes и SHA-256 signatures, не raw
+prompt/command/tool args/results.
+
+Отчёт успешной task сохраняется под task-scoped delivery evidence. Guard не добавляет LLM-pass и
+не является reviewer.
+
+## External skill safety
+
+Перед worker launch controller запускает `scripts/skill_safety.py scan-all`.
+
+- scan полностью offline/deterministic;
+- `CRITICAL` блокирует запуск;
+- `WARNING` сохраняется как evidence и не блокирует;
+- external/vendored skill должен иметь `SOURCE.json` с immutable commit и license provenance;
+- тот же scan подключён в pre-commit/CI.
+
 ## Execution model
 
-Выбранные role-passes по умолчанию выполняются последовательно одним worker. Будущая среда может
-использовать уже поддерживаемый read-only subagent mechanism, но Agent Flow v1 его не устанавливает,
-не требует и никогда не запускает параллельных production writers.
+Выбранные role-passes по умолчанию выполняются последовательно одним worker. Если текущий Codex host
+уже предоставляет safe collab/subagent mechanism и plan разрешает read-only parallelism, worker может
+использовать его только в пределах `agent_budget`. Agent Flow не устанавливает agent framework и
+никогда не разрешает параллельных production writers.

@@ -193,6 +193,10 @@ Repository skills live under `.agents/skills/`.
 - A skill never expands task scope. New schema/API/platform/product work requires the task or a
   reproducible `BLOCKER/HIGH`, not a broad skill checklist.
 - Repository/backlog rules take precedence over generic skill guidance when they conflict.
+- Any vendored/external repository skill must include a sibling `SOURCE.json` with immutable source
+  commit, source URL/repository, license and license file. Before a delivery worker starts,
+  `scripts/skill_safety.py scan-all` performs an offline deterministic scan. `CRITICAL` findings
+  block worker launch; warnings are evidence only. The scanner never makes network or LLM calls.
 
 # Agent Flow v1
 
@@ -206,6 +210,15 @@ worker starts. The resulting bounded plan is stored under task-scoped
   triggers.
 - Agent Flow v1 keeps one Codex worker and one production writer by default. It does not install an
   agent framework or spawn parallel production writers inside one task.
+- Every plan includes a deterministic `agent_budget`. Ordinary work gets a bounded tool-action
+  budget; research/cross-cutting work gets a larger bounded budget. Safe host-provided read-only
+  collab/subagents are allowed only when the plan explicitly permits them, at most two concurrently;
+  parallel production writers remain forbidden.
+- `run_task_delivery.py` enforces the budget against the live `codex exec --json` stream. Repeated
+  identical failures, pathological repeated actions/short cycles without a successful file-change
+  progress event, tool-budget overflow or collab/subagent-budget overflow stop the full worker process
+  tree with privacy-safe hashed evidence. Raw prompts, commands, arguments and tool results are not
+  copied into guard evidence.
 - `integration-release` is controller-managed. Automatic reviewer/security-reviewer/adversarial
   agents remain prohibited by the normal lifecycle.
 - When the plan requires Graphify, bootstrap it once before broad architecture inspection and then
@@ -234,6 +247,9 @@ Reusable role contracts live under `.agents/roles/`.
   returns to a separate owner-approved task with the normal implementation role.
 - If real subagents are unavailable, perform required role stages as clearly separated
   sequential passes in the same session and report that accurately.
+- If real collab/subagents are available, stay within the current Agent Flow `agent_budget`; subagents
+  are read-only unless a future explicit contract changes that. Never use extra agents to bypass
+  task scope, lifecycle gates, worktree ownership or the single-production-writer rule.
 
 # Backlog routing and full task lifecycle
 

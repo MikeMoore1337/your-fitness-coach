@@ -14,6 +14,15 @@ AGENT_FLOW_SCHEMA_VERSION = 1
 PONYTAIL_TESTED_VERSION = "4.10.0"
 PONYTAIL_MODES = frozenset({"off", "lite", "full", "ultra"})
 
+ORDINARY_TOOL_ACTION_BUDGET = 160
+EXPANDED_TOOL_ACTION_BUDGET = 240
+READ_ONLY_SUBAGENT_BUDGET = 2
+READ_ONLY_COLLAB_TOOL_BUDGET = 10
+LOOP_IDENTICAL_FAILURE_LIMIT = 4
+LOOP_IDENTICAL_ACTION_LIMIT = 8
+LOOP_SHORT_CYCLE_PERIOD_MAX = 3
+LOOP_SHORT_CYCLE_REPETITIONS = 4
+
 WORKER_ROLES = (
     "orchestrator",
     "researcher",
@@ -241,6 +250,34 @@ def build_agent_flow(
         "implementer" in selected
         and any(role in selected for role in {"researcher", "orchestrator"})
     )
+    expanded_tool_budget = bool(
+        research
+        or cross_cutting
+        or architecture_signal
+        or graphify_required
+        or any(surface in {"security", "deployment"} for surface in surfaces)
+    )
+    subagent_budget = READ_ONLY_SUBAGENT_BUDGET if read_only_parallelism else 0
+    collab_budget = READ_ONLY_COLLAB_TOOL_BUDGET if read_only_parallelism else 0
+    agent_budget = {
+        "max_completed_tool_actions": (
+            EXPANDED_TOOL_ACTION_BUDGET if expanded_tool_budget else ORDINARY_TOOL_ACTION_BUDGET
+        ),
+        "max_collab_tool_calls": collab_budget,
+        "max_spawned_subagents": subagent_budget,
+        "max_concurrent_subagents": subagent_budget,
+        "max_identical_failed_actions": LOOP_IDENTICAL_FAILURE_LIMIT,
+        "max_identical_actions_without_progress": LOOP_IDENTICAL_ACTION_LIMIT,
+        "short_cycle_period_max": LOOP_SHORT_CYCLE_PERIOD_MAX,
+        "short_cycle_repetitions": LOOP_SHORT_CYCLE_REPETITIONS,
+        "subagent_mode": (
+            "read-only-only-when-host-collab-is-already-available"
+            if read_only_parallelism
+            else "disabled"
+        ),
+        "parallel_production_writers": False,
+        "enforcement": "live-codex-jsonl-worker-guard",
+    }
 
     roles = [
         {
@@ -296,6 +333,7 @@ def build_agent_flow(
             "fallback_policy": "use-yfc-minimalism-ladder",
             "required": False,
         },
+        "agent_budget": agent_budget,
         "worker_role_passes": roles,
         "skipped_worker_roles": list(skipped),
         "controller_managed_roles": [
@@ -349,8 +387,10 @@ def render_agent_flow_prompt(plan: Mapping[str, Any]) -> str:
         + json.dumps(dict(plan), ensure_ascii=False, sort_keys=True)
         + "\n"
         "Execute only the listed worker role passes, in their listed order, inside the current "
-        "worker unless the environment already provides a safe read-only subagent mechanism. "
-        "Do not install or invent an agent framework. Only implementer may write production code. "
+        "worker. If the environment already provides a safe collab/subagent mechanism, use it only "
+        "within agent_budget and only for read-only planning/research work; never create another "
+        "production writer. Do not install or invent an agent framework. Only implementer may write "
+        "production code. "
         "qa-verifier stays read-only and returns blocking defects to implementer. "
         "Do not synthesize reviewer/security-review agents. "
         "If graphify.bootstrap_required is true, run its command once before broad architecture "

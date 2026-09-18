@@ -25,6 +25,9 @@ Change a small Python helper with targeted tests.
     assert plan["ponytail"]["mode"] == "full"
     assert plan["ponytail"]["source"] == "deterministic-inference"
     assert plan["execution"]["single_production_writer"] is True
+    assert plan["agent_budget"]["max_spawned_subagents"] == 0
+    assert plan["agent_budget"]["max_collab_tool_calls"] == 0
+    assert plan["agent_budget"]["max_completed_tool_actions"] == 160
     assert plan["controller_managed_roles"][0]["name"] == "integration-release"
 
 
@@ -43,6 +46,8 @@ Assess wearable platform feasibility and document evidence. Do not implement pro
     assert [item["name"] for item in plan["worker_role_passes"]] == ["researcher"]
     assert plan["execution"]["production_writer"] is None
     assert plan["ponytail"]["mode"] == "off"
+    assert plan["agent_budget"]["max_spawned_subagents"] == 0
+    assert plan["agent_budget"]["max_completed_tool_actions"] == 240
     assert plan["execution"]["spawn_extra_codex_processes"] is False
 
 
@@ -67,6 +72,10 @@ React frontend, and a PostgreSQL/Alembic migration.
     assert plan["routing"]["detected_surfaces"] == ["backend", "frontend", "database"]
     assert plan["graphify"]["bootstrap_required"] is True
     assert plan["ponytail"]["mode"] == "lite"
+    assert plan["agent_budget"]["max_spawned_subagents"] == 2
+    assert plan["agent_budget"]["max_concurrent_subagents"] == 2
+    assert plan["agent_budget"]["max_collab_tool_calls"] == 10
+    assert plan["agent_budget"]["max_completed_tool_actions"] == 240
 
 
 def test_explicit_roles_override_inferred_orchestrator_and_qa() -> None:
@@ -233,4 +242,5 @@ Cross-cutting architecture change in FastAPI backend and React frontend.
     assert "Do not synthesize reviewer/security-review agents" in prompt
     assert "never install it automatically" in prompt
     assert "ponytail-review/audit loops" in prompt
+    assert "within agent_budget" in prompt
     assert "@ponytail-review" not in prompt

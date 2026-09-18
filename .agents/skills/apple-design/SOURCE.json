@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "classification": "external-skill-source",
+  "source_url": "https://github.com/emilkowalski/skills/blob/main/skills/apple-design/SKILL.md",
+  "source_repository": "https://github.com/emilkowalski/skills",
+  "source_commit": "85e8e2363b713506e1d5b6e07a0eb2da66be1bc3",
+  "license": "MIT",
+  "license_file": "LICENSE.md",
+  "vendored_at": "2026-09-19"
+}
