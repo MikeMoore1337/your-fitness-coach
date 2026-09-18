@@ -25,6 +25,22 @@ def _load_module():
 delivery = _load_module()
 
 
+def _agent_budget() -> dict[str, int | str | bool]:
+    return {
+        "max_completed_tool_actions": 160,
+        "max_collab_tool_calls": 0,
+        "max_spawned_subagents": 0,
+        "max_concurrent_subagents": 0,
+        "max_identical_failed_actions": 4,
+        "max_identical_actions_without_progress": 8,
+        "short_cycle_period_max": 3,
+        "short_cycle_repetitions": 4,
+        "subagent_mode": "disabled",
+        "parallel_production_writers": False,
+        "enforcement": "live-codex-jsonl-worker-guard",
+    }
+
+
 def _claim_process_instance(*, boot_id: str = "a" * 32, start_ticks: str = "1") -> dict[str, str]:
     return {"kind": "linux-proc", "boot_id": boot_id, "start_ticks": start_ticks}
 
@@ -118,11 +134,55 @@ def test_worker_launch_sets_ponytail_mode_from_agent_flow(
             "357",
             {"lease": {"worktree": str(worktree)}},
             artifacts,
-            agent_flow={"ponytail": {"mode": "lite"}},
+            agent_flow={"ponytail": {"mode": "lite"}, "agent_budget": _agent_budget()},
         )
         == 0
     )
     assert observed["env"]["PONYTAIL_DEFAULT_MODE"] == "lite"
+    assert json.loads(observed["env"]["YFC_WORKER_GUARD_CONFIG"])[
+        "max_completed_tool_actions"
+    ] == 160
+    assert observed["env"]["YFC_WORKER_GUARD_REPORT"] == str(
+        (artifacts / "worker-guard.json").resolve()
+    )
+
+
+def test_prepare_skill_safety_blocks_critical_findings(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    evidence = tmp_path / "skill-safety.json"
+
+    class _FakeArtifactManager:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        def allocate(self, *args: Any, **kwargs: Any) -> Path:
+            return evidence
+
+    monkeypatch.setattr(delivery, "ArtifactManager", _FakeArtifactManager)
+    monkeypatch.setattr(
+        delivery,
+        "scan_repository_skills",
+        lambda root: {
+            "skills_scanned": 1,
+            "external_skills": 1,
+            "critical_findings": 1,
+            "warning_findings": 0,
+            "blocked": True,
+            "results": [
+                {
+                    "findings": [
+                        {"severity": "CRITICAL", "code": "NETWORK_TO_SHELL_PIPE"}
+                    ]
+                }
+            ],
+        },
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="NETWORK_TO_SHELL_PIPE"):
+        delivery._prepare_skill_safety("362", tmp_path)
+
+    assert evidence.is_file()
 
 
 class _FakeSupervisedWorker:

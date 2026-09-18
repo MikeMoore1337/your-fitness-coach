@@ -12,11 +12,13 @@ import argparse
 import errno
 import json
 import os
+import queue
 import re
 import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
@@ -48,12 +50,14 @@ try:
         task_risk_lane,
         validate_control_transition,
     )
+    from scripts.skill_safety import SkillSafetyError, scan_repository_skills
     from scripts.task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
         GitRepository,
         TaskController,
         find_task_document,
     )
+    from scripts.worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 except ModuleNotFoundError:
     from agent_flow import AgentFlowError, build_agent_flow_from_path, render_agent_flow_prompt
     from artifact_manager import ArtifactError, ArtifactManager
@@ -73,12 +77,14 @@ except ModuleNotFoundError:
         task_risk_lane,
         validate_control_transition,
     )
+    from skill_safety import SkillSafetyError, scan_repository_skills
     from task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
         GitRepository,
         TaskController,
         find_task_document,
     )
+    from worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 
 SCRIPT_PATH = Path(__file__).resolve()
 REPOSITORY_ROOT = SCRIPT_PATH.parents[1]
@@ -88,8 +94,11 @@ TASK_ID_RE = re.compile(r"^[0-9]+[A-Z]?$", re.IGNORECASE)
 TRANSIENT_START_MARKERS = ("coordination state is locked",)
 TASK_FILE_RE = re.compile(r"^(?P<task_id>[0-9]+[A-Z]?)-.+\.md$", re.IGNORECASE)
 CONTROL_ISSUE_RE = re.compile(r"^\[Task (?P<task_id>[0-9]+[A-Z]?)\]", re.IGNORECASE)
+WORKER_GUARD_EXIT_CODE = 124
 WORKER_PARENT_LOST_EXIT_CODE = 125
 WORKER_SUPERVISOR_POLL_SECONDS = 0.25
+WORKER_GUARD_CONFIG_ENV = "YFC_WORKER_GUARD_CONFIG"
+WORKER_GUARD_REPORT_ENV = "YFC_WORKER_GUARD_REPORT"
 WORKER_TERMINATION_TIMEOUT_SECONDS = 5
 WORKER_KILL_SIGNAL = getattr(signal, "SIGKILL", 9)
 WORKER_STATE_VERSION = 1
@@ -1422,6 +1431,55 @@ def _prepare_agent_flow(
     return plan, evidence_path
 
 
+def _prepare_skill_safety(task_id: str, artifacts: Path) -> tuple[dict[str, Any], Path]:
+    try:
+        report = scan_repository_skills(REPOSITORY_ROOT / ".agents" / "skills")
+    except SkillSafetyError as error:
+        raise DeliveryError(f"Skill safety scan failed: {error}") from error
+
+    manager = ArtifactManager(REPOSITORY_ROOT / ".artifacts", repo_root=REPOSITORY_ROOT)
+    evidence_path = manager.allocate(
+        task_id,
+        "evidence",
+        Path("evidence") / "skill-safety" / f"{artifacts.name}.json",
+        purpose="deterministic offline repository skill safety scan",
+        command="scripts/run_task_delivery.py",
+        owner="run_task_delivery",
+        create=False,
+    )
+    try:
+        evidence_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as error:
+        raise DeliveryError(f"Cannot write skill safety evidence {evidence_path}: {error}") from error
+
+    _event(
+        "SKILL_SAFETY_SCANNED",
+        task_id=task_id,
+        skills_scanned=report["skills_scanned"],
+        external_skills=report["external_skills"],
+        critical_findings=report["critical_findings"],
+        warning_findings=report["warning_findings"],
+        evidence=str(evidence_path),
+    )
+    if report["blocked"]:
+        codes = sorted(
+            {
+                str(finding["code"])
+                for result in report["results"]
+                for finding in result["findings"]
+                if finding["severity"] == "CRITICAL"
+            }
+        )
+        raise DeliveryError(
+            "HUMAN_REQUIRED: deterministic skill safety scan found CRITICAL findings "
+            f"({', '.join(codes)}); inspect {evidence_path}"
+        )
+    return report, evidence_path
+
+
 def _artifact_root(task_id: str) -> Path:
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     try:
@@ -1465,6 +1523,22 @@ def _cleanup_delivery_artifacts(task_id: str, artifacts: Path) -> dict[str, Any]
             )
         except ArtifactError as error:
             raise DeliveryError(f"Cannot preserve terminal delivery result: {error}") from error
+
+    guard_report = artifacts / "worker-guard.json"
+    if guard_report.exists():
+        try:
+            if not guard_report.is_file():
+                raise DeliveryError(f"Worker guard report is not a regular file: {guard_report}")
+            manager.promote_file(
+                guard_report,
+                task_id,
+                Path("evidence") / "delivery" / f"{relative.name}-worker-guard.json",
+                purpose="privacy-safe terminal worker guard counters and verdict",
+                command="scripts/run_task_delivery.py",
+                owner="run_task_delivery",
+            )
+        except ArtifactError as error:
+            raise DeliveryError(f"Cannot preserve worker guard evidence: {error}") from error
     try:
         result = manager.cleanup_task(
             task_id,
@@ -1738,6 +1812,52 @@ def _release_windows_worker(process: Any) -> None:
         raise DeliveryError("HUMAN_REQUIRED: cannot release Windows Codex worker") from error
 
 
+def _worker_guard_from_environment() -> tuple[WorkerEventGuard | None, Path | None]:
+    raw_config = os.environ.get(WORKER_GUARD_CONFIG_ENV)
+    if not raw_config:
+        return None, None
+    try:
+        parsed = json.loads(raw_config)
+    except json.JSONDecodeError as error:
+        raise DeliveryError("HUMAN_REQUIRED: worker guard configuration is malformed") from error
+    if not isinstance(parsed, Mapping):
+        raise DeliveryError("HUMAN_REQUIRED: worker guard configuration is not an object")
+    try:
+        guard = WorkerEventGuard(GuardLimits.from_mapping(parsed))
+    except WorkerGuardConfigError as error:
+        raise DeliveryError(f"HUMAN_REQUIRED: worker guard configuration is invalid: {error}") from error
+
+    raw_report_path = os.environ.get(WORKER_GUARD_REPORT_ENV)
+    if not raw_report_path:
+        raise DeliveryError("HUMAN_REQUIRED: worker guard report path is missing")
+    report_path = Path(raw_report_path)
+    if not report_path.is_absolute():
+        raise DeliveryError("HUMAN_REQUIRED: worker guard report path must be absolute")
+    return guard, report_path
+
+
+def _write_worker_guard_report(guard: WorkerEventGuard, report_path: Path | None) -> None:
+    if report_path is None:
+        return
+    try:
+        report_path.write_text(
+            json.dumps(guard.report(), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as error:
+        raise DeliveryError(f"HUMAN_REQUIRED: cannot write worker guard report {report_path}") from error
+
+
+def _forward_worker_output(line: bytes) -> None:
+    binary_stream = getattr(sys.stdout, "buffer", None)
+    if binary_stream is not None:
+        binary_stream.write(line)
+        binary_stream.flush()
+        return
+    sys.stdout.write(line.decode("utf-8", errors="replace"))
+    sys.stdout.flush()
+
+
 def _run_worker_bootstrap(
     command: Sequence[str],
     *,
@@ -1746,6 +1866,8 @@ def _run_worker_bootstrap(
     popen: Callable[..., Any] = subprocess.Popen,
     parent_probe: Callable[[int], bool] = _worker_parent_is_alive,
     sleeper: Callable[[float], None] = time.sleep,
+    guard: WorkerEventGuard | None = None,
+    guard_report_path: Path | None = None,
 ) -> int:
     if parent_pid < 1 or not command:
         raise DeliveryError("HUMAN_REQUIRED: worker bootstrap received invalid process metadata")
@@ -1754,6 +1876,19 @@ def _run_worker_bootstrap(
 
     worker_process: Any | None = None
     process_group_id: int | None = None
+    report_written = False
+
+    def terminate_worker() -> None:
+        if worker_process is None or worker_process.poll() is not None:
+            return
+        if process_group_id is not None:
+            _kill_posix_worker_group(process_group_id)
+        else:
+            worker_process.terminate()
+        try:
+            worker_process.wait(timeout=WORKER_TERMINATION_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired as error:
+            raise DeliveryError("HUMAN_REQUIRED: guarded Codex worker did not terminate") from error
 
     def terminate_from_parent_loss(signum: int = 0, frame: Any = None) -> None:
         del signum, frame
@@ -1773,8 +1908,15 @@ def _run_worker_bootstrap(
         "stdin": subprocess.DEVNULL,
         "stderr": subprocess.STDOUT,
     }
+    if guard is not None:
+        launch_kwargs["stdout"] = subprocess.PIPE
+        launch_kwargs["bufsize"] = 0
     if os.name != "nt":
         launch_kwargs["start_new_session"] = True
+
+    output_queue: queue.Queue[bytes | None] | None = None
+    reader_done = guard is None
+
     try:
         with _block_worker_parent_loss_signal():
             if (
@@ -1790,11 +1932,32 @@ def _run_worker_bootstrap(
                 try:
                     process_group_id = os.getpgid(worker_process.pid)
                 except ProcessLookupError:
-                    # start_new_session=True makes the worker PID its process-group ID;
-                    # retain that identity when the leader exits before getpgid runs.
                     process_group_id = worker_process.pid
             if worker_state_path is not None:
                 _write_worker_state(worker_state_path, worker_process, process_group_id)
+
+        if guard is not None:
+            stream = getattr(worker_process, "stdout", None)
+            if stream is None:
+                terminate_worker()
+                raise DeliveryError("HUMAN_REQUIRED: guarded Codex worker has no stdout stream")
+            output_queue = queue.Queue()
+
+            def read_output() -> None:
+                try:
+                    while True:
+                        line = stream.readline()
+                        if not line:
+                            break
+                        output_queue.put(line)
+                finally:
+                    output_queue.put(None)
+
+            threading.Thread(
+                target=read_output,
+                name="yfc-codex-worker-output",
+                daemon=True,
+            ).start()
     except OSError as error:
         if process_group_id is not None:
             _kill_posix_worker_group(process_group_id)
@@ -1804,27 +1967,74 @@ def _run_worker_bootstrap(
             _kill_posix_worker_group(process_group_id)
         raise
 
+    def drain_output() -> Any:
+        nonlocal reader_done
+        if guard is None or output_queue is None:
+            return None
+        blocked = None
+        while True:
+            try:
+                line = output_queue.get_nowait()
+            except queue.Empty:
+                break
+            if line is None:
+                reader_done = True
+                continue
+            _forward_worker_output(line)
+            decision = guard.observe_line(line)
+            if decision.blocked and blocked is None:
+                blocked = decision
+        return blocked
+
     try:
-        while worker_process.poll() is None:
-            if not parent_probe(parent_pid):
-                if process_group_id is not None:
-                    _kill_posix_worker_group(process_group_id)
-                else:
-                    worker_process.terminate()
-                worker_process.wait(timeout=WORKER_TERMINATION_TIMEOUT_SECONDS)
-                _event("WORKER_BOOTSTRAP_ABORTED_PARENT_LOST", parent_pid=parent_pid)
-                return WORKER_PARENT_LOST_EXIT_CODE
+        while True:
+            blocked = drain_output()
+            if blocked is not None:
+                terminate_worker()
+                _write_worker_guard_report(guard, guard_report_path)
+                report_written = True
+                _event(
+                    "WORKER_GUARD_BLOCKED",
+                    reason_code=blocked.reason_code,
+                    signature_hash=blocked.signature_hash,
+                )
+                return WORKER_GUARD_EXIT_CODE
+
+            running = worker_process.poll() is None
+            if running:
+                if not parent_probe(parent_pid):
+                    terminate_worker()
+                    _event("WORKER_BOOTSTRAP_ABORTED_PARENT_LOST", parent_pid=parent_pid)
+                    return WORKER_PARENT_LOST_EXIT_CODE
+            elif reader_done:
+                break
             sleeper(WORKER_SUPERVISOR_POLL_SECONDS)
+
+        blocked = drain_output()
+        if blocked is not None:
+            _write_worker_guard_report(guard, guard_report_path)
+            report_written = True
+            _event(
+                "WORKER_GUARD_BLOCKED",
+                reason_code=blocked.reason_code,
+                signature_hash=blocked.signature_hash,
+            )
+            return WORKER_GUARD_EXIT_CODE
+
+        if guard is not None:
+            _write_worker_guard_report(guard, guard_report_path)
+            report_written = True
+
         if process_group_id is not None and _posix_worker_group_is_alive(process_group_id):
             _kill_posix_worker_group(process_group_id)
             raise DeliveryError("HUMAN_REQUIRED: Codex worker left live POSIX descendants")
         return int(worker_process.returncode)
     finally:
-        if worker_process.poll() is None:
-            if process_group_id is not None:
-                _kill_posix_worker_group(process_group_id)
-            else:
-                worker_process.terminate()
+        if worker_process is not None and worker_process.poll() is None:
+            terminate_worker()
+        if guard is not None and not report_written:
+            with suppress(DeliveryError):
+                _write_worker_guard_report(guard, guard_report_path)
 
 
 class _WindowsWorkerJob:
@@ -2082,10 +2292,13 @@ def _worker_bootstrap_from_args(
     if parent_pid is None or not command:
         raise DeliveryError("HUMAN_REQUIRED: worker bootstrap arguments are incomplete")
     worker_state_path = _worker_state_path_from_arg(worker_state_path_value)
+    guard, guard_report_path = _worker_guard_from_environment()
     return _run_worker_bootstrap(
         command,
         parent_pid=parent_pid,
         worker_state_path=worker_state_path,
+        guard=guard,
+        guard_report_path=guard_report_path,
     )
 
 
@@ -2113,6 +2326,17 @@ def _launch_worker(
             mode = ponytail.get("mode")
             if isinstance(mode, str) and mode in {"off", "lite", "full", "ultra"}:
                 worker_env["PONYTAIL_DEFAULT_MODE"] = mode
+        raw_budget = agent_flow.get("agent_budget")
+        if not isinstance(raw_budget, Mapping):
+            raise DeliveryError("HUMAN_REQUIRED: Agent Flow has no worker agent budget")
+        try:
+            guard_limits = GuardLimits.from_mapping(raw_budget)
+        except WorkerGuardConfigError as error:
+            raise DeliveryError(f"HUMAN_REQUIRED: Agent Flow worker budget is invalid: {error}") from error
+        worker_env[WORKER_GUARD_CONFIG_ENV] = json.dumps(
+            guard_limits.as_dict(), ensure_ascii=True, sort_keys=True
+        )
+        worker_env[WORKER_GUARD_REPORT_ENV] = str((artifacts / "worker-guard.json").resolve())
     parent_identity = _current_process_instance_identity()
     worker_command = [
         codex,
@@ -2169,6 +2393,20 @@ def _launch_worker(
         )
     _reconcile_worker_state(worker_state_path)
     return completed.returncode
+
+
+def _worker_exit_blocker(worker_exit: int, artifacts: Path) -> str:
+    if worker_exit != WORKER_GUARD_EXIT_CODE:
+        return f"worker exited with code {worker_exit}"
+    report_path = artifacts / "worker-guard.json"
+    reason = "UNKNOWN_GUARD_REASON"
+    try:
+        raw = json.loads(report_path.read_text(encoding="utf-8"))
+        if isinstance(raw, Mapping) and isinstance(raw.get("block_reason_code"), str):
+            reason = str(raw["block_reason_code"])
+    except (OSError, json.JSONDecodeError):
+        pass
+    return f"worker guard blocked execution ({reason}); inspect {report_path}"
 
 
 def _queue_budget_from_controller_history(history: Mapping[str, Any]) -> dict[str, int]:
@@ -2283,8 +2521,10 @@ def _deliver_one(
         task_id=task_id,
         roles=[item["name"] for item in agent_flow["worker_role_passes"]],
         graphify=agent_flow["graphify"]["bootstrap_required"],
+        agent_budget=agent_flow["agent_budget"],
         evidence=str(agent_flow_path),
     )
+    _prepare_skill_safety(task_id, artifacts)
     _event(
         "STARTED",
         task_id=task_id,
@@ -2303,6 +2543,7 @@ def _deliver_one(
     history = _history(task_id)
     budget_report: dict[str, int] | None = None
     if worker_exit != 0:
+        blocker = _worker_exit_blocker(worker_exit, artifacts)
         if (
             issue_contract is not None
             and control_issue is not None
@@ -2314,7 +2555,7 @@ def _deliver_one(
                 task_id=task_id,
                 status_issue=status_issue,
                 branch=started["lease"]["branch"],
-                blocker=f"worker exited with code {worker_exit} after controller finish",
+                blocker=f"{blocker} after controller finish",
             )
         if status_issue is not None:
             _post_control_state(
@@ -2324,12 +2565,10 @@ def _deliver_one(
                     state="blocked",
                     issue_number=status_issue,
                     branch=started["lease"]["branch"],
-                    blocker=f"worker exited with code {worker_exit}",
+                    blocker=blocker,
                 ),
             )
-        raise DeliveryError(
-            f"Worker exited with code {worker_exit}; inspect {artifacts / 'events.jsonl'}"
-        )
+        raise DeliveryError(f"{blocker}; inspect {artifacts / 'events.jsonl'}")
     if history is None or history.get("state") != "finished":
         state = history.get("state") if history else "missing"
         if status_issue is not None:
