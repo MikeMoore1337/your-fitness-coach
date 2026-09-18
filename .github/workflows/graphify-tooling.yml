@@ -1,0 +1,83 @@
+name: Graphify tooling smoke
+
+on:
+  pull_request:
+    paths:
+      - scripts/graphify_yfc.py
+      - tests/test_graphify_yfc.py
+      - docs/graphify-development.md
+      - .github/workflows/graphify-tooling.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graphify-tooling-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-local-path: ${{ github.workspace }}/.artifacts/runtime/cache/uv
+          cache-suffix: graphify-tooling
+      - name: Install pinned Graphify and pytest
+        run: |
+          uv tool install "graphifyy==0.9.63"
+          python -m pip install "pytest>=9.1,<10"
+      - name: Run wrapper tests
+        run: python -m pytest tests/test_graphify_yfc.py -q
+      - name: Build local code graph
+        run: python scripts/graphify_yfc.py extract . --code-only --no-cluster
+      - name: Verify graph scope and representative queries
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          graph_path = Path('.artifacts/shared/graphify/graph.json')
+          if not graph_path.is_file():
+              raise SystemExit('Graphify did not create canonical graph.json')
+          if Path('graphify-out').exists():
+              raise SystemExit('Unexpected graphify-out/ directory was created')
+
+          data = json.loads(graph_path.read_text(encoding='utf-8'))
+          nodes = data.get('nodes', [])
+          links = data.get('links', data.get('edges', []))
+          by_id = {str(node.get('id')): node for node in nodes}
+          sources = [str(node.get('source_file', '')).replace('\\\\', '/') for node in nodes]
+
+          assert any('/backend/' in f'/{source}' for source in sources)
+          assert any('/frontend/' in f'/{source}' for source in sources)
+          forbidden = ('.artifacts/', 'codex-backlog/tasks/', 'codex-backlog/bugs/', 'docs/private/')
+          assert not any(any(f'/{prefix}' in f'/{source}' for prefix in forbidden) for source in sources)
+          assert not any(Path(source).name.startswith('.env') for source in sources if source)
+
+          def endpoint_id(value):
+              if isinstance(value, dict):
+                  return str(value.get('id', ''))
+              return str(value)
+
+          cross_file = False
+          for link in links:
+              source = by_id.get(endpoint_id(link.get('source')), {})
+              target = by_id.get(endpoint_id(link.get('target')), {})
+              source_file = str(source.get('source_file', ''))
+              target_file = str(target.get('source_file', ''))
+              if source_file and target_file and source_file != target_file:
+                  cross_file = True
+                  break
+          assert cross_file, 'Expected at least one cross-file relationship'
+          PY
+          python scripts/graphify_yfc.py explain FastAPI
+          python scripts/graphify_yfc.py explain QueryClient
