@@ -490,6 +490,60 @@ def test_reconcile_worker_state_terminates_live_posix_group_before_cleanup(
     assert not process_state.exists()
 
 
+def test_worker_prompt_includes_agent_flow_contract() -> None:
+    started = {
+        "lease": {
+            "canonical_task_path": "D:/repo/codex-backlog/tasks/355-agent-flow.md",
+            "branch": "task/355-agent-flow",
+            "worktree": "D:/repo/.artifacts/worktrees/355-agent-flow",
+        },
+        "prompt": "controller evidence",
+    }
+    plan = {
+        "schema_version": 1,
+        "worker_role_passes": [{"name": "implementer"}],
+        "graphify": {"bootstrap_required": False},
+        "execution": {"single_production_writer": True},
+    }
+
+    prompt = delivery._worker_prompt("355", started, agent_flow=plan)
+
+    assert "Agent Flow v1 routing contract" in prompt
+    assert '"single_production_writer": true' in prompt
+    assert "Only implementer may write production code" in prompt
+
+
+def test_prepare_agent_flow_writes_durable_evidence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    task = tmp_path / "codex-backlog" / "tasks" / "355-agent-flow.md"
+    task.parent.mkdir(parents=True)
+    task.write_text(
+        """
+# Task
+
+- **Тип:** Feature
+- **Основная роль:** implementer
+
+Change a small helper.
+""",
+        encoding="utf-8",
+    )
+    artifacts = delivery._artifact_root("355")
+    started = {"lease": {"canonical_task_path": str(task)}}
+
+    plan, evidence = delivery._prepare_agent_flow("355", started, artifacts)
+
+    assert evidence.is_file()
+    relative = evidence.relative_to(tmp_path / ".artifacts")
+    assert relative.parts[:4] == ("tasks", "355", "evidence", "agent-flow")
+    assert relative.name == artifacts.name + ".json"
+    persisted = json.loads(evidence.read_text(encoding="utf-8"))
+    assert persisted == plan
+    assert [item["name"] for item in plan["worker_role_passes"]] == ["implementer"]
+
+
 def test_worker_prompt_carries_one_launch_delivery_contract() -> None:
     started = {
         "lease": {
@@ -1394,6 +1448,17 @@ def test_continuous_cleanup_failure_posts_central_queue_stop(
     queue_stops: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
     monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
     monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_agent_flow",
+        lambda *args, **kwargs: (
+            {
+                "worker_role_passes": [{"name": "implementer"}],
+                "graphify": {"bootstrap_required": False},
+            },
+            tmp_path / "agent-flow.json",
+        ),
+    )
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 0)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(delivery, "_verify_closeout", lambda started: None)
@@ -1444,6 +1509,17 @@ def test_continuous_worker_exit_after_finish_posts_central_queue_stop(
     status_updates: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
     monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
     monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_agent_flow",
+        lambda *args, **kwargs: (
+            {
+                "worker_role_passes": [{"name": "implementer"}],
+                "graphify": {"bootstrap_required": False},
+            },
+            tmp_path / "agent-flow.json",
+        ),
+    )
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 23)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(
@@ -1504,6 +1580,17 @@ def test_terminal_state_publication_failure_posts_central_queue_stop(
 
     monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
     monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_agent_flow",
+        lambda *args, **kwargs: (
+            {
+                "worker_role_passes": [{"name": "implementer"}],
+                "graphify": {"bootstrap_required": False},
+            },
+            tmp_path / "agent-flow.json",
+        ),
+    )
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 0)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(delivery, "_queue_budget_from_controller_history", lambda history: {})

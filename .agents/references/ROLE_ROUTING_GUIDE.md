@@ -1,8 +1,14 @@
-# Role routing guide v3
+# Role routing guide v4
 
 Canonical quality/QA severity, recheck limits, commit/finalization и lifecycle находятся в `codex-backlog/TASK_EXECUTION_LIFECYCLE.md`.
 
 Этот файл отвечает только за выбор роли.
+
+Runtime-routing normal delivery выполняется deterministic-модулем `scripts/agent_flow.py`.
+Он не заменяет task metadata: явные роли task остаются authoritative. Если явных ролей нет,
+router применяет только консервативные documented triggers и сохраняет bounded routing trace
+под task-scoped `.artifacts/.../evidence/agent-flow/`.
+
 
 ## Роли
 
