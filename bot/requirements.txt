@@ -3,7 +3,7 @@
 aiofiles==25.1.0
     # via aiogram
 aiogram==3.30.0
-    # via -r bot/requirements.in
+    # via -r requirements.in
 aiohappyeyeballs==2.7.1
     # via aiohttp
 aiohttp==3.14.3
@@ -11,7 +11,7 @@ aiohttp==3.14.3
     #   aiogram
     #   aiohttp-socks
 aiohttp-socks==0.12.0
-    # via -r bot/requirements.in
+    # via -r requirements.in
 aiosignal==1.4.0
     # via aiohttp
 annotated-types==0.8.0
@@ -34,7 +34,7 @@ h11==0.16.0
 httpcore==1.0.9
     # via httpx
 httpx==0.28.1
-    # via -r bot/requirements.in
+    # via -r requirements.in
 idna==3.18
     # via
     #   anyio
@@ -57,10 +57,10 @@ pydantic==2.13.4
 pydantic-core==2.46.4
     # via pydantic
 pydantic-settings==2.14.2
-    # via -r bot/requirements.in
+    # via -r requirements.in
 python-dotenv==1.2.2
     # via pydantic-settings
-python-socks==3.0.0
+python-socks[asyncio]==3.0.0
     # via aiohttp-socks
 typing-extensions==4.16.0
     # via
@@ -72,7 +72,7 @@ typing-inspection==0.4.2
     # via
     #   pydantic
     #   pydantic-settings
-tzdata==2026.3
-    # via -r bot/requirements.in
+tzdata==2026.4
+    # via -r requirements.in
 yarl==1.24.5
     # via aiohttp
