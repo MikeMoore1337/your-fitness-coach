@@ -287,7 +287,9 @@ function NutritionSummary({ date, today }: { date: string; today: string }) {
             {diary.data.meals.some((meal) => meal.entries.length > 0) && (
               <p aria-label={foodSummary}>
                 <strong>{formatAmount(diary.data.totals.energy_kcal)}</strong>
-                {diary.data.targets ? ` / ${formatAmount(diary.data.targets.energy_kcal)}` : ''}{' '}
+                {diary.data.targets
+                  ? ` / ${formatAmount(diary.data.targets.energy_kcal)}`
+                  : ''}{' '}
                 ккал
               </p>
             )}

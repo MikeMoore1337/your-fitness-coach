@@ -48,7 +48,9 @@ export function AiCoachContextualEntry({
           <Icon name="ai-coach" size={16} /> AI Coach
         </span>
         <strong>Разобрать: {label.toLocaleLowerCase('ru-RU')}</strong>
-        <p>AI Coach получает контекст экрана. Вопрос можно изменить или написать перед отправкой.</p>
+        <p>
+          AI Coach получает контекст экрана. Вопрос можно изменить или написать перед отправкой.
+        </p>
       </div>
       <AppLink
         className="button-link secondary-link"

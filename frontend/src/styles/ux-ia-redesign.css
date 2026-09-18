@@ -837,8 +837,7 @@
 }
 
 .app-section--progress .progress-category-nav.section-navigation > a,
-.app-section--profile .profile-settings-nav.section-navigation
-  > .profile-settings-nav__item {
+.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item {
   display: grid;
   min-width: 0;
   min-height: 58px;
@@ -861,8 +860,10 @@
   line-height: 1.2;
 }
 
-.app-section--profile .profile-settings-nav.section-navigation
-  > .profile-settings-nav__item > .section-navigation__leading-icon {
+.app-section--profile
+  .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item
+  > .section-navigation__leading-icon {
   grid-column: 1;
   grid-row: 1 / span 2;
   align-self: center;
@@ -878,10 +879,11 @@
   grid-column: 1;
 }
 
-.app-section--progress .progress-category-nav.section-navigation
-  > a > .section-navigation__chevron,
-.app-section--profile .profile-settings-nav.section-navigation
-  > .profile-settings-nav__item > .section-navigation__chevron {
+.app-section--progress .progress-category-nav.section-navigation > a > .section-navigation__chevron,
+.app-section--profile
+  .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item
+  > .section-navigation__chevron {
   grid-column: 3;
   grid-row: 1 / span 2;
   align-self: center;
@@ -889,17 +891,26 @@
   color: var(--v2-text-secondary);
 }
 
-.app-section--progress .progress-category-nav.section-navigation > a > .section-navigation__chevron {
+.app-section--progress
+  .progress-category-nav.section-navigation
+  > a
+  > .section-navigation__chevron {
   grid-column: 2;
 }
 
 .app-section--progress .progress-category-nav.section-navigation > a > strong,
-.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item > span {
+.app-section--profile
+  .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item
+  > span {
   min-width: 0;
 }
 
 .app-section--progress .progress-category-nav.section-navigation > a > small,
-.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item > small {
+.app-section--profile
+  .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item
+  > small {
   overflow: hidden;
   color: var(--v2-text-secondary);
   font-family: var(--font-body);
@@ -911,8 +922,10 @@
 }
 
 .app-section--progress .progress-category-nav.section-navigation > a > strong,
-.app-section--profile .profile-settings-nav.section-navigation
-  > .profile-settings-nav__item > span {
+.app-section--profile
+  .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item
+  > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -922,25 +935,30 @@
 .app-section--progress .progress-category-nav.section-navigation > a.is-active,
 .app-section--progress .progress-category-nav.section-navigation > a[aria-current='page'],
 .app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item:hover,
-.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item.is-active,
-.app-section--profile .profile-settings-nav.section-navigation
+.app-section--profile
+  .profile-settings-nav.section-navigation
+  > .profile-settings-nav__item.is-active,
+.app-section--profile
+  .profile-settings-nav.section-navigation
   > .profile-settings-nav__item[aria-current='location'] {
   border-color: var(--v2-lime);
   background: var(--v2-surface-strong);
 }
 
 .app-section--progress .progress-category-nav.section-navigation > a:focus-visible,
-.app-section--profile .profile-settings-nav.section-navigation
+.app-section--profile
+  .profile-settings-nav.section-navigation
   > .profile-settings-nav__item:focus-visible {
   outline: 3px solid var(--v2-focus);
   outline-offset: 3px;
 }
 
-.app-section--profile .profile-settings-nav.section-navigation
-  > .profile-settings-nav__item,
-.app-section--profile .profile-settings-nav.section-navigation
+.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item,
+.app-section--profile
+  .profile-settings-nav.section-navigation
   > .profile-settings-nav__item:nth-child(2n),
-.app-section--profile .profile-settings-nav.section-navigation
+.app-section--profile
+  .profile-settings-nav.section-navigation
   > .profile-settings-nav__item:last-child {
   border: 1px solid var(--v2-border);
 }
@@ -967,16 +985,17 @@
   }
 
   .app-section--progress .progress-category-nav.section-navigation > a,
-  .app-section--profile .profile-settings-nav.section-navigation
-    > .profile-settings-nav__item {
+  .app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item {
     min-height: 56px;
     padding: 7px 8px;
     gap: 1px 6px;
   }
 
   .app-section--progress .progress-category-nav.section-navigation > a > small,
-  .app-section--profile .profile-settings-nav.section-navigation
-    > .profile-settings-nav__item > small {
+  .app-section--profile
+    .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item
+    > small {
     font-size: 0.68rem;
   }
 }
@@ -993,13 +1012,14 @@
 }
 
 @media (max-width: 430px) {
-  .app-section--profile .profile-settings-nav.section-navigation
-    > .profile-settings-nav__item > small {
+  .app-section--profile
+    .profile-settings-nav.section-navigation
+    > .profile-settings-nav__item
+    > small {
     display: none;
   }
 
-  .app-section--profile .profile-settings-nav.section-navigation
-    > .profile-settings-nav__item {
+  .app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item {
     grid-template-rows: auto;
   }
 }

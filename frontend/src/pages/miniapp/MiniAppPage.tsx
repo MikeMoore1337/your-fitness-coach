@@ -610,7 +610,11 @@ export default function MiniAppPage({
                     aria-describedby="profile-nav-personal-description"
                     onClick={() => openProfileSection('profile-personal')}
                   >
-                    <Icon className="section-navigation__leading-icon" name="nav-profile" size={16} />
+                    <Icon
+                      className="section-navigation__leading-icon"
+                      name="nav-profile"
+                      size={16}
+                    />
                     <span>Личные данные</span>
                     <small id="profile-nav-personal-description">
                       Имя, параметры, часовой пояс
@@ -657,9 +661,7 @@ export default function MiniAppPage({
                     }`}
                     href="#profile-notifications"
                     aria-current={
-                      activeProfileNavTarget === 'profile-notifications'
-                        ? 'location'
-                        : undefined
+                      activeProfileNavTarget === 'profile-notifications' ? 'location' : undefined
                     }
                     aria-label="Уведомления"
                     aria-describedby="profile-nav-notifications-description"
@@ -682,7 +684,11 @@ export default function MiniAppPage({
                     aria-describedby="profile-nav-security-description"
                     onClick={() => openProfileSection('profile-security')}
                   >
-                    <Icon className="section-navigation__leading-icon" name="account-security" size={16} />
+                    <Icon
+                      className="section-navigation__leading-icon"
+                      name="account-security"
+                      size={16}
+                    />
                     <span>Доступ и безопасность</span>
                     <small id="profile-nav-security-description">Вход, копия данных, аккаунт</small>
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />

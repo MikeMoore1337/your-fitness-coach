@@ -315,7 +315,7 @@ function ProgressInsights({ summary }: { summary: ProgressSummary }) {
             .slice(0, 3)
             .map((item) => (
               <li key={item}>{item}</li>
-          ))}
+            ))}
         </ul>
       </div>
     </>
@@ -422,8 +422,8 @@ function SummaryOverview({ summary, search }: { search: string; summary: Progres
                       'Мало данных'
                     ) : (
                       <>
-                        <strong>{formatNumber(summary.adherence.overall_percent)}%</strong> по доступным
-                        компонентам
+                        <strong>{formatNumber(summary.adherence.overall_percent)}%</strong> по
+                        доступным компонентам
                       </>
                     )}
                   </small>

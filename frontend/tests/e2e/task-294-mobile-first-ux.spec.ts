@@ -5,7 +5,16 @@ import { expectNoHorizontalOverflow } from './fixtures/mobile-tma';
 
 const FIXED_DATE = '2026-09-06';
 const CAPTURE_EVIDENCE = process.env.YFC_CAPTURE_TASK_294_EVIDENCE === '1';
-const EVIDENCE_DIR = resolve(process.cwd(), '..', '..', '..', 'tasks', '294', 'evidence', 'screenshots');
+const EVIDENCE_DIR = resolve(
+  process.cwd(),
+  '..',
+  '..',
+  '..',
+  'tasks',
+  '294',
+  'evidence',
+  'screenshots',
+);
 
 async function enableAiCoach(page: Page): Promise<void> {
   await page.route('**/api/v1/ai-coach/**', async (route) => {
@@ -110,11 +119,12 @@ test('Task 294 keeps mobile action and section surfaces bounded', async ({ page 
     const buttonBox = button.getBoundingClientRect();
     return {
       buttonCenter: buttonBox.left + buttonBox.width / 2,
-      contentCenter:
-        icon && label ? (icon.left + label.right) / 2 : Number.NaN,
+      contentCenter: icon && label ? (icon.left + label.right) / 2 : Number.NaN,
     };
   });
-  expect(Math.abs(addProductGeometry.buttonCenter - addProductGeometry.contentCenter)).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(addProductGeometry.buttonCenter - addProductGeometry.contentCenter),
+  ).toBeLessThanOrEqual(2);
   await expect(page.locator('.nutrition-day-summary')).toHaveCSS('border-top-width', '1px');
   await expectNoHorizontalOverflow(page);
 
@@ -153,7 +163,10 @@ test('Task 294 keeps mobile action and section surfaces bounded', async ({ page 
   await expect(todayNutrition.locator('.today-nutrition__content > div')).toHaveCount(2);
   await expect(todayNutrition.locator('.today-nutrition__food-group')).toBeVisible();
   await expect(todayNutrition.locator('.today-nutrition__water')).toBeVisible();
-  await expect(todayNutrition.locator('[data-icon="nav-nutrition"]')).toHaveAttribute('width', '16');
+  await expect(todayNutrition.locator('[data-icon="nav-nutrition"]')).toHaveAttribute(
+    'width',
+    '16',
+  );
   await expect(todayNutrition.getByRole('link', { name: 'Открыть дневник питания' })).toBeVisible();
   await expect(todayNutrition.getByRole('link', { name: '+ Вода' })).toBeVisible();
   const desktopFoodGroupColumns = await todayNutrition
@@ -221,7 +234,10 @@ test('Task 294 keeps Progress desktop hierarchy and Profile nav title-first on m
       });
       const rightStackStyles = await rightStack.evaluate((stack) => {
         const styles = getComputedStyle(stack);
-        return { alignContent: styles.alignContent, gridTemplateColumns: styles.gridTemplateColumns };
+        return {
+          alignContent: styles.alignContent,
+          gridTemplateColumns: styles.gridTemplateColumns,
+        };
       });
       const insightStyles = await insights.evaluate((grid) => {
         const styles = getComputedStyle(grid);
@@ -309,7 +325,9 @@ test('Task 294 keeps Progress desktop hierarchy and Profile nav title-first on m
     await expect(profileNavigation.locator(':scope > a > small')).toHaveCount(6);
     await expect(profileNavigation.locator(':scope > a > small').first()).toBeHidden();
     const titleBoxes = await Promise.all(
-      (await profileNavigation.locator(':scope > a > span').all()).map((title) => title.boundingBox()),
+      (await profileNavigation.locator(':scope > a > span').all()).map((title) =>
+        title.boundingBox(),
+      ),
     );
     const navigationBoxes = await Promise.all(
       (await profileNavigation.locator(':scope > a').all()).map((item) => item.boundingBox()),
@@ -364,7 +382,13 @@ test('Task 294 keeps Today secondary cards readable across desktop and mobile wi
     expect(waterTextBox).not.toBeNull();
     expect(waterActionBox).not.toBeNull();
     expect(foodActionBox!.y).toBeGreaterThanOrEqual(foodValuesBox!.y + foodValuesBox!.height - 1);
-    expect(Math.abs(waterTextBox!.y + waterTextBox!.height / 2 - (waterActionBox!.y + waterActionBox!.height / 2))).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(
+        waterTextBox!.y +
+          waterTextBox!.height / 2 -
+          (waterActionBox!.y + waterActionBox!.height / 2),
+      ),
+    ).toBeLessThanOrEqual(1);
     expect(waterTextBox!.x + waterTextBox!.width).toBeLessThanOrEqual(waterActionBox!.x);
 
     const progressCard = progress.locator('.today-summary-card--progress');
@@ -450,14 +474,17 @@ test('Task 294 uses one shared navigation treatment in Profile and Progress', as
   await openApp(page, 'profile');
   const profileNavigation = page.locator('.profile-settings-nav.section-navigation');
   await expect(profileNavigation).toBeVisible();
-  const profileStyle = await profileNavigation.locator(':scope > a').first().evaluate((item) => {
-    const styles = getComputedStyle(item);
-    return {
-      borderRadius: styles.borderRadius,
-      backgroundColor: styles.backgroundColor,
-      borderTopWidth: styles.borderTopWidth,
-    };
-  });
+  const profileStyle = await profileNavigation
+    .locator(':scope > a')
+    .first()
+    .evaluate((item) => {
+      const styles = getComputedStyle(item);
+      return {
+        borderRadius: styles.borderRadius,
+        backgroundColor: styles.backgroundColor,
+        borderTopWidth: styles.borderTopWidth,
+      };
+    });
   const profileNavigationMetrics = await profileNavigation.evaluate((navigation) => ({
     columns: getComputedStyle(navigation).gridTemplateColumns.split(' ').length,
     itemHeights: Array.from(navigation.children).map((item) => item.getBoundingClientRect().height),
@@ -472,14 +499,17 @@ test('Task 294 uses one shared navigation treatment in Profile and Progress', as
   await openApp(page, 'progress');
   const progressNavigation = page.locator('.progress-category-nav.section-navigation');
   await expect(progressNavigation).toBeVisible();
-  const progressStyle = await progressNavigation.locator(':scope > a').nth(1).evaluate((item) => {
-    const styles = getComputedStyle(item);
-    return {
-      borderRadius: styles.borderRadius,
-      backgroundColor: styles.backgroundColor,
-      borderTopWidth: styles.borderTopWidth,
-    };
-  });
+  const progressStyle = await progressNavigation
+    .locator(':scope > a')
+    .nth(1)
+    .evaluate((item) => {
+      const styles = getComputedStyle(item);
+      return {
+        borderRadius: styles.borderRadius,
+        backgroundColor: styles.backgroundColor,
+        borderTopWidth: styles.borderTopWidth,
+      };
+    });
   expect(progressStyle).toEqual(profileStyle);
   const progressNavigationMetrics = await progressNavigation.evaluate((navigation) => ({
     columns: getComputedStyle(navigation).gridTemplateColumns.split(' ').length,
@@ -521,10 +551,10 @@ test('Task 294 captures owner visual evidence', async ({ browser }) => {
           surface.viewport === 'desktop-1024'
             ? { width: 1024, height: 900 }
             : surface.viewport === 'desktop-1440'
-            ? { width: 1440, height: 900 }
-            : surface.mobile
-              ? { width: 390, height: 844 }
-              : { width: 1280, height: 900 },
+              ? { width: 1440, height: 900 }
+              : surface.mobile
+                ? { width: 390, height: 844 }
+                : { width: 1280, height: 900 },
         hasTouch: surface.mobile,
       });
       const page = await context.newPage();
@@ -539,10 +569,7 @@ test('Task 294 captures owner visual evidence', async ({ browser }) => {
       await expect(page.locator('h1').first()).toBeVisible();
       await expectNoHorizontalOverflow(page);
       await page.screenshot({
-        path: resolve(
-          EVIDENCE_DIR,
-          `task-294-${surface.name}-${surface.viewport}-${theme}.png`,
-        ),
+        path: resolve(EVIDENCE_DIR, `task-294-${surface.name}-${surface.viewport}-${theme}.png`),
         fullPage: true,
       });
       await context.close();
