@@ -1453,7 +1453,9 @@ def _prepare_skill_safety(task_id: str, artifacts: Path) -> tuple[dict[str, Any]
             encoding="utf-8",
         )
     except OSError as error:
-        raise DeliveryError(f"Cannot write skill safety evidence {evidence_path}: {error}") from error
+        raise DeliveryError(
+            f"Cannot write skill safety evidence {evidence_path}: {error}"
+        ) from error
 
     _event(
         "SKILL_SAFETY_SCANNED",
@@ -1825,7 +1827,9 @@ def _worker_guard_from_environment() -> tuple[WorkerEventGuard | None, Path | No
     try:
         guard = WorkerEventGuard(GuardLimits.from_mapping(parsed))
     except WorkerGuardConfigError as error:
-        raise DeliveryError(f"HUMAN_REQUIRED: worker guard configuration is invalid: {error}") from error
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: worker guard configuration is invalid: {error}"
+        ) from error
 
     raw_report_path = os.environ.get(WORKER_GUARD_REPORT_ENV)
     if not raw_report_path:
@@ -1845,7 +1849,9 @@ def _write_worker_guard_report(guard: WorkerEventGuard, report_path: Path | None
             encoding="utf-8",
         )
     except OSError as error:
-        raise DeliveryError(f"HUMAN_REQUIRED: cannot write worker guard report {report_path}") from error
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot write worker guard report {report_path}"
+        ) from error
 
 
 def _forward_worker_output(line: bytes) -> None:
@@ -2332,7 +2338,9 @@ def _launch_worker(
         try:
             guard_limits = GuardLimits.from_mapping(raw_budget)
         except WorkerGuardConfigError as error:
-            raise DeliveryError(f"HUMAN_REQUIRED: Agent Flow worker budget is invalid: {error}") from error
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Agent Flow worker budget is invalid: {error}"
+            ) from error
         worker_env[WORKER_GUARD_CONFIG_ENV] = json.dumps(
             guard_limits.as_dict(), ensure_ascii=True, sort_keys=True
         )
@@ -2404,7 +2412,7 @@ def _worker_exit_blocker(worker_exit: int, artifacts: Path) -> str:
         raw = json.loads(report_path.read_text(encoding="utf-8"))
         if isinstance(raw, Mapping) and isinstance(raw.get("block_reason_code"), str):
             reason = str(raw["block_reason_code"])
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         pass
     return f"worker guard blocked execution ({reason}); inspect {report_path}"
 
@@ -2568,7 +2576,9 @@ def _deliver_one(
                     blocker=blocker,
                 ),
             )
-        raise DeliveryError(f"{blocker[:1].upper() + blocker[1:]}; inspect {artifacts / 'events.jsonl'}")
+        raise DeliveryError(
+            f"{blocker[:1].upper() + blocker[1:]}; inspect {artifacts / 'events.jsonl'}"
+        )
     if history is None or history.get("state") != "finished":
         state = history.get("state") if history else "missing"
         if status_issue is not None:

@@ -139,9 +139,9 @@ def test_worker_launch_sets_ponytail_mode_from_agent_flow(
         == 0
     )
     assert observed["env"]["PONYTAIL_DEFAULT_MODE"] == "lite"
-    assert json.loads(observed["env"]["YFC_WORKER_GUARD_CONFIG"])[
-        "max_completed_tool_actions"
-    ] == 160
+    assert (
+        json.loads(observed["env"]["YFC_WORKER_GUARD_CONFIG"])["max_completed_tool_actions"] == 160
+    )
     assert observed["env"]["YFC_WORKER_GUARD_REPORT"] == str(
         (artifacts / "worker-guard.json").resolve()
     )
@@ -169,13 +169,7 @@ def test_prepare_skill_safety_blocks_critical_findings(
             "critical_findings": 1,
             "warning_findings": 0,
             "blocked": True,
-            "results": [
-                {
-                    "findings": [
-                        {"severity": "CRITICAL", "code": "NETWORK_TO_SHELL_PIPE"}
-                    ]
-                }
-            ],
+            "results": [{"findings": [{"severity": "CRITICAL", "code": "NETWORK_TO_SHELL_PIPE"}]}],
         },
     )
 
@@ -1552,7 +1546,11 @@ def test_continuous_cleanup_failure_posts_central_queue_stop(
             tmp_path / "agent-flow.json",
         ),
     )
-    monkeypatch.setattr(delivery, "_prepare_skill_safety", lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"))
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_skill_safety",
+        lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"),
+    )
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 0)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(delivery, "_verify_closeout", lambda started: None)
@@ -1615,7 +1613,11 @@ def test_continuous_worker_exit_after_finish_posts_central_queue_stop(
             tmp_path / "agent-flow.json",
         ),
     )
-    monkeypatch.setattr(delivery, "_prepare_skill_safety", lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"))
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_skill_safety",
+        lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"),
+    )
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 23)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(
@@ -1688,7 +1690,11 @@ def test_terminal_state_publication_failure_posts_central_queue_stop(
             tmp_path / "agent-flow.json",
         ),
     )
-    monkeypatch.setattr(delivery, "_prepare_skill_safety", lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"))
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_skill_safety",
+        lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"),
+    )
     monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 0)
     monkeypatch.setattr(delivery, "_history", lambda task_id: history)
     monkeypatch.setattr(delivery, "_queue_budget_from_controller_history", lambda history: {})

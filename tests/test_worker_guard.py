@@ -84,10 +84,16 @@ def test_file_change_progress_resets_repeated_failure_history() -> None:
     guard = WorkerEventGuard(_limits())
 
     for _ in range(3):
-        assert guard.observe_event(_command("pytest", exit_code=1, output="same failure")).blocked is False
+        assert (
+            guard.observe_event(_command("pytest", exit_code=1, output="same failure")).blocked
+            is False
+        )
     assert guard.observe_event(_file_change()).blocked is False
     for _ in range(3):
-        assert guard.observe_event(_command("pytest", exit_code=1, output="same failure")).blocked is False
+        assert (
+            guard.observe_event(_command("pytest", exit_code=1, output="same failure")).blocked
+            is False
+        )
 
     assert guard.report()["blocked"] is False
 

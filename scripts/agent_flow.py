@@ -261,9 +261,7 @@ def build_agent_flow(
     collab_budget = READ_ONLY_COLLAB_TOOL_BUDGET if read_only_parallelism else 0
     agent_budget = {
         "max_completed_tool_actions": (
-            EXPANDED_TOOL_ACTION_BUDGET
-            if expanded_tool_budget
-            else ORDINARY_TOOL_ACTION_BUDGET
+            EXPANDED_TOOL_ACTION_BUDGET if expanded_tool_budget else ORDINARY_TOOL_ACTION_BUDGET
         ),
         "max_collab_tool_calls": collab_budget,
         "max_spawned_subagents": subagent_budget,

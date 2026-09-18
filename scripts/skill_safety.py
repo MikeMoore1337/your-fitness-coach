@@ -345,16 +345,10 @@ def scan_repository_skills(skills_root: Path) -> dict[str, Any]:
         raise SkillSafetyError(f"Skills root not found: {root}")
     results = [scan_skill(path) for path in sorted(root.glob("*/SKILL.md"))]
     critical = sum(
-        1
-        for result in results
-        for finding in result["findings"]
-        if finding["severity"] == CRITICAL
+        1 for result in results for finding in result["findings"] if finding["severity"] == CRITICAL
     )
     warnings = sum(
-        1
-        for result in results
-        for finding in result["findings"]
-        if finding["severity"] == WARNING
+        1 for result in results for finding in result["findings"] if finding["severity"] == WARNING
     )
     return {
         "schema_version": SCHEMA_VERSION,
@@ -392,12 +386,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             report = scan_repository_skills(args.root)
         else:
             result = scan_skill(args.path)
-            critical = sum(
-                1 for finding in result["findings"] if finding["severity"] == CRITICAL
-            )
-            warnings = sum(
-                1 for finding in result["findings"] if finding["severity"] == WARNING
-            )
+            critical = sum(1 for finding in result["findings"] if finding["severity"] == CRITICAL)
+            warnings = sum(1 for finding in result["findings"] if finding["severity"] == WARNING)
             report = {
                 "schema_version": SCHEMA_VERSION,
                 "classification": "yfc-skill-safety-report",

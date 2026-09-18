@@ -33,7 +33,7 @@ class GuardLimits:
     short_cycle_repetitions: int
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> "GuardLimits":
+    def from_mapping(cls, value: Mapping[str, Any]) -> GuardLimits:
         names = (
             "max_completed_tool_actions",
             "max_collab_tool_calls",
@@ -141,9 +141,7 @@ def _result_payload(item: Mapping[str, Any]) -> dict[str, Any]:
         normalized_states = {}
         if isinstance(states, Mapping):
             normalized_states = {
-                str(key): (
-                    raw.get("status") if isinstance(raw, Mapping) else None
-                )
+                str(key): (raw.get("status") if isinstance(raw, Mapping) else None)
                 for key, raw in states.items()
             }
         return {
@@ -255,7 +253,11 @@ class WorkerEventGuard:
             return GuardDecision()
 
         item_type = item.get("type")
-        if item_type == "collab_tool_call" and event_type in {"item.started", "item.updated", "item.completed"}:
+        if item_type == "collab_tool_call" and event_type in {
+            "item.started",
+            "item.updated",
+            "item.completed",
+        }:
             decision = self._observe_collab(item)
             if decision.blocked:
                 return decision
@@ -288,14 +290,9 @@ class WorkerEventGuard:
         self._recent_actions.append(action_signature)
 
         if _is_failed(item):
-            failure_signature = _digest(
-                {"action": action_payload, "result": _result_payload(item)}
-            )
+            failure_signature = _digest({"action": action_payload, "result": _result_payload(item)})
             self._failed_counts[failure_signature] += 1
-            if (
-                self._failed_counts[failure_signature]
-                >= self.limits.max_identical_failed_actions
-            ):
+            if self._failed_counts[failure_signature] >= self.limits.max_identical_failed_actions:
                 return self._block("IDENTICAL_FAILED_ACTION_LOOP", failure_signature)
 
         identical_count = sum(
@@ -315,7 +312,7 @@ class WorkerEventGuard:
             text = line
         try:
             raw = json.loads(text)
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             self.malformed_lines += 1
             return GuardDecision()
         if not isinstance(raw, Mapping):

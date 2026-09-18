@@ -119,7 +119,8 @@ def test_invalid_external_source_manifest_is_critical(tmp_path: Path) -> None:
 
     assert any(
         item["severity"] == CRITICAL
-        and item["code"] in {
+        and item["code"]
+        in {
             "INVALID_EXTERNAL_SKILL_SOURCE_MANIFEST",
             "INVALID_EXTERNAL_SKILL_PROVENANCE",
         }
