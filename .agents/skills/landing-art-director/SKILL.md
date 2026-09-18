@@ -125,6 +125,14 @@ Mobile Landing проектируется отдельно, а не станов
 - no horizontal overflow;
 - media/motion budget проверяется отдельно.
 
+## Apple / Liquid Glass reference
+
+Если Landing task использует Apple-like materials, Liquid Glass controls, native-feel interactions
+или физичный gesture/motion language, подключай `$apple-design` как reference.
+
+Не превращай Landing в Apple clone: YFC sport-tech identity, lime/black/white core, storytelling и
+product truth остаются главными.
+
 ## Motion
 
 Landing может быть выразительнее authenticated product.

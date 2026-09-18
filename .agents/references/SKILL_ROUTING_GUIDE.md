@@ -1,4 +1,4 @@
-# Skill routing guide v6
+# Skill routing guide v7
 
 ## Принцип
 
@@ -14,10 +14,10 @@ Task = scope и результат.
 | --- | --- | --- |
 | Обычный React UI | `$frontend-engineer` | `$product-designer` при реальном UX/visual decision |
 | Client-facing smartphone UI | `$frontend-engineer` | `$mobile-engineer` при keyboard/safe-area/lifecycle/device runtime; `$product-designer` при composition decision |
-| Существенный motion | `$motion-design-engineer` + implementation skill | `$performance-engineer` при подтверждённой стоимости; `$accessibility-engineer` при сложном reduced-motion/a11y |
-| Design exploration | `$product-designer` + explicit `$ui-prototyper` | `$landing-art-director` для Landing; `$motion-design-engineer` если motion является частью концепции |
+| Существенный motion | `$motion-design-engineer` + implementation skill | `$apple-design` при Apple-like physical/gesture trigger; `$performance-engineer` при подтверждённой стоимости; `$accessibility-engineer` при сложном reduced-motion/a11y |
+| Design exploration | `$product-designer` + explicit `$ui-prototyper` | `$landing-art-director` для Landing; `$apple-design` при Apple/Liquid Glass/native-feel direction; `$motion-design-engineer` если motion является частью концепции |
 | Landing | `$landing-art-director` + `$product-designer` | `$frontend-engineer` при реализации; SEO/performance только по scope |
-| UI audit | `$ui-audit` | `$motion-design-engineer` при существенном motion review; a11y/perf по риску |
+| UI audit | `$ui-audit` | `$apple-design` только при аудите Apple/Liquid Glass/native-feel contract; `$motion-design-engineer` при существенном motion review; a11y/perf по риску |
 | Backend/API | `$backend-engineer` | `$python-engineer` при Python implementation; data/security/privacy по границе |
 | Python | `$python-engineer` | domain skill по фактическому коду |
 | DB/schema/query | `$data-engineer` | backend/privacy по изменению contract/lifecycle |
@@ -56,6 +56,30 @@ Responsive layout сам по себе принадлежит `$frontend-enginee
 - выполняет dedicated motion hardening.
 
 Одна короткая стандартная CSS transition не требует отдельного skill.
+
+## Apple Design
+
+`$apple-design` - условный reference skill для Apple-подобной interaction/material физики на web/TMA.
+
+Trigger:
+
+- Apple-style или Liquid Glass design direction;
+- native-like mobile web/TMA interaction;
+- translucent material/depth hierarchy;
+- gesture-driven drag/swipe/sheet/drawer;
+- spring physics, interruptibility, velocity handoff, momentum projection;
+- rubber-banding или physical direct manipulation.
+
+Не загружай его для обычной формы, layout fix, icon audit, backend task или короткой стандартной
+transition только потому, что продукт должен выглядеть качественно.
+
+Authority:
+
+- `$product-designer` владеет YFC visual direction, composition и brand;
+- `$motion-design-engineer` владеет production motion contract;
+- `$apple-design` даёт Apple-specific interaction/material techniques и не превращает YFC в iOS clone;
+- YFC sport-tech + lime/black/white anchors, task scope, accessibility, performance и product truth выше
+  Apple-like reference patterns.
 
 ## UI prototyping
 

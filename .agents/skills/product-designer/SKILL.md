@@ -252,6 +252,16 @@ Nutrition, workout, progress и analytics не должны быть "табли
 
 Animation data не должна искажать scale/value.
 
+## Apple-specific reference
+
+Если current task явно требует Apple/Liquid Glass/native-like direction, physical materials,
+gesture-driven sheets/drawers/swipes или Apple-like interaction feel, подключай `$apple-design`
+как reference skill.
+
+Он не определяет visual identity YFC. Сохраняй sport-tech характер, lime/black/white core и выбранный
+owner direction. Не копируй iOS chrome/geometry механически и не превращай Apple reference в скрытый
+global redesign.
+
 ## Motion
 
 Motion является частью design language.
