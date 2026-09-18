@@ -1260,9 +1260,19 @@
   }
 }
 
-@media (min-width: 390px) and (max-width: 430px) {
+@media (min-width: 431px) and (max-width: 439px) {
+  .today-nutrition__action-label-full {
+    display: none;
+  }
+
+  .today-nutrition__action-label-compact {
+    display: inline;
+  }
+}
+
+@media (min-width: 390px) and (max-width: 439px) {
   .today-nutrition__food-group .today-summary-card__action {
     justify-self: end;
-    margin-right: 30px;
+    margin-right: 0;
   }
 }

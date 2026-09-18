@@ -243,6 +243,8 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
   expect(await diaryAction.evaluate((element) => (element as HTMLElement).innerText)).toBe(
     'Открыть дневник',
   );
+  await page.mouse.wheel(0, 120);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   const [diaryActionBox, todayBottomNavBox, todayFabBox] = await Promise.all([
     diaryAction.boundingBox(),
     page.locator('#appBottomNav').boundingBox(),
@@ -265,18 +267,45 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
   await expectNoHorizontalOverflow(page);
   await capture(page, 'today-390-sparse-light.png');
 
-  for (const width of [390, 430, 440]) {
+  for (const width of [360, 389, 390, 393, 400, 430, 439, 440, 768]) {
     await page.setViewportSize({ width, height: 844 });
     await openApp(page, 'today');
+    await page.mouse.wheel(0, 120);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
     const action = page.getByRole('link', { name: 'Открыть дневник питания' });
+    const water = page.getByRole('link', { name: '+ Вода' });
     const group = page.locator('.today-nutrition__food-group');
-    const [actionBox, groupBox] = await Promise.all([action.boundingBox(), group.boundingBox()]);
+    const nutrition = page.getByRole('region', { name: 'Питание на сегодня' });
+    const values = nutrition.locator('.today-nutrition__values');
+    const [actionBox, waterBox, groupBox, nutritionBox, valuesBox] = await Promise.all([
+      action.boundingBox(),
+      water.boundingBox(),
+      group.boundingBox(),
+      nutrition.boundingBox(),
+      values.boundingBox(),
+    ]);
     expect(actionBox).not.toBeNull();
+    expect(waterBox).not.toBeNull();
     expect(groupBox).not.toBeNull();
-    expect(actionBox!.x + actionBox!.width).toBeGreaterThanOrEqual(
-      groupBox!.x + groupBox!.width - 31,
+    expect(nutritionBox).not.toBeNull();
+    expect(valuesBox).not.toBeNull();
+    if (!actionBox || !waterBox || !groupBox || !nutritionBox || !valuesBox) continue;
+    if (width >= 390 && width <= 440) {
+      expect(
+        Math.abs(actionBox.x + actionBox.width - (waterBox.x + waterBox.width)),
+      ).toBeLessThanOrEqual(2);
+    }
+    expect(actionBox.x).toBeGreaterThanOrEqual(nutritionBox.x);
+    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+      nutritionBox.x + nutritionBox.width + 1,
     );
+    expect(actionBox.x).toBeGreaterThanOrEqual(groupBox.x);
+    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(groupBox.x + groupBox.width + 1);
+    expect(valuesBox.x + valuesBox.width).toBeLessThanOrEqual(actionBox.x + 1);
     expect(actionBox!.height).toBeGreaterThanOrEqual(44);
+    expect(await action.evaluate((element) => (element as HTMLElement).innerText)).toBe(
+      width < 440 ? 'Открыть дневник' : 'Открыть дневник питания',
+    );
     const [fabBox, bottomNavBox] = await Promise.all([
       page.locator('.app-quick-add-trigger').boundingBox(),
       page.locator('#appBottomNav').boundingBox(),
@@ -288,6 +317,12 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
       expect(overlaps(actionBox!, bottomNavBox!)).toBe(false);
     }
     await expectNoHorizontalOverflow(page);
+    if (CAPTURE_EVIDENCE && width !== 400) {
+      await page.screenshot({
+        path: resolve(EVIDENCE_DIR, `hotfix-today-nutrition-${width}.png`),
+        fullPage: false,
+      });
+    }
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
