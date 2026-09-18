@@ -211,6 +211,51 @@ function formatAmount(value: string | number | null | undefined): string {
   return Number.isFinite(numeric) ? String(Math.round(numeric)) : '—';
 }
 
+function finiteAmount(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function validDiaryRemaining(
+  total: string | number | null | undefined,
+  target: string | number | null | undefined,
+  remaining: string | number | null | undefined,
+): number | null {
+  const totalAmount = finiteAmount(total);
+  const targetAmount = finiteAmount(target);
+  const remainingAmount = finiteAmount(remaining);
+  if (totalAmount === null || targetAmount === null || remainingAmount === null) return null;
+  return Math.abs(targetAmount - totalAmount - remainingAmount) <= 0.01 ? remainingAmount : null;
+}
+
+const nutritionMacroRows = [
+  { key: 'protein_g', label: 'Белок' },
+  { key: 'fat_g', label: 'Жиры' },
+  { key: 'carbs_g', label: 'Углеводы' },
+] as const;
+
+const cardioActivityLabels: Record<CardioSession['activity_type'], string> = {
+  walking: 'ходьба',
+  running: 'бег',
+  elliptical: 'эллиптический тренажёр',
+  stationary_bike: 'велотренажёр',
+  cycling: 'велосипед',
+  rowing: 'гребля',
+  stepper: 'степпер',
+  swimming: 'плавание',
+  other: 'активность',
+};
+
+function cardioSessionsCountLabel(value: number): string {
+  const lastTwo = value % 100;
+  if (lastTwo >= 11 && lastTwo <= 14) return `${value} сессий`;
+  const last = value % 10;
+  if (last === 1) return `${value} сессия`;
+  if (last >= 2 && last <= 4) return `${value} сессии`;
+  return `${value} сессий`;
+}
+
 function compactSignal(value: string, maxLength = 140): string {
   const normalized = value.replace(/\s+/g, ' ').trim();
   return normalized.length > maxLength
@@ -260,21 +305,34 @@ function NutritionSummary({ date, today }: { date: string; today: string }) {
     );
   }
 
-  const foodSummary = diary.data.meals.some((meal) => meal.entries.length > 0)
-    ? diary.data.targets
-      ? `${formatAmount(diary.data.totals.energy_kcal)} из ${formatAmount(diary.data.targets.energy_kcal)} ккал · белок ${formatAmount(diary.data.totals.protein_g)} г`
-      : `${formatAmount(diary.data.totals.energy_kcal)} ккал записано`
-    : 'Записей за день пока нет';
+  const hasFoodEntries = diary.data.meals.some((meal) => meal.entries.length > 0);
+  const calorieTotal = finiteAmount(diary.data.totals.energy_kcal);
+  const calorieTarget = finiteAmount(diary.data.targets?.energy_kcal);
+  const calorieRemaining = hasFoodEntries
+    ? validDiaryRemaining(
+        diary.data.totals.energy_kcal,
+        diary.data.targets?.energy_kcal,
+        diary.data.remaining?.energy_kcal,
+      )
+    : null;
+  const foodSummary =
+    diary.data.status === 'fasted' ? 'День отмечен как постный' : 'Записей за день пока нет';
   const hydrationSummary = hydration.data
-    ? hydration.data.goal?.enabled && hydration.data.goal.target_ml
-      ? `вода ${hydration.data.total_ml} из ${hydration.data.goal.target_ml} мл`
-      : `вода ${hydration.data.total_ml} мл`
+    ? hydration.data.entries.length === 0
+      ? 'Вода пока не записана'
+      : hydration.data.goal?.enabled && hydration.data.goal.target_ml
+        ? `Вода ${hydration.data.total_ml} из ${hydration.data.goal.target_ml} мл`
+        : `Вода ${hydration.data.total_ml} мл`
     : hydration.isLoading
-      ? 'вода загружается…'
-      : 'вода недоступна';
+      ? 'Вода загружается…'
+      : 'Вода недоступна';
   const dateLabel = formatNutritionDateLabel(date, today);
   const nutritionTitle = date === today ? 'Питание на сегодня' : `Питание за ${dateLabel}`;
   const caloriesLabel = date === today ? 'Калории за сегодня' : `Калории за ${dateLabel}`;
+  const calorieValueLabel =
+    calorieTarget === null
+      ? `${formatAmount(diary.data.totals.energy_kcal)} ккал`
+      : `${formatAmount(diary.data.totals.energy_kcal)} из ${formatAmount(diary.data.targets?.energy_kcal)} ккал`;
   return (
     <section className="today-nutrition" aria-label={nutritionTitle}>
       <h2>
@@ -284,32 +342,59 @@ function NutritionSummary({ date, today }: { date: string; today: string }) {
       <div className="today-nutrition__content">
         <div className="today-nutrition__food-group">
           <div className="today-nutrition__values">
-            {diary.data.meals.some((meal) => meal.entries.length > 0) && (
-              <p aria-label={foodSummary}>
-                <strong>{formatAmount(diary.data.totals.energy_kcal)}</strong>
-                {diary.data.targets
-                  ? ` / ${formatAmount(diary.data.targets.energy_kcal)}`
-                  : ''}{' '}
-                ккал
-              </p>
+            {hasFoodEntries ? (
+              <>
+                <p aria-label={`${caloriesLabel}: ${calorieValueLabel}`}>
+                  <strong>{formatAmount(diary.data.totals.energy_kcal)}</strong>
+                  {diary.data.targets
+                    ? ` / ${formatAmount(diary.data.targets.energy_kcal)}`
+                    : ''}{' '}
+                  ккал
+                </p>
+                {calorieRemaining !== null && (
+                  <small className="today-nutrition__remaining">
+                    {calorieRemaining >= 0
+                      ? `Осталось ${formatAmount(calorieRemaining)} ккал`
+                      : `Выше ориентира на ${formatAmount(Math.abs(calorieRemaining))} ккал`}
+                  </small>
+                )}
+                {diary.data.targets &&
+                  calorieTotal !== null &&
+                  calorieTarget !== null &&
+                  calorieTarget > 0 && (
+                    <progress aria-label={caloriesLabel} max={calorieTarget} value={calorieTotal} />
+                  )}
+                <dl className="today-nutrition__macros" aria-label="Белки, жиры и углеводы">
+                  {nutritionMacroRows.map(({ key, label }) => {
+                    const total = diary.data.totals[key];
+                    const target = diary.data.targets?.[key];
+                    const targetAmount = finiteAmount(target);
+                    return (
+                      <div key={key}>
+                        <dt>{label}</dt>
+                        <dd>
+                          {targetAmount === null
+                            ? `${formatAmount(total)} г`
+                            : `${formatAmount(total)} / ${formatAmount(target)} г`}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </>
+            ) : (
+              <p>{foodSummary}</p>
             )}
-            {!diary.data.meals.some((meal) => meal.entries.length > 0) && <p>{foodSummary}</p>}
-            {diary.data.meals.some((meal) => meal.entries.length > 0) &&
-              diary.data.targets &&
-              Number(diary.data.targets.energy_kcal) > 0 && (
-                <progress
-                  aria-label={caloriesLabel}
-                  max={diary.data.targets.energy_kcal}
-                  value={diary.data.totals.energy_kcal}
-                />
-              )}
           </div>
           <AppLink
             className="today-summary-card__action"
             to={`/app?section=nutrition&date=${date}`}
             aria-label="Открыть дневник питания"
           >
-            Открыть дневник питания
+            <span className="today-nutrition__action-label-full">Открыть дневник питания</span>
+            <span className="today-nutrition__action-label-compact" aria-hidden="true">
+              Открыть дневник
+            </span>
           </AppLink>
         </div>
         <div className="today-nutrition__water">
@@ -323,6 +408,53 @@ function NutritionSummary({ date, today }: { date: string; today: string }) {
           </AppLink>
         </div>
       </div>
+    </section>
+  );
+}
+
+function ActivitySummary({
+  cardio,
+  date,
+  error,
+  loading,
+  timeZone,
+  today,
+}: {
+  cardio?: CardioSession[];
+  date: string;
+  error: boolean;
+  loading: boolean;
+  timeZone: string;
+  today: string;
+}) {
+  if (loading || error) return null;
+  const completedSessions = weekCardioForDate(cardio, date, timeZone).filter(
+    (session) =>
+      session.status === 'completed' && (finiteAmount(session.duration_minutes) ?? 0) > 0,
+  );
+  if (completedSessions.length === 0) return null;
+
+  const totalDuration = completedSessions.reduce(
+    (total, session) => total + (finiteAmount(session.duration_minutes) ?? 0),
+    0,
+  );
+  const summary =
+    completedSessions.length === 1
+      ? `Кардио · ${cardioActivityLabels[completedSessions[0]!.activity_type]} · ${formatAmount(totalDuration)} мин`
+      : `${cardioSessionsCountLabel(completedSessions.length)} · ${formatAmount(totalDuration)} мин`;
+  const dateLabel = date === today ? 'сегодня' : formatNutritionDateLabel(date, today);
+
+  return (
+    <section className="today-activity-grid" aria-label={`Активность за ${dateLabel}`}>
+      <SemanticCard
+        action={<AppLink to="/app?section=progress&view=cardio">Открыть кардио</AppLink>}
+        className="today-panel today-summary-card today-summary-card--activity"
+        family="training"
+        icon="nav-today"
+        summary={summary}
+        title="Активность"
+        variant="action"
+      />
     </section>
   );
 }
@@ -348,25 +480,21 @@ function ProgressSummaryPanel({ summary }: { summary: ReturnType<typeof useProgr
 
   const completedWorkouts = summary.data.training.completed_workouts;
   const latestWeight = summary.data.body.latest_measurement?.weight_kg;
-  const progressSignals = [
-    completedWorkouts > 0
-      ? `${completedWorkouts} ${completedWorkouts === 1 ? 'тренировка' : completedWorkouts < 5 ? 'тренировки' : 'тренировок'} за 30 дней`
-      : null,
-    latestWeight != null ? `последний вес ${latestWeight.toLocaleString('ru-RU')} кг` : null,
-  ].filter((value): value is string => Boolean(value));
+  const progressSignal =
+    latestWeight != null
+      ? `последний вес ${latestWeight.toLocaleString('ru-RU')} кг`
+      : completedWorkouts > 0
+        ? `${completedWorkouts} ${completedWorkouts === 1 ? 'тренировка' : completedWorkouts < 5 ? 'тренировки' : 'тренировок'} за 30 дней`
+        : null;
 
   return (
     <section className="today-progress-grid" aria-label="Главное о прогрессе">
       <SemanticCard
-        action={<AppLink to="/app?section=progress">Открыть</AppLink>}
+        action={<AppLink to="/app?section=progress">Открыть прогресс</AppLink>}
         className="today-panel today-summary-card today-summary-card--progress"
         family="progress"
         icon="nav-progress"
-        summary={
-          progressSignals.length > 0
-            ? progressSignals.join(' · ')
-            : 'Появится после первых тренировок и замеров'
-        }
+        summary={progressSignal ?? 'Появится после первых тренировок и замеров'}
         title="Прогресс"
         variant="action"
       />
@@ -1149,6 +1277,14 @@ export function TodayDashboard({
         </div>
         <div className="today-dashboard__facts">
           <NutritionSummary date={selectedDate} today={today} />
+          <ActivitySummary
+            cardio={cardioWeek.data}
+            date={selectedDate}
+            error={Boolean(cardioWeek.error)}
+            loading={cardioWeek.isLoading}
+            timeZone={timeZone}
+            today={today}
+          />
           <ProgressSummaryPanel summary={progress} />
           {user && wellbeingRequested && (
             <>

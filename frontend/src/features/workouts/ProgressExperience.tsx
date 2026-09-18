@@ -138,19 +138,21 @@ function progressPercent(component: AdherenceComponent): string {
 function ProgressMetricCard({
   detail,
   label,
+  state,
   to,
   value,
 }: {
   detail: string;
   label: string;
+  state: 'populated' | 'sparse';
   to: string;
   value: string;
 }) {
   return (
-    <AppLink className="progress-overview__metric" to={to}>
+    <AppLink className="progress-overview__metric" data-progress-state={state} to={to}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>{detail}</small>
+      {state === 'populated' && <small>{detail}</small>}
       <span className="progress-overview__metric-arrow" aria-hidden="true">
         <Icon name="arrow-right" size={16} />
       </span>
@@ -354,6 +356,21 @@ function SummaryOverview({ summary, search }: { search: string; summary: Progres
   const weight = summary.body.trends.find((trend) => trend.metric === 'weight_kg');
   const confirmedNutritionDays = summary.nutrition.complete_days + summary.nutrition.fasted_days;
   const latestWeight = weight ? `${formatNumber(weight.latest_value)} кг` : 'Мало данных';
+  const bodyState = weight ? 'populated' : 'sparse';
+  const trainingState =
+    summary.training.planned_workouts > 0 || summary.training.completed_workouts > 0
+      ? 'populated'
+      : 'sparse';
+  const nutritionState =
+    summary.nutrition.visible && summary.nutrition.average_calories != null
+      ? 'populated'
+      : 'sparse';
+  const cardioState =
+    summary.cardio.planned_sessions > 0 ||
+    summary.cardio.completed_sessions > 0 ||
+    summary.cardio.duration_minutes > 0
+      ? 'populated'
+      : 'sparse';
   return (
     <section
       className="progress-summary progress-overview semantic-card semantic-card--summary semantic-card--progress"
@@ -376,12 +393,14 @@ function SummaryOverview({ summary, search }: { search: string; summary: Progres
             <ProgressMetricCard
               detail={weight ? formatChange(weight.change, 'кг') : 'Мало данных'}
               label="Тело"
+              state={bodyState}
               to={progressViewPath(search, 'body')}
               value={latestWeight}
             />
             <ProgressMetricCard
               detail={`${formatNumber(summary.training.frequency_per_week, 1)} в неделю · ${summary.training.new_personal_records} PR`}
               label="Тренировки"
+              state={trainingState}
               to={progressViewPath(search, 'training')}
               value={`${summary.training.completed_workouts} / ${summary.training.planned_workouts}`}
             />
@@ -392,6 +411,7 @@ function SummaryOverview({ summary, search }: { search: string; summary: Progres
                   : 'Недоступно для этой роли'
               }
               label="Питание"
+              state={nutritionState}
               to={progressViewPath(search, 'nutrition')}
               value={
                 !summary.nutrition.visible
@@ -404,6 +424,7 @@ function SummaryOverview({ summary, search }: { search: string; summary: Progres
             <ProgressMetricCard
               detail={`${formatNumber(summary.cardio.duration_minutes, 0)} мин · ${progressPercent(summary.adherence.cardio)}`}
               label="Кардио"
+              state={cardioState}
               to={progressViewPath(search, 'cardio')}
               value={`${summary.cardio.completed_sessions} сессий`}
             />

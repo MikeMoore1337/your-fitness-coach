@@ -22,6 +22,7 @@ export interface PlatformApiOptions {
   trainerActive?: boolean;
   measurementHistory?: 'none' | 'many';
   cardioState?: 'empty' | 'planned' | 'completed';
+  progressState?: 'sparse' | 'populated';
   avatarState?: 'default' | 'provider' | 'custom';
 }
 
@@ -896,32 +897,34 @@ export async function installPlatformApi(
     period_start: today,
     period_end: today,
     training: {
-      planned_workouts: 1,
-      completed_workouts: workoutStatus === 'completed' ? 1 : 0,
+      planned_workouts: options.progressState === 'sparse' ? 0 : 1,
+      completed_workouts:
+        options.progressState === 'sparse' ? 0 : workoutStatus === 'completed' ? 1 : 0,
       skipped_workouts: 0,
       frequency_per_week: 0,
       volume_kg: 0,
       new_personal_records: 0,
-      last_completed_workout_on: workoutStatus === 'completed' ? today : null,
+      last_completed_workout_on:
+        options.progressState === 'sparse' || workoutStatus !== 'completed' ? null : today,
       next_workout: null,
     },
     nutrition: {
       visible: true,
-      logged_days: nutritionEntries.length ? 1 : 0,
-      complete_days: 0,
+      logged_days: options.progressState === 'populated' ? 1 : nutritionEntries.length ? 1 : 0,
+      complete_days: options.progressState === 'populated' ? 1 : 0,
       incomplete_days: nutritionEntries.length ? 1 : 0,
       fasted_days: 0,
-      unlogged_days: nutritionEntries.length ? 28 : 29,
+      unlogged_days: options.progressState === 'populated' ? 0 : nutritionEntries.length ? 28 : 29,
       adherence_evaluated_days: 0,
-      average_calories: null,
+      average_calories: options.progressState === 'populated' ? 1980 : null,
       target_calories: 2100,
       average_protein_g: null,
       target_protein_g: 140,
       target_effective_on: today,
     },
     body: {
-      latest_measurement: measurements[0] ?? null,
-      trends: measurementTrends(periodDays),
+      latest_measurement: options.progressState === 'sparse' ? null : (measurements[0] ?? null),
+      trends: options.progressState === 'sparse' ? [] : measurementTrends(periodDays),
       priority: { mode: 'balanced', muscle_group_ids: [] },
       guidance: {
         comparison_basis: 'self',

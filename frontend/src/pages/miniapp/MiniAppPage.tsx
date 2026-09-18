@@ -629,12 +629,12 @@ export default function MiniAppPage({
                     aria-current={
                       activeProfileNavTarget === 'profile-fitness' ? 'location' : undefined
                     }
-                    aria-label="Цели и параметры"
+                    aria-label="Цели"
                     aria-describedby="profile-nav-fitness-description"
                     onClick={() => openProfileSection('profile-personal', 'profile-fitness')}
                   >
                     <Icon className="section-navigation__leading-icon" name="nav-plan" size={16} />
-                    <span>Цели и параметры</span>
+                    <span>Цели</span>
                     <small id="profile-nav-fitness-description">Цель, уровень и частота</small>
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
@@ -646,12 +646,12 @@ export default function MiniAppPage({
                     aria-current={
                       activeProfileNavTarget === 'profile-trainer' ? 'location' : undefined
                     }
-                    aria-label="Тренер и приглашения"
+                    aria-label="Тренер"
                     aria-describedby="profile-nav-trainer-description"
                     onClick={() => openProfileSection('profile-trainer')}
                   >
                     <Icon className="section-navigation__leading-icon" name="nav-coach" size={16} />
-                    <span>Тренер и приглашения</span>
+                    <span>Тренер</span>
                     <small id="profile-nav-trainer-description">Приглашения и режим тренера</small>
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
@@ -680,7 +680,7 @@ export default function MiniAppPage({
                     aria-current={
                       activeProfileNavTarget === 'profile-security' ? 'location' : undefined
                     }
-                    aria-label="Доступ и безопасность"
+                    aria-label="Безопасность"
                     aria-describedby="profile-nav-security-description"
                     onClick={() => openProfileSection('profile-security')}
                   >
@@ -689,7 +689,7 @@ export default function MiniAppPage({
                       name="account-security"
                       size={16}
                     />
-                    <span>Доступ и безопасность</span>
+                    <span>Безопасность</span>
                     <small id="profile-nav-security-description">Вход, копия данных, аккаунт</small>
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>

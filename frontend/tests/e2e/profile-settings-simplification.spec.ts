@@ -125,10 +125,10 @@ test('profile stays compact while disclosures, icons and shared provider actions
   ).toBeVisible();
   const iconContract = [
     ['Личные данные', 'nav-profile'],
-    ['Цели и параметры', 'nav-plan'],
-    ['Тренер и приглашения', 'nav-coach'],
+    ['Цели', 'nav-plan'],
+    ['Тренер', 'nav-coach'],
     ['Уведомления', 'nav-today'],
-    ['Доступ и безопасность', 'account-security'],
+    ['Безопасность', 'account-security'],
   ] as const;
   const profileNavigation = page.getByRole('navigation', { name: 'Разделы профиля' });
   for (const [name, icon] of iconContract) {
@@ -142,7 +142,7 @@ test('profile stays compact while disclosures, icons and shared provider actions
   expect(await majorCards.count()).toBeGreaterThanOrEqual(5);
   for (const card of await majorCards.all()) await expect(card).not.toHaveAttribute('open');
 
-  await openProfileSection(page, 'Цели и параметры');
+  await openProfileSection(page, 'Цели');
   const profileCard = page.locator('#profile-personal');
   await expect(profileCard).toHaveAttribute('open');
   const saveProfile = page.getByRole('button', { name: 'Сохранить изменения' });
@@ -171,7 +171,7 @@ test('profile stays compact while disclosures, icons and shared provider actions
   await page.keyboard.press('Space');
   await expect(notificationCenter).toHaveAttribute('open');
 
-  await openProfileSection(page, 'Доступ и безопасность');
+  await openProfileSection(page, 'Безопасность');
   await page.getByText('Способы входа', { exact: true }).click();
   const googleAction = page.getByRole('button', { name: 'Привязать Google' });
   await expect(googleAction).toHaveClass(/oauth-button--google/);
