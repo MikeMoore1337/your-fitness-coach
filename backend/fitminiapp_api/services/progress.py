@@ -9,7 +9,7 @@ from math import floor
 from typing import Literal, cast
 
 from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.core.timezone import (
     get_user_timezone_name,
@@ -545,6 +545,11 @@ def build_progress_summaries(
 
     measurement_rows = (
         db.query(BodyMeasurement)
+        .options(
+            joinedload(BodyMeasurement.custom_values).joinedload(
+                BodyMeasurementCustomValue.definition
+            )
+        )
         .filter(
             _user_date_filter(
                 user_ids,
@@ -591,7 +596,7 @@ def build_progress_summaries(
             BodyMeasurement.id == latest_measurement_candidates.c.measurement_id,
         )
         .options(
-            selectinload(BodyMeasurement.custom_values).joinedload(
+            joinedload(BodyMeasurement.custom_values).joinedload(
                 BodyMeasurementCustomValue.definition
             )
         )

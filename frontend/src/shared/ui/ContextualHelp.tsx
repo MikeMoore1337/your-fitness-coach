@@ -15,7 +15,7 @@ export function ContextualHelp({
   return (
     <details className="contextual-help">
       <summary>
-        <span>{summary}</span>
+        {summary}
         <DisclosureIcon />
       </summary>
       <div className="contextual-help__body">
