@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 AGENT_FLOW_SCHEMA_VERSION = 1
+PONYTAIL_TESTED_VERSION = "4.10.0"
+PONYTAIL_MODES = frozenset({"off", "lite", "full", "ultra"})
 
 WORKER_ROLES = (
     "orchestrator",
@@ -98,6 +100,18 @@ def _roles_from_value(value: str) -> tuple[str, ...]:
 
 def _task_type(text: str) -> str:
     return _extract_bold_field(text, "Тип") or _extract_bold_field(text, "Type")
+
+
+def _explicit_ponytail_mode(text: str) -> str | None:
+    raw = _extract_bold_field(text, "Ponytail") or _extract_bold_field(text, "Ponytail mode")
+    if not raw:
+        return None
+    mode = raw.strip().lower()
+    if mode not in PONYTAIL_MODES:
+        raise AgentFlowError(
+            f"Unsupported Ponytail mode {raw!r}; expected one of {sorted(PONYTAIL_MODES)}"
+        )
+    return mode
 
 
 def _explicit_role_contract(text: str) -> tuple[str, tuple[str, ...], bool, bool]:
@@ -200,6 +214,29 @@ def build_agent_flow(
 
     selected = _ordered_roles(selected_roles)
     graphify_required = bool(cross_cutting or architecture_signal or "orchestrator" in selected)
+
+    explicit_ponytail_mode = _explicit_ponytail_mode(task_text)
+    if explicit_ponytail_mode is not None:
+        ponytail_mode = explicit_ponytail_mode
+        ponytail_source = "explicit-task-field"
+        ponytail_reason = "explicit Ponytail task override"
+    elif "implementer" not in selected:
+        ponytail_mode = "off"
+        ponytail_source = "deterministic-inference"
+        ponytail_reason = "no production implementation pass"
+    elif (
+        cross_cutting
+        or architecture_signal
+        or any(surface in {"security", "deployment"} for surface in surfaces)
+    ):
+        ponytail_mode = "lite"
+        ponytail_source = "deterministic-inference"
+        ponytail_reason = "complex or sensitive implementation keeps minimalism advisory"
+    else:
+        ponytail_mode = "full"
+        ponytail_source = "deterministic-inference"
+        ponytail_reason = "ordinary implementation uses the full minimalism ladder"
+
     read_only_parallelism = bool(
         "implementer" in selected
         and any(role in selected for role in {"researcher", "orchestrator"})
@@ -247,6 +284,17 @@ def build_agent_flow(
             "bootstrap_required": graphify_required,
             "command": ("python scripts/graphify_yfc.py bootstrap" if graphify_required else None),
             "failure_policy": "fallback-to-direct-source-inspection",
+        },
+        "ponytail": {
+            "mode": ponytail_mode,
+            "source": ponytail_source,
+            "reason": ponytail_reason,
+            "tested_version": PONYTAIL_TESTED_VERSION,
+            "environment_variable": "PONYTAIL_DEFAULT_MODE",
+            "install_policy": "never-auto-install",
+            "review_policy": "never-auto-run-review-or-audit",
+            "fallback_policy": "use-yfc-minimalism-ladder",
+            "required": False,
         },
         "worker_role_passes": roles,
         "skipped_worker_roles": list(skipped),
@@ -307,7 +355,10 @@ def render_agent_flow_prompt(plan: Mapping[str, Any]) -> str:
         "Do not synthesize reviewer/security-review agents. "
         "If graphify.bootstrap_required is true, run its command once before broad architecture "
         "inspection; a tooling-only bootstrap failure falls back to direct source inspection when "
-        "safe. Always verify source/tests/migrations/docs before writes.\n"
+        "safe. Ponytail is optional host tooling: use the planned mode if the plugin is already "
+        "available, never install it automatically, and never start ponytail-review/audit loops. "
+        "If it is unavailable, apply the YFC minimalism ladder from AGENTS.md directly. "
+        "Always verify source/tests/migrations/docs before writes.\n"
     )
 
 

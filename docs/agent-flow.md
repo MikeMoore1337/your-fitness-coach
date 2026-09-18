@@ -43,6 +43,15 @@ migrations, Git history и active documentation.
 Если Graphify bootstrap не работает только из-за локального tooling/network, это само по себе не
 блокирует task, когда безопасно можно перейти к прямому чтению исходников.
 
+## Ponytail
+
+Agent Flow also records a bounded Ponytail mode for the task. This does not install or require the
+plugin. The delivery controller exports the selected mode through `PONYTAIL_DEFAULT_MODE`; a host
+with Ponytail installed can consume it, while a host without the plugin uses the equivalent compact
+YFC minimalism ladder from `AGENTS.md`.
+
+Ponytail is never used to add a review loop. See `docs/ponytail-development.md`.
+
 ## Execution model
 
 Выбранные role-passes по умолчанию выполняются последовательно одним worker. Будущая среда может
