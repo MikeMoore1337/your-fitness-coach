@@ -60,6 +60,8 @@ function makeSummary(): ProgressSummary {
       trends: [
         {
           metric: 'weight_kg',
+          label: 'Вес',
+          unit: 'kg',
           first_value: 69.4,
           latest_value: 68.4,
           change: -1,
@@ -77,6 +79,8 @@ function makeSummary(): ProgressSummary {
         },
         {
           metric: 'waist_cm',
+          label: 'Талия',
+          unit: 'cm',
           first_value: 73,
           latest_value: 72,
           change: -1,
@@ -88,6 +92,25 @@ function makeSummary(): ProgressSummary {
           points: [
             { measured_on: '2030-01-02', value: 73 },
             { measured_on: '2030-01-29', value: 72 },
+          ],
+        },
+        {
+          metric: 'custom:17',
+          label: 'Живот',
+          unit: 'cm',
+          definition_id: 17,
+          first_value: 86,
+          latest_value: 84,
+          change: -2,
+          first_measured_on: '2030-01-02',
+          latest_measured_on: '2030-01-29',
+          point_count: 3,
+          span_days: 27,
+          interpretation_status: 'available',
+          points: [
+            { measured_on: '2030-01-02', value: 86 },
+            { measured_on: '2030-01-15', value: 85 },
+            { measured_on: '2030-01-29', value: 84 },
           ],
         },
       ],
@@ -359,6 +382,8 @@ describe('ProgressExperience', () => {
       screen.getByText(/Это предпочтение для планирования\. Оно не оценивает тело/),
     ).toBeVisible();
     expect(screen.getAllByText('Талия').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Живот').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('84 см').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByText('Как сравнивать замеры'));
     expect(screen.getByText('Снимайте замеры в похожее время суток.')).toBeVisible();
     expect(
@@ -391,6 +416,22 @@ describe('ProgressExperience', () => {
       'href',
       '/app/report?period=days_7',
     );
+  });
+
+  it('does not auto-select a custom metric when no canonical trend exists', async () => {
+    const summary = makeSummary();
+    const customTrend = summary.body.trends.find((trend) => trend.metric === 'custom:17');
+    if (!customTrend) throw new Error('Expected the custom trend fixture');
+    summary.body.trends = [customTrend];
+    installApi({ summary });
+    renderExperience('?section=progress&progress_view=body');
+
+    await screen.findByRole('heading', { name: 'Замеры и приоритеты' });
+    expect(screen.getByRole('tab', { name: 'Живот' })).toHaveAttribute('aria-selected', 'false');
+    expect(screen.queryByRole('img', { name: /Живот/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Живот' }));
+    expect(await screen.findByRole('img', { name: /Живот/ })).toBeVisible();
   });
 
   it('keeps empty, one-point and partial adherence states factual', async () => {

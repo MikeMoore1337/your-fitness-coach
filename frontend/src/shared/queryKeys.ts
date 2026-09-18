@@ -8,6 +8,7 @@ export const queryKeys = {
   measurements: {
     all: ['measurements'] as const,
     subject: (clientId?: number) => ['measurements', clientId ?? 'me'] as const,
+    definitions: (clientId?: number) => ['measurement-definitions', clientId ?? 'me'] as const,
   },
   progress: {
     summaries: ['workout', 'progress-summary'] as const,
@@ -55,6 +56,7 @@ export async function invalidateMeasurementMutation(
 ): Promise<void> {
   const invalidations = [
     queryClient.invalidateQueries({ queryKey: queryKeys.measurements.subject(clientId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.measurements.definitions(clientId) }),
   ];
   if (clientId == null) {
     invalidations.push(

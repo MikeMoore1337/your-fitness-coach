@@ -175,6 +175,8 @@ const progressSummary = {
     trends: [
       {
         metric: 'weight_kg',
+        label: 'Вес',
+        unit: 'kg',
         first_value: 69.1,
         latest_value: 68.4,
         change: -0.7,

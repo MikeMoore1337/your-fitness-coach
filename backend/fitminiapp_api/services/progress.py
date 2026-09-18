@@ -28,6 +28,8 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import (
     BodyMeasurement,
+    BodyMeasurementCustomValue,
+    BodyMeasurementDefinition,
     CoachClient,
     User,
     UserProfile,
@@ -58,6 +60,22 @@ ADHERENCE_WEIGHTS = {
     "protein": 0.20,
 }
 BODY_METRICS = ("weight_kg", "chest_cm", "waist_cm", "hips_cm", "biceps_cm", "thigh_cm")
+BODY_METRIC_LABELS = {
+    "weight_kg": "Вес",
+    "chest_cm": "Грудь",
+    "waist_cm": "Талия",
+    "hips_cm": "Бёдра",
+    "biceps_cm": "Окружность плеча",
+    "thigh_cm": "Окружность бедра",
+}
+BODY_METRIC_UNITS = {
+    "weight_kg": "kg",
+    "chest_cm": "cm",
+    "waist_cm": "cm",
+    "hips_cm": "cm",
+    "biceps_cm": "cm",
+    "thigh_cm": "cm",
+}
 BODY_TREND_MIN_POINTS = 3
 BODY_TREND_MIN_SPAN_DAYS = 14
 BODY_MEASUREMENT_GUIDANCE = {
@@ -179,44 +197,84 @@ def _user_date_filter(
     )
 
 
+def _body_trend(
+    *,
+    metric: str,
+    label: str,
+    unit: str,
+    points: list[tuple[date, float]],
+    definition_id: int | None = None,
+) -> dict:
+    first_date, first_value = points[0]
+    latest_date, latest_value = points[-1]
+    span_days = (latest_date - first_date).days
+    if len(points) == 1:
+        interpretation_status = "single_point"
+    elif len(points) < BODY_TREND_MIN_POINTS:
+        interpretation_status = "insufficient_points"
+    elif span_days < BODY_TREND_MIN_SPAN_DAYS:
+        interpretation_status = "insufficient_period"
+    else:
+        interpretation_status = "available"
+    return {
+        "metric": metric,
+        "label": label,
+        "unit": unit,
+        "definition_id": definition_id,
+        "first_value": first_value,
+        "latest_value": latest_value,
+        "change": round(latest_value - first_value, 2) if len(points) >= 2 else None,
+        "first_measured_on": first_date,
+        "latest_measured_on": latest_date,
+        "point_count": len(points),
+        "span_days": span_days,
+        "interpretation_status": interpretation_status,
+        "points": [{"measured_on": measured_on, "value": value} for measured_on, value in points],
+    }
+
+
 def _body_trends(rows: list) -> list[dict]:
     trends: list[dict] = []
     for metric in BODY_METRICS:
-        points = [row for row in rows if getattr(row, metric) is not None]
-        if not points:
-            continue
-        first = points[0]
-        latest = points[-1]
-        first_value = float(getattr(first, metric))
-        latest_value = float(getattr(latest, metric))
-        span_days = (latest.measured_on - first.measured_on).days
-        if len(points) == 1:
-            interpretation_status = "single_point"
-        elif len(points) < BODY_TREND_MIN_POINTS:
-            interpretation_status = "insufficient_points"
-        elif span_days < BODY_TREND_MIN_SPAN_DAYS:
-            interpretation_status = "insufficient_period"
-        else:
-            interpretation_status = "available"
+        points = [
+            (row.measured_on, float(getattr(row, metric)))
+            for row in rows
+            if getattr(row, metric) is not None
+        ]
+        if points:
+            trends.append(
+                _body_trend(
+                    metric=metric,
+                    label=BODY_METRIC_LABELS[metric],
+                    unit=BODY_METRIC_UNITS[metric],
+                    points=points,
+                )
+            )
+
+    custom_points: dict[int, list[tuple[date, float]]] = defaultdict(list)
+    custom_definitions: dict[int, BodyMeasurementDefinition] = {}
+    for row in rows:
+        for custom_value in getattr(row, "custom_values", []):
+            custom_points[custom_value.definition_id].append(
+                (row.measured_on, float(custom_value.value))
+            )
+            custom_definitions[custom_value.definition_id] = custom_value.definition
+    for definition_id in sorted(
+        custom_points,
+        key=lambda item: (
+            str(getattr(custom_definitions[item], "label", "")).casefold(),
+            item,
+        ),
+    ):
+        definition = custom_definitions[definition_id]
         trends.append(
-            {
-                "metric": metric,
-                "first_value": first_value,
-                "latest_value": latest_value,
-                "change": round(latest_value - first_value, 2) if len(points) >= 2 else None,
-                "first_measured_on": first.measured_on,
-                "latest_measured_on": latest.measured_on,
-                "point_count": len(points),
-                "span_days": span_days,
-                "interpretation_status": interpretation_status,
-                "points": [
-                    {
-                        "measured_on": point.measured_on,
-                        "value": float(getattr(point, metric)),
-                    }
-                    for point in points
-                ],
-            }
+            _body_trend(
+                metric=f"custom:{definition_id}",
+                label=definition.label,
+                unit=definition.unit,
+                definition_id=definition_id,
+                points=custom_points[definition_id],
+            )
         )
     return trends
 
@@ -487,6 +545,11 @@ def build_progress_summaries(
 
     measurement_rows = (
         db.query(BodyMeasurement)
+        .options(
+            joinedload(BodyMeasurement.custom_values).joinedload(
+                BodyMeasurementCustomValue.definition
+            )
+        )
         .filter(
             _user_date_filter(
                 user_ids,
@@ -505,7 +568,7 @@ def build_progress_summaries(
 
     latest_measurement_candidates = (
         db.query(
-            BodyMeasurement,
+            BodyMeasurement.id.label("measurement_id"),
             func.row_number()
             .over(
                 partition_by=BodyMeasurement.user_id,
@@ -527,20 +590,44 @@ def build_progress_summaries(
         .subquery()
     )
     latest_measurement_rows = (
-        db.query(latest_measurement_candidates)
+        db.query(BodyMeasurement)
+        .join(
+            latest_measurement_candidates,
+            BodyMeasurement.id == latest_measurement_candidates.c.measurement_id,
+        )
+        .options(
+            joinedload(BodyMeasurement.custom_values).joinedload(
+                BodyMeasurementCustomValue.definition
+            )
+        )
         .filter(latest_measurement_candidates.c.row_number == 1)
         .all()
     )
-    latest_measurement_by_user = {
-        row.user_id: {
+    latest_measurement_by_user: dict[int, dict] = {}
+    for row in latest_measurement_rows:
+        if row.user_id in latest_measurement_by_user:
+            continue
+        latest_measurement_by_user[row.user_id] = {
             "measured_on": row.measured_on,
             **{
                 metric: float(getattr(row, metric)) if getattr(row, metric) is not None else None
                 for metric in BODY_METRICS
             },
+            "custom_measurements": [
+                {
+                    "definition_id": value.definition_id,
+                    "label": value.definition.label,
+                    "unit": value.definition.unit,
+                    "value": float(value.value),
+                    "measured_on": row.measured_on,
+                    "archived": value.definition.archived_at is not None,
+                }
+                for value in sorted(
+                    row.custom_values,
+                    key=lambda item: (item.definition.label.casefold(), item.definition_id),
+                )
+            ],
         }
-        for row in latest_measurement_rows
-    }
 
     visible_nutrition_ids = set(user_ids) & nutrition_visible_user_ids
     targets = (

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { PublicWebLink } from '../navigation/PublicWebLink';
 import { Icon } from './Icon';
+import { DisclosureIcon } from './common';
 
 export function ContextualHelp({
   children,
@@ -13,7 +14,10 @@ export function ContextualHelp({
 }) {
   return (
     <details className="contextual-help">
-      <summary>{summary}</summary>
+      <summary>
+        {summary}
+        <DisclosureIcon />
+      </summary>
       <div className="contextual-help__body">
         <div>{children}</div>
         <PublicWebLink className="contextual-help__link" path={articlePath}>

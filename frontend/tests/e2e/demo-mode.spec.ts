@@ -1218,66 +1218,69 @@ test('demo reload, reset, expiry and isolated sessions preserve the session boun
   await secondContext.close();
 });
 
-test('production composition keeps responsive geometry, utility and keyboard focus in light and dark demo states', async ({
-  browser,
-}) => {
-  for (const viewport of DEMO_VIEWPORTS) {
-    for (const colorScheme of ['light', 'dark'] as const) {
+for (const viewport of DEMO_VIEWPORTS) {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`production composition keeps responsive geometry, utility and keyboard focus (${viewport.name} ${colorScheme})`, async ({
+      browser,
+    }) => {
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
         colorScheme,
         isMobile: viewport.mobile,
         hasTouch: viewport.mobile,
       });
-      const page = await context.newPage();
-      await installDemoTransport(page);
-      await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
-      await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
-      await expect(page.locator('.app-bottom-nav')).toBeVisible();
-      await expectNoHorizontalOverflow(page);
-      await expectDockWithinViewport(page);
-      await expectElementsWithinHorizontalViewport(
-        page,
-        '.demo-cabinet-boundary, .demo-route, .app-section',
-      );
-      await expectUiAuditClean(page, `demo today ${viewport.name} ${colorScheme} top`, {
-        checkTouchTargets: viewport.mobile,
-      });
-      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-      await expectUiAuditClean(page, `demo today ${viewport.name} ${colorScheme} bottom`, {
-        checkTouchTargets: viewport.mobile,
-      });
-      await page.evaluate(() => window.scrollTo(0, 0));
-
-      if (viewport.mobile) {
-        const moreButton = page.getByRole('button', { name: 'Сценарии', exact: true });
-        await moreButton.focus();
-        await expect(moreButton).toBeFocused();
-        await moreButton.press('Enter');
-        await expect(page.locator('#appMorePanel')).toBeVisible();
-        await expect(page.locator('#appMorePanel .app-more-panel__close')).toBeFocused();
-        await page.keyboard.press('Escape');
-        await expect(moreButton).toBeFocused();
-
-        const safeArea = await page.evaluate(() => {
-          document.documentElement.style.setProperty('--yfc-tg-safe-bottom', '24px');
-          document.documentElement.style.setProperty('--yfc-tg-content-safe-bottom', '12px');
-          return {
-            safeBottom: document.documentElement.style.getPropertyValue('--yfc-tg-safe-bottom'),
-            contentSafeBottom: document.documentElement.style.getPropertyValue(
-              '--yfc-tg-content-safe-bottom',
-            ),
-          };
+      try {
+        const page = await context.newPage();
+        await installDemoTransport(page);
+        await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+        await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
+        await expect(page.locator('.app-bottom-nav')).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+        await expectDockWithinViewport(page);
+        await expectElementsWithinHorizontalViewport(
+          page,
+          '.demo-cabinet-boundary, .demo-route, .app-section',
+        );
+        await expectUiAuditClean(page, `demo today ${viewport.name} ${colorScheme} top`, {
+          checkTouchTargets: viewport.mobile,
         });
-        expect(safeArea).toEqual({ safeBottom: '24px', contentSafeBottom: '12px' });
-      } else {
-        await expect(page.locator('.app-bottom-nav__utility')).toBeVisible();
-        await expect(
-          page.locator('.app-bottom-nav__utility .app-bottom-nav__demo-exit'),
-        ).toBeVisible();
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        await expectUiAuditClean(page, `demo today ${viewport.name} ${colorScheme} bottom`, {
+          checkTouchTargets: viewport.mobile,
+        });
+        await page.evaluate(() => window.scrollTo(0, 0));
+
+        if (viewport.mobile) {
+          const moreButton = page.getByRole('button', { name: 'Сценарии', exact: true });
+          await moreButton.focus();
+          await expect(moreButton).toBeFocused();
+          await moreButton.press('Enter');
+          await expect(page.locator('#appMorePanel')).toBeVisible();
+          await expect(page.locator('#appMorePanel .app-more-panel__close')).toBeFocused();
+          await page.keyboard.press('Escape');
+          await expect(moreButton).toBeFocused();
+
+          const safeArea = await page.evaluate(() => {
+            document.documentElement.style.setProperty('--yfc-tg-safe-bottom', '24px');
+            document.documentElement.style.setProperty('--yfc-tg-content-safe-bottom', '12px');
+            return {
+              safeBottom: document.documentElement.style.getPropertyValue('--yfc-tg-safe-bottom'),
+              contentSafeBottom: document.documentElement.style.getPropertyValue(
+                '--yfc-tg-content-safe-bottom',
+              ),
+            };
+          });
+          expect(safeArea).toEqual({ safeBottom: '24px', contentSafeBottom: '12px' });
+        } else {
+          await expect(page.locator('.app-bottom-nav__utility')).toBeVisible();
+          await expect(
+            page.locator('.app-bottom-nav__utility .app-bottom-nav__demo-exit'),
+          ).toBeVisible();
+        }
+        await captureEvidence(page, `${viewport.name}-${colorScheme}-today.png`);
+      } finally {
+        await context.close();
       }
-      await captureEvidence(page, `${viewport.name}-${colorScheme}-today.png`);
-      await context.close();
-    }
+    });
   }
-});
+}

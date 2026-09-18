@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from fitminiapp_api.schemas.progress import (
     NutritionReportPeriod,
@@ -15,6 +15,15 @@ class ReportHandoffCreateRequest(BaseModel):
     period: NutritionReportPeriod
     date_from: date | None = None
     date_to: date | None = None
+    client_comment: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("client_comment")
+    @classmethod
+    def normalize_client_comment(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class ReportHandoffTrainer(BaseModel):
@@ -35,6 +44,7 @@ class ReportHandoffResponse(BaseModel):
     created_at: datetime
     delivery_status: ReportHandoffDeliveryStatus
     delivery_attempt: int = Field(ge=1)
+    client_comment: str | None = None
     live: Literal[True] = True
 
 

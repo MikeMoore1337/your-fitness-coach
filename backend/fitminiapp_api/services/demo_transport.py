@@ -736,10 +736,23 @@ def _progress_summary(
                 "hips_cm": None,
                 "biceps_cm": None,
                 "thigh_cm": None,
+                "custom_measurements": [
+                    {
+                        "definition_id": 93_001,
+                        "label": "Пользовательский показатель",
+                        "unit": "cm",
+                        "value": 84.0,
+                        "measured_on": _iso(end),
+                        "archived": False,
+                    }
+                ],
             },
             "trends": [
                 {
                     "metric": "weight_kg",
+                    "label": "Вес",
+                    "unit": "kg",
+                    "definition_id": None,
                     "first_value": 77.8,
                     "latest_value": 77.1,
                     "change": -0.7,
@@ -752,7 +765,26 @@ def _progress_summary(
                         {"measured_on": _iso(end - timedelta(days=28)), "value": 77.8},
                         {"measured_on": _iso(end), "value": 77.1},
                     ],
-                }
+                },
+                {
+                    "metric": "custom:93001",
+                    "label": "Пользовательский показатель",
+                    "unit": "cm",
+                    "definition_id": 93_001,
+                    "first_value": 86.0,
+                    "latest_value": 84.0,
+                    "change": -2.0,
+                    "first_measured_on": _iso(end - timedelta(days=28)),
+                    "latest_measured_on": _iso(end),
+                    "point_count": 3,
+                    "span_days": 28,
+                    "interpretation_status": "available",
+                    "points": [
+                        {"measured_on": _iso(end - timedelta(days=28)), "value": 86.0},
+                        {"measured_on": _iso(end - timedelta(days=14)), "value": 85.0},
+                        {"measured_on": _iso(end), "value": 84.0},
+                    ],
+                },
             ],
             "priority": {"mode": "balanced", "muscle_group_ids": []},
             "guidance": {
@@ -1418,6 +1450,17 @@ def handle_demo_transport(
                 "weekly_volume": [],
                 "personal_records": [],
             }
+        if path == "/api/v1/workouts/diary/custom-definitions":
+            return [
+                {
+                    "id": 93_001,
+                    "label": "Пользовательский показатель",
+                    "unit": "cm",
+                    "archived": False,
+                    "created_at": _iso(_now(session) - timedelta(days=60)),
+                    "updated_at": _iso(_now(session) - timedelta(days=60)),
+                }
+            ]
         if path == "/api/v1/workouts/diary":
             return [
                 {
@@ -1430,6 +1473,15 @@ def handle_demo_transport(
                     "biceps_cm": None,
                     "thigh_cm": None,
                     "note": None,
+                    "custom_values": [
+                        {
+                            "definition_id": 93_001,
+                            "label": "Пользовательский показатель",
+                            "unit": "cm",
+                            "value": 86.0,
+                            "archived": False,
+                        }
+                    ],
                     "created_at": _iso(_now(session) - timedelta(days=28)),
                 },
                 {
@@ -1442,6 +1494,15 @@ def handle_demo_transport(
                     "biceps_cm": None,
                     "thigh_cm": None,
                     "note": None,
+                    "custom_values": [
+                        {
+                            "definition_id": 93_001,
+                            "label": "Пользовательский показатель",
+                            "unit": "cm",
+                            "value": 84.0,
+                            "archived": False,
+                        }
+                    ],
                     "created_at": _iso(_now(session)),
                 },
             ]
@@ -1554,6 +1615,15 @@ def handle_demo_transport(
                         "biceps_cm": None,
                         "thigh_cm": None,
                         "note": None,
+                        "custom_values": [
+                            {
+                                "definition_id": 93_001,
+                                "label": "Пользовательский показатель",
+                                "unit": "cm",
+                                "value": 86.0,
+                                "archived": False,
+                            }
+                        ],
                         "created_at": _iso(_now(session) - timedelta(days=28)),
                     },
                     {
@@ -1566,8 +1636,28 @@ def handle_demo_transport(
                         "biceps_cm": None,
                         "thigh_cm": None,
                         "note": None,
+                        "custom_values": [
+                            {
+                                "definition_id": 93_001,
+                                "label": "Пользовательский показатель",
+                                "unit": "cm",
+                                "value": 84.0,
+                                "archived": False,
+                            }
+                        ],
                         "created_at": _iso(_now(session)),
                     },
+                ]
+            if len(parts) == 5 and parts[3] == "measurements" and parts[4] == "custom-definitions":
+                return [
+                    {
+                        "id": 93_001,
+                        "label": "Пользовательский показатель",
+                        "unit": "cm",
+                        "archived": False,
+                        "created_at": _iso(_now(session) - timedelta(days=60)),
+                        "updated_at": _iso(_now(session) - timedelta(days=60)),
+                    }
                 ]
             if len(parts) == 4 and parts[3] == "nutrition-report":
                 return _nutrition_report(session, client_id)

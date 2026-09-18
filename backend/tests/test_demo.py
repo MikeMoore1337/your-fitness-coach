@@ -265,9 +265,13 @@ def test_demo_transport_returns_production_dtos_and_keeps_set_updates_independen
     assert [item.is_completed for item in workout.exercises[0].sets] == [True, True, False]
     for item in _transport(client, token, "/api/v1/workouts/week").json():
         WorkoutScheduleItem.model_validate(item)
-    ProgressSummaryResponse.model_validate(
-        _transport(client, token, "/api/v1/workouts/progress/summary").json()
+    progress_summary = _transport(client, token, "/api/v1/workouts/progress/summary").json()
+    ProgressSummaryResponse.model_validate(progress_summary)
+    assert any(
+        trend["label"] == "Пользовательский показатель"
+        for trend in progress_summary["body"]["trends"]
     )
+    assert all(trend["label"] != "Обхват живота" for trend in progress_summary["body"]["trends"])
     TrainingAnalyticsResponse.model_validate(
         _transport(client, token, "/api/v1/workouts/progress/training-analytics").json()
     )

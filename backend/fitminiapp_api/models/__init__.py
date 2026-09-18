@@ -91,6 +91,8 @@ from fitminiapp_api.models.support import BotSupportCase
 from fitminiapp_api.models.token import RefreshToken
 from fitminiapp_api.models.user import (
     BodyMeasurement,
+    BodyMeasurementCustomValue,
+    BodyMeasurementDefinition,
     CoachClient,
     CoachClientInvite,
     CoachRoleApplication,
@@ -119,6 +121,8 @@ __all__ = [
     "AuthActionToken",
     "AuthIdentity",
     "BodyMeasurement",
+    "BodyMeasurementCustomValue",
+    "BodyMeasurementDefinition",
     "BotSupportCase",
     "CardioSession",
     "CoachClient",

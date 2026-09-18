@@ -513,6 +513,44 @@ class WorkoutTimelineItem(BaseModel):
     exercises: list[WorkoutTimelineExercise]
 
 
+class BodyMeasurementCustomValueSave(BaseModel):
+    definition_id: int = Field(ge=1)
+    value: float | None = Field(default=None, gt=0, le=300, allow_inf_nan=False)
+
+
+class BodyMeasurementDefinitionCreate(BaseModel):
+    label: str = Field(min_length=1, max_length=64)
+
+    @field_validator("label")
+    @classmethod
+    def normalize_label(cls, value: str) -> str:
+        normalized = " ".join(value.strip().split())
+        if not normalized:
+            raise ValueError("Название показателя не может быть пустым")
+        return normalized
+
+
+class BodyMeasurementDefinitionUpdate(BodyMeasurementDefinitionCreate):
+    pass
+
+
+class BodyMeasurementDefinitionResponse(BaseModel):
+    id: int
+    label: str
+    unit: Literal["cm"] = "cm"
+    archived: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class BodyMeasurementCustomValueResponse(BaseModel):
+    definition_id: int
+    label: str
+    unit: Literal["cm"] = "cm"
+    value: float
+    archived: bool = False
+
+
 class BodyMeasurementSave(BaseModel):
     measured_on: date | None = None
     weight_kg: float | None = Field(default=None, ge=20, le=350, allow_inf_nan=False)
@@ -522,6 +560,7 @@ class BodyMeasurementSave(BaseModel):
     biceps_cm: float | None = Field(default=None, gt=0, le=150, allow_inf_nan=False)
     thigh_cm: float | None = Field(default=None, gt=0, le=200, allow_inf_nan=False)
     note: str | None = Field(default=None, max_length=500)
+    custom_values: list[BodyMeasurementCustomValueSave] = Field(default_factory=list, max_length=32)
 
 
 class BodyMeasurementResponse(BaseModel):
@@ -535,3 +574,4 @@ class BodyMeasurementResponse(BaseModel):
     thigh_cm: float | None = None
     note: str | None = None
     created_at: datetime | None = None
+    custom_values: list[BodyMeasurementCustomValueResponse] = Field(default_factory=list)

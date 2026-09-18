@@ -82,10 +82,26 @@ def test_handoff_is_explicit_live_authorized_and_idempotent(client) -> None:
     relation_id = _link(sender_id, trainer_id)
     secret = _add_private_check_in(sender_id)
     period = _period()
+    client_comment = "Комментарий клиента для тренера"
+    definition = client.post(
+        "/api/v1/workouts/diary/custom-definitions",
+        json={"label": "Живот"},
+        headers=sender_headers,
+    )
+    assert definition.status_code == 201, definition.text
+    measurement = client.post(
+        "/api/v1/workouts/diary",
+        json={
+            "measured_on": today_msk().isoformat(),
+            "custom_values": [{"definition_id": definition.json()["id"], "value": 86}],
+        },
+        headers=sender_headers,
+    )
+    assert measurement.status_code == 200, measurement.text
 
     created = client.post(
         "/api/v1/report-handoffs",
-        json=period,
+        json={**period, "client_comment": client_comment},
         headers={**sender_headers, "Idempotency-Key": "handoff-83-first"},
     )
 
@@ -97,6 +113,7 @@ def test_handoff_is_explicit_live_authorized_and_idempotent(client) -> None:
     assert handoff["trainer"]["id"] == trainer_id
     assert handoff["delivery_status"] == "delivered"
     assert handoff["live"] is True
+    assert handoff["client_comment"] == client_comment
     assert "report" not in handoff
     assert "overview" in handoff["included_section_ids"]
 
@@ -106,6 +123,7 @@ def test_handoff_is_explicit_live_authorized_and_idempotent(client) -> None:
         assert stored.sender_user_id == sender_id
         assert stored.trainer_user_id == trainer_id
         assert stored.relationship_id == relation_id
+        assert stored.client_comment == client_comment
         notification = db.get(Notification, stored.notification_id)
         assert notification is not None
         assert notification.channel == "in_app"
@@ -118,17 +136,21 @@ def test_handoff_is_explicit_live_authorized_and_idempotent(client) -> None:
 
     repeated_key = client.post(
         "/api/v1/report-handoffs",
-        json=period,
+        json={**period, "client_comment": client_comment},
         headers={**sender_headers, "Idempotency-Key": "handoff-83-first"},
     )
     repeated_revision = client.post(
         "/api/v1/report-handoffs",
-        json=period,
+        json={**period, "client_comment": client_comment},
         headers={**sender_headers, "Idempotency-Key": "handoff-83-second"},
     )
     conflicting_key = client.post(
         "/api/v1/report-handoffs",
-        json={**period, "date_from": (today_msk() - timedelta(days=5)).isoformat()},
+        json={
+            **period,
+            "date_from": (today_msk() - timedelta(days=5)).isoformat(),
+            "client_comment": client_comment,
+        },
         headers={**sender_headers, "Idempotency-Key": "handoff-83-first"},
     )
 
@@ -160,7 +182,12 @@ def test_handoff_is_explicit_live_authorized_and_idempotent(client) -> None:
     assert sender_view.status_code == 200, sender_view.text
     assert wrong_view.status_code == 404
     assert trainer_view.json()["report"]["subject"]["role"] == "client"
+    assert trainer_view.json()["handoff"]["client_comment"] == client_comment
     assert trainer_view.json()["report"]["nutrition"]["period"] == "custom"
+    assert any(
+        trend["label"] == "Живот" and trend["latest_value"] == 86
+        for trend in trainer_view.json()["report"]["body"]["trends"]
+    )
     assert "note" not in trainer_view.text
     assert secret not in trainer_view.text
     assert trainer_view.json()["data_changed_since_send"] is False
@@ -184,6 +211,50 @@ def test_handoff_is_explicit_live_authorized_and_idempotent(client) -> None:
     history = client.get("/api/v1/report-handoffs", headers=sender_headers)
     assert history.status_code == 200
     assert [item["id"] for item in history.json()] == [handoff["id"]]
+
+
+def test_handoff_comment_is_plain_text_versioned_and_bounded(client) -> None:
+    sender_headers = _auth(client, 83_051)
+    trainer_headers = _auth(client, 83_052, is_coach=True)
+    sender_id = _user_id(83_051)
+    trainer_id = _user_id(83_052)
+    _link(sender_id, trainer_id)
+    period = {"period": "days_7"}
+
+    first = client.post(
+        "/api/v1/report-handoffs",
+        json={**period, "client_comment": "Версия один"},
+        headers={**sender_headers, "Idempotency-Key": "handoff-83-comment-a"},
+    )
+    second = client.post(
+        "/api/v1/report-handoffs",
+        json={**period, "client_comment": "Версия два"},
+        headers={**sender_headers, "Idempotency-Key": "handoff-83-comment-b"},
+    )
+    conflicting_key = client.post(
+        "/api/v1/report-handoffs",
+        json={**period, "client_comment": "Другое содержание"},
+        headers={**sender_headers, "Idempotency-Key": "handoff-83-comment-a"},
+    )
+    too_long = client.post(
+        "/api/v1/report-handoffs",
+        json={**period, "client_comment": "x" * 2001},
+        headers={**sender_headers, "Idempotency-Key": "handoff-83-comment-long"},
+    )
+
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+    assert first.json()["id"] != second.json()["id"]
+    assert conflicting_key.status_code == 409
+    assert too_long.status_code == 422
+
+    trainer_view = client.get(
+        f"/api/v1/report-handoffs/{second.json()['id']}",
+        headers=trainer_headers,
+    )
+    assert trainer_view.status_code == 200
+    assert trainer_view.json()["handoff"]["client_comment"] == "Версия два"
+    assert trainer_id == trainer_view.json()["handoff"]["trainer"]["id"]
 
 
 def test_handoff_retry_and_stale_notification_are_safe(client) -> None:

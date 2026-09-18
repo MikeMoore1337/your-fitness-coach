@@ -700,6 +700,16 @@ body {
   list-style: none;
 }
 
+.data-confidence__details > summary > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.data-confidence__details > summary > .disclosure-icon {
+  flex: 0 0 28px;
+  align-self: center;
+}
+
 .data-confidence__details > summary::-webkit-details-marker {
   display: none;
 }
@@ -796,13 +806,34 @@ body {
 }
 
 .contextual-help > summary {
+  display: flex;
   min-height: 44px;
-  width: fit-content;
-  display: inline-flex;
+  width: min(100%, 65ch);
   align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-subtle);
   color: var(--color-text);
   cursor: pointer;
   font-weight: 700;
+  list-style: none;
+}
+
+.contextual-help > summary::-webkit-details-marker {
+  display: none;
+}
+
+.contextual-help > summary > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.contextual-help > summary > .disclosure-icon {
+  flex: 0 0 28px;
+  align-self: center;
 }
 
 .contextual-help__body {

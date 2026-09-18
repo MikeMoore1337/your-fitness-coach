@@ -108,6 +108,61 @@ describe('Diary measurement guidance', () => {
     );
   });
 
+  it('renders owner-scoped custom centimetre fields and keeps their values in the save payload', async () => {
+    const definition = {
+      id: 17,
+      label: 'Живот',
+      unit: 'cm' as const,
+      archived: false,
+      created_at: '2026-08-01T10:00:00Z',
+      updated_at: '2026-08-01T10:00:00Z',
+    };
+    const row = {
+      id: 8,
+      measured_on: '2026-08-20',
+      weight_kg: null,
+      chest_cm: null,
+      waist_cm: null,
+      hips_cm: null,
+      biceps_cm: null,
+      thigh_cm: null,
+      note: null,
+      custom_values: [
+        { definition_id: 17, label: 'Живот', unit: 'cm' as const, value: 86, archived: false },
+      ],
+    };
+    apiMock.mockImplementation((path: string, options?: { method?: string; body?: unknown }) => {
+      if (path === '/api/v1/workouts/diary/custom-definitions?include_archived=true') {
+        return Promise.resolve([definition]);
+      }
+      if (path === '/api/v1/workouts/diary' && options?.method === 'POST') {
+        return Promise.resolve({ ...row, ...(options.body as object) });
+      }
+      return Promise.resolve([row]);
+    });
+
+    renderDiary({ embedded: true });
+
+    expect(await screen.findByLabelText('Живот, см')).toHaveValue(null);
+    expect(screen.getByText('Живот: 86 см')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
+    expect(await screen.findByLabelText('Живот, см')).toHaveValue(86);
+    fireEvent.change(screen.getByLabelText('Живот, см'), { target: { value: '85.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/workouts/diary',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.objectContaining({
+            custom_values: [{ definition_id: 17, value: 85.5 }],
+          }),
+        }),
+      ),
+    );
+  });
+
   it('preserves a recoverable draft and shows the save error beside the form', async () => {
     apiMock.mockImplementation((path: string, options?: { method?: string }) => {
       if (path === '/api/v1/workouts/diary' && options?.method === 'POST') {

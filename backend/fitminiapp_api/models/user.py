@@ -198,6 +198,97 @@ class BodyMeasurement(Base):
     thigh_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+    custom_values: Mapped[list[BodyMeasurementCustomValue]] = relationship(
+        "BodyMeasurementCustomValue",
+        back_populates="measurement",
+        cascade="all, delete-orphan",
+        order_by="BodyMeasurementCustomValue.definition_id",
+        lazy="selectin",
+    )
+
+
+class BodyMeasurementDefinition(Base):
+    __tablename__ = "body_measurement_definitions"
+    __table_args__ = (
+        CheckConstraint(
+            "length(trim(label)) BETWEEN 1 AND 64",
+            name="ck_body_measurement_definitions_label_length",
+        ),
+        CheckConstraint(
+            "length(trim(normalized_label)) BETWEEN 1 AND 64",
+            name="ck_body_measurement_definitions_normalized_label_length",
+        ),
+        CheckConstraint("unit = 'cm'", name="ck_body_measurement_definitions_unit"),
+        UniqueConstraint(
+            "user_id",
+            "normalized_label",
+            name="uq_body_measurement_definition_user_label",
+        ),
+        Index(
+            "ix_body_measurement_definitions_user_archived",
+            "user_id",
+            "archived_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    label: Mapped[str] = mapped_column(String(64), nullable=False)
+    normalized_label: Mapped[str] = mapped_column(String(64), nullable=False)
+    unit: Mapped[str] = mapped_column(String(8), nullable=False, default="cm", server_default="cm")
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+
+    values: Mapped[list[BodyMeasurementCustomValue]] = relationship(
+        "BodyMeasurementCustomValue",
+        back_populates="definition",
+        order_by="BodyMeasurementCustomValue.measurement_id",
+        lazy="selectin",
+    )
+
+
+class BodyMeasurementCustomValue(Base):
+    __tablename__ = "body_measurement_custom_values"
+    __table_args__ = (
+        CheckConstraint(
+            "value > 0 AND value <= 300",
+            name="ck_body_measurement_custom_values_range",
+        ),
+        UniqueConstraint(
+            "measurement_id",
+            "definition_id",
+            name="uq_body_measurement_custom_value_measurement_definition",
+        ),
+        Index(
+            "ix_body_measurement_custom_values_definition_measurement",
+            "definition_id",
+            "measurement_id",
+        ),
+        Index(
+            "ix_body_measurement_custom_values_measurement",
+            "measurement_id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    measurement_id: Mapped[int] = mapped_column(
+        ForeignKey("body_measurements.id", ondelete="CASCADE"), nullable=False
+    )
+    definition_id: Mapped[int] = mapped_column(
+        ForeignKey("body_measurement_definitions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    value: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
+
+    measurement: Mapped[BodyMeasurement] = relationship(
+        "BodyMeasurement", back_populates="custom_values"
+    )
+    definition: Mapped[BodyMeasurementDefinition] = relationship(
+        "BodyMeasurementDefinition", back_populates="values", lazy="joined"
+    )
 
 
 class CoachClient(Base):

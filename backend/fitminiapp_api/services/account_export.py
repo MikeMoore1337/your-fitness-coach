@@ -62,6 +62,8 @@ from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
 from fitminiapp_api.models.report_handoff import ReportHandoff
 from fitminiapp_api.models.user import (
     BodyMeasurement,
+    BodyMeasurementCustomValue,
+    BodyMeasurementDefinition,
     CoachClient,
     CoachRoleApplication,
     User,
@@ -73,7 +75,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 15
+ACCOUNT_EXPORT_SCHEMA_VERSION = 16
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -86,6 +88,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "user_profiles": "profile",
     "user_profile_priority_muscles": "profile",
     "body_measurements": "measurements",
+    "body_measurement_definitions": "measurements",
+    "body_measurement_custom_values": "measurements",
     "cardio_sessions": "cardio_sessions",
     "nutrition_targets": "nutrition",
     "hydration_goals": "hydration",
@@ -624,8 +628,19 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
     )
     measurements = (
         db.query(BodyMeasurement)
+        .options(
+            selectinload(BodyMeasurement.custom_values).joinedload(
+                BodyMeasurementCustomValue.definition
+            )
+        )
         .filter(BodyMeasurement.user_id == user.id)
         .order_by(BodyMeasurement.measured_on.asc(), BodyMeasurement.id.asc())
+        .all()
+    )
+    measurement_definitions = (
+        db.query(BodyMeasurementDefinition)
+        .filter(BodyMeasurementDefinition.user_id == user.id)
+        .order_by(BodyMeasurementDefinition.created_at.asc(), BodyMeasurementDefinition.id.asc())
         .all()
     )
     cardio_sessions = (
@@ -1077,7 +1092,33 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "daily_wellbeing_check_ins": [
             _fields(row, DAILY_WELLBEING_FIELDS) for row in daily_wellbeing_check_ins
         ],
-        "measurements": [_fields(row, MEASUREMENT_FIELDS) for row in measurements],
+        "measurement_definitions": [
+            {
+                "id": definition.id,
+                "label": definition.label,
+                "unit": definition.unit,
+                "archived": definition.archived_at is not None,
+                "created_at": definition.created_at,
+                "updated_at": definition.updated_at,
+            }
+            for definition in measurement_definitions
+        ],
+        "measurements": [
+            {
+                **_fields(row, MEASUREMENT_FIELDS),
+                "custom_values": [
+                    {
+                        "definition_id": value.definition_id,
+                        "value": value.value,
+                    }
+                    for value in sorted(
+                        row.custom_values,
+                        key=lambda item: (item.definition_id, item.id),
+                    )
+                ],
+            }
+            for row in measurements
+        ],
         "cardio_sessions": [
             _fields(
                 row,
@@ -1273,6 +1314,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "timezone": handoff.timezone,
                 "report_contract_version": handoff.report_contract_version,
                 "included_section_ids": handoff.included_section_ids,
+                "client_comment": handoff.client_comment,
                 "delivery_attempt": handoff.delivery_attempt,
                 "notification_id": handoff.notification_id,
                 "created_at": handoff.created_at,
