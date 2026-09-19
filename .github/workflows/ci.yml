@@ -253,7 +253,7 @@ jobs:
           browser: node-unit
 
   frontend-smoke:
-    name: Frontend smoke (${{ matrix.shard }}/4)
+    name: Frontend smoke (${{ matrix.shard }}/5)
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_smoke == 'true'
     runs-on: ubuntu-latest
@@ -261,7 +261,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
     env:
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-e2e-shard-{1}', github.workspace, matrix.shard) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
@@ -301,7 +301,7 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
       - name: Run shared frontend E2E group
-        run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/4"
+        run: python scripts/ci_contract.py run-group frontend-e2e --shard "${{ matrix.shard }}/5"
       - name: Upload Playwright traces on failure
         if: failure() && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
