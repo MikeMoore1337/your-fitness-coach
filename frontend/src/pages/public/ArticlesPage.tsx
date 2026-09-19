@@ -328,9 +328,7 @@ function ArticleDetail({ slug }: { slug: string }) {
                   >
                     <strong>{item.title}</strong>
                     <span>{item.description}</span>
-                    <small>
-                      Открыть <Icon name="arrow-right" size={16} />
-                    </small>
+                    <small>Открыть →</small>
                   </AppLink>
                 ))}
               </div>

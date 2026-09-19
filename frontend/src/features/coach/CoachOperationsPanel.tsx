@@ -218,10 +218,12 @@ export function CoachOperationsPanel({
   clients,
   onOpenClient,
   timezone,
+  onDemoStep,
 }: {
   clients: Client[];
   onOpenClient: (clientId: number) => void;
   timezone?: string | null;
+  onDemoStep?: (step: 'task') => void;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
@@ -936,7 +938,9 @@ export function CoachOperationsPanel({
           <div className="coach-operations__section-head">
             <div>
               <span className="eyebrow">Следующий шаг</span>
-              <h3 id="coach-tasks-title">Задачи клиентов</h3>
+              <h3 id="coach-tasks-title" onFocus={() => onDemoStep?.('task')} tabIndex={-1}>
+                Задачи клиентов
+              </h3>
             </div>
             <Badge tone={tasks.length ? 'warning' : 'neutral'}>{tasks.length}</Badge>
           </div>

@@ -10,6 +10,7 @@ import {
 } from '../../shared/analytics/productEvents';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Card, ErrorState, LoadingState } from '../../shared/ui/common';
+import { AppLink } from '../../shared/navigation/router';
 import { TrainerModeSwitch } from '../trainer/TrainerModeSwitch';
 
 export function TrainerCapabilityCard() {
@@ -17,6 +18,7 @@ export function TrainerCapabilityCard() {
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const capability = useQuery({
     queryKey: ['me', 'trainer-capability'],
     queryFn: () => api<TrainerCapability>('/api/v1/me/trainer-capability'),
@@ -38,6 +40,11 @@ export function TrainerCapabilityCard() {
       if (result.activated_now) {
         trackGrowthEvent('trainer_application_completed');
         trackProductEvent({ name: 'trainer_mode_activated', surface: productEventSurface() });
+        trackProductEvent(
+          { name: 'trainer_onboarding_started', surface: productEventSurface() },
+          { dedupe: 'session' },
+        );
+        setShowOnboarding(true);
       }
       await refresh();
       toast('Режим тренера включён');
@@ -49,6 +56,7 @@ export function TrainerCapabilityCard() {
     onSuccess: async () => {
       await refresh();
       setAcceptedTerms(false);
+      setShowOnboarding(false);
       toast('Режим тренера выключен');
     },
     onError: async (reason) => {
@@ -92,6 +100,47 @@ export function TrainerCapabilityCard() {
             <p>Личный профиль и собственные тренировки остаются доступны.</p>
           </div>
           <TrainerModeSwitch mode="personal" />
+          {showOnboarding && (
+            <section
+              className="trainer-capability__onboarding"
+              aria-labelledby="trainer-onboarding-title"
+            >
+              <div>
+                <span className="eyebrow">Первый рабочий шаг</span>
+                <h3 id="trainer-onboarding-title">Откройте Coach Today</h3>
+                <p>
+                  Настройка минимальна: пригласите первого клиента из рабочего пространства или
+                  сразу пропустите этот шаг и посмотрите весь кабинет.
+                </p>
+              </div>
+              <div className="trainer-capability__onboarding-actions">
+                <AppLink
+                  className="trainer-capability__onboarding-primary"
+                  to="/coach"
+                  onClick={() =>
+                    trackProductEvent(
+                      { name: 'trainer_onboarding_completed', surface: productEventSurface() },
+                      { dedupe: 'session' },
+                    )
+                  }
+                >
+                  Пригласить первого клиента
+                </AppLink>
+                <AppLink
+                  className="trainer-capability__onboarding-secondary"
+                  to="/coach"
+                  onClick={() =>
+                    trackProductEvent(
+                      { name: 'trainer_onboarding_completed', surface: productEventSurface() },
+                      { dedupe: 'session' },
+                    )
+                  }
+                >
+                  Пропустить и открыть Coach Today
+                </AppLink>
+              </div>
+            </section>
+          )}
           <div className="trainer-capability__status">
             <strong>Следующий шаг</strong>
             <p>

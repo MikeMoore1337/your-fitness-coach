@@ -53,6 +53,7 @@ export type OnboardingLatencyBucket =
 export type PwaServiceWorkerErrorCategory =
   'registration' | 'update' | 'cache' | 'navigation' | 'install' | 'activate';
 export type LandingTelegramPlacement = 'hero' | 'continuity' | 'footer';
+export type TrainerLandingCtaDestination = 'onboarding' | 'demo';
 export type EditorialCtaDestination = 'tma' | 'web' | 'landing' | 'article';
 export type EditorialCtaCampaign = 'telegram_editorial_v1';
 export type PublicArticleCtaDestination = 'tma' | 'web' | 'landing';
@@ -88,7 +89,8 @@ export type AiCoachFailureClass = 'network' | 'timeout' | 'validation' | 'unknow
 export type AiCoachHelpfulness = 'helpful' | 'not_helpful';
 export type DemoAnalyticsScenario = 'self_training' | 'nutrition' | 'trainer';
 export type DemoLandingPlacement = 'hero' | 'section' | 'continuity' | 'footer';
-export type DemoMeaningfulAction = 'finish_workout' | 'add_recent' | 'save_comment';
+export type DemoMeaningfulAction =
+  'finish_workout' | 'add_recent' | 'save_comment' | 'trainer_route_completed';
 
 export const IMPLEMENTED_GROWTH_EVENT_NAMES = [
   'registration_started',
@@ -146,6 +148,11 @@ type ContextFreeProductEventName =
   | 'login_completed'
   | 'onboarding_started'
   | 'onboarding_completed'
+  | 'trainer_landing_viewed'
+  | 'trainer_onboarding_started'
+  | 'trainer_onboarding_completed'
+  | 'trainer_first_invite_created'
+  | 'trainer_first_client_connected'
   | 'program_recommendation_started'
   | 'program_recommendation_completed'
   | 'program_import_started'
@@ -237,6 +244,11 @@ export type ProductEvent =
       surface: ProductSurface;
       placement: DemoLandingPlacement;
       scenario: DemoAnalyticsScenario;
+    }
+  | {
+      name: 'trainer_landing_cta_clicked';
+      surface: ProductSurface;
+      destination: TrainerLandingCtaDestination;
     }
   | {
       name:
@@ -496,6 +508,11 @@ const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'login_completed',
   'onboarding_started',
   'onboarding_completed',
+  'trainer_landing_viewed',
+  'trainer_onboarding_started',
+  'trainer_onboarding_completed',
+  'trainer_first_invite_created',
+  'trainer_first_client_connected',
   'program_recommendation_started',
   'program_recommendation_completed',
   'program_import_started',
@@ -777,6 +794,11 @@ const DEMO_MEANINGFUL_ACTIONS = new Set<DemoMeaningfulAction>([
   'finish_workout',
   'add_recent',
   'save_comment',
+  'trainer_route_completed',
+]);
+const TRAINER_LANDING_CTA_DESTINATIONS = new Set<TrainerLandingCtaDestination>([
+  'onboarding',
+  'demo',
 ]);
 const LANDING_TELEGRAM_PLACEMENTS = new Set<LandingTelegramPlacement>([
   'hero',
@@ -817,6 +839,7 @@ function hasOnlyKeys(value: Record<string, unknown>, allowedKeys: readonly strin
 
 function eventPropertyKeys(name: string): readonly string[] {
   if (name === 'landing_demo_selected') return ['placement', 'scenario'];
+  if (name === 'trainer_landing_cta_clicked') return ['destination'];
   if (
     name === 'demo_started' ||
     name === 'demo_scenario_selected' ||
@@ -885,6 +908,9 @@ function hasValidEventProperties(value: Record<string, unknown>): boolean {
       DEMO_LANDING_PLACEMENTS.has(value.placement as DemoLandingPlacement) &&
       DEMO_SCENARIOS.has(value.scenario as DemoAnalyticsScenario)
     );
+  }
+  if (value.name === 'trainer_landing_cta_clicked') {
+    return TRAINER_LANDING_CTA_DESTINATIONS.has(value.destination as TrainerLandingCtaDestination);
   }
   if (
     value.name === 'demo_started' ||

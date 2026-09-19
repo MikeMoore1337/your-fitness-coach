@@ -178,6 +178,20 @@ describe('product event contract', () => {
   it('validates constrained event context values and surface combinations', () => {
     expect(
       isProductEvent({
+        name: 'trainer_landing_cta_clicked',
+        surface: 'mobile_web',
+        destination: 'demo',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'trainer_landing_cta_clicked',
+        surface: 'mobile_web',
+        destination: '/coach?name=private',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
         name: 'landing_telegram_selected',
         surface: 'desktop_web',
         placement: 'continuity',

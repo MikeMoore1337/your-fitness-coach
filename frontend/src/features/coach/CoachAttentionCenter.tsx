@@ -23,7 +23,13 @@ function attentionLatencyBucket(elapsedMs: number) {
   return 'over_1s' as const;
 }
 
-export function CoachAttentionCenter({ enabled = true }: { enabled?: boolean }) {
+export function CoachAttentionCenter({
+  enabled = true,
+  onAction,
+}: {
+  enabled?: boolean;
+  onAction?: () => void;
+}) {
   const startedAt = useRef<number | null>(null);
   const timingTracked = useRef(false);
   const previousKeys = useRef<Set<string> | null>(null);
@@ -123,6 +129,7 @@ export function CoachAttentionCenter({ enabled = true }: { enabled?: boolean }) 
                 className="button-link secondary-link"
                 to={item.destination}
                 onClick={() => {
+                  onAction?.();
                   trackProductEvent({
                     name: 'coach_attention_opened',
                     surface: productEventSurface(),

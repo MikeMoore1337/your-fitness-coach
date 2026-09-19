@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppShell, type DemoAppShellConfig } from '../../app/AppShell';
 import '../../styles/react.css';
@@ -52,7 +52,7 @@ import {
   type CoachQuickActionKind,
 } from '../../shared/analytics/productEvents';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
-import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
+import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import {
   BodyPriorityPicker,
   isBodyPriorityComplete,
@@ -998,6 +998,7 @@ export default function CoachPage({
   renderShell?: boolean;
 } = {}) {
   const { user } = useAuth();
+  const runtime = useRuntime();
   const capabilities = useRuntimeCapabilities();
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
@@ -1023,6 +1024,14 @@ export default function CoachPage({
   const usefulActionStartedAt = useRef<number | null>(null);
   const usefulActionTracked = useRef(false);
   useTelegramOverlayBackButton(clientDetailOpen, () => setClientDetailOpen(false));
+
+  const markDemoStep = useCallback(
+    (step: 'attention' | 'client' | 'workout' | 'progress' | 'task' | 'return') => {
+      if (runtime.kind !== 'demo') return;
+      runtime.onNavigate?.(`/coach?demo_step=${step}`);
+    },
+    [runtime],
+  );
 
   useEffect(() => {
     usefulActionStartedAt.current = performance.now();
@@ -1072,6 +1081,8 @@ export default function CoachPage({
 
   const trackCoachQuickAction = (kind: CoachQuickActionKind) => {
     trackCoachUsefulAction();
+    if (kind === 'review_workout') markDemoStep('workout');
+    if (kind === 'progress') markDemoStep('progress');
     trackProductEvent({
       name: 'coach_quick_action_used',
       surface: productEventSurface(),
@@ -1136,6 +1147,13 @@ export default function CoachPage({
     () => (clients.data ?? []).filter((client) => client.status === 'active'),
     [clients.data],
   );
+  useEffect(() => {
+    if (runtime.kind === 'demo' || !user?.is_coach || activeClients.length === 0) return;
+    trackProductEvent(
+      { name: 'trainer_first_client_connected', surface: productEventSurface() },
+      { dedupe: 'session' },
+    );
+  }, [activeClients.length, runtime.kind, user?.is_coach]);
   const pendingCount = (clients.data ?? []).filter((client) => client.status === 'pending').length;
   const filteredClients = useMemo(
     () =>
@@ -1163,6 +1181,7 @@ export default function CoachPage({
       toast('Приглашения доступны только в рабочем кабинете.', 'error');
       return;
     }
+    const firstInvite = (clients.data ?? []).length === 0;
     setInviteCreating(true);
     try {
       const result = await api<InviteLink>('/api/v1/coach/invite-links', {
@@ -1170,6 +1189,12 @@ export default function CoachPage({
       });
       setInviteLink(result);
       trackGrowthEvent('client_invited');
+      if (firstInvite) {
+        trackProductEvent(
+          { name: 'trainer_first_invite_created', surface: productEventSurface() },
+          { dedupe: 'session' },
+        );
+      }
       await queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clients });
       if (result.web_url || result.url) await copyInvite(result.web_url || result.url || '');
       else toast('Приглашение создано');
@@ -1193,6 +1218,7 @@ export default function CoachPage({
         destination,
       });
     }
+    if (destination === 'today') markDemoStep('return');
     if (filter) setClientFilter(filter);
     setTab(destination);
     if (destination !== 'clients') setClientDetailOpen(false);
@@ -1200,6 +1226,7 @@ export default function CoachPage({
 
   const openClient = (clientId: number) => {
     trackCoachUsefulAction();
+    markDemoStep('client');
     trackProductEvent({
       name: 'trainer_client_opened',
       surface: productEventSurface(),
@@ -1284,6 +1311,7 @@ export default function CoachPage({
           <>
             <CoachOperationsPanel
               clients={activeClients}
+              onDemoStep={markDemoStep}
               onOpenClient={openClient}
               timezone={user.profile?.timezone}
             />
@@ -1300,6 +1328,7 @@ export default function CoachPage({
               onNavigate={(destination, filter) => navigateCoach(destination, filter)}
               onOpenClient={openClient}
               onInvite={() => void createInvite()}
+              onAttentionAction={() => markDemoStep('attention')}
             />
           </>
         )}

@@ -4,7 +4,7 @@ import { expectNoHorizontalOverflow } from './fixtures/mobile-tma';
 test.use({ video: 'on' });
 
 for (const width of [390, 1440]) {
-  test(`scroll-controlled final repetition ${width}`, async ({ page }, testInfo) => {
+  test(`content-driven final repetition ${width}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/');
@@ -19,23 +19,21 @@ for (const width of [390, 1440]) {
     await page.mouse.wheel(0, bounds!.y);
     await expect(scene).toHaveAttribute('data-phase', '0');
     await page.screenshot({ path: testInfo.outputPath('effort.png') });
-    const stickyHeight = await scene
-      .locator('.strength-scene__sticky')
-      .evaluate((node) => node.clientHeight);
-    const travel = bounds!.height - stickyHeight;
-    await page.mouse.wheel(0, travel * 0.67);
-    await expect(scene).toHaveAttribute('data-phase', '1');
+    const metrics = await scene.evaluate((element) => {
+      const sticky = element.querySelector<HTMLElement>('.strength-scene__sticky');
+      if (!sticky) throw new Error('Strength scene content is missing');
+      return {
+        sceneHeight: element.getBoundingClientRect().height,
+        stickyHeight: sticky.getBoundingClientRect().height,
+        position: getComputedStyle(sticky).position,
+      };
+    });
+    expect(metrics.position).toBe('relative');
+    expect(metrics.sceneHeight - metrics.stickyHeight).toBeLessThanOrEqual(1);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(scene).toHaveAttribute('data-phase', '2');
     await expect(scene.locator('[data-reps]')).toHaveText('3');
     await expect(scene.locator('.strength-scene__raised')).toHaveCSS('opacity', '1');
-    await page.screenshot({ path: testInfo.outputPath('record.png') });
-    await page.mouse.wheel(0, travel * 0.28);
-    await expect(scene).toHaveAttribute('data-phase', '2');
     await expect(scene.locator('.strength-scene__result')).toHaveCSS('opacity', '1');
-    await page.screenshot({ path: testInfo.outputPath('result.png') });
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.mouse.wheel(0, -travel * 0.8);
-    await expect(scene).toHaveAttribute('data-phase', '2');
-    await expect(scene.locator('.strength-scene__raised')).toHaveCSS('opacity', '1');
-    await expect(scene.locator('.strength-scene__sticky')).toHaveCSS('position', 'relative');
   });
 }

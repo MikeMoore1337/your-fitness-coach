@@ -25,6 +25,7 @@ type CoachTodayProps = {
   onNavigate: (destination: CoachTodayNavigation, filter?: CoachClientFilter) => void;
   onOpenClient: (clientId: number) => void;
   onInvite: () => void;
+  onAttentionAction?: () => void;
 };
 
 function formatDate(value: string): string {
@@ -51,6 +52,7 @@ export function CoachToday({
   onNavigate,
   onOpenClient,
   onInvite,
+  onAttentionAction,
 }: CoachTodayProps) {
   const activeProgramClientIds = useMemo(
     () =>
@@ -110,7 +112,7 @@ export function CoachToday({
         </div>
       </header>
 
-      <CoachAttentionCenter enabled />
+      <CoachAttentionCenter enabled onAction={onAttentionAction} />
 
       <section className="coach-today__section" aria-labelledby="coach-today-next-title">
         <div className="coach-os-section-heading">

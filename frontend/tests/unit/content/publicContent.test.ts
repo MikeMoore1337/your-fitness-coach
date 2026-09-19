@@ -67,14 +67,20 @@ describe('public content routing', () => {
     const trainerPage = getPublicContentPage('/for-trainers');
 
     expect(trainerPage?.workflow?.steps.map((step) => step.title)).toEqual([
-      'Включить режим',
-      'Пригласить клиента',
-      'Подтвердить связь',
-      'Назначить программу',
-      'Смотреть факты',
+      'Открыть Coach Today',
+      'Разобрать внимание',
+      'Открыть клиента',
+      'Собрать рабочий день',
+      'Вернуться в Сегодня',
     ]);
-    expect(trainerPage?.cta?.label).toBe('Включить режим тренера');
+    expect(trainerPage?.cta?.label).toBe('Попробовать кабинет тренера');
+    expect(
+      trainerPage?.related.some(
+        (link) => link.path.includes('scenario=trainer') && link.path.includes('section=trainer'),
+      ),
+    ).toBe(true);
     expect(JSON.stringify(trainerPage)).not.toMatch(/NO_DATA|тысяч|клиент(?:ов|а) в месяц/i);
+    expect(JSON.stringify(trainerPage)).toMatch(/публичный профиль|ручной факт оплаты/i);
   });
 
   it('keeps the three-day training program on one canonical public route', () => {
