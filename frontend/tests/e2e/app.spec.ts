@@ -2371,6 +2371,10 @@ test('пользователь напрямую включает режим тр
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await openCard(page, 'Тренер и приглашения');
   await modeSwitch.getByRole('link', { name: 'Клиенты' }).click();
+  await page
+    .getByRole('navigation', { name: 'Разделы тренера' })
+    .getByRole('button', { name: 'Клиенты', exact: true })
+    .click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Клиенты', exact: true }).first()).toHaveAttribute(
     'aria-current',
@@ -3024,6 +3028,11 @@ test('тренер открывает кабинет', async ({ page }) => {
   await mockApi(page);
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
+  await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Разделы тренера' })
+    .getByRole('button', { name: 'Клиенты', exact: true })
+    .click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Тренер', exact: true })).toHaveAttribute(
     'aria-current',
