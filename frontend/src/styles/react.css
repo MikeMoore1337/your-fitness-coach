@@ -7671,6 +7671,36 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   align-content: start;
   gap: 14px;
 }
+.nutrition-picker__search-control {
+  position: relative;
+  min-width: 0;
+}
+.nutrition-picker__search-control--has-clear .nutrition-picker__search-input--has-clear {
+  padding-right: calc(0.75rem + var(--touch-target) + 0.25rem);
+}
+.nutrition-picker__search-control--has-clear
+  .nutrition-picker__search-input--has-clear::-webkit-search-cancel-button,
+.nutrition-picker__search-control--has-clear
+  .nutrition-picker__search-input--has-clear::-webkit-search-decoration {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.nutrition-picker__search-clear {
+  position: absolute;
+  inset-block: 0;
+  right: 4px;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  margin-block: auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.nutrition-picker__search-clear:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
 .nutrition-picker__tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

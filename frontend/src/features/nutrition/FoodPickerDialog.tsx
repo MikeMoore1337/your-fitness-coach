@@ -34,6 +34,7 @@ import {
   CloseIcon,
   ErrorState,
   Field,
+  IconButton,
   Input,
   LoadingState,
   Select,
@@ -462,6 +463,11 @@ export function FoodPickerDialog({
   }, [draft, quick, setDraft]);
 
   const normalizedSearchInput = searchInput.trim().replace(/\s+/g, ' ');
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearchQuery('');
+    document.getElementById('nutrition-food-search')?.focus();
+  };
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchQuery(normalizedSearchInput), 250);
     return () => window.clearTimeout(timer);
@@ -1195,26 +1201,51 @@ export function FoodPickerDialog({
               labelFor="nutrition-food-search"
               hint="Локальный поиск начинается после двух символов"
             >
-              <Input
-                id="nutrition-food-search"
-                type="search"
-                value={searchInput}
-                onFocus={() =>
-                  trackProductEvent(
-                    {
-                      name: 'nutrition_food_add_path_selected',
-                      surface: productEventSurface(),
-                      path: 'search',
-                    },
-                    { dedupe: 'session', dedupeKey: 'nutrition-food-add-path-search' },
-                  )
-                }
-                onChange={(event) => {
-                  if (event.target.value.trim()) setEntryMethod('search');
-                  setSearchInput(event.target.value);
-                }}
-                placeholder="Например, овсянка"
-              />
+              <div
+                className={`nutrition-picker__search-control${
+                  searchInput ? ' nutrition-picker__search-control--has-clear' : ''
+                }`}
+              >
+                <Input
+                  id="nutrition-food-search"
+                  className={searchInput ? 'nutrition-picker__search-input--has-clear' : ''}
+                  type="search"
+                  value={searchInput}
+                  onFocus={() =>
+                    trackProductEvent(
+                      {
+                        name: 'nutrition_food_add_path_selected',
+                        surface: productEventSurface(),
+                        path: 'search',
+                      },
+                      { dedupe: 'session', dedupeKey: 'nutrition-food-add-path-search' },
+                    )
+                  }
+                  onChange={(event) => {
+                    if (event.target.value.trim()) setEntryMethod('search');
+                    setSearchInput(event.target.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && searchInput) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      clearSearch();
+                    }
+                  }}
+                  placeholder="Например, овсянка"
+                />
+                {searchInput && (
+                  <IconButton
+                    className="nutrition-picker__search-clear"
+                    type="button"
+                    aria-label="Очистить поиск"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={clearSearch}
+                  >
+                    <Icon name="close" size={16} />
+                  </IconButton>
+                )}
+              </div>
             </Field>
             {!demoSafeMode && (
               <div className="nutrition-picker__primary-path-actions">

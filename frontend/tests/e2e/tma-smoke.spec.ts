@@ -2076,7 +2076,7 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   mobilePage,
   tma,
   tmaPage,
-}) => {
+}, testInfo) => {
   await tmaPage.addInitScript(() => {
     const events: unknown[] = [];
     Object.defineProperty(window, '__productAnalyticsEvents', { value: events, writable: false });
@@ -2118,8 +2118,21 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   const breakfast = tmaPage.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
   await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
-  await tmaPage.getByRole('searchbox', { name: 'Найти продукт' }).fill('овсянка');
+  await tma.setTheme('dark');
+  await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  const tmaSearch = tmaPage.getByRole('searchbox', { name: 'Найти продукт' });
+  await tmaSearch.fill('овсянка');
+  const tmaClearSearch = tmaPage.getByRole('button', {
+    name: 'Очистить поиск',
+    exact: true,
+  });
+  await expect(tmaClearSearch).toBeVisible();
+  await tmaClearSearch.click();
+  await expect(tmaSearch).toHaveValue('');
+  await expect(tmaSearch).toBeFocused();
+  await tmaSearch.fill('овсянка');
   await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();
+  await tmaPage.screenshot({ path: testInfo.outputPath('tma-nutrition-search-390x844-dark.png') });
   await tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
   await tmaPage.getByRole('button', { name: 'Добавить в дневник' }).click();
   await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();

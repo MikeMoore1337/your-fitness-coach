@@ -264,13 +264,22 @@ test('@critical active workout keeps the current set primary across mobile width
       await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
       await expect(page.locator('#appBottomNav')).toBeVisible();
     }
-    await expect(page.locator('#appBottomNav .app-bottom-nav__primary > a').first()).toBeVisible();
+    const bottomNav = page.locator('#appBottomNav');
+    await expect(bottomNav.locator('.app-bottom-nav__primary > a')).toHaveCount(4);
+    for (const label of ['Сегодня', 'План', 'Питание', 'Прогресс']) {
+      const link = bottomNav.getByRole('link', { name: label, exact: true });
+      await expect(link).toBeVisible();
+      await expect(link.locator('svg[data-icon]')).toBeVisible();
+    }
     await page.evaluate(
       () =>
         new Promise<void>((resolve) =>
           requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
         ),
     );
+    // WebKit can defer fixed-nav inline SVG painting after the keyboard-hide repaint.
+    // A paint-only capture makes the following evidence screenshot deterministic.
+    await page.screenshot({ animations: 'disabled' });
     await page.screenshot({
       path: test.info().outputPath(`active-workout-${viewport.width}x${viewport.height}-dark.png`),
       fullPage: false,

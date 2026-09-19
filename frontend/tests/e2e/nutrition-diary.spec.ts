@@ -799,19 +799,73 @@ const russianSearchVisualCases = [
 
 for (const current of russianSearchVisualCases) {
   test(`Russian multi-variant food search visual evidence (${current.label})`, async ({ page }) => {
+    const unexpectedBrowserProblems: string[] = [];
+    page.on('console', (message) => {
+      const text = message.text();
+      const expectedHarnessNoise =
+        text === 'Service Worker registration blocked by Playwright' ||
+        text === 'Failed to load resource: the server responded with a status of 404 (Not Found)';
+      if (!expectedHarnessNoise && (message.type() === 'warning' || message.type() === 'error')) {
+        unexpectedBrowserProblems.push(`${message.type()}: ${text}`);
+      }
+    });
+    page.on('pageerror', (error) => unexpectedBrowserProblems.push(`pageerror: ${error.message}`));
     await page.setViewportSize(current.viewport);
     await page.emulateMedia({ colorScheme: current.dark ? 'dark' : 'light' });
     await mockNutritionApi(page);
     await page.goto('/app?section=nutrition');
     const breakfast = page.getByRole('region', { name: 'Завтрак' });
     await breakfast.getByRole('button', { name: /Добавить/ }).click();
-    await page.getByRole('searchbox', { name: 'Найти продукт' }).fill('рис');
+    const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+    await search.fill('рис');
+    const clearSearch = page.getByRole('button', { name: 'Очистить поиск', exact: true });
+    await expect(clearSearch).toBeVisible();
+    await expect(clearSearch).toBeInViewport();
+    await expect(search).toHaveClass(/nutrition-picker__search-input--has-clear/);
+    expect(await page.locator('.nutrition-picker__search-clear').count()).toBe(1);
+    const searchGeometry = await search.evaluate((input) => {
+      const styles = getComputedStyle(input);
+      const inputRect = input.getBoundingClientRect();
+      const clear = input.parentElement?.querySelector('button');
+      const clearRect = clear?.getBoundingClientRect();
+      return {
+        paddingRight: Number.parseFloat(styles.paddingRight),
+        inputRect: { left: inputRect.left, right: inputRect.right },
+        clearRect: clearRect
+          ? {
+              left: clearRect.left,
+              right: clearRect.right,
+              width: clearRect.width,
+              height: clearRect.height,
+            }
+          : null,
+      };
+    });
+    expect(searchGeometry.paddingRight).toBeGreaterThanOrEqual(48);
+    expect(searchGeometry.clearRect?.width).toBeGreaterThanOrEqual(44);
+    expect(searchGeometry.clearRect?.height).toBeGreaterThanOrEqual(43.5);
+    expect(searchGeometry.clearRect?.right).toBeLessThanOrEqual(searchGeometry.inputRect.right);
+    await search.focus();
+    await expect(search).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(clearSearch).toBeFocused();
+    expect(await clearSearch.evaluate((button) => button.matches(':focus-visible'))).toBe(true);
+    await clearSearch.click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await expect(clearSearch).not.toBeAttached();
+    await search.fill('рис');
+    await search.press('Escape');
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await search.fill('рис');
     await expect(page.getByText('Рис белый приготовленный, без добавления масла')).toBeVisible();
     await expect(page.getByText('Рис бурый приготовленный, без добавления масла')).toBeVisible();
     await expect(page.getByText('Рис дикий приготовленный, без добавления масла')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
       current.viewport.width,
     );
+    expect(unexpectedBrowserProblems).toEqual([]);
     await page.screenshot({
       path: `../.artifacts/runtime/tests/screenshots/task-114a/russian-food-variants-${current.label}.png`,
     });
