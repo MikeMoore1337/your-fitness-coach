@@ -3050,7 +3050,10 @@ test('тренер быстро переходит между программо
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
 
-  await page.getByRole('tab', { name: 'Назначенные программы' }).click();
+  await page
+    .getByRole('navigation', { name: 'Разделы тренера' })
+    .getByRole('button', { name: 'Программы', exact: true })
+    .click();
   await openCard(page, 'Программы клиентов');
   await expect(page.getByText('План клиента на четыре недели')).toBeVisible();
   await page.getByRole('button', { name: 'Открыть клиента' }).click();
