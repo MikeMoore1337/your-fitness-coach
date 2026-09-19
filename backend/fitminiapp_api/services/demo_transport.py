@@ -1114,6 +1114,29 @@ def _client(session: _DemoSession, slug: str) -> dict[str, Any]:
     }
 
 
+def _pending_client() -> dict[str, Any]:
+    return {
+        "id": None,
+        "invite_id": 54_001,
+        "telegram_user_id": None,
+        "username": None,
+        "full_name": "Елена · ожидает подтверждения",
+        "birth_date": None,
+        "goal": None,
+        "level": None,
+        "height_cm": None,
+        "weight_kg": None,
+        "workouts_per_week": None,
+        "cardio_trainings_per_week": None,
+        "resting_heart_rate": None,
+        "body_priority": None,
+        "training_preferences": None,
+        "timezone": None,
+        "kbju": None,
+        "status": "pending",
+    }
+
+
 def _assigned_program(session: _DemoSession, slug: str) -> dict[str, Any]:
     names = {"alexey": "Алексей", "maria": "Мария", "ivan": "Иван"}
     return {
@@ -1575,9 +1598,11 @@ def handle_demo_transport(
         if path in {"/api/v1/programs/templates/mine", "/api/v1/programs/templates/hidden"}:
             return [] if path.endswith("hidden") else [_program_template(session)]
         if path == "/api/v1/coach/clients":
-            return [_client(session, slug) for slug in ("alexey", "maria", "ivan")]
+            return [_client(session, slug) for slug in ("alexey", "maria", "ivan")] + [
+                _pending_client()
+            ]
         if path == "/api/v1/coach/assigned-programs":
-            return [_assigned_program(session, slug) for slug in ("alexey", "maria", "ivan")]
+            return [_assigned_program(session, slug) for slug in ("alexey", "maria")]
         if path == "/api/v1/coach/client-summaries":
             items = []
             for slug in ("alexey", "maria", "ivan"):
@@ -1586,7 +1611,25 @@ def handle_demo_transport(
                 items.append(item)
             return {"items": items, "total": len(items), "limit": 100, "offset": 0}
         if path == "/api/v1/coach/attention":
-            return {"items": [], "total": 0, "generated_at": _iso(_now(session))}
+            return {
+                "items": [
+                    {
+                        "key": "without_program:51003:51003",
+                        "kind": "without_program",
+                        "client": {"id": DEMO_CLIENT_IDS["ivan"], "name": "Иван"},
+                        "title": "Нет активной программы",
+                        "reason": "Назначьте следующий рабочий план клиента.",
+                        "source_kind": "client",
+                        "source_id": DEMO_CLIENT_IDS["ivan"],
+                        "source_state": "active",
+                        "action": "assign_program",
+                        "destination": f"/coach?client_id={DEMO_CLIENT_IDS['ivan']}",
+                        "created_at": _iso(_now(session)),
+                    }
+                ],
+                "total": 1,
+                "generated_at": _iso(_now(session)),
+            }
         if len(parts) >= 4 and parts[:2] == ["coach", "clients"] and parts[2].isdigit():
             client_id = int(parts[2])
             slug = _client_slug(client_id)
@@ -1594,6 +1637,85 @@ def handle_demo_transport(
                 return _client_analytics(session, client_id)
             if len(parts) == 4 and parts[3] == "workouts":
                 return _client_timeline(session)
+            if len(parts) == 4 and parts[3] == "weekly-check-ins":
+                period_end = _today(session)
+                period_start = period_end - timedelta(days=6)
+                return {
+                    "items": [
+                        {
+                            "id": 95_001,
+                            "user_id": client_id,
+                            "week_start": _iso(period_start),
+                            "week_end": _iso(period_end),
+                            "submitted_on": _iso(period_end),
+                            "timezone": "Europe/Moscow",
+                            "status": "completed",
+                            "summary_version": "weekly-check-in-summary-v1",
+                            "summary": {
+                                "ruleset_version": "weekly-check-in-summary-v1",
+                                "period_start": _iso(period_start),
+                                "period_end": _iso(period_end),
+                                "goal": "muscle_gain",
+                                "training": {
+                                    "planned_workouts": 4,
+                                    "completed_workouts": 3,
+                                    "adherence": {
+                                        "status": "available",
+                                        "percent": 75,
+                                        "achieved": 3,
+                                        "evaluated": 4,
+                                        "weight": 1,
+                                        "reason": None,
+                                    },
+                                },
+                                "nutrition": {
+                                    "logged_days": 5,
+                                    "complete_days": 4,
+                                    "incomplete_days": 1,
+                                    "fasted_days": 0,
+                                    "unlogged_days": 2,
+                                    "average_calories": 2_010,
+                                    "target_calories": 2_150,
+                                    "average_protein_g": 132,
+                                    "target_protein_g": 145,
+                                    "calories_adherence": {
+                                        "status": "available",
+                                        "percent": 78,
+                                        "achieved": 4,
+                                        "evaluated": 5,
+                                        "weight": 1,
+                                        "reason": None,
+                                    },
+                                    "protein_adherence": {
+                                        "status": "available",
+                                        "percent": 81,
+                                        "achieved": 4,
+                                        "evaluated": 5,
+                                        "weight": 1,
+                                        "reason": None,
+                                    },
+                                    "current_target": None,
+                                    "suspicious_low_days": [],
+                                },
+                                "anthropometry_trends": [],
+                                "progression": {
+                                    "training_volume_kg": 6_480,
+                                    "new_personal_records": 1,
+                                },
+                                "data_sufficiency": {},
+                            },
+                            "training_load": 4,
+                            "recovery": 3,
+                            "hunger": 2,
+                            "adherence_difficulty": 2,
+                            "note": "На этой неделе восстановление было неровным.",
+                            "created_at": _iso(_now(session)),
+                        }
+                    ],
+                    "total": 1,
+                    "limit": 12,
+                    "offset": 0,
+                }
             if (
                 len(parts) == 6
                 and parts[3] == "workouts"
@@ -1661,6 +1783,31 @@ def handle_demo_transport(
                 ]
             if len(parts) == 4 and parts[3] == "nutrition-report":
                 return _nutrition_report(session, client_id)
+            if len(parts) == 4 and parts[3] == "report-handoffs":
+                if slug != "alexey":
+                    return []
+                period_end = _today(session)
+                return [
+                    {
+                        "id": 94_001,
+                        "trainer": {
+                            "id": session.user_id,
+                            "full_name": "Демо-тренер",
+                            "username": "demo_trainer",
+                        },
+                        "period": "days_30",
+                        "period_start": _iso(period_end - timedelta(days=29)),
+                        "period_end": _iso(period_end),
+                        "timezone": "Europe/Moscow",
+                        "report_contract_version": "progress-report-v1",
+                        "included_section_ids": ["overview", "training", "body", "nutrition"],
+                        "created_at": _iso(_now(session) - timedelta(days=1)),
+                        "delivery_status": "delivered",
+                        "delivery_attempt": 1,
+                        "client_comment": "На этой неделе восстановление было сложнее обычного — посмотрите, пожалуйста, объём.",
+                        "live": True,
+                    }
+                ]
             if len(parts) == 4 and parts[3] == "programs":
                 return []
             if len(parts) == 4 and parts[3] == "profile":

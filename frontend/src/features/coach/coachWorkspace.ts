@@ -16,8 +16,8 @@ export function clientDisplayName(client: Client): string {
   return (
     client.full_name ||
     (client.username ? `@${client.username}` : null) ||
-    (client.telegram_user_id ? String(client.telegram_user_id) : null) ||
-    'Приглашённый клиент'
+    (client.status === 'pending' ? 'Ожидающий клиент' : null) ||
+    'Клиент'
   );
 }
 
@@ -27,13 +27,28 @@ export function daysSince(value: string | null | undefined, now = new Date()): n
   return Math.max(0, Math.floor((current - dateValue(value)) / DAY_MS));
 }
 
+export function russianQuantity(
+  value: number,
+  forms: readonly [one: string, few: string, many: string],
+): string {
+  const absolute = Math.abs(value) % 100;
+  const lastDigit = absolute % 10;
+  if (absolute >= 11 && absolute <= 19) return forms[2];
+  if (lastDigit === 1) return forms[0];
+  if (lastDigit >= 2 && lastDigit <= 4) return forms[1];
+  return forms[2];
+}
+
+export function formatDaysAgo(days: number): string {
+  return `${days} ${russianQuantity(days, ['день', 'дня', 'дней'])} назад`;
+}
+
 export function activityLabel(value: string | null | undefined, now = new Date()): string {
   const days = daysSince(value, now);
   if (days == null) return 'Тренировок ещё не было';
   if (days === 0) return 'Тренировался сегодня';
   if (days === 1) return 'Тренировался вчера';
-  if (days < 5) return `Тренировался ${days} дня назад`;
-  return `Тренировался ${days} дней назад`;
+  return `Тренировался ${formatDaysAgo(days)}`;
 }
 
 export function needsCoachAttention(summary?: TrainerClientProgressSummary): boolean {
@@ -60,7 +75,12 @@ export function filterCoachClients({
   );
 
   return clients.filter((client) => {
-    const searchable = [clientDisplayName(client), client.username, client.telegram_user_id]
+    const searchable = [
+      clientDisplayName(client),
+      client.full_name,
+      client.username,
+      client.telegram_user_id,
+    ]
       .filter(Boolean)
       .join(' ')
       .toLocaleLowerCase('ru-RU');

@@ -61,6 +61,20 @@ export type AiCoachEntryPoint =
 export type CoachAttentionKind =
   'workout_feedback' | 'weekly_check_in' | 'missed_workout' | 'skipped_workout' | 'without_program';
 export type CoachAttentionLatencyBucket = 'under_250ms' | '250_1000ms' | 'over_1s';
+export type CoachQuickActionKind =
+  | 'review_workout'
+  | 'review_check_in'
+  | 'write_workout_comment'
+  | 'reschedule_workout'
+  | 'assign_program'
+  | 'progress'
+  | 'report'
+  | 'nutrition'
+  | 'profile'
+  | 'end_relationship';
+export type CoachNavigationDestination = 'today' | 'clients' | 'programs' | 'tools';
+export type CoachTimelineEventKind = 'workout' | 'check_in' | 'measurement';
+export type CoachUsefulActionLatencyBucket = 'under_10s' | '10_30s' | '30_60s' | 'over_60s';
 export type AiCoachMode = 'generic' | 'personal';
 export type AiCoachOutcome =
   | 'answer'
@@ -168,6 +182,8 @@ type ContextFreeProductEventName =
   | 'account_delete_started'
   | 'account_delete_completed'
   | 'cardio_logged'
+  | 'coach_home_viewed'
+  | 'coach_client_opened'
   | 'trainer_workspace_viewed'
   | 'trainer_client_opened'
   | 'trainer_program_assigned'
@@ -390,6 +406,26 @@ export type ProductEvent =
       latency_bucket: CoachAttentionLatencyBucket;
     }
   | {
+      name: 'coach_navigation_selected';
+      surface: ProductSurface;
+      destination: CoachNavigationDestination;
+    }
+  | {
+      name: 'coach_quick_action_used';
+      surface: ProductSurface;
+      kind: CoachQuickActionKind;
+    }
+  | {
+      name: 'coach_timeline_event_opened';
+      surface: ProductSurface;
+      kind: CoachTimelineEventKind;
+    }
+  | {
+      name: 'coach_time_to_first_useful_action';
+      surface: ProductSurface;
+      latency_bucket: CoachUsefulActionLatencyBucket;
+    }
+  | {
       name: 'ai_coach_request_started';
       surface: ProductSurface;
       mode: AiCoachMode;
@@ -496,6 +532,8 @@ const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'account_delete_started',
   'account_delete_completed',
   'cardio_logged',
+  'coach_home_viewed',
+  'coach_client_opened',
   'trainer_workspace_viewed',
   'trainer_client_opened',
   'trainer_program_assigned',
@@ -682,6 +720,35 @@ const COACH_ATTENTION_LATENCY_BUCKETS = new Set<CoachAttentionLatencyBucket>([
   '250_1000ms',
   'over_1s',
 ]);
+const COACH_QUICK_ACTION_KINDS = new Set<CoachQuickActionKind>([
+  'review_workout',
+  'review_check_in',
+  'write_workout_comment',
+  'reschedule_workout',
+  'assign_program',
+  'progress',
+  'report',
+  'nutrition',
+  'profile',
+  'end_relationship',
+]);
+const COACH_NAVIGATION_DESTINATIONS = new Set<CoachNavigationDestination>([
+  'today',
+  'clients',
+  'programs',
+  'tools',
+]);
+const COACH_TIMELINE_EVENT_KINDS = new Set<CoachTimelineEventKind>([
+  'workout',
+  'check_in',
+  'measurement',
+]);
+const COACH_USEFUL_ACTION_LATENCY_BUCKETS = new Set<CoachUsefulActionLatencyBucket>([
+  'under_10s',
+  '10_30s',
+  '30_60s',
+  'over_60s',
+]);
 const AI_COACH_MODES = new Set<AiCoachMode>(['generic', 'personal']);
 const AI_COACH_OUTCOMES = new Set<AiCoachOutcome>([
   'answer',
@@ -799,6 +866,10 @@ function eventPropertyKeys(name: string): readonly string[] {
   )
     return ['kind'];
   if (name === 'coach_attention_load_timing') return ['latency_bucket'];
+  if (name === 'coach_navigation_selected') return ['destination'];
+  if (name === 'coach_quick_action_used') return ['kind'];
+  if (name === 'coach_timeline_event_opened') return ['kind'];
+  if (name === 'coach_time_to_first_useful_action') return ['latency_bucket'];
   if (name === 'ai_coach_request_started') return ['mode'];
   if (name === 'ai_coach_response_received') return ['mode', 'outcome'];
   if (name === 'ai_coach_request_failed') return ['mode', 'failure'];
@@ -959,6 +1030,20 @@ function hasValidEventProperties(value: Record<string, unknown>): boolean {
   }
   if (value.name === 'coach_attention_load_timing') {
     return COACH_ATTENTION_LATENCY_BUCKETS.has(value.latency_bucket as CoachAttentionLatencyBucket);
+  }
+  if (value.name === 'coach_navigation_selected') {
+    return COACH_NAVIGATION_DESTINATIONS.has(value.destination as CoachNavigationDestination);
+  }
+  if (value.name === 'coach_quick_action_used') {
+    return COACH_QUICK_ACTION_KINDS.has(value.kind as CoachQuickActionKind);
+  }
+  if (value.name === 'coach_timeline_event_opened') {
+    return COACH_TIMELINE_EVENT_KINDS.has(value.kind as CoachTimelineEventKind);
+  }
+  if (value.name === 'coach_time_to_first_useful_action') {
+    return COACH_USEFUL_ACTION_LATENCY_BUCKETS.has(
+      value.latency_bucket as CoachUsefulActionLatencyBucket,
+    );
   }
   if (value.name === 'ai_coach_request_started') {
     return AI_COACH_MODES.has(value.mode as AiCoachMode);

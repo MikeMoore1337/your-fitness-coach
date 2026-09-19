@@ -16,6 +16,17 @@ const captureLandingProductProofs =
       process?: { env?: Record<string, string | undefined> };
     }
   ).process?.env?.YFC_CAPTURE_LANDING_PRODUCT_PROOFS === '1';
+const captureTask291 =
+  (
+    globalThis as typeof globalThis & {
+      process?: { env?: Record<string, string | undefined> };
+    }
+  ).process?.env?.CAPTURE_TASK_291 === '1';
+const task291EvidenceDir = (
+  globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  }
+).process?.env?.TASK_291_EVIDENCE_DIR;
 
 const clients = [
   {
@@ -125,7 +136,25 @@ function summary(
       target_effective_on: userId === 13 ? null : '2026-07-01',
     },
     body: {
-      latest_measurement: measuredOn ? { measured_on: measuredOn, weight_kg: 68.5 } : null,
+      latest_measurement: measuredOn
+        ? {
+            measured_on: measuredOn,
+            weight_kg: 68.5,
+            custom_measurements:
+              userId === 11
+                ? [
+                    {
+                      definition_id: 91,
+                      label: 'Талия',
+                      unit: 'cm',
+                      value: 86,
+                      measured_on: measuredOn,
+                      archived: false,
+                    },
+                  ]
+                : [],
+          }
+        : null,
       trends: [],
       priority: null,
       guidance: {},
@@ -218,7 +247,10 @@ function coachNutritionReport(url: URL) {
   };
 }
 
-async function mockCoachWorkspace(page: Page) {
+async function mockCoachWorkspace(
+  page: Page,
+  options: { attention?: 'empty' | 'actionable' } = {},
+) {
   const feedbackComments: Array<{
     id: number;
     trainer_author_id: number;
@@ -292,6 +324,31 @@ async function mockCoachWorkspace(page: Page) {
           offset: 0,
         },
       });
+    if (path.endsWith('/coach/attention'))
+      return route.fulfill({
+        json:
+          options.attention === 'actionable'
+            ? {
+                items: [
+                  {
+                    key: 'without_program:12:12',
+                    kind: 'without_program',
+                    client: { id: 12, name: 'Борис Александрович С Очень Длинной Фамилией' },
+                    title: 'Нужно назначить программу',
+                    reason: 'У активного клиента пока нет действующей программы.',
+                    source_kind: 'client',
+                    source_id: 12,
+                    source_state: 'without_program',
+                    action: 'assign_program',
+                    destination: '/coach?client_id=12',
+                    created_at: '2026-08-20T10:00:00',
+                  },
+                ],
+                total: 1,
+                generated_at: '2026-08-20T10:00:00',
+              }
+            : { items: [], total: 0, generated_at: '2026-08-20T10:00:00' },
+      });
     if (path.endsWith('/coach/assigned-programs'))
       return route.fulfill({
         json: [
@@ -339,6 +396,63 @@ async function mockCoachWorkspace(page: Page) {
           weight_change_kg: -0.8,
           personal_records: [],
         },
+      });
+    if (path.endsWith('/coach/clients/11/weekly-check-ins'))
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: 901,
+              user_id: 11,
+              week_start: '2026-08-10',
+              week_end: '2026-08-16',
+              submitted_on: '2026-08-17',
+              timezone: 'Europe/Moscow',
+              status: 'completed',
+              summary_version: 'weekly-review-summary-v2',
+              summary: {},
+              note: 'Энергии на этой неделе было достаточно.',
+              created_at: '2026-08-17T10:00:00',
+            },
+          ],
+          total: 1,
+          limit: 12,
+          offset: 0,
+        },
+      });
+    if (path.endsWith('/coach/clients/11/measurements'))
+      return route.fulfill({
+        json: [
+          {
+            id: 902,
+            measured_on: '2026-08-18',
+            weight_kg: 68.5,
+            waist_cm: 86,
+            custom_values: [
+              { definition_id: 91, label: 'Талия', unit: 'cm', value: 86, archived: false },
+            ],
+          },
+        ],
+      });
+    if (path.endsWith('/coach/clients/11/report-handoffs'))
+      return route.fulfill({
+        json: [
+          {
+            id: 903,
+            trainer: { id: 1, full_name: 'Ирина Тренер', username: 'coach' },
+            period: 'days_30',
+            period_start: '2026-07-22',
+            period_end: '2026-08-20',
+            timezone: 'Europe/Moscow',
+            report_contract_version: 'progress-report-v1',
+            included_section_ids: ['overview', 'training', 'nutrition'],
+            created_at: '2026-08-20T12:00:00',
+            delivery_status: 'delivered',
+            delivery_attempt: 1,
+            client_comment: 'В целом стало легче держать план, спасибо за обратную связь.',
+            live: true,
+          },
+        ],
       });
     if (path.endsWith('/coach/clients/11/workouts/501/comments')) {
       if (request.method() === 'POST') {
@@ -417,10 +531,54 @@ async function openCoach(page: Page) {
   await mockCoachWorkspace(page);
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
+  await page.getByRole('button', { name: 'Клиенты', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
 }
 
-test('dashboard даёт обзор и фильтрует клиентов без загрузки полной истории', async ({ page }) => {
+async function captureTask291Evidence(page: Page, name: string) {
+  if (!captureTask291 || !task291EvidenceDir) return;
+  await page.screenshot({ path: `${task291EvidenceDir}/${name}.png`, fullPage: true });
+}
+
+async function assertCoachNavigationFits(page: Page, width: number) {
+  await page.setViewportSize({ width, height: 844 });
+  const navigation = page.getByRole('navigation', { name: 'Разделы тренера' });
+  await expect(navigation).toBeVisible();
+  await expect(navigation.getByRole('button')).toHaveCount(4);
+  await expect(navigation.getByRole('button', { name: 'Ещё · инструменты' })).toBeVisible();
+  await expect
+    .poll(() =>
+      navigation
+        .getByRole('button', { name: 'Ещё · инструменты' })
+        .evaluate((button) => (button as HTMLElement).innerText),
+    )
+    .toBe('Ещё');
+
+  const geometry = await navigation.evaluate((element) => {
+    const navigationRect = element.getBoundingClientRect();
+    const buttonRects = Array.from(element.querySelectorAll('button')).map((button) => {
+      const rect = button.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width };
+    });
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      left: navigationRect.left,
+      right: navigationRect.right,
+      buttonRects,
+    };
+  });
+  expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth);
+  expect(geometry.left).toBeGreaterThanOrEqual(0);
+  expect(geometry.right).toBeLessThanOrEqual(width);
+  for (const button of geometry.buttonRects) {
+    expect(button.left).toBeGreaterThanOrEqual(geometry.left);
+    expect(button.right).toBeLessThanOrEqual(geometry.right);
+    expect(button.width).toBeGreaterThan(0);
+  }
+}
+
+test('операционный roster даёт факты и не загружает полную историю заранее', async ({ page }) => {
   await page.setViewportSize(
     captureLandingProductProofs ? { width: 1280, height: 972 } : { width: 1440, height: 1000 },
   );
@@ -437,14 +595,12 @@ test('dashboard даёт обзор и фильтрует клиентов бе�
   });
   await openCoach(page);
 
-  await expect(page.getByText('Состояние клиентской базы')).toBeVisible();
-  await expect(
-    page.getByLabel('Состояние клиентской базы').getByText('Тренировались за 7 дней'),
-  ).toBeVisible();
+  await expect(page.getByText('Состояние клиентской базы')).toHaveCount(0);
   await expect(page.getByText('Борис Александрович С Очень Длинной Фамилией')).toBeVisible();
   await expect(page.getByText('Сейчас открыт клиент')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeVisible();
   await expect(page.getByText('16 учтённых дней питания за период')).toBeVisible();
+  await page.locator('#coach-client-program > summary').click();
   await expect(page.locator('.coach-client-program .ui-badge--success')).toHaveCSS(
     'border-radius',
     '10px',
@@ -478,7 +634,7 @@ test('dashboard даёт обзор и фильтрует клиентов бе�
   }
 
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
-  await expect(page.getByRole('tab', { name: 'Клиенты' })).toHaveCSS(
+  await expect(page.getByRole('button', { name: 'Клиенты', exact: true })).toHaveCSS(
     'background-color',
     'rgb(20, 23, 23)',
   );
@@ -514,11 +670,165 @@ test('dashboard даёт обзор и фильтрует клиентов бе�
   await page.getByLabel('Показать').selectOption('pending');
   await expect(page.locator('.coach-client-roster .coach-client-row')).toHaveCount(1);
   await expect(page.getByText('Елена — приглашение ожидает подтверждения')).toBeVisible();
-  await page.getByRole('button', { name: 'Пригласить клиента', exact: true }).click();
-  await expect(page.getByLabel('Универсальная ссылка — для браузера и Telegram')).toHaveValue(
+  await page.getByRole('button', { name: 'Пригласить клиента', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Ещё · инструменты' }).click();
+  await expect(page.getByLabel('Ссылка для браузера и Telegram')).toHaveValue(
     'https://example.test/join/test',
   );
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
+});
+
+test('Task 291 показывает action-first Today и ленивый контекст клиента', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const contextRequests: string[] = [];
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname;
+    if (
+      /\/coach\/clients\/11\/(workouts|weekly-check-ins|measurements|report-handoffs)$/.test(path)
+    ) {
+      contextRequests.push(path);
+    }
+  });
+  await mockCoachWorkspace(page, { attention: 'actionable' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await expect(page.getByText('Нужно назначить программу')).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Разделы тренера' })).toBeVisible();
+  await expect(
+    page.getByRole('navigation', { name: 'Разделы тренера' }).getByRole('button'),
+  ).toHaveCount(4);
+  await captureTask291Evidence(page, 'today-actionable-mobile-light');
+
+  await page.getByRole('button', { name: 'Клиенты', exact: true }).click();
+  await page.getByLabel('Показать').selectOption('pending');
+  await expect(page.locator('.coach-client-roster .coach-client-row')).toHaveCount(1);
+  await expect(page.getByText('Елена — приглашение ожидает подтверждения')).toBeVisible();
+  await captureTask291Evidence(page, 'client-roster-mobile-pending-light');
+  await page.getByLabel('Показать').selectOption('all');
+  await page.getByLabel('Найти клиента').fill('Борис');
+  await expect(page.getByText('Борис Александрович С Очень Длинной Фамилией')).toBeVisible();
+  await expect(page.getByText('Мария Орлова')).toHaveCount(0);
+  await captureTask291Evidence(page, 'client-roster-mobile-search-light');
+  await page.getByLabel('Найти клиента').fill('');
+  await page.getByRole('button', { name: 'Сегодня', exact: true }).click();
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+  await captureTask291Evidence(page, 'today-actionable-mobile-dark');
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+
+  await page.getByRole('button', { name: 'Клиенты', exact: true }).click();
+  await page.getByRole('button', { name: /Анна Петрова/ }).click();
+  await expect(page.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeVisible();
+  expect(contextRequests).toEqual([]);
+  await expect(page.getByText(/Талия: 86 cm/)).toBeVisible();
+  const clientQuickActions = page.getByLabel('Данные клиента');
+  await expect(clientQuickActions.getByRole('link', { name: 'Последние события' })).toBeVisible();
+  await expect(clientQuickActions.getByRole('link', { name: 'Прогресс' })).toBeVisible();
+  await expect(clientQuickActions.getByRole('link', { name: 'Отчёт' })).toBeVisible();
+
+  await clientQuickActions.getByRole('link', { name: 'Последние события' }).click();
+  await expect(page.getByTestId('coach-client-timeline')).toBeVisible();
+  await expect(page.getByText('Тренировка завершена')).toBeVisible();
+  await expect(page.getByText('Недельный итог отправлен')).toBeVisible();
+  await expect(page.locator('[data-event-kind="measurement"] p')).toHaveText(
+    'Вес 68.5 кг · Талия 86 см',
+  );
+  expect(contextRequests).toHaveLength(3);
+  expect(new Set(contextRequests)).toEqual(
+    new Set([
+      '/api/v1/coach/clients/11/workouts',
+      '/api/v1/coach/clients/11/weekly-check-ins',
+      '/api/v1/coach/clients/11/measurements',
+    ]),
+  );
+  await captureTask291Evidence(page, 'client-timeline-mobile-light');
+
+  await clientQuickActions.getByRole('link', { name: 'Отчёт' }).click();
+  const coachReportEntry = page.getByTestId('coach-report-entry');
+  await expect(coachReportEntry).toBeVisible();
+  await expect(coachReportEntry.getByText('Комментарий клиента')).toBeVisible();
+  await expect(
+    page.getByText('В целом стало легче держать план, спасибо за обратную связь.'),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Открыть расширенный отчёт' })).toHaveAttribute(
+    'href',
+    '/app/report?period=days_30&client_id=11',
+  );
+  await captureTask291Evidence(page, 'client-report-handoff-mobile-light');
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+  await clientQuickActions.getByRole('link', { name: 'Последние события' }).click();
+  await expect(page.getByTestId('coach-client-timeline')).toBeVisible();
+  await captureTask291Evidence(page, 'client-timeline-mobile-dark');
+  await captureTask291Evidence(page, 'client-workspace-mobile-dark');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('Task 291 показывает все четыре trainer destinations на узких mobile viewport', async ({
+  page,
+}) => {
+  await mockCoachWorkspace(page, { attention: 'actionable' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+  await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+
+  for (const width of [320, 360, 390, 430]) {
+    await assertCoachNavigationFits(page, width);
+    await captureTask291Evidence(page, `trainer-navigation-${width}-light`);
+  }
+});
+
+test('Task 291 сохраняет плотную desktop-композицию и Light/Dark контраст', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCoachWorkspace(page, { attention: 'actionable' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+  await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await captureTask291Evidence(page, 'today-actionable-desktop-light');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await captureTask291Evidence(page, 'today-actionable-desktop-1280-light');
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await captureTask291Evidence(page, 'today-actionable-desktop-dark');
+  await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+
+  await page.getByRole('button', { name: 'Клиенты', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeVisible();
+  await captureTask291Evidence(page, 'client-workspace-desktop-light');
+  await page.getByLabel('Данные клиента').getByRole('link', { name: 'Последние события' }).click();
+  await expect(page.getByTestId('coach-client-timeline')).toBeVisible();
+  await captureTask291Evidence(page, 'client-timeline-desktop-light');
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await captureTask291Evidence(page, 'client-workspace-desktop-dark');
+  await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+  }
+});
+
+test('Task 291 спокойно показывает отсутствие срочных действий', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCoachWorkspace(page);
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+  await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await expect(page.getByText('Срочных действий нет')).toBeVisible();
+  await expect(
+    page.getByText('Здесь появятся только конкретные новые состояния клиента.'),
+  ).toBeVisible();
+  await captureTask291Evidence(page, 'today-no-attention-mobile-light');
 });
 
 test('trainer nutrition report stays scoped to the active client and remains read-only', async ({
@@ -566,7 +876,7 @@ test('mobile использует список и отдельный конте�
   await page.setViewportSize({ width: 390, height: 844 });
   await openCoach(page);
 
-  expect((await page.locator('.coach-workspace-header').boundingBox())?.height).toBeLessThan(190);
+  expect((await page.locator('.coach-os-header').boundingBox())?.height).toBeLessThan(210);
   await expect(page.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeHidden();
   await page.getByRole('button', { name: /Борис Александрович/ }).click();
   await expect(
@@ -578,17 +888,15 @@ test('mobile использует список и отдельный конте�
   await expect(page.getByText('Сейчас открыт клиент')).toBeVisible();
   await expect(page.getByText('Цель: Набор мышц')).toBeVisible();
   await expect(page.getByRole('button', { name: 'К списку клиентов' })).toBeVisible();
-  await expect(page.getByRole('tablist', { name: 'Разделы тренера' })).toBeHidden();
-  const headerBox = await page.locator('.coach-workspace-header').boundingBox();
-  const attentionEyebrowBox = await page
-    .locator('.coach-attention-center .eyebrow')
-    .first()
-    .boundingBox();
+  await expect(page.getByRole('navigation', { name: 'Разделы тренера' })).toBeVisible();
+  const headerBox = await page.locator('.coach-os-header').boundingBox();
+  const detailHeaderBox = await page.locator('.coach-client-detail__header').boundingBox();
   expect(
-    (attentionEyebrowBox?.y ?? 0) - ((headerBox?.y ?? 0) + (headerBox?.height ?? 0)),
-  ).toBeLessThanOrEqual(44);
+    (detailHeaderBox?.y ?? 0) - ((headerBox?.y ?? 0) + (headerBox?.height ?? 0)),
+  ).toBeGreaterThanOrEqual(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 
+  await page.locator('#coach-client-program > summary').click();
   await page.getByText('Назначить новую программу').click();
   await expect(page.getByRole('heading', { name: 'Добавьте упражнения' })).toBeVisible();
   const trainingFields = page.locator('.program-exercise-row__metrics .field');
@@ -708,6 +1016,7 @@ test('trainer leaves contextual workout and exercise feedback without messenger 
   await mockCoachWorkspace(page);
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
+  await page.getByRole('button', { name: 'Клиенты', exact: true }).click();
 
   const rosterBox = await page.locator('.coach-client-roster').boundingBox();
   const detailBox = await page.locator('.coach-client-detail').boundingBox();

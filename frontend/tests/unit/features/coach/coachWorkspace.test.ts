@@ -6,8 +6,11 @@ import type {
 } from '../../../../src/shared/api/types';
 import {
   activityLabel,
+  clientDisplayName,
   coachWorkspaceStats,
+  formatDaysAgo,
   filterCoachClients,
+  russianQuantity,
 } from '../../../../src/features/coach/coachWorkspace';
 
 const clients = [
@@ -107,6 +110,22 @@ describe('coach workspace summaries', () => {
     expect(activityLabel(null)).toBe('Тренировок ещё не было');
   });
 
+  it('uses deterministic Russian plural forms for relative days', () => {
+    expect([1, 2, 5, 11, 21, 22, 25, 31, 42].map((days) => formatDaysAgo(days))).toEqual([
+      '1 день назад',
+      '2 дня назад',
+      '5 дней назад',
+      '11 дней назад',
+      '21 день назад',
+      '22 дня назад',
+      '25 дней назад',
+      '31 день назад',
+      '42 дня назад',
+    ]);
+    expect(russianQuantity(31, ['день', 'дня', 'дней'])).toBe('день');
+    expect(activityLabel('2030-01-01')).toBe('Тренировался 31 день назад');
+  });
+
   it('filters by activity, assignment and searchable identity', () => {
     const summaries = new Map([
       [1, summary(1, '2030-01-31')],
@@ -131,5 +150,26 @@ describe('coach workspace summaries', () => {
         (client) => client.invite_id,
       ),
     ).toEqual([41]);
+  });
+
+  it('does not promote a raw Telegram id to the primary client identity', () => {
+    expect(
+      clientDisplayName({
+        id: 3,
+        full_name: null,
+        username: null,
+        telegram_user_id: 99123,
+        status: 'active',
+      } as Client),
+    ).toBe('Клиент');
+    expect(
+      clientDisplayName({
+        id: null,
+        invite_id: 42,
+        full_name: null,
+        username: null,
+        status: 'pending',
+      } as Client),
+    ).toBe('Ожидающий клиент');
   });
 });

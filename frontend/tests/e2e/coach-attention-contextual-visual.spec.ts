@@ -272,7 +272,7 @@ test('Task 284 attention center renders a compact deterministic trainer surface'
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await page.goto('/coach');
 
-  await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
   const center = page.getByRole('region', { name: 'Требует внимания' });
   await expect(center).toBeVisible();
   await expect(center).toContainText('Анна Петрова');
