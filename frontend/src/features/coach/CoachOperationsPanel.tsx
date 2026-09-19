@@ -803,7 +803,7 @@ export function CoachOperationsPanel({
       <div className="coach-operations__metrics" aria-label="Сводка операций сегодня">
         <div>
           <span>Встречи</span>
-          <strong>{operationData?.sessions.length ?? '—'}</strong>
+          <strong>{operationData?.sessions?.length ?? '—'}</strong>
         </div>
         <div>
           <span>Задачи</span>
@@ -811,11 +811,11 @@ export function CoachOperationsPanel({
         </div>
         <div>
           <span>Пакеты ≤ 2</span>
-          <strong>{operationData?.low_packages.length || '—'}</strong>
+          <strong>{operationData?.low_packages?.length || '—'}</strong>
         </div>
         <div>
           <span>Оплаты</span>
-          <strong>{operationData?.payment_facts.length || '—'}</strong>
+          <strong>{operationData?.payment_facts?.length || '—'}</strong>
         </div>
       </div>
 
@@ -1011,7 +1011,7 @@ export function CoachOperationsPanel({
                 </div>
               </div>
             ))}
-            {!operationData?.low_packages.length && !operationData?.payment_facts.length && (
+            {!operationData?.low_packages?.length && !operationData?.payment_facts?.length && (
               <p className="muted">Новых финансовых фактов нет.</p>
             )}
           </div>
@@ -1091,14 +1091,14 @@ export function CoachClientOperationsCard({
       <div className="coach-client-operations__grid">
         <div>
           <span>Встречи</span>
-          <strong>{data?.sessions.length ?? 0}</strong>
+          <strong>{data?.sessions?.length ?? 0}</strong>
         </div>
         <div>
           <span>Открытые задачи</span>
-          <strong>{data?.tasks.filter((item) => item.state === 'open').length ?? 0}</strong>
+          <strong>{data?.tasks?.filter((item) => item.state === 'open').length ?? 0}</strong>
         </div>
       </div>
-      {data?.sessions.slice(0, 3).map((item) => (
+      {data?.sessions?.slice(0, 3).map((item) => (
         <div className="coach-client-operations__row" key={`session-${item.id}`}>
           <div>
             <strong>{sessionDate(item.starts_at) + ' · ' + sessionTime(item.starts_at)}</strong>
@@ -1109,7 +1109,7 @@ export function CoachClientOperationsCard({
           <Badge tone={sessionTone(item.status)}>{statusLabels[item.status]}</Badge>
         </div>
       ))}
-      {data?.packages.map((item) => (
+      {data?.packages?.map((item) => (
         <div className="coach-client-operations__row" key={`package-${item.id}`}>
           <div>
             <strong>{item.name}</strong>
@@ -1122,7 +1122,7 @@ export function CoachClientOperationsCard({
           </Badge>
         </div>
       ))}
-      {data?.payments.map((item) => (
+      {data?.payments?.map((item) => (
         <div className="coach-client-operations__row" key={`payment-${item.id}`}>
           <div>
             <strong>
