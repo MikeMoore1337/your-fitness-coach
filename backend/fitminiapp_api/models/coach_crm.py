@@ -161,7 +161,7 @@ class CoachPackage(Base):
     __tablename__ = "coach_packages"
     __table_args__ = (
         CheckConstraint(
-            "counts_sessions = 0 OR included_sessions IS NOT NULL",
+            "NOT counts_sessions OR included_sessions IS NOT NULL",
             name="ck_coach_packages_count_requires_total",
         ),
         CheckConstraint(

@@ -69,7 +69,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.CheckConstraint(
-            "counts_sessions = 0 OR included_sessions IS NOT NULL",
+            "NOT counts_sessions OR included_sessions IS NOT NULL",
             name="ck_coach_packages_count_requires_total",
         ),
         sa.CheckConstraint(
