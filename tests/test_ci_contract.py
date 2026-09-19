@@ -244,14 +244,15 @@ def test_allure_dependencies_are_scheduled_only() -> None:
     assert "ALLURE_RESULTS_DIR:" in workflow[python_job_start:python_steps_start]
 
 
-def test_workflow_keeps_four_way_smoke_and_python_shards_independent() -> None:
+def test_workflow_keeps_frontend_five_way_and_python_four_way_shards_independent() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
-    assert "name: Frontend smoke (${{ matrix.shard }}/4)" in workflow
+    assert "name: Frontend smoke (${{ matrix.shard }}/5)" in workflow
     assert "name: Python tests (${{ matrix.shard }}/4)" in workflow
-    assert workflow.count("        shard: [1, 2, 3, 4]") == 2
-    assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/4"' in workflow
+    assert "        shard: [1, 2, 3, 4, 5]" in workflow
+    assert "        shard: [1, 2, 3, 4]" in workflow
+    assert 'run-group frontend-e2e --shard "${{ matrix.shard }}/5"' in workflow
     assert 'run-group python-tests --shard "${{ matrix.shard }}/4"' in workflow
     assert workflow.count("          path: ~/.cache/ms-playwright") == 5
     assert (
@@ -261,7 +262,7 @@ def test_workflow_keeps_four_way_smoke_and_python_shards_independent() -> None:
         == 2
     )
     assert (
-        "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/4)\n    needs: scope-router\n    if:"
+        "  frontend-smoke:\n    name: Frontend smoke (${{ matrix.shard }}/5)\n    needs: scope-router\n    if:"
         in workflow
     )
     assert (
@@ -279,6 +280,20 @@ def test_workflow_keeps_four_way_smoke_and_python_shards_independent() -> None:
         in workflow
     )
 
+
+def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None:
+    payload = ci_contract.contract_payload()
+
+    assert payload["sharding"]["frontend-e2e"] == {
+        "count": ci_contract.FRONTEND_E2E_SHARD_COUNT,
+        "strategy": "playwright",
+    }
+    assert payload["sharding"]["python-tests"] == {
+        "count": ci_contract.PYTHON_TEST_SHARD_COUNT,
+        "strategy": "pytest-node-round-robin",
+    }
+    assert ci_contract.FRONTEND_E2E_SHARD_COUNT == 5
+    assert ci_contract.PYTHON_TEST_SHARD_COUNT == 4
 
 def test_cross_stack_profile_includes_delivery_policy_gates() -> None:
     groups = set(ci_contract.PROFILE_GROUPS["cross-stack"])
