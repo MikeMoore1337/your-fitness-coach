@@ -120,8 +120,9 @@ def test_docker_cleanup_never_prunes_volumes(monkeypatch) -> None:
     monkeypatch.setattr(
         cleanup.subprocess,
         "run",
-        lambda command, check=False: commands.append(command)
-        or type("Result", (), {"returncode": 0})(),
+        lambda command, check=False: (
+            commands.append(command) or type("Result", (), {"returncode": 0})()
+        ),
     )
     report = cleanup.CleanupReport()
 
