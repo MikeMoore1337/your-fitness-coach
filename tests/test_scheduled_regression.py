@@ -109,6 +109,26 @@ def test_schedule_contract_resolves_daily_weekly_and_rejects_unknown_cron() -> N
         scheduled_regression.resolve_run_kind("schedule", schedule_cron="0 0 * * *")
 
 
+
+def test_scheduled_report_bundle_topology_matches_ci_shard_counts() -> None:
+    daily = scheduled_regression.report_bundles("daily")
+    weekly = scheduled_regression.report_bundles("weekly")
+
+    for bundles in (daily, weekly):
+        frontend = [browser for suite, browser in bundles if suite == "frontend-e2e"]
+        python = [browser for suite, browser in bundles if suite == "python-tests"]
+        assert frontend == [
+            f"chromium-shard-{shard}"
+            for shard in range(1, scheduled_regression.FRONTEND_E2E_SHARD_COUNT + 1)
+        ]
+        assert python == [
+            f"python-shard-{shard}"
+            for shard in range(1, scheduled_regression.PYTHON_TEST_SHARD_COUNT + 1)
+        ]
+
+    assert scheduled_regression.FRONTEND_E2E_SHARD_COUNT == 5
+    assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 5
+
 def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> None:
     root = Path(__file__).parents[1]
     compose = (root / "docker-compose.yml").read_text(encoding="utf-8")
@@ -581,12 +601,12 @@ def test_aggregate_results_merges_current_run_and_adds_allowlisted_metadata(tmp_
     assert metadata["expected_bundles"] == expected_bundles
     assert metadata["present_bundles"] == expected_bundles
     assert metadata["counts"] == {
-        "passed": 11,
+        "passed": 13,
         "failed": 0,
         "broken": 0,
         "skipped": 0,
         "unknown": 0,
-        "total": 11,
+        "total": 13,
     }
     environment = (tmp_path / "merged" / "environment.properties").read_text(encoding="utf-8")
     assert "allure.report.kind=daily" in environment
