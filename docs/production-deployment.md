@@ -163,6 +163,16 @@ immutable images, создаёт свежий локальный dump и зап�
 запускает новый backend и проверяет его, затем запускает единственных worker/bot и записывает
 успешную revision.
 
+После успешного rollout workflow атомарно обновляет `current` и запускает
+`scripts/production_host_cleanup.py` под тем же production host lock. Cleanup сначала проверяет,
+что `current` указывает ровно на deployed SHA и что его `.deployment-sha` совпадает. Затем он
+оставляет пять последних штатных `fitminiapp-*.dump`, текущий release и два предыдущих корректных
+immutable release, удаляет staging-каталоги и deployment bundles старше 24 часов и выполняет только
+`docker image prune -a` и `docker builder prune -a`. Docker volumes, PostgreSQL data,
+`pre-restore-*.dump`, env backups, deployment/recovery evidence и неизвестные/symlink targets не
+удаляются. Cleanup пишет свободное место до/после и warning при остатке менее 3 GiB. Следующий
+single-slot rollout по-прежнему fail-closed при менее 2 GiB до скачивания candidate images.
+
 Соединение production host с GHCR защищено ограниченным retry до остановки приложения: login и
 скачивание images выполняют не более пяти попыток с возрастающей задержкой. Исчерпание попыток
 остаётся fail-closed и не переводит rollout к maintenance stop; token и содержимое временного

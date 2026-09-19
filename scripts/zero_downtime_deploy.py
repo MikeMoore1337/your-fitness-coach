@@ -437,6 +437,11 @@ def _single_slot_capacity() -> dict[str, int]:
         "memory_available_mb": 64,
         "disk_available_mb": 2048,
     }
+    if report["disk_available_mb"] < 3072:
+        print(
+            "WARNING: production free disk is below 3072 MiB before single-slot rollout",
+            file=sys.stderr,
+        )
     missing = {
         key: (report[key], required) for key, required in minimums.items() if report[key] < required
     }
