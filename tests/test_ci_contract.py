@@ -295,6 +295,7 @@ def test_contract_exposes_independent_frontend_and_python_shard_counts() -> None
     assert ci_contract.FRONTEND_E2E_SHARD_COUNT == 5
     assert ci_contract.PYTHON_TEST_SHARD_COUNT == 4
 
+
 def test_cross_stack_profile_includes_delivery_policy_gates() -> None:
     groups = set(ci_contract.PROFILE_GROUPS["cross-stack"])
     assert {"policy", "workflow-config", "deployment-contract"} <= groups
