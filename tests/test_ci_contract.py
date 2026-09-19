@@ -536,6 +536,25 @@ def test_push_route_keeps_merge_provenance_and_container_delivery() -> None:
     assert decision["outputs"]["run_containers"] is True
 
 
+def test_post_merge_container_gate_allows_intentional_skipped_quality() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    container_start = workflow.index("  containers:")
+    container_end = workflow.index("\n  scheduled-report:", container_start)
+    container_job = workflow[container_start:container_end]
+    audit_start = workflow.index("  dependency-audit:")
+    audit_end = workflow.index("\n  critical-smoke:", audit_start)
+    audit_job = workflow[audit_start:audit_end]
+
+    for job in (container_job, audit_job):
+        assert "needs: [scope-router, quality]" in job
+        assert "always()" in job
+        assert "github.event_name == 'push' && needs.quality.result == 'skipped'" in job
+        assert "needs.quality.result == 'success'" in job
+
+    assert "needs.scope-router.outputs.run_containers == 'true'" in container_job
+
+
 def test_expected_result_set_rejects_missing_or_skipped_required_jobs() -> None:
     expected = ["scope-router", "quality"]
     ci_contract.verify_results(expected, {"scope-router": "success", "quality": "success"})
