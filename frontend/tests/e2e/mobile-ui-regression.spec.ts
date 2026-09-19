@@ -212,6 +212,42 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   });
 });
 
+test('@critical active workout keeps the current set primary across mobile widths', async ({
+  page,
+}) => {
+  await preparePage(page, 'dark', 'browser', { workoutStatus: 'in_progress' });
+
+  for (const viewport of MOBILE_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await page.goto('/app?section=today');
+    await waitForSurface(page, 'today');
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+    const currentSet = page.locator('.active-workout-set.is-current');
+    const currentSetDone = currentSet.locator('.active-workout-set__done');
+    await expect(currentSet).toBeVisible();
+    await expect(currentSet).toContainText(/Подход \d+ из \d+/);
+    await expect(currentSet).toContainText(/(?:повторений|Повторы по плану)/);
+    await expect(currentSet).toContainText(/Отдых \d+ с/);
+    await expect(currentSetDone).toBeVisible();
+    await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
+    await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
+    await assertMobileShellGeometry(page);
+
+    const reps = currentSet.getByRole('spinbutton', { name: /Повторы, .*подход 1/ });
+    await reps.focus();
+    await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
+    await expect(page.locator('#appBottomNav')).toBeHidden();
+    await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
+
+    await page.screenshot({
+      path: test.info().outputPath(`active-workout-${viewport.width}x${viewport.height}-dark.png`),
+      fullPage: true,
+    });
+    await reps.evaluate((element) => (element as HTMLElement).blur());
+  }
+});
+
 test('@critical mocked TMA preserves safe areas, lifecycle and Today geometry', async ({
   page,
 }) => {

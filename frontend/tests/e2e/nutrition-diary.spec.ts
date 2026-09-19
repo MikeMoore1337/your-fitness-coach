@@ -980,6 +980,9 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(search).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
   await expect(page.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Избранное' })).not.toBeVisible();
+  await page.getByText('Каталог и фильтры', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Избранное' })).toBeVisible();
   await page.getByText('Другие способы добавления').click();
   await expect(page.getByRole('button', { name: 'Рецепты' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);

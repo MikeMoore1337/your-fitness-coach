@@ -2124,6 +2124,8 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   await tmaPage.getByRole('button', { name: 'Добавить в дневник' }).click();
   await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
+  await expect(tmaPage.getByRole('button', { name: 'Избранное' })).not.toBeVisible();
+  await tmaPage.getByText('Каталог и фильтры', { exact: true }).click();
   await tmaPage.getByRole('button', { name: 'Избранное' }).click();
   await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
   await tmaPage.getByText('Другие способы добавления', { exact: true }).click();

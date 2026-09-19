@@ -7706,6 +7706,13 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   color: var(--text);
   text-align: left;
 }
+.nutrition-food-result__select-label {
+  flex: 0 0 auto;
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
 .nutrition-food-result:hover,
 .nutrition-food-result:focus-within {
   border-color: var(--accent-line);
@@ -7796,6 +7803,15 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 .nutrition-picker__serving-hint {
   margin-top: -7px;
 }
+.nutrition-picker__primary-path-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.nutrition-picker__primary-path-actions .ui-button {
+  min-width: 0;
+  padding-inline: 10px;
+}
 .nutrition-picker__tools {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -7825,6 +7841,26 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 }
 .nutrition-picker__secondary-tools .nutrition-picker__tools {
   padding: 0 10px 10px;
+}
+.nutrition-picker__catalog-filters {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-subtle);
+}
+.nutrition-picker__catalog-filters > summary {
+  min-height: 42px;
+  padding: 12px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.nutrition-picker__catalog-filters > summary:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+.nutrition-picker__catalog-filters .nutrition-picker__tabs {
+  margin: 0 10px 10px;
 }
 .nutrition-provider-fallback,
 .nutrition-barcode__found {
@@ -9013,6 +9049,11 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   }
   .nutrition-picker__tools {
     grid-template-columns: 1fr;
+  }
+  .nutrition-picker__primary-path-actions .ui-button {
+    min-height: 48px;
+    padding-inline: 6px;
+    font-size: 0.78rem;
   }
   .nutrition-picker__tools .ui-button {
     justify-content: flex-start;

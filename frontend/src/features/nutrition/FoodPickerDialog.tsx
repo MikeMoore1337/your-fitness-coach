@@ -267,6 +267,7 @@ function FoodResults({
                 {foodBasisLabel(food)}
               </span>
             </span>
+            <span className="nutrition-food-result__select-label">Выбрать</span>
             <Badge>{foodSourceLabel(food)}</Badge>
           </button>
           {allowManage && (
@@ -1188,33 +1189,6 @@ export function FoodPickerDialog({
           </div>
         ) : (
           <div className="nutrition-picker__browse">
-            {!demoSafeMode && (
-              <>
-                <Button
-                  id="nutrition-label-scan-entry"
-                  fullWidth
-                  type="button"
-                  onClick={() => {
-                    trackProductEvent({
-                      name: 'nutrition_food_add_path_selected',
-                      surface: productEventSurface(),
-                      path: 'photo',
-                    });
-                    setEntryMethod('label_scan');
-                    setScanBarcode('');
-                    setView('label-scan');
-                  }}
-                >
-                  По фото этикетки
-                </Button>
-              </>
-            )}
-            {demoSafeMode && (
-              <p className="muted demo-capability-notice" role="status">
-                В демо доступны поиск, подготовленный каталог и быстрый ввод. Фото этикетки, ручное
-                сохранение и внешние каталоги доступны после входа.
-              </p>
-            )}
             <Field
               label="Найти продукт"
               labelFor="nutrition-food-search"
@@ -1242,23 +1216,50 @@ export function FoodPickerDialog({
               />
             </Field>
             {!demoSafeMode && (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  trackProductEvent({
-                    name: 'nutrition_food_add_path_selected',
-                    surface: productEventSurface(),
-                    path: 'manual',
-                  });
-                  setEntryMethod('custom');
-                  setEditingFood(undefined);
-                  setEditorBarcode('');
-                  setView('food-editor');
-                }}
-              >
-                <Icon name="plus" size={16} /> Ввести вручную
-              </Button>
+              <div className="nutrition-picker__primary-path-actions">
+                <Button
+                  id="nutrition-label-scan-entry"
+                  fullWidth
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    trackProductEvent({
+                      name: 'nutrition_food_add_path_selected',
+                      surface: productEventSurface(),
+                      path: 'photo',
+                    });
+                    setEntryMethod('label_scan');
+                    setScanBarcode('');
+                    setView('label-scan');
+                  }}
+                >
+                  По фото этикетки
+                </Button>
+                <Button
+                  fullWidth
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    trackProductEvent({
+                      name: 'nutrition_food_add_path_selected',
+                      surface: productEventSurface(),
+                      path: 'manual',
+                    });
+                    setEntryMethod('custom');
+                    setEditingFood(undefined);
+                    setEditorBarcode('');
+                    setView('food-editor');
+                  }}
+                >
+                  <Icon name="plus" size={16} /> Ввести вручную
+                </Button>
+              </div>
+            )}
+            {demoSafeMode && (
+              <p className="muted demo-capability-notice" role="status">
+                В демо доступны поиск, подготовленный каталог и быстрый ввод. Фото этикетки, ручное
+                сохранение и внешние каталоги доступны после входа.
+              </p>
             )}
             <details className="nutrition-picker__secondary-tools">
               <summary>Другие способы добавления</summary>
@@ -1316,52 +1317,55 @@ export function FoodPickerDialog({
               </div>
             </details>
             {searchQuery.length < 2 && (
-              <div className="nutrition-picker__tabs" aria-label="Быстрое добавление">
-                <button
-                  type="button"
-                  className={source === 'mine' ? 'is-active' : ''}
-                  aria-pressed={source === 'mine'}
-                  onClick={() => {
-                    setEntryMethod('personal');
-                    setSource('mine');
-                  }}
-                >
-                  Мои продукты
-                </button>
-                <button
-                  type="button"
-                  className={source === 'frequent' ? 'is-active' : ''}
-                  aria-pressed={source === 'frequent'}
-                  onClick={() => {
-                    setEntryMethod('frequent');
-                    setSource('frequent');
-                  }}
-                >
-                  Частые
-                </button>
-                <button
-                  type="button"
-                  className={source === 'recent' ? 'is-active' : ''}
-                  aria-pressed={source === 'recent'}
-                  onClick={() => {
-                    setEntryMethod('recent');
-                    setSource('recent');
-                  }}
-                >
-                  Недавние
-                </button>
-                <button
-                  type="button"
-                  className={source === 'favorites' ? 'is-active' : ''}
-                  aria-pressed={source === 'favorites'}
-                  onClick={() => {
-                    setEntryMethod('favorite');
-                    setSource('favorites');
-                  }}
-                >
-                  Избранное
-                </button>
-              </div>
+              <details className="nutrition-picker__catalog-filters">
+                <summary>Каталог и фильтры</summary>
+                <div className="nutrition-picker__tabs" aria-label="Быстрое добавление">
+                  <button
+                    type="button"
+                    className={source === 'mine' ? 'is-active' : ''}
+                    aria-pressed={source === 'mine'}
+                    onClick={() => {
+                      setEntryMethod('personal');
+                      setSource('mine');
+                    }}
+                  >
+                    Мои продукты
+                  </button>
+                  <button
+                    type="button"
+                    className={source === 'frequent' ? 'is-active' : ''}
+                    aria-pressed={source === 'frequent'}
+                    onClick={() => {
+                      setEntryMethod('frequent');
+                      setSource('frequent');
+                    }}
+                  >
+                    Частые
+                  </button>
+                  <button
+                    type="button"
+                    className={source === 'recent' ? 'is-active' : ''}
+                    aria-pressed={source === 'recent'}
+                    onClick={() => {
+                      setEntryMethod('recent');
+                      setSource('recent');
+                    }}
+                  >
+                    Недавние
+                  </button>
+                  <button
+                    type="button"
+                    className={source === 'favorites' ? 'is-active' : ''}
+                    aria-pressed={source === 'favorites'}
+                    onClick={() => {
+                      setEntryMethod('favorite');
+                      setSource('favorites');
+                    }}
+                  >
+                    Избранное
+                  </button>
+                </div>
+              </details>
             )}
             {activeLoading && <LoadingState label="Ищем продукты…" />}
             {activeError && (
