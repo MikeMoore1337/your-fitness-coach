@@ -150,9 +150,7 @@ def _prune_releases(
         report.removed_releases.append(str(release))
 
 
-def _prune_staging(
-    releases_root: Path, report: CleanupReport, *, stale_before: float
-) -> None:
+def _prune_staging(releases_root: Path, report: CleanupReport, *, stale_before: float) -> None:
     for item in releases_root.iterdir():
         if not item.name.startswith(".staging-"):
             continue
