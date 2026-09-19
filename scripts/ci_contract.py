@@ -32,7 +32,8 @@ else:
 
 CONTRACT_VERSION = "ci-contract-v2"
 ROUTER_VERSION = "ci-router-v2"
-CI_SHARD_COUNT = 4
+FRONTEND_E2E_SHARD_COUNT = 5
+PYTHON_TEST_SHARD_COUNT = 4
 SHARDABLE_GROUPS = frozenset({"frontend-e2e", "python-tests"})
 SHARD_RE = re.compile(r"(?P<number>[1-9][0-9]*)/(?P<count>[1-9][0-9]*)\Z")
 
@@ -1147,9 +1148,9 @@ def contract_payload() -> dict[str, object]:
         },
         "profiles": {name: list(groups) for name, groups in sorted(PROFILE_GROUPS.items())},
         "sharding": {
-            "frontend-e2e": {"count": CI_SHARD_COUNT, "strategy": "playwright"},
+            "frontend-e2e": {"count": FRONTEND_E2E_SHARD_COUNT, "strategy": "playwright"},
             "python-tests": {
-                "count": CI_SHARD_COUNT,
+                "count": PYTHON_TEST_SHARD_COUNT,
                 "strategy": "pytest-node-round-robin",
             },
         },
