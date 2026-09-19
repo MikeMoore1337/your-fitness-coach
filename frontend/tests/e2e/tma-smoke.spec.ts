@@ -1229,7 +1229,11 @@ test('direct Trainer activation keeps client context focused in mocked TMA', asy
   await tmaPage.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await tmaPage.getByRole('link', { name: 'Кабинет тренера' }).click();
   await expect(tmaPage).toHaveURL('/coach');
-  await expect(tmaPage.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
+  await expect(tmaPage.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await tmaPage
+    .getByRole('navigation', { name: 'Разделы тренера' })
+    .getByRole('button', { name: 'Клиенты', exact: true })
+    .click();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
 
   await tmaPage.getByRole('button', { name: /Анна Петрова/ }).click();
