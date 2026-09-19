@@ -751,8 +751,9 @@ test('Task 291 показывает action-first Today и ленивый кон�
   await captureTask291Evidence(page, 'client-timeline-mobile-light');
 
   await clientQuickActions.getByRole('link', { name: 'Отчёт' }).click();
-  await expect(page.getByTestId('coach-report-entry')).toBeVisible();
-  await expect(page.getByText('Комментарий клиента')).toBeVisible();
+  const coachReportEntry = page.getByTestId('coach-report-entry');
+  await expect(coachReportEntry).toBeVisible();
+  await expect(coachReportEntry.getByText('Комментарий клиента')).toBeVisible();
   await expect(
     page.getByText('В целом стало легче держать план, спасибо за обратную связь.'),
   ).toBeVisible();
