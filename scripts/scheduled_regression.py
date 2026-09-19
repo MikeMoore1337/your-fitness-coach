@@ -21,6 +21,8 @@ WEEKLY_RETENTION_DAYS: Final = 35
 RAW_RESULTS_RETENTION_DAYS: Final = 3
 MAX_BUNDLE_BYTES: Final = 50 * 1024 * 1024
 MAX_REPORT_BYTES: Final = 100 * 1024 * 1024
+FRONTEND_E2E_SHARD_COUNT: Final = 5
+PYTHON_TEST_SHARD_COUNT: Final = 5
 
 RUN_KINDS: tuple[str, ...] = ("daily", "weekly")
 PROFILE_BY_RUN_KIND: Mapping[str, str] = {
@@ -48,33 +50,34 @@ REPORT_SUITES_BY_RUN_KIND: Mapping[str, tuple[str, ...]] = {
 REPORT_BUNDLES_BY_RUN_KIND: Mapping[str, tuple[tuple[str, str], ...]] = {
     "daily": (
         ("frontend-checks", "node-unit"),
-        ("frontend-e2e", "chromium-shard-1"),
-        ("frontend-e2e", "chromium-shard-2"),
-        ("frontend-e2e", "chromium-shard-3"),
-        ("frontend-e2e", "chromium-shard-4"),
+        *tuple(
+            ("frontend-e2e", f"chromium-shard-{shard}")
+            for shard in range(1, FRONTEND_E2E_SHARD_COUNT + 1)
+        ),
         ("frontend-mobile-regression", "mobile-chromium-webkit"),
-        ("python-tests", "python-shard-1"),
-        ("python-tests", "python-shard-2"),
-        ("python-tests", "python-shard-3"),
-        ("python-tests", "python-shard-4"),
+        *tuple(
+            ("python-tests", f"python-shard-{shard}")
+            for shard in range(1, PYTHON_TEST_SHARD_COUNT + 1)
+        ),
         ("migrated-stack", "chromium-api"),
     ),
     "weekly": (
         ("frontend-checks", "node-unit"),
-        ("frontend-e2e", "chromium-shard-1"),
-        ("frontend-e2e", "chromium-shard-2"),
-        ("frontend-e2e", "chromium-shard-3"),
-        ("frontend-e2e", "chromium-shard-4"),
+        *tuple(
+            ("frontend-e2e", f"chromium-shard-{shard}")
+            for shard in range(1, FRONTEND_E2E_SHARD_COUNT + 1)
+        ),
         ("frontend-mobile-regression", "mobile-chromium-webkit"),
         ("frontend-mobile-regression-extended", "mobile-firefox-webkit"),
         ("frontend-cross-browser", "chromium-firefox-webkit"),
-        ("python-tests", "python-shard-1"),
-        ("python-tests", "python-shard-2"),
-        ("python-tests", "python-shard-3"),
-        ("python-tests", "python-shard-4"),
+        *tuple(
+            ("python-tests", f"python-shard-{shard}")
+            for shard in range(1, PYTHON_TEST_SHARD_COUNT + 1)
+        ),
         ("migrated-stack", "chromium-api"),
     ),
 }
+
 REPORT_JOB_BY_SUITE: Mapping[str, str] = {
     "frontend-checks": "frontend",
     "frontend-e2e": "frontend-smoke",

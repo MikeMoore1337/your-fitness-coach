@@ -23,16 +23,23 @@ from pathlib import Path
 
 if __package__:
     from scripts.scheduled_regression import (
+        FRONTEND_E2E_SHARD_COUNT,
+        PYTHON_TEST_SHARD_COUNT,
         profile_for_run_kind,
         report_suites,
         resolve_run_kind,
     )
 else:
-    from scheduled_regression import profile_for_run_kind, report_suites, resolve_run_kind
+    from scheduled_regression import (
+        FRONTEND_E2E_SHARD_COUNT,
+        PYTHON_TEST_SHARD_COUNT,
+        profile_for_run_kind,
+        report_suites,
+        resolve_run_kind,
+    )
 
 CONTRACT_VERSION = "ci-contract-v2"
 ROUTER_VERSION = "ci-router-v2"
-CI_SHARD_COUNT = 4
 SHARDABLE_GROUPS = frozenset({"frontend-e2e", "python-tests"})
 SHARD_RE = re.compile(r"(?P<number>[1-9][0-9]*)/(?P<count>[1-9][0-9]*)\Z")
 
@@ -120,7 +127,6 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "auto",
                 cwd="frontend",
             ),
-            _cmd("frontend-unit", "npm", "run", "test", cwd="frontend"),
             _cmd("frontend-build", "npx", "vite", "build", cwd="frontend"),
             _cmd(
                 "frontend-ui-audit-pr",
@@ -136,6 +142,11 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
             "frontend/playwright.config.ts",
             "frontend/tests/e2e/ui-quality-gate.spec.ts",
         ),
+    ),
+    "frontend-unit": GroupSpec(
+        name="frontend-unit",
+        commands=(_cmd("frontend-unit", "npm", "run", "test", cwd="frontend"),),
+        prerequisites=("npm", "frontend/node_modules"),
     ),
     "frontend-e2e": GroupSpec(
         name="frontend-e2e",
@@ -440,6 +451,7 @@ PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
     "frontend": (
         "quality",
         "frontend-checks",
+        "frontend-unit",
         "frontend-e2e",
         "frontend-mobile-regression",
         "critical-smoke",
@@ -457,6 +469,7 @@ PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
     "cross-stack": (
         "quality",
         "frontend-checks",
+        "frontend-unit",
         "frontend-e2e",
         "frontend-mobile-regression",
         "python-tests",
@@ -482,6 +495,7 @@ PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
 PROFILE_GROUPS["daily-regression"] = (
     "quality",
     "frontend-checks",
+    "frontend-unit",
     "frontend-e2e",
     "frontend-mobile-regression",
     "python-tests",
@@ -506,6 +520,7 @@ GROUP_TO_JOB: dict[str, str] = {
     "policy": "policy",
     "external-skill-security": "policy",
     "frontend-checks": "frontend",
+    "frontend-unit": "frontend",
     "frontend-e2e": "frontend-smoke",
     "frontend-mobile-regression": "frontend-mobile-regression",
     "frontend-mobile-regression-extended": "frontend-mobile-regression-extended",
@@ -1147,9 +1162,9 @@ def contract_payload() -> dict[str, object]:
         },
         "profiles": {name: list(groups) for name, groups in sorted(PROFILE_GROUPS.items())},
         "sharding": {
-            "frontend-e2e": {"count": CI_SHARD_COUNT, "strategy": "playwright"},
+            "frontend-e2e": {"count": FRONTEND_E2E_SHARD_COUNT, "strategy": "playwright"},
             "python-tests": {
-                "count": CI_SHARD_COUNT,
+                "count": PYTHON_TEST_SHARD_COUNT,
                 "strategy": "pytest-node-round-robin",
             },
         },
@@ -1363,7 +1378,7 @@ def _local_command(command: CommandSpec, *, group: str, env: Mapping[str, str]) 
 
     # Four parallel TestClient processes can exhaust Windows' ephemeral socket
     # pool. Keep one isolated xdist process locally; GitHub PostgreSQL CI keeps
-    # its four-way command and sharding unchanged.
+    # its four-worker command and external CI sharding unchanged.
     argv = list(command.argv)
     worker_option = argv.index("-n")
     argv[worker_option + 1] = "1"
