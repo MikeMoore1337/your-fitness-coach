@@ -42,6 +42,18 @@ def test_crm_sessions_are_separate_from_workouts_and_package_ledger_is_traceable
     coach_headers = _auth(client, 29_201, is_coach=True)
     client_headers = _auth(client, 29_202)
     _coach_id, client_id = _link(29_201, 29_202)
+    with get_session_context() as db:
+        db.query(CoachClient).filter(
+            CoachClient.coach_user_id == _coach_id,
+            CoachClient.client_user_id == client_id,
+        ).update({CoachClient.operational_status: None})
+
+    roster = client.get("/api/v1/coach/clients", headers=coach_headers)
+    assert roster.status_code == 200, roster.text
+    assert (
+        next(row for row in roster.json() if row["id"] == client_id)["operational_status"]
+        == "active"
+    )
 
     package = client.post(
         "/api/v1/coach/packages",
@@ -257,6 +269,7 @@ def test_crm_sessions_are_separate_from_workouts_and_package_ledger_is_traceable
 
     export = client.get("/api/v1/me/export", headers=coach_headers)
     assert export.status_code == 200, export.text
+    assert export.json()["coaching_relationships"][0]["operational_status"] == "active"
     assert export.json()["coach_business_sessions"]
     assert export.json()["coach_package_ledger"]
     assert export.json()["coach_payments"]
