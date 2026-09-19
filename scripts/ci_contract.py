@@ -23,17 +23,23 @@ from pathlib import Path
 
 if __package__:
     from scripts.scheduled_regression import (
+        FRONTEND_E2E_SHARD_COUNT,
+        PYTHON_TEST_SHARD_COUNT,
         profile_for_run_kind,
         report_suites,
         resolve_run_kind,
     )
 else:
-    from scheduled_regression import profile_for_run_kind, report_suites, resolve_run_kind
+    from scheduled_regression import (
+        FRONTEND_E2E_SHARD_COUNT,
+        PYTHON_TEST_SHARD_COUNT,
+        profile_for_run_kind,
+        report_suites,
+        resolve_run_kind,
+    )
 
 CONTRACT_VERSION = "ci-contract-v2"
 ROUTER_VERSION = "ci-router-v2"
-FRONTEND_E2E_SHARD_COUNT = 5
-PYTHON_TEST_SHARD_COUNT = 5
 SHARDABLE_GROUPS = frozenset({"frontend-e2e", "python-tests"})
 SHARD_RE = re.compile(r"(?P<number>[1-9][0-9]*)/(?P<count>[1-9][0-9]*)\Z")
 
