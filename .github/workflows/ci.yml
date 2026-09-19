@@ -726,8 +726,8 @@ jobs:
 
   dependency-audit:
     name: Dependency audit
-    needs: scope-router
-    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_dependency_audit == 'true'
+    needs: [scope-router, quality]
+    if: needs.scope-router.result == 'success' && needs.quality.result == 'success' && needs.scope-router.outputs.run_dependency_audit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -814,8 +814,8 @@ jobs:
 
   containers:
     name: Container (${{ matrix.image }})
-    needs: scope-router
-    if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_containers == 'true'
+    needs: [scope-router, quality]
+    if: needs.scope-router.result == 'success' && needs.quality.result == 'success' && needs.scope-router.outputs.run_containers == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
