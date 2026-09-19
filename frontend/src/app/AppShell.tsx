@@ -290,11 +290,10 @@ export function AppShell({
       return;
     }
 
-    const mobileViewport = window.matchMedia('(max-width: 899px)');
     const syncNavigationHeight = () => {
       root.style.setProperty(
         '--app-bottom-nav-height',
-        mobileViewport.matches ? `${navigation.getBoundingClientRect().height}px` : '0px',
+        mobileNavigationMatches() ? `${navigation.getBoundingClientRect().height}px` : '0px',
       );
     };
 
