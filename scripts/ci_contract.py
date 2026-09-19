@@ -857,9 +857,11 @@ def classify_scope(paths: Sequence[str]) -> dict[str, object]:
         groups.append("container-contract")
     if container_security and "container-contract" not in groups:
         groups.append("container-contract")
-    if any(path.startswith(_SKILL_PREFIX) for path in normalized):
-        if "external-skill-security" not in groups:
-            groups.append("external-skill-security")
+    if (
+        any(path.startswith(_SKILL_PREFIX) for path in normalized)
+        and "external-skill-security" not in groups
+    ):
+        groups.append("external-skill-security")
     return _decision_for_groups(
         profile=profile,
         paths=normalized,
