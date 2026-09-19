@@ -296,4 +296,12 @@ jobs:
              bash scripts/deploy_production.sh '$DEPLOY_SHA' '$PROD_URL' '$PROD_PUBLIC_URL' '$PROD_ROLLOUT_MODE'
              install -m 600 \"\$RELEASE_PATH/.env\" '$PROD_PATH/.env'
              ln -sfn \"\$RELEASE_PATH\" '$PROD_PATH/current'
+             python3 \"\$RELEASE_PATH/scripts/production_host_cleanup.py\" '$DEPLOY_SHA' \
+               --app-root '$PROD_PATH' \
+               --backup-keep 5 \
+               --previous-releases 2 \
+               --tmp-root /tmp \
+               --warning-free-mb 3072 \
+               --stale-ttl-hours 24 \
+               --docker-prune
              rm -f '/tmp/$BUNDLE_NAME'"
