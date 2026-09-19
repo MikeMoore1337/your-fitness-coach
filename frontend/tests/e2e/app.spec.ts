@@ -1,8 +1,15 @@
+import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 
 type AppDestination = 'Сегодня' | 'План' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
+const TASK_293_EVIDENCE_DIR = process.env.TASK_293_EVIDENCE_DIR;
+
+async function captureTask293Evidence(page: Page, fileName: string): Promise<void> {
+  if (!TASK_293_EVIDENCE_DIR) return;
+  await page.screenshot({ path: path.resolve(TASK_293_EVIDENCE_DIR, fileName), fullPage: true });
+}
 
 async function openAppDestination(page: Page, destination: AppDestination) {
   const mainNavigation = page.getByRole('navigation', { name: 'Основная навигация' });
@@ -195,6 +202,31 @@ test('лендинг остаётся адаптивным на контроль
   }
 });
 
+test('лендинг сохраняет content-driven высоту блока каждого подхода', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+
+    const metrics = await page.locator('.strength-scene').evaluate((scene) => {
+      const sticky = scene.querySelector<HTMLElement>('.strength-scene__sticky');
+      if (!sticky) throw new Error('Strength scene content is missing');
+      return {
+        sceneHeight: scene.getBoundingClientRect().height,
+        stickyHeight: sticky.getBoundingClientRect().height,
+        position: getComputedStyle(sticky).position,
+      };
+    });
+
+    expect(metrics.position).toBe('relative');
+    expect(metrics.sceneHeight - metrics.stickyHeight).toBeLessThanOrEqual(1);
+    expect(metrics.sceneHeight).toBeLessThan(viewport.height);
+  }
+});
+
 test('лендинг доступен с клавиатуры и содержит метаданные', async ({ page }) => {
   await page.goto('/');
 
@@ -227,7 +259,9 @@ test('блок возможностей показывает пользу спо
 
     await expect(page.getByRole('heading', { name: /питание без догадок/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /замечай своё движение/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /тренер рядом с планом/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /для тренера — отдельный рабочий ритм/i }),
+    ).toBeVisible();
     await expect(page.locator('.landing-feature')).toHaveCount(2);
     if (viewport.width <= 430) {
       const compactTextLinks = page.locator('.landing-brand, .landing-footer a');
@@ -277,11 +311,13 @@ test('сценарии спортсмена и тренера ведут в ве
     await expect(page.locator('.landing-practice')).toBeVisible();
     await expect(page.locator('.landing-trainer')).toBeVisible();
     await expect(page.getByText(/попробуй сам/i)).toBeVisible();
-    await expect(page.getByRole('heading', { name: /тренер рядом с планом/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /для тренера — отдельный рабочий ритм/i }),
+    ).toBeVisible();
     await expect(
       page.locator('.landing-footer').getByRole('link', { name: 'Тренировки', exact: true }),
     ).toHaveAttribute('href', '/training');
-    await expect(page.getByRole('link', { name: /посмотреть кабинет тренера/i })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: /открыть путь для тренера/i })).toHaveAttribute(
       'href',
       '/for-trainers',
     );
@@ -2293,6 +2329,31 @@ test('training preferences сохраняют Mobile Web/TMA композици�
   }
 });
 
+test('Task 293 trainer onboarding offers invite-or-skip after activation', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 1050 });
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await mockApi(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await openAppDestination(page, 'Профиль');
+  await openCard(page, 'Тренер и приглашения');
+
+  const trainerCard = page
+    .getByRole('heading', { name: 'Режим тренера', exact: true })
+    .locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " card ")][1]');
+  const terms = page.getByRole('checkbox', { name: /принимаю условия/i });
+  await terms.check();
+  await page.getByRole('button', { name: 'Включить режим тренера' }).click();
+  await expect(trainerCard.getByText('Режим тренера включён')).toBeVisible();
+  await expect(
+    trainerCard.getByRole('link', { name: 'Пропустить и открыть Coach Today' }),
+  ).toHaveAttribute('href', '/coach');
+  await captureTask293Evidence(page, 'trainer-onboarding-mobile.png');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await captureTask293Evidence(page, 'trainer-onboarding-desktop.png');
+});
+
 test('пользователь напрямую включает режим тренера из профиля', async ({ browser }) => {
   const page = await browser.newPage({
     colorScheme: 'light',
@@ -2369,6 +2430,7 @@ test('пользователь напрямую включает режим тр
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await openAppDestination(page, 'Профиль');
   await openCard(page, 'Тренер и приглашения');
   await modeSwitch.getByRole('link', { name: 'Клиенты' }).click();
   await page

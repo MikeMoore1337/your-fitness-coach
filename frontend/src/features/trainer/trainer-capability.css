@@ -81,6 +81,54 @@
   gap: var(--v2-space-2, 8px);
 }
 
+.trainer-capability__onboarding {
+  display: grid;
+  gap: var(--v2-space-3, 12px);
+  padding: var(--v2-space-4, 18px);
+  border: 1px solid var(--v2-border);
+  border-left: 3px solid var(--v2-lime);
+  background: var(--v2-surface-secondary);
+}
+
+.trainer-capability__onboarding h3 {
+  margin: 6px 0 0;
+}
+
+.trainer-capability__onboarding p {
+  max-width: 680px;
+  margin: 8px 0 0;
+  color: var(--v2-text-secondary);
+}
+
+.trainer-capability__onboarding-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2, 8px);
+}
+
+.trainer-capability__onboarding-actions a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--radius-action);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.trainer-capability__onboarding-primary {
+  border-color: transparent !important;
+  background: var(--v2-lime);
+  color: var(--v2-on-lime);
+}
+
+.trainer-capability__onboarding-secondary {
+  background: transparent;
+  color: var(--v2-text-primary);
+}
+
 .trainer-capability__status p,
 .trainer-capability__disable p {
   margin: 0;
@@ -178,7 +226,8 @@
 
 @media (max-width: 680px) {
   .trainer-capability__activate,
-  .trainer-capability__disable .btn-danger {
+  .trainer-capability__disable .btn-danger,
+  .trainer-capability__onboarding-actions a {
     width: 100%;
   }
 

@@ -124,9 +124,9 @@ describe('LandingPage', () => {
       'href',
       '/progress',
     );
-    expect(screen.getByRole('link', { name: /^Посмотреть кабинет тренера$/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Посмотреть демо кабинета$/ })).toHaveAttribute(
       'href',
-      '/for-trainers',
+      '/demo?cabinet=1&scenario=trainer&section=trainer',
     );
     expect(appUrlForHostname('your-fitness-coach.ru')).toBe(
       'https://app.your-fitness-coach.ru/app',

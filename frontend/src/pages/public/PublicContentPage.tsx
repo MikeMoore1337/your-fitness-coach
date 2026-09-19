@@ -22,6 +22,7 @@ import { AppThemeToggle } from '../../shared/ui/AppThemeToggle';
 import { Icon } from '../../shared/ui/Icon';
 import { useWebTheme } from '../../shared/useWebTheme';
 import { applyRouteMetadata } from '../../shared/seo/metadata';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import PublicBmiCalculator from './PublicBmiCalculator';
 import PublicNutritionCalculator from './PublicNutritionCalculator';
 import PublicOneRepMaxCalculator from './PublicOneRepMaxCalculator';
@@ -557,12 +558,24 @@ function RelatedContent({ page }: { page: PublicContentPageData }) {
       </div>
       <div className="public-related-grid">
         {page.related.map((item) => (
-          <AppLink className="public-related-card" to={item.path} key={item.path}>
+          <AppLink
+            className="public-related-card"
+            to={item.path}
+            key={item.path}
+            onClick={
+              page.path === '/for-trainers' && item.path.startsWith('/demo?')
+                ? () =>
+                    trackProductEvent({
+                      name: 'trainer_landing_cta_clicked',
+                      surface: productEventSurface(),
+                      destination: 'demo',
+                    })
+                : undefined
+            }
+          >
             <strong>{item.label}</strong>
             {item.description && <span>{item.description}</span>}
-            <small>
-              Открыть <Icon name="arrow-right" size={16} />
-            </small>
+            <small>Открыть →</small>
           </AppLink>
         ))}
       </div>
@@ -603,6 +616,14 @@ export default function PublicContentPage() {
   }, [page, path]);
 
   useEffect(() => {
+    if (page?.path !== '/for-trainers') return;
+    trackProductEvent(
+      { name: 'trainer_landing_viewed', surface: productEventSurface() },
+      { dedupe: 'session' },
+    );
+  }, [page?.path]);
+
+  useEffect(() => {
     document.body.classList.add('public-shell-mode');
     document.body.classList.toggle('public-shell-dark-mode', theme === 'dark');
     return () => {
@@ -641,7 +662,20 @@ export default function PublicContentPage() {
               <p className="public-hero__lead">{page.intro}</p>
               {page.cta?.placement === 'hero-and-footer' && (
                 <div className="public-hero__action">
-                  <a className="landing-button landing-action" href={appUrl}>
+                  <a
+                    className="landing-button landing-action"
+                    href={appUrl}
+                    onClick={
+                      page.path === '/for-trainers'
+                        ? () =>
+                            trackProductEvent({
+                              name: 'trainer_landing_cta_clicked',
+                              surface: productEventSurface(),
+                              destination: 'onboarding',
+                            })
+                        : undefined
+                    }
+                  >
                     {page.cta.label}
                     <span className="landing-action__arrow" aria-hidden="true">
                       <Icon name="external-link" size={16} />
@@ -730,7 +764,20 @@ export default function PublicContentPage() {
                 <h2 id="public-cta-title">{page.cta.label}</h2>
                 <p>{page.cta.description}</p>
               </div>
-              <a className="landing-button landing-action" href={appUrl}>
+              <a
+                className="landing-button landing-action"
+                href={appUrl}
+                onClick={
+                  page.path === '/for-trainers'
+                    ? () =>
+                        trackProductEvent({
+                          name: 'trainer_landing_cta_clicked',
+                          surface: productEventSurface(),
+                          destination: 'onboarding',
+                        })
+                    : undefined
+                }
+              >
                 {page.cta.label}
                 <span className="landing-action__arrow" aria-hidden="true">
                   <Icon name="external-link" size={16} />

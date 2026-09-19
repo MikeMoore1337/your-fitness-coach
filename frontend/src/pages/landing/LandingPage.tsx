@@ -192,6 +192,12 @@ export default function LandingPage() {
       placement,
       scenario,
     });
+  const trackTrainerCta = (destination: 'onboarding' | 'demo') =>
+    trackProductEvent({
+      name: 'trainer_landing_cta_clicked',
+      surface: productEventSurface(),
+      destination,
+    });
   const trackTelegramSelection = (placement: LandingTelegramPlacement) =>
     trackProductEvent({
       name: 'landing_telegram_selected',
@@ -378,15 +384,30 @@ export default function LandingPage() {
         <LandingChapter className="landing-trainer" aria-labelledby="trainer-title">
           <div className="landing-trainer__copy">
             <p className="landing-kicker">04 · Работа с тренером</p>
-            <h2 id="trainer-title">Тренер рядом с планом.</h2>
+            <h2 id="trainer-title">Для тренера — отдельный рабочий ритм.</h2>
             <p>
-              Тренер включает режим из профиля, приглашает клиента, назначает программу, видит
-              выполненную работу и оставляет комментарии к конкретным тренировкам. CRM, платежи и
-              расписание бизнеса остаются за пределами продукта.
+              Coach Today собирает внимание, клиенты, тренировки, прогресс, встречи, пакеты и
+              задачи. Тренер включает режим из профиля, приглашает клиента и возвращается к
+              конкретному следующему действию. Платёжный процессинг и публичный профиль остаются за
+              пределами продукта.
             </p>
-            <AppLink className="landing-button" to="/for-trainers">
-              Посмотреть кабинет тренера <Icon name="arrow-right" size={20} />
+            <AppLink
+              className="landing-button"
+              to="/for-trainers"
+              onClick={() => trackTrainerCta('onboarding')}
+            >
+              Открыть путь для тренера <Icon name="arrow-right" size={20} />
             </AppLink>
+            <a
+              className="landing-button landing-button--secondary"
+              href={cabinetScenarioUrl(demoUrl, 'trainer')}
+              onClick={() => {
+                trackTrainerCta('demo');
+                trackDemoSelection('section', 'trainer');
+              }}
+            >
+              Посмотреть демо кабинета <Icon name="arrow-right" size={20} />
+            </a>
           </div>
           <img
             className="landing-trainer__proof"

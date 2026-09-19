@@ -1,6 +1,8 @@
 import type { DemoScenario, DemoSessionSnapshot, DemoTrainerState } from './demoApi';
 
 export type DemoRouteStepKey =
+  | 'today'
+  | 'attention'
   | 'plan'
   | 'workout'
   | 'result'
@@ -9,6 +11,9 @@ export type DemoRouteStepKey =
   | 'product'
   | 'total'
   | 'client'
+  | 'operations'
+  | 'task'
+  | 'return'
   | 'comment'
   | 'ready';
 
@@ -18,8 +23,15 @@ export type DemoRouteStep = {
   complete: boolean;
 };
 
+export type TrainerDemoStepKey =
+  'today' | 'attention' | 'client' | 'workout' | 'progress' | 'operations' | 'task' | 'return';
+
 export type DemoRouteTarget =
-  | { kind: 'navigate'; section: 'today' | 'plan' | 'nutrition' | 'progress' | 'trainer' }
+  | {
+      kind: 'navigate';
+      section: 'today' | 'plan' | 'nutrition' | 'progress' | 'trainer';
+      demoStep?: TrainerDemoStepKey;
+    }
   | { kind: 'focus'; targetId: string }
   | null;
 
@@ -64,15 +76,15 @@ export function setDemoRouteVisible(scenario: DemoScenario, visible: boolean): v
   }
 }
 
-function trainerComment(snapshot: DemoSessionSnapshot): string | null {
-  const state = snapshot.state;
-  if (state.kind !== 'trainer') return null;
-  const client = state.clients.find((item) => item.id === state.selected_client_id);
-  return client?.comment ?? null;
-}
-
 function currentSectionVisited(visitedSections: ReadonlySet<string>, section: string): boolean {
   return visitedSections.has(section);
+}
+
+function trainerStepVisited(
+  visitedSections: ReadonlySet<string>,
+  step: TrainerDemoStepKey,
+): boolean {
+  return visitedSections.has(`trainer:${step}`);
 }
 
 function firstIncompleteIndex(steps: readonly DemoRouteStep[]): number {
@@ -171,28 +183,56 @@ function nutritionRoute(
 
 function trainerRoute(
   snapshot: DemoSessionSnapshot,
-  section: string,
+  _section: string,
   visitedSections: ReadonlySet<string>,
 ): DemoRouteState {
   const state = snapshot.state;
   if (state.kind !== 'trainer') throw new Error('Trainer route requires a trainer snapshot');
-  const clientComplete = currentSectionVisited(visitedSections, 'trainer');
-  const resultComplete = Boolean(state.selected_client_id) && clientComplete;
-  const commentComplete = Boolean(trainerComment(snapshot));
+  const todayComplete = currentSectionVisited(visitedSections, 'trainer');
+  const attentionComplete = trainerStepVisited(visitedSections, 'attention');
+  const clientComplete =
+    Boolean(state.selected_client_id) && trainerStepVisited(visitedSections, 'client');
+  const workoutComplete = trainerStepVisited(visitedSections, 'workout');
+  const progressComplete = trainerStepVisited(visitedSections, 'progress');
+  const operationsComplete = trainerStepVisited(visitedSections, 'operations');
+  const taskComplete = trainerStepVisited(visitedSections, 'task');
+  const returnComplete = trainerStepVisited(visitedSections, 'return');
   const steps: readonly DemoRouteStep[] = [
+    { key: 'today', label: 'Сегодня', complete: todayComplete },
+    { key: 'attention', label: 'Внимание', complete: attentionComplete },
     { key: 'client', label: 'Клиент', complete: clientComplete },
-    { key: 'result', label: 'Результат', complete: resultComplete },
-    { key: 'comment', label: 'Комментарий', complete: commentComplete },
-    { key: 'ready', label: 'Готово', complete: commentComplete },
+    { key: 'workout', label: 'Тренировка', complete: workoutComplete },
+    { key: 'progress', label: 'Прогресс', complete: progressComplete },
+    { key: 'operations', label: 'Операции', complete: operationsComplete },
+    { key: 'task', label: 'Задача', complete: taskComplete },
+    { key: 'return', label: 'Назад в Сегодня', complete: returnComplete },
   ];
   let target: DemoRouteTarget = null;
   let nextHint = 'Маршрут завершён. Можно начать со своими данными.';
-  if (!clientComplete || !resultComplete) {
-    target = { kind: 'navigate', section: 'trainer' };
-    nextHint = 'Следующий шаг: откройте подготовленного клиента.';
-  } else if (!commentComplete) {
-    target = { kind: 'navigate', section: 'trainer' };
-    nextHint = 'Следующий шаг: откройте клиента и оставьте комментарий к результату.';
+  if (!todayComplete) {
+    target = { kind: 'navigate', section: 'trainer', demoStep: 'today' };
+    nextHint = 'Следующий шаг: откройте Coach Today.';
+  } else if (!attentionComplete) {
+    target = { kind: 'focus', targetId: 'coach-attention-title' };
+    nextHint = 'Следующий шаг: выберите действие из списка внимания.';
+  } else if (!clientComplete) {
+    target = { kind: 'focus', targetId: 'coach-client-detail-title' };
+    nextHint = 'Следующий шаг: откройте карточку клиента.';
+  } else if (!workoutComplete) {
+    target = { kind: 'focus', targetId: 'coach-client-timeline' };
+    nextHint = 'Следующий шаг: откройте последние события и тренировку клиента.';
+  } else if (!progressComplete) {
+    target = { kind: 'focus', targetId: 'coach-client-progress' };
+    nextHint = 'Следующий шаг: откройте прогресс и замеры клиента.';
+  } else if (!operationsComplete) {
+    target = { kind: 'navigate', section: 'trainer', demoStep: 'operations' };
+    nextHint = 'Следующий шаг: вернитесь в Сегодня и соберите рабочий день.';
+  } else if (!taskComplete) {
+    target = { kind: 'focus', targetId: 'coach-tasks-title' };
+    nextHint = 'Следующий шаг: посмотрите задачу клиента.';
+  } else if (!returnComplete) {
+    target = { kind: 'navigate', section: 'trainer', demoStep: 'return' };
+    nextHint = 'Следующий шаг: вернитесь в Coach Today.';
   }
   return {
     steps,

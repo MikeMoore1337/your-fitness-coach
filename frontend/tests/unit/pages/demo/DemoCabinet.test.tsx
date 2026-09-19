@@ -177,4 +177,35 @@ describe('Demo cabinet production composition', () => {
     expect(route.complete).toBe(true);
     expect(route.target).toBeNull();
   });
+
+  it('keeps the trainer route connected to the real workspace milestones', () => {
+    const snapshot = demoFixture('trainer');
+    if (snapshot.state.kind !== 'trainer') throw new Error('Expected trainer fixture');
+    snapshot.state.selected_client_id = snapshot.state.clients[0]?.id ?? 'alexey';
+    const visited = new Set([
+      'trainer',
+      'trainer:attention',
+      'trainer:client',
+      'trainer:workout',
+      'trainer:progress',
+      'trainer:operations',
+      'trainer:task',
+      'trainer:return',
+    ]);
+
+    const route = getDemoRouteState('trainer', snapshot, 'trainer', visited);
+
+    expect(route.steps.map((step) => step.label)).toEqual([
+      'Сегодня',
+      'Внимание',
+      'Клиент',
+      'Тренировка',
+      'Прогресс',
+      'Операции',
+      'Задача',
+      'Назад в Сегодня',
+    ]);
+    expect(route.complete).toBe(true);
+    expect(route.target).toBeNull();
+  });
 });

@@ -1,4 +1,5 @@
 .public-page {
+  --public-editorial-measure: 820px;
   min-height: 100vh;
   background:
     linear-gradient(180deg, rgba(182, 242, 56, 0.08), transparent 28rem), var(--landing-paper);
@@ -57,7 +58,7 @@
 }
 
 .public-hero__copy {
-  max-width: 790px;
+  max-width: var(--public-editorial-measure);
 }
 
 .public-hero h1 {
@@ -75,7 +76,7 @@
 }
 
 .public-hero__lead {
-  max-width: 740px;
+  max-width: var(--public-editorial-measure);
   margin: 32px 0 0;
   color: var(--landing-muted);
   font-size: clamp(1.05rem, 1.8vw, 1.35rem);
@@ -238,7 +239,7 @@
 }
 
 .public-disclaimer {
-  max-width: 900px;
+  max-width: var(--public-editorial-measure);
   margin: 38px auto 0;
   padding: 20px 24px;
   border-left: 4px solid var(--landing-green);
@@ -347,7 +348,7 @@
 }
 
 .public-body {
-  max-width: 820px;
+  max-width: var(--public-editorial-measure);
   margin: 0 auto;
   padding: clamp(68px, 9vw, 118px) 0;
 }
@@ -428,7 +429,8 @@
   grid-template-columns: minmax(180px, 0.35fr) minmax(0, 1fr);
   gap: 34px;
   align-items: end;
-  margin-bottom: 42px;
+  max-width: var(--public-editorial-measure);
+  margin: 0 auto 42px;
 }
 
 .public-guide-grid,
@@ -524,12 +526,18 @@
 
 .public-related-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.public-related {
+  padding: clamp(52px, 7vw, 88px) 0;
 }
 
 .public-related-card {
   display: flex;
-  min-height: 230px;
+  min-height: 0;
   flex-direction: column;
+  padding: 22px;
   color: var(--landing-ink);
   text-decoration: none;
   transition:
@@ -549,18 +557,20 @@
 }
 
 .public-related-card span {
-  margin-top: 16px;
+  margin-top: 12px;
   color: var(--landing-muted);
   font-size: 0.86rem;
   line-height: 1.55;
 }
 
 .public-related-card small {
-  margin-top: auto;
-  padding-top: 28px;
+  margin-top: 20px;
+  padding-top: 0;
   color: var(--landing-kicker);
   font-size: 0.72rem;
   font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .public-sources ol {
@@ -987,12 +997,12 @@
   .public-guide-card,
   .public-related-card {
     min-height: 0;
-    padding: 24px;
+    padding: 20px;
     border-radius: var(--radius-control);
   }
 
   .public-related-card small {
-    margin-top: 28px;
+    margin-top: 18px;
   }
 
   .public-category-list {

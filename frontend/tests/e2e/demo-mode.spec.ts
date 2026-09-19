@@ -20,6 +20,15 @@ const DEMO_VIEWPORTS = [
 const TASK_274_EVIDENCE_DIR = process.env.TASK_274_EVIDENCE_DIR;
 const TASK_278_EVIDENCE_DIR = process.env.TASK_278_EVIDENCE_DIR;
 const TASK_291_EVIDENCE_DIR = process.env.TASK_291_EVIDENCE_DIR;
+const TASK_293_EVIDENCE_DIR = process.env.TASK_293_EVIDENCE_DIR;
+const TASK_293_THEME =
+  process.env.TASK_293_THEME === 'light' || process.env.TASK_293_THEME === 'dark'
+    ? process.env.TASK_293_THEME
+    : undefined;
+const TASK_293_VIEWPORT = /^\d+x\d+$/.test(process.env.TASK_293_VIEWPORT ?? '')
+  ? process.env.TASK_293_VIEWPORT
+  : undefined;
+const TASK_293_VARIANT = `${TASK_293_VIEWPORT ?? 'default'}-${TASK_293_THEME ?? 'light'}`;
 const TASK_278_THEME =
   process.env.TASK_278_THEME === 'light' || process.env.TASK_278_THEME === 'dark'
     ? process.env.TASK_278_THEME
@@ -38,6 +47,11 @@ async function captureTask278Evidence(page: Page, fileName: string): Promise<voi
 async function captureTask291Evidence(page: Page, fileName: string): Promise<void> {
   if (!TASK_291_EVIDENCE_DIR) return;
   await page.screenshot({ path: resolve(TASK_291_EVIDENCE_DIR, fileName), fullPage: true });
+}
+
+async function captureTask293Evidence(page: Page, fileName: string): Promise<void> {
+  if (!TASK_293_EVIDENCE_DIR) return;
+  await page.screenshot({ path: resolve(TASK_293_EVIDENCE_DIR, fileName), fullPage: true });
 }
 
 async function assertBottomNavigationGeometry(page: Page, width: number): Promise<void> {
@@ -1254,6 +1268,49 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await trainerPage.getByRole('button', { name: 'Отправить комментарий' }).click();
   await expect(trainerPage.getByText('Хороший контроль темпа.')).toBeVisible();
   await trainerContext.close();
+});
+
+test('trainer demo follows the connected Today-to-Today route', async ({ page }) => {
+  if (TASK_293_VIEWPORT) {
+    const [width = 390, height = 844] = TASK_293_VIEWPORT.split('x').map(Number);
+    await page.setViewportSize({ width, height });
+  }
+  if (TASK_293_THEME) {
+    await page.emulateMedia({ colorScheme: TASK_293_THEME, reducedMotion: 'reduce' });
+    await page.addInitScript((theme) => localStorage.setItem('app-theme', theme), TASK_293_THEME);
+  }
+  await installDemoTransport(page);
+  await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
+  await expect(page.getByRole('heading', { name: 'Сегодня', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Требует внимания' })).toBeVisible();
+  await captureTask293Evidence(page, `${TASK_293_VARIANT}-trainer-demo-start.png`);
+
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  const attentionAction = page.getByRole('link', { name: 'Назначить программу', exact: true });
+  await attentionAction.click();
+  await expect(page).toHaveURL(/client_id=51003/);
+  await expect(page.getByRole('heading', { name: 'Иван', level: 2 })).toBeVisible();
+  await captureTask293Evidence(page, `${TASK_293_VARIANT}-trainer-demo-client.png`);
+
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await page.getByRole('link', { name: 'Последние события', exact: true }).click();
+  await page
+    .getByLabel('Данные клиента')
+    .getByRole('link', { name: 'Прогресс', exact: true })
+    .click();
+
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page).toHaveURL(/section=trainer.*demo_step=operations/);
+  await expect(page.getByRole('heading', { name: 'Сегодня', level: 1 })).toBeVisible();
+  await captureTask293Evidence(page, `${TASK_293_VARIANT}-trainer-demo-operations.png`);
+
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Задачи клиентов', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page).toHaveURL(/section=trainer.*demo_step=return/);
+  await expect(page.getByRole('heading', { name: 'Сегодня', level: 1 })).toBeVisible();
+  await expect(page.getByText('Основной сценарий завершён')).toBeVisible();
+  await captureTask293Evidence(page, `${TASK_293_VARIANT}-trainer-demo-complete.png`);
 });
 
 test('demo exposes deterministic loading and error states without leaving the boundary', async ({

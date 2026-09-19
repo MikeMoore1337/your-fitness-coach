@@ -3758,7 +3758,7 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
         ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
         ("/calculators/1rm", "Калькулятор 1ПМ: оценочный одноповторный максимум"),
         ("/progress", "Прогресс, который можно проверить"),
-        ("/for-trainers", "Кабинет тренера для программ"),
+        ("/for-trainers", "Рабочий кабинет тренера, который держит день"),
         ("/knowledge", "Материалы, которые помогают понять"),
         (
             "/knowledge/nutrition/glycemic-index",

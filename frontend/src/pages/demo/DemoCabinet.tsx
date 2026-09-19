@@ -20,6 +20,7 @@ import {
   getDemoRouteState,
   isDemoRouteVisible,
   setDemoRouteVisible,
+  type TrainerDemoStepKey,
   type DemoRouteState,
   type DemoRouteTarget,
 } from '../../features/demo/demoRoute';
@@ -36,6 +37,17 @@ import './demo-cabinet.css';
 
 export type DemoCabinetSection =
   'today' | 'plan' | 'nutrition' | 'progress' | 'profile' | 'trainer';
+
+const TRAINER_DEMO_STEPS: ReadonlySet<TrainerDemoStepKey> = new Set([
+  'today',
+  'attention',
+  'client',
+  'workout',
+  'progress',
+  'operations',
+  'task',
+  'return',
+]);
 
 function scenarioFromSearch(search: string): DemoScenario {
   const value = new URLSearchParams(search).get('scenario');
@@ -92,7 +104,23 @@ function productionPathInDemo(to: string, scenario: DemoScenario): string {
   if (parsed.origin !== window.location.origin) return to;
 
   if (parsed.pathname === '/coach') {
-    return demoCabinetPath(scenario, scenario === 'trainer' ? 'trainer' : 'today');
+    const target = new URL(
+      demoCabinetPath(scenario, scenario === 'trainer' ? 'trainer' : 'today'),
+      window.location.origin,
+    );
+    if (scenario === 'trainer') {
+      for (const key of ['client_id', 'workout_id'] as const) {
+        const value = parsed.searchParams.get(key);
+        if (value && /^\d+$/.test(value)) target.searchParams.set(key, value);
+      }
+      const focus = parsed.searchParams.get('focus');
+      if (focus === 'weekly_check_in') target.searchParams.set('focus', focus);
+      const demoStep = parsed.searchParams.get('demo_step');
+      if (demoStep && TRAINER_DEMO_STEPS.has(demoStep as TrainerDemoStepKey)) {
+        target.searchParams.set('demo_step', demoStep);
+      }
+    }
+    return `${target.pathname}?${target.searchParams.toString()}`;
   }
   if (parsed.pathname === '/app/report') return demoCabinetPath(scenario, 'progress');
   if (parsed.pathname !== '/app') return to;
@@ -181,7 +209,9 @@ function DemoRoute({
   return (
     <section className="demo-route" aria-label="Маршрут демо">
       <div className="demo-route__header">
-        <strong id="demoRouteTitle">Маршрут демо · {route.currentStep} из 4</strong>
+        <strong id="demoRouteTitle">
+          Маршрут демо · {route.currentStep} из {route.steps.length}
+        </strong>
         <Button aria-controls="demoRouteSteps" onClick={onHide} variant="secondary">
           Скрыть маршрут
         </Button>
@@ -289,6 +319,22 @@ export default function DemoCabinet() {
 
   const markNavigation = useCallback(
     (to: string) => {
+      let parsed: URL | null = null;
+      try {
+        parsed = new URL(to, window.location.origin);
+      } catch {
+        parsed = null;
+      }
+      if (scenario === 'trainer' && parsed?.origin === window.location.origin) {
+        if (parsed.pathname === '/coach') {
+          const demoStep = parsed.searchParams.get('demo_step');
+          if (demoStep && TRAINER_DEMO_STEPS.has(demoStep as TrainerDemoStepKey)) {
+            markVisited(scenario, `trainer:${demoStep}`);
+          }
+          if (parsed.searchParams.get('client_id')) markVisited(scenario, 'trainer:client');
+          if (parsed.searchParams.get('workout_id')) markVisited(scenario, 'trainer:workout');
+        }
+      }
       const mapped = productionPathInDemo(to, scenario);
       if (!mapped.startsWith('/demo')) return;
       const destination = new URL(mapped, window.location.origin);
@@ -334,7 +380,22 @@ export default function DemoCabinet() {
   }, [load]);
 
   useEffect(() => {
-    const normalized = demoCabinetPath(scenario, section);
+    const normalizedUrl = new URL(demoCabinetPath(scenario, section), window.location.origin);
+    if (scenario === 'trainer') {
+      const current = new URL(window.location.href);
+      for (const key of ['client_id', 'workout_id'] as const) {
+        const value = current.searchParams.get(key);
+        if (value && /^\d+$/.test(value)) normalizedUrl.searchParams.set(key, value);
+      }
+      if (current.searchParams.get('focus') === 'weekly_check_in') {
+        normalizedUrl.searchParams.set('focus', 'weekly_check_in');
+      }
+      const demoStep = current.searchParams.get('demo_step');
+      if (demoStep && TRAINER_DEMO_STEPS.has(demoStep as TrainerDemoStepKey)) {
+        normalizedUrl.searchParams.set('demo_step', demoStep);
+      }
+    }
+    const normalized = `${normalizedUrl.pathname}?${normalizedUrl.searchParams.toString()}`;
     if (`${window.location.pathname}${search}` !== normalized) navigate(normalized, true);
   }, [navigate, scenario, search, section]);
 
@@ -411,13 +472,27 @@ export default function DemoCabinet() {
       { name: 'demo_route_completed', surface: productEventSurface(), scenario },
       { dedupe: 'session', dedupeKey: `completed:${scenario}` },
     );
+    if (scenario === 'trainer') {
+      trackProductEvent(
+        {
+          name: 'demo_meaningful_action_completed',
+          surface: productEventSurface(),
+          scenario,
+          action: 'trainer_route_completed',
+        },
+        { dedupe: 'session', dedupeKey: `meaningful:${scenario}` },
+      );
+    }
   }, [route, scenario, snapshot]);
 
   const onRouteContinue = (target: DemoRouteTarget) => {
     if (!target) return;
     if (target.kind === 'navigate') {
       markVisited(scenario, target.section);
-      navigate(demoCabinetPath(scenario, target.section));
+      if (target.demoStep) markVisited(scenario, `trainer:${target.demoStep}`);
+      const targetPath = new URL(demoCabinetPath(scenario, target.section), window.location.origin);
+      if (target.demoStep) targetPath.searchParams.set('demo_step', target.demoStep);
+      navigate(`${targetPath.pathname}?${targetPath.searchParams.toString()}`);
       return;
     }
     window.requestAnimationFrame(() => document.getElementById(target.targetId)?.focus());
@@ -569,7 +644,7 @@ export default function DemoCabinet() {
             >
               <DemoAuthProvider>
                 {section === 'trainer' ? (
-                  <CoachPage demo={shellDemo} renderShell={false} />
+                  <CoachPage key={search} demo={shellDemo} renderShell={false} />
                 ) : (
                   <MiniAppPage
                     demo={shellDemo}
@@ -579,9 +654,10 @@ export default function DemoCabinet() {
                 )}
               </DemoAuthProvider>
             </DemoRuntimeProvider>
-            {route.complete && snapshot.cabinet.meaningful_action_completed && (
-              <Conversion scenario={scenario} section={section} />
-            )}
+            {route.complete &&
+              (scenario === 'trainer' || snapshot.cabinet.meaningful_action_completed) && (
+                <Conversion scenario={scenario} section={section} />
+              )}
           </>
         )}
       </div>

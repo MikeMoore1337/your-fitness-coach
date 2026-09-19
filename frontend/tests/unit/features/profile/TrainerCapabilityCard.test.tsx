@@ -92,6 +92,15 @@ describe('TrainerCapabilityCard', () => {
       name: 'trainer_mode_activated',
       surface: 'tma',
     });
+    expect(trackProductEventMock).toHaveBeenCalledWith(
+      { name: 'trainer_onboarding_started', surface: 'tma' },
+      { dedupe: 'session' },
+    );
+    fireEvent.click(screen.getByRole('link', { name: 'Пропустить и открыть Coach Today' }));
+    expect(trackProductEventMock).toHaveBeenCalledWith(
+      { name: 'trainer_onboarding_completed', surface: 'tma' },
+      { dedupe: 'session' },
+    );
   });
 
   it('не дублирует activation event для идемпотентного ответа API', async () => {

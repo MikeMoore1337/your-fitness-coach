@@ -32,7 +32,7 @@ const representativePages = [
   },
   {
     path: '/for-trainers',
-    heading: /кабинет тренера для программ/i,
+    heading: /рабочий кабинет тренера, который держит день в фокусе/i,
   },
   {
     path: '/exercises',
@@ -432,6 +432,67 @@ test('публичные страницы сохраняют hierarchy и не �
         });
         expect(heroGutters.left).toBeGreaterThanOrEqual(40);
         expect(heroGutters.right).toBeGreaterThanOrEqual(40);
+      }
+    }
+  }
+});
+
+test('related materials use one editorial measure and compact inline CTAs', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const relatedArticle = {
+    ...publicArticleCard,
+    slug: 'recovery-basics',
+    title: 'Восстановление после тренировки',
+  };
+  await page.route('**/api/v1/public/articles/strength-basics', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ ...publicArticle, related_slugs: [relatedArticle.slug] }),
+    });
+  });
+  await page.route('**/api/v1/public/articles', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify([publicArticleCard, relatedArticle]),
+    });
+  });
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    for (const route of ['/for-trainers', '/training', '/articles/strength-basics']) {
+      await page.goto(route);
+      await expect(page.locator('.public-related-card').first()).toBeVisible();
+      const metrics = await page.evaluate(() => {
+        const copy = document.querySelector<HTMLElement>('.public-body');
+        const sectionHeading = document.querySelector<HTMLElement>('.public-section-heading');
+        const cards = [...document.querySelectorAll<HTMLElement>('.public-related-card')];
+        return {
+          copyWidth: copy?.getBoundingClientRect().width ?? 0,
+          sectionHeadingWidth: sectionHeading?.getBoundingClientRect().width ?? 0,
+          cards: cards.map((card) => {
+            const cta = card.querySelector<HTMLElement>('small');
+            return {
+              height: card.getBoundingClientRect().height,
+              ctaText: cta?.textContent,
+              ctaHeight: cta?.getBoundingClientRect().height ?? 0,
+              ctaScrollHeight: cta?.scrollHeight ?? 0,
+              ctaSvgCount: cta?.querySelectorAll('svg').length ?? 0,
+            };
+          }),
+        };
+      });
+
+      expect(metrics.copyWidth).toBeLessThanOrEqual(820);
+      expect(metrics.sectionHeadingWidth).toBeLessThanOrEqual(820);
+      expect(metrics.cards.length).toBeGreaterThan(0);
+      for (const card of metrics.cards) {
+        expect(card.height).toBeLessThanOrEqual(230);
+        expect(card.ctaText).toBe('Открыть →');
+        expect(card.ctaHeight).toBeGreaterThan(0);
+        expect(card.ctaScrollHeight).toBeLessThanOrEqual(Math.ceil(card.ctaHeight));
+        expect(card.ctaSvgCount).toBe(0);
       }
     }
   }

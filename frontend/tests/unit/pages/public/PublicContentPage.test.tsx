@@ -214,13 +214,48 @@ describe('PublicContentPage', () => {
     vi.unstubAllGlobals();
   });
 
+  it('tracks the trainer landing view and balanced CTA without private fields', async () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) =>
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+
+    try {
+      renderPath('/for-trainers');
+
+      await waitFor(() =>
+        expect(events).toContainEqual(
+          expect.objectContaining({ name: 'trainer_landing_viewed', surface: 'desktop_web' }),
+        ),
+      );
+      fireEvent.click(screen.getAllByRole('link', { name: 'Попробовать кабинет тренера' })[0]!);
+
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          name: 'trainer_landing_cta_clicked',
+          surface: 'desktop_web',
+          destination: 'onboarding',
+        }),
+      );
+      expect(
+        events.every((event) =>
+          ['url', 'email', 'client_id', 'payment', 'fitness_data', 'free_text'].every(
+            (key) => !(key in event),
+          ),
+        ),
+      ).toBe(true);
+    } finally {
+      window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+    }
+  });
+
   it.each([
     ['/training', /дневник тренировок: от программы до прогресса/i],
     ['/programs/full-body-3-days', /программа тренировок 3 раза в неделю: full body на 3 дня/i],
     ['/nutrition', /рассчитать кбжу: калории, белки, жиры и углеводы/i],
     ['/calculators/1rm', /калькулятор 1пм: оценочный одноповторный максимум/i],
     ['/progress', /прогресс, который можно проверить/i],
-    ['/for-trainers', /кабинет тренера для программ/i],
+    ['/for-trainers', /рабочий кабинет тренера, который держит день/i],
     ['/knowledge', /материалы, которые помогают понять/i],
   ])('renders a distinct indexable intent for %s', (path, heading) => {
     renderPath(path);
