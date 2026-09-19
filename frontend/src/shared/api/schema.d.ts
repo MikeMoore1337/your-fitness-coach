@@ -1451,6 +1451,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/operations/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Operations Today */
+        get: operations["coach_operations_today_api_v1_coach_operations_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/agenda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Agenda */
+        get: operations["coach_agenda_api_v1_coach_agenda_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Sessions */
+        post: operations["create_coach_sessions_api_v1_coach_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Session */
+        patch: operations["update_coach_session_api_v1_coach_sessions__session_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/clients/{client_id}/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Client Operations */
+        get: operations["coach_client_operations_api_v1_coach_clients__client_id__operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/clients/{client_id}/operational-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Client Operational Status */
+        patch: operations["update_coach_client_operational_status_api_v1_coach_clients__client_id__operational_status_patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Packages */
+        get: operations["coach_packages_api_v1_coach_packages_get"];
+        put?: never;
+        /** Create Coach Package */
+        post: operations["create_coach_package_api_v1_coach_packages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/packages/{package_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Package State */
+        patch: operations["update_coach_package_state_api_v1_coach_packages__package_id__state_patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Payments */
+        get: operations["coach_payments_api_v1_coach_payments_get"];
+        put?: never;
+        /** Create Coach Payment */
+        post: operations["create_coach_payment_api_v1_coach_payments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/payments/{payment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Payment */
+        patch: operations["update_coach_payment_api_v1_coach_payments__payment_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Tasks */
+        get: operations["coach_tasks_api_v1_coach_tasks_get"];
+        put?: never;
+        /** Create Coach Task */
+        post: operations["create_coach_task_api_v1_coach_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/tasks/{task_id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Task State */
+        patch: operations["update_coach_task_state_api_v1_coach_tasks__task_id__state_patch"];
+        trace?: never;
+    };
     "/api/v1/coach/assigned-programs": {
         parameters: {
             query?: never;
@@ -5797,6 +6004,29 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending";
+            /**
+             * Operational Status
+             * @default active
+             * @enum {string}
+             */
+            operational_status: "active" | "paused" | "archived";
+        };
+        /** CoachAgendaResponse */
+        CoachAgendaResponse: {
+            /**
+             * Date From
+             * Format: date
+             */
+            date_from: string;
+            /**
+             * Date To
+             * Format: date
+             */
+            date_to: string;
+            /** Timezone */
+            timezone: string;
+            /** Items */
+            items: components["schemas"]["CoachSessionResponse"][];
         };
         /** CoachAssignedProgramResponse */
         CoachAssignedProgramResponse: {
@@ -5907,6 +6137,25 @@ export interface components {
              */
             generated_at: string;
         };
+        /** CoachClientOperationalStatusUpdate */
+        CoachClientOperationalStatusUpdate: {
+            /**
+             * Operational Status
+             * @enum {string}
+             */
+            operational_status: "active" | "paused" | "archived";
+        };
+        /** CoachClientOperationsResponse */
+        CoachClientOperationsResponse: {
+            /** Sessions */
+            sessions: components["schemas"]["CoachSessionResponse"][];
+            /** Packages */
+            packages: components["schemas"]["CoachPackageResponse"][];
+            /** Payments */
+            payments: components["schemas"]["CoachPaymentResponse"][];
+            /** Tasks */
+            tasks: components["schemas"]["CoachTaskResponse"][];
+        };
         /** CoachInviteLinkResponse */
         CoachInviteLinkResponse: {
             /** Invite Id */
@@ -5956,6 +6205,173 @@ export interface components {
             /** Token */
             token: string;
         };
+        /** CoachOperationsTodayResponse */
+        CoachOperationsTodayResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Timezone */
+            timezone: string;
+            /** Sessions */
+            sessions: components["schemas"]["CoachSessionResponse"][];
+            /** Overdue Tasks */
+            overdue_tasks: components["schemas"]["CoachTaskResponse"][];
+            /** Due Tasks */
+            due_tasks: components["schemas"]["CoachTaskResponse"][];
+            /** Low Packages */
+            low_packages: components["schemas"]["CoachPackageResponse"][];
+            /** Payment Facts */
+            payment_facts: components["schemas"]["CoachPaymentResponse"][];
+        };
+        /** CoachPackageCreate */
+        CoachPackageCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Name */
+            name: string;
+            /**
+             * Counts Sessions
+             * @default true
+             */
+            counts_sessions: boolean;
+            /** Included Sessions */
+            included_sessions?: number | null;
+            /** Starts On */
+            starts_on?: string | null;
+            /** Expires On */
+            expires_on?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** CoachPackageResponse */
+        CoachPackageResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Name */
+            name: string;
+            /** Counts Sessions */
+            counts_sessions: boolean;
+            /** Included Sessions */
+            included_sessions: number | null;
+            /** Charged Sessions */
+            charged_sessions: number;
+            /** Reversed Sessions */
+            reversed_sessions: number;
+            /** Balance */
+            balance: number | null;
+            /** Starts On */
+            starts_on: string | null;
+            /** Expires On */
+            expires_on: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "active" | "finished" | "cancelled";
+            /** Note */
+            note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CoachPackageStateUpdate */
+        CoachPackageStateUpdate: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "active" | "finished" | "cancelled";
+        };
+        /** CoachPaymentCreate */
+        CoachPaymentCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Package Id */
+            package_id?: number | null;
+            /** Expected Amount Minor */
+            expected_amount_minor: number;
+            /**
+             * Paid Amount Minor
+             * @default 0
+             */
+            paid_amount_minor: number;
+            /** Currency */
+            currency: string;
+            /** Payment Date */
+            payment_date?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** CoachPaymentResponse */
+        CoachPaymentResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Package Id */
+            package_id: number | null;
+            /** Expected Amount Minor */
+            expected_amount_minor: number;
+            /** Paid Amount Minor */
+            paid_amount_minor: number;
+            /** Currency */
+            currency: string;
+            /** Payment Date */
+            payment_date: string | null;
+            /** Method */
+            method: string | null;
+            /** Note */
+            note: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "expected" | "partial" | "paid" | "cancelled";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CoachPaymentUpdate */
+        CoachPaymentUpdate: {
+            /** Expected Amount Minor */
+            expected_amount_minor?: number | null;
+            /** Paid Amount Minor */
+            paid_amount_minor?: number | null;
+            /** Currency */
+            currency?: string | null;
+            /** Payment Date */
+            payment_date?: string | null;
+            /** Method */
+            method?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Status */
+            status?: ("expected" | "partial" | "paid" | "cancelled") | null;
+        };
         /** CoachProgramExerciseAssignmentResponse */
         CoachProgramExerciseAssignmentResponse: {
             /** Workouts Updated */
@@ -5990,6 +6406,206 @@ export interface components {
             superset_order?: number | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** CoachSessionCreate */
+        CoachSessionCreate: {
+            /** Client Id */
+            client_id: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * Fold
+             * @default 0
+             */
+            fold: number;
+            /**
+             * Duration Minutes
+             * @default 60
+             */
+            duration_minutes: number;
+            /**
+             * Format
+             * @default other
+             * @enum {string}
+             */
+            format: "gym" | "online" | "other";
+            /** Location */
+            location?: string | null;
+            /** Private Note */
+            private_note?: string | null;
+            /** Package Id */
+            package_id?: number | null;
+            /** User Workout Id */
+            user_workout_id?: number | null;
+            recurrence?: components["schemas"]["CoachSessionRecurrence"] | null;
+        };
+        /** CoachSessionRecurrence */
+        CoachSessionRecurrence: {
+            /** Weekdays */
+            weekdays: number[];
+            /** Until */
+            until?: string | null;
+            /** Occurrence Count */
+            occurrence_count?: number | null;
+        };
+        /** CoachSessionResponse */
+        CoachSessionResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Starts At Utc
+             * Format: date-time
+             */
+            starts_at_utc: string;
+            /** Timezone */
+            timezone: string;
+            /** Duration Minutes */
+            duration_minutes: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "gym" | "online" | "other";
+            /** Location */
+            location: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "completed" | "cancelled" | "no_show";
+            /** Private Note */
+            private_note: string | null;
+            /** Package Id */
+            package_id: number | null;
+            /** Package Balance */
+            package_balance: number | null;
+            /** User Workout Id */
+            user_workout_id: number | null;
+            /** Series Id */
+            series_id: number | null;
+            /** Occurrence Key */
+            occurrence_key: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CoachSessionUpdate */
+        CoachSessionUpdate: {
+            /** Starts At */
+            starts_at?: string | null;
+            /** Timezone */
+            timezone?: string | null;
+            /**
+             * Fold
+             * @default 0
+             */
+            fold: number;
+            /** Duration Minutes */
+            duration_minutes?: number | null;
+            /** Format */
+            format?: ("gym" | "online" | "other") | null;
+            /** Location */
+            location?: string | null;
+            /** Private Note */
+            private_note?: string | null;
+            /** Status */
+            status?: ("scheduled" | "completed" | "cancelled" | "no_show") | null;
+            /**
+             * Apply To
+             * @default occurrence
+             * @enum {string}
+             */
+            apply_to: "occurrence" | "series";
+            /** Charge Package */
+            charge_package?: boolean | null;
+        };
+        /** CoachTaskCreate */
+        CoachTaskCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Title */
+            title: string;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * Fold
+             * @default 0
+             */
+            fold: number;
+        };
+        /** CoachTaskResponse */
+        CoachTaskResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Title */
+            title: string;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /**
+             * Due At Utc
+             * Format: date-time
+             */
+            due_at_utc: string;
+            /** Timezone */
+            timezone: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "completed";
+            /** Completed At */
+            completed_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CoachTaskStateUpdate */
+        CoachTaskStateUpdate: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "completed";
         };
         /** DailyValuePercent */
         DailyValuePercent: {
@@ -14953,6 +15569,500 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoachAttentionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_operations_today_api_v1_coach_operations_today_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachOperationsTodayResponse"];
+                };
+            };
+        };
+    };
+    coach_agenda_api_v1_coach_agenda_get: {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachAgendaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_sessions_api_v1_coach_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachSessionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_session_api_v1_coach_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachSessionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_client_operations_api_v1_coach_clients__client_id__operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachClientOperationsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_client_operational_status_api_v1_coach_clients__client_id__operational_status_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachClientOperationalStatusUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_packages_api_v1_coach_packages_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPackageResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_package_api_v1_coach_packages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachPackageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPackageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_package_state_api_v1_coach_packages__package_id__state_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                package_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachPackageStateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPackageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_payments_api_v1_coach_payments_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPaymentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_payment_api_v1_coach_payments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachPaymentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPaymentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_payment_api_v1_coach_payments__payment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachPaymentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachPaymentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_tasks_api_v1_coach_tasks_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+                state?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachTaskResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_task_api_v1_coach_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachTaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachTaskResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_task_state_api_v1_coach_tasks__task_id__state_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachTaskStateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachTaskResponse"];
                 };
             };
             /** @description Validation Error */

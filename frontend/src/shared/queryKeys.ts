@@ -18,6 +18,8 @@ export const queryKeys = {
   },
   trainer: {
     attention: ['coach', 'attention'] as const,
+    operationsToday: ['coach', 'operations', 'today'] as const,
+    agenda: (dateFrom: string, dateTo: string) => ['coach', 'agenda', dateFrom, dateTo] as const,
     clients: ['coach', 'clients'] as const,
     clientAnalytics: (clientId: number) => ['coach', 'client', clientId, 'analytics'] as const,
     clientSummary: (clientId: number) => ['coach', 'client', clientId, 'summary'] as const,
@@ -27,6 +29,10 @@ export const queryKeys = {
       ['coach', 'client', clientId, 'weekly-check-ins'] as const,
     clientReportHandoffs: (clientId: number) =>
       ['coach', 'client', clientId, 'report-handoffs'] as const,
+    clientOperations: (clientId: number) => ['coach', 'client', clientId, 'operations'] as const,
+    packages: ['coach', 'packages'] as const,
+    payments: ['coach', 'payments'] as const,
+    tasks: ['coach', 'tasks'] as const,
   },
   workoutComments: {
     client: (workoutId: number) => ['workout', workoutId, 'comments'] as const,

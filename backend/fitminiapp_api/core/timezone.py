@@ -90,5 +90,27 @@ def local_naive_to_utc_naive(value: datetime, timezone_name: str | None) -> date
     return value.replace(tzinfo=get_timezone(timezone_name)).astimezone(UTC).replace(tzinfo=None)
 
 
+def local_naive_to_utc_naive_strict(
+    value: datetime,
+    timezone_name: str,
+    *,
+    fold: int = 0,
+) -> datetime:
+    """Convert a local wall time while rejecting nonexistent DST wall times."""
+    if fold not in (0, 1):
+        raise ValueError("fold must be 0 or 1")
+    if value.tzinfo is not None:
+        return value.astimezone(UTC).replace(tzinfo=None)
+    try:
+        timezone = ZoneInfo(timezone_name)
+    except Exception as exc:
+        raise ValueError("Invalid IANA timezone") from exc
+    local = value.replace(tzinfo=timezone, fold=fold)
+    roundtrip = local.astimezone(UTC).astimezone(timezone).replace(tzinfo=None)
+    if roundtrip != value:
+        raise ValueError("Local time does not exist in this timezone")
+    return local.astimezone(UTC).replace(tzinfo=None)
+
+
 def user_local_naive_to_utc_naive(value: datetime, user) -> datetime:
     return local_naive_to_utc_naive(value, get_user_timezone_name(user))

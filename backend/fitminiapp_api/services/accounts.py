@@ -19,6 +19,14 @@ from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity, L
 from fitminiapp_api.models.billing import Payment, Subscription
 from fitminiapp_api.models.cardio import CardioSession
 from fitminiapp_api.models.check_in import WeeklyCheckIn
+from fitminiapp_api.models.coach_crm import (
+    CoachBusinessSession,
+    CoachPackage,
+    CoachPackageLedgerEntry,
+    CoachPayment,
+    CoachSessionSeries,
+    CoachTask,
+)
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
     Exercise,
@@ -288,6 +296,38 @@ def delete_user_cascade(db: Session, user: User) -> None:
             ReportHandoff.trainer_user_id == user.id,
         )
     ).delete(synchronize_session=False)
+    crm_package_ids = [
+        row.id
+        for row in db.query(CoachPackage.id)
+        .filter(or_(CoachPackage.coach_user_id == user.id, CoachPackage.client_user_id == user.id))
+        .all()
+    ]
+    if crm_package_ids:
+        db.query(CoachPackageLedgerEntry).filter(
+            CoachPackageLedgerEntry.package_id.in_(crm_package_ids)
+        ).delete(synchronize_session=False)
+    db.query(CoachBusinessSession).filter(
+        or_(
+            CoachBusinessSession.coach_user_id == user.id,
+            CoachBusinessSession.client_user_id == user.id,
+        )
+    ).delete(synchronize_session=False)
+    db.query(CoachSessionSeries).filter(
+        or_(
+            CoachSessionSeries.coach_user_id == user.id,
+            CoachSessionSeries.client_user_id == user.id,
+        )
+    ).delete(synchronize_session=False)
+    db.query(CoachPayment).filter(
+        or_(CoachPayment.coach_user_id == user.id, CoachPayment.client_user_id == user.id)
+    ).delete(synchronize_session=False)
+    db.query(CoachTask).filter(
+        or_(CoachTask.coach_user_id == user.id, CoachTask.client_user_id == user.id)
+    ).delete(synchronize_session=False)
+    if crm_package_ids:
+        db.query(CoachPackage).filter(CoachPackage.id.in_(crm_package_ids)).delete(
+            synchronize_session=False
+        )
     db.query(CoachClient).filter(
         or_(CoachClient.coach_user_id == user.id, CoachClient.client_user_id == user.id)
     ).delete(synchronize_session=False)

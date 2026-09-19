@@ -18,6 +18,14 @@ from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthIdentity, LocalCredential
 from fitminiapp_api.models.cardio import CardioSession
 from fitminiapp_api.models.check_in import WeeklyCheckIn
+from fitminiapp_api.models.coach_crm import (
+    CoachBusinessSession,
+    CoachPackage,
+    CoachPackageLedgerEntry,
+    CoachPayment,
+    CoachSessionSeries,
+    CoachTask,
+)
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
     Exercise,
@@ -75,7 +83,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 16
+ACCOUNT_EXPORT_SCHEMA_VERSION = 17
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -128,6 +136,12 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "exercise_guide_metadata": "custom_exercises",
     "exercise_alternatives": "custom_exercises",
     "coach_clients": "coaching_relationships",
+    "coach_session_series": "coach_session_series",
+    "coach_business_sessions": "coach_business_sessions",
+    "coach_packages": "coach_packages",
+    "coach_package_ledger": "coach_package_ledger",
+    "coach_payments": "coach_payments",
+    "coach_tasks": "coach_tasks",
     "coach_role_applications": "coach_role_applications",
     "workout_comments": "workout_comments",
     "workout_comment_revisions": "workout_comments",
@@ -176,6 +190,65 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
 
 def _fields(row: object, names: tuple[str, ...]) -> dict[str, object]:
     return {name: getattr(row, name) for name in names}
+
+
+def _crm_business_session_fields(row: CoachBusinessSession, user_id: int) -> dict[str, object]:
+    names: tuple[str, ...] = (
+        "id",
+        "client_user_id",
+        "series_id",
+        "package_id",
+        "user_workout_id",
+        "occurrence_key",
+        "starts_at_utc",
+        "timezone",
+        "duration_minutes",
+        "format",
+        "location",
+        "status",
+        "created_at",
+        "updated_at",
+    )
+    if row.coach_user_id == user_id:
+        names = (*names[:-2], "private_note", *names[-2:])
+    return _fields(row, names)
+
+
+def _crm_package_fields(row: CoachPackage, user_id: int) -> dict[str, object]:
+    names: tuple[str, ...] = (
+        "id",
+        "client_user_id",
+        "name",
+        "counts_sessions",
+        "included_sessions",
+        "starts_on",
+        "expires_on",
+        "state",
+        "created_at",
+        "updated_at",
+    )
+    if row.coach_user_id == user_id:
+        names = (*names[:-2], "note", *names[-2:])
+    return _fields(row, names)
+
+
+def _crm_payment_fields(row: CoachPayment, user_id: int) -> dict[str, object]:
+    names: tuple[str, ...] = (
+        "id",
+        "client_user_id",
+        "package_id",
+        "expected_amount_minor",
+        "paid_amount_minor",
+        "currency",
+        "payment_date",
+        "method",
+        "status",
+        "created_at",
+        "updated_at",
+    )
+    if row.coach_user_id == user_id:
+        names = (*names[:-2], "note", *names[-2:])
+    return _fields(row, names)
 
 
 def _serialize_ai_coach_conversation_message(
@@ -872,6 +945,55 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(CoachClient.created_at.asc(), CoachClient.id.asc())
         .all()
     )
+    session_series = (
+        db.query(CoachSessionSeries)
+        .filter(
+            or_(
+                CoachSessionSeries.coach_user_id == user.id,
+                CoachSessionSeries.client_user_id == user.id,
+            )
+        )
+        .order_by(CoachSessionSeries.start_date.asc(), CoachSessionSeries.id.asc())
+        .all()
+    )
+    business_sessions = (
+        db.query(CoachBusinessSession)
+        .filter(
+            or_(
+                CoachBusinessSession.coach_user_id == user.id,
+                CoachBusinessSession.client_user_id == user.id,
+            )
+        )
+        .order_by(CoachBusinessSession.starts_at_utc.asc(), CoachBusinessSession.id.asc())
+        .all()
+    )
+    packages = (
+        db.query(CoachPackage)
+        .filter(or_(CoachPackage.coach_user_id == user.id, CoachPackage.client_user_id == user.id))
+        .order_by(CoachPackage.created_at.asc(), CoachPackage.id.asc())
+        .all()
+    )
+    package_ids = [package.id for package in packages if package.coach_user_id == user.id]
+    package_ledger = (
+        db.query(CoachPackageLedgerEntry)
+        .filter(CoachPackageLedgerEntry.package_id.in_(package_ids))
+        .order_by(CoachPackageLedgerEntry.created_at.asc(), CoachPackageLedgerEntry.id.asc())
+        .all()
+        if package_ids
+        else []
+    )
+    payments = (
+        db.query(CoachPayment)
+        .filter(or_(CoachPayment.coach_user_id == user.id, CoachPayment.client_user_id == user.id))
+        .order_by(CoachPayment.created_at.asc(), CoachPayment.id.asc())
+        .all()
+    )
+    coach_tasks = (
+        db.query(CoachTask)
+        .filter(CoachTask.coach_user_id == user.id)
+        .order_by(CoachTask.created_at.asc(), CoachTask.id.asc())
+        .all()
+    )
     report_handoffs = (
         db.query(ReportHandoff)
         .filter(
@@ -1294,12 +1416,79 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "id": relation.id,
                 "role": "coach" if relation.coach_user_id == user.id else "client",
                 "status": relation.status,
+                **(
+                    {"operational_status": relation.operational_status}
+                    if relation.coach_user_id == user.id
+                    else {}
+                ),
                 "created_at": relation.created_at,
                 "accepted_at": relation.accepted_at,
                 "ended_at": relation.ended_at,
                 "ended_reason": relation.ended_reason,
             }
             for relation in relations
+        ],
+        "coach_session_series": [
+            _fields(
+                series,
+                (
+                    "id",
+                    "client_user_id",
+                    "package_id",
+                    "recurrence_kind",
+                    "weekdays",
+                    "start_date",
+                    "start_time",
+                    "recurrence_end_date",
+                    "occurrence_count",
+                    "timezone",
+                    "duration_minutes",
+                    "format",
+                    "location",
+                    "status",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for series in session_series
+        ],
+        "coach_business_sessions": [
+            _crm_business_session_fields(session, user.id) for session in business_sessions
+        ],
+        "coach_packages": [_crm_package_fields(package, user.id) for package in packages],
+        "coach_package_ledger": [
+            _fields(
+                entry,
+                (
+                    "id",
+                    "package_id",
+                    "session_id",
+                    "entry_type",
+                    "quantity",
+                    "reason",
+                    "created_at",
+                ),
+            )
+            for entry in package_ledger
+        ],
+        "coach_payments": [_crm_payment_fields(payment, user.id) for payment in payments],
+        "coach_tasks": [
+            _fields(
+                task,
+                (
+                    "id",
+                    "client_user_id",
+                    "title",
+                    "due_at_utc",
+                    "timezone",
+                    "state",
+                    "completed_at",
+                    "reopened_at",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for task in coach_tasks
         ],
         "report_handoffs": [
             {
