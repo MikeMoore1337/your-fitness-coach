@@ -2,6 +2,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import type { FoodDiaryEntry, HydrationEntry } from '../../src/shared/api/types';
 import { nutritionDaySummary } from './fixtures/locators';
 
+test.use({ serviceWorkers: 'block' });
+
 const zeroNutrition = {
   energy_kcal: '0.00',
   protein_g: '0.000',
@@ -789,8 +791,10 @@ test('hydration touch matrix has no horizontal overflow and keeps controls reach
 
 const russianSearchVisualCases = [
   { label: 'desktop-1280', viewport: { width: 1280, height: 900 }, dark: false },
+  { label: 'desktop-1280-dark', viewport: { width: 1280, height: 900 }, dark: true },
   { label: 'mobile-web-360', viewport: { width: 360, height: 800 }, dark: false },
   { label: 'dark-mobile-390', viewport: { width: 390, height: 844 }, dark: true },
+  { label: 'mobile-web-430', viewport: { width: 430, height: 932 }, dark: false },
 ] as const;
 
 for (const current of russianSearchVisualCases) {
@@ -991,6 +995,55 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(addButton).toBeFocused();
 
   await addButton.click();
+  const productResult = page.locator('.nutrition-food-result').filter({ hasText: 'Овсяная каша' });
+  const favoriteButton = productResult.locator('.nutrition-food-result__favorite');
+  await expect(favoriteButton).toBeVisible();
+  const favoriteGeometry = await favoriteButton.evaluate((button) => {
+    const buttonRect = button.getBoundingClientRect();
+    const icon = button.querySelector<SVGElement>('.yfc-icon');
+    const iconRect = icon?.getBoundingClientRect();
+    const rowRect = button.closest('.nutrition-food-result')?.getBoundingClientRect();
+    return {
+      button: {
+        left: buttonRect.left,
+        right: buttonRect.right,
+        top: buttonRect.top,
+        bottom: buttonRect.bottom,
+        width: buttonRect.width,
+        height: buttonRect.height,
+      },
+      icon: iconRect
+        ? {
+            centerX: iconRect.left + iconRect.width / 2,
+            centerY: iconRect.top + iconRect.height / 2,
+          }
+        : null,
+      row: rowRect
+        ? { left: rowRect.left, right: rowRect.right, top: rowRect.top, bottom: rowRect.bottom }
+        : null,
+    };
+  });
+  expect(favoriteGeometry.button.width).toBeGreaterThanOrEqual(44);
+  expect(favoriteGeometry.button.height).toBeGreaterThanOrEqual(44);
+  expect(favoriteGeometry.row).not.toBeNull();
+  expect(favoriteGeometry.button.left).toBeGreaterThan(favoriteGeometry.row!.left);
+  expect(favoriteGeometry.button.right).toBeLessThan(favoriteGeometry.row!.right);
+  expect(favoriteGeometry.icon).not.toBeNull();
+  expect(
+    Math.abs(
+      favoriteGeometry.icon!.centerX -
+        (favoriteGeometry.button.left + favoriteGeometry.button.width / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(
+      favoriteGeometry.icon!.centerY -
+        (favoriteGeometry.button.top + favoriteGeometry.button.height / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  await expect(favoriteButton).toHaveAttribute('aria-pressed', 'true');
+  await favoriteButton.focus();
+  await expect(favoriteButton).toBeFocused();
   await page.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
   await expect(page.getByRole('spinbutton', { name: 'Количество' })).toHaveValue('1');
   await page.getByRole('button', { name: 'Добавить в дневник' }).click();

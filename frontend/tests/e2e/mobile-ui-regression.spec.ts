@@ -230,21 +230,52 @@ test('@critical active workout keeps the current set primary across mobile width
     await expect(currentSet).toContainText(/(?:повторений|Повторы по плану)/);
     await expect(currentSet).toContainText(/Отдых \d+ с/);
     await expect(currentSetDone).toBeVisible();
-    await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
     await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
     await assertMobileShellGeometry(page);
 
-    const reps = currentSet.getByRole('spinbutton', { name: /Повторы, .*подход 1/ });
-    await reps.focus();
-    await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
-    await expect(page.locator('#appBottomNav')).toBeHidden();
-    await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(
+      viewport.height,
+    );
+    await currentSetDone.evaluate((element) => {
+      element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    });
+    await expect(currentSetDone).toBeInViewport();
+    await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
+    await expectUiAuditClean(page, 'active workout current set', { checkTouchTargets: true });
 
+    const numberInputs = currentSet.locator('input[type="number"]');
+    await expect(numberInputs).toHaveCount(2);
+    expect(
+      await numberInputs.evaluateAll((inputs) =>
+        inputs.map((input) => (input as HTMLInputElement).type),
+      ),
+    ).toEqual(['number', 'number']);
+
+    for (const input of [
+      currentSet.getByRole('spinbutton', { name: /Вес, .*подход 1/ }),
+      currentSet.getByRole('spinbutton', { name: /Повторы, .*подход 1/ }),
+    ]) {
+      await input.focus();
+      await expect(input).toBeInViewport();
+      await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
+      await expect(page.locator('#appBottomNav')).toBeHidden();
+      await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
+      await input.evaluate((element) => (element as HTMLElement).blur());
+      await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
+      await expect(page.locator('#appBottomNav')).toBeVisible();
+    }
+    await expect(page.locator('#appBottomNav .app-bottom-nav__primary > a').first()).toBeVisible();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
     await page.screenshot({
       path: test.info().outputPath(`active-workout-${viewport.width}x${viewport.height}-dark.png`),
-      fullPage: true,
+      fullPage: false,
+      animations: 'disabled',
     });
-    await reps.evaluate((element) => (element as HTMLElement).blur());
   }
 });
 

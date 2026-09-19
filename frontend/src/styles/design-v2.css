@@ -2556,6 +2556,7 @@ body:has(.app-shell--design-v2) {
   border-radius: var(--v2-panel-radius);
   background: var(--v2-surface-secondary);
   box-shadow: inset 3px 0 0 var(--v2-lime);
+  scroll-margin-block: var(--v2-space-4) var(--yfc-mobile-dock-clearance);
 }
 
 .active-workout--design-v2 .active-workout-set__context {
@@ -4416,8 +4417,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   --yfc-layout-safe-right: max(var(--yfc-safe-right), var(--yfc-content-safe-right));
   --yfc-layout-safe-bottom: max(var(--yfc-safe-bottom), var(--yfc-content-safe-bottom));
   --yfc-layout-safe-left: max(var(--yfc-safe-left), var(--yfc-content-safe-left));
-  --yfc-mobile-dock-clearance: calc(96px + max(8px, var(--yfc-layout-safe-bottom)));
-  --yfc-mobile-action-clearance: calc(104px + max(8px, var(--yfc-layout-safe-bottom)));
+  --app-bottom-nav-height: 0px;
+  --yfc-mobile-dock-clearance: max(
+    96px,
+    calc(var(--app-bottom-nav-height) + 24px + max(8px, var(--yfc-layout-safe-bottom)))
+  );
+  --yfc-mobile-action-clearance: max(
+    104px,
+    calc(var(--app-bottom-nav-height) + 32px + max(8px, var(--yfc-layout-safe-bottom)))
+  );
 }
 
 .app-shell--design-v2 {
@@ -4436,6 +4444,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 @media (max-width: 899px) {
+  :root {
+    --app-bottom-nav-height: 72px;
+  }
+
   body:has(.app-shell--design-v2 #appBottomNav) {
     padding-bottom: calc(72px + max(14px, var(--yfc-layout-safe-bottom)));
   }

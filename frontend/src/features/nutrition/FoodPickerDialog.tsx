@@ -274,6 +274,7 @@ function FoodResults({
             <div className="nutrition-food-result__actions">
               <button
                 type="button"
+                className="nutrition-food-result__favorite"
                 aria-label={
                   food.is_favorite
                     ? `Убрать ${food.name} из избранного`
