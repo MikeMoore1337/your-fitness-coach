@@ -123,7 +123,7 @@ def _client_entry_from_user(
     nutrition_target: NutritionTargetResponse | None,
     *,
     include_preferences_context: bool,
-    operational_status: str = "active",
+    operational_status: str | None = "active",
 ) -> dict:
     from fitminiapp_api.services.training_preferences import serialize_training_preferences
 
@@ -156,7 +156,7 @@ def _client_entry_from_user(
         "timezone": get_user_timezone_name(user),
         "kbju": nutrition_target,
         "status": "active",
-        "operational_status": operational_status,
+        "operational_status": operational_status or "active",
     }
 
 

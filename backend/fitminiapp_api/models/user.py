@@ -320,8 +320,8 @@ class CoachClient(Base):
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="active", server_default="active"
     )
-    operational_status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="active", server_default="active"
+    operational_status: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, default="active", server_default="active"
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
     accepted_at: Mapped[datetime | None] = mapped_column(

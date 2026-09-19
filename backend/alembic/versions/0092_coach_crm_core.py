@@ -14,24 +14,18 @@ depends_on: str | Sequence[str] | None = None
 online_rollout_phase = "expand"
 online_rollout_notes = (
     "Adds coach-owned business sessions, bounded weekly series, package ledger, manual payment "
-    "records and trainer tasks. Session times are stored as naive UTC plus an IANA timezone."
+    "records and trainer tasks. Session times are stored as naive UTC plus an IANA timezone. "
+    "The populated coach_clients table receives only a nullable operational-status column during "
+    "expand; legacy NULL values are projected as active by the service layer and new ORM writes "
+    "keep the existing active default."
 )
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("coach_clients") as batch_op:
-        batch_op.add_column(
-            sa.Column(
-                "operational_status",
-                sa.String(length=16),
-                server_default="active",
-                nullable=False,
-            )
-        )
-        batch_op.create_check_constraint(
-            "ck_coach_clients_operational_status",
-            "operational_status IN ('active', 'paused', 'archived')",
-        )
+    op.add_column(
+        "coach_clients",
+        sa.Column("operational_status", sa.String(length=16), nullable=True),
+    )
 
     op.create_table(
         "coach_packages",
@@ -434,6 +428,4 @@ def downgrade() -> None:
     op.drop_table("coach_session_series")
     op.drop_index("ix_coach_packages_coach_client_state", table_name="coach_packages")
     op.drop_table("coach_packages")
-    with op.batch_alter_table("coach_clients") as batch_op:
-        batch_op.drop_constraint("ck_coach_clients_operational_status", type_="check")
-        batch_op.drop_column("operational_status")
+    op.drop_column("coach_clients", "operational_status")

@@ -1417,7 +1417,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 "role": "coach" if relation.coach_user_id == user.id else "client",
                 "status": relation.status,
                 **(
-                    {"operational_status": relation.operational_status}
+                    {"operational_status": relation.operational_status or "active"}
                     if relation.coach_user_id == user.id
                     else {}
                 ),
