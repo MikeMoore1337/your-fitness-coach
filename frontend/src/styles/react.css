@@ -5014,6 +5014,13 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   white-space: nowrap;
   pointer-events: none;
 }
+
+@media (max-width: 899px) {
+  .app-bottom-nav__btn--mobile-hidden {
+    display: none;
+  }
+}
+
 .app-bottom-nav__avatar {
   overflow: hidden;
   display: grid;

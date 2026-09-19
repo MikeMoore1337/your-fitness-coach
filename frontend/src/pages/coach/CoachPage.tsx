@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppShell, type DemoAppShellConfig } from '../../app/AppShell';
 import '../../styles/react.css';
 import '../../styles/design-v2.css';
+import '../../features/coach/coach-os.css';
 import { useAuth } from '../../app/AuthProvider';
 import { Diary } from '../../features/diary/Diary';
 import { ClientAnalytics } from '../../features/coach/ClientAnalytics';
-import { CoachAttentionCenter } from '../../features/coach/CoachAttentionCenter';
+import { CoachToday } from '../../features/coach/CoachToday';
+import { CoachClientTimeline } from '../../features/coach/CoachClientTimeline';
+import { CoachReportHandoffEntry } from '../../features/coach/CoachReportHandoffEntry';
 import { TrainerModeSwitch } from '../../features/trainer/TrainerModeSwitch';
 import { ExerciseCatalog } from '../../features/exercises/ExerciseCatalog';
 import { NutritionForm } from '../../features/nutrition/NutritionForm';
@@ -42,6 +45,7 @@ import {
   productEventSurface,
   trackGrowthEvent,
   trackProductEvent,
+  type CoachQuickActionKind,
 } from '../../shared/analytics/productEvents';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
@@ -59,13 +63,12 @@ import {
 import {
   activityLabel,
   clientDisplayName,
-  coachWorkspaceStats,
   filterCoachClients,
   needsCoachAttention,
   type CoachClientFilter,
 } from '../../features/coach/coachWorkspace';
 
-type CoachTab = 'clients' | 'programs' | 'catalog';
+type CoachTab = 'today' | 'clients' | 'programs' | 'tools';
 
 async function loadCoachClientSummaries(): Promise<TrainerClientProgressList> {
   const limit = 100;
@@ -415,80 +418,12 @@ function coachGoalLabel(goal: string | null | undefined): string {
   );
 }
 
-function clientCountLabel(value: number): string {
-  const lastTwo = value % 100;
-  const last = value % 10;
-  if (lastTwo >= 11 && lastTwo <= 14) return `${value} клиентов`;
-  if (last === 1) return `${value} клиент`;
-  if (last >= 2 && last <= 4) return `${value} клиента`;
-  return `${value} клиентов`;
-}
-
 function adherenceText(summary?: TrainerClientProgressSummary): string {
   const workouts = summary?.adherence.workouts;
   if (!workouts || workouts.status !== 'available' || workouts.percent == null) {
     return 'Пока мало данных о выполнении плана';
   }
   return `Выполнено ${workouts.achieved} из ${workouts.evaluated} по плану — ${Math.round(workouts.percent)}%`;
-}
-
-function CoachWorkspaceDashboard({
-  clients,
-  loading,
-  summaries,
-  unavailable,
-}: {
-  clients: Client[];
-  loading: boolean;
-  summaries: TrainerClientProgressSummary[];
-  unavailable: boolean;
-}) {
-  const stats = coachWorkspaceStats(clients, summaries);
-  const summariesMissing = loading || unavailable;
-  return (
-    <section className="coach-dashboard" aria-labelledby="coach-dashboard-title">
-      <div className="coach-dashboard__heading">
-        <div>
-          <span className="eyebrow">За последние 30 дней</span>
-          <h2 id="coach-dashboard-title">Состояние клиентской базы</h2>
-        </div>
-        <p>
-          {unavailable
-            ? 'Краткие показатели временно недоступны'
-            : loading
-              ? 'Обновляем краткие показатели клиентов…'
-              : stats.attention
-                ? `${clientCountLabel(stats.attention)} ${stats.attention === 1 ? 'давно не тренировался' : 'давно не тренировались'}`
-                : 'У активных клиентов нет длительных пауз'}
-        </p>
-      </div>
-      <dl className="coach-fact-strip">
-        <div>
-          <dt>Активные</dt>
-          <dd>{stats.active}</dd>
-        </div>
-        <div>
-          <dt>Ожидают подключения</dt>
-          <dd>{stats.pending}</dd>
-        </div>
-        <div>
-          <dt>Тренировались за 7 дней</dt>
-          <dd>
-            {summariesMissing ? '—' : stats.recent}{' '}
-            {!summariesMissing && <small>из {stats.active}</small>}
-          </dd>
-        </div>
-        <div>
-          <dt>Новые личные результаты</dt>
-          <dd>{summariesMissing ? '—' : stats.personalRecords}</dd>
-        </div>
-        <div>
-          <dt>Обновили замеры</dt>
-          <dd>{summariesMissing ? '—' : stats.measurementUpdates}</dd>
-        </div>
-      </dl>
-    </section>
-  );
 }
 
 function CoachZeroState({
@@ -557,11 +492,115 @@ function CoachZeroState({
   );
 }
 
+function CoachInviteCard({
+  inviteLink,
+  inviteCreating,
+  inviteDisabled,
+  onCreate,
+  onCopy,
+}: {
+  inviteLink: InviteLink | null;
+  inviteCreating: boolean;
+  inviteDisabled: boolean;
+  onCreate: () => void;
+  onCopy: (value: string) => Promise<void>;
+}) {
+  return (
+    <Card
+      className={`coach-invite-panel${inviteLink ? ' is-visible' : ''}`}
+      collapsible={false}
+      title="Пригласить клиента"
+      description="Клиент сначала увидит ваше имя и сам подтвердит подключение."
+      actions={
+        <button disabled={inviteCreating || inviteDisabled} onClick={onCreate} type="button">
+          {inviteCreating ? 'Создаём…' : 'Создать приглашение'}
+        </button>
+      }
+    >
+      {inviteLink ? (
+        <div className="auth-notice stack top-gap">
+          {inviteLink.web_url && (
+            <label className="field">
+              <span>Ссылка для браузера и Telegram</span>
+              <input
+                readOnly
+                value={inviteLink.web_url}
+                onFocus={(event) => event.currentTarget.select()}
+              />
+            </label>
+          )}
+          {inviteLink.telegram_url && (
+            <label className="field">
+              <span>Открыть внутри Telegram</span>
+              <input
+                readOnly
+                value={inviteLink.telegram_url}
+                onFocus={(event) => event.currentTarget.select()}
+              />
+            </label>
+          )}
+          {inviteLink.code && (
+            <label className="field">
+              <span>Код приглашения</span>
+              <input
+                readOnly
+                value={inviteLink.code}
+                onFocus={(event) => event.currentTarget.select()}
+              />
+            </label>
+          )}
+          <p className="muted">
+            Действует до {new Date(inviteLink.expires_at).toLocaleString('ru-RU')}.
+          </p>
+          <div className="toolbar wrap">
+            <button
+              type="button"
+              onClick={() =>
+                void onCopy(
+                  inviteLink.web_url || inviteLink.url || inviteLink.code || inviteLink.start_param,
+                )
+              }
+            >
+              Копировать
+            </button>
+            {inviteLink.web_url && typeof navigator.share === 'function' && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() =>
+                  void navigator
+                    .share({
+                      title: 'Приглашение тренера',
+                      text: 'Откройте Your Fitness Coach и подтвердите подключение к тренеру.',
+                      url: inviteLink.web_url!,
+                    })
+                    .catch(() => undefined)
+                }
+              >
+                Поделиться
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="muted">
+          Новая персональная ссылка появится здесь. До подтверждения клиента доступ к данным не
+          открывается.
+        </p>
+      )}
+    </Card>
+  );
+}
+
 function ClientSummaryFacts({ summary }: { summary?: TrainerClientProgressSummary }) {
   if (!summary) {
     return <p className="muted">Сводка ещё загружается или данных за период пока нет.</p>;
   }
   const workoutAdherence = summary.adherence.workouts;
+  const latestMeasurement = summary.body.latest_measurement;
+  const customMeasurement = latestMeasurement?.custom_measurements?.find(
+    (measurement) => !measurement.archived,
+  );
   return (
     <div className="coach-client-facts">
       <div>
@@ -589,11 +628,14 @@ function ClientSummaryFacts({ summary }: { summary?: TrainerClientProgressSummar
       </div>
       <div>
         <span>Последний замер</span>
-        <strong>{formatCoachDate(summary.body.latest_measurement?.measured_on)}</strong>
+        <strong>{formatCoachDate(latestMeasurement?.measured_on)}</strong>
         <small>
-          {summary.body.latest_measurement?.weight_kg != null
-            ? `${summary.body.latest_measurement.weight_kg} кг`
+          {latestMeasurement?.weight_kg != null
+            ? `${latestMeasurement.weight_kg} кг`
             : 'Вес не указан'}
+          {customMeasurement
+            ? ` · ${customMeasurement.label}: ${customMeasurement.value} ${customMeasurement.unit}`
+            : ''}
         </small>
       </div>
     </div>
@@ -634,6 +676,9 @@ function CoachClientDetail({
   focusedWorkoutId,
   onBack,
   onOpenCatalog,
+  onFocusWorkout,
+  onFocusCheckIn,
+  onQuickAction,
   programs,
   summary,
 }: {
@@ -643,10 +688,17 @@ function CoachClientDetail({
   focusedWorkoutId: number | null;
   onBack: () => void;
   onOpenCatalog: () => void;
+  onFocusWorkout: (workoutId: number) => void;
+  onFocusCheckIn: () => void;
+  onQuickAction: (kind: CoachQuickActionKind) => void;
   programs: CoachAssignedProgram[];
   summary?: TrainerClientProgressSummary;
 }) {
   const capabilities = useRuntimeCapabilities();
+  const [timelineRequest, setTimelineRequest] = useState<number | null>(null);
+  const [programRequest, setProgramRequest] = useState<number | null>(null);
+  const [progressRequest, setProgressRequest] = useState<number | null>(null);
+  const [reportRequest, setReportRequest] = useState<number | null>(null);
   if (client.id == null) return null;
   const activeProgram = programs.find((program) => program.is_active);
   return (
@@ -664,22 +716,107 @@ function CoachClientDetail({
           </p>
         </div>
         <nav className="coach-client-quick-actions" aria-label="Данные клиента">
-          <a href="#coach-client-program">Программа</a>
-          <a href="#coach-client-progress">Тренировки и прогресс</a>
-          <a href="#coach-client-nutrition">Питание</a>
-          <a href="#coach-client-profile">Профиль</a>
-          <AppLink to={`/app/report?period=days_30&client_id=${client.id}`}>Отчёт</AppLink>
+          <a
+            href="#coach-client-timeline"
+            onClick={() => {
+              onQuickAction('review_workout');
+              setTimelineRequest(Date.now());
+            }}
+          >
+            Последние события
+          </a>
+          <a
+            href="#coach-client-program"
+            onClick={() => {
+              onQuickAction('assign_program');
+              setProgramRequest(Date.now());
+            }}
+          >
+            Программа
+          </a>
+          <a
+            href="#coach-client-progress"
+            onClick={() => {
+              onQuickAction('progress');
+              setProgressRequest(Date.now());
+            }}
+          >
+            Прогресс
+          </a>
+          <a
+            href="#coach-client-nutrition"
+            onClick={() => {
+              onQuickAction('nutrition');
+            }}
+          >
+            Питание
+          </a>
+          <a
+            href="#coach-client-profile"
+            onClick={() => {
+              onQuickAction('profile');
+            }}
+          >
+            Профиль
+          </a>
+          <a
+            href="#coach-client-report"
+            onClick={() => {
+              onQuickAction('report');
+              setReportRequest(Date.now());
+            }}
+          >
+            Отчёт
+          </a>
         </nav>
       </header>
 
       <ClientSummaryFacts summary={summary} />
 
+      <section className="coach-client-overview" aria-label="Контекст клиента">
+        <div>
+          <span className="eyebrow">Текущий контекст</span>
+          <strong>{activeProgram?.title ?? 'Активной программы нет'}</strong>
+          <small>
+            {summary?.training.next_workout
+              ? `Следующая тренировка · ${formatCoachDate(summary.training.next_workout.scheduled_date)} · ${summary.training.next_workout.title}`
+              : 'Следующая тренировка не запланирована'}
+          </small>
+        </div>
+        <div>
+          <span className="eyebrow">Состояние</span>
+          <strong>
+            {needsCoachAttention(summary) ? 'Нужна проверка' : 'Недавняя активность есть'}
+          </strong>
+          <small>{activityLabel(summary?.training.last_completed_workout_on)}</small>
+        </div>
+      </section>
+
+      <ClientDataSection
+        id="coach-client-timeline"
+        key={`timeline-${client.id}-${timelineRequest ?? 'closed'}`}
+        title="Лента активности"
+        description="Тренировки, недельные итоги и замеры в одной хронологии"
+        open={timelineRequest != null}
+      >
+        <CoachClientTimeline
+          clientId={client.id}
+          enabled
+          onOpenWorkout={onFocusWorkout}
+          onOpenCheckIn={onFocusCheckIn}
+          onOpenProgress={() => {
+            onQuickAction('progress');
+            setProgressRequest(Date.now());
+          }}
+        />
+      </ClientDataSection>
+
       <ClientDataSection
         id="coach-client-program"
-        key={`program-${client.id}-${focusedProgramId ?? 'none'}`}
+        key={`program-${client.id}-${focusedProgramId ?? 'none'}-${programRequest ?? 'closed'}`}
         title="Программа тренировок"
         description="Текущий план, ближайшая тренировка и новое назначение"
-        open
+        open={Boolean(focusedProgramId || programRequest)}
       >
         <div className="coach-client-programs">
           <div className="coach-client-programs__head">
@@ -758,9 +895,10 @@ function CoachClientDetail({
 
       <ClientDataSection
         id="coach-client-progress"
+        key={`progress-${client.id}-${focusedAttention ?? 'none'}-${focusedWorkoutId ?? 'none'}-${progressRequest ?? 'closed'}`}
         title="Тренировки, прогресс и замеры"
         description={adherenceText(summary)}
-        open={Boolean(focusedAttention || focusedProgramId || focusedWorkoutId)}
+        open={Boolean(focusedAttention || focusedProgramId || focusedWorkoutId || progressRequest)}
       >
         <ClientAnalytics
           clientId={client.id}
@@ -776,6 +914,16 @@ function CoachClientDetail({
           readOnly={!capabilities.canMutateProgress}
           timeZone={client.timezone}
         />
+      </ClientDataSection>
+
+      <ClientDataSection
+        id="coach-client-report"
+        key={`report-${client.id}-${reportRequest ?? 'closed'}`}
+        title="Расширенный отчёт"
+        description="Канонический report и комментарий клиента"
+        open={reportRequest != null}
+      >
+        <CoachReportHandoffEntry clientId={client.id} enabled />
       </ClientDataSection>
 
       <ClientDataSection
@@ -839,13 +987,13 @@ export default function CoachPage({
   const capabilities = useRuntimeCapabilities();
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<CoachTab>('clients');
   const initialClientId = (() => {
     const value = new URLSearchParams(window.location.search).get('client_id');
     if (!value || !/^\d+$/.test(value)) return null;
     const clientId = Number(value);
     return Number.isSafeInteger(clientId) && clientId > 0 ? clientId : null;
   })();
+  const [tab, setTab] = useState<CoachTab>(initialClientId ? 'clients' : 'today');
   const initialWorkoutId = (() => {
     const value = new URLSearchParams(window.location.search).get('workout_id');
     if (!value || !/^\d+$/.test(value)) return null;
@@ -858,12 +1006,22 @@ export default function CoachPage({
       : null;
   const [selectedId, setSelectedId] = useState<number | null>(initialClientId);
   const [clientDetailOpen, setClientDetailOpen] = useState(Boolean(initialClientId));
+  const usefulActionStartedAt = useRef<number | null>(null);
+  const usefulActionTracked = useRef(false);
   useTelegramOverlayBackButton(clientDetailOpen, () => setClientDetailOpen(false));
+
+  useEffect(() => {
+    usefulActionStartedAt.current = performance.now();
+  }, []);
 
   useEffect(() => {
     if (user?.is_coach) {
       trackProductEvent(
         { name: 'trainer_workspace_viewed', surface: productEventSurface() },
+        { dedupe: 'session' },
+      );
+      trackProductEvent(
+        { name: 'coach_home_viewed', surface: productEventSurface() },
         { dedupe: 'session' },
       );
     }
@@ -878,6 +1036,34 @@ export default function CoachPage({
   );
   const [inviteLink, setInviteLink] = useState<InviteLink | null>(null);
   const [inviteCreating, setInviteCreating] = useState(false);
+
+  const trackCoachUsefulAction = () => {
+    if (usefulActionTracked.current) return;
+    usefulActionTracked.current = true;
+    const elapsed = performance.now() - (usefulActionStartedAt.current ?? performance.now());
+    const latency_bucket =
+      elapsed < 10_000
+        ? ('under_10s' as const)
+        : elapsed < 30_000
+          ? ('10_30s' as const)
+          : elapsed < 60_000
+            ? ('30_60s' as const)
+            : ('over_60s' as const);
+    trackProductEvent({
+      name: 'coach_time_to_first_useful_action',
+      surface: productEventSurface(),
+      latency_bucket,
+    });
+  };
+
+  const trackCoachQuickAction = (kind: CoachQuickActionKind) => {
+    trackCoachUsefulAction();
+    trackProductEvent({
+      name: 'coach_quick_action_used',
+      surface: productEventSurface(),
+      kind,
+    });
+  };
   const clients = useQuery({
     queryKey: queryKeys.trainer.clients,
     queryFn: () => api<Client[]>('/api/v1/coach/clients'),
@@ -980,22 +1166,57 @@ export default function CoachPage({
     }
   };
 
+  const navigateCoach = (destination: CoachTab, filter?: CoachClientFilter) => {
+    if (
+      destination === 'today' ||
+      destination === 'clients' ||
+      destination === 'programs' ||
+      destination === 'tools'
+    ) {
+      trackProductEvent({
+        name: 'coach_navigation_selected',
+        surface: productEventSurface(),
+        destination,
+      });
+    }
+    if (filter) setClientFilter(filter);
+    setTab(destination);
+    if (destination !== 'clients') setClientDetailOpen(false);
+  };
+
+  const openClient = (clientId: number) => {
+    trackCoachUsefulAction();
+    trackProductEvent({
+      name: 'trainer_client_opened',
+      surface: productEventSurface(),
+    });
+    trackProductEvent({
+      name: 'coach_client_opened',
+      surface: productEventSurface(),
+    });
+    setSelectedId(clientId);
+    setFocusedProgramId(null);
+    setFocusedWorkoutId(null);
+    setFocusedAttention(null);
+    setClientDetailOpen(true);
+    setTab('clients');
+  };
+
   const content = (
     <div
-      className={`page-stack app-section app-section--programs app-section--design-v2 coach-workspace--design-v2${clientDetailOpen ? ' is-client-detail-open' : ''}`}
+      className={`page-stack app-section app-section--programs app-section--design-v2 coach-workspace--design-v2 coach-os${clientDetailOpen ? ' is-client-detail-open' : ''}`}
     >
       <TrainerModeSwitch
         mode="clients"
-        sticky
         clientName={clientDetailOpen && selected ? clientDisplayName(selected) : undefined}
       />
-      <header className="coach-workspace-header">
+      <header className="coach-os-header">
         <div>
-          <span className="eyebrow">Клиенты · рабочее пространство</span>
-          <h1>Кабинет тренера</h1>
-          <p>Факты о тренировках, планах и прогрессе — без потери контекста клиента.</p>
+          <span className="eyebrow">Тренер · рабочее пространство</span>
+          <h1>{tab === 'today' ? 'Сегодня' : 'Кабинет тренера'}</h1>
+          <p>Сначала действие, затем детали клиента — без потери глубины YFC.</p>
         </div>
-        <div className="coach-workspace-header__actions">
+        <div className="coach-os-header__actions">
           <button
             disabled={inviteCreating || !capabilities.canManageCoach}
             onClick={() => void createInvite()}
@@ -1005,45 +1226,64 @@ export default function CoachPage({
           </button>
         </div>
       </header>
-      <div className="react-tabs react-tabs--coach" role="tablist" aria-label="Разделы тренера">
+      <nav className="coach-os-nav" aria-label="Разделы тренера">
         {(
           [
+            ['today', 'Сегодня'],
             ['clients', 'Клиенты'],
-            ['programs', 'Назначенные программы'],
-            ['catalog', 'Упражнения'],
+            ['programs', 'Программы'],
+            ['tools', 'Ещё · инструменты'],
           ] as const
         ).map(([key, label]) => (
           <button
             type="button"
-            role="tab"
-            aria-selected={tab === key}
-            id={`coach-tab-${key}`}
-            aria-controls={`coach-panel-${key}`}
-            tabIndex={tab === key ? 0 : -1}
+            aria-current={tab === key ? 'page' : undefined}
             className={tab === key ? 'is-active' : 'secondary'}
-            onClick={() => setTab(key)}
+            aria-label={key === 'tools' ? label : undefined}
+            onClick={() => navigateCoach(key)}
             onKeyDown={handleTabKeyDown}
             key={key}
           >
-            {label}
+            <span className="coach-os-nav__label coach-os-nav__label--desktop">{label}</span>
+            <span
+              className="coach-os-nav__label coach-os-nav__label--mobile"
+              aria-hidden={key === 'tools' ? true : undefined}
+            >
+              {key === 'tools' ? 'Ещё' : label}
+            </span>
           </button>
         ))}
-      </div>
+      </nav>
       <section
         className="page-stack"
-        role="tabpanel"
-        id={`coach-panel-${tab}`}
-        aria-labelledby={`coach-tab-${tab}`}
+        aria-label={
+          tab === 'today'
+            ? 'Сегодня'
+            : tab === 'clients'
+              ? 'Клиенты'
+              : tab === 'programs'
+                ? 'Программы'
+                : 'Инструменты'
+        }
       >
+        {tab === 'today' && (
+          <CoachToday
+            clients={clients.data ?? []}
+            programs={programs.data ?? []}
+            summaries={clientSummaries.data?.items ?? []}
+            clientsLoading={clients.isLoading}
+            programsLoading={programs.isPending}
+            summariesLoading={clientSummaries.isPending}
+            pendingCount={pendingCount}
+            inviteCreating={inviteCreating}
+            inviteDisabled={!capabilities.canManageCoach}
+            onNavigate={(destination, filter) => navigateCoach(destination, filter)}
+            onOpenClient={openClient}
+            onInvite={() => void createInvite()}
+          />
+        )}
         {tab === 'clients' && (
           <>
-            <CoachAttentionCenter enabled={Boolean(user?.is_coach)} />
-            <CoachWorkspaceDashboard
-              clients={clients.data ?? []}
-              loading={activeClients.length > 0 && clientSummaries.isPending}
-              summaries={clientSummaries.data?.items ?? []}
-              unavailable={Boolean(clientSummaries.error)}
-            />
             {clientSummaries.error && activeClients.length > 0 && (
               <div className="coach-summary-warning" role="status">
                 Краткие показатели временно недоступны. Список клиентов и подробные разделы
@@ -1061,96 +1301,6 @@ export default function CoachPage({
                 onInvite={() => void createInvite()}
               />
             )}
-            <Card
-              className={`coach-invite-panel${inviteLink ? ' is-visible' : ''}`}
-              collapsible={false}
-              title="Пригласить клиента"
-              description="Отправьте персональную ссылку. Клиент сначала увидит ваше имя и сам подтвердит подключение."
-              actions={
-                <button
-                  className="secondary"
-                  disabled={inviteCreating || !capabilities.canManageCoach}
-                  onClick={() => void createInvite()}
-                >
-                  {inviteCreating ? 'Создаём…' : 'Создать приглашение'}
-                </button>
-              }
-            >
-              {inviteLink ? (
-                <div className="auth-notice stack top-gap">
-                  {inviteLink.web_url && (
-                    <label className="field">
-                      <span>Универсальная ссылка — для браузера и Telegram</span>
-                      <input
-                        readOnly
-                        value={inviteLink.web_url}
-                        onFocus={(event) => event.currentTarget.select()}
-                      />
-                    </label>
-                  )}
-                  {inviteLink.telegram_url && (
-                    <label className="field">
-                      <span>Открыть сразу внутри Telegram</span>
-                      <input
-                        readOnly
-                        value={inviteLink.telegram_url}
-                        onFocus={(event) => event.currentTarget.select()}
-                      />
-                    </label>
-                  )}
-                  {inviteLink.code && (
-                    <label className="field">
-                      <span>Код приглашения — если ссылка не открывается</span>
-                      <input
-                        readOnly
-                        value={inviteLink.code}
-                        onFocus={(event) => event.currentTarget.select()}
-                      />
-                    </label>
-                  )}
-                  <p className="muted">
-                    Действует до {new Date(inviteLink.expires_at).toLocaleString('ru-RU')}.
-                  </p>
-                  <div className="toolbar wrap">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void copyInvite(
-                          inviteLink.web_url ||
-                            inviteLink.url ||
-                            inviteLink.code ||
-                            inviteLink.start_param,
-                        )
-                      }
-                    >
-                      Копировать
-                    </button>
-                    {inviteLink.web_url && typeof navigator.share === 'function' && (
-                      <button
-                        type="button"
-                        className="secondary"
-                        onClick={() =>
-                          void navigator
-                            .share({
-                              title: 'Приглашение тренера',
-                              text: 'Откройте Your Fitness Coach и подтвердите подключение к тренеру.',
-                              url: inviteLink.web_url,
-                            })
-                            .catch(() => undefined)
-                        }
-                      >
-                        Поделиться
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="muted">
-                  Новая персональная ссылка появится здесь. Приглашение не даёт доступ к данным до
-                  подтверждения клиентом.
-                </p>
-              )}
-            </Card>
             <div className={`coach-client-workspace${clientDetailOpen ? ' is-client-open' : ''}`}>
               <Card className="coach-client-roster" title="Клиенты" collapsible={false}>
                 <div className="coach-client-tools">
@@ -1158,7 +1308,7 @@ export default function CoachPage({
                     <span>Найти клиента</span>
                     <input
                       type="search"
-                      placeholder="Имя, username или Telegram ID"
+                      placeholder="Имя или username"
                       value={clientSearch}
                       onChange={(event) => setClientSearch(event.target.value)}
                     />
@@ -1208,15 +1358,7 @@ export default function CoachPage({
                             disabled={!client.id}
                             onClick={() => {
                               if (!client.id) return;
-                              trackProductEvent({
-                                name: 'trainer_client_opened',
-                                surface: productEventSurface(),
-                              });
-                              setSelectedId(client.id);
-                              setFocusedProgramId(null);
-                              setFocusedWorkoutId(null);
-                              setFocusedAttention(null);
-                              setClientDetailOpen(true);
+                              openClient(client.id);
                             }}
                           >
                             <span className="coach-client-row__identity">
@@ -1286,7 +1428,18 @@ export default function CoachPage({
                   focusedProgramId={focusedProgramId}
                   focusedWorkoutId={focusedWorkoutId}
                   onBack={() => setClientDetailOpen(false)}
-                  onOpenCatalog={() => setTab('catalog')}
+                  onOpenCatalog={() => navigateCoach('tools')}
+                  onFocusWorkout={(workoutId) => {
+                    trackCoachQuickAction('review_workout');
+                    setFocusedWorkoutId(workoutId);
+                    setFocusedAttention(null);
+                  }}
+                  onFocusCheckIn={() => {
+                    trackCoachQuickAction('review_check_in');
+                    setFocusedAttention('weekly_check_in');
+                    setFocusedWorkoutId(null);
+                  }}
+                  onQuickAction={trackCoachQuickAction}
                   programs={selectedPrograms}
                   summary={selectedSummary}
                 />
@@ -1325,11 +1478,7 @@ export default function CoachPage({
                     <div className="coach-program-row__main">
                       <span className="eyebrow">Программа клиента</span>
                       <strong>{item.title}</strong>
-                      <p>
-                        {item.client_full_name ||
-                          item.client_username ||
-                          item.client_telegram_user_id}
-                      </p>
+                      <p>{item.client_full_name || item.client_username || 'Клиент'}</p>
                       <small>
                         Назначена {new Date(item.assigned_at).toLocaleDateString('ru-RU')}
                         {item.next_workout_date
@@ -1350,16 +1499,8 @@ export default function CoachPage({
                       <button
                         type="button"
                         onClick={() => {
-                          trackProductEvent({
-                            name: 'trainer_client_opened',
-                            surface: productEventSurface(),
-                          });
-                          setSelectedId(item.client_id);
+                          openClient(item.client_id);
                           setFocusedProgramId(item.id);
-                          setFocusedWorkoutId(null);
-                          setFocusedAttention(null);
-                          setClientDetailOpen(true);
-                          setTab('clients');
                         }}
                       >
                         Открыть клиента
@@ -1374,7 +1515,7 @@ export default function CoachPage({
                             setFocusedWorkoutId(null);
                             setFocusedAttention(null);
                             setClientDetailOpen(true);
-                            setTab('catalog');
+                            navigateCoach('tools');
                           }}
                         >
                           Добавить упражнение
@@ -1407,12 +1548,21 @@ export default function CoachPage({
             )}
           </Card>
         )}
-        {tab === 'catalog' && (
-          <ExerciseCatalog
-            canCreate={capabilities.canCreateCatalog}
-            canAssign={capabilities.canMutatePrograms && capabilities.canManageCoach}
-            targetTelegramId={selected?.telegram_user_id}
-          />
+        {tab === 'tools' && (
+          <>
+            <CoachInviteCard
+              inviteLink={inviteLink}
+              inviteCreating={inviteCreating}
+              inviteDisabled={!capabilities.canManageCoach}
+              onCreate={() => void createInvite()}
+              onCopy={copyInvite}
+            />
+            <ExerciseCatalog
+              canCreate={capabilities.canCreateCatalog}
+              canAssign={capabilities.canMutatePrograms && capabilities.canManageCoach}
+              targetTelegramId={selected?.telegram_user_id}
+            />
+          </>
         )}
       </section>
     </div>
