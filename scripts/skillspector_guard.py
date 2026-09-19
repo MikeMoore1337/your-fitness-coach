@@ -16,9 +16,7 @@ from typing import Any
 
 SKILLSPECTOR_VERSION = "2.11.2-postrelease"
 SKILLSPECTOR_COMMIT = "d162d9b343e559be13df8ebba093df3bc9d58c90"
-SKILLSPECTOR_SOURCE = (
-    f"git+https://github.com/NVIDIA/SkillSpector.git@{SKILLSPECTOR_COMMIT}"
-)
+SKILLSPECTOR_SOURCE = f"git+https://github.com/NVIDIA/SkillSpector.git@{SKILLSPECTOR_COMMIT}"
 EXTERNAL_SOURCE_NAME = "SOURCE.json"
 SECRET_ENV_RE = re.compile(
     r"(TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL|AUTH|PRIVATE|SESSION)", re.IGNORECASE
@@ -120,8 +118,7 @@ def _validate_static_report(report: Mapping[str, Any], report_path: Path) -> Sca
         )
     )
     if (
-        completeness.get("is_complete") is not True
-        or completeness.get("status") != "complete"
+        completeness.get("is_complete") is not True or completeness.get("status") != "complete"
     ) and not reference_missing_only:
         raise SkillSpectorGuardError(
             "SkillSpector analysis is incomplete "
@@ -176,11 +173,7 @@ def _validate_static_report(report: Mapping[str, Any], report_path: Path) -> Sca
         severity=severity,
         score=score,
         report_path=report_path,
-        warning=(
-            recommendation == "CAUTION"
-            or severity == "MEDIUM"
-            or reference_missing_only
-        ),
+        warning=(recommendation == "CAUTION" or severity == "MEDIUM" or reference_missing_only),
     )
 
 
@@ -216,9 +209,7 @@ def scan_skill(
     if completed.returncode == 1:
         completeness = report.get("analysis_completeness")
         exceptions = (
-            completeness.get("ledger_exceptions")
-            if isinstance(completeness, Mapping)
-            else None
+            completeness.get("ledger_exceptions") if isinstance(completeness, Mapping) else None
         )
         reference_missing_only = (
             isinstance(exceptions, list)

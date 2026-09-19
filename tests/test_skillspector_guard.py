@@ -6,7 +6,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 from scripts import skillspector_guard as guard
 
 
@@ -40,10 +39,7 @@ def _report(
             "entirely_uninspected_files": 0,
             "partially_inspected_files": 0,
             "limitations": [],
-            "ledger_exceptions": [
-                {"reason_code": reason_code}
-                for reason_code in reason_codes
-            ],
+            "ledger_exceptions": [{"reason_code": reason_code} for reason_code in reason_codes],
         },
         "issues": [],
     }
@@ -110,9 +106,7 @@ def test_caution_is_warning_not_blocker(tmp_path: Path) -> None:
     verdict = guard.scan_skill(
         skill,
         output_root=tmp_path / "out",
-        runner=_runner_with_report(
-            _report(recommendation="CAUTION", severity="MEDIUM", score=35)
-        ),
+        runner=_runner_with_report(_report(recommendation="CAUTION", severity="MEDIUM", score=35)),
         uvx="uvx",
         env={"PATH": "/bin"},
     )
@@ -250,9 +244,7 @@ def test_unexpected_llm_usage_blocks(tmp_path: Path) -> None:
         guard.scan_skill(
             skill,
             output_root=tmp_path / "out",
-            runner=_runner_with_report(
-                _report(llm_requested=True, llm_calls_attempted=1)
-            ),
+            runner=_runner_with_report(_report(llm_requested=True, llm_calls_attempted=1)),
             uvx="uvx",
             env={"PATH": "/bin"},
         )
@@ -275,10 +267,13 @@ def test_no_external_skills_is_clean_noop(tmp_path: Path) -> None:
     internal.mkdir()
     (internal / "SKILL.md").write_text("# Internal\n", encoding="utf-8")
 
-    assert guard.scan_external_skills(
-        tmp_path,
-        output_root=tmp_path / "out",
-        runner=lambda *args, **kwargs: pytest.fail("runner must not execute"),
-        uvx="uvx",
-        env={"PATH": "/bin"},
-    ) == []
+    assert (
+        guard.scan_external_skills(
+            tmp_path,
+            output_root=tmp_path / "out",
+            runner=lambda *args, **kwargs: pytest.fail("runner must not execute"),
+            uvx="uvx",
+            env={"PATH": "/bin"},
+        )
+        == []
+    )
