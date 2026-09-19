@@ -22,8 +22,8 @@ vendoring.
 
 Зафиксированная версия:
 
-- release: `2.11.2`;
-- commit: `69dcdfb74487d361ba4c811d088cfdea2ff3a9dc`;
+- base release: `2.11.2`;
+- tested post-release commit: `d162d9b343e559be13df8ebba093df3bc9d58c90`;
 - license: Apache-2.0.
 
 SkillSpector не добавляется в `pyproject.toml`, backend, bot или frontend. Он запускается изолированно
@@ -47,7 +47,12 @@ YFC wrapper дополнительно проверяет, что:
 - `SAFE` проходит;
 - `CAUTION` проходит с явным warning;
 - `DO_NOT_INSTALL`, `HIGH`, `CRITICAL` блокируют;
-- malformed/incomplete/tool-error блокируют.
+- malformed/tool-error блокируют;
+- incomplete coverage блокирует;
+- единственное исключение — upstream `reference_missing`, когда все discovered files полностью
+  проанализированы, нет других limitations/partial files и отсутствуют ambiguous references.
+  Это соответствует текущему upstream install-gate contract: отсутствующая ссылка не скрывает
+  bundled bytes, тогда как `reference_unresolved` остаётся blocker.
 
 ## Исходящий трафик
 

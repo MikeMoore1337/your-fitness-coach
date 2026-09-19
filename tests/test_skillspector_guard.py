@@ -18,6 +18,7 @@ def _report(
     complete: bool = True,
     llm_requested: bool = False,
     llm_calls_attempted: int = 0,
+    reason_codes: tuple[str, ...] = (),
 ) -> dict[str, object]:
     return {
         "execution_successful": True,
@@ -35,6 +36,14 @@ def _report(
             "execution_successful": True,
             "is_complete": complete,
             "status": "complete" if complete else "partial",
+            "coverage_percent": 100.0,
+            "entirely_uninspected_files": 0,
+            "partially_inspected_files": 0,
+            "limitations": [],
+            "ledger_exceptions": [
+                {"reason_code": reason_code}
+                for reason_code in reason_codes
+            ],
         },
         "issues": [],
     }
@@ -123,6 +132,55 @@ def test_do_not_install_blocks(tmp_path: Path) -> None:
             output_root=tmp_path / "out",
             runner=_runner_with_report(
                 _report(recommendation="DO_NOT_INSTALL", severity="HIGH", score=70),
+                returncode=1,
+            ),
+            uvx="uvx",
+            env={"PATH": "/bin"},
+        )
+
+
+def test_reference_missing_only_is_nonblocking_caution(tmp_path: Path) -> None:
+    skill = tmp_path / "missing-reference"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("# Missing reference\n", encoding="utf-8")
+
+    verdict = guard.scan_skill(
+        skill,
+        output_root=tmp_path / "out",
+        runner=_runner_with_report(
+            _report(
+                recommendation="CAUTION",
+                severity="MEDIUM",
+                score=10,
+                complete=False,
+                reason_codes=("reference_missing",),
+            ),
+            returncode=1,
+        ),
+        uvx="uvx",
+        env={"PATH": "/bin"},
+    )
+
+    assert verdict.warning is True
+
+
+def test_ambiguous_reference_still_blocks(tmp_path: Path) -> None:
+    skill = tmp_path / "ambiguous-reference"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("# Ambiguous reference\n", encoding="utf-8")
+
+    with pytest.raises(guard.SkillSpectorGuardError, match="incomplete"):
+        guard.scan_skill(
+            skill,
+            output_root=tmp_path / "out",
+            runner=_runner_with_report(
+                _report(
+                    recommendation="CAUTION",
+                    severity="MEDIUM",
+                    score=10,
+                    complete=False,
+                    reason_codes=("reference_unresolved",),
+                ),
                 returncode=1,
             ),
             uvx="uvx",

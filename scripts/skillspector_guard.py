@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-SKILLSPECTOR_VERSION = "2.11.2"
-SKILLSPECTOR_COMMIT = "69dcdfb74487d361ba4c811d088cfdea2ff3a9dc"
+SKILLSPECTOR_VERSION = "2.11.2-postrelease"
+SKILLSPECTOR_COMMIT = "d162d9b343e559be13df8ebba093df3bc9d58c90"
 SKILLSPECTOR_SOURCE = (
     f"git+https://github.com/NVIDIA/SkillSpector.git@{SKILLSPECTOR_COMMIT}"
 )
@@ -107,7 +107,22 @@ def _validate_static_report(report: Mapping[str, Any], report_path: Path) -> Sca
         raise SkillSpectorGuardError(
             f"SkillSpector report has no analysis_completeness; inspect {report_path}"
         )
-    if completeness.get("is_complete") is not True or completeness.get("status") != "complete":
+    exceptions = completeness.get("ledger_exceptions")
+    reference_missing_only = (
+        isinstance(exceptions, list)
+        and bool(exceptions)
+        and not completeness.get("limitations")
+        and int(completeness.get("entirely_uninspected_files", 0) or 0) == 0
+        and int(completeness.get("partially_inspected_files", 0) or 0) == 0
+        and all(
+            isinstance(item, Mapping) and item.get("reason_code") == "reference_missing"
+            for item in exceptions
+        )
+    )
+    if (
+        completeness.get("is_complete") is not True
+        or completeness.get("status") != "complete"
+    ) and not reference_missing_only:
         raise SkillSpectorGuardError(
             "SkillSpector analysis is incomplete "
             f"({_completeness_diagnostic(completeness)}); inspect {report_path}"
@@ -161,7 +176,11 @@ def _validate_static_report(report: Mapping[str, Any], report_path: Path) -> Sca
         severity=severity,
         score=score,
         report_path=report_path,
-        warning=recommendation == "CAUTION" or severity == "MEDIUM",
+        warning=(
+            recommendation == "CAUTION"
+            or severity == "MEDIUM"
+            or reference_missing_only
+        ),
     )
 
 
@@ -195,9 +214,27 @@ def scan_skill(
     report = _parse_report(report_path)
     verdict = _validate_static_report(report, report_path)
     if completed.returncode == 1:
-        raise SkillSpectorGuardError(
-            f"SkillSpector strict gate failed for {verdict.skill}; inspect {report_path}"
+        completeness = report.get("analysis_completeness")
+        exceptions = (
+            completeness.get("ledger_exceptions")
+            if isinstance(completeness, Mapping)
+            else None
         )
+        reference_missing_only = (
+            isinstance(exceptions, list)
+            and bool(exceptions)
+            and not completeness.get("limitations")
+            and int(completeness.get("entirely_uninspected_files", 0) or 0) == 0
+            and int(completeness.get("partially_inspected_files", 0) or 0) == 0
+            and all(
+                isinstance(item, Mapping) and item.get("reason_code") == "reference_missing"
+                for item in exceptions
+            )
+        )
+        if not reference_missing_only:
+            raise SkillSpectorGuardError(
+                f"SkillSpector strict gate failed for {verdict.skill}; inspect {report_path}"
+            )
     return verdict
 
 
