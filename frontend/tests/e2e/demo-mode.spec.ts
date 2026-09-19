@@ -19,6 +19,7 @@ const DEMO_VIEWPORTS = [
 
 const TASK_274_EVIDENCE_DIR = process.env.TASK_274_EVIDENCE_DIR;
 const TASK_278_EVIDENCE_DIR = process.env.TASK_278_EVIDENCE_DIR;
+const TASK_291_EVIDENCE_DIR = process.env.TASK_291_EVIDENCE_DIR;
 const TASK_278_THEME =
   process.env.TASK_278_THEME === 'light' || process.env.TASK_278_THEME === 'dark'
     ? process.env.TASK_278_THEME
@@ -32,6 +33,65 @@ async function captureEvidence(page: Page, fileName: string): Promise<void> {
 async function captureTask278Evidence(page: Page, fileName: string): Promise<void> {
   if (!TASK_278_EVIDENCE_DIR) return;
   await page.screenshot({ path: resolve(TASK_278_EVIDENCE_DIR, fileName), fullPage: true });
+}
+
+async function captureTask291Evidence(page: Page, fileName: string): Promise<void> {
+  if (!TASK_291_EVIDENCE_DIR) return;
+  await page.screenshot({ path: resolve(TASK_291_EVIDENCE_DIR, fileName), fullPage: true });
+}
+
+async function assertBottomNavigationGeometry(page: Page, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: 844 });
+  const geometry = await page.evaluate(() => {
+    const navigation = document.querySelector<HTMLElement>('#appBottomNav');
+    const content = document.querySelector<HTMLElement>('#appContent');
+    if (!navigation || !content) throw new Error('Expected app bottom navigation and content');
+
+    const scrollElement = document.scrollingElement ?? document.documentElement;
+    const actions = Array.from(
+      content.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
+    ).filter((element) => element.offsetParent !== null);
+    const lastAction = actions.at(-1);
+    const previousScrollBehavior = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = 'auto';
+    scrollElement.scrollTop = scrollElement.scrollHeight;
+    document.documentElement.style.scrollBehavior = previousScrollBehavior;
+
+    const navigationRect = navigation.getBoundingClientRect();
+    const lastActionRect = lastAction?.getBoundingClientRect() ?? null;
+    const floatingAction = document.querySelector<HTMLElement>('.app-quick-add-trigger');
+    const floatingActionRect = floatingAction?.getBoundingClientRect() ?? null;
+    const overlaps = (left: DOMRect, right: DOMRect) =>
+      left.left < right.right &&
+      left.right > right.left &&
+      left.top < right.bottom &&
+      left.bottom > right.top;
+
+    return {
+      navigationHeight: navigationRect.height,
+      navigationTop: navigationRect.top,
+      navigationBottom: navigationRect.bottom,
+      lastActionBottom: lastActionRect?.bottom ?? null,
+      bodyPaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom),
+      scrollHeight: scrollElement.scrollHeight,
+      viewportHeight: window.innerHeight,
+      viewportBottomGap: window.innerHeight - navigationRect.bottom,
+      floatingActionOverlap: Boolean(
+        floatingActionRect && overlaps(floatingActionRect, navigationRect),
+      ),
+    };
+  });
+  expect(geometry.navigationHeight).toBeGreaterThan(0);
+  expect(geometry.navigationBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+  expect(geometry.viewportBottomGap).toBeGreaterThanOrEqual(0);
+  expect(geometry.viewportBottomGap).toBeLessThanOrEqual(16);
+  expect(geometry.bodyPaddingBottom).toBeGreaterThanOrEqual(geometry.navigationHeight);
+  expect(geometry.scrollHeight).toBeGreaterThanOrEqual(geometry.viewportHeight);
+  expect(geometry.lastActionBottom).not.toBeNull();
+  expect(geometry.lastActionBottom ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(
+    geometry.navigationTop,
+  );
+  expect(geometry.floatingActionOverlap).toBe(false);
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -235,7 +295,23 @@ function progressSummary(snapshot: DemoSessionSnapshot) {
       target_effective_on: '2026-08-25',
     },
     body: {
-      latest_measurement: null,
+      latest_measurement:
+        snapshot.scenario === 'trainer'
+          ? {
+              measured_on: today(),
+              weight_kg: 77.1,
+              custom_measurements: [
+                {
+                  definition_id: 93001,
+                  label: 'Талия',
+                  unit: 'cm',
+                  value: 84,
+                  measured_on: today(),
+                  archived: false,
+                },
+              ],
+            }
+          : null,
       trends: [],
       priority: { mode: 'balanced', muscle_group_ids: [] },
       guidance: {
@@ -478,6 +554,44 @@ function client(slug: 'alexey' | 'maria' | 'ivan') {
   };
 }
 
+function pendingClient() {
+  return {
+    id: null,
+    invite_id: 54001,
+    telegram_user_id: null,
+    username: null,
+    full_name: 'Елена · ожидает подтверждения',
+    status: 'pending',
+  };
+}
+
+function assignedProgram(slug: 'alexey' | 'maria') {
+  const names = { alexey: 'Алексей', maria: 'Мария' };
+  const ids = { alexey: 51001, maria: 51002 };
+  return {
+    id: slug === 'alexey' ? 97001 : 97002,
+    client_id: ids[slug],
+    client_telegram_user_id: null,
+    client_username: slug,
+    client_full_name: names[slug],
+    template_id: null,
+    title: 'Сила и устойчивость',
+    goal: 'muscle_gain',
+    level: 'intermediate',
+    assigned_at: '2026-08-25T10:00:00Z',
+    is_active: true,
+    status: 'active',
+    start_date: '2026-08-25',
+    duration_weeks: 8,
+    schedule_weekdays: [1, 3, 5],
+    completed_at: null,
+    workouts_total: 24,
+    workouts_completed: 12,
+    next_workout_date: today(),
+    current_revision_number: 1,
+  };
+}
+
 function timeline() {
   return [
     {
@@ -706,8 +820,30 @@ function transport(snapshot: DemoSessionSnapshot, path: string, method: string, 
       },
     ];
   if (path.endsWith('/programs/templates/hidden')) return [];
-  if (path === '/api/v1/coach/clients') return (['alexey', 'maria', 'ivan'] as const).map(client);
-  if (path === '/api/v1/coach/assigned-programs') return [];
+  if (path === '/api/v1/coach/clients')
+    return [...(['alexey', 'maria', 'ivan'] as const).map(client), pendingClient()];
+  if (path === '/api/v1/coach/assigned-programs')
+    return (['alexey', 'maria'] as const).map(assignedProgram);
+  if (path.startsWith('/api/v1/coach/attention'))
+    return {
+      items: [
+        {
+          key: 'without_program:51003:51003',
+          kind: 'without_program',
+          client: { id: 51003, name: 'Иван' },
+          title: 'Нет активной программы',
+          reason: 'Назначьте следующий рабочий план клиента.',
+          source_kind: 'client',
+          source_id: 51003,
+          source_state: 'active',
+          action: 'assign_program',
+          destination: '/coach?client_id=51003',
+          created_at: '2026-09-15T10:00:00Z',
+        },
+      ],
+      total: 1,
+      generated_at: '2026-09-15T10:00:00Z',
+    };
   if (path.startsWith('/api/v1/coach/client-summaries'))
     return {
       items: (['alexey', 'maria', 'ivan'] as const).map((slug) => ({
@@ -1084,11 +1220,26 @@ test('nutrition and coach scenarios render shared production surfaces with local
   const trainerPage = await trainerContext.newPage();
   await installDemoTransport(trainerPage);
   await trainerPage.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
-  await expect(trainerPage.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(trainerPage.getByRole('button', { name: 'Пригласить клиента' })).toBeDisabled();
+  await expect(trainerPage.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await expect(
+    trainerPage.getByRole('button', { name: 'Пригласить клиента' }).first(),
+  ).toBeDisabled();
+  for (const width of [320, 360, 390, 430]) {
+    await assertBottomNavigationGeometry(trainerPage, width);
+    await captureTask291Evidence(trainerPage, `demo-trainer-navigation-${width}-light.png`);
+  }
+  await captureTask291Evidence(trainerPage, 'demo-trainer-mobile-light.png');
+  await trainerPage.getByRole('button', { name: 'Клиенты', exact: true }).click();
   await expect(trainerPage.getByRole('button', { name: /^Алексей/ })).toBeVisible();
   await trainerPage.getByRole('button', { name: /^Алексей/ }).click();
-  await trainerPage.getByRole('link', { name: 'Тренировки и прогресс' }).click();
+  await captureTask291Evidence(trainerPage, 'demo-trainer-mobile-client-light.png');
+  await trainerPage.setViewportSize({ width: 1440, height: 900 });
+  await trainerPage.getByRole('button', { name: 'Сегодня', exact: true }).click();
+  await expect(trainerPage.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await captureTask291Evidence(trainerPage, 'demo-trainer-desktop-light.png');
+  await trainerPage.getByRole('button', { name: 'Клиенты', exact: true }).click();
+  await trainerPage.getByRole('button', { name: /^Алексей/ }).click();
+  await trainerPage.getByLabel('Данные клиента').getByRole('link', { name: 'Прогресс' }).click();
   const progressDisclosure = trainerPage.locator('details#coach-client-progress');
   if ((await progressDisclosure.getAttribute('open')) === null) {
     await progressDisclosure.locator(':scope > summary').click();

@@ -192,6 +192,22 @@ def test_handoff_is_explicit_live_authorized_and_idempotent(client) -> None:
     assert secret not in trainer_view.text
     assert trainer_view.json()["data_changed_since_send"] is False
 
+    coach_projection = client.get(
+        f"/api/v1/coach/clients/{sender_id}/report-handoffs?limit=5",
+        headers=trainer_headers,
+    )
+    assert coach_projection.status_code == 200, coach_projection.text
+    assert [item["id"] for item in coach_projection.json()] == [handoff["id"]]
+    assert coach_projection.json()[0]["client_comment"] == client_comment
+    assert '"report":' not in coach_projection.text
+    assert secret not in coach_projection.text
+
+    wrong_projection = client.get(
+        f"/api/v1/coach/clients/{sender_id}/report-handoffs",
+        headers=wrong_trainer_headers,
+    )
+    assert wrong_projection.status_code == 404
+
     with get_session_context() as db:
         db.add(
             BodyMeasurement(

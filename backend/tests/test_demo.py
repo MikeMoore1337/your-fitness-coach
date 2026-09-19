@@ -396,7 +396,9 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
     attention = CoachAttentionResponse.model_validate(
         _transport(client, trainer_token, "/api/v1/coach/attention").json()
     )
-    assert attention.items == []
+    assert attention.total == 1
+    assert attention.items[0].kind == "without_program"
+    assert attention.items[0].client.id == 51003
     timeline = _transport(client, trainer_token, "/api/v1/coach/clients/51002/workouts?limit=30")
     WorkoutTimelineItem.model_validate(timeline.json()[0])
     comment = _transport(

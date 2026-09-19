@@ -296,6 +296,60 @@ describe('product event contract', () => {
     ).toBe(false);
   });
 
+  it('keeps Coach OS telemetry bounded to aggregate interaction enums', () => {
+    expect(isProductEvent({ name: 'coach_home_viewed', surface: 'mobile_web' })).toBe(true);
+    expect(isProductEvent({ name: 'coach_client_opened', surface: 'desktop_web' })).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_navigation_selected',
+        surface: 'mobile_web',
+        destination: 'today',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_quick_action_used',
+        surface: 'mobile_web',
+        kind: 'report',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_timeline_event_opened',
+        surface: 'desktop_web',
+        kind: 'measurement',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_time_to_first_useful_action',
+        surface: 'mobile_web',
+        latency_bucket: '10_30s',
+      }),
+    ).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'coach_quick_action_used',
+        surface: 'mobile_web',
+        kind: 'client_comment_text',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'coach_timeline_event_opened',
+        surface: 'mobile_web',
+        kind: 'weight_value',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+    expect(
+      isProductEvent({
+        name: 'coach_navigation_selected',
+        surface: 'mobile_web',
+        destination: 'client/51001',
+      } as unknown as ProductEvent),
+    ).toBe(false);
+  });
+
   it('keeps guided-flow telemetry typed, bounded and free of private context', () => {
     expect(
       isProductEvent({

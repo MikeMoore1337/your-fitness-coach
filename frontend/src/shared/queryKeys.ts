@@ -22,6 +22,11 @@ export const queryKeys = {
     clientAnalytics: (clientId: number) => ['coach', 'client', clientId, 'analytics'] as const,
     clientSummary: (clientId: number) => ['coach', 'client', clientId, 'summary'] as const,
     clientSummaries: ['coach', 'client-summaries'] as const,
+    clientWorkouts: (clientId: number) => ['coach', 'client', clientId, 'workouts'] as const,
+    clientCheckIns: (clientId: number) =>
+      ['coach', 'client', clientId, 'weekly-check-ins'] as const,
+    clientReportHandoffs: (clientId: number) =>
+      ['coach', 'client', clientId, 'report-handoffs'] as const,
   },
   workoutComments: {
     client: (workoutId: number) => ['workout', workoutId, 'comments'] as const,

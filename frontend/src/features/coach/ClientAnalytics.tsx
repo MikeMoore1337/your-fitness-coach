@@ -96,12 +96,12 @@ export function ClientAnalytics({
     queryFn: () => api<WorkoutProgress>(`/api/v1/coach/clients/${clientId}/analytics`),
   });
   const timeline = useQuery({
-    queryKey: ['coach', 'client', clientId, 'workouts'],
+    queryKey: queryKeys.trainer.clientWorkouts(clientId),
     queryFn: () =>
       api<WorkoutTimelineItem[]>(`/api/v1/coach/clients/${clientId}/workouts?limit=30`),
   });
   const checkIns = useQuery({
-    queryKey: ['coach', 'client', clientId, 'weekly-check-ins'],
+    queryKey: queryKeys.trainer.clientCheckIns(clientId),
     queryFn: () =>
       api<WeeklyCheckInHistory>(`/api/v1/coach/clients/${clientId}/weekly-check-ins?limit=1`),
     enabled: focusedCheckIn,

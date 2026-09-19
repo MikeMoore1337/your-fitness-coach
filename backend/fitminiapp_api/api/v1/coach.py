@@ -38,6 +38,7 @@ from fitminiapp_api.schemas.progress import (
     ProgressSummaryResponse,
     TrainerClientProgressListResponse,
 )
+from fitminiapp_api.schemas.report_handoff import ReportHandoffResponse
 from fitminiapp_api.schemas.user import UserProfileUpdate
 from fitminiapp_api.schemas.workout import (
     BodyMeasurementDefinitionResponse,
@@ -96,6 +97,10 @@ from fitminiapp_api.services.progress import (
 )
 from fitminiapp_api.services.progress_report_downloads import create_progress_report_download_token
 from fitminiapp_api.services.progress_reports import build_progress_report
+from fitminiapp_api.services.report_handoffs import (
+    ReportHandoffError,
+    list_trainer_report_handoffs,
+)
 from fitminiapp_api.services.weekly_check_ins import list_weekly_check_ins
 from fitminiapp_api.services.workout_comments import (
     WorkoutCommentError,
@@ -332,6 +337,22 @@ def coach_client_progress_report(
         )
     except NutritionReportError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
+
+
+@router.get(
+    "/clients/{client_id}/report-handoffs",
+    response_model=list[ReportHandoffResponse],
+)
+def coach_client_report_handoffs(
+    client_id: int,
+    limit: int = Query(default=5, ge=1, le=20),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[ReportHandoffResponse]:
+    try:
+        return list_trainer_report_handoffs(db, current_user, client_id, limit=limit)
+    except ReportHandoffError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post(

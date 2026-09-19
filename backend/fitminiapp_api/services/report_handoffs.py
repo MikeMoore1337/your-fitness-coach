@@ -446,6 +446,44 @@ def list_report_handoffs(
     return [_handoff_response(db, handoff, trainer) for handoff, trainer in rows]
 
 
+def list_trainer_report_handoffs(
+    db: Session,
+    trainer: User,
+    client_id: int,
+    *,
+    limit: int = 5,
+) -> list[ReportHandoffResponse]:
+    """Return only the metadata a coach needs for a managed client's latest handoffs.
+
+    The report payload is intentionally not duplicated here. The existing handoff view and
+    progress-report routes remain the authoritative report surfaces; this projection only makes
+    the already-authorized client comment discoverable inside the coach workspace.
+    """
+    relation = (
+        db.query(CoachClient)
+        .filter(
+            CoachClient.coach_user_id == trainer.id,
+            CoachClient.client_user_id == client_id,
+            CoachClient.status == "active",
+        )
+        .first()
+    )
+    if relation is None:
+        raise ReportHandoffError("Отчёт недоступен", status_code=404)
+    handoffs = (
+        db.query(ReportHandoff)
+        .filter(
+            ReportHandoff.trainer_user_id == trainer.id,
+            ReportHandoff.sender_user_id == client_id,
+            ReportHandoff.relationship_id == relation.id,
+        )
+        .order_by(ReportHandoff.created_at.desc(), ReportHandoff.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [_handoff_response(db, handoff, trainer) for handoff in handoffs]
+
+
 def get_report_handoff_view(
     db: Session,
     actor: User,
