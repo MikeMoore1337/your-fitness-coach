@@ -195,13 +195,17 @@ jobs:
         run: python scripts/ci_contract.py run-group external-skill-security
 
   frontend:
-    name: Frontend
+    name: Frontend (${{ matrix.lane }})
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [checks, unit]
     env:
-      ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-checks', github.workspace) || '' }}
+      ALLURE_RESULTS_DIR: ${{ matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-checks', github.workspace) || '' }}
       ALLURE_VITEST_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-vitest/dist/reporter.js
     steps:
       - uses: actions/checkout@v4
@@ -219,6 +223,7 @@ jobs:
         with:
           python-version: "3.14"
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        if: matrix.lane == 'checks'
         with:
           version: "0.11.32"
           enable-cache: true
@@ -229,18 +234,24 @@ jobs:
         working-directory: frontend
         run: npm ci
       - name: Install PR Playwright browser
+        if: matrix.lane == 'checks'
         working-directory: frontend
         run: npx playwright install --with-deps chromium
       - name: Install scheduled Vitest reporter
-        if: needs.scope-router.outputs.run_scheduled_report == 'true'
+        if: matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
         working-directory: frontend
         run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
       - name: Install API schema dependencies
+        if: matrix.lane == 'checks'
         run: uv pip install -r backend/requirements-runtime.txt
       - name: Run shared frontend checks group
+        if: matrix.lane == 'checks'
         run: python scripts/ci_contract.py run-group frontend-checks
+      - name: Run shared frontend unit group
+        if: matrix.lane == 'unit'
+        run: python scripts/ci_contract.py run-group frontend-unit
       - name: Upload encrypted Allure results
-        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        if: always() && matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
         uses: ./.github/actions/upload-allure-results
         env:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
@@ -550,7 +561,7 @@ jobs:
           browser: chromium-firefox-webkit
 
   python-tests:
-    name: Python tests (${{ matrix.shard }}/4)
+    name: Python tests (${{ matrix.shard }}/5)
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_python == 'true'
     runs-on: ubuntu-latest
@@ -560,7 +571,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5]
 
     services:
       postgres:
@@ -603,7 +614,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token
           SECRET_KEY: test-secret-key-at-least-thirty-two-characters
-        run: python scripts/ci_contract.py run-group python-tests --shard "${{ matrix.shard }}/4"
+        run: python scripts/ci_contract.py run-group python-tests --shard "${{ matrix.shard }}/5"
       - name: Upload encrypted Allure results
         if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
         uses: ./.github/actions/upload-allure-results
