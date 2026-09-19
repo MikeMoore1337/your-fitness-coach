@@ -109,7 +109,6 @@ def test_schedule_contract_resolves_daily_weekly_and_rejects_unknown_cron() -> N
         scheduled_regression.resolve_run_kind("schedule", schedule_cron="0 0 * * *")
 
 
-
 def test_scheduled_report_bundle_topology_matches_ci_shard_counts() -> None:
     daily = scheduled_regression.report_bundles("daily")
     weekly = scheduled_regression.report_bundles("weekly")
@@ -128,6 +127,7 @@ def test_scheduled_report_bundle_topology_matches_ci_shard_counts() -> None:
 
     assert scheduled_regression.FRONTEND_E2E_SHARD_COUNT == 5
     assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 5
+
 
 def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> None:
     root = Path(__file__).parents[1]
