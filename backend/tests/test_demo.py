@@ -6,6 +6,15 @@ import pytest
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
+from fitminiapp_api.schemas.coach_crm import (
+    CoachAgendaResponse,
+    CoachClientOperationsResponse,
+    CoachOperationsTodayResponse,
+    CoachPackageResponse,
+    CoachPaymentResponse,
+    CoachSessionResponse,
+    CoachTaskResponse,
+)
 from fitminiapp_api.schemas.feedback import WorkoutCommentResponse
 from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse
 from fitminiapp_api.schemas.hydration import HydrationDayResponse, HydrationEntryResponse
@@ -399,6 +408,76 @@ def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_w
     assert attention.total == 1
     assert attention.items[0].kind == "without_program"
     assert attention.items[0].client.id == 51003
+    CoachOperationsTodayResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/operations/today").json()
+    )
+    agenda = CoachAgendaResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/agenda").json()
+    )
+    assert {item.status for item in agenda.items} >= {"scheduled", "completed", "no_show"}
+    packages = _transport(client, trainer_token, "/api/v1/coach/packages").json()
+    assert {item["state"] for item in packages} >= {"active", "finished", "cancelled"}
+    for item in packages:
+        CoachPackageResponse.model_validate(item)
+    payments = _transport(client, trainer_token, "/api/v1/coach/payments").json()
+    assert {item["status"] for item in payments} >= {"expected", "partial", "paid"}
+    for item in payments:
+        CoachPaymentResponse.model_validate(item)
+    for item in _transport(client, trainer_token, "/api/v1/coach/tasks").json():
+        CoachTaskResponse.model_validate(item)
+    CoachClientOperationsResponse.model_validate(
+        _transport(client, trainer_token, "/api/v1/coach/clients/51001/operations").json()
+    )
+    created_task = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/tasks",
+        "POST",
+        {
+            "client_id": 51001,
+            "title": "Подтвердить план",
+            "due_at": "2026-09-19T12:00:00",
+            "timezone": "Europe/Moscow",
+            "fold": 0,
+        },
+    )
+    CoachTaskResponse.model_validate(created_task.json())
+    created_session = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/sessions",
+        "POST",
+        {
+            "client_id": 51001,
+            "starts_at": "2026-09-20T18:00:00",
+            "timezone": "Europe/Moscow",
+            "fold": 0,
+            "duration_minutes": 60,
+            "format": "online",
+        },
+    )
+    CoachSessionResponse.model_validate(created_session.json()[0])
+    created_payment = _transport(
+        client,
+        trainer_token,
+        "/api/v1/coach/payments",
+        "POST",
+        {
+            "client_id": 51001,
+            "expected_amount_minor": 20_000,
+            "paid_amount_minor": 0,
+            "currency": "RUB",
+        },
+    )
+    CoachPaymentResponse.model_validate(created_payment.json())
+    edited_payment = _transport(
+        client,
+        trainer_token,
+        f"/api/v1/coach/payments/{created_payment.json()['id']}",
+        "PATCH",
+        {"paid_amount_minor": 20_000},
+    )
+    assert CoachPaymentResponse.model_validate(edited_payment.json()).status == "paid"
     timeline = _transport(client, trainer_token, "/api/v1/coach/clients/51002/workouts?limit=30")
     WorkoutTimelineItem.model_validate(timeline.json()[0])
     comment = _transport(

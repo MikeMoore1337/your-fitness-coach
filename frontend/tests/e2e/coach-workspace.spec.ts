@@ -38,7 +38,7 @@ const clients = [
     goal: 'maintenance',
     level: 'intermediate',
     height_cm: 168,
-    weight_kg: 62,
+    weight_kg: 78.4,
     workouts_per_week: 3,
     cardio_trainings_per_week: 1,
     timezone: 'Europe/Moscow',
@@ -349,6 +349,27 @@ async function mockCoachWorkspace(
               }
             : { items: [], total: 0, generated_at: '2026-08-20T10:00:00' },
       });
+    if (path.endsWith('/coach/operations/today'))
+      return route.fulfill({
+        json: {
+          date: '2026-08-20',
+          timezone: 'Europe/Moscow',
+          sessions: [],
+          overdue_tasks: [],
+          due_tasks: [],
+          low_packages: [],
+          payment_facts: [],
+        },
+      });
+    if (path.endsWith('/coach/agenda'))
+      return route.fulfill({
+        json: {
+          date_from: url.searchParams.get('date_from') ?? '2026-08-20',
+          date_to: url.searchParams.get('date_to') ?? '2026-08-26',
+          timezone: 'Europe/Moscow',
+          items: [],
+        },
+      });
     if (path.endsWith('/coach/assigned-programs'))
       return route.fulfill({
         json: [
@@ -377,6 +398,8 @@ async function mockCoachWorkspace(
         ],
       });
     if (path.endsWith('/coach/clients')) return route.fulfill({ json: clients });
+    if (/\/coach\/clients\/\d+\/operations$/.test(path))
+      return route.fulfill({ json: { sessions: [], packages: [], payments: [], tasks: [] } });
     if (/\/coach\/clients\/\d+\/nutrition-report\.csv$/.test(path))
       return route.fulfill({
         body: '\ufeffrow_type,period_start,period_end\nsummary,2026-07-22,2026-08-20\n',
@@ -599,6 +622,8 @@ test('операционный roster даёт факты и не загружа
   await expect(page.getByText('Борис Александрович С Очень Длинной Фамилией')).toBeVisible();
   await expect(page.getByText('Сейчас открыт клиент')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Анна Петрова', exact: true })).toBeVisible();
+  await page.locator('#coach-client-profile > summary').click();
+  await expect(page.getByLabel('Вес, кг')).toHaveValue('78.4');
   await expect(page.getByText('16 учтённых дней питания за период')).toBeVisible();
   await page.locator('#coach-client-program > summary').click();
   await expect(page.locator('.coach-client-program .ui-badge--success')).toHaveCSS(

@@ -8,6 +8,10 @@ import { useAuth } from '../../app/AuthProvider';
 import { Diary } from '../../features/diary/Diary';
 import { ClientAnalytics } from '../../features/coach/ClientAnalytics';
 import { CoachToday } from '../../features/coach/CoachToday';
+import {
+  CoachClientOperationsCard,
+  CoachOperationsPanel,
+} from '../../features/coach/CoachOperationsPanel';
 import { CoachClientTimeline } from '../../features/coach/CoachClientTimeline';
 import { CoachReportHandoffEntry } from '../../features/coach/CoachReportHandoffEntry';
 import { TrainerModeSwitch } from '../../features/trainer/TrainerModeSwitch';
@@ -418,6 +422,10 @@ function coachGoalLabel(goal: string | null | undefined): string {
   );
 }
 
+function operationalStatusLabel(status: Client['operational_status']): string {
+  return { active: 'В работе', paused: 'Пауза', archived: 'Архив' }[status];
+}
+
 function adherenceText(summary?: TrainerClientProgressSummary): string {
   const workouts = summary?.adherence.workouts;
   if (!workouts || workouts.status !== 'available' || workouts.percent == null) {
@@ -712,7 +720,8 @@ function CoachClientDetail({
           <h2 id="coach-client-detail-title">{clientDisplayName(client)}</h2>
           <p>
             {client.username ? `@${client.username} · ` : ''}
-            Цель: {coachGoalLabel(client.goal)}
+            Цель: {coachGoalLabel(client.goal)} · Операционный статус:{' '}
+            <strong>{operationalStatusLabel(client.operational_status)}</strong>
           </p>
         </div>
         <nav className="coach-client-quick-actions" aria-label="Данные клиента">
@@ -791,6 +800,11 @@ function CoachClientDetail({
           <small>{activityLabel(summary?.training.last_completed_workout_on)}</small>
         </div>
       </section>
+
+      <CoachClientOperationsCard
+        clientId={client.id}
+        operationalStatus={client.operational_status}
+      />
 
       <ClientDataSection
         id="coach-client-timeline"
@@ -1267,20 +1281,27 @@ export default function CoachPage({
         }
       >
         {tab === 'today' && (
-          <CoachToday
-            clients={clients.data ?? []}
-            programs={programs.data ?? []}
-            summaries={clientSummaries.data?.items ?? []}
-            clientsLoading={clients.isLoading}
-            programsLoading={programs.isPending}
-            summariesLoading={clientSummaries.isPending}
-            pendingCount={pendingCount}
-            inviteCreating={inviteCreating}
-            inviteDisabled={!capabilities.canManageCoach}
-            onNavigate={(destination, filter) => navigateCoach(destination, filter)}
-            onOpenClient={openClient}
-            onInvite={() => void createInvite()}
-          />
+          <>
+            <CoachOperationsPanel
+              clients={activeClients}
+              onOpenClient={openClient}
+              timezone={user.profile?.timezone}
+            />
+            <CoachToday
+              clients={clients.data ?? []}
+              programs={programs.data ?? []}
+              summaries={clientSummaries.data?.items ?? []}
+              clientsLoading={clients.isLoading}
+              programsLoading={programs.isPending}
+              summariesLoading={clientSummaries.isPending}
+              pendingCount={pendingCount}
+              inviteCreating={inviteCreating}
+              inviteDisabled={!capabilities.canManageCoach}
+              onNavigate={(destination, filter) => navigateCoach(destination, filter)}
+              onOpenClient={openClient}
+              onInvite={() => void createInvite()}
+            />
+          </>
         )}
         {tab === 'clients' && (
           <>

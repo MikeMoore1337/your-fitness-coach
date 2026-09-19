@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_coach
 from fitminiapp_api.core.config import settings
-from fitminiapp_api.core.timezone import now_for_user_naive
+from fitminiapp_api.core.timezone import (
+    get_user_timezone_name,
+    now_for_user_naive,
+    today_in_timezone,
+)
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.program import (
     UserProgram,
@@ -15,6 +19,24 @@ from fitminiapp_api.models.program import (
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.check_in import WeeklyCheckInHistoryResponse
 from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
+from fitminiapp_api.schemas.coach_crm import (
+    CoachAgendaResponse,
+    CoachClientOperationalStatusUpdate,
+    CoachClientOperationsResponse,
+    CoachOperationsTodayResponse,
+    CoachPackageCreate,
+    CoachPackageResponse,
+    CoachPackageStateUpdate,
+    CoachPaymentCreate,
+    CoachPaymentResponse,
+    CoachPaymentUpdate,
+    CoachSessionCreate,
+    CoachSessionResponse,
+    CoachSessionUpdate,
+    CoachTaskCreate,
+    CoachTaskResponse,
+    CoachTaskStateUpdate,
+)
 from fitminiapp_api.schemas.feedback import (
     WorkoutCommentCreate,
     WorkoutCommentResponse,
@@ -62,6 +84,24 @@ from fitminiapp_api.services.coach_clients import (
     get_client_managed_by_coach,
     remove_client_for_coach,
     revoke_coach_invite,
+)
+from fitminiapp_api.services.coach_crm import (
+    CoachCrmError,
+    client_operations,
+    create_package,
+    create_payment,
+    create_sessions,
+    create_task,
+    list_packages,
+    list_payments,
+    list_sessions,
+    list_tasks,
+    operations_today,
+    update_client_operational_status,
+    update_package_state,
+    update_payment,
+    update_session,
+    update_task_state,
 )
 from fitminiapp_api.services.exercise_catalog import _effective_exercise_id, list_exercises
 from fitminiapp_api.services.measurements import (
@@ -116,6 +156,14 @@ WorkoutCommentIdempotencyKey = Annotated[
     str | None,
     Header(alias="Idempotency-Key", min_length=8, max_length=128),
 ]
+CoachCrmIdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
+
+
+def _crm_error(exc: CoachCrmError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 def _comment_error(exc: WorkoutCommentError) -> HTTPException:
@@ -227,6 +275,206 @@ def coach_attention(
     return CoachAttentionResponse.model_validate(
         build_coach_attention(db, current_user, limit=limit)
     )
+
+
+@router.get("/operations/today", response_model=CoachOperationsTodayResponse)
+def coach_operations_today(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    try:
+        return operations_today(db, current_user)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.get("/agenda", response_model=CoachAgendaResponse)
+def coach_agenda(
+    date_from: date | None = None,
+    date_to: date | None = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachAgendaResponse:
+    resolved_from = date_from or today_in_timezone(get_user_timezone_name(current_user))
+    resolved_to = date_to or (resolved_from + timedelta(days=6))
+    try:
+        return CoachAgendaResponse(
+            date_from=resolved_from,
+            date_to=resolved_to,
+            timezone=get_user_timezone_name(current_user),
+            items=list_sessions(db, current_user, date_from=resolved_from, date_to=resolved_to),
+        )
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.post(
+    "/sessions", response_model=list[CoachSessionResponse], status_code=status.HTTP_201_CREATED
+)
+def create_coach_sessions(
+    payload: CoachSessionCreate,
+    idempotency_key: CoachCrmIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[CoachSessionResponse]:
+    try:
+        return create_sessions(db, current_user, payload, idempotency_key=idempotency_key)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/sessions/{session_id}", response_model=CoachSessionResponse)
+def update_coach_session(
+    session_id: int,
+    payload: CoachSessionUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachSessionResponse:
+    try:
+        return update_session(db, current_user, session_id, payload)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.get("/clients/{client_id}/operations", response_model=CoachClientOperationsResponse)
+def coach_client_operations(
+    client_id: int,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    try:
+        return client_operations(db, current_user, client_id)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/clients/{client_id}/operational-status")
+def update_coach_client_operational_status(
+    client_id: int,
+    payload: CoachClientOperationalStatusUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    try:
+        update_client_operational_status(db, current_user, client_id, payload.operational_status)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+    return {"operational_status": payload.operational_status}
+
+
+@router.get("/packages", response_model=list[CoachPackageResponse])
+def coach_packages(
+    client_id: int | None = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[CoachPackageResponse]:
+    try:
+        return list_packages(db, current_user, client_id)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.post("/packages", response_model=CoachPackageResponse, status_code=status.HTTP_201_CREATED)
+def create_coach_package(
+    payload: CoachPackageCreate,
+    idempotency_key: CoachCrmIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachPackageResponse:
+    try:
+        return create_package(db, current_user, payload, idempotency_key=idempotency_key)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/packages/{package_id}/state", response_model=CoachPackageResponse)
+def update_coach_package_state(
+    package_id: int,
+    payload: CoachPackageStateUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachPackageResponse:
+    try:
+        return update_package_state(db, current_user, package_id, payload.state)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.get("/payments", response_model=list[CoachPaymentResponse])
+def coach_payments(
+    client_id: int | None = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[CoachPaymentResponse]:
+    try:
+        return list_payments(db, current_user, client_id)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.post("/payments", response_model=CoachPaymentResponse, status_code=status.HTTP_201_CREATED)
+def create_coach_payment(
+    payload: CoachPaymentCreate,
+    idempotency_key: CoachCrmIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachPaymentResponse:
+    try:
+        return create_payment(db, current_user, payload, idempotency_key=idempotency_key)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/payments/{payment_id}", response_model=CoachPaymentResponse)
+def update_coach_payment(
+    payment_id: int,
+    payload: CoachPaymentUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachPaymentResponse:
+    try:
+        return update_payment(db, current_user, payment_id, payload)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.get("/tasks", response_model=list[CoachTaskResponse])
+def coach_tasks(
+    client_id: int | None = None,
+    state: str | None = Query(default=None, pattern="^(open|completed)$"),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> list[CoachTaskResponse]:
+    try:
+        return list_tasks(db, current_user, client_id=client_id, state=state)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.post("/tasks", response_model=CoachTaskResponse, status_code=status.HTTP_201_CREATED)
+def create_coach_task(
+    payload: CoachTaskCreate,
+    idempotency_key: CoachCrmIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachTaskResponse:
+    try:
+        return create_task(db, current_user, payload, idempotency_key=idempotency_key)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
+
+
+@router.patch("/tasks/{task_id}/state", response_model=CoachTaskResponse)
+def update_coach_task_state(
+    task_id: int,
+    payload: CoachTaskStateUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachTaskResponse:
+    try:
+        return update_task_state(db, current_user, task_id, payload.state)
+    except CoachCrmError as exc:
+        raise _crm_error(exc) from exc
 
 
 @router.get(

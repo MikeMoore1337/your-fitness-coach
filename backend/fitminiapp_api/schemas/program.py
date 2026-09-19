@@ -563,7 +563,7 @@ class ClientResponse(BaseModel):
     goal: str | None = None
     level: str | None = None
     height_cm: int | None = None
-    weight_kg: int | None = None
+    weight_kg: float | None = Field(default=None, ge=20, le=350, allow_inf_nan=False)
     workouts_per_week: int | None = None
     cardio_trainings_per_week: int | None = None
     resting_heart_rate: int | None = None
@@ -572,3 +572,4 @@ class ClientResponse(BaseModel):
     timezone: str | None = None
     kbju: NutritionTargetResponse | None = None
     status: Literal["active", "pending"]
+    operational_status: Literal["active", "paused", "archived"] = "active"

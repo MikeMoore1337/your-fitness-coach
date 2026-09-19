@@ -1111,6 +1111,9 @@ def _client(session: _DemoSession, slug: str) -> dict[str, Any]:
         "timezone": "Europe/Moscow",
         "kbju": _nutrition_target(DEMO_CLIENT_IDS[slug], _today(session), session),
         "status": "active",
+        "operational_status": session.state.setdefault("crm_operational_status", {}).get(
+            slug, "active"
+        ),
     }
 
 
@@ -1134,6 +1137,7 @@ def _pending_client() -> dict[str, Any]:
         "timezone": None,
         "kbju": None,
         "status": "pending",
+        "operational_status": "active",
     }
 
 
@@ -1161,6 +1165,278 @@ def _assigned_program(session: _DemoSession, slug: str) -> dict[str, Any]:
         "workouts_planned": 24,
         "next_workout_date": _iso(_today(session) + timedelta(days=2)),
         "current_revision_number": 1,
+    }
+
+
+def _crm_client_name(client_id: int) -> str:
+    return {
+        DEMO_CLIENT_IDS["alexey"]: "Алексей",
+        DEMO_CLIENT_IDS["maria"]: "Мария",
+        DEMO_CLIENT_IDS["ivan"]: "Иван",
+    }.get(client_id, "Демо-клиент")
+
+
+def _crm_session(
+    session: _DemoSession,
+    session_id: int,
+    client_id: int,
+    day_offset: int,
+    hour: int,
+    *,
+    status: str = "scheduled",
+    format_name: str = "online",
+    location: str | None = "Telegram-звонок",
+) -> dict[str, Any]:
+    starts_at = datetime.combine(
+        _today(session) + timedelta(days=day_offset), datetime.min.time()
+    ).replace(hour=hour, minute=0)
+    return {
+        "id": session_id,
+        "client_id": client_id,
+        "client_name": _crm_client_name(client_id),
+        "starts_at": _iso(starts_at),
+        "starts_at_utc": _iso(starts_at - timedelta(hours=3)),
+        "timezone": "Europe/Moscow",
+        "duration_minutes": 60,
+        "format": format_name,
+        "location": location,
+        "status": status,
+        "private_note": "Проверить самочувствие и технику базовых движений.",
+        "package_id": 72001 if client_id == DEMO_CLIENT_IDS["alexey"] else None,
+        "package_balance": 2 if client_id == DEMO_CLIENT_IDS["alexey"] else None,
+        "user_workout_id": DEMO_WORKOUT_ID if client_id == DEMO_CLIENT_IDS["alexey"] else None,
+        "series_id": None,
+        "occurrence_key": None,
+        "created_at": _iso(_now(session)),
+        "updated_at": _iso(_now(session)),
+    }
+
+
+def _crm_package(
+    session: _DemoSession,
+    package_id: int,
+    client_id: int,
+    *,
+    counts: bool = True,
+    state: str = "active",
+    included_sessions: int | None = None,
+    charged_sessions: int | None = None,
+) -> dict[str, Any]:
+    included = (
+        included_sessions if counts and included_sessions is not None else 10 if counts else None
+    )
+    charged = charged_sessions if counts and charged_sessions is not None else 8 if counts else 0
+    return {
+        "id": package_id,
+        "client_id": client_id,
+        "client_name": _crm_client_name(client_id),
+        "name": "Сопровождение · 10 встреч" if counts else "Разбор техники",
+        "counts_sessions": counts,
+        "included_sessions": included,
+        "charged_sessions": charged,
+        "reversed_sessions": 0,
+        "balance": included - charged
+        if counts and included is not None and charged is not None
+        else None,
+        "starts_on": _iso(_today(session) - timedelta(days=14)),
+        "expires_on": _iso(_today(session) + timedelta(days=45)),
+        "state": state,
+        "note": "Демо-данные, не связаны с реальным клиентом.",
+        "created_at": _iso(_now(session) - timedelta(days=14)),
+        "updated_at": _iso(_now(session)),
+    }
+
+
+def _crm_task(
+    session: _DemoSession, task_id: int, client_id: int, day_offset: int, state: str = "open"
+) -> dict[str, Any]:
+    due_at = datetime.combine(
+        _today(session) + timedelta(days=day_offset), datetime.min.time()
+    ).replace(hour=12, minute=0)
+    return {
+        "id": task_id,
+        "client_id": client_id,
+        "client_name": _crm_client_name(client_id),
+        "title": "Отправить короткий комментарий по технике",
+        "due_at": _iso(due_at),
+        "due_at_utc": _iso(due_at - timedelta(hours=3)),
+        "timezone": "Europe/Moscow",
+        "state": state,
+        "completed_at": _iso(_now(session)) if state == "completed" else None,
+        "created_at": _iso(_now(session) - timedelta(days=1)),
+        "updated_at": _iso(_now(session)),
+    }
+
+
+def _crm_payment(
+    session: _DemoSession,
+    payment_id: int,
+    client_id: int,
+    *,
+    expected_amount_minor: int = 35_000,
+    paid_amount_minor: int = 15_000,
+    package_id: int | None = 72001,
+) -> dict[str, Any]:
+    status = (
+        "paid"
+        if paid_amount_minor == expected_amount_minor
+        else "partial"
+        if paid_amount_minor
+        else "expected"
+    )
+    return {
+        "id": payment_id,
+        "client_id": client_id,
+        "client_name": _crm_client_name(client_id),
+        "package_id": package_id,
+        "expected_amount_minor": expected_amount_minor,
+        "paid_amount_minor": paid_amount_minor,
+        "currency": "RUB",
+        "payment_date": _iso(_today(session)),
+        "method": "перевод",
+        "note": "Остаток ожидается до следующей встречи.",
+        "status": status,
+        "created_at": _iso(_now(session) - timedelta(days=2)),
+        "updated_at": _iso(_now(session)),
+    }
+
+
+def _crm_state(session: _DemoSession) -> dict[str, list[dict[str, Any]]]:
+    state = session.state
+    state.setdefault(
+        "crm_sessions",
+        [
+            _crm_session(session, 71001, DEMO_CLIENT_IDS["alexey"], 0, 19),
+            _crm_session(
+                session,
+                71002,
+                DEMO_CLIENT_IDS["maria"],
+                0,
+                12,
+                status="completed",
+                format_name="gym",
+                location="Зал · Ленинградская",
+            ),
+            _crm_session(session, 71003, DEMO_CLIENT_IDS["ivan"], 0, 17, status="no_show"),
+            _crm_session(
+                session,
+                71004,
+                DEMO_CLIENT_IDS["alexey"],
+                1,
+                18,
+                status="cancelled",
+            ),
+        ],
+    )
+    state.setdefault(
+        "crm_packages",
+        [
+            _crm_package(session, 72001, DEMO_CLIENT_IDS["alexey"]),
+            _crm_package(session, 72002, DEMO_CLIENT_IDS["maria"], counts=False),
+            _crm_package(
+                session,
+                72003,
+                DEMO_CLIENT_IDS["maria"],
+                included_sessions=12,
+                charged_sessions=12,
+                state="finished",
+            ),
+            _crm_package(
+                session,
+                72004,
+                DEMO_CLIENT_IDS["ivan"],
+                included_sessions=6,
+                charged_sessions=0,
+                state="cancelled",
+            ),
+        ],
+    )
+    state.setdefault(
+        "crm_payments",
+        [
+            _crm_payment(session, 73001, DEMO_CLIENT_IDS["alexey"]),
+            _crm_payment(
+                session,
+                73002,
+                DEMO_CLIENT_IDS["maria"],
+                expected_amount_minor=20_000,
+                paid_amount_minor=0,
+                package_id=72002,
+            ),
+            _crm_payment(
+                session,
+                73003,
+                DEMO_CLIENT_IDS["ivan"],
+                expected_amount_minor=12_000,
+                paid_amount_minor=12_000,
+                package_id=72004,
+            ),
+        ],
+    )
+    state.setdefault(
+        "crm_tasks",
+        [
+            _crm_task(session, 74001, DEMO_CLIENT_IDS["alexey"], -1),
+            _crm_task(session, 74002, DEMO_CLIENT_IDS["maria"], 0),
+        ],
+    )
+    return {
+        "sessions": state["crm_sessions"],
+        "packages": state["crm_packages"],
+        "payments": state["crm_payments"],
+        "tasks": state["crm_tasks"],
+    }
+
+
+def _crm_agenda(session: _DemoSession, raw_path: str) -> dict[str, Any]:
+    state = _crm_state(session)
+    date_from_raw = _query(raw_path, "date_from")
+    date_to_raw = _query(raw_path, "date_to")
+    try:
+        date_from = date.fromisoformat(date_from_raw) if date_from_raw else _today(session)
+        date_to = date.fromisoformat(date_to_raw) if date_to_raw else date_from + timedelta(days=6)
+    except ValueError as exc:
+        raise DemoActionForbiddenError from exc
+    items = [
+        item
+        for item in state["sessions"]
+        if date_from <= date.fromisoformat(str(item["starts_at"])[:10]) <= date_to
+    ]
+    return {
+        "date_from": _iso(date_from),
+        "date_to": _iso(date_to),
+        "timezone": "Europe/Moscow",
+        "items": items,
+    }
+
+
+def _crm_operations_today(session: _DemoSession) -> dict[str, Any]:
+    state = _crm_state(session)
+    today = _today(session)
+    return {
+        "date": _iso(today),
+        "timezone": "Europe/Moscow",
+        "sessions": [
+            item for item in state["sessions"] if str(item["starts_at"]).startswith(_iso(today))
+        ],
+        "overdue_tasks": [
+            item
+            for item in state["tasks"]
+            if item["state"] == "open" and date.fromisoformat(str(item["due_at"])[:10]) < today
+        ],
+        "due_tasks": [
+            item
+            for item in state["tasks"]
+            if item["state"] == "open" and date.fromisoformat(str(item["due_at"])[:10]) == today
+        ],
+        "low_packages": [
+            item
+            for item in state["packages"]
+            if item["balance"] is not None and item["balance"] <= 2
+        ],
+        "payment_facts": [
+            item for item in state["payments"] if item["status"] in {"expected", "partial"}
+        ],
     }
 
 
@@ -1630,9 +1906,25 @@ def handle_demo_transport(
                 "total": 1,
                 "generated_at": _iso(_now(session)),
             }
+        if path == "/api/v1/coach/operations/today":
+            return _crm_operations_today(session)
+        if path == "/api/v1/coach/agenda":
+            return _crm_agenda(session, raw_path)
+        if path == "/api/v1/coach/packages":
+            return _crm_state(session)["packages"]
+        if path == "/api/v1/coach/payments":
+            return _crm_state(session)["payments"]
+        if path == "/api/v1/coach/tasks":
+            return _crm_state(session)["tasks"]
         if len(parts) >= 4 and parts[:2] == ["coach", "clients"] and parts[2].isdigit():
             client_id = int(parts[2])
             slug = _client_slug(client_id)
+            if len(parts) == 4 and parts[3] == "operations":
+                state = _crm_state(session)
+                return {
+                    key: [item for item in values if int(item["client_id"]) == client_id]
+                    for key, values in state.items()
+                }
             if len(parts) == 4 and parts[3] == "analytics":
                 return _client_analytics(session, client_id)
             if len(parts) == 4 and parts[3] == "workouts":
@@ -1895,6 +2187,120 @@ def handle_demo_transport(
             return _hydration_goal(session, _request_body(body))
         if path == "/api/v1/nutrition/hydration/presets":
             return _hydration_preset(session, _request_body(body))
+        if path == "/api/v1/coach/sessions":
+            payload = _request_body(body)
+            session_client_id = payload.get("client_id")
+            starts_at = payload.get("starts_at")
+            if (
+                isinstance(session_client_id, bool)
+                or not isinstance(session_client_id, int)
+                or session_client_id not in DEMO_CLIENT_IDS.values()
+                or not isinstance(starts_at, str)
+            ):
+                raise DemoActionForbiddenError
+            state = _crm_state(session)
+            next_id = max([71000, *(int(item["id"]) for item in state["sessions"])]) + 1
+            created = _crm_session(
+                session,
+                next_id,
+                session_client_id,
+                0,
+                18,
+                format_name=str(payload.get("format") or "other"),
+                location=payload.get("location"),
+            )
+            created["starts_at"] = starts_at
+            created["starts_at_utc"] = starts_at
+            created["duration_minutes"] = int(payload.get("duration_minutes") or 60)
+            created["private_note"] = payload.get("private_note")
+            created["package_id"] = payload.get("package_id")
+            created["user_workout_id"] = payload.get("user_workout_id")
+            state["sessions"].append(created)
+            session.revision += 1
+            return [created]
+        if path == "/api/v1/coach/packages":
+            payload = _request_body(body)
+            package_client_id = payload.get("client_id")
+            name = payload.get("name")
+            if (
+                isinstance(package_client_id, bool)
+                or not isinstance(package_client_id, int)
+                or package_client_id not in DEMO_CLIENT_IDS.values()
+                or not isinstance(name, str)
+                or not name.strip()
+            ):
+                raise DemoActionForbiddenError
+            state = _crm_state(session)
+            next_id = max([72000, *(int(item["id"]) for item in state["packages"])]) + 1
+            created = _crm_package(
+                session,
+                next_id,
+                package_client_id,
+                counts=bool(payload.get("counts_sessions", True)),
+            )
+            created["name"] = name.strip()
+            created["included_sessions"] = payload.get("included_sessions")
+            created["balance"] = payload.get("included_sessions")
+            state["packages"].append(created)
+            session.revision += 1
+            return created
+        if path == "/api/v1/coach/payments":
+            payload = _request_body(body)
+            payment_client_id = payload.get("client_id")
+            expected = payload.get("expected_amount_minor")
+            paid = payload.get("paid_amount_minor", 0)
+            if (
+                isinstance(payment_client_id, bool)
+                or not isinstance(payment_client_id, int)
+                or payment_client_id not in DEMO_CLIENT_IDS.values()
+                or isinstance(expected, bool)
+                or not isinstance(expected, int)
+                or expected <= 0
+                or isinstance(paid, bool)
+                or not isinstance(paid, int)
+                or paid < 0
+                or paid > expected
+            ):
+                raise DemoActionForbiddenError
+            state = _crm_state(session)
+            next_id = max([73000, *(int(item["id"]) for item in state["payments"])]) + 1
+            payment = _crm_payment(session, next_id, payment_client_id)
+            payment.update(
+                {
+                    "expected_amount_minor": expected,
+                    "paid_amount_minor": paid,
+                    "currency": str(payload.get("currency") or "RUB").upper(),
+                    "method": payload.get("method"),
+                    "note": payload.get("note"),
+                    "status": "paid" if paid == expected else "partial" if paid else "expected",
+                }
+            )
+            state["payments"].append(payment)
+            session.revision += 1
+            return payment
+        if path == "/api/v1/coach/tasks":
+            payload = _request_body(body)
+            task_client_id = payload.get("client_id")
+            title = payload.get("title")
+            due_at = payload.get("due_at")
+            if (
+                isinstance(task_client_id, bool)
+                or not isinstance(task_client_id, int)
+                or task_client_id not in DEMO_CLIENT_IDS.values()
+                or not isinstance(title, str)
+                or not title.strip()
+                or not isinstance(due_at, str)
+            ):
+                raise DemoActionForbiddenError
+            state = _crm_state(session)
+            next_id = max([74000, *(int(item["id"]) for item in state["tasks"])]) + 1
+            task = _crm_task(session, next_id, task_client_id, 0)
+            task["title"] = title.strip()
+            task["due_at"] = due_at
+            task["due_at_utc"] = due_at
+            state["tasks"].append(task)
+            session.revision += 1
+            return task
         if (
             len(parts) == 6
             and parts[0:2] == ["coach", "clients"]
@@ -1938,6 +2344,134 @@ def handle_demo_transport(
     if method == "PATCH" and len(parts) == 3 and parts[0] == "workouts" and parts[1] == "sets":
         set_id = int(parts[2]) if parts[2].isdigit() else 0
         return _apply_workout_set(session, set_id, _request_body(body))
+
+    if (
+        method == "PATCH"
+        and len(parts) == 3
+        and parts[:2] == ["coach", "sessions"]
+        and parts[2].isdigit()
+    ):
+        session_id = int(parts[2])
+        state = _crm_state(session)
+        stored = next((item for item in state["sessions"] if int(item["id"]) == session_id), None)
+        if stored is None:
+            raise DemoActionForbiddenError
+        payload = _request_body(body)
+        for key in ("starts_at", "timezone", "location", "private_note", "status", "format"):
+            if key in payload:
+                stored[key] = payload[key]
+        if "duration_minutes" in payload:
+            stored["duration_minutes"] = payload["duration_minutes"]
+        stored["updated_at"] = _iso(_now(session))
+        session.revision += 1
+        return stored
+
+    if (
+        method == "PATCH"
+        and len(parts) == 4
+        and parts[:2] == ["coach", "packages"]
+        and parts[2].isdigit()
+        and parts[3] == "state"
+    ):
+        package_id = int(parts[2])
+        stored = next(
+            (item for item in _crm_state(session)["packages"] if int(item["id"]) == package_id),
+            None,
+        )
+        if stored is None:
+            raise DemoActionForbiddenError
+        payload = _request_body(body)
+        if payload.get("state") not in {"active", "finished", "cancelled"}:
+            raise DemoActionForbiddenError
+        stored["state"] = payload["state"]
+        stored["updated_at"] = _iso(_now(session))
+        session.revision += 1
+        return stored
+
+    if (
+        method == "PATCH"
+        and len(parts) == 3
+        and parts[:2] == ["coach", "payments"]
+        and parts[2].isdigit()
+    ):
+        payment_id = int(parts[2])
+        stored = next(
+            (item for item in _crm_state(session)["payments"] if int(item["id"]) == payment_id),
+            None,
+        )
+        if stored is None:
+            raise DemoActionForbiddenError
+        payload = _request_body(body)
+        expected = payload.get("expected_amount_minor", stored["expected_amount_minor"])
+        paid = payload.get("paid_amount_minor", stored["paid_amount_minor"])
+        if (
+            isinstance(expected, bool)
+            or not isinstance(expected, int)
+            or expected <= 0
+            or isinstance(paid, bool)
+            or not isinstance(paid, int)
+            or paid < 0
+            or paid > expected
+        ):
+            raise DemoActionForbiddenError
+        stored["expected_amount_minor"] = expected
+        stored["paid_amount_minor"] = paid
+        if "currency" in payload:
+            stored["currency"] = str(payload["currency"]).upper()
+        if "method" in payload:
+            stored["method"] = payload["method"]
+        if "note" in payload:
+            stored["note"] = payload["note"]
+        stored["status"] = (
+            "cancelled"
+            if payload.get("status") == "cancelled"
+            else "paid"
+            if paid == expected
+            else "partial"
+            if paid
+            else "expected"
+        )
+        stored["updated_at"] = _iso(_now(session))
+        session.revision += 1
+        return stored
+
+    if (
+        method == "PATCH"
+        and len(parts) == 4
+        and parts[:2] == ["coach", "tasks"]
+        and parts[2].isdigit()
+        and parts[3] == "state"
+    ):
+        task_id = int(parts[2])
+        stored = next(
+            (item for item in _crm_state(session)["tasks"] if int(item["id"]) == task_id), None
+        )
+        if stored is None:
+            raise DemoActionForbiddenError
+        payload = _request_body(body)
+        if payload.get("state") not in {"open", "completed"}:
+            raise DemoActionForbiddenError
+        stored["state"] = payload["state"]
+        stored["completed_at"] = _iso(_now(session)) if payload["state"] == "completed" else None
+        stored["updated_at"] = _iso(_now(session))
+        session.revision += 1
+        return stored
+
+    if (
+        method == "PATCH"
+        and len(parts) == 4
+        and parts[:2] == ["coach", "clients"]
+        and parts[2].isdigit()
+        and parts[3] == "operational-status"
+    ):
+        client_id = int(parts[2])
+        slug = _client_slug(client_id)
+        payload = _request_body(body)
+        if payload.get("operational_status") not in {"active", "paused", "archived"}:
+            raise DemoActionForbiddenError
+        session.state.setdefault("crm_operational_status", {})[slug] = payload["operational_status"]
+        session.revision += 1
+        return {"operational_status": payload["operational_status"]}
 
     if (
         method in {"PATCH", "DELETE"}

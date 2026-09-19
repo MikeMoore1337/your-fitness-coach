@@ -307,6 +307,10 @@ class CoachClient(Base):
             "status",
             "client_user_id",
         ),
+        CheckConstraint(
+            "operational_status IN ('active', 'paused', 'archived')",
+            name="ck_coach_clients_operational_status",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -314,6 +318,9 @@ class CoachClient(Base):
     client_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     private_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
     status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="active", server_default="active"
+    )
+    operational_status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="active", server_default="active"
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
