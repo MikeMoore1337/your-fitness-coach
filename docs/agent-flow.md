@@ -73,13 +73,18 @@ prompt/command/tool args/results.
 
 ## External skill safety
 
-Перед worker launch controller запускает `scripts/skill_safety.py scan-all`.
+Layer 1: перед worker launch controller запускает `scripts/skill_safety.py scan-all`.
 
 - scan полностью offline/deterministic;
 - `CRITICAL` блокирует запуск;
 - `WARNING` сохраняется как evidence и не блокирует;
 - external/vendored skill должен иметь `SOURCE.json` с immutable commit и license provenance;
-- тот же scan подключён в pre-commit/CI.
+- тот же lightweight scan подключён в pre-commit/CI.
+
+Layer 2: при изменении `.agents/skills/**` CI routing добавляет
+`external-skill-security`. Эта группа запускает pinned NVIDIA SkillSpector через
+`scripts/skillspector_guard.py` в static-only режиме, без LLM. Обычные product tasks без skill
+changes этот инструмент не устанавливают и не запускают.
 
 ## Execution model
 

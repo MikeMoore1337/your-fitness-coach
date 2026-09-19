@@ -47,6 +47,7 @@ jobs:
       changed_paths: ${{ steps.route.outputs.changed_paths }}
       run_quality: ${{ steps.route.outputs.run_quality }}
       run_policy: ${{ steps.route.outputs.run_policy }}
+      run_external_skill_security: ${{ steps.route.outputs.run_external_skill_security }}
       run_frontend: ${{ steps.route.outputs.run_frontend }}
       run_frontend_smoke: ${{ steps.route.outputs.run_frontend_smoke }}
       run_frontend_mobile_regression: ${{ steps.route.outputs.run_frontend_mobile_regression }}
@@ -189,6 +190,9 @@ jobs:
         run: mkdir -p .artifacts/runtime/tests
       - name: Run shared delivery policy group
         run: python scripts/ci_contract.py run-group policy
+      - name: Run SkillSpector external skill gate
+        if: needs.scope-router.outputs.run_external_skill_security == 'true'
+        run: python scripts/ci_contract.py run-group external-skill-security
 
   frontend:
     name: Frontend

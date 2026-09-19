@@ -157,6 +157,7 @@ def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> Non
     for group in (
         "quality",
         "policy",
+        "external-skill-security",
         "frontend-checks",
         "frontend-e2e",
         "frontend-mobile-regression",
@@ -442,6 +443,24 @@ def test_scope_router_preserves_dot_prefixed_workflow_paths() -> None:
     assert decision["profile"] == "workflow-platform"
 
 
+def test_skill_change_adds_skillspector_policy_group_only_when_needed() -> None:
+    skill = ci_contract.classify_scope([".agents/skills/apple-design/SKILL.md"])
+    ordinary = ci_contract.classify_scope(["backend/fitminiapp_api/services/example.py"])
+
+    assert "external-skill-security" in skill["required_groups"]
+    assert skill["outputs"]["run_external_skill_security"] is True
+    assert "policy" in skill["required_jobs"]
+    assert "external-skill-security" not in ordinary["required_groups"]
+    assert ordinary["outputs"]["run_external_skill_security"] is False
+
+
+def test_skill_source_manifest_change_requires_skillspector() -> None:
+    decision = ci_contract.classify_scope([".agents/skills/apple-design/SOURCE.json"])
+
+    assert "external-skill-security" in decision["required_groups"]
+    assert decision["signals"]["external_skill"] is True
+
+
 def test_scope_router_writes_machine_readable_outputs(tmp_path: Path) -> None:
     destination = tmp_path / "github-output"
     decision = ci_contract.classify_scope(["frontend/package.json"])
@@ -451,6 +470,7 @@ def test_scope_router_writes_machine_readable_outputs(tmp_path: Path) -> None:
     output = destination.read_text(encoding="utf-8")
     assert "profile=frontend" in output
     assert "run_frontend_dependency_audit=true" in output
+    assert "run_external_skill_security=false" in output
     assert 'required_jobs=["' in output
 
 
