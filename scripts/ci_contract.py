@@ -334,6 +334,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "tests/test_agent_flow.py",
                 "tests/test_worker_guard.py",
                 "tests/test_skill_safety.py",
+                "tests/test_skillspector_guard.py",
                 "tests/test_run_task_delivery.py",
                 "tests/test_scheduled_regression.py",
                 "tests/test_deployment_contract.py",
@@ -343,6 +344,21 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
             ),
         ),
         prerequisites=("python",),
+    ),
+    "external-skill-security": GroupSpec(
+        name="external-skill-security",
+        commands=(
+            _cmd(
+                "skillspector-static-gate",
+                "python",
+                "scripts/skillspector_guard.py",
+                "scan-all-external",
+                retry_on_transient=True,
+                retry_max_attempts=2,
+                retry_delays_seconds=(2,),
+            ),
+        ),
+        prerequisites=("python", "uvx"),
     ),
     "workflow-config": GroupSpec(
         name="workflow-config",
@@ -488,6 +504,7 @@ PROFILE_GROUPS["weekly-exhaustive"] = (
 GROUP_TO_JOB: dict[str, str] = {
     "quality": "quality",
     "policy": "policy",
+    "external-skill-security": "policy",
     "frontend-checks": "frontend",
     "frontend-e2e": "frontend-smoke",
     "frontend-mobile-regression": "frontend-mobile-regression",
@@ -544,6 +561,7 @@ ROUTER_OUTPUTS: dict[str, str] = {
 }
 
 ROUTER_GROUP_OUTPUTS: dict[str, str] = {
+    "external-skill-security": "run_external_skill_security",
     "workflow-config": "run_workflow_config",
     "image-contract": "run_image_contract",
     "deployment-contract": "run_deployment_contract",
@@ -574,6 +592,7 @@ _API_PREFIXES = (
 _API_TOKENS = ("openapi", "auth", "session", "cookie", "telegram")
 _SHARED_CI_CONTRACT_PATHS = frozenset({"scripts/ci_contract.py"})
 _CONTAINER_SECURITY_PATHS = frozenset({".trivyignore.yaml"})
+_SKILL_PREFIX = ".agents/skills/"
 _MIGRATION_PREFIXES = (
     "backend/alembic/",
     "backend/fitminiapp_api/db/",
@@ -661,6 +680,7 @@ def _profile_for_paths(
     container_security = any(
         _is_container_security_path(path) for path in normalized if not _is_documentation_path(path)
     )
+    external_skill = any(path.startswith(_SKILL_PREFIX) for path in normalized)
     api_contract = any(
         _is_api_path(path) for path in normalized if not _is_documentation_path(path)
     )
@@ -695,6 +715,8 @@ def _profile_for_paths(
         reasons.append("migration or persistence boundary changed")
     if container_security:
         reasons.append("container security configuration changed; requiring image scan")
+    if external_skill:
+        reasons.append("repository skill changed; requiring SkillSpector second-stage scan")
     if frontend_dependency:
         reasons.append("frontend dependency manifest changed")
     if python_dependency:
@@ -737,6 +759,7 @@ def _profile_for_paths(
         "python_dependency": python_dependency,
         "runtime_dependency": runtime_dependency,
         "container_security": container_security,
+        "external_skill": external_skill,
     }
     return (
         profile,
@@ -834,6 +857,11 @@ def classify_scope(paths: Sequence[str]) -> dict[str, object]:
         groups.append("container-contract")
     if container_security and "container-contract" not in groups:
         groups.append("container-contract")
+    if (
+        any(path.startswith(_SKILL_PREFIX) for path in normalized)
+        and "external-skill-security" not in groups
+    ):
+        groups.append("external-skill-security")
     return _decision_for_groups(
         profile=profile,
         paths=normalized,
@@ -1139,6 +1167,7 @@ def contract_payload() -> dict[str, object]:
                 "api_tokens": list(_API_TOKENS),
                 "shared_ci_contract_paths": sorted(_SHARED_CI_CONTRACT_PATHS),
                 "container_security_paths": sorted(_CONTAINER_SECURITY_PATHS),
+                "skill_prefix": _SKILL_PREFIX,
                 "migration_prefixes": list(_MIGRATION_PREFIXES),
             },
         },
@@ -1456,6 +1485,7 @@ def validate_contract() -> None:
     }:
         raise CIContractError("CI router outputs do not cover the stable job set")
     if set(ROUTER_GROUP_OUTPUTS) != {
+        "external-skill-security",
         "workflow-config",
         "image-contract",
         "deployment-contract",

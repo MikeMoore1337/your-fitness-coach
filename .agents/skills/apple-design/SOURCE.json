@@ -6,5 +6,13 @@
   "source_commit": "85e8e2363b713506e1d5b6e07a0eb2da66be1bc3",
   "license": "MIT",
   "license_file": "LICENSE.md",
-  "vendored_at": "2026-09-19"
+  "vendored_at": "2026-09-19",
+  "security_scan_policy": {
+    "layer2": "NVIDIA SkillSpector",
+    "version": "2.11.2-postrelease",
+    "commit": "d162d9b343e559be13df8ebba093df3bc9d58c90",
+    "mode": "static-no-llm",
+    "fail_on_incomplete": true,
+    "reference_missing_only_nonblocking": true
+  }
 }

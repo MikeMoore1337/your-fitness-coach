@@ -195,8 +195,13 @@ Repository skills live under `.agents/skills/`.
 - Repository/backlog rules take precedence over generic skill guidance when they conflict.
 - Any vendored/external repository skill must include a sibling `SOURCE.json` with immutable source
   commit, source URL/repository, license and license file. Before a delivery worker starts,
-  `scripts/skill_safety.py scan-all` performs an offline deterministic scan. `CRITICAL` findings
-  block worker launch; warnings are evidence only. The scanner never makes network or LLM calls.
+  `scripts/skill_safety.py scan-all` performs the mandatory stdlib-only offline Layer 1 scan.
+  `CRITICAL` findings block worker launch; warnings are evidence only.
+- NVIDIA SkillSpector is the conditional Layer 2 scanner for repository skill changes and explicit
+  pre-vendoring checks. It runs only through `scripts/skillspector_guard.py`, pinned to the tested
+  upstream commit, with `--no-llm --fail-on-incomplete`. It is never a YFC runtime dependency,
+  never runs on ordinary product PRs without skill changes, and never replaces Layer 1. See
+  `docs/skillspector-development.md`.
 
 # Agent Flow v1
 
