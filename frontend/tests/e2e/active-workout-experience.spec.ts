@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-test.use({ video: 'on' });
+test.use({ serviceWorkers: 'block', video: 'on' });
 
 const captureLandingProductProofs =
   (
@@ -357,10 +357,11 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(firstSet).toHaveAttribute('aria-current', 'step');
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
-  await Promise.all([
-    waitForCompletedSetPatch(page, 201),
-    firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).dblclick(),
-  ]);
+  const firstDone = firstSet.getByRole('button', {
+    name: 'Завершить: Жим штанги лёжа, подход 1',
+  });
+  await firstDone.scrollIntoViewIfNeeded();
+  await Promise.all([waitForCompletedSetPatch(page, 201), firstDone.dblclick()]);
 
   const secondSet = page.locator('[data-workout-set-id="202"]');
   await expect(secondSet).toHaveAttribute('aria-current', 'step');
