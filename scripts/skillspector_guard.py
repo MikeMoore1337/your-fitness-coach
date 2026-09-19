@@ -82,6 +82,20 @@ def _parse_report(path: Path) -> dict[str, Any]:
     return raw
 
 
+def _completeness_diagnostic(completeness: Mapping[str, Any]) -> str:
+    reason_codes: set[str] = set()
+    exceptions = completeness.get("ledger_exceptions")
+    if isinstance(exceptions, list):
+        for item in exceptions:
+            if isinstance(item, Mapping) and isinstance(item.get("reason_code"), str):
+                reason_codes.add(str(item["reason_code"]))
+    status = str(completeness.get("status") or "unknown")
+    coverage = completeness.get("coverage_percent")
+    coverage_text = str(coverage) if isinstance(coverage, (int, float)) else "unknown"
+    reasons = ",".join(sorted(reason_codes)) or "none"
+    return f"status={status} coverage={coverage_text} reason_codes={reasons}"
+
+
 def _validate_static_report(report: Mapping[str, Any], report_path: Path) -> ScanVerdict:
     if report.get("execution_successful") is False:
         raise SkillSpectorGuardError(
@@ -95,7 +109,8 @@ def _validate_static_report(report: Mapping[str, Any], report_path: Path) -> Sca
         )
     if completeness.get("is_complete") is not True or completeness.get("status") != "complete":
         raise SkillSpectorGuardError(
-            f"SkillSpector analysis is incomplete; inspect {report_path}"
+            "SkillSpector analysis is incomplete "
+            f"({_completeness_diagnostic(completeness)}); inspect {report_path}"
         )
     if completeness.get("execution_successful") is False:
         raise SkillSpectorGuardError(
