@@ -283,6 +283,34 @@ export function AppShell({
   useDocumentScrollLock(moreSurfacePresent);
 
   useEffect(() => {
+    const root = document.documentElement;
+    const navigation = document.getElementById('appBottomNav');
+    if (!navigation) {
+      root.style.removeProperty('--app-bottom-nav-height');
+      return;
+    }
+
+    const syncNavigationHeight = () => {
+      root.style.setProperty(
+        '--app-bottom-nav-height',
+        mobileNavigationMatches() ? `${navigation.getBoundingClientRect().height}px` : '0px',
+      );
+    };
+
+    syncNavigationHeight();
+    window.addEventListener('resize', syncNavigationHeight);
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncNavigationHeight);
+    observer?.observe(navigation);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', syncNavigationHeight);
+      root.style.removeProperty('--app-bottom-nav-height');
+    };
+  }, [mobileNavigation, shellVisible]);
+
+  useEffect(() => {
     if (moreOpen) {
       morePanelRef.current?.querySelector<HTMLElement>('button, a')?.focus();
     }

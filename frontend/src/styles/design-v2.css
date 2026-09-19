@@ -2549,6 +2549,30 @@ body:has(.app-shell--design-v2) {
   background: var(--v2-surface-secondary);
 }
 
+.active-workout--design-v2 .active-workout-set.is-current {
+  margin-block: var(--v2-space-2);
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-lime);
+  border-radius: var(--v2-panel-radius);
+  background: var(--v2-surface-secondary);
+  box-shadow: inset 3px 0 0 var(--v2-lime);
+  scroll-margin-block: var(--v2-space-4) var(--yfc-mobile-dock-clearance);
+}
+
+.active-workout--design-v2 .active-workout-set__context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-1) var(--v2-space-2);
+  margin: 0;
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.active-workout--design-v2 .active-workout-set.is-current :where(input, .active-workout-set__done) {
+  scroll-margin-bottom: var(--yfc-mobile-dock-clearance);
+}
+
 .active-workout--design-v2 .active-workout-set.is-current .active-workout-set__number {
   background: var(--v2-surface-secondary);
   color: var(--v2-text-primary);
@@ -4393,6 +4417,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   --yfc-layout-safe-right: max(var(--yfc-safe-right), var(--yfc-content-safe-right));
   --yfc-layout-safe-bottom: max(var(--yfc-safe-bottom), var(--yfc-content-safe-bottom));
   --yfc-layout-safe-left: max(var(--yfc-safe-left), var(--yfc-content-safe-left));
+  --app-bottom-nav-height: 0px;
+  --yfc-mobile-dock-clearance: max(
+    96px,
+    calc(var(--app-bottom-nav-height) + 24px + max(8px, var(--yfc-layout-safe-bottom)))
+  );
+  --yfc-mobile-action-clearance: max(
+    104px,
+    calc(var(--app-bottom-nav-height) + 32px + max(8px, var(--yfc-layout-safe-bottom)))
+  );
 }
 
 .app-shell--design-v2 {
@@ -4411,6 +4444,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 @media (max-width: 899px) {
+  :root {
+    --app-bottom-nav-height: 72px;
+  }
+
   body:has(.app-shell--design-v2 #appBottomNav) {
     padding-bottom: calc(72px + max(14px, var(--yfc-layout-safe-bottom)));
   }
@@ -4446,7 +4483,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 /* Task 75C: the mobile dock keeps the shared AppShell and changes only its compact shape. */
 @media (max-width: 899px) {
   body:has(.app-shell--design-v2 #appBottomNav) {
-    padding-bottom: calc(96px + max(8px, var(--yfc-layout-safe-bottom)));
+    padding-bottom: var(--yfc-mobile-dock-clearance);
   }
 
   body:has(.app-shell--design-v2 #appBottomNav) .toast:not(.hidden) {
@@ -4464,6 +4501,25 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     box-shadow:
       inset 0 1px var(--glass-light),
       var(--glass-shadow);
+  }
+
+  html:has(.app-shell--design-v2 #appBottomNav) {
+    scroll-padding-bottom: var(--yfc-mobile-dock-clearance);
+  }
+
+  .app-shell--design-v2 #appContent :where(button, a, input, select, textarea, summary) {
+    scroll-margin-bottom: var(--yfc-mobile-dock-clearance);
+  }
+
+  html[data-yfc-keyboard='visible'] body:has(.app-shell--design-v2 #appBottomNav) {
+    padding-bottom: max(18px, var(--yfc-layout-safe-bottom));
+  }
+
+  html[data-yfc-keyboard='visible']
+    .app-shell--design-v2
+    #appContent
+    :where(button, a, input, select, textarea, summary):focus {
+    scroll-margin-block: 16px 40%;
   }
 }
 
@@ -7725,10 +7781,16 @@ button.notification-row__main:focus-visible {
 /* Nutrition discovery, recipes, barcode and copy flows inherit the diary foundation. */
 .app-section--nutrition :where(.nutrition-picker__panel, .nutrition-copy__panel) {
   border-color: var(--v2-border);
-  border-radius: var(--v2-region-radius) var(--v2-region-radius) 0 0;
+  border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
   color: var(--v2-text-primary);
   box-shadow: var(--elevation-overlay);
+}
+
+@media (max-width: 640px) {
+  .app-section--nutrition .nutrition-picker__panel {
+    border-radius: var(--v2-region-radius) var(--v2-region-radius) 0 0;
+  }
 }
 
 .app-section--nutrition

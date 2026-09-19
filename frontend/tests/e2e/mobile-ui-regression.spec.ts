@@ -212,6 +212,82 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   });
 });
 
+test('@critical active workout keeps the current set primary across mobile widths', async ({
+  page,
+}) => {
+  await preparePage(page, 'dark', 'browser', { workoutStatus: 'in_progress' });
+
+  for (const viewport of MOBILE_VIEWPORTS) {
+    await page.setViewportSize(viewport);
+    await page.goto('/app?section=today');
+    await waitForSurface(page, 'today');
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+    const currentSet = page.locator('.active-workout-set.is-current');
+    const currentSetDone = currentSet.locator('.active-workout-set__done');
+    await expect(currentSet).toBeVisible();
+    await expect(currentSet).toContainText(/Подход \d+ из \d+/);
+    await expect(currentSet).toContainText(/(?:повторений|Повторы по плану)/);
+    await expect(currentSet).toContainText(/Отдых \d+ с/);
+    await expect(currentSetDone).toBeVisible();
+    await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
+    await assertMobileShellGeometry(page);
+
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(
+      viewport.height,
+    );
+    await currentSetDone.evaluate((element) => {
+      element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
+    });
+    await expect(currentSetDone).toBeInViewport();
+    await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
+    await expectUiAuditClean(page, 'active workout current set', { checkTouchTargets: true });
+
+    const numberInputs = currentSet.locator('input[type="number"]');
+    await expect(numberInputs).toHaveCount(2);
+    expect(
+      await numberInputs.evaluateAll((inputs) =>
+        inputs.map((input) => (input as HTMLInputElement).type),
+      ),
+    ).toEqual(['number', 'number']);
+
+    for (const input of [
+      currentSet.getByRole('spinbutton', { name: /Вес, .*подход 1/ }),
+      currentSet.getByRole('spinbutton', { name: /Повторы, .*подход 1/ }),
+    ]) {
+      await input.focus();
+      await expect(input).toBeInViewport();
+      await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
+      await expect(page.locator('#appBottomNav')).toBeHidden();
+      await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
+      await input.evaluate((element) => (element as HTMLElement).blur());
+      await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
+      await expect(page.locator('#appBottomNav')).toBeVisible();
+    }
+    const bottomNav = page.locator('#appBottomNav');
+    await expect(bottomNav.locator('.app-bottom-nav__primary > a')).toHaveCount(4);
+    for (const label of ['Сегодня', 'План', 'Питание', 'Прогресс']) {
+      const link = bottomNav.getByRole('link', { name: label, exact: true });
+      await expect(link).toBeVisible();
+      await expect(link.locator('svg[data-icon]')).toBeVisible();
+    }
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    // WebKit can defer fixed-nav inline SVG painting after the keyboard-hide repaint.
+    // A paint-only capture makes the following evidence screenshot deterministic.
+    await page.screenshot({ animations: 'disabled' });
+    await page.screenshot({
+      path: test.info().outputPath(`active-workout-${viewport.width}x${viewport.height}-dark.png`),
+      fullPage: false,
+      animations: 'disabled',
+    });
+  }
+});
+
 test('@critical mocked TMA preserves safe areas, lifecycle and Today geometry', async ({
   page,
 }) => {

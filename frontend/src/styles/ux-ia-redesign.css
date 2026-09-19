@@ -3,7 +3,10 @@
 .app-quick-add-trigger {
   position: fixed;
   right: max(18px, var(--yfc-layout-safe-right, 0px));
-  bottom: calc(104px + max(8px, var(--yfc-layout-safe-bottom, 0px)));
+  bottom: var(
+    --yfc-mobile-action-clearance,
+    calc(104px + max(8px, var(--yfc-layout-safe-bottom, 0px)))
+  );
   z-index: 9010;
   display: inline-flex;
   min-height: 48px;
@@ -29,6 +32,14 @@
 @media (min-width: 521px) and (max-width: 899px) {
   body:has(.active-workout-rest) .app-quick-add-trigger {
     bottom: calc(176px + max(8px, var(--yfc-layout-safe-bottom, 0px)));
+  }
+}
+
+@media (max-width: 899px) {
+  html[data-yfc-keyboard='visible'] .app-quick-add-trigger,
+  body:has(.active-workout--design-v2) .app-quick-add-trigger {
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 

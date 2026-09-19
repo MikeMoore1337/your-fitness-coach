@@ -590,6 +590,7 @@ describe('NutritionDiary', () => {
     expect(
       await screen.findByText('Локальный каталог сейчас не ответил. Попробуйте снова.'),
     ).toBeVisible();
+    fireEvent.click(screen.getByText('Каталог и фильтры', { exact: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Избранное' }));
     expect(await screen.findByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
   });

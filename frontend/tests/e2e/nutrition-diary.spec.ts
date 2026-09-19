@@ -2,6 +2,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 import type { FoodDiaryEntry, HydrationEntry } from '../../src/shared/api/types';
 import { nutritionDaySummary } from './fixtures/locators';
 
+test.use({ serviceWorkers: 'block' });
+
 const zeroNutrition = {
   energy_kcal: '0.00',
   protein_g: '0.000',
@@ -789,25 +791,81 @@ test('hydration touch matrix has no horizontal overflow and keeps controls reach
 
 const russianSearchVisualCases = [
   { label: 'desktop-1280', viewport: { width: 1280, height: 900 }, dark: false },
+  { label: 'desktop-1280-dark', viewport: { width: 1280, height: 900 }, dark: true },
   { label: 'mobile-web-360', viewport: { width: 360, height: 800 }, dark: false },
   { label: 'dark-mobile-390', viewport: { width: 390, height: 844 }, dark: true },
+  { label: 'mobile-web-430', viewport: { width: 430, height: 932 }, dark: false },
 ] as const;
 
 for (const current of russianSearchVisualCases) {
   test(`Russian multi-variant food search visual evidence (${current.label})`, async ({ page }) => {
+    const unexpectedBrowserProblems: string[] = [];
+    page.on('console', (message) => {
+      const text = message.text();
+      const expectedHarnessNoise =
+        text === 'Service Worker registration blocked by Playwright' ||
+        text === 'Failed to load resource: the server responded with a status of 404 (Not Found)';
+      if (!expectedHarnessNoise && (message.type() === 'warning' || message.type() === 'error')) {
+        unexpectedBrowserProblems.push(`${message.type()}: ${text}`);
+      }
+    });
+    page.on('pageerror', (error) => unexpectedBrowserProblems.push(`pageerror: ${error.message}`));
     await page.setViewportSize(current.viewport);
     await page.emulateMedia({ colorScheme: current.dark ? 'dark' : 'light' });
     await mockNutritionApi(page);
     await page.goto('/app?section=nutrition');
     const breakfast = page.getByRole('region', { name: 'Завтрак' });
     await breakfast.getByRole('button', { name: /Добавить/ }).click();
-    await page.getByRole('searchbox', { name: 'Найти продукт' }).fill('рис');
+    const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+    await search.fill('рис');
+    const clearSearch = page.getByRole('button', { name: 'Очистить поиск', exact: true });
+    await expect(clearSearch).toBeVisible();
+    await expect(clearSearch).toBeInViewport();
+    await expect(search).toHaveClass(/nutrition-picker__search-input--has-clear/);
+    expect(await page.locator('.nutrition-picker__search-clear').count()).toBe(1);
+    const searchGeometry = await search.evaluate((input) => {
+      const styles = getComputedStyle(input);
+      const inputRect = input.getBoundingClientRect();
+      const clear = input.parentElement?.querySelector('button');
+      const clearRect = clear?.getBoundingClientRect();
+      return {
+        paddingRight: Number.parseFloat(styles.paddingRight),
+        inputRect: { left: inputRect.left, right: inputRect.right },
+        clearRect: clearRect
+          ? {
+              left: clearRect.left,
+              right: clearRect.right,
+              width: clearRect.width,
+              height: clearRect.height,
+            }
+          : null,
+      };
+    });
+    expect(searchGeometry.paddingRight).toBeGreaterThanOrEqual(48);
+    expect(searchGeometry.clearRect?.width).toBeGreaterThanOrEqual(44);
+    expect(searchGeometry.clearRect?.height).toBeGreaterThanOrEqual(43.5);
+    expect(searchGeometry.clearRect?.right).toBeLessThanOrEqual(searchGeometry.inputRect.right);
+    await search.focus();
+    await expect(search).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(clearSearch).toBeFocused();
+    expect(await clearSearch.evaluate((button) => button.matches(':focus-visible'))).toBe(true);
+    await clearSearch.click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await expect(clearSearch).not.toBeAttached();
+    await search.fill('рис');
+    await search.press('Escape');
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await search.fill('рис');
     await expect(page.getByText('Рис белый приготовленный, без добавления масла')).toBeVisible();
     await expect(page.getByText('Рис бурый приготовленный, без добавления масла')).toBeVisible();
     await expect(page.getByText('Рис дикий приготовленный, без добавления масла')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
       current.viewport.width,
     );
+    expect(unexpectedBrowserProblems).toEqual([]);
     await page.screenshot({
       path: `../.artifacts/runtime/tests/screenshots/task-114a/russian-food-variants-${current.label}.png`,
     });
@@ -980,6 +1038,9 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(search).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ввести вручную' })).toBeVisible();
   await expect(page.getByRole('button', { name: /штрихкод/i })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Избранное' })).not.toBeVisible();
+  await page.getByText('Каталог и фильтры', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Избранное' })).toBeVisible();
   await page.getByText('Другие способы добавления').click();
   await expect(page.getByRole('button', { name: 'Рецепты' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
@@ -988,6 +1049,55 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(addButton).toBeFocused();
 
   await addButton.click();
+  const productResult = page.locator('.nutrition-food-result').filter({ hasText: 'Овсяная каша' });
+  const favoriteButton = productResult.locator('.nutrition-food-result__favorite');
+  await expect(favoriteButton).toBeVisible();
+  const favoriteGeometry = await favoriteButton.evaluate((button) => {
+    const buttonRect = button.getBoundingClientRect();
+    const icon = button.querySelector<SVGElement>('.yfc-icon');
+    const iconRect = icon?.getBoundingClientRect();
+    const rowRect = button.closest('.nutrition-food-result')?.getBoundingClientRect();
+    return {
+      button: {
+        left: buttonRect.left,
+        right: buttonRect.right,
+        top: buttonRect.top,
+        bottom: buttonRect.bottom,
+        width: buttonRect.width,
+        height: buttonRect.height,
+      },
+      icon: iconRect
+        ? {
+            centerX: iconRect.left + iconRect.width / 2,
+            centerY: iconRect.top + iconRect.height / 2,
+          }
+        : null,
+      row: rowRect
+        ? { left: rowRect.left, right: rowRect.right, top: rowRect.top, bottom: rowRect.bottom }
+        : null,
+    };
+  });
+  expect(favoriteGeometry.button.width).toBeGreaterThanOrEqual(44);
+  expect(favoriteGeometry.button.height).toBeGreaterThanOrEqual(44);
+  expect(favoriteGeometry.row).not.toBeNull();
+  expect(favoriteGeometry.button.left).toBeGreaterThan(favoriteGeometry.row!.left);
+  expect(favoriteGeometry.button.right).toBeLessThan(favoriteGeometry.row!.right);
+  expect(favoriteGeometry.icon).not.toBeNull();
+  expect(
+    Math.abs(
+      favoriteGeometry.icon!.centerX -
+        (favoriteGeometry.button.left + favoriteGeometry.button.width / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(
+      favoriteGeometry.icon!.centerY -
+        (favoriteGeometry.button.top + favoriteGeometry.button.height / 2),
+    ),
+  ).toBeLessThanOrEqual(1);
+  await expect(favoriteButton).toHaveAttribute('aria-pressed', 'true');
+  await favoriteButton.focus();
+  await expect(favoriteButton).toBeFocused();
   await page.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
   await expect(page.getByRole('spinbutton', { name: 'Количество' })).toHaveValue('1');
   await page.getByRole('button', { name: 'Добавить в дневник' }).click();

@@ -152,6 +152,9 @@ function WorkoutDuration({ startedAt, completedAt }: { startedAt: string; comple
 
 function WorkoutSetRow({
   set,
+  setPosition,
+  setTotal,
+  prescribedReps,
   disabled,
   isCurrent,
   previousResult,
@@ -164,6 +167,9 @@ function WorkoutSetRow({
   enqueue,
 }: {
   set: WorkoutSet;
+  setPosition: number;
+  setTotal: number;
+  prescribedReps: string | null;
   disabled: boolean;
   isCurrent: boolean;
   previousResult: string | null;
@@ -299,7 +305,9 @@ function WorkoutSetRow({
         <div className="active-workout-set__identity">
           <span className="active-workout-set__number">{set.set_number}</span>
           <div>
-            <strong>{isCurrent ? 'Текущий подход' : `Подход ${set.set_number}`}</strong>
+            <strong>
+              {isCurrent ? `Подход ${setPosition} из ${setTotal}` : `Подход ${set.set_number}`}
+            </strong>
             {isCurrent && <span>Сначала вес, затем повторы</span>}
           </div>
         </div>
@@ -332,6 +340,14 @@ function WorkoutSetRow({
         >
           Подставить предыдущий результат
         </button>
+      )}
+
+      {isCurrent && (
+        <p className="active-workout-set__context">
+          <span>{prescribedReps ? `${prescribedReps} повторений` : 'Повторы по плану'}</span>
+          <span aria-hidden="true">·</span>
+          <span>Отдых {restSeconds} с</span>
+        </p>
       )}
 
       <div className="active-workout-set__controls">
@@ -1303,6 +1319,9 @@ export function TodayWorkout({
                         <WorkoutSetRow
                           key={set.id}
                           set={set}
+                          setPosition={setIndex + 1}
+                          setTotal={exercise.sets.length}
+                          prescribedReps={exercise.prescribed_reps}
                           restSeconds={exercise.rest_seconds}
                           disabled={!started}
                           workoutId={data.id}
