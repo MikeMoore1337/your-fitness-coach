@@ -40,7 +40,7 @@ class ScanVerdict:
 
 
 def _safe_env(source: Mapping[str, str] | None = None) -> dict[str, str]:
-    raw = dict(source or os.environ)
+    raw = dict(os.environ if source is None else source)
     return {key: value for key, value in raw.items() if SECRET_ENV_RE.search(key) is None}
 
 

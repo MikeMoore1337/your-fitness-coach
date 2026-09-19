@@ -29,7 +29,7 @@ vendoring.
 SkillSpector не добавляется в `pyproject.toml`, backend, bot или frontend. Он запускается изолированно
 через `uvx`.
 
-## Production policy
+## Политика запуска
 
 Автоматический scan всегда static-only:
 
@@ -49,7 +49,7 @@ YFC wrapper дополнительно проверяет, что:
 - `DO_NOT_INSTALL`, `HIGH`, `CRITICAL` блокируют;
 - malformed/incomplete/tool-error блокируют.
 
-## Data egress
+## Исходящий трафик
 
 При static scan содержимое skill не отправляется LLM-провайдеру.
 
@@ -60,7 +60,7 @@ SkillSpector SC4 может выполнять собственный bounded lo
 недоступности сети upstream использует offline fallback. Это единственный допустимый внешний lookup
 в default YFC static mode.
 
-## CI routing
+## CI-маршрутизация
 
 `.agents/skills/**` change добавляет CI group:
 

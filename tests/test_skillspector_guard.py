@@ -169,9 +169,9 @@ def test_tool_error_blocks(tmp_path: Path) -> None:
     skill.mkdir()
     (skill / "SKILL.md").write_text("# Tool\n", encoding="utf-8")
 
-    runner = lambda command, **kwargs: SimpleNamespace(
-        returncode=2, stdout="", stderr="internal failure"
-    )
+    def runner(command: list[str], **kwargs: object) -> SimpleNamespace:
+        del command, kwargs
+        return SimpleNamespace(returncode=2, stdout="", stderr="internal failure")
 
     with pytest.raises(guard.SkillSpectorGuardError, match="tool error"):
         guard.scan_skill(
