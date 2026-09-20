@@ -485,6 +485,11 @@
   }
 }
 @media (min-width: 851px) {
+  .landing-hero {
+    min-height: 100svh;
+    height: 100svh;
+    max-height: none;
+  }
   .landing-hero__copy {
     padding-top: 100px;
   }
