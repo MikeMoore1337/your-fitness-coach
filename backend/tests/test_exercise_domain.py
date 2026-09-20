@@ -227,48 +227,39 @@ def test_seeded_exercise_metadata_and_alternatives_are_serialized(client) -> Non
     assert details.status_code == 200
     guide = details.json()["guide"]
     assert guide["media_reference"] == "exercise-guides:bench-press"
-    assert guide["source_name"] == "free-exercise-db"
-    assert guide["source_license"] == "Unlicense (общественное достояние)"
-    assert guide["source_license_url"].endswith("/LICENSE.md")
-    assert guide["media"][0] == {
-        "type": "image",
-        "url": "/static/exercise-guides/bench-press-start.jpg",
-        "poster": "/static/exercise-guides/bench-press-start.jpg",
-        "phase_id": "concentric_end",
-        "phase": "Фаза усилия",
-        "alt": "Жим лежа: фаза усилия",
-        "asset_id": None,
-        "asset_version": None,
-        "variant_key": None,
-        "source_name": "free-exercise-db",
-        "source_url": "https://github.com/yuhonas/free-exercise-db",
-        "source_license": "Unlicense (общественное достояние)",
-        "source_license_url": ("https://github.com/yuhonas/free-exercise-db/blob/main/LICENSE.md"),
-        "width": 850,
-        "height": 567,
-        "byte_size": 72816,
-        "sort_order": 0,
-        "sources": [
-            {
-                "url": "/static/exercise-guides/bench-press-start.jpg",
-                "mime_type": "image/jpeg",
-                "width": 850,
-                "height": 567,
-                "byte_size": 72816,
-            }
-        ],
-    }
-    assert guide["media"][1]["phase"] == "Фаза возврата"
+    assert guide["source_name"] == "Exercise data by RepDB (repdb.co)"
+    assert guide["source_license"] == "RepDB Free Tier License v1.0"
+    assert guide["source_license_url"].endswith("/LICENSE-DATA.md")
+    assert [item["type"] for item in guide["media"]] == ["image", "image"]
+    assert [item["url"] for item in guide["media"]] == [
+        "/static/exercise-guides/pilot/bench-press/bench-press-start.webp",
+        "/static/exercise-guides/pilot/bench-press/bench-press-peak.webp",
+    ]
+    assert [item["poster"] for item in guide["media"]] == [
+        "/static/exercise-guides/pilot/bench-press/bench-press-start.webp",
+        "/static/exercise-guides/pilot/bench-press/bench-press-peak.webp",
+    ]
+    assert guide["media"][0]["source_name"] == "Exercise data by RepDB (repdb.co)"
+    assert guide["media"][0]["source_license"] == "RepDB Free Tier License v1.0"
+    assert guide["media"][0]["sources"] == [
+        {
+            "url": "/static/exercise-guides/pilot/bench-press/bench-press-start.webp",
+            "mime_type": "image/webp",
+            "width": 512,
+            "height": 512,
+            "byte_size": 21554,
+        }
+    ]
     assert guide["images"] == [
         {
-            "phase": "Фаза усилия",
-            "url": "/static/exercise-guides/bench-press-start.jpg",
-            "alt": "Жим лежа: фаза усилия",
+            "phase": "Начало",
+            "url": "/static/exercise-guides/pilot/bench-press/bench-press-start.webp",
+            "alt": "Жим лежа: начало",
         },
         {
-            "phase": "Фаза возврата",
-            "url": "/static/exercise-guides/bench-press-active.jpg",
-            "alt": "Жим лежа: фаза возврата",
+            "phase": "Пик",
+            "url": "/static/exercise-guides/pilot/bench-press/bench-press-peak.webp",
+            "alt": "Жим лежа: пик",
         },
     ]
     assert guide["safety_notes"]
@@ -285,7 +276,7 @@ def test_seeded_exercise_metadata_and_alternatives_are_serialized(client) -> Non
     )
     assert guide_response.status_code == 200
     assert guide_response.json()["media_reference"] == "exercise-guides:bench-press"
-    assert guide_response.json()["source_license_url"].endswith("/LICENSE.md")
+    assert guide_response.json()["source_license_url"].endswith("/LICENSE-DATA.md")
 
     lat_pulldown = next(item for item in catalog.json() if item["slug"] == "lat-pulldown")
     lat_pulldown_guide = client.get(
@@ -334,8 +325,8 @@ def test_seeded_exercise_metadata_and_alternatives_are_serialized(client) -> Non
             ("pallof-press-active.jpg", "Удержание"),
         ],
         "rowing-machine": [
-            ("rowing-machine-start.jpg", "Первое положение"),
-            ("rowing-machine-active.jpg", "Второе положение"),
+            ("rowing-machine-start.webp", "Начало"),
+            ("rowing-machine-peak.webp", "Пик"),
         ],
         "walking-lunge": [
             ("walking-lunge-start.jpg", "Первое положение"),
@@ -676,17 +667,32 @@ def test_task_120c_lower_body_machine_batch_contract_and_workout_integration(cli
         assert len(guide["technique_steps"]) == 3
         assert len(guide["common_mistakes"]) == 3
         assert guide["safety_notes"]
-        assert guide["source_name"] == "Your Fitness Coach"
-        assert guide["source_license"] == "Иллюстрация создана для приложения"
-        assert [media["url"].rsplit("/", 1)[-1] for media in guide["media"]] == [
-            "concentric_end-480w.webp",
-            "eccentric_end-480w.webp",
-        ]
-        assert [media["phase_id"] for media in guide["media"]] == [
-            "concentric_end",
-            "eccentric_end",
-        ]
-        assert all(media["asset_version"] == "120e-v1" for media in guide["media"])
+        if slug == "plate-loaded-leg-press":
+            assert guide["source_name"] == "Exercise data by RepDB (repdb.co)"
+            assert guide["source_license"] == "RepDB Free Tier License v1.0"
+            assert [media["url"].rsplit("/", 1)[-1] for media in guide["media"]] == [
+                "plate-loaded-leg-press-start.webp",
+                "plate-loaded-leg-press-peak.webp",
+            ]
+        else:
+            assert guide["source_name"] == "Your Fitness Coach"
+            assert guide["source_license"] == "Иллюстрация создана для приложения"
+            assert [media["url"].rsplit("/", 1)[-1] for media in guide["media"]] == [
+                "concentric_end-480w.webp",
+                "eccentric_end-480w.webp",
+            ]
+        if slug == "plate-loaded-leg-press":
+            assert [media["phase_id"] for media in guide["media"]] == [
+                "eccentric_end",
+                "concentric_end",
+            ]
+        else:
+            assert [media["phase_id"] for media in guide["media"]] == [
+                "concentric_end",
+                "eccentric_end",
+            ]
+        if slug != "plate-loaded-leg-press":
+            assert all(media["asset_version"] == "120e-v1" for media in guide["media"])
         assert all(media["alt"] for media in guide["media"])
 
     assert "жим ногами на блинах" in by_slug["plate-loaded-leg-press"]["aliases"]
@@ -903,7 +909,7 @@ def test_personalized_copy_keeps_guide_provenance_and_base_alternatives(client) 
     details = client.get(f"/api/v1/programs/exercises/{bench['id']}", headers=headers)
     assert details.status_code == 200
     assert details.json()["title"] == "Мой жим лежа"
-    assert details.json()["guide"]["source_name"] == "free-exercise-db"
+    assert details.json()["guide"]["source_name"] == "Exercise data by RepDB (repdb.co)"
     assert details.json()["guide"]["media_reference"] == "exercise-guides:bench-press"
     assert {item["slug"] for item in details.json()["alternatives"]} == {
         "dumbbell-bench-press",

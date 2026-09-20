@@ -238,8 +238,72 @@ async function mockActiveWorkout(page: Page, mixed = false) {
             ],
             safety_notes: ['Используйте страховку при тяжёлых подходах.'],
             alternatives: [],
-            media: [],
-            images: [],
+            media: [
+              {
+                type: 'image',
+                url: '/static/exercise-guides/pilot/bench-press/bench-press-start.webp',
+                poster: '/static/exercise-guides/pilot/bench-press/bench-press-start.webp',
+                phase_id: 'eccentric_end',
+                phase: 'Начало',
+                alt: 'Жим штанги лёжа: начало',
+                source_name: 'Exercise data by RepDB (repdb.co)',
+                source_url: 'https://github.com/RepDB/exercise-dataset',
+                source_license: 'RepDB Free Tier License v1.0',
+                source_license_url:
+                  'https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md',
+                width: 512,
+                height: 512,
+                byte_size: 21_554,
+                sort_order: 0,
+                sources: [
+                  {
+                    url: '/static/exercise-guides/pilot/bench-press/bench-press-start.webp',
+                    mime_type: 'image/webp',
+                    width: 512,
+                    height: 512,
+                    byte_size: 21_554,
+                  },
+                ],
+              },
+              {
+                type: 'image',
+                url: '/static/exercise-guides/pilot/bench-press/bench-press-peak.webp',
+                poster: '/static/exercise-guides/pilot/bench-press/bench-press-peak.webp',
+                phase_id: 'concentric_end',
+                phase: 'Пик',
+                alt: 'Жим штанги лёжа: пик',
+                source_name: 'Exercise data by RepDB (repdb.co)',
+                source_url: 'https://github.com/RepDB/exercise-dataset',
+                source_license: 'RepDB Free Tier License v1.0',
+                source_license_url:
+                  'https://github.com/RepDB/exercise-dataset/blob/9ed9357f09c7566ea0256c57ebd6374ebb8b575e/LICENSE-DATA.md',
+                width: 512,
+                height: 512,
+                byte_size: 23_314,
+                sort_order: 1,
+                sources: [
+                  {
+                    url: '/static/exercise-guides/pilot/bench-press/bench-press-peak.webp',
+                    mime_type: 'image/webp',
+                    width: 512,
+                    height: 512,
+                    byte_size: 23_314,
+                  },
+                ],
+              },
+            ],
+            images: [
+              {
+                phase: 'Начало',
+                url: '/static/exercise-guides/pilot/bench-press/bench-press-start.webp',
+                alt: 'Жим штанги лёжа: начало',
+              },
+              {
+                phase: 'Пик',
+                url: '/static/exercise-guides/pilot/bench-press/bench-press-peak.webp',
+                alt: 'Жим штанги лёжа: пик',
+              },
+            ],
             media_reference: 'test:bench-press',
             source_name: 'Test source',
             source_url: 'https://example.com',
@@ -282,6 +346,14 @@ async function mockActiveWorkout(page: Page, mixed = false) {
       return route.fulfill({ status: 204, body: '' });
     }
     return route.fulfill({ json: [] });
+  });
+
+  await page.route('**/static/exercise-guides/pilot/bench-press/*', async (route) => {
+    const fileName = new URL(route.request().url()).pathname.split('/').at(-1);
+    return route.fulfill({
+      path: `../backend/assets/exercise-guides/pilot/bench-press/${fileName}`,
+      contentType: 'image/webp',
+    });
   });
 
   return {
@@ -441,6 +513,19 @@ test('active workout has touch-size controls and no horizontal overflow', async 
   await expect(guideButton).toHaveText('Техника');
   await guideButton.click();
   await expect(page.getByRole('heading', { name: 'Техника выполнения' })).toBeVisible();
+  const guideImages = page.locator('.exercise-guide-image img');
+  await expect(guideImages).toHaveCount(2);
+  await guideImages.first().scrollIntoViewIfNeeded();
+  await expect
+    .poll(() => guideImages.nth(0).evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() => guideImages.nth(1).evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expect(page.locator('.exercise-guide-image video')).toHaveCount(0);
+  await page.screenshot({
+    path: '../.artifacts/tasks/389/evidence/screenshots/active-workout-mobile-390x844.png',
+  });
   await page.getByRole('button', { name: 'Закрыть карточку упражнения' }).click();
 
   for (const viewport of [

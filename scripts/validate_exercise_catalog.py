@@ -18,6 +18,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 BACKEND_DIR = ROOT_DIR / "backend"
 MEDIA_DIR = BACKEND_DIR / "assets" / "exercise-guides"
 MANIFEST_PATH = MEDIA_DIR / "manifest.json"
+PILOT_MANIFEST_PATH = MEDIA_DIR / "pilot-manifest.json"
 COVERAGE_PATH = ROOT_DIR / "docs" / "exercises" / "catalog-v2" / "COVERAGE_MATRIX.csv"
 
 if str(BACKEND_DIR) not in sys.path:
@@ -128,6 +129,49 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int]:
     return manifest["asset_count"], manifest["derivative_count"]
 
 
+def _validate_pilot_media(catalog_slugs: set[str]) -> None:
+    if not PILOT_MANIFEST_PATH.is_file():
+        return
+    manifest = json.loads(PILOT_MANIFEST_PATH.read_text(encoding="utf-8"))
+    exercises = manifest.get("exercises", {})
+    _require(set(exercises) <= catalog_slugs, "Pilot references unknown exercise")
+    for slug, item in exercises.items():
+        source = item.get("source", {})
+        _require(
+            source.get("name") and source.get("url") and source.get("license"),
+            f"Invalid pilot provenance: {slug}",
+        )
+        _require(item.get("media"), f"Missing pilot media: {slug}")
+        for media in item["media"]:
+            _require(media.get("type") == "image", f"Pilot media must be static: {slug}")
+            for field in ("path", "poster_path"):
+                relative = Path(media[field])
+                _require(
+                    not relative.is_absolute() and ".." not in relative.parts,
+                    f"Invalid pilot path: {slug}/{field}",
+                )
+                _require(
+                    (MEDIA_DIR / relative).is_file(),
+                    f"Referenced pilot media is missing: {media[field]}",
+                )
+            asset_path = MEDIA_DIR / media["path"]
+            _require(
+                media.get("width", 0) > 0 and media.get("height", 0) > 0,
+                f"Invalid pilot dimensions: {slug}",
+            )
+            _require(
+                media.get("asset_sha256") == hashlib.sha256(asset_path.read_bytes()).hexdigest(),
+                f"Stale pilot media hash: {media['path']}",
+            )
+            poster_hash = media.get("poster_sha256")
+            if poster_hash:
+                poster_path = MEDIA_DIR / media["poster_path"]
+                _require(
+                    poster_hash == hashlib.sha256(poster_path.read_bytes()).hexdigest(),
+                    f"Stale pilot poster hash: {media['poster_path']}",
+                )
+
+
 def _validate_final_coverage() -> int:
     with COVERAGE_PATH.open(encoding="utf-8", newline="") as source:
         rows = list(csv.DictReader(source))
@@ -207,6 +251,7 @@ def validate_catalog() -> dict[str, int]:
 
     _validate_aliases(catalog_slugs)
     asset_count, derivative_count = _validate_media(catalog_slugs)
+    _validate_pilot_media(catalog_slugs)
     coverage_decisions = _validate_final_coverage()
     cardio_count = sum(
         canonical_muscle_identifier(muscle) == "cardio" for _, _, muscle, _ in EXERCISE_CATALOG

@@ -1870,6 +1870,16 @@ def test_exercise_guide_assets_have_cache_headers_and_missing_asset_is_safe(clie
     )
     assert asset.headers["etag"]
 
+    pilot_start = client.get("/static/exercise-guides/pilot/bench-press/bench-press-start.webp")
+    assert pilot_start.status_code == 200
+    assert pilot_start.headers["content-type"] == "image/webp"
+    assert pilot_start.headers["cache-control"] == (
+        "public, max-age=2592000, stale-while-revalidate=86400"
+    )
+    pilot_peak = client.get("/static/exercise-guides/pilot/bench-press/bench-press-peak.webp")
+    assert pilot_peak.status_code == 200
+    assert pilot_peak.headers["content-type"] == "image/webp"
+
     missing = client.get("/static/exercise-guides/not-a-real-exercise-start.jpg")
     assert missing.status_code == 404
 
@@ -3903,8 +3913,7 @@ def test_public_exercise_api_uses_allowlisted_domain_data_and_excludes_private_r
     assert bench.json()["difficulty_level"] == "intermediate"
     assert len(bench.json()["media"]) == 2
     assert all(
-        item["source_license"] == "Unlicense (общественное достояние)"
-        for item in bench.json()["media"]
+        item["source_license"] == "RepDB Free Tier License v1.0" for item in bench.json()["media"]
     )
 
     private_slug = client.get("/api/v1/public/exercises/squat-u-private")
@@ -4005,8 +4014,10 @@ def test_bench_press_public_page_has_one_canonical_seo_exemplar(client, monkeypa
     assert "Дыхание" in response.text
     assert "Частые ошибки" in response.text
     assert "Что важно для безопасности" in response.text
-    assert "/static/exercise-guides/bench-press-start.jpg" in response.text
-    assert "Unlicense (общественное достояние)" in response.text
+    assert "/static/exercise-guides/pilot/bench-press/bench-press-start.webp" in response.text
+    assert "/static/exercise-guides/pilot/bench-press/bench-press-peak.webp" in response.text
+    assert "RepDB Free Tier License v1.0" in response.text
+    assert "<video" not in response.text
     assert "Открыть тренировки в Your Fitness Coach" in response.text
     assert "exercise_added_from_public_page" not in response.text
 

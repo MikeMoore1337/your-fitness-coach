@@ -13,7 +13,7 @@ from fitminiapp_api.services.exercise_domain import (
     exercise_equipment_payload,
     exercise_muscle_payload,
 )
-from fitminiapp_api.services.exercise_guide_media import get_guide_media
+from fitminiapp_api.services.exercise_guide_media import get_guide_media, resolve_guide_source
 
 SOURCE_NAME = "free-exercise-db"
 SOURCE_URL = "https://github.com/yuhonas/free-exercise-db"
@@ -701,6 +701,13 @@ def get_exercise_guide(
         metadata.source_license_url
         if metadata is not None
         else (None if is_yfc_original else SOURCE_LICENSE_URL)
+    )
+    source_name, source_url, source_license, source_license_url = resolve_guide_source(
+        slug,
+        source_name=source_name,
+        source_url=source_url,
+        source_license=source_license,
+        source_license_url=source_license_url,
     )
     media = get_guide_media(
         slug,

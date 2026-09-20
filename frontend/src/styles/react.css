@@ -1842,6 +1842,9 @@ details:not([open]) > :not(summary) {
 }
 .exercise-guide-image__frame img {
   display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   transition: transform var(--motion-state) var(--motion-ease);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2883,10 +2886,6 @@ details:not([open]) > :not(summary) {
   }
   .nutrition-metrics .metric strong {
     font-size: 1rem;
-  }
-  .exercise-guide-images {
-    grid-template-columns: 1fr;
-    gap: 12px;
   }
   .exercise-guide-image figcaption {
     padding: 8px 4px;
