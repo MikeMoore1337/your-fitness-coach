@@ -75,10 +75,10 @@ jobs:
     environment: production
     env:
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
-      PROD_HOST: app.your-fitness-coach.ru
-      PROD_PORT: "22"
-      PROD_USER: root
-      PROD_PATH: /root/fit-mini-app
+      PROD_HOST: 77.91.90.171
+      PROD_PORT: "1337"
+      PROD_USER: yfc-deploy
+      PROD_PATH: /srv/yfc/fit-mini-app
       PROD_URL: https://app.your-fitness-coach.ru
       PROD_PUBLIC_URL: https://your-fitness-coach.ru
       PROD_ROLLOUT_MODE: single-slot
