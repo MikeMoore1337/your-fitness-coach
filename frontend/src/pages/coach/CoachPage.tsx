@@ -40,7 +40,7 @@ import {
   ErrorState,
   LoadingState,
 } from '../../shared/ui/common';
-import { AppLink, Redirect } from '../../shared/navigation/router';
+import { Redirect } from '../../shared/navigation/router';
 import { LIVE_DATA_REFETCH_INTERVAL_MS } from '../../shared/sync';
 import { coachClientProfileDraftStorageKey } from '../../shared/userScopedStorage';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
@@ -1498,18 +1498,13 @@ export default function CoachPage({
           </>
         )}
         {tab === 'programs' && (
-          <Card
-            title="Программы клиентов"
-            description="Здесь только назначения вашим клиентам. Собственные программы хранятся в личном плане."
-            actions={
-              <AppLink className="button-link secondary-link" to="/app?section=programs">
-                Мои программы
-              </AppLink>
-            }
-          >
-            <label className="field top-gap">
-              <span>Поиск</span>
+          <Card className="coach-programs-card" title="Программы клиентов">
+            <label className="coach-programs-search">
+              <span className="sr-only">Поиск по клиенту или программе</span>
+              <Icon className="coach-programs-search__icon" name="search" size={20} />
               <input
+                aria-label="Поиск по клиенту или программе"
+                placeholder="Поиск по клиенту или программе"
                 type="search"
                 value={programSearch}
                 onChange={(e) => setProgramSearch(e.target.value)}
@@ -1522,7 +1517,7 @@ export default function CoachPage({
             ) : !filteredPrograms.length ? (
               <EmptyState title="Назначений не найдено" />
             ) : (
-              <div className="list-grid top-gap">
+              <div className="list-grid">
                 {filteredPrograms.map((item) => (
                   <article className="coach-program-row" key={item.id}>
                     <div className="coach-program-row__main">

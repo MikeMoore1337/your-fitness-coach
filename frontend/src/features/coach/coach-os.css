@@ -54,6 +54,25 @@
   gap: var(--v2-space-2);
 }
 
+.coach-programs-search {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.coach-programs-search__icon {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: var(--v2-space-3);
+  color: var(--v2-text-secondary);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.coach-programs-search input {
+  padding-inline-start: calc(var(--v2-space-3) + 20px + var(--v2-space-2));
+}
+
 .coach-os-nav {
   display: flex;
   gap: 4px;
@@ -731,6 +750,10 @@
   .coach-today__hero-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coach-os .coach-os-header__actions {
+    grid-template-columns: 1fr;
   }
 
   .coach-os-header__actions > *,

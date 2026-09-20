@@ -7050,6 +7050,13 @@ button.notification-row__main:focus-visible {
   grid-column: 1 / -1;
 }
 
+.app-section--programs
+  .coach-program-row
+  > :where(.demo-capability-fieldset, .demo-capability-notice) {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 .app-section--programs .program-history__intro,
 .app-section--programs .program-history__heading,
 .app-section--programs .program-current-block__topline {

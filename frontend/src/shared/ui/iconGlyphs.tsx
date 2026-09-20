@@ -88,6 +88,13 @@ const glyphs = {
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
     </>
   ),
+  // Lucide: search.
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </>
+  ),
   // Lucide: lock-keyhole.
   'account-security': (
     <>
