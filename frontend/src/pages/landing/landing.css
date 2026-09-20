@@ -109,6 +109,34 @@
   border-color: var(--glass-edge);
   box-shadow: inset 0 1px var(--glass-light);
 }
+.landing-page .landing-button--secondary-on-light {
+  background: #f3f5f5;
+  color: #090b0b;
+  border-color: #687575;
+  box-shadow: inset 0 1px rgb(255 255 255 / 80%);
+}
+.landing-page .landing-button--secondary-on-dark {
+  background: #202525;
+  color: #fff;
+  border-color: #899393;
+  box-shadow: inset 0 1px rgb(255 255 255 / 25%);
+}
+.landing-page .landing-button--secondary-on-light:hover {
+  background: #e7eded;
+  border-color: #4e5d5d;
+}
+.landing-page .landing-button--secondary-on-dark:hover {
+  background: #303838;
+  border-color: #b4c0c0;
+}
+.landing-page .landing-button--secondary-on-light:focus-visible {
+  outline: 3px solid #090b0b;
+  outline-offset: 4px;
+}
+.landing-page .landing-button--secondary-on-dark:focus-visible {
+  outline: 3px solid #b2f520;
+  outline-offset: 4px;
+}
 
 .landing-page .landing-button:hover {
   text-decoration: none;
@@ -281,6 +309,12 @@
   font-size: 15px;
   margin-bottom: 24px;
   max-width: 520px;
+}
+.landing-trainer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 .landing-start__steps {
   list-style: none;

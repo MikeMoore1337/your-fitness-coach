@@ -153,6 +153,127 @@ test('landing keeps the approved sports composition across themes and viewports'
   expect(errors).toEqual([]);
 });
 
+test('landing secondary actions keep contrast tied to their section surface', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  const surfaceCases = [
+    { selector: '.landing-feature--0 .landing-button', className: 'on-light' },
+    { selector: '.landing-feature--1 .landing-button', className: 'on-dark' },
+    {
+      selector: '.landing-trainer__actions .landing-button--secondary',
+      className: 'on-light',
+    },
+    { selector: '.landing-contact__actions .landing-button--secondary', className: 'on-dark' },
+  ];
+
+  for (const theme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await openLanding(page, theme);
+
+    for (const item of surfaceCases) {
+      const cta = page.locator(item.selector);
+      await expect(cta).toHaveClass(new RegExp(`landing-button--secondary-${item.className}`));
+      const metrics = await cta.evaluate((element) => {
+        const parse = (color: string) => {
+          const channels = (color.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+          if (channels.length !== 3) throw new Error(`Unsupported color: ${color}`);
+          return channels;
+        };
+        const luminance = (color: string) => {
+          const [red, green, blue] = parse(color).map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.03928
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          });
+          return 0.2126 * red! + 0.7152 * green! + 0.0722 * blue!;
+        };
+        const contrast = (foreground: string, background: string) => {
+          const foregroundLuminance = luminance(foreground);
+          const backgroundLuminance = luminance(background);
+          return (
+            (Math.max(foregroundLuminance, backgroundLuminance) + 0.05) /
+            (Math.min(foregroundLuminance, backgroundLuminance) + 0.05)
+          );
+        };
+        const style = getComputedStyle(element);
+        const icon = element.querySelector('.yfc-icon');
+        const iconColor = icon ? getComputedStyle(icon).color : null;
+        return {
+          background: style.backgroundColor,
+          border: style.borderTopColor,
+          color: style.color,
+          iconColor,
+          textContrast: contrast(style.color, style.backgroundColor),
+          borderContrast: contrast(style.borderTopColor, style.backgroundColor),
+        };
+      });
+      expect(metrics.textContrast).toBeGreaterThanOrEqual(4.5);
+      if (metrics.iconColor) expect(metrics.iconColor).toBe(metrics.color);
+      expect(metrics.borderContrast).toBeGreaterThanOrEqual(3);
+
+      await cta.focus();
+      const focus = await cta.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { outlineStyle: style.outlineStyle, outlineWidth: parseFloat(style.outlineWidth) };
+      });
+      expect(focus.outlineStyle).not.toBe('none');
+      expect(focus.outlineWidth).toBeGreaterThanOrEqual(2);
+
+      await cta.hover();
+      const hover = await cta.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, color: style.color };
+      });
+      expect(hover.color).toBe(metrics.color);
+      expect(hover.background).not.toBe('rgba(0, 0, 0, 0)');
+    }
+
+    const trainerButtons = await page
+      .locator('.landing-trainer__actions .landing-button')
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top };
+        }),
+      );
+    expect(trainerButtons).toHaveLength(2);
+    const first = trainerButtons[0]!;
+    const second = trainerButtons[1]!;
+    const separated =
+      Math.abs(first.top - second.top) < 1 ? second.left - first.right : second.top - first.bottom;
+    expect(separated).toBeGreaterThanOrEqual(11);
+
+    if (theme === 'dark') {
+      await page.locator('.landing-feature--0').screenshot({
+        path: testInfo.outputPath('desktop-dark-nutrition.png'),
+      });
+      await page.locator('.landing-trainer').screenshot({
+        path: testInfo.outputPath('desktop-dark-trainer.png'),
+      });
+    } else {
+      await page.locator('.landing-feature--1').screenshot({
+        path: testInfo.outputPath('desktop-light-progress.png'),
+      });
+      await page.locator('.landing-contact').screenshot({
+        path: testInfo.outputPath('desktop-light-final.png'),
+      });
+    }
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLanding(page, 'dark');
+  await page.locator('.strength-scene').screenshot({
+    path: testInfo.outputPath('mobile-dark-strength.png'),
+  });
+  await page.locator('.landing-trainer').screenshot({
+    path: testInfo.outputPath('mobile-dark-trainer.png'),
+  });
+});
+
 test('media failures preserve the story and reserve the scene layout', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.route('**/assets/marketing/**', (route) => route.abort());
