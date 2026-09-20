@@ -26,14 +26,18 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator('.landing-hero')).toBeVisible();
       await settle(page);
       await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
-      await expect(page.locator('.public-shell__header')).toHaveCSS('backdrop-filter', 'none');
-      await expect(page.locator('.public-shell__header')).toHaveCSS(
-        'background-color',
-        'rgba(0, 0, 0, 0)',
+      const header = page.locator('.public-shell__header');
+      await expect(header).toHaveCSS(
+        'backdrop-filter',
+        width < 500 ? 'blur(8px) saturate(1.1)' : 'blur(12px) saturate(1.15)',
       );
-      await expect(page.locator('.public-shell__header')).toHaveCSS('box-shadow', 'none');
-      await expect(page.locator('.public-shell__header')).toHaveCSS('border-bottom-width', '0px');
-      const headerBox = await page.locator('.public-shell__header').boundingBox();
+      await expect(header).toHaveCSS(
+        'background-color',
+        width < 500 ? 'rgba(9, 11, 11, 0.22)' : 'rgba(9, 11, 11, 0.28)',
+      );
+      await expect(header).toHaveCSS('box-shadow', width < 500 ? 'none' : /0px 8px 24px/);
+      await expect(header).toHaveCSS('border-bottom-width', '1px');
+      const headerBox = await header.boundingBox();
       const heroBox = await page.locator('.landing-hero').boundingBox();
       expect(headerBox).not.toBeNull();
       expect(heroBox).not.toBeNull();
