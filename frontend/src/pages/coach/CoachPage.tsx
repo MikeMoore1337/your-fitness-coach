@@ -12,6 +12,7 @@ import {
   CoachClientOperationsCard,
   CoachOperationsPanel,
 } from '../../features/coach/CoachOperationsPanel';
+import { CoachToolsHub, type CoachTool } from '../../features/coach/CoachToolsHub';
 import { CoachClientTimeline } from '../../features/coach/CoachClientTimeline';
 import { CoachReportHandoffEntry } from '../../features/coach/CoachReportHandoffEntry';
 import { TrainerModeSwitch } from '../../features/trainer/TrainerModeSwitch';
@@ -34,6 +35,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import {
   Badge,
+  Button,
   Card,
   DisclosureIcon,
   EmptyState,
@@ -430,6 +432,18 @@ function operationalStatusLabel(status: Client['operational_status']): string {
   return { active: 'В работе', paused: 'Пауза', archived: 'Архив' }[status];
 }
 
+const coachToolValues: readonly CoachTool[] = [
+  'schedule',
+  'tasks',
+  'finance',
+  'invitations',
+  'catalog',
+];
+
+function coachToolFromSearch(value: string | null): CoachTool | null {
+  return value && coachToolValues.includes(value as CoachTool) ? (value as CoachTool) : null;
+}
+
 function adherenceText(summary?: TrainerClientProgressSummary): string {
   const workouts = summary?.adherence.workouts;
   if (!workouts || workouts.status !== 'available' || workouts.percent == null) {
@@ -508,25 +522,32 @@ function CoachInviteCard({
   inviteLink,
   inviteCreating,
   inviteDisabled,
+  alwaysVisible = false,
   onCreate,
   onCopy,
 }: {
   inviteLink: InviteLink | null;
   inviteCreating: boolean;
   inviteDisabled: boolean;
+  alwaysVisible?: boolean;
   onCreate: () => void;
   onCopy: (value: string) => Promise<void>;
 }) {
   return (
     <Card
-      className={`coach-invite-panel${inviteLink ? ' is-visible' : ''}`}
+      className={`coach-invite-panel${inviteLink || alwaysVisible ? ' is-visible' : ''}`}
       collapsible={false}
       title="Пригласить клиента"
       description="Клиент сначала увидит ваше имя и сам подтвердит подключение."
       actions={
-        <button disabled={inviteCreating || inviteDisabled} onClick={onCreate} type="button">
+        <Button
+          className="coach-invite-panel__create"
+          disabled={inviteCreating || inviteDisabled}
+          onClick={onCreate}
+          type="button"
+        >
           {inviteCreating ? 'Создаём…' : 'Создать приглашение'}
-        </button>
+        </Button>
       }
     >
       {inviteLink ? (
@@ -1015,8 +1036,11 @@ export default function CoachPage({
     return Number.isSafeInteger(clientId) && clientId > 0 ? clientId : null;
   })();
   const routeTab = initialClientId ? 'clients' : coachTabFromSearch(search);
+  const routeTool = coachToolFromSearch(searchParams.get('tool'));
   const [localTab, setLocalTab] = useState<CoachTab>(routeTab);
+  const [localTool, setLocalTool] = useState<CoachTool | null>(routeTool);
   const tab = runtime.kind === 'demo' ? localTab : routeTab;
+  const activeTool = runtime.kind === 'demo' ? localTool : routeTool;
   const initialWorkoutId = (() => {
     const value = searchParams.get('workout_id');
     if (!value || !/^\d+$/.test(value)) return null;
@@ -1116,7 +1140,8 @@ export default function CoachPage({
   const clientSummaries = useQuery({
     queryKey: queryKeys.trainer.clientSummaries,
     queryFn: loadCoachClientSummaries,
-    enabled: Boolean(clients.data?.some((client) => client.status === 'active')),
+    enabled:
+      tab === 'clients' && Boolean(clients.data?.some((client) => client.status === 'active')),
     refetchInterval: tab === 'clients' ? LIVE_DATA_REFETCH_INTERVAL_MS : false,
     refetchOnWindowFocus: true,
   });
@@ -1233,9 +1258,20 @@ export default function CoachPage({
     if (destination === 'today') markDemoStep('return');
     if (filter) setClientFilter(filter);
     setLocalTab(destination);
+    setLocalTool(null);
     if (destination !== 'clients') setLocalClientDetailOpen(false);
     const nextPath = coachPathForTab(destination);
     if (runtime.kind !== 'demo' && `${path}${search}` !== nextPath) navigate(nextPath);
+  };
+
+  const openCoachTool = (tool: CoachTool) => {
+    setLocalTab('tools');
+    setLocalTool(tool);
+    setLocalClientDetailOpen(false);
+    if (runtime.kind !== 'demo') {
+      const nextPath = `/coach?tab=tools&tool=${tool}`;
+      if (`${path}${search}` !== nextPath) navigate(nextPath);
+    }
   };
 
   const openClient = (clientId: number) => {
@@ -1276,13 +1312,14 @@ export default function CoachPage({
           <p>Сначала действие, затем детали клиента — без потери глубины YFC.</p>
         </div>
         <div className="coach-os-header__actions">
-          <button
+          <Button
+            className="coach-os-header__invite"
             disabled={inviteCreating || !capabilities.canManageCoach}
             onClick={() => void createInvite()}
             type="button"
           >
             {inviteCreating ? 'Создаём…' : 'Пригласить клиента'}
-          </button>
+          </Button>
         </div>
       </header>
       {demo && (
@@ -1332,22 +1369,17 @@ export default function CoachPage({
             <CoachOperationsPanel
               clients={activeClients}
               onDemoStep={markDemoStep}
+              onNavigate={openCoachTool}
               onOpenClient={openClient}
               timezone={user.profile?.timezone}
             />
             <CoachToday
               clients={clients.data ?? []}
               programs={programs.data ?? []}
-              summaries={clientSummaries.data?.items ?? []}
               clientsLoading={clients.isLoading}
               programsLoading={programs.isPending}
-              summariesLoading={clientSummaries.isPending}
               pendingCount={pendingCount}
-              inviteCreating={inviteCreating}
-              inviteDisabled={!capabilities.canManageCoach}
               onNavigate={(destination, filter) => navigateCoach(destination, filter)}
-              onOpenClient={openClient}
-              onInvite={() => void createInvite()}
               onAttentionAction={() => markDemoStep('attention')}
             />
           </>
@@ -1501,7 +1533,7 @@ export default function CoachPage({
                     if (runtime.kind === 'demo') setLocalClientDetailOpen(false);
                     else navigate(coachPathForTab('clients'), true);
                   }}
-                  onOpenCatalog={() => navigateCoach('tools')}
+                  onOpenCatalog={() => openCoachTool('catalog')}
                   onFocusWorkout={(workoutId) => {
                     trackCoachQuickAction('review_workout');
                     setFocusedWorkoutId(workoutId);
@@ -1583,7 +1615,7 @@ export default function CoachPage({
                             setFocusedWorkoutId(null);
                             setFocusedAttention(null);
                             setLocalClientDetailOpen(true);
-                            navigateCoach('tools');
+                            openCoachTool('catalog');
                           }}
                         >
                           Добавить упражнение
@@ -1618,18 +1650,44 @@ export default function CoachPage({
         )}
         {tab === 'tools' && (
           <>
-            <CoachInviteCard
-              inviteLink={inviteLink}
-              inviteCreating={inviteCreating}
-              inviteDisabled={!capabilities.canManageCoach}
-              onCreate={() => void createInvite()}
-              onCopy={copyInvite}
-            />
-            <ExerciseCatalog
-              canCreate={capabilities.canCreateCatalog}
-              canAssign={capabilities.canMutatePrograms && capabilities.canManageCoach}
-              targetTelegramId={selected?.telegram_user_id}
-            />
+            {activeTool === 'schedule' || activeTool === 'tasks' || activeTool === 'finance' ? (
+              <CoachOperationsPanel
+                clients={activeClients}
+                onDemoStep={markDemoStep}
+                onNavigate={openCoachTool}
+                onOpenClient={openClient}
+                surface={activeTool}
+                timezone={user.profile?.timezone}
+              />
+            ) : activeTool === 'invitations' ? (
+              <>
+                <CoachInviteCard
+                  alwaysVisible
+                  inviteLink={inviteLink}
+                  inviteCreating={inviteCreating}
+                  inviteDisabled={!capabilities.canManageCoach}
+                  onCreate={() => void createInvite()}
+                  onCopy={copyInvite}
+                />
+                <Button
+                  className="coach-invite-pending-action"
+                  onClick={() => navigateCoach('clients', 'pending')}
+                  type="button"
+                  variant="secondary"
+                >
+                  Открыть ожидающие подключения{pendingCount ? ` · ${pendingCount}` : ''}
+                  <Icon name="arrow-right" size={16} />
+                </Button>
+              </>
+            ) : activeTool === 'catalog' ? (
+              <ExerciseCatalog
+                canCreate={capabilities.canCreateCatalog}
+                canAssign={capabilities.canMutatePrograms && capabilities.canManageCoach}
+                targetTelegramId={selected?.telegram_user_id}
+              />
+            ) : (
+              <CoachToolsHub onNavigate={openCoachTool} />
+            )}
           </>
         )}
       </section>

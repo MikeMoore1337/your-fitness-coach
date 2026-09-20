@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const captureAudit = Boolean(
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
@@ -32,6 +32,11 @@ const task387EvidenceDir = (
     process?: { env?: Record<string, string | undefined> };
   }
 ).process?.env?.TASK_387_EVIDENCE_DIR;
+const task388EvidenceDir = (
+  globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  }
+).process?.env?.TASK_388_EVIDENCE_DIR;
 
 const clients = [
   {
@@ -254,7 +259,10 @@ function coachNutritionReport(url: URL) {
 
 async function mockCoachWorkspace(
   page: Page,
-  options: { attention?: 'empty' | 'actionable' } = {},
+  options: {
+    attention?: 'empty' | 'actionable';
+    operations?: 'empty' | 'seeded';
+  } = {},
 ) {
   const feedbackComments: Array<{
     id: number;
@@ -281,6 +289,92 @@ async function mockCoachWorkspace(
       revisions: [],
     },
   ];
+  const operationDate = new Date().toISOString().slice(0, 10);
+  const seededSession = {
+    id: 601,
+    client_id: 11,
+    client_name: 'Анна Петрова',
+    starts_at: `${operationDate}T18:30:00+03:00`,
+    starts_at_utc: `${operationDate}T15:30:00Z`,
+    timezone: 'Europe/Moscow',
+    duration_minutes: 60,
+    format: 'online',
+    location: 'Telegram-звонок',
+    status: 'scheduled',
+    private_note: null,
+    package_id: 701,
+    package_balance: 2,
+    user_workout_id: null,
+    series_id: null,
+    occurrence_key: null,
+    created_at: `${operationDate}T09:00:00Z`,
+    updated_at: `${operationDate}T09:00:00Z`,
+  };
+  const seededTask = {
+    id: 602,
+    client_id: 12,
+    client_name: 'Борис Александрович С Очень Длинной Фамилией',
+    title: 'Проверить технику приседа',
+    due_at: `${operationDate}T12:00:00+03:00`,
+    due_at_utc: `${operationDate}T09:00:00Z`,
+    timezone: 'Europe/Moscow',
+    state: 'open',
+    completed_at: null,
+    created_at: `${operationDate}T09:00:00Z`,
+    updated_at: `${operationDate}T09:00:00Z`,
+  };
+  const seededPackage = {
+    id: 701,
+    client_id: 11,
+    client_name: 'Анна Петрова',
+    name: 'Сопровождение · август',
+    counts_sessions: true,
+    included_sessions: 10,
+    charged_sessions: 8,
+    reversed_sessions: 0,
+    balance: 2,
+    starts_on: operationDate,
+    expires_on: null,
+    state: 'active',
+    note: null,
+    created_at: `${operationDate}T09:00:00Z`,
+    updated_at: `${operationDate}T09:00:00Z`,
+  };
+  const seededPayment = {
+    id: 703,
+    client_id: 11,
+    client_name: 'Анна Петрова',
+    package_id: 701,
+    expected_amount_minor: 300000,
+    paid_amount_minor: 150000,
+    currency: 'RUB',
+    payment_date: operationDate,
+    method: 'Перевод',
+    note: null,
+    status: 'partial',
+    created_at: `${operationDate}T09:00:00Z`,
+    updated_at: `${operationDate}T09:00:00Z`,
+  };
+  const operations =
+    options.operations === 'seeded'
+      ? {
+          date: operationDate,
+          timezone: 'Europe/Moscow',
+          sessions: [seededSession],
+          overdue_tasks: [seededTask],
+          due_tasks: [],
+          low_packages: [seededPackage],
+          payment_facts: [seededPayment],
+        }
+      : {
+          date: operationDate,
+          timezone: 'Europe/Moscow',
+          sessions: [],
+          overdue_tasks: [],
+          due_tasks: [],
+          low_packages: [],
+          payment_facts: [],
+        };
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -414,25 +508,18 @@ async function mockCoachWorkspace(
               }
             : { items: [], total: 0, generated_at: '2026-08-20T10:00:00' },
       });
-    if (path.endsWith('/coach/operations/today'))
-      return route.fulfill({
-        json: {
-          date: '2026-08-20',
-          timezone: 'Europe/Moscow',
-          sessions: [],
-          overdue_tasks: [],
-          due_tasks: [],
-          low_packages: [],
-          payment_facts: [],
-        },
-      });
+    if (path.endsWith('/coach/operations/today')) return route.fulfill({ json: operations });
+    if (path.endsWith('/coach/packages')) return route.fulfill({ json: operations.low_packages });
+    if (path.endsWith('/coach/payments')) return route.fulfill({ json: operations.payment_facts });
+    if (path.endsWith('/coach/tasks'))
+      return route.fulfill({ json: [...operations.overdue_tasks, ...operations.due_tasks] });
     if (path.endsWith('/coach/agenda'))
       return route.fulfill({
         json: {
           date_from: url.searchParams.get('date_from') ?? '2026-08-20',
           date_to: url.searchParams.get('date_to') ?? '2026-08-26',
           timezone: 'Europe/Moscow',
-          items: [],
+          items: operations.sessions,
         },
       });
     if (path.endsWith('/coach/assigned-programs'))
@@ -639,6 +726,22 @@ async function captureTask387Evidence(page: Page, name: string) {
   await page.screenshot({ path: `${task387EvidenceDir}/${name}.png`, fullPage: true });
 }
 
+async function captureTask388Evidence(page: Page, name: string) {
+  if (!task388EvidenceDir) return;
+  await page.screenshot({ path: `${task388EvidenceDir}/${name}.png`, fullPage: true });
+}
+
+async function captureTask388ViewportEvidence(page: Page, name: string) {
+  if (!task388EvidenceDir) return;
+  await page.screenshot({ path: `${task388EvidenceDir}/${name}.png` });
+}
+
+async function assertAboveMobileDock(page: Page, locator: Locator) {
+  const targetBox = await locator.boundingBox();
+  const dockBox = await page.locator('#appBottomNav').boundingBox();
+  expect((targetBox?.y ?? 0) + (targetBox?.height ?? 0)).toBeLessThanOrEqual(dockBox?.y ?? 0);
+}
+
 async function assertCoachNavigationFits(page: Page, width: number) {
   await page.setViewportSize({ width, height: 844 });
   const duplicateNavigation = page.getByRole('navigation', { name: 'Разделы тренера' });
@@ -777,6 +880,7 @@ test('операционный roster даёт факты и не загружа
   await expect(page.getByText('Елена — приглашение ожидает подтверждения')).toBeVisible();
   await page.getByRole('button', { name: 'Пригласить клиента', exact: true }).first().click();
   await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Приглашения и подключения' }).click();
   await expect(page.getByLabel('Ссылка для браузера и Telegram')).toHaveValue(
     'https://example.test/join/test',
   );
@@ -1006,6 +1110,137 @@ test('Stage 1 сохраняет trainer-first entry и явное перекл�
 
   await page.setViewportSize({ width: 320, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+});
+
+test('Issue 388 оставляет Today компактным и ведёт CRM-факты в focused destinations', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCoachWorkspace(page, { attention: 'actionable', operations: 'seeded' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Сегодня', exact: true })).toBeVisible();
+  await expect(page.getByTestId('coach-tools-hub')).toHaveCount(0);
+  await expect(page.locator('.coach-operations__overview')).toBeVisible();
+  await expect(page.locator('.coach-operations__agenda')).toHaveCount(0);
+  await expect(page.getByText('Проверить технику приседа', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+
+  const clientsCta = page.getByRole('button', { name: /Открыть список клиентов/ });
+  const clientsCard = page.locator('.coach-today__section--compact');
+  await expect(clientsCta).toBeVisible();
+  const clientsCtaBox = await clientsCta.boundingBox();
+  const clientsCardBox = await clientsCard.boundingBox();
+  expect(clientsCtaBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(clientsCtaBox?.width ?? 0).toBeGreaterThanOrEqual((clientsCardBox?.width ?? 0) - 48);
+  const todayInviteCta = page.getByRole('button', { name: 'Пригласить клиента', exact: true });
+  await expect(todayInviteCta).toBeVisible();
+  const todayInviteCtaBox = await todayInviteCta.boundingBox();
+  const todayHeroBox = await page.locator('.coach-today__hero').boundingBox();
+  expect(todayInviteCtaBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(todayInviteCtaBox?.width ?? 0).toBeGreaterThanOrEqual((todayHeroBox?.width ?? 0) - 48);
+  await todayInviteCta.scrollIntoViewIfNeeded();
+  await assertAboveMobileDock(page, todayInviteCta);
+  await captureTask388ViewportEvidence(page, '390-today-invite-cta');
+  await clientsCta.scrollIntoViewIfNeeded();
+  await captureTask388ViewportEvidence(page, '390-clients-cta-full-width');
+
+  await captureTask388Evidence(page, '390-today-light');
+
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+  await captureTask388Evidence(page, '390-today-dark');
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+
+  const primaryNavigation = trainerPrimaryNavigation(page);
+  await primaryNavigation.getByRole('link', { name: 'Ещё', exact: true }).click();
+  await expect(page).toHaveURL('/coach?tab=tools');
+  await expect(page.getByTestId('coach-tools-hub')).toBeVisible();
+  await captureTask388Evidence(page, '390-tools-hub');
+
+  await page.getByRole('button', { name: 'Расписание и встречи' }).click();
+  await expect(page).toHaveURL('/coach?tab=tools&tool=schedule');
+  await expect(page.getByRole('heading', { name: 'Встречи', exact: true })).toBeVisible();
+  await expect(page.locator('.coach-operations__agenda')).toBeVisible();
+  await expect(page.getByTestId('coach-session-601')).toBeVisible();
+  await captureTask388Evidence(page, '390-schedule');
+
+  await page.goBack();
+  await expect(page).toHaveURL('/coach?tab=tools');
+  await expect(page.getByTestId('coach-tools-hub')).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL('/coach?tab=tools&tool=schedule');
+  await expect(page.getByTestId('coach-session-601')).toBeVisible();
+  await primaryNavigation.getByRole('link', { name: 'Ещё', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Задачи' }).click();
+  await expect(page).toHaveURL('/coach?tab=tools&tool=tasks');
+  await expect(
+    page.getByRole('heading', { name: 'Задачи клиентов', exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByText('Проверить технику приседа', { exact: true })).toBeVisible();
+  await captureTask388Evidence(page, '390-tasks');
+  await primaryNavigation.getByRole('link', { name: 'Ещё', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Пакеты и оплаты' }).click();
+  await expect(page).toHaveURL('/coach?tab=tools&tool=finance');
+  await expect(page.getByRole('heading', { name: 'Пакеты и оплаты', exact: true })).toBeVisible();
+  await expect(page.getByText(/Сопровождение · август/)).toBeVisible();
+  await expect(page.getByText('Частично оплачено', { exact: true })).toBeVisible();
+  const newPackageCta = page.getByRole('button', { name: 'Новый пакет', exact: true });
+  const recordPaymentCta = page.getByRole('button', { name: 'Учесть оплату', exact: true });
+  const newPackageBox = await newPackageCta.boundingBox();
+  const recordPaymentBox = await recordPaymentCta.boundingBox();
+  expect(newPackageBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(recordPaymentBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(recordPaymentBox?.y ?? 0).toBeGreaterThanOrEqual(
+    (newPackageBox?.y ?? 0) + (newPackageBox?.height ?? 0) + 8,
+  );
+  await newPackageCta.scrollIntoViewIfNeeded();
+  await assertAboveMobileDock(page, newPackageCta);
+  await captureTask388ViewportEvidence(page, '390-finance-actions');
+  await captureTask388Evidence(page, '390-finance');
+  await primaryNavigation.getByRole('link', { name: 'Ещё', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Приглашения и подключения' }).click();
+  const createInviteCta = page.getByRole('button', { name: 'Создать приглашение', exact: true });
+  const pendingInvitesCta = page.getByRole('button', {
+    name: /Открыть ожидающие подключения/,
+  });
+  await expect(createInviteCta).toBeVisible();
+  await expect(pendingInvitesCta).toBeVisible();
+  const createInviteBox = await createInviteCta.boundingBox();
+  const pendingInvitesBox = await pendingInvitesCta.boundingBox();
+  const inviteCardBox = await page.locator('.coach-invite-panel').boundingBox();
+  expect(createInviteBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  expect(createInviteBox?.width ?? 0).toBeGreaterThanOrEqual((inviteCardBox?.width ?? 0) - 48);
+  expect(pendingInvitesBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+  await pendingInvitesCta.scrollIntoViewIfNeeded();
+  await assertAboveMobileDock(page, pendingInvitesCta);
+  await captureTask388ViewportEvidence(page, '390-invitations-actions');
+  await captureTask388Evidence(page, '390-invitations');
+
+  await primaryNavigation.getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await expect(page.getByLabel('Найти клиента')).toBeVisible();
+  await captureTask388Evidence(page, '390-clients');
+  await primaryNavigation.getByRole('link', { name: 'Программы', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Программы клиентов', exact: true }),
+  ).toBeVisible();
+  await captureTask388Evidence(page, '390-programs');
+
+  await primaryNavigation.getByRole('link', { name: 'Сегодня', exact: true }).click();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.getByRole('heading', { name: 'Сегодня', exact: true })).toBeVisible();
+  await expect(page.locator('.coach-operations__agenda')).toHaveCount(0);
+  await captureTask388Evidence(page, '1440-today-light');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
 });
 
 test('Task 291 сохраняет плотную desktop-композицию и Light/Dark контраст', async ({ page }) => {

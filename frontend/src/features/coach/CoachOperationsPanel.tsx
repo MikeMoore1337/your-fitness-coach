@@ -8,6 +8,7 @@ import type {
   CoachPackage,
   CoachPayment,
   CoachSession,
+  CoachTask,
 } from '../../shared/api/types';
 import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/queryKeys';
@@ -29,11 +30,14 @@ import {
   Select,
   SegmentedControl,
 } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { WeekStrip } from '../../shared/ui/WeekStrip';
+import type { CoachTool } from './CoachToolsHub';
 
 type Composer = 'session' | 'task' | 'package' | 'payment' | null;
 type ViewMode = 'day' | 'week';
 type SessionStatus = CoachSession['status'];
+type CoachOperationsSurface = 'overview' | 'schedule' | 'tasks' | 'finance';
 
 type SessionDraft = {
   clientId: string;
@@ -214,16 +218,98 @@ function SessionRow({
   );
 }
 
+function CoachOperationsOverview({
+  sessions,
+  tasks,
+  lowPackageCount,
+  paymentCount,
+  onNavigate,
+}: {
+  sessions: CoachSession[];
+  tasks: CoachTask[];
+  lowPackageCount: number;
+  paymentCount: number;
+  onNavigate?: (tool: CoachTool) => void;
+}) {
+  const nextSession = sessions[0];
+  const totalFacts = sessions.length + tasks.length + lowPackageCount + paymentCount;
+  return (
+    <section className="coach-operations__overview" aria-labelledby="coach-overview-title">
+      <div className="coach-operations__section-head">
+        <div>
+          <span className="eyebrow">Рабочий обзор</span>
+          <h3 id="coach-overview-title">Что дальше</h3>
+        </div>
+        <Badge>{totalFacts}</Badge>
+      </div>
+      <div className="coach-operations__overview-list">
+        <button
+          className="coach-operations__overview-row"
+          onClick={() => onNavigate?.('schedule')}
+          type="button"
+        >
+          <span>
+            <strong>Расписание и встречи</strong>
+            <small>
+              {nextSession
+                ? `${nextSession.client_name || 'Клиент'} · ${sessionSummary(nextSession)}`
+                : 'Сегодня встреч пока нет'}
+            </small>
+          </span>
+          <Badge tone={sessions.length ? 'warning' : 'neutral'}>{sessions.length}</Badge>
+          <Icon name="arrow-right" size={16} />
+        </button>
+        <button
+          className="coach-operations__overview-row"
+          onClick={() => onNavigate?.('tasks')}
+          type="button"
+        >
+          <span>
+            <strong>Задачи клиентов</strong>
+            <small>
+              {tasks.length ? 'Есть задачи, требующие действия' : 'На сегодня задач нет'}
+            </small>
+          </span>
+          <Badge tone={tasks.length ? 'warning' : 'neutral'}>{tasks.length}</Badge>
+          <Icon name="arrow-right" size={16} />
+        </button>
+        <button
+          className="coach-operations__overview-row"
+          onClick={() => onNavigate?.('finance')}
+          type="button"
+        >
+          <span>
+            <strong>Пакеты и оплаты</strong>
+            <small>
+              {lowPackageCount + paymentCount
+                ? 'Есть финансовые факты для проверки'
+                : 'Новых финансовых фактов нет'}
+            </small>
+          </span>
+          <Badge tone={lowPackageCount + paymentCount ? 'warning' : 'neutral'}>
+            {lowPackageCount + paymentCount}
+          </Badge>
+          <Icon name="arrow-right" size={16} />
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function CoachOperationsPanel({
   clients,
   onOpenClient,
   timezone,
   onDemoStep,
+  surface = 'overview',
+  onNavigate,
 }: {
   clients: Client[];
   onOpenClient: (clientId: number) => void;
   timezone?: string | null;
   onDemoStep?: (step: 'task') => void;
+  surface?: CoachOperationsSurface;
+  onNavigate?: (tool: CoachTool) => void;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
@@ -265,11 +351,22 @@ export function CoachOperationsPanel({
       api<CoachAgenda>(
         `/api/v1/coach/agenda?date_from=${encodeURIComponent(rangeStart)}&date_to=${encodeURIComponent(rangeEnd)}`,
       ),
+    enabled: surface === 'schedule',
   });
   const packages = useQuery<CoachPackage[]>({
     queryKey: queryKeys.trainer.packages,
     queryFn: () => api<CoachPackage[]>('/api/v1/coach/packages'),
-    enabled: composer === 'session' || composer === 'payment',
+    enabled: surface === 'finance' || composer === 'session' || composer === 'payment',
+  });
+  const payments = useQuery<CoachPayment[]>({
+    queryKey: queryKeys.trainer.payments,
+    queryFn: () => api<CoachPayment[]>('/api/v1/coach/payments'),
+    enabled: surface === 'finance',
+  });
+  const taskList = useQuery<CoachTask[]>({
+    queryKey: queryKeys.trainer.tasks,
+    queryFn: () => api<CoachTask[]>('/api/v1/coach/tasks?state=open'),
+    enabled: surface === 'tasks',
   });
 
   const visibleSessions = useMemo(() => {
@@ -323,6 +420,22 @@ export function CoachOperationsPanel({
     setPaymentPaid('');
     setPaymentCurrency('RUB');
     setComposer('payment');
+  };
+
+  const openNewTask = () => {
+    setFormError(null);
+    setTaskTitle('');
+    setTaskClientId('');
+    setTaskDate(today);
+    setComposer('task');
+  };
+
+  const openNewPackage = () => {
+    setFormError(null);
+    setPackageName('Сопровождение');
+    setPackageClientId('');
+    setPackageCount('10');
+    setComposer('package');
   };
 
   const editPayment = (item: CoachPayment) => {
@@ -782,6 +895,11 @@ export function CoachOperationsPanel({
 
   const operationData = operations.data;
   const tasks = [...(operationData?.overdue_tasks ?? []), ...(operationData?.due_tasks ?? [])];
+  const focusedTasks = surface === 'tasks' ? (taskList.data ?? []) : tasks;
+  const focusedPackages =
+    surface === 'finance' ? (packages.data ?? []) : operationData?.low_packages;
+  const focusedPayments =
+    surface === 'finance' ? (payments.data ?? []) : operationData?.payment_facts;
 
   return (
     <section
@@ -791,236 +909,310 @@ export function CoachOperationsPanel({
     >
       <header className="coach-operations__header">
         <div>
-          <span className="eyebrow">Бизнес-операции</span>
-          <h2 id="coach-operations-title">Сегодня без лишнего шума</h2>
-          <p>Встречи, задачи и деньги — отдельными фактами, без скрытых оценок клиента.</p>
+          <span className="eyebrow">
+            {surface === 'overview'
+              ? 'Бизнес-операции'
+              : surface === 'schedule'
+                ? 'Расписание'
+                : surface === 'tasks'
+                  ? 'Следующий шаг'
+                  : 'Факты оплаты'}
+          </span>
+          <h2 id="coach-operations-title">
+            {surface === 'overview'
+              ? 'Короткий рабочий обзор'
+              : surface === 'schedule'
+                ? 'Встречи'
+                : surface === 'tasks'
+                  ? 'Задачи клиентов'
+                  : 'Пакеты и оплаты'}
+          </h2>
+          <p>
+            {surface === 'overview'
+              ? 'Сначала ближайшее действие, подробности — в отдельном рабочем разделе.'
+              : surface === 'schedule'
+                ? 'Откройте день или неделю, чтобы работать со встречами без лишнего контекста.'
+                : surface === 'tasks'
+                  ? 'Открытые и просроченные задачи клиентов в одном списке.'
+                  : 'Остатки пакетов и ручной учёт оплат клиентов.'}
+          </p>
         </div>
         <div className="coach-operations__header-actions">
-          <Button onClick={openNewSession} type="button">
-            Новая встреча
-          </Button>
+          {(surface === 'overview' || surface === 'schedule') && (
+            <Button onClick={openNewSession} type="button">
+              Новая встреча
+            </Button>
+          )}
+          {surface === 'tasks' && (
+            <Button onClick={openNewTask} type="button">
+              Новая задача
+            </Button>
+          )}
+          {surface === 'finance' && (
+            <>
+              <Button onClick={openNewPackage} type="button" variant="secondary">
+                Новый пакет
+              </Button>
+              <Button onClick={openNewPayment} type="button">
+                Учесть оплату
+              </Button>
+            </>
+          )}
         </div>
       </header>
 
-      <div className="coach-operations__metrics" aria-label="Сводка операций сегодня">
-        <div>
-          <span>Встречи</span>
-          <strong>{operationData?.sessions?.length ?? '—'}</strong>
-        </div>
-        <div>
-          <span>Задачи</span>
-          <strong>{tasks.length || '—'}</strong>
-        </div>
-        <div>
-          <span>Пакеты ≤ 2</span>
-          <strong>{operationData?.low_packages?.length || '—'}</strong>
-        </div>
-        <div>
-          <span>Оплаты</span>
-          <strong>{operationData?.payment_facts?.length || '—'}</strong>
-        </div>
-      </div>
-
-      <div className="coach-operations__toolbar">
-        <SegmentedControl
-          ariaLabel="Режим просмотра расписания"
-          onChange={(value) => setView(value as ViewMode)}
-          options={[
-            { label: 'День', value: 'day' },
-            { label: 'Неделя', value: 'week' },
-          ]}
-          value={view}
-        />
-        <div className="coach-operations__quick-actions">
-          <Button onClick={() => setComposer('task')} type="button" variant="secondary">
-            Задача
-          </Button>
-          <Button onClick={() => setComposer('package')} type="button" variant="secondary">
-            Пакет
-          </Button>
-          <Button onClick={openNewPayment} type="button" variant="secondary">
-            Учёт оплаты
-          </Button>
-        </div>
-      </div>
-
-      {view === 'week' ? (
-        <WeekStrip
-          anchorDate={selectedDate}
-          ariaLabel="Неделя встреч"
-          getDayMeta={(day) => {
-            const count = countsByDate.get(day) ?? 0;
-            return count
-              ? {
-                  status: {
-                    key: 'planned',
-                    label: `${count} ${count === 1 ? 'встреча' : 'встречи'}`,
-                    pictogram: 'planned',
-                  },
-                }
-              : {};
-          }}
-          mode="overview"
-          navigation={{
-            onNext: () => setSelectedDate(addCalendarDays(rangeStart, 7)),
-            onPrevious: () => setSelectedDate(addCalendarDays(rangeStart, -7)),
-          }}
-          title="Рабочая неделя"
-          today={today}
-        />
-      ) : (
-        <WeekStrip
-          anchorDate={selectedDate}
-          ariaLabel="Выберите день для расписания"
-          getDayMeta={(day) => {
-            const count = countsByDate.get(day) ?? 0;
-            return count
-              ? {
-                  status: {
-                    key: 'planned',
-                    label: `${count} ${count === 1 ? 'встреча' : 'встречи'}`,
-                    pictogram: 'planned',
-                  },
-                }
-              : {};
-          }}
-          mode="picker"
-          navigation={{
-            onNext: () => setSelectedDate(addCalendarDays(rangeStart, 7)),
-            onPrevious: () => setSelectedDate(addCalendarDays(rangeStart, -7)),
-          }}
-          onSelect={setSelectedDate}
-          selectedDate={selectedDate}
-          title="Рабочий день"
-          today={today}
+      {surface === 'overview' && (
+        <CoachOperationsOverview
+          lowPackageCount={operationData?.low_packages?.length ?? 0}
+          onNavigate={onNavigate}
+          paymentCount={operationData?.payment_facts?.length ?? 0}
+          sessions={operationData?.sessions ?? []}
+          tasks={tasks}
         />
       )}
 
-      <section className="coach-operations__agenda" aria-labelledby="coach-agenda-title">
-        <div className="coach-operations__section-head">
+      {surface !== 'overview' && (
+        <div className="coach-operations__metrics" aria-label="Сводка операций сегодня">
           <div>
-            <span className="eyebrow">Расписание</span>
-            <h3 id="coach-agenda-title">
-              {view === 'day'
-                ? dateLabel(selectedDate)
-                : `${dateLabel(rangeStart)} — ${dateLabel(rangeEnd)}`}
-            </h3>
+            <span>Встречи</span>
+            <strong>{operationData?.sessions?.length ?? '—'}</strong>
           </div>
-          <Badge>{visibleSessions.length}</Badge>
+          <div>
+            <span>Задачи</span>
+            <strong>{tasks.length || '—'}</strong>
+          </div>
+          <div>
+            <span>Пакеты ≤ 2</span>
+            <strong>{operationData?.low_packages?.length || '—'}</strong>
+          </div>
+          <div>
+            <span>Оплаты</span>
+            <strong>{operationData?.payment_facts?.length || '—'}</strong>
+          </div>
         </div>
-        {agenda.isPending ? (
-          <LoadingState label="Собираем расписание…" />
-        ) : agenda.error ? (
-          <ErrorState
-            message={agenda.error instanceof Error ? agenda.error.message : 'Расписание недоступно'}
-            retry={() => void agenda.refetch()}
-          />
-        ) : visibleSessions.length === 0 ? (
-          <EmptyState title="Встреч пока нет" text="Добавьте запись или выберите другой день." />
-        ) : (
-          <div className="coach-operations__session-list">
-            {visibleSessions.map((item) => (
-              <SessionRow
-                clients={clients}
-                item={item}
-                key={item.id}
-                onEdit={editSession}
-                onOpenClient={onOpenClient}
-                onStatus={changeSessionStatus}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      )}
 
-      <div className="coach-operations__facts-grid">
-        <section className="coach-operations__fact-card" aria-labelledby="coach-tasks-title">
-          <div className="coach-operations__section-head">
-            <div>
-              <span className="eyebrow">Следующий шаг</span>
-              <h3 id="coach-tasks-title" onFocus={() => onDemoStep?.('task')} tabIndex={-1}>
-                Задачи клиентов
-              </h3>
+      {surface === 'schedule' && (
+        <>
+          <div className="coach-operations__toolbar">
+            <SegmentedControl
+              ariaLabel="Режим просмотра расписания"
+              onChange={(value) => setView(value as ViewMode)}
+              options={[
+                { label: 'День', value: 'day' },
+                { label: 'Неделя', value: 'week' },
+              ]}
+              value={view}
+            />
+            <div className="coach-operations__quick-actions">
+              <Button onClick={openNewTask} type="button" variant="secondary">
+                Задача
+              </Button>
+              <Button onClick={openNewPackage} type="button" variant="secondary">
+                Пакет
+              </Button>
+              <Button onClick={openNewPayment} type="button" variant="secondary">
+                Учёт оплаты
+              </Button>
             </div>
-            <Badge tone={tasks.length ? 'warning' : 'neutral'}>{tasks.length}</Badge>
           </div>
-          {operations.isPending ? (
-            <LoadingState label="Загружаем задачи…" />
-          ) : tasks.length === 0 ? (
-            <p className="muted">На сегодня задач нет.</p>
-          ) : (
-            <div className="coach-operations__fact-list">
-              {tasks.map((task) => (
-                <div className="coach-operations__fact-row" key={task.id}>
-                  <div>
-                    <strong>{task.title}</strong>
-                    <span>
-                      {task.client_name} ·{' '}
-                      {task.due_at.slice(0, 10) < today ? 'просрочено' : 'сегодня'}
-                    </span>
-                  </div>
-                  <Button
-                    onClick={() =>
-                      mutation.mutate({
-                        method: 'PATCH',
-                        path: `/api/v1/coach/tasks/${task.id}/state`,
-                        body: { state: 'completed' },
-                      })
+
+          {view === 'week' ? (
+            <WeekStrip
+              anchorDate={selectedDate}
+              ariaLabel="Неделя встреч"
+              getDayMeta={(day) => {
+                const count = countsByDate.get(day) ?? 0;
+                return count
+                  ? {
+                      status: {
+                        key: 'planned',
+                        label: `${count} ${count === 1 ? 'встреча' : 'встречи'}`,
+                        pictogram: 'planned',
+                      },
                     }
-                    type="button"
-                    variant="secondary"
-                  >
-                    Закрыть
-                  </Button>
-                </div>
-              ))}
-            </div>
+                  : {};
+              }}
+              mode="overview"
+              navigation={{
+                onNext: () => setSelectedDate(addCalendarDays(rangeStart, 7)),
+                onPrevious: () => setSelectedDate(addCalendarDays(rangeStart, -7)),
+              }}
+              title="Рабочая неделя"
+              today={today}
+            />
+          ) : (
+            <WeekStrip
+              anchorDate={selectedDate}
+              ariaLabel="Выберите день для расписания"
+              getDayMeta={(day) => {
+                const count = countsByDate.get(day) ?? 0;
+                return count
+                  ? {
+                      status: {
+                        key: 'planned',
+                        label: `${count} ${count === 1 ? 'встреча' : 'встречи'}`,
+                        pictogram: 'planned',
+                      },
+                    }
+                  : {};
+              }}
+              mode="picker"
+              navigation={{
+                onNext: () => setSelectedDate(addCalendarDays(rangeStart, 7)),
+                onPrevious: () => setSelectedDate(addCalendarDays(rangeStart, -7)),
+              }}
+              onSelect={setSelectedDate}
+              selectedDate={selectedDate}
+              title="Рабочий день"
+              today={today}
+            />
           )}
-        </section>
 
-        <section className="coach-operations__fact-card" aria-labelledby="coach-money-title">
-          <div className="coach-operations__section-head">
-            <div>
-              <span className="eyebrow">Факты оплаты</span>
-              <h3 id="coach-money-title">Пакеты и деньги</h3>
+          <section className="coach-operations__agenda" aria-labelledby="coach-agenda-title">
+            <div className="coach-operations__section-head">
+              <div>
+                <span className="eyebrow">Расписание</span>
+                <h3 id="coach-agenda-title">
+                  {view === 'day'
+                    ? dateLabel(selectedDate)
+                    : `${dateLabel(rangeStart)} — ${dateLabel(rangeEnd)}`}
+                </h3>
+              </div>
+              <Badge>{visibleSessions.length}</Badge>
             </div>
-            <Badge tone="warning">Ручной учёт</Badge>
-          </div>
-          <div className="coach-operations__fact-list">
-            {(operationData?.low_packages ?? []).map((item) => (
-              <div className="coach-operations__fact-row" key={`package-${item.id}`}>
-                <div>
-                  <strong>{item.client_name}</strong>
-                  <span>
-                    {item.name} · осталось {item.balance} из {item.included_sessions}
-                  </span>
-                </div>
-                <Badge tone="warning">Пакет</Badge>
+            {agenda.isPending ? (
+              <LoadingState label="Собираем расписание…" />
+            ) : agenda.error ? (
+              <ErrorState
+                message={
+                  agenda.error instanceof Error ? agenda.error.message : 'Расписание недоступно'
+                }
+                retry={() => void agenda.refetch()}
+              />
+            ) : visibleSessions.length === 0 ? (
+              <EmptyState
+                title="Встреч пока нет"
+                text="Добавьте запись или выберите другой день."
+              />
+            ) : (
+              <div className="coach-operations__session-list">
+                {visibleSessions.map((item) => (
+                  <SessionRow
+                    clients={clients}
+                    item={item}
+                    key={item.id}
+                    onEdit={editSession}
+                    onOpenClient={onOpenClient}
+                    onStatus={changeSessionStatus}
+                  />
+                ))}
               </div>
-            ))}
-            {(operationData?.payment_facts ?? []).map((item) => (
-              <div className="coach-operations__fact-row" key={`payment-${item.id}`}>
-                <div>
-                  <strong>{item.client_name}</strong>
-                  <span>
-                    {money(item.paid_amount_minor, item.currency)} из{' '}
-                    {money(item.expected_amount_minor, item.currency)}
-                  </span>
-                </div>
-                <div className="coach-operations__fact-actions">
-                  <Badge tone="warning">{paymentStatusLabels[item.status]}</Badge>
-                  <Button onClick={() => editPayment(item)} type="button" variant="secondary">
-                    Изменить
-                  </Button>
-                </div>
-              </div>
-            ))}
-            {!operationData?.low_packages?.length && !operationData?.payment_facts?.length && (
-              <p className="muted">Новых финансовых фактов нет.</p>
             )}
-          </div>
-        </section>
-      </div>
+          </section>
+        </>
+      )}
+
+      {(surface === 'tasks' || surface === 'finance') && (
+        <div className="coach-operations__facts-grid">
+          {surface === 'tasks' && (
+            <section className="coach-operations__fact-card" aria-labelledby="coach-tasks-title">
+              <div className="coach-operations__section-head">
+                <div>
+                  <span className="eyebrow">Следующий шаг</span>
+                  <h3 id="coach-tasks-title" onFocus={() => onDemoStep?.('task')} tabIndex={-1}>
+                    Задачи клиентов
+                  </h3>
+                </div>
+                <Badge tone={focusedTasks.length ? 'warning' : 'neutral'}>
+                  {focusedTasks.length}
+                </Badge>
+              </div>
+              {operations.isPending || taskList.isPending ? (
+                <LoadingState label="Загружаем задачи…" />
+              ) : focusedTasks.length === 0 ? (
+                <p className="muted">
+                  {surface === 'tasks' ? 'Открытых задач нет.' : 'На сегодня задач нет.'}
+                </p>
+              ) : (
+                <div className="coach-operations__fact-list">
+                  {focusedTasks.map((task) => (
+                    <div className="coach-operations__fact-row" key={task.id}>
+                      <div>
+                        <strong>{task.title}</strong>
+                        <span>
+                          {task.client_name} ·{' '}
+                          {task.due_at.slice(0, 10) < today ? 'просрочено' : 'сегодня'}
+                        </span>
+                      </div>
+                      <Button
+                        onClick={() =>
+                          mutation.mutate({
+                            method: 'PATCH',
+                            path: `/api/v1/coach/tasks/${task.id}/state`,
+                            body: { state: 'completed' },
+                          })
+                        }
+                        type="button"
+                        variant="secondary"
+                      >
+                        Закрыть
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {surface === 'finance' && (
+            <section className="coach-operations__fact-card" aria-labelledby="coach-money-title">
+              <div className="coach-operations__section-head">
+                <div>
+                  <span className="eyebrow">Факты оплаты</span>
+                  <h3 id="coach-money-title">Пакеты и деньги</h3>
+                </div>
+                <Badge tone="warning">Ручной учёт</Badge>
+              </div>
+              <div className="coach-operations__fact-list">
+                {(focusedPackages ?? []).map((item) => (
+                  <div className="coach-operations__fact-row" key={`package-${item.id}`}>
+                    <div>
+                      <strong>{item.client_name}</strong>
+                      <span>
+                        {item.name} · осталось {item.balance} из {item.included_sessions}
+                      </span>
+                    </div>
+                    <Badge tone="warning">Пакет</Badge>
+                  </div>
+                ))}
+                {(focusedPayments ?? []).map((item) => (
+                  <div className="coach-operations__fact-row" key={`payment-${item.id}`}>
+                    <div>
+                      <strong>{item.client_name}</strong>
+                      <span>
+                        {money(item.paid_amount_minor, item.currency)} из{' '}
+                        {money(item.expected_amount_minor, item.currency)}
+                      </span>
+                    </div>
+                    <div className="coach-operations__fact-actions">
+                      <Badge tone="warning">{paymentStatusLabels[item.status]}</Badge>
+                      <Button onClick={() => editPayment(item)} type="button" variant="secondary">
+                        Изменить
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {packages.isPending || payments.isPending ? (
+                  <LoadingState label="Загружаем финансовые факты…" />
+                ) : !focusedPackages?.length && !focusedPayments?.length ? (
+                  <p className="muted">Новых финансовых фактов нет.</p>
+                ) : null}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
 
       {formError && (
         <p className="coach-operations__form-error" role="alert">
