@@ -798,7 +798,7 @@ def test_missing_lease_worktree_fails_closed_before_new_start(
         controller.start("226K", owner_launch=True, session_label="candidate", offline=True)
 
 
-def test_dirty_exclusive_task_worktree_blocks_new_writer(
+def test_unrelated_dirty_task_worktree_does_not_block_new_writer(
     repository: tuple[Path, Any],
 ) -> None:
     root, _, controller, worktree, _, _ = _prepare_started(
@@ -809,10 +809,71 @@ def test_dirty_exclusive_task_worktree_blocks_new_writer(
 
     report = controller.doctor(offline=True)
 
+    inventory = next(
+        item for item in report["inventory"] if item["branch"] == "task/226H-synthetic-task"
+    )
+    assert report["safe_for_implementation"] is True
+    assert report["ok"] is True
+    assert inventory["classification"] == "DIRTY_NEEDS_OWNER"
+    assert any("Task 226H worktree is dirty" in item for item in report["recovery_findings"])
+    assert not any(
+        "Task 226H worktree is dirty" in item for item in report["implementation_blockers"]
+    )
+
+    started = controller.start("226I", owner_launch=True, session_label="candidate", offline=True)
+
+    assert started["lease"]["lifecycle_state"] == "implementation"
+    assert (worktree / "uncommitted.txt").read_text(encoding="utf-8") == "preserve\n"
+
+
+def test_unrelated_interrupted_task_worktree_does_not_block_new_writer(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, _, _ = _prepare_started(
+        repository, "226L", concurrency="independent-write"
+    )
+    _write_task(root, "226M", "candidate")
+    marker = git_repository.git_dir(worktree) / "MERGE_HEAD"
+    marker.write_text("synthetic\n", encoding="utf-8")
+
+    try:
+        report = controller.doctor(offline=True)
+
+        inventory = next(
+            item for item in report["inventory"] if item["branch"] == "task/226L-synthetic-task"
+        )
+        assert report["safe_for_implementation"] is True
+        assert inventory["classification"] == "DIRTY_NEEDS_OWNER"
+        assert any(
+            "Task 226L worktree is dirty or interrupted" in item
+            for item in report["recovery_findings"]
+        )
+
+        started = controller.start(
+            "226M", owner_launch=True, session_label="candidate", offline=True
+        )
+
+        assert started["lease"]["lifecycle_state"] == "implementation"
+        assert marker.read_text(encoding="utf-8") == "synthetic\n"
+    finally:
+        marker.unlink(missing_ok=True)
+
+
+def test_dirty_canonical_worktree_remains_global_implementation_blocker(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "226N", "candidate")
+    (root / "canonical-uncommitted.txt").write_text("preserve\n", encoding="utf-8")
+    controller = task_session.TaskController(git_repository)
+
+    report = controller.doctor(offline=True)
+
     assert report["safe_for_implementation"] is False
-    assert any("Task 226H worktree is dirty" in item for item in report["implementation_blockers"])
-    with pytest.raises(task_session.TaskSessionError, match="implementation/start blockers"):
-        controller.start("226I", owner_launch=True, session_label="candidate", offline=True)
+    assert "controller worktree is dirty" in report["implementation_blockers"]
+    with pytest.raises(task_session.TaskSessionError, match="canonical master refresh"):
+        controller.start("226N", owner_launch=True, session_label="candidate", offline=True)
+    assert (root / "canonical-uncommitted.txt").read_text(encoding="utf-8") == "preserve\n"
 
 
 def test_adopt_current_uses_same_compatible_lease_contract(
@@ -833,6 +894,25 @@ def test_adopt_current_uses_same_compatible_lease_contract(
 
     assert lease["task_id"] == "228"
     assert lease["concurrency_class"] == "independent-write"
+
+
+def test_adopt_current_refuses_dirty_task_worktree_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _ = repository
+    _write_task(root, "228A", "adopted", concurrency="independent-write")
+    adopted_path = root / ".artifacts" / "worktrees" / "adopted-228A"
+    _git(root, "worktree", "add", "-b", "task/228A-adopted", str(adopted_path), "origin/master")
+    (adopted_path / "uncommitted.txt").write_text("preserve\n", encoding="utf-8")
+    adopted_controller = task_session.TaskController(task_session.GitRepository(adopted_path))
+
+    with pytest.raises(task_session.TaskSessionError, match="adoption refuses dirty worktree"):
+        adopted_controller.adopt_current(
+            "228A", owner_launch=True, session_label="adopted", offline=True
+        )
+
+    assert not adopted_controller.store.task_lease_path("228A").exists()
+    assert (adopted_path / "uncommitted.txt").read_text(encoding="utf-8") == "preserve\n"
 
 
 def test_active_production_deploy_blocks_only_delivery_acquisition(

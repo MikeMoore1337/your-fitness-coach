@@ -2342,7 +2342,7 @@ class TaskController:
             if status or operation_issues:
                 classification = "DIRTY_NEEDS_OWNER"
                 if task_id:
-                    implementation_blockers.append(
+                    recovery_findings.append(
                         f"Task {task_id} worktree is dirty or interrupted; recovery is required"
                     )
             elif unique:
@@ -2696,6 +2696,8 @@ class TaskController:
         ]
         if len(matches) != 1 or self.repository.current_worktree == self._canonical_root():
             raise TaskSessionError("Cannot adopt the controller worktree")
+        if self.repository.status(self.repository.current_worktree):
+            raise TaskSessionError(f"Task {expected} adoption refuses dirty worktree")
         if self.repository.operation_issues(self.repository.current_worktree):
             raise TaskSessionError("Cannot adopt a worktree with an active Git operation")
         base_sha = self.repository.ref("origin/master")
