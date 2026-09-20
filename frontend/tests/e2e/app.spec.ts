@@ -2399,7 +2399,7 @@ test('пользователь напрямую включает режим тр
   });
   expect(repeatedActivation).toMatchObject({ activated_now: false, is_active: true });
   const modeSwitch = page.getByRole('navigation', { name: 'Режим работы' });
-  await expect(modeSwitch.getByRole('link', { name: 'Для себя' })).toHaveAttribute(
+  await expect(modeSwitch.getByRole('link', { name: 'Для себя' }).first()).toHaveAttribute(
     'aria-current',
     'page',
   );
@@ -2432,16 +2432,19 @@ test('пользователь напрямую включает режим тр
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await openAppDestination(page, 'Профиль');
   await openCard(page, 'Тренер и приглашения');
-  await modeSwitch.getByRole('link', { name: 'Клиенты' }).click();
+  await modeSwitch.getByRole('link', { name: 'В кабинет тренера', exact: true }).first().click();
   await page
-    .getByRole('navigation', { name: 'Разделы тренера' })
-    .getByRole('button', { name: 'Клиенты', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Клиенты', exact: true }).first()).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .locator('.app-bottom-nav__primary')
+      .getByRole('link', { name: 'Клиенты', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Добавьте первого клиента' })).toBeVisible();
   const modeCopyPadding = await page
     .locator('.trainer-mode-context__copy')
@@ -3092,14 +3095,17 @@ test('тренер открывает кабинет', async ({ page }) => {
   await page.getByRole('button', { name: 'Тренер' }).click();
   await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
   await page
-    .getByRole('navigation', { name: 'Разделы тренера' })
-    .getByRole('button', { name: 'Клиенты', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Тренер', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .locator('.app-bottom-nav__primary')
+      .getByRole('link', { name: 'Клиенты', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: 'Админ-панель' })).toHaveCount(0);
   await expect(page.getByText('Клиентов пока нет')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Добавьте первого клиента' })).toBeVisible();
@@ -3113,8 +3119,9 @@ test('тренер быстро переходит между программо
   await page.getByRole('button', { name: 'Тренер' }).click();
 
   await page
-    .getByRole('navigation', { name: 'Разделы тренера' })
-    .getByRole('button', { name: 'Программы', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Программы', exact: true })
     .click();
   await openCard(page, 'Программы клиентов');
   await expect(page.getByText('План клиента на четыре недели')).toBeVisible();

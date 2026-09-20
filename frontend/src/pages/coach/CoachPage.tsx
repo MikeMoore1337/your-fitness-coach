@@ -1285,34 +1285,36 @@ export default function CoachPage({
           </button>
         </div>
       </header>
-      <nav className="coach-os-nav" aria-label="Разделы тренера">
-        {(
-          [
-            ['today', 'Сегодня'],
-            ['clients', 'Клиенты'],
-            ['programs', 'Программы'],
-            ['tools', 'Ещё · инструменты'],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            type="button"
-            aria-current={tab === key ? 'page' : undefined}
-            className={tab === key ? 'is-active' : 'secondary'}
-            aria-label={key === 'tools' ? label : undefined}
-            onClick={() => navigateCoach(key)}
-            onKeyDown={handleTabKeyDown}
-            key={key}
-          >
-            <span className="coach-os-nav__label coach-os-nav__label--desktop">{label}</span>
-            <span
-              className="coach-os-nav__label coach-os-nav__label--mobile"
-              aria-hidden={key === 'tools' ? true : undefined}
+      {demo && (
+        <nav className="coach-os-nav" aria-label="Разделы тренера">
+          {(
+            [
+              ['today', 'Сегодня'],
+              ['clients', 'Клиенты'],
+              ['programs', 'Программы'],
+              ['tools', 'Ещё · инструменты'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              type="button"
+              aria-current={tab === key ? 'page' : undefined}
+              className={tab === key ? 'is-active' : 'secondary'}
+              aria-label={key === 'tools' ? label : undefined}
+              onClick={() => navigateCoach(key)}
+              onKeyDown={handleTabKeyDown}
+              key={key}
             >
-              {key === 'tools' ? 'Ещё' : label}
-            </span>
-          </button>
-        ))}
-      </nav>
+              <span className="coach-os-nav__label coach-os-nav__label--desktop">{label}</span>
+              <span
+                className="coach-os-nav__label coach-os-nav__label--mobile"
+                aria-hidden={key === 'tools' ? true : undefined}
+              >
+                {key === 'tools' ? 'Ещё' : label}
+              </span>
+            </button>
+          ))}
+        </nav>
+      )}
       <section
         className="page-stack"
         aria-label={
