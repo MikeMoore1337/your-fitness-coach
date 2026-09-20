@@ -1122,3 +1122,246 @@ test('trainer leaves contextual workout and exercise feedback without messenger 
     });
   }
 });
+
+test('Coach Programs keeps responsive geometry content-driven', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openCoach(page);
+  await page.getByRole('button', { name: 'Программы', exact: true }).click();
+
+  const card = page.locator('.coach-programs-card');
+  await card.locator(':scope > summary').click();
+  const searchField = card.locator('.coach-programs-search');
+  const searchInput = card.locator('input[type="search"]');
+  await expect(card.locator('.card-disclosure__header-action')).toHaveCount(0);
+  await expect(card.locator('.card-disclosure__actions')).toHaveCount(0);
+  await expect(card.getByRole('link', { name: 'Мой план →', exact: true })).toHaveCount(0);
+  await expect(card.getByText('Мои программы', { exact: true })).toHaveCount(0);
+  await expect(
+    card.getByText(
+      'Здесь только назначения вашим клиентам. Собственные программы хранятся в личном плане.',
+      { exact: true },
+    ),
+  ).toHaveCount(0);
+  await expect(card.locator(':scope > summary small')).toHaveCount(0);
+  await expect(card.getByText('Поиск', { exact: true })).toHaveCount(0);
+  await expect(searchField).toBeVisible();
+  await expect(searchInput).toHaveAttribute('placeholder', 'Поиск по клиенту или программе');
+  await expect(searchField.locator('[data-icon="search"]')).toBeVisible();
+  await expect(card.locator('.card-disclosure__body > :first-child')).toHaveClass(
+    /coach-programs-search/,
+  );
+  await expect(card.getByText('Тренировочные блоки ещё не настроены')).toBeVisible();
+
+  const measureGeometry = async () =>
+    page.evaluate(() => {
+      const box = (selector: string) => {
+        const element = document.querySelector<HTMLElement>(selector);
+        if (!element) throw new Error(`Missing geometry target: ${selector}`);
+        const rect = element.getBoundingClientRect();
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+        };
+      };
+      const body = box('.coach-programs-card .card-disclosure__body');
+      const bodyStyles = getComputedStyle(
+        document.querySelector<HTMLElement>('.coach-programs-card .card-disclosure__body')!,
+      );
+      const header = box('.coach-os-header');
+      const headerElement = document.querySelector<HTMLElement>('.coach-os-header')!;
+      const headerStyles = getComputedStyle(headerElement);
+      const headerContent = {
+        left: header.left + Number.parseFloat(headerStyles.paddingLeft),
+        right: header.right - Number.parseFloat(headerStyles.paddingRight),
+      };
+      const summary = box('.coach-programs-card > summary');
+      const summaryCopy = box('.coach-programs-card > summary > span:first-child');
+      const heading = box('.coach-programs-card > summary h2');
+      const collapse = box('.coach-programs-card > summary .disclosure-icon');
+      const summaryStyles = getComputedStyle(
+        document.querySelector<HTMLElement>('.coach-programs-card > summary')!,
+      );
+      const headingStyles = getComputedStyle(
+        document.querySelector<HTMLElement>('.coach-programs-card > summary h2')!,
+      );
+      const searchField = box('.coach-programs-card .coach-programs-search');
+      const searchInput = box('.coach-programs-card input[type="search"]');
+      const searchIcon = box('.coach-programs-card .coach-programs-search [data-icon="search"]');
+      const programsDivider = box('.coach-programs-card .list-grid');
+      const programRow = box('.coach-program-row');
+      const evolution = box('.program-history');
+      const evolutionIntro = box('.program-history__intro');
+      const evolutionEmpty = box('.program-history .empty-state');
+      const evolutionSummary = box('.program-history__disclosure > summary');
+      const invite = box('.coach-os-header__actions > button');
+
+      return {
+        viewportWidth: window.innerWidth,
+        dividerBottom: body.top + Number.parseFloat(bodyStyles.borderTopWidth),
+        summary,
+        summaryCopy,
+        heading,
+        collapse,
+        summaryGap: Number.parseFloat(summaryStyles.gap),
+        headingLineHeight: Number.parseFloat(headingStyles.lineHeight),
+        searchField,
+        searchInput,
+        searchIcon,
+        programsDivider,
+        programRow,
+        evolution,
+        evolutionIntro,
+        evolutionEmpty,
+        evolutionSummary,
+        invite,
+        headerContent,
+        documentScrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+
+  const assertGeometry = (geometry: Awaited<ReturnType<typeof measureGeometry>>) => {
+    expect(geometry.documentScrollWidth).toBeLessThanOrEqual(geometry.viewportWidth);
+    expect(geometry.heading.left).toBeGreaterThanOrEqual(geometry.summary.left);
+    expect(geometry.heading.right).toBeLessThanOrEqual(
+      geometry.collapse.left - geometry.summaryGap + 1,
+    );
+    expect(geometry.collapse.left).toBeGreaterThanOrEqual(geometry.summary.left);
+    expect(geometry.collapse.right).toBeLessThanOrEqual(geometry.summary.right);
+    if (geometry.viewportWidth <= 430) {
+      expect(geometry.heading.height).toBeLessThanOrEqual(geometry.headingLineHeight + 1);
+    }
+    expect(geometry.searchField.top - geometry.dividerBottom).toBeGreaterThanOrEqual(8);
+    expect(geometry.searchField.top - geometry.dividerBottom).toBeLessThanOrEqual(24);
+    expect(Math.abs(geometry.searchField.top - geometry.searchInput.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.searchField.height - geometry.searchInput.height)).toBeLessThanOrEqual(
+      1,
+    );
+    expect(
+      Math.abs(
+        geometry.searchIcon.top +
+          geometry.searchIcon.height / 2 -
+          (geometry.searchInput.top + geometry.searchInput.height / 2),
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(geometry.programsDivider.top - geometry.searchField.bottom).toBeGreaterThanOrEqual(8);
+    expect(geometry.programsDivider.top - geometry.searchField.bottom).toBeLessThanOrEqual(24);
+    expect(Math.abs(geometry.programsDivider.top - geometry.programRow.top)).toBeLessThanOrEqual(1);
+
+    for (const target of [
+      geometry.evolution,
+      geometry.evolutionIntro,
+      geometry.evolutionEmpty,
+      geometry.evolutionSummary,
+    ]) {
+      expect(Math.abs(target.left - geometry.programRow.left)).toBeLessThanOrEqual(1);
+      expect(Math.abs(target.right - geometry.programRow.right)).toBeLessThanOrEqual(1);
+    }
+
+    if (geometry.viewportWidth <= 640) {
+      expect(Math.abs(geometry.invite.left - geometry.headerContent.left)).toBeLessThanOrEqual(1);
+      expect(Math.abs(geometry.invite.right - geometry.headerContent.right)).toBeLessThanOrEqual(1);
+    } else {
+      expect(geometry.invite.left).toBeGreaterThanOrEqual(geometry.headerContent.left);
+      expect(geometry.invite.right).toBeLessThanOrEqual(geometry.headerContent.right);
+    }
+  };
+
+  const widths = [320, 360, 390, 430, 768, 1280, 1440];
+  const measurements: Array<Record<string, number | string>> = [];
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 1000 });
+    const geometry = await measureGeometry();
+    assertGeometry(geometry);
+    measurements.push({
+      theme: 'light',
+      width,
+      dividerBottom: geometry.dividerBottom,
+      headingHeight: geometry.heading.height,
+      collapseWidth: geometry.collapse.width,
+      searchFieldTop: geometry.searchField.top,
+      searchFieldBottom: geometry.searchField.bottom,
+      dividerToSearch: geometry.searchField.top - geometry.dividerBottom,
+      searchToProgramsDivider: geometry.programsDivider.top - geometry.searchField.bottom,
+      searchInputTop: geometry.searchInput.top,
+      evolutionWidth: geometry.evolution.width,
+      parentWidth: geometry.programRow.width,
+      evolutionEmptyWidth: geometry.evolutionEmpty.width,
+      evolutionSummaryWidth: geometry.evolutionSummary.width,
+      inviteWidth: geometry.invite.width,
+      pageScrollWidth: geometry.documentScrollWidth,
+    });
+  }
+
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.screenshot({
+    path: '../.artifacts/tasks/375/evidence/screenshots/coach-programs-320-light.png',
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: '../.artifacts/tasks/375/evidence/screenshots/coach-programs-390-light.png',
+    fullPage: true,
+  });
+
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 1000 });
+    const geometry = await measureGeometry();
+    assertGeometry(geometry);
+    measurements.push({
+      theme: 'dark',
+      width,
+      dividerBottom: geometry.dividerBottom,
+      headingHeight: geometry.heading.height,
+      collapseWidth: geometry.collapse.width,
+      searchFieldTop: geometry.searchField.top,
+      searchFieldBottom: geometry.searchField.bottom,
+      dividerToSearch: geometry.searchField.top - geometry.dividerBottom,
+      searchToProgramsDivider: geometry.programsDivider.top - geometry.searchField.bottom,
+      searchInputTop: geometry.searchInput.top,
+      evolutionWidth: geometry.evolution.width,
+      parentWidth: geometry.programRow.width,
+      evolutionEmptyWidth: geometry.evolutionEmpty.width,
+      evolutionSummaryWidth: geometry.evolutionSummary.width,
+      inviteWidth: geometry.invite.width,
+      pageScrollWidth: geometry.documentScrollWidth,
+    });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: '../.artifacts/tasks/375/evidence/screenshots/coach-programs-390-dark.png',
+    fullPage: true,
+  });
+
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({
+    path: '../.artifacts/tasks/375/evidence/screenshots/coach-programs-1440-light.png',
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await card.locator('input[type="search"]').fill('несуществующая программа');
+  await expect(card.getByText('Назначений не найдено', { exact: true })).toBeVisible();
+  await card.locator('input[type="search"]').fill('');
+  await expect(card.locator('.coach-program-row')).toBeVisible();
+  await card.locator(':scope > summary').click();
+  await expect(card.locator('.card-disclosure__body')).toBeHidden();
+  await card.locator(':scope > summary').click();
+  await expect(card.locator('.card-disclosure__body')).toBeVisible();
+
+  console.log(`COACH_PROGRAMS_GEOMETRY ${JSON.stringify(measurements)}`);
+});
