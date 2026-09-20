@@ -930,9 +930,9 @@ jobs:
       REPORT_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report
       REPORT_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report-metadata.json
       PUBLICATION_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-publication.json
-      ALLURE_REPORT_SSH_HOST: ${{ vars.ALLURE_REPORT_SSH_HOST || 'app.your-fitness-coach.ru' }}
-      ALLURE_REPORT_SSH_PORT: ${{ vars.ALLURE_REPORT_SSH_PORT || '22' }}
-      ALLURE_REPORT_SSH_USER: ${{ vars.ALLURE_REPORT_SSH_USER || 'yfc-allure-publisher' }}
+      ALLURE_REPORT_SSH_HOST: ${{ vars.ALLURE_REPORT_SSH_HOST }}
+      ALLURE_REPORT_SSH_PORT: ${{ vars.ALLURE_REPORT_SSH_PORT }}
+      ALLURE_REPORT_SSH_USER: ${{ vars.ALLURE_REPORT_SSH_USER }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
