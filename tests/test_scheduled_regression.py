@@ -1,6 +1,7 @@
 import ast
 import io
 import json
+import os
 import shutil
 import subprocess
 import tarfile
@@ -171,6 +172,9 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     assert "/healthz" in caddy
     assert "ALLURE_REPORT_SSH_PRIVATE_KEY" in workflow
     assert "ALLURE_REPORT_SSH_KNOWN_HOSTS" in workflow
+    assert "vars.ALLURE_REPORT_SSH_HOST ||" not in workflow
+    assert "vars.ALLURE_REPORT_SSH_PORT ||" not in workflow
+    assert "vars.ALLURE_REPORT_SSH_USER ||" not in workflow
     assert 'default: "3"' in action
     assert "ALLURE_R2" not in workflow
     assert "allure-report-worker" not in workflow
@@ -526,7 +530,7 @@ def test_publisher_streams_header_and_archive_over_ssh(monkeypatch, tmp_path: Pa
             self.stdin = CaptureStream()
             self.returncode = 0
 
-        def communicate(self) -> tuple[bytes, bytes]:
+        def communicate(self, *, timeout: int | None = None) -> tuple[bytes, bytes]:
             return (
                 (
                     json.dumps(
@@ -552,6 +556,19 @@ def test_publisher_streams_header_and_archive_over_ssh(monkeypatch, tmp_path: Pa
         return process
 
     monkeypatch.setattr(publish_allure_report.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(
+        publish_allure_report,
+        "_prepare_ssh_credentials",
+        lambda **kwargs: publish_allure_report._PreparedSSHCredentials(
+            host=kwargs["host"],
+            port=kwargs["port"],
+            user=kwargs["user"],
+            private_key_path=kwargs["temporary_root"] / "id_ed25519",
+            known_hosts_path=kwargs["temporary_root"] / "known_hosts",
+            private_key_fingerprint="SHA256:test-private",
+            host_key_fingerprint="SHA256:test-host",
+        ),
+    )
     response = publish_allure_report._publish_over_ssh(
         report_root=report_root,
         header=header,
@@ -574,6 +591,392 @@ def test_publisher_streams_header_and_archive_over_ssh(monkeypatch, tmp_path: Pa
     assert response["status"] == "published"
     assert captured["kwargs"]["shell"] is False
     assert captured["args"][-1] == "yfc-allure-publish-v1"
+
+
+def _native_ed25519_keypair(tmp_path: Path) -> tuple[str, str]:
+    if os.name != "posix":
+        pytest.skip("OpenSSH private-key permission checks require POSIX temp-file ACLs")
+    key_path = tmp_path / "publisher-key"
+    result = subprocess.run(
+        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    return (
+        key_path.read_text(encoding="utf-8"),
+        key_path.with_suffix(".pub").read_text(encoding="utf-8").strip(),
+    )
+
+
+def test_ssh_private_key_normalizes_line_endings_and_derives_safe_fingerprint(
+    tmp_path: Path,
+) -> None:
+    private_key, public_key = _native_ed25519_keypair(tmp_path)
+    normalized_input = private_key.replace("\n", "\r\n").removesuffix("\r\n")
+    fingerprint = publish_allure_report._prepare_private_key(
+        normalized_input, tmp_path / "normalized-key"
+    )
+    expected = subprocess.run(
+        ["ssh-keygen", "-lf", "-"],
+        input=public_key + "\n",
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert expected.returncode == 0
+    assert fingerprint in expected.stdout
+    assert (tmp_path / "normalized-key").read_bytes() == private_key.encode("utf-8")
+    if os.name == "posix":
+        assert (tmp_path / "normalized-key").stat().st_mode & 0o777 == 0o600
+
+
+def test_ssh_private_key_normalization_preserves_body_and_adds_only_final_lf(
+    monkeypatch, tmp_path: Path
+) -> None:
+    seen: list[bytes] = []
+
+    def fake_keygen(arguments, *, input_text=None):
+        if arguments[0] == "-y":
+            seen.append(Path(arguments[-1]).read_bytes())
+            return subprocess.CompletedProcess(arguments, 0, "ssh-ed25519 AAAA\n", "")
+        return subprocess.CompletedProcess(arguments, 0, "256 SHA256:fingerprint\n", "")
+
+    monkeypatch.setattr(publish_allure_report, "_run_ssh_keygen", fake_keygen)
+    body = "-----BEGIN OPENSSH PRIVATE KEY-----\nABC+/_=\n-----END OPENSSH PRIVATE KEY-----"
+    fingerprint = publish_allure_report._prepare_private_key(
+        body.replace("\n", "\r\n"), tmp_path / "normalized-key"
+    )
+    assert fingerprint == "SHA256:fingerprint"
+    assert seen == [body.encode() + b"\n"]
+
+
+@pytest.mark.parametrize(
+    "bad_material", ["secret\x00key", "\ufeff-----BEGIN OPENSSH PRIVATE KEY-----"]
+)
+def test_ssh_private_key_rejects_nul_and_bom_without_secret_diagnostics(
+    bad_material: str, tmp_path: Path
+) -> None:
+    with pytest.raises(publish_allure_report.SSHFailure) as raised:
+        publish_allure_report._prepare_private_key(bad_material, tmp_path / "private-key")
+    assert raised.value.failure_class == "private_key_invalid"
+    assert bad_material not in str(raised.value)
+    assert raised.value.__cause__ is None
+
+
+@pytest.mark.parametrize(
+    "bad_material", ["target.example ssh-ed25519 AAAA\x00", "\ufefftarget.example ssh-ed25519 AAAA"]
+)
+def test_known_hosts_rejects_nul_and_bom(bad_material: str, tmp_path: Path) -> None:
+    with pytest.raises(publish_allure_report.SSHFailure, match="known_hosts_invalid"):
+        publish_allure_report._prepare_known_hosts(
+            bad_material,
+            host="target.example",
+            port=1337,
+            path=tmp_path / "known_hosts",
+        )
+
+
+def test_invalid_private_key_is_classified_without_returning_keygen_stderr(
+    monkeypatch, tmp_path: Path
+) -> None:
+    secret = "PRIVATE-KEY-SENTINEL"
+    monkeypatch.setattr(
+        publish_allure_report,
+        "_run_ssh_keygen",
+        lambda arguments, *, input_text=None: subprocess.CompletedProcess(
+            arguments, 255, "", f"Load key: {secret}: error in libcrypto"
+        ),
+    )
+    with pytest.raises(publish_allure_report.SSHFailure) as raised:
+        publish_allure_report._prepare_private_key(secret, tmp_path / "private-key")
+    assert raised.value.failure_class == "private_key_invalid"
+    assert secret not in str(raised.value)
+
+
+def test_known_hosts_matches_exact_nonstandard_port_and_returns_fingerprint(
+    monkeypatch, tmp_path: Path
+) -> None:
+    def fake_keygen(arguments, *, input_text=None):
+        return subprocess.CompletedProcess(arguments, 0, "256 SHA256:hostfingerprint target\n", "")
+
+    monkeypatch.setattr(publish_allure_report, "_run_ssh_keygen", fake_keygen)
+    fingerprint = publish_allure_report._prepare_known_hosts(
+        "[target.example]:1337 ssh-ed25519 AAAA\r\n",
+        host="target.example",
+        port=1337,
+        path=tmp_path / "known_hosts",
+    )
+    assert fingerprint == "SHA256:hostfingerprint"
+    assert (tmp_path / "known_hosts").read_text(encoding="utf-8") == (
+        "[target.example]:1337 ssh-ed25519 AAAA\n"
+    )
+
+
+def test_known_hosts_rejects_missing_target_wildcard_and_malformed_entries(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        publish_allure_report,
+        "_run_ssh_keygen",
+        lambda arguments, *, input_text=None: subprocess.CompletedProcess(
+            arguments, 0, "256 SHA256:host-fingerprint target\n", ""
+        ),
+    )
+    with pytest.raises(publish_allure_report.SSHFailure, match="host_key_entry_missing"):
+        publish_allure_report._prepare_known_hosts(
+            "other.example ssh-ed25519 AAAA\n",
+            host="target.example",
+            port=1337,
+            path=tmp_path / "missing",
+        )
+    with pytest.raises(publish_allure_report.SSHFailure, match="known_hosts_invalid"):
+        publish_allure_report._prepare_known_hosts(
+            "*.example ssh-ed25519 AAAA\n",
+            host="target.example",
+            port=1337,
+            path=tmp_path / "wildcard",
+        )
+    with pytest.raises(publish_allure_report.SSHFailure, match="known_hosts_invalid"):
+        publish_allure_report._prepare_known_hosts(
+            "[target.example]:1337 ssh-ed25519\n",
+            host="target.example",
+            port=1337,
+            path=tmp_path / "malformed",
+        )
+
+
+@pytest.mark.parametrize(
+    ("stderr", "expected"),
+    [
+        ("Host key verification failed", "host_key_mismatch"),
+        ("Permission denied (publickey).", "publickey_auth_failed"),
+        ("connect to host target port 1337: Connection refused", "connection_refused"),
+        ("Connection timed out", "connection_timeout"),
+        ("No route to host", "connection_unreachable"),
+        ("opaque diagnostic", "unknown_ssh_failure"),
+    ],
+)
+def test_ssh_failure_classification_is_bounded(stderr: str, expected: str) -> None:
+    assert publish_allure_report._classify_ssh_failure(stderr=stderr) == expected
+
+
+def test_broken_pipe_preserves_internal_stderr_and_exposes_only_safe_class(
+    monkeypatch, tmp_path: Path
+) -> None:
+    secret = "PRIVATE-KEY-SENTINEL"
+
+    class BrokenPipeStream:
+        def write(self, value: bytes) -> int:
+            raise BrokenPipeError
+
+        def flush(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class BrokenPipeProcess:
+        def __init__(self) -> None:
+            self.stdin = BrokenPipeStream()
+            self.returncode = 1
+            self.killed = False
+            self.timeout = None
+
+        def communicate(self, *, timeout: int | None = None) -> tuple[bytes, bytes]:
+            self.timeout = timeout
+            return b"", f"Permission denied (publickey): {secret}\n".encode()
+
+        def kill(self) -> None:
+            self.killed = True
+
+    process = BrokenPipeProcess()
+    monkeypatch.setattr(
+        publish_allure_report,
+        "_prepare_ssh_credentials",
+        lambda **kwargs: publish_allure_report._PreparedSSHCredentials(
+            host=kwargs["host"],
+            port=kwargs["port"],
+            user=kwargs["user"],
+            private_key_path=kwargs["temporary_root"] / "id_ed25519",
+            known_hosts_path=kwargs["temporary_root"] / "known_hosts",
+            private_key_fingerprint="SHA256:test-private",
+            host_key_fingerprint="SHA256:test-host",
+        ),
+    )
+    monkeypatch.setattr(publish_allure_report.subprocess, "Popen", lambda *args, **kwargs: process)
+    with pytest.raises(publish_allure_report.SSHFailure) as raised:
+        publish_allure_report._publish_over_ssh(
+            report_root=tmp_path / "missing-report",
+            header={},
+            host="target.example",
+            port=1337,
+            user="publisher",
+            private_key=secret,
+            known_hosts="[target.example]:1337 ssh-ed25519 AAAA",
+        )
+    assert raised.value.failure_class == "publickey_auth_failed"
+    assert secret not in str(raised.value)
+    assert process.timeout == publish_allure_report._SSH_PROCESS_TIMEOUT_SECONDS
+    assert process.killed is False
+
+
+def test_ssh_process_is_killed_only_after_bounded_communicate_timeout() -> None:
+    class TimeoutProcess:
+        def __init__(self) -> None:
+            self.returncode = None
+            self.calls = 0
+            self.killed = False
+
+        def communicate(self, *, timeout: int | None = None) -> tuple[bytes, bytes]:
+            self.calls += 1
+            if self.calls == 1:
+                raise subprocess.TimeoutExpired("ssh", timeout or 0)
+            self.returncode = -9
+            return b"", b""
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def wait(self, *, timeout: int | None = None) -> int:
+            return -9
+
+    process = TimeoutProcess()
+    stdout, stderr, timed_out = publish_allure_report._communicate_bounded(process)
+    assert (stdout, stderr, timed_out) == (b"", b"", True)
+    assert process.calls == 2
+    assert process.killed is True
+
+
+def test_ssh_preflight_accepts_only_exact_forced_publisher_rejection_without_publication(
+    monkeypatch, tmp_path: Path
+) -> None:
+    captured: dict[str, object] = {}
+
+    class ProbeStream:
+        def close(self) -> None:
+            captured["stdin_closed"] = True
+
+    class ProbeProcess:
+        stdin = ProbeStream()
+        returncode = 1
+        response = b'{"status": "error", "error": "publication rejected"}\n'
+
+        def communicate(self, *, timeout: int | None = None) -> tuple[bytes, bytes]:
+            return self.response, b""
+
+        def kill(self) -> None:
+            raise AssertionError("exact preflight rejection must not be killed")
+
+    def fake_popen(arguments, **kwargs):
+        captured["arguments"] = arguments
+        captured["kwargs"] = kwargs
+        return ProbeProcess()
+
+    monkeypatch.setattr(publish_allure_report.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(
+        publish_allure_report, "_prepare_private_key", lambda value, path: "SHA256:private"
+    )
+    monkeypatch.setattr(
+        publish_allure_report,
+        "_prepare_known_hosts",
+        lambda value, *, host, port, path: "SHA256:host",
+    )
+    monkeypatch.setenv("ALLURE_REPORT_SSH_HOST", "target.example")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_PORT", "1337")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_USER", "publisher")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_PRIVATE_KEY", "private")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_KNOWN_HOSTS", "known")
+    monkeypatch.setattr(
+        publish_allure_report,
+        "_write_archive",
+        lambda *args: pytest.fail("preflight must not publish an archive"),
+    )
+    monkeypatch.setattr(
+        publish_allure_report,
+        "_write_publication",
+        lambda *args: pytest.fail("preflight must not write publication metadata"),
+    )
+
+    result = publish_allure_report.ssh_preflight()
+    assert result["ALLURE_SSH_PRIVATE_KEY_PARSE_OK"] == "yes"
+    assert result["ALLURE_SSH_KNOWN_HOSTS_MATCH"] == "yes"
+    assert result["ALLURE_SSH_AUTH_ACCEPTED"] == "yes"
+    assert result["ALLURE_SSH_FORCED_COMMAND_REACHED"] == "yes"
+    assert result["ALLURE_SSH_PREFLIGHT"] == "pass"
+    assert result["ALLURE_SSH_FAILURE_CLASS"] == "none"
+    assert captured["arguments"][-1] == publish_allure_report.PREFLIGHT_COMMAND
+    assert captured["kwargs"]["shell"] is False
+    assert captured["stdin_closed"] is True
+
+    ProbeProcess.response = b'{"status": "error", "error": "unexpected"}\n'
+    result = publish_allure_report.ssh_preflight()
+    assert result["ALLURE_SSH_PREFLIGHT"] == "fail"
+    assert result["ALLURE_SSH_FAILURE_CLASS"] == "remote_command_failed"
+
+
+def test_ssh_preflight_auth_failure_is_safe_and_fail_closed(monkeypatch) -> None:
+    class ProbeStream:
+        def close(self) -> None:
+            return None
+
+    class ProbeProcess:
+        stdin = ProbeStream()
+        returncode = 255
+
+        def communicate(self, *, timeout: int | None = None) -> tuple[bytes, bytes]:
+            return b"", b"Permission denied (publickey). PRIVATE-SENTINEL\n"
+
+        def kill(self) -> None:
+            raise AssertionError("auth failure should already be exited")
+
+    monkeypatch.setattr(
+        publish_allure_report.subprocess, "Popen", lambda *args, **kwargs: ProbeProcess()
+    )
+    monkeypatch.setattr(
+        publish_allure_report, "_prepare_private_key", lambda value, path: "SHA256:private"
+    )
+    monkeypatch.setattr(
+        publish_allure_report,
+        "_prepare_known_hosts",
+        lambda value, *, host, port, path: "SHA256:host",
+    )
+    monkeypatch.setenv("ALLURE_REPORT_SSH_HOST", "target.example")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_PORT", "1337")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_USER", "publisher")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_PRIVATE_KEY", "private")
+    monkeypatch.setenv("ALLURE_REPORT_SSH_KNOWN_HOSTS", "known")
+    result = publish_allure_report.ssh_preflight()
+    assert result["ALLURE_SSH_PREFLIGHT"] == "fail"
+    assert result["ALLURE_SSH_FAILURE_CLASS"] == "publickey_auth_failed"
+    assert result["ALLURE_SSH_PRIVATE_KEY_FINGERPRINT"] == "SHA256:private"
+    assert result["ALLURE_SSH_HOST_KEY_FINGERPRINT"] == "SHA256:host"
+
+
+def test_allure_ssh_preflight_workflow_is_manual_master_only_and_read_only() -> None:
+    workflow = (
+        Path(__file__).parents[1] / ".github" / "workflows" / "allure-ssh-preflight.yml"
+    ).read_text(encoding="utf-8")
+    assert "workflow_dispatch:" in workflow
+    assert "  push:" not in workflow
+    assert "  pull_request:" not in workflow
+    assert "  schedule:" not in workflow
+    assert "permissions:\n  contents: read" in workflow
+    assert 'python-version: "3.14"' in workflow
+    assert "ref: master" in workflow
+    assert "python scripts/publish_allure_report.py ssh-preflight" in workflow
+    assert "scripts/publish_allure_report.py publish" not in workflow
+    for name in (
+        "ALLURE_REPORT_SSH_HOST",
+        "ALLURE_REPORT_SSH_PORT",
+        "ALLURE_REPORT_SSH_USER",
+        "ALLURE_REPORT_SSH_PRIVATE_KEY",
+        "ALLURE_REPORT_SSH_KNOWN_HOSTS",
+    ):
+        assert name in workflow
 
 
 def test_report_period_uses_moscow_calendar_boundary_and_safe_paths() -> None:

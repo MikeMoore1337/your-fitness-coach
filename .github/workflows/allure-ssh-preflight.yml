@@ -1,0 +1,33 @@
+name: Allure SSH preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ssh-preflight:
+    name: Verify Allure publisher SSH boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require master ref
+        env:
+          EXPECTED_REF: refs/heads/master
+        run: test "$GITHUB_REF" = "$EXPECTED_REF"
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Run non-publishing SSH preflight
+        env:
+          ALLURE_REPORT_SSH_HOST: ${{ vars.ALLURE_REPORT_SSH_HOST }}
+          ALLURE_REPORT_SSH_PORT: ${{ vars.ALLURE_REPORT_SSH_PORT }}
+          ALLURE_REPORT_SSH_USER: ${{ vars.ALLURE_REPORT_SSH_USER }}
+          ALLURE_REPORT_SSH_PRIVATE_KEY: ${{ secrets.ALLURE_REPORT_SSH_PRIVATE_KEY }}
+          ALLURE_REPORT_SSH_KNOWN_HOSTS: ${{ secrets.ALLURE_REPORT_SSH_KNOWN_HOSTS }}
+        run: python scripts/publish_allure_report.py ssh-preflight
