@@ -551,7 +551,10 @@ export default function LandingPage() {
                     Публичные материалы помогают понять тренировочный план, ориентиры питания и
                     ограничения прогресса. Они не заменяют индивидуальную медицинскую помощь.
                   </p>
-                  <nav aria-label="Материалы о продукте и тренировках">
+                  <nav
+                    className="landing-assurance__links"
+                    aria-label="Материалы о продукте и тренировках"
+                  >
                     <AppLink to="/training">Тренировки и программы</AppLink>
                     <AppLink to="/nutrition">Питание и КБЖУ</AppLink>
                     <AppLink to="/progress">Прогресс и измерения</AppLink>
