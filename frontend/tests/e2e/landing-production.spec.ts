@@ -153,6 +153,72 @@ test('landing keeps the approved sports composition across themes and viewports'
   expect(errors).toEqual([]);
 });
 
+test('landing hero fills the desktop first viewport without horizontal overflow', async ({
+  page,
+}, testInfo) => {
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+    { width: 2560, height: 1440 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await openLanding(page, 'dark');
+    await expect(page.locator('.landing-hero')).toBeVisible();
+    await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
+    await page
+      .locator('.landing-hero__image')
+      .evaluate((element) => (element as HTMLImageElement).decode());
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    const geometry = await page.evaluate(() => {
+      const hero = document.querySelector<HTMLElement>('.landing-hero')!;
+      const nextSection = hero.nextElementSibling as HTMLElement | null;
+      const heroBounds = hero.getBoundingClientRect();
+      const nextBounds = nextSection?.getBoundingClientRect();
+      const ctaBounds = document
+        .querySelector<HTMLElement>('.landing-hero__actions')!
+        .getBoundingClientRect();
+      const platformBounds = document
+        .querySelector<HTMLElement>('.landing-hero__platform-note')!
+        .getBoundingClientRect();
+      return {
+        heroBottom: heroBounds.bottom,
+        nextTop: nextBounds?.top ?? null,
+        ctaBottom: ctaBounds.bottom,
+        platformBottom: platformBounds.bottom,
+        viewportHeight: window.innerHeight,
+        scrollTop: window.scrollY,
+      };
+    });
+
+    expect(geometry.scrollTop).toBe(0);
+    expect(geometry.heroBottom).toBeGreaterThanOrEqual(geometry.viewportHeight - 1);
+    expect(geometry.nextTop).toBeGreaterThanOrEqual(geometry.viewportHeight - 1);
+    expect(geometry.ctaBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    expect(geometry.platformBottom).toBeLessThanOrEqual(geometry.viewportHeight);
+    await expectNoHorizontalOverflow(page, viewport.width);
+    if (viewport.width === 1920 || viewport.width === 2560) {
+      await page.screenshot({
+        path: testInfo.outputPath(`landing-${viewport.width}x${viewport.height}-hero.png`),
+      });
+    }
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openLanding(page, 'dark');
+  await expect(page.locator('.landing-hero')).toBeVisible();
+  await expect(page.locator('.landing-hero__actions')).toBeVisible();
+  await expect(page.locator('.landing-hero__platform-note')).toBeVisible();
+  await expectNoHorizontalOverflow(page, 390);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: testInfo.outputPath('landing-390x844-hero.png') });
+});
+
 test('landing secondary actions keep contrast tied to their section surface', async ({
   page,
 }, testInfo) => {
