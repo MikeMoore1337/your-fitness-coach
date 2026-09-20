@@ -1,7 +1,7 @@
 import { StrictMode, lazy, Suspense, useEffect, useLayoutEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './app/AuthProvider';
+import { AuthProvider, useAuth } from './app/AuthProvider';
 import { AuthGate } from './app/AuthGate';
 import { OnboardingGate } from './app/OnboardingGate';
 import { ErrorBoundary } from './app/ErrorBoundary';
@@ -11,7 +11,13 @@ import { OnlineStatus } from './shared/ui/OnlineStatus';
 import { LoadingState } from './shared/ui/common';
 import { isTelegramLaunch } from './shared/telegram/launch';
 import { applyPlatformTheme, useTelegram } from './shared/telegram/useTelegram';
-import { NavigationProvider, Redirect, useNavigation } from './shared/navigation/router';
+import {
+  NavigationProvider,
+  PERSONAL_WORKSPACE_RETURN_STATE,
+  Redirect,
+  useNavigation,
+} from './shared/navigation/router';
+import { hasExplicitAppDestination } from './shared/auth/redirects';
 import {
   isPublicKnowledgePath,
   publicKnowledgePathFromLegacyRoute,
@@ -95,6 +101,25 @@ function AuthenticatedRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AuthenticatedAppRoute() {
+  const { user } = useAuth();
+  const { search } = useNavigation();
+  const isIntentionalPersonalReturn =
+    window.history.state?.[PERSONAL_WORKSPACE_RETURN_STATE] === true;
+  if (
+    user?.is_coach &&
+    !isIntentionalPersonalReturn &&
+    !hasExplicitAppDestination(search, window.location.hash)
+  ) {
+    return <Redirect to="/coach" />;
+  }
+  return (
+    <OnboardingGate>
+      <MiniAppPage />
+    </OnboardingGate>
+  );
+}
+
 function AppRoutes() {
   const { path } = useNavigation();
   const legacyKnowledgePath = publicKnowledgePathFromLegacyRoute(path);
@@ -149,9 +174,7 @@ function AppRoutes() {
   if (path === '/app')
     return (
       <AuthenticatedRoute>
-        <OnboardingGate>
-          <MiniAppPage />
-        </OnboardingGate>
+        <AuthenticatedAppRoute />
       </AuthenticatedRoute>
     );
   if (path === '/app/report')

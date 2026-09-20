@@ -40,7 +40,13 @@ import {
   ErrorState,
   LoadingState,
 } from '../../shared/ui/common';
-import { Redirect } from '../../shared/navigation/router';
+import {
+  coachPathForTab,
+  coachTabFromSearch,
+  Redirect,
+  useNavigation,
+  type CoachTab,
+} from '../../shared/navigation/router';
 import { LIVE_DATA_REFETCH_INTERVAL_MS } from '../../shared/sync';
 import { coachClientProfileDraftStorageKey } from '../../shared/userScopedStorage';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
@@ -71,8 +77,6 @@ import {
   needsCoachAttention,
   type CoachClientFilter,
 } from '../../features/coach/coachWorkspace';
-
-type CoachTab = 'today' | 'clients' | 'programs' | 'tools';
 
 async function loadCoachClientSummaries(): Promise<TrainerClientProgressList> {
   const limit = 100;
@@ -998,32 +1002,39 @@ export default function CoachPage({
   renderShell?: boolean;
 } = {}) {
   const { user } = useAuth();
+  const { navigate, path, search } = useNavigation();
   const runtime = useRuntime();
   const capabilities = useRuntimeCapabilities();
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
+  const searchParams = new URLSearchParams(search);
   const initialClientId = (() => {
-    const value = new URLSearchParams(window.location.search).get('client_id');
+    const value = searchParams.get('client_id');
     if (!value || !/^\d+$/.test(value)) return null;
     const clientId = Number(value);
     return Number.isSafeInteger(clientId) && clientId > 0 ? clientId : null;
   })();
-  const [tab, setTab] = useState<CoachTab>(initialClientId ? 'clients' : 'today');
+  const routeTab = initialClientId ? 'clients' : coachTabFromSearch(search);
+  const [localTab, setLocalTab] = useState<CoachTab>(routeTab);
+  const tab = runtime.kind === 'demo' ? localTab : routeTab;
   const initialWorkoutId = (() => {
-    const value = new URLSearchParams(window.location.search).get('workout_id');
+    const value = searchParams.get('workout_id');
     if (!value || !/^\d+$/.test(value)) return null;
     const workoutId = Number(value);
     return Number.isSafeInteger(workoutId) && workoutId > 0 ? workoutId : null;
   })();
   const initialAttentionFocus =
-    new URLSearchParams(window.location.search).get('focus') === 'weekly_check_in'
-      ? ('weekly_check_in' as const)
-      : null;
+    searchParams.get('focus') === 'weekly_check_in' ? ('weekly_check_in' as const) : null;
   const [selectedId, setSelectedId] = useState<number | null>(initialClientId);
-  const [clientDetailOpen, setClientDetailOpen] = useState(Boolean(initialClientId));
+  const [localClientDetailOpen, setLocalClientDetailOpen] = useState(Boolean(initialClientId));
+  const clientDetailOpen =
+    runtime.kind === 'demo' ? localClientDetailOpen : Boolean(initialClientId);
   const usefulActionStartedAt = useRef<number | null>(null);
   const usefulActionTracked = useRef(false);
-  useTelegramOverlayBackButton(clientDetailOpen, () => setClientDetailOpen(false));
+  useTelegramOverlayBackButton(clientDetailOpen, () => {
+    if (runtime.kind === 'demo') setLocalClientDetailOpen(false);
+    else navigate(coachPathForTab('clients'), true);
+  });
 
   const markDemoStep = useCallback(
     (step: 'attention' | 'client' | 'workout' | 'progress' | 'task' | 'return') => {
@@ -1126,7 +1137,8 @@ export default function CoachPage({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['coach'] });
       setSelectedId(null);
-      setClientDetailOpen(false);
+      if (runtime.kind === 'demo') setLocalClientDetailOpen(false);
+      else navigate(coachPathForTab('clients'), true);
       toast('Данные тренера обновлены');
     },
     onError: (reason) => toast((reason as Error).message, 'error'),
@@ -1220,8 +1232,10 @@ export default function CoachPage({
     }
     if (destination === 'today') markDemoStep('return');
     if (filter) setClientFilter(filter);
-    setTab(destination);
-    if (destination !== 'clients') setClientDetailOpen(false);
+    setLocalTab(destination);
+    if (destination !== 'clients') setLocalClientDetailOpen(false);
+    const nextPath = coachPathForTab(destination);
+    if (runtime.kind !== 'demo' && `${path}${search}` !== nextPath) navigate(nextPath);
   };
 
   const openClient = (clientId: number) => {
@@ -1239,8 +1253,11 @@ export default function CoachPage({
     setFocusedProgramId(null);
     setFocusedWorkoutId(null);
     setFocusedAttention(null);
-    setClientDetailOpen(true);
-    setTab('clients');
+    setLocalClientDetailOpen(true);
+    setLocalTab('clients');
+    if (runtime.kind !== 'demo') {
+      navigate(`/coach?tab=clients&client_id=${clientId}`);
+    }
   };
 
   const content = (
@@ -1250,6 +1267,7 @@ export default function CoachPage({
       <TrainerModeSwitch
         mode="clients"
         clientName={clientDetailOpen && selected ? clientDisplayName(selected) : undefined}
+        returnTo={demo ? undefined : coachPathForTab(tab)}
       />
       <header className="coach-os-header">
         <div>
@@ -1477,7 +1495,10 @@ export default function CoachPage({
                   focusedAttention={focusedAttention}
                   focusedProgramId={focusedProgramId}
                   focusedWorkoutId={focusedWorkoutId}
-                  onBack={() => setClientDetailOpen(false)}
+                  onBack={() => {
+                    if (runtime.kind === 'demo') setLocalClientDetailOpen(false);
+                    else navigate(coachPathForTab('clients'), true);
+                  }}
                   onOpenCatalog={() => navigateCoach('tools')}
                   onFocusWorkout={(workoutId) => {
                     trackCoachQuickAction('review_workout');
@@ -1559,7 +1580,7 @@ export default function CoachPage({
                             setSelectedId(item.client_id);
                             setFocusedWorkoutId(null);
                             setFocusedAttention(null);
-                            setClientDetailOpen(true);
+                            setLocalClientDetailOpen(true);
                             navigateCoach('tools');
                           }}
                         >

@@ -27,6 +27,11 @@ const task291EvidenceDir = (
     process?: { env?: Record<string, string | undefined> };
   }
 ).process?.env?.TASK_291_EVIDENCE_DIR;
+const task387EvidenceDir = (
+  globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  }
+).process?.env?.TASK_387_EVIDENCE_DIR;
 
 const clients = [
   {
@@ -311,6 +316,66 @@ async function mockCoachWorkspace(
           trainer: null,
         },
       });
+    if (path.endsWith('/workouts/today'))
+      return route.fulfill({ status: 404, json: { detail: 'На сегодня тренировка не назначена' } });
+    if (path.endsWith('/workouts/week') || path.endsWith('/workouts/cardio'))
+      return route.fulfill({ json: [] });
+    if (path.endsWith('/workouts/progress/summary'))
+      return route.fulfill({
+        json: {
+          user_id: 1,
+          period_days: 30,
+          period_start: '2026-08-01',
+          period_end: '2026-08-30',
+          training: { completed_workouts: 0, last_completed_workout_on: null, next_workout: null },
+          nutrition: { visible: false },
+          body: { latest_measurement: null, trends: [], priority: null, guidance: {} },
+          adherence: {
+            formula_version: 'adherence-v1',
+            overall_percent: null,
+            included_components: [],
+            workouts: {},
+            cardio: {},
+            calories: {},
+            protein: {},
+          },
+          data_sufficiency: {},
+        },
+      });
+    if (path.endsWith('/nutrition/diary'))
+      return route.fulfill({
+        json: {
+          diary_date: url.searchParams.get('diary_date') ?? '2026-08-30',
+          timezone: 'Europe/Moscow',
+          meals: [],
+          totals: {
+            energy_kcal: '0',
+            protein_g: '0',
+            fat_g: '0',
+            carbs_g: '0',
+            fiber_g: null,
+          },
+          targets: null,
+          remaining: null,
+        },
+      });
+    if (path.endsWith('/nutrition/hydration'))
+      return route.fulfill({
+        json: {
+          diary_date: url.searchParams.get('diary_date') ?? '2026-08-30',
+          timezone: 'Europe/Moscow',
+          total_ml: 0,
+          goal: null,
+          progress_percent: null,
+          entries: [],
+          presets: [],
+          last_logged_at: null,
+          reminder_suppression_key: null,
+          action_url: '/app?section=nutrition',
+        },
+      });
+    if (path.endsWith('/check-ins/weekly/current'))
+      return route.fulfill({ json: { existing: false } });
     if (path.endsWith('/coach/client-summaries'))
       return route.fulfill({
         json: {
@@ -563,6 +628,11 @@ async function captureTask291Evidence(page: Page, name: string) {
   await page.screenshot({ path: `${task291EvidenceDir}/${name}.png`, fullPage: true });
 }
 
+async function captureTask387Evidence(page: Page, name: string) {
+  if (!task387EvidenceDir) return;
+  await page.screenshot({ path: `${task387EvidenceDir}/${name}.png`, fullPage: true });
+}
+
 async function assertCoachNavigationFits(page: Page, width: number) {
   await page.setViewportSize({ width, height: 844 });
   const navigation = page.getByRole('navigation', { name: 'Разделы тренера' });
@@ -810,6 +880,76 @@ test('Task 291 показывает все четыре trainer destinations н�
     await assertCoachNavigationFits(page, width);
     await captureTask291Evidence(page, `trainer-navigation-${width}-light`);
   }
+});
+
+test('Stage 1 сохраняет trainer-first entry и явное переключение рабочего контекста', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCoachWorkspace(page, { attention: 'actionable' });
+
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Тренер', exact: true }).click();
+  await expect(page).toHaveURL('/coach');
+  await expect(page.getByRole('heading', { name: 'Сегодня', exact: true })).toBeVisible();
+
+  await page.goto('/app?section=nutrition');
+  await expect(page).toHaveURL('/app?section=nutrition');
+  await expect(page.getByRole('link', { name: 'В кабинет тренера', exact: true })).toHaveAttribute(
+    'href',
+    '/coach',
+  );
+
+  await page.goto('/app');
+  await expect(page).toHaveURL('/coach');
+  const primaryNavigation = page.getByRole('navigation', { name: 'Основная навигация' });
+  await expect(primaryNavigation.getByRole('link', { name: 'Сегодня', exact: true })).toBeVisible();
+  await expect(primaryNavigation.getByRole('link', { name: 'Клиенты', exact: true })).toBeVisible();
+  await expect(
+    primaryNavigation.getByRole('link', { name: 'Программы', exact: true }),
+  ).toBeVisible();
+  await expect(primaryNavigation.getByRole('link', { name: 'Ещё', exact: true })).toBeVisible();
+  await expect(primaryNavigation.getByRole('link', { name: 'Для себя', exact: true })).toHaveCount(
+    0,
+  );
+  await captureTask387Evidence(page, '390-light-trainer');
+
+  await primaryNavigation.getByRole('link', { name: 'Программы', exact: true }).click();
+  await expect(page).toHaveURL('/coach?tab=programs');
+  await expect(page.getByRole('heading', { name: 'Кабинет тренера', exact: true })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Для себя', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\?section=today&trainer_return=/);
+  expect(new URL(page.url()).searchParams.get('trainer_return')).toBe('/coach?tab=programs');
+  await expect(page.getByRole('link', { name: 'В кабинет тренера', exact: true })).toHaveAttribute(
+    'href',
+    '/coach?tab=programs',
+  );
+  await captureTask387Evidence(page, '390-personal-after-switch');
+
+  await page.getByRole('link', { name: 'Питание', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\?section=nutrition&trainer_return=/);
+  expect(new URL(page.url()).searchParams.get('trainer_return')).toBe('/coach?tab=programs');
+  await page.getByRole('link', { name: 'В кабинет тренера', exact: true }).click();
+  await expect(page).toHaveURL('/coach?tab=programs');
+
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Кабинет тренера', exact: true })).toBeVisible();
+  await captureTask387Evidence(page, '390-dark-trainer');
+
+  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
+  await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#appMorePanel')).toBeHidden();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await captureTask387Evidence(page, '1440-trainer');
+
+  await page.setViewportSize({ width: 320, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
+  await captureTask387Evidence(page, '320-narrow');
 });
 
 test('Task 291 сохраняет плотную desktop-композицию и Light/Dark контраст', async ({ page }) => {
