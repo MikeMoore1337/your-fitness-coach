@@ -214,6 +214,58 @@ def test_contextual_sync_skips_quiet_and_missed_slots_without_catch_up(monkeypat
         assert db.query(Notification).filter(Notification.user_id == user.id).count() == 0
 
 
+def test_contextual_scheduler_cancellation_reactivates_but_terminal_does_not(monkeypatch) -> None:
+    fixed_now = datetime(2026, 8, 24, 9)
+    monkeypatch.setattr(reminder_templates, "now_for_user_naive", lambda _user: fixed_now)
+
+    with get_session_context() as db:
+        user = User(telegram_user_id=84_006, is_coach=False)
+        db.add(user)
+        db.flush()
+        db.add(UserProfile(user_id=user.id, timezone="Europe/Moscow"))
+        setting = NotificationSetting(user_id=user.id, meal_reminders_enabled=True)
+        db.add(setting)
+        db.add(
+            ReminderTemplateSchedule(
+                user_id=user.id,
+                template_key="meal_logging",
+                template_version="v1",
+                weekdays=[0],
+                schedule_times=["10:00:00"],
+                max_per_day=1,
+                minimum_spacing_minutes=120,
+            )
+        )
+        db.commit()
+
+        assert reminder_templates.sync_contextual_reminders(db) == 1
+        reminder = db.query(Notification).filter(Notification.user_id == user.id).one()
+
+        setting.meal_reminders_enabled = False
+        db.commit()
+        assert reminder_templates.sync_contextual_reminders(db) == 0
+        db.refresh(reminder)
+        assert reminder.status == "cancelled"
+        assert reminder.last_error == "contextual_reminder_not_due"
+
+        setting.meal_reminders_enabled = True
+        db.commit()
+        assert reminder_templates.sync_contextual_reminders(db) == 0
+        db.refresh(reminder)
+        assert reminder.status == "queued"
+        assert reminder.last_error is None
+
+        reminder.status = "cancelled"
+        reminder.attempt_count = 1
+        reminder.last_error = "telegram_chat_unavailable"
+        db.commit()
+        assert reminder_templates.sync_contextual_reminders(db) == 0
+        db.refresh(reminder)
+        assert reminder.status == "cancelled"
+        assert reminder.attempt_count == 1
+        assert reminder.last_error == "telegram_chat_unavailable"
+
+
 def test_contextual_dedupe_is_scoped_per_user(monkeypatch) -> None:
     fixed_now = datetime(2026, 3, 8, 7)
     monkeypatch.setattr(reminder_templates, "now_for_user_naive", lambda _user: fixed_now)

@@ -20,6 +20,7 @@ from fitminiapp_api.models.notification import Notification, NotificationSetting
 from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.schemas.notification import ReminderTemplateUpdate
+from fitminiapp_api.services.notifications import can_scheduler_reactivate_cancelled_notification
 
 ReminderTemplateKey = Literal["meal_logging", "hydration", "movement_break"]
 ScheduleKind = Literal["times", "interval"]
@@ -618,7 +619,10 @@ def sync_contextual_reminders(db: Session) -> int:
         existing_row = existing_by_user_key.get((user.id, dedupe_key))
         scheduled_for_utc = local_naive_to_utc_naive(scheduled_for, timezone)
         if existing_row is not None:
-            if existing_row.status in {"queued", "cancelled"}:
+            if existing_row.status == "queued" or (
+                existing_row.status == "cancelled"
+                and can_scheduler_reactivate_cancelled_notification(existing_row)
+            ):
                 was_cancelled = existing_row.status == "cancelled"
                 existing_row.status = "queued"
                 existing_row.scheduled_for = scheduled_for

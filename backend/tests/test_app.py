@@ -3098,7 +3098,7 @@ def test_workout_reminders_are_deduplicated_claimed_and_retried(client, monkeypa
 
         rows[0].status = "cancelled"
         rows[0].attempt_count = 3
-        rows[0].last_error = "disabled"
+        rows[0].last_error = "workout_reminder_invalidated"
         rows[0].next_attempt_at = fixed_utc_now
         session.commit()
         assert sync_workout_reminders(session) == 0

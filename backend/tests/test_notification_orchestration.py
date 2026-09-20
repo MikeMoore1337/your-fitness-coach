@@ -1,21 +1,24 @@
 import asyncio
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
 
 from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.models.check_in import WeeklyCheckIn
 from fitminiapp_api.models.notification import Notification, NotificationSetting
 from fitminiapp_api.models.program import ProgramTemplate, UserProgram, UserWorkout
 from fitminiapp_api.models.user import BodyMeasurement, User, UserProfile
 from fitminiapp_api.services import notifications as notification_service
 from fitminiapp_api.services import worker
 from fitminiapp_api.services.notifications import (
+    can_scheduler_reactivate_cancelled_notification,
     cancel_workout_reminder,
     neutral_telegram_text,
     quiet_hours_retry_at,
     reminder_category_enabled,
     sync_measurement_reminders,
+    sync_weekly_check_in_reminders,
     sync_workout_reminders,
 )
 
@@ -104,6 +107,53 @@ def test_each_optional_reminder_category_is_rechecked_before_delivery(
     assert reminder_category_enabled(event, setting) is True
 
 
+@pytest.mark.parametrize(
+    ("last_error", "expected"),
+    [
+        ("workout_reminder_invalidated", True),
+        (None, True),
+        ("telegram_chat_unavailable", False),
+        ("telegram_http_status:400", False),
+        ("unknown_cancellation", False),
+    ],
+)
+def test_scheduler_reactivation_policy_is_semantic_and_fail_closed(
+    last_error: str | None,
+    expected: bool,
+) -> None:
+    notification = Notification(
+        user_id=1,
+        category="workout_reminder",
+        event_kind="reminder",
+        title="Reminder",
+        body="Body",
+        scheduled_for=datetime(2026, 8, 24, 9),
+        scheduled_for_utc=datetime(2026, 8, 24, 6),
+        status="cancelled",
+        last_error=last_error,
+        dedupe_key="workout:1:reminder",
+    )
+
+    assert can_scheduler_reactivate_cancelled_notification(notification) is expected
+
+
+def test_scheduler_reactivation_policy_rejects_non_reminder_events() -> None:
+    notification = Notification(
+        user_id=1,
+        category="workout_reminder",
+        event_kind="security",
+        title="Security",
+        body="Body",
+        scheduled_for=datetime(2026, 8, 24, 9),
+        scheduled_for_utc=datetime(2026, 8, 24, 6),
+        status="cancelled",
+        last_error="workout_reminder_invalidated",
+        dedupe_key="workout:1:reminder",
+    )
+
+    assert can_scheduler_reactivate_cancelled_notification(notification) is False
+
+
 def test_workout_reminder_uses_exact_time_reschedules_and_cancels(monkeypatch) -> None:
     fixed_now = datetime(2026, 3, 9, 10)
     monkeypatch.setattr(notification_service, "now_for_user_naive", lambda _user: fixed_now)
@@ -148,9 +198,11 @@ def test_workout_reminder_uses_exact_time_reschedules_and_cancels(monkeypatch) -
         session.commit()
         session.refresh(reminder)
         assert reminder.status == "cancelled"
+        assert reminder.last_error == "workout_reminder_invalidated"
         assert sync_workout_reminders(session) == 0
         session.refresh(reminder)
         assert reminder.scheduled_for == datetime(2026, 3, 10, 17)
+        assert reminder.last_error is None
 
         workout.status = "completed"
         session.commit()
@@ -195,6 +247,173 @@ def test_measurement_reminder_is_optional_deduplicated_and_cancelled(monkeypatch
         assert sync_measurement_reminders(session) == 0
         session.refresh(reminder)
         assert reminder.status == "cancelled"
+        assert reminder.last_error == "measurement_reminder_not_due"
+
+        session.query(BodyMeasurement).filter(BodyMeasurement.user_id == user_id).delete()
+        session.commit()
+        assert sync_measurement_reminders(session) == 0
+        session.refresh(reminder)
+        assert reminder.status == "queued"
+        assert reminder.last_error is None
+
+
+def test_weekly_check_in_scheduler_cancellation_reactivates(monkeypatch) -> None:
+    local_day = date(2026, 8, 24)
+    monkeypatch.setattr(notification_service, "today_in_timezone", lambda _timezone: local_day)
+
+    with get_session_context() as session:
+        user = User(telegram_user_id=86408, is_coach=False)
+        session.add(user)
+        session.flush()
+        session.add(UserProfile(user_id=user.id, timezone="Europe/Moscow"))
+        session.add(NotificationSetting(user_id=user.id, reminder_hour=9))
+        session.commit()
+        user_id = user.id
+
+        assert sync_weekly_check_in_reminders(session) >= 1
+        reminder = (
+            session.query(Notification)
+            .filter(Notification.dedupe_key.like(f"weekly_check_in:{user_id}:%"))
+            .one()
+        )
+        week_start = local_day - timedelta(days=local_day.weekday())
+        session.add(
+            WeeklyCheckIn(
+                user_id=user_id,
+                week_start=week_start,
+                week_end=week_start + timedelta(days=6),
+                submitted_on=local_day,
+                timezone="Europe/Moscow",
+                status="completed",
+                summary_version="v1",
+                summary={},
+            )
+        )
+        session.commit()
+
+        assert sync_weekly_check_in_reminders(session) == 0
+        session.refresh(reminder)
+        assert reminder.status == "cancelled"
+        assert reminder.last_error == "weekly_check_in_not_due"
+
+        session.query(WeeklyCheckIn).filter(WeeklyCheckIn.user_id == user_id).delete()
+        session.commit()
+        assert sync_weekly_check_in_reminders(session) == 0
+        session.refresh(reminder)
+        assert reminder.status == "queued"
+        assert reminder.last_error is None
+
+
+def test_workout_terminal_delivery_cancellation_is_not_reactivated(monkeypatch) -> None:
+    fixed_now = datetime(2026, 8, 24, 10)
+    monkeypatch.setattr(notification_service, "now_for_user_naive", lambda _user: fixed_now)
+
+    with get_session_context() as session:
+        user = User(telegram_user_id=86409, is_coach=False)
+        session.add(user)
+        session.flush()
+        session.add(UserProfile(user_id=user.id, timezone="Europe/Moscow"))
+        session.add(NotificationSetting(user_id=user.id))
+        template = session.query(ProgramTemplate).first()
+        assert template is not None
+        program = UserProgram(user_id=user.id, template_id=template.id, is_active=True)
+        session.add(program)
+        session.flush()
+        workout = UserWorkout(
+            user_program_id=program.id,
+            scheduled_date=fixed_now.date(),
+            scheduled_time=time(18),
+            day_number=1,
+            title="Тренировка",
+            status="planned",
+        )
+        session.add(workout)
+        session.flush()
+        assert sync_workout_reminders(session) == 1
+        reminder = (
+            session.query(Notification).filter_by(dedupe_key=f"workout:{workout.id}:reminder").one()
+        )
+        reminder.status = "cancelled"
+        reminder.attempt_count = 1
+        reminder.last_error = "telegram_chat_unavailable"
+        reminder.next_attempt_at = None
+        reminder.processing_started_at = None
+        session.commit()
+
+        assert sync_workout_reminders(session) == 0
+        session.refresh(reminder)
+        assert reminder.status == "cancelled"
+        assert reminder.attempt_count == 1
+        assert reminder.last_error == "telegram_chat_unavailable"
+        assert reminder.next_attempt_at is None
+
+
+def test_weekly_check_in_terminal_delivery_cancellation_is_not_reactivated(monkeypatch) -> None:
+    local_day = date(2026, 8, 24)
+    monkeypatch.setattr(notification_service, "today_in_timezone", lambda _timezone: local_day)
+
+    with get_session_context() as session:
+        user = User(telegram_user_id=86410, is_coach=False)
+        session.add(user)
+        session.flush()
+        session.add(UserProfile(user_id=user.id, timezone="Europe/Moscow"))
+        session.add(NotificationSetting(user_id=user.id, reminder_hour=9))
+        session.commit()
+        assert sync_weekly_check_in_reminders(session) >= 1
+        reminder = (
+            session.query(Notification)
+            .filter(Notification.dedupe_key.like(f"weekly_check_in:{user.id}:%"))
+            .one()
+        )
+        reminder.status = "cancelled"
+        reminder.attempt_count = 1
+        reminder.last_error = "telegram_chat_unavailable"
+        reminder.next_attempt_at = None
+        session.commit()
+
+        assert sync_weekly_check_in_reminders(session) == 0
+        session.refresh(reminder)
+        assert reminder.status == "cancelled"
+        assert reminder.attempt_count == 1
+        assert reminder.last_error == "telegram_chat_unavailable"
+
+
+def test_measurement_terminal_delivery_cancellation_is_not_reactivated(monkeypatch) -> None:
+    local_day = date(2026, 8, 24)
+    monkeypatch.setattr(notification_service, "today_in_timezone", lambda _timezone: local_day)
+
+    with get_session_context() as session:
+        user = User(telegram_user_id=86411, is_coach=False)
+        session.add(user)
+        session.flush()
+        session.add(UserProfile(user_id=user.id, timezone="Europe/Moscow"))
+        session.add(
+            NotificationSetting(
+                user_id=user.id,
+                measurement_reminders_enabled=True,
+                reminder_hour=9,
+            )
+        )
+        session.commit()
+        assert sync_measurement_reminders(session) == 1
+        reminder = (
+            session.query(Notification)
+            .filter(
+                Notification.user_id == user.id, Notification.category == "measurement_reminder"
+            )
+            .one()
+        )
+        reminder.status = "cancelled"
+        reminder.attempt_count = 1
+        reminder.last_error = "telegram_chat_unavailable"
+        reminder.next_attempt_at = None
+        session.commit()
+
+        assert sync_measurement_reminders(session) == 0
+        session.refresh(reminder)
+        assert reminder.status == "cancelled"
+        assert reminder.attempt_count == 1
+        assert reminder.last_error == "telegram_chat_unavailable"
 
 
 def test_quiet_hours_cross_midnight_and_use_account_timezone() -> None:

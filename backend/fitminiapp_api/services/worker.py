@@ -181,10 +181,21 @@ def _log_delivery_failure(
         extra["notification_category"] = category
     if outcome is not None:
         extra["outcome"] = outcome
-    logger.error("notification_delivery_failed", extra=extra)
+    terminal_cancelled = outcome == "cancelled" or (
+        isinstance(error, NotificationDeliveryError) and error.terminal_status == "cancelled"
+    )
+    if terminal_cancelled:
+        logger.warning("notification_delivery_cancelled", extra=extra)
+    else:
+        logger.error("notification_delivery_failed", extra=extra)
 
 
-def _log_delivery_completed(notification_id: int, category: str) -> None:
+def _log_delivery_completed(
+    notification_id: int,
+    category: str,
+    *,
+    provider: str = "web_push",
+) -> None:
     notification_ref = hmac.new(
         settings.secret_key.encode("utf-8"),
         str(notification_id).encode("ascii"),
@@ -195,7 +206,7 @@ def _log_delivery_completed(notification_id: int, category: str) -> None:
         extra={
             "notification_ref": f"notification:{notification_ref}",
             "notification_category": category,
-            "provider": "web_push",
+            "provider": provider,
             "outcome": "sent",
         },
     )
@@ -773,12 +784,28 @@ async def run_once(*, sync_reminders: bool = True) -> None:
                         user = delivered_users.get(delivered_row.user_id)
                         if user is not None and user.is_active:
                             mark_delivery_succeeded(db, delivered_row, user, commit=False)
+                            _log_delivery_completed(
+                                delivered_row.id,
+                                delivered_row.category,
+                                provider="telegram",
+                            )
                         else:
                             delivered_row.status = "cancelled"
                             delivered_row.processing_started_at = None
                     else:
                         mark_delivery_failed(db, delivered_row, error, commit=False)
-                        _log_delivery_failure(delivered_row.id, error)
+                        outcome = {
+                            "queued": "retry",
+                            "cancelled": "cancelled",
+                            "failed": "failed",
+                        }.get(delivered_row.status, "failed")
+                        _log_delivery_failure(
+                            delivered_row.id,
+                            error,
+                            provider="telegram",
+                            category=delivered_row.category,
+                            outcome=outcome,
+                        )
                 db.commit()
 
     await _run_web_push_delivery_batch()
