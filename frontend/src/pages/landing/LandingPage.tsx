@@ -335,7 +335,14 @@ export default function LandingPage() {
               <p className="landing-kicker">{feature.label}</p>
               <h2>{index === 0 ? 'Питание без догадок.' : 'Замечай своё движение.'}</h2>
               <p>{feature.text}</p>
-              <AppLink className="landing-button landing-button--secondary" to={feature.href}>
+              <AppLink
+                className={`landing-button landing-button--secondary ${
+                  index === 0
+                    ? 'landing-button--secondary-on-light'
+                    : 'landing-button--secondary-on-dark'
+                }`}
+                to={feature.href}
+              >
                 {feature.linkLabel}
               </AppLink>
             </div>
@@ -391,23 +398,25 @@ export default function LandingPage() {
               конкретному следующему действию. Платёжный процессинг и публичный профиль остаются за
               пределами продукта.
             </p>
-            <AppLink
-              className="landing-button"
-              to="/for-trainers"
-              onClick={() => trackTrainerCta('onboarding')}
-            >
-              Открыть путь для тренера <Icon name="arrow-right" size={20} />
-            </AppLink>
-            <a
-              className="landing-button landing-button--secondary"
-              href={cabinetScenarioUrl(demoUrl, 'trainer')}
-              onClick={() => {
-                trackTrainerCta('demo');
-                trackDemoSelection('section', 'trainer');
-              }}
-            >
-              Посмотреть демо кабинета <Icon name="arrow-right" size={20} />
-            </a>
+            <div className="landing-trainer__actions">
+              <AppLink
+                className="landing-button"
+                to="/for-trainers"
+                onClick={() => trackTrainerCta('onboarding')}
+              >
+                Открыть путь для тренера <Icon name="arrow-right" size={20} />
+              </AppLink>
+              <a
+                className="landing-button landing-button--secondary landing-button--secondary-on-light"
+                href={cabinetScenarioUrl(demoUrl, 'trainer')}
+                onClick={() => {
+                  trackTrainerCta('demo');
+                  trackDemoSelection('section', 'trainer');
+                }}
+              >
+                Посмотреть демо кабинета <Icon name="arrow-right" size={20} />
+              </a>
+            </div>
           </div>
           <img
             className="landing-trainer__proof"
@@ -597,7 +606,7 @@ export default function LandingPage() {
               Открыть приложение <Icon name="arrow-right" size={20} />
             </a>
             <a
-              className="landing-button landing-button--secondary"
+              className="landing-button landing-button--secondary landing-button--secondary-on-dark"
               href={cabinetScenarioUrl(demoUrl, 'self_training')}
               onClick={() => trackDemoSelection('section', 'self_training')}
             >

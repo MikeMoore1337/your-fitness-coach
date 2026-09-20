@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { strengthFrame } from '../../../../src/pages/landing/StrengthScene';
+import { strengthFrame, strengthProgress } from '../../../../src/pages/landing/StrengthScene';
 
 describe('approved scroll sequence', () => {
+  it('maps the sticky scene to a bounded scroll range', () => {
+    expect(strengthProgress(0, 300, 100)).toBe(0);
+    expect(strengthProgress(-100, 300, 100)).toBeCloseTo(0.5);
+    expect(strengthProgress(-300, 300, 100)).toBe(1);
+    expect(Number.isFinite(strengthProgress(-1, 100, 100))).toBe(true);
+  });
+
   it('finishes the lift before recording the third repetition', () => {
     expect(strengthFrame(0)).toEqual({ phase: 0, lift: 0, count: 2, result: 0 });
     expect(strengthFrame(0.47).count).toBe(2);
