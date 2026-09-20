@@ -1,24 +1,20 @@
 .strength-scene {
-  min-height: 0;
+  min-height: 225svh;
   background: #fff;
   color: #101212;
   padding: 0 5vw;
 }
 .strength-scene__sticky {
-  position: relative;
-  height: auto;
-  min-height: 0;
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  min-height: 100svh;
   display: grid;
   align-content: center;
   gap: 16px;
   padding-block: clamp(32px, 5vw, 56px);
   max-width: 1350px;
   margin: auto;
-}
-@media (prefers-reduced-motion: reduce) {
-  .strength-scene__sticky {
-    padding-block: 40px;
-  }
 }
 .landing-page .strength-scene__copy h2 {
   font: 700 32px/1.04 var(--font-display);
@@ -159,6 +155,11 @@
     height: clamp(260px, 50svh, 480px);
   }
 }
+@media (max-width: 850px) {
+  .strength-scene {
+    min-height: 200svh;
+  }
+}
 @media (max-height: 650px) and (max-width: 850px) {
   .strength-scene__copy > p:last-child {
     display: none;
@@ -174,5 +175,17 @@
   }
   .strength-scene__record {
     min-height: 64px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .strength-scene {
+    min-height: 0;
+  }
+  .strength-scene__sticky {
+    position: relative;
+    top: auto;
+    height: auto;
+    min-height: 0;
+    padding-block: 40px;
   }
 }

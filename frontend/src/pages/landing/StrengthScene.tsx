@@ -3,6 +3,10 @@ import { useEffect, useRef } from 'react';
 import './strength-scene.css';
 
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
+export function strengthProgress(sectionTop: number, sectionHeight: number, stickyHeight: number) {
+  return clamp(-sectionTop / Math.max(1, sectionHeight - stickyHeight));
+}
+
 export function strengthFrame(progress: number) {
   const lift = clamp((progress - 0.06) / 0.42);
   return {
@@ -35,10 +39,15 @@ export function StrengthScene() {
       const bounds = node!.getBoundingClientRect();
       const target = media?.matches
         ? 1
-        : clamp(-bounds.top / Math.max(1, node!.offsetHeight - sticky.offsetHeight));
+        : strengthProgress(bounds.top, node!.offsetHeight, sticky.offsetHeight);
       const delta = previous === null ? 16 : Math.min(40, Math.max(0, time - previous));
       previous = time;
-      if (displayed === null || media?.matches || bounds.bottom < 0 || bounds.top > innerHeight)
+      if (
+        displayed === null ||
+        media?.matches ||
+        bounds.bottom < 0 ||
+        bounds.top > window.innerHeight
+      )
         displayed = target;
       const gap = target - displayed;
       displayed +=

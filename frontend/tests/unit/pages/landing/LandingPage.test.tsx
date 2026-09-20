@@ -77,6 +77,24 @@ describe('LandingPage', () => {
     expect(screen.getByText(/Данные подготовленных демо-сценариев отделены/)).toBeInTheDocument();
   });
 
+  it('binds secondary actions to their fixed visual surfaces', () => {
+    const { container } = renderLanding();
+
+    expect(container.querySelector('.landing-feature--0 .landing-button')).toHaveClass(
+      'landing-button--secondary-on-light',
+    );
+    expect(container.querySelector('.landing-feature--1 .landing-button')).toHaveClass(
+      'landing-button--secondary-on-dark',
+    );
+    expect(container.querySelector('.landing-trainer__actions')).toHaveClass(
+      'landing-trainer__actions',
+    );
+    expect(container.querySelectorAll('.landing-trainer__actions .landing-button')).toHaveLength(2);
+    expect(
+      container.querySelector('.landing-contact__actions .landing-button--secondary'),
+    ).toHaveClass('landing-button--secondary-on-dark');
+  });
+
   it('loads hero eagerly and the paired below-fold photographs lazily', () => {
     renderLanding();
     expect(screen.getByAltText('Спортсменка толкает тренировочные сани')).toHaveAttribute(
