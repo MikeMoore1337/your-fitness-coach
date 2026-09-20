@@ -58,6 +58,27 @@ ALLOWED_NOTIFICATION_QUERY_KEYS = frozenset(
     }
 )
 ALLOWED_NOTIFICATION_SECTIONS = frozenset({"today", "progress", "programs", "nutrition", "profile"})
+SCHEDULER_CANCELLATION_REASONS = frozenset(
+    {
+        "workout_reminder_invalidated",
+        "workout_reminder_not_due",
+        "workout_reminders_disabled",
+        "weekly_check_in_not_due",
+        "weekly_check_in_reminders_disabled",
+        "measurement_reminder_not_due",
+        "measurement_reminders_disabled",
+        "contextual_reminder_disabled",
+        "contextual_reminder_not_due",
+    }
+)
+_LEGACY_SCHEDULER_REMINDER_KEYS = (
+    ("workout_reminder", "workout:"),
+    ("weekly_check_in_reminder", "weekly_check_in:"),
+    ("measurement_reminder", "measurement:"),
+    ("meal_logging_reminder", "contextual:"),
+    ("hydration_reminder", "contextual:"),
+    ("movement_break_reminder", "contextual:"),
+)
 
 
 class NotificationDeliveryError(RuntimeError):
@@ -74,6 +95,21 @@ class NotificationDeliveryError(RuntimeError):
         self.code = code
         self.retry_after = retry_after
         self.terminal_status = terminal_status
+
+
+def can_scheduler_reactivate_cancelled_notification(notification: Notification) -> bool:
+    """Allow only scheduler-owned cancellation state to become queued again."""
+    if notification.status != "cancelled" or notification.event_kind != "reminder":
+        return False
+    if notification.last_error in SCHEDULER_CANCELLATION_REASONS:
+        return True
+    if notification.last_error is not None:
+        return False
+    dedupe_key = notification.dedupe_key or ""
+    return any(
+        notification.category == category and dedupe_key.startswith(prefix)
+        for category, prefix in _LEGACY_SCHEDULER_REMINDER_KEYS
+    )
 
 
 def normalize_notification_action_url(action_url: str | None) -> str | None:
@@ -498,7 +534,10 @@ def sync_workout_reminders(db: Session) -> int:
         dedupe_key = f"workout:{workout.id}:reminder"
         existing_notification = reminders_by_key.get(dedupe_key)
         if existing_notification:
-            if existing_notification.status in {"queued", "cancelled"}:
+            if existing_notification.status == "queued" or (
+                existing_notification.status == "cancelled"
+                and can_scheduler_reactivate_cancelled_notification(existing_notification)
+            ):
                 was_cancelled = existing_notification.status == "cancelled"
                 existing_notification.status = "queued"
                 existing_notification.scheduled_for = scheduled_for
@@ -532,8 +571,16 @@ def sync_workout_reminders(db: Session) -> int:
     for user_id, notifications in queued_by_user.items():
         setting, _, _ = settings_by_user[user_id]
         for notification in notifications:
-            if not setting.workout_reminders_enabled or notification.dedupe_key not in active_keys:
-                notification.status = "cancelled"
+            if setting.workout_reminders_enabled and notification.dedupe_key in active_keys:
+                continue
+            notification.status = "cancelled"
+            notification.last_error = (
+                "workout_reminders_disabled"
+                if not setting.workout_reminders_enabled
+                else "workout_reminder_not_due"
+            )
+            notification.processing_started_at = None
+            notification.next_attempt_at = None
 
     try:
         db.commit()
@@ -577,6 +624,7 @@ def sync_weekly_check_in_reminders(db: Session) -> int:
         return 0
 
     week_by_user: dict[int, tuple[date, date]] = {}
+    settings_by_user = {user.id: setting for setting, user, _timezone in rows}
     for _setting, user, timezone in rows:
         local_day = today_in_timezone(timezone)
         week_start = local_day - timedelta(days=local_day.weekday())
@@ -628,7 +676,10 @@ def sync_weekly_check_in_reminders(db: Session) -> int:
     for dedupe_key, (user, timezone, scheduled_for) in active.items():
         existing = reminders_by_key.get(dedupe_key)
         if existing:
-            if existing.status in {"queued", "cancelled"}:
+            if existing.status == "queued" or (
+                existing.status == "cancelled"
+                and can_scheduler_reactivate_cancelled_notification(existing)
+            ):
                 was_cancelled = existing.status == "cancelled"
                 existing.status = "queued"
                 existing.scheduled_for = scheduled_for
@@ -659,6 +710,14 @@ def sync_weekly_check_in_reminders(db: Session) -> int:
     for reminder in reminders:
         if reminder.status == "queued" and reminder.dedupe_key not in active_keys:
             reminder.status = "cancelled"
+            setting = settings_by_user.get(reminder.user_id)
+            reminder.last_error = (
+                "weekly_check_in_reminders_disabled"
+                if setting is not None and not setting.weekly_check_in_reminders_enabled
+                else "weekly_check_in_not_due"
+            )
+            reminder.processing_started_at = None
+            reminder.next_attempt_at = None
 
     try:
         db.commit()
@@ -688,6 +747,7 @@ def sync_measurement_reminders(db: Session) -> int:
         .all(),
     )
     last_measurement_by_user: dict[int, date] = dict(last_measurement_rows)
+    settings_by_user = {user.id: setting for setting, user, _timezone in rows}
     active: dict[str, tuple[User, str | None, datetime]] = {}
     for setting, user, timezone in rows:
         local_day = today_in_timezone(timezone)
@@ -718,7 +778,10 @@ def sync_measurement_reminders(db: Session) -> int:
     for dedupe_key, (user, timezone, scheduled_for) in active.items():
         existing = reminders_by_key.get(dedupe_key)
         if existing:
-            if existing.status in {"queued", "cancelled"}:
+            if existing.status == "queued" or (
+                existing.status == "cancelled"
+                and can_scheduler_reactivate_cancelled_notification(existing)
+            ):
                 was_cancelled = existing.status == "cancelled"
                 existing.status = "queued"
                 existing.scheduled_for = scheduled_for
@@ -749,6 +812,14 @@ def sync_measurement_reminders(db: Session) -> int:
     for reminder in reminders:
         if reminder.status == "queued" and reminder.dedupe_key not in active_keys:
             reminder.status = "cancelled"
+            setting = settings_by_user.get(reminder.user_id)
+            reminder.last_error = (
+                "measurement_reminders_disabled"
+                if setting is not None and not setting.measurement_reminders_enabled
+                else "measurement_reminder_not_due"
+            )
+            reminder.processing_started_at = None
+            reminder.next_attempt_at = None
 
     try:
         db.commit()
