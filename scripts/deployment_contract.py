@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 REGISTRY = "ghcr.io"
-IMAGE_KINDS = ("backend", "bot")
+IMAGE_KINDS = ("backend", "bot", "hermes-discovery", "hermes-worker")
 REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 

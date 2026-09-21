@@ -1,5 +1,5 @@
 [Unit]
-Description=Task 129 bounded Hermes discovery schedule
+Description=Task 403 bounded Hermes discovery schedule
 
 [Timer]
 Unit=hermes-worker-drain.service

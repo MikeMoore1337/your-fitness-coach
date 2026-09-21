@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://your-fitness-coach.local/schemas/task403-hermes-deployment-mode-v1.json",
+  "title": "Task 403 Hermes deployment mode contract",
+  "type": "object",
+  "required": ["mode", "filesystem", "network", "container", "resources", "egress"],
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": ["separate-vm", "colocated-isolated"]
+    },
+    "filesystem": {
+      "type": "object",
+      "required": ["runtime", "config", "state", "no_yfc_runtime_dependency"],
+      "properties": {
+        "runtime": {"const": "/opt/hermes"},
+        "config": {"const": "/etc/hermes"},
+        "state": {"const": "/var/lib/hermes"},
+        "no_yfc_runtime_dependency": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "network": {
+      "type": "object",
+      "required": ["name", "public_ports", "yfc_networks_forbidden"],
+      "properties": {
+        "name": {"const": "hermes-net"},
+        "public_ports": {"const": []},
+        "yfc_networks_forbidden": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "container": {
+      "type": "object",
+      "required": ["uid_gid", "read_only_rootfs", "cap_drop", "no_new_privileges", "docker_socket"],
+      "properties": {
+        "uid_gid": {"const": "10000:10000"},
+        "read_only_rootfs": {"const": true},
+        "cap_drop": {"const": "ALL"},
+        "no_new_privileges": {"const": true},
+        "docker_socket": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "required": ["discovery", "worker", "sequential", "guard"],
+      "properties": {
+        "discovery": {"const": {"memory_mib": 256, "cpu": 0.25}},
+        "worker": {"const": {"memory_mib": 512, "cpu": 0.5}},
+        "sequential": {"const": true},
+        "guard": {
+          "const": {
+            "memory_available_min_mib": 768,
+            "swap_used_max_mib": 512,
+            "load1_max": 1.5,
+            "disk_free_min_gib": 5
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "egress": {
+      "type": "object",
+      "required": ["inbound", "scoped_firewall_required", "application_allowlist_required"],
+      "properties": {
+        "inbound": {"const": "none"},
+        "scoped_firewall_required": {"const": true},
+        "application_allowlist_required": {"const": true}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

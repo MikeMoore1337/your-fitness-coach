@@ -26,7 +26,7 @@ from discovery_runner import (
     mark_candidate_status,
 )
 
-IMAGE_DIGEST_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
+IMAGE_DIGEST_PATTERN = re.compile(r"^(?:sha256:[0-9a-f]{64}|[^\s@]+@sha256:[0-9a-f]{64})$")
 DOCKER_NETWORK_NAME_PATTERN = re.compile(r"^hermes-[a-z0-9][a-z0-9_.-]{0,56}$")
 JOB_NAME_PATTERN = re.compile(r"^[0-9a-f]{64}\.json$")
 DEFAULT_MAX_JOBS = 1
@@ -139,6 +139,8 @@ def _worker_command(
         "ALL",
         "--security-opt",
         "no-new-privileges:true",
+        "--oom-score-adj",
+        "500",
         "--pids-limit",
         "32",
         "--memory",

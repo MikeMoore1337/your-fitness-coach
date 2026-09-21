@@ -57,7 +57,7 @@ def test_discovery_timer_runs_worker_drain_and_preserves_scheduler_guardrails() 
 
     assert timer == (
         "[Unit]\n"
-        "Description=Task 129 bounded Hermes discovery schedule\n"
+        "Description=Task 403 bounded Hermes discovery schedule\n"
         "\n"
         "[Timer]\n"
         "Unit=hermes-worker-drain.service\n"
@@ -82,6 +82,11 @@ def test_shared_host_systemd_launchers_are_root_only_and_container_hardening_is_
     assert "User=hermes" not in discovery_unit
     assert "Group=hermes" not in discovery_unit
     assert "Environment=HERMES_DOCKER_NETWORK=hermes-net" in discovery_unit
+    assert "HERMES_DEPLOYMENT_MODE=@HERMES_DEPLOYMENT_MODE@" in discovery_unit
+    assert "COLOCATED_ISOLATED_HERMES=@COLOCATED_ISOLATED_HERMES@" in discovery_unit
+    assert "hermes_resource_guard.py check --phase discovery" in discovery_unit
+    assert "hermes_resource_guard.py run --phase discovery" in discovery_unit
+    assert "--oom-score-adj 500" in discovery_unit
     assert "--network=${HERMES_DOCKER_NETWORK}" in discovery_unit
     assert "@DISCOVERY_IMAGE@ --once" in discovery_unit
     assert "--read-only" in discovery_unit
@@ -100,13 +105,20 @@ def test_shared_host_systemd_launchers_are_root_only_and_container_hardening_is_
     assert "User=hermes" not in drain_unit
     assert "Group=hermes" not in drain_unit
     assert "Environment=HERMES_DOCKER_NETWORK=hermes-net" in drain_unit
-    assert "ExecStart=/usr/bin/python3 /opt/hermes/hermes_worker_drain.py --once" in drain_unit
+    assert "hermes_resource_guard.py check --phase worker" in drain_unit
+    assert "hermes_resource_guard.py run --phase worker" in drain_unit
+    assert "hermes_worker_drain.py --once" in drain_unit
+    assert "OOMScoreAdjust=500" in drain_unit
     assert "TasksMax=32" in drain_unit
     assert "MemoryMax=512M" in drain_unit
     assert "CPUQuota=50%" in drain_unit
 
     for unit in (discovery_unit, drain_unit):
         assert "docker.sock" not in unit
+        assert "/srv/yfc" not in unit
+        assert "/var/lib/docker" not in unit
+        assert "--publish" not in unit
+        assert " -p " not in unit
         assert "--privileged" not in unit
         assert ":latest" not in unit
 
@@ -157,6 +169,17 @@ def test_worker_drain_rejects_non_immutable_or_floating_images(
     monkeypatch.setenv("HERMES_WORKER_IMAGE", value)
     with pytest.raises(hermes_worker_drain.DrainError, match="hermes_worker_image_not_immutable"):
         hermes_worker_drain._worker_image()
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["sha256:" + "a" * 64, "registry.invalid/hermes-worker@sha256:" + "b" * 64],
+)
+def test_worker_drain_accepts_content_addressed_images(
+    value: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_WORKER_IMAGE", value)
+    assert hermes_worker_drain._worker_image() == value
 
 
 def test_canonical_registry_is_lf_only() -> None:
@@ -385,6 +408,7 @@ def test_worker_drain_handoff_is_immutable_and_does_not_put_secret_values_in_arg
     assert command[command.index("--memory") + 1] == "512m"
     assert command[command.index("--cpus") + 1] == "0.50"
     assert command[command.index("--user") + 1] == "10000:10000"
+    assert command[command.index("--oom-score-adj") + 1] == "500"
     assert "--read-only" in command
     assert "--cap-drop" in command
     assert "docker.sock" not in command

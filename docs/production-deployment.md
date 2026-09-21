@@ -69,6 +69,10 @@ branch policy только для `master`; production secrets остаются 
 - Canonical source of truth — `.artifacts/operations/deployments/state.json` на production host. Он хранит
   active/rollback slot, revision и immutable image digest без secrets. Caddy admin config
   проверяется против этого состояния перед каждым rollout.
+- Single-slot deployment также сериализуется через
+  `.artifacts/operations/deployments/deployment.lock`. Co-located Hermes Task 403 открывает этот
+  же lock только в shared-режиме перед каждой фазой и не меняет его владельца или права; Hermes
+  не читает YFC `.env` и не участвует в YFC rollout.
 
 Frontend входит в backend image. После switch Caddy направляет новый HTML/API только в candidate,
 а запрос `/assets/*`, отсутствующий в candidate, повторяет только в прежний backend. Это сохраняет

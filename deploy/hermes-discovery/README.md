@@ -1,4 +1,4 @@
-# Hermes discovery runner и scheduler (Task 129)
+# Hermes discovery runner и scheduler (Task 403)
 
 `discovery_runner.py` — отдельный stdlib-only runtime для получения public RSS/JSON
 Feed/HTML metadata. Он не импортирует hardened editorial worker и не имеет provider key,
@@ -27,7 +27,7 @@ Canonical allowlist — `backend/fitminiapp_api/resources/news_sources.json`. В
 `definitions_version=yfc-news-sources:<sha256>`. Этот файл является versioned deployment
 artifact, его нельзя редактировать вручную. Перед установкой его SHA-256 должен быть подставлен
 в оба systemd template как `HERMES_DISCOVERY_DEFINITIONS_SHA256`; external runtime отклоняет
-файл с отсутствующим или несовпадающим digest. На VM он монтируется read-only в
+файл с отсутствующим или несовпадающим digest. На target host он монтируется read-only в
 `/opt/hermes/config/source-definitions.json`.
 
 Тестовый `local_mock` envelope может содержать только loopback/`host.docker.internal` URLs и
@@ -80,54 +80,66 @@ state не создаёт новый idempotency key автоматически.
 только после bounded age threshold. Missed timer run не replay'ится (`Persistent=false`), а
 следующий запуск снова применяет dedupe без publication quota.
 
-## Установка после Gate A (не выполняется этим PR)
+## Установка и production topology Task 403
 
-1. Из exact release bundle сгенерировать definitions из canonical registry и зафиксировать
-   SHA-256 самого deployment-файла.
-2. Подставить в `*.service.template` только immutable digest discovery image, worker image и
-   этот SHA-256 как `HERMES_DISCOVERY_DEFINITIONS_SHA256`; floating `latest` запрещён.
-3. Создать отдельную Linux x86_64 Hermes VM и `/etc/hermes/source-definitions.json` (0444),
-   `/etc/hermes/worker.env` (0600), `/var/lib/hermes` (0700). Для bind mount каталога
-   container UID/GID `10000:10000` должны иметь запись в `/var/lib/hermes`. Пользователь `hermes`
-   должен иметь UID/GID `10000:10000`, но не должен состоять в группе `docker` и не должен видеть
-   `/var/run/docker.sock`. Оба host-side systemd launcher-а запускаются от `root` только для
-   точной команды Docker; внутри обоих контейнеров остаются `--user 10000:10000`, `--read-only`,
-   `--cap-drop ALL` и `no-new-privileges`, без socket mount. VM не содержит YFC repo/runtime/DB.
-   Обе units используют одну owner-approved сеть `HERMES_DOCKER_NETWORK=hermes-net`; имя для
-   worker drain дополнительно проверяется allowlist-ом `hermes-*` и встроенные Docker-сети
-   отвергаются.
-4. Настроить default-deny egress firewall: exact approved source hosts для discovery, exact
-   Groq host и exact YFC intake host/path для worker; deny Telegram Bot API, PostgreSQL/Redis,
-   SSH, metadata, registry и arbitrary internet. Inbound Hermes ports отсутствуют.
-5. Включить timer только после Gate A и owner-approved credentials. `HERMES_INTAKE_ENABLED`
-   остаётся false до отдельного approval; production `NEWS_*` flags не меняются.
+Поддерживаются режимы `separate-vm` и `colocated-isolated`. Для текущего запуска владелец
+выбрал `colocated-isolated` на существующем YFC RU VPS: отдельная VM не создаётся. Hermes
+production flag: `COLOCATED_ISOLATED_HERMES=yes`.
+изолируется каталогами `/opt/hermes`, `/etc/hermes`, `/var/lib/hermes`, пользователем
+`hermes` с UID/GID `10000:10000` и Docker-сетью `hermes-net`. В этой сети не должно быть
+YFC-контейнеров или пересекающихся подсетей; Hermes не публикует порты и не получает YFC
+volume, `.env`, БД, Redis, socket или host repository.
 
-После рендера шаблонов с exact image digests и definitions digest установить units можно так
-(команды выполняются на Hermes VM, не в этом локальном PR):
+Установка выполняется только из exact merged release bundle. `source-definitions.json` должен
+быть сгенерирован из canonical registry, а discovery и worker должны быть immutable digest
+(repository digest или `sha256:<64 hex>` image ID); `latest` и floating tags запрещены.
+Post-merge CI строит и сканирует `hermes-discovery` и `hermes-worker` images, публикуя refs,
+выведенные общим `scripts/deployment_contract.py`. На target сначала нужно pull exact merged
+ref и зафиксировать его digest или image ID; installer проверяет, что image metadata совпадает
+с переданным immutable ref.
+`scripts/hermes_colocation.py` копирует runtime и definitions в изолированные каталоги,
+устанавливает `/etc/hermes/worker.env` с mode `0600`, рендерит units и запускает
+`systemd-analyze verify`. Installer не меняет глобальный firewall и оставляет timer disabled.
+
+На co-located host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`, used swap
+`<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Он использует
+тот же canonical YFC deployment lock
+`/srv/yfc/fit-mini-app/.artifacts/operations/deployments/deployment.lock` в shared-lock режиме
+и не меняет его права. При нарушении возвращаются reason codes `insufficient_memory`,
+`swap_pressure`, `high_load`, `insufficient_disk` или `yfc_deploy_active`; Hermes discovery и
+worker не запускаются одновременно. Фазы ограничены `256 MiB/0.25 CPU` и `512 MiB/0.50 CPU`.
+
+Пример установки (значения image и secret placeholders не являются production credentials):
 
 ```sh
-install -o root -g root -m 0644 hermes-discovery.service /etc/systemd/system/hermes-discovery.service
-install -o root -g root -m 0644 hermes-worker-drain.service /etc/systemd/system/hermes-worker-drain.service
-install -o root -g root -m 0644 hermes-discovery.target /etc/systemd/system/hermes-discovery.target
-install -o root -g root -m 0644 hermes-discovery.timer /etc/systemd/system/hermes-discovery.timer
-systemd-analyze verify /etc/systemd/system/hermes-discovery.service /etc/systemd/system/hermes-worker-drain.service /etc/systemd/system/hermes-discovery.target /etc/systemd/system/hermes-discovery.timer
-systemctl daemon-reload
+python3 scripts/hermes_colocation.py install \
+  --source-root /srv/yfc/fit-mini-app/current \
+  --source-definitions /srv/yfc/fit-mini-app/current/.artifacts/tasks/403/evidence/source-definitions.json \
+  --worker-env /etc/hermes/worker.env \
+  --discovery-image registry.example/hermes-discovery@sha256:<64-hex> \
+  --worker-image registry.example/hermes-worker@sha256:<64-hex> \
+  --mode colocated-isolated
 ```
 
-До включения timer проверить exact boundary без запуска job:
+Перед включением timer проверить boundary без запуска job:
 
 ```sh
 id hermes
 id -nG hermes
 docker network inspect hermes-net
+docker network ls
+systemd-analyze verify /etc/systemd/system/hermes-discovery.service /etc/systemd/system/hermes-worker-drain.service /etc/systemd/system/hermes-discovery.target /etc/systemd/system/hermes-discovery.timer
 systemctl cat hermes-discovery.service hermes-worker-drain.service
 systemctl status hermes-discovery.timer --no-pager
+python3 /opt/hermes/hermes_resource_guard.py check --phase discovery --mode colocated-isolated
 ```
 
-После отдельного owner approval на внешний Gate A и подготовки credentials активировать schedule
-нужно одной командой: `systemctl enable --now hermes-discovery.timer`. Она одновременно включает
-timer на boot и запускает его в текущем boot; затем для немедленного bounded smoke можно выполнить
-`systemctl start hermes-discovery.target`. До этого timer можно только установить и проверить.
+До credentials, доказанной scoped egress policy и owner-approved external shadow timer можно
+только установить и проверить. После этих gate активировать schedule одной командой:
+`systemctl enable --now hermes-discovery.timer`; timer запускает worker drain, а его
+`Requires/After` сначала запускают discovery. Missed runs не replay'ятся. Target остаётся
+доступен для ручного bounded orchestration, но не используется как timer unit, чтобы active
+target не блокировал следующие six-hour runs.
 
 Если `/var/lib/hermes/state.json` был создан предыдущей дефектной версией от `root:root`, перед
 первым запуском после обновления восстановить владельца state для контейнерного UID/GID:

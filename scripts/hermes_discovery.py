@@ -70,6 +70,8 @@ def provenance() -> None:
     )
     drain_path = root / "hermes_worker_drain.py"
     drain_source = drain_path.read_text(encoding="utf-8")
+    guard_path = root / "hermes_resource_guard.py"
+    guard_source = guard_path.read_text(encoding="utf-8")
     timer_unit = (root / "systemd" / "hermes-discovery.timer").read_text(encoding="utf-8")
     tree = ast.parse(runner_path.read_text(encoding="utf-8"), filename=str(runner_path))
     imports = {
@@ -97,6 +99,12 @@ def provenance() -> None:
         "source.schema": (root / "source-definitions.schema.json").is_file(),
         "systemd.definitions_digest": all(
             "HERMES_DISCOVERY_DEFINITIONS_SHA256=@SOURCE_DEFINITIONS_SHA256@" in unit
+            for unit in (discovery_unit, drain_unit)
+        ),
+        "systemd.resource_guard": all(
+            "hermes_resource_guard.py check" in unit
+            and "hermes_resource_guard.py run" in unit
+            and "HERMES_YFC_DEPLOYMENT_LOCK" in unit
             for unit in (discovery_unit, drain_unit)
         ),
         "systemd.discovery_once": "@DISCOVERY_IMAGE@ --once" in discovery_unit,
@@ -127,8 +135,21 @@ def provenance() -> None:
         "systemd.discovery_no_floating_image": ":latest" not in discovery_unit,
         "systemd.discovery_no_bridge": "--network bridge" not in discovery_unit,
         "systemd.drain_service_resources": all(
-            token in drain_unit for token in ("TasksMax=32", "MemoryMax=512M", "CPUQuota=50%")
+            token in drain_unit
+            for token in ("TasksMax=32", "MemoryMax=512M", "CPUQuota=50%", "OOMScoreAdjust=500")
         ),
+        "systemd.discovery_oom_priority": "--oom-score-adj 500" in discovery_unit,
+        "systemd.timer_worker": "Unit=hermes-worker-drain.service" in timer_unit,
+        "resource_guard.thresholds": all(
+            token in guard_source
+            for token in (
+                "MIN_MEMORY_AVAILABLE_MIB = 768",
+                "MAX_SWAP_USED_MIB = 512",
+                "MAX_LOAD1 = 1.50",
+                "MIN_DISK_FREE_MIB = 5 * 1024",
+            )
+        ),
+        "resource_guard.no_shell": "shell=True" not in guard_source,
         "worker.docker_network_validation": all(
             token in drain_source
             for token in (
