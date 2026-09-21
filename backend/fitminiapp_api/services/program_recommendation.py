@@ -432,6 +432,9 @@ def recommend_program_templates(
             ProgramTemplate.is_public.is_(True),
             ProgramTemplate.owner_user_id.is_(None),
             ProgramTemplate.created_by_user_id.is_(None),
+            # Source-backed library additions remain explicitly selectable until
+            # the approved discovery/filter surface owns their recommendation rules.
+            ProgramTemplate.provenance_type == "YFC_GENERIC",
             ProgramTemplate.slug != LEGACY_DEMO_TEMPLATE_SLUG,
         )
         .order_by(ProgramTemplate.slug.asc(), ProgramTemplate.id.asc())

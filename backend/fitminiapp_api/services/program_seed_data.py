@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 type ExerciseSeed = tuple[str, str, str, str]
-type TemplateExerciseSeed = tuple[str, int, str, int]
+type TemplateExerciseMetadata = dict[str, object]
+type TemplateExerciseSeed = (
+    tuple[str, int, str, int] | tuple[str, int, str, int, TemplateExerciseMetadata]
+)
 type TemplateDaySeed = tuple[str, list[TemplateExerciseSeed]]
 
 LEGACY_TEMPLATE_SLUGS = {"upper-lower-4x"}
@@ -892,3 +895,1784 @@ STRENGTH_TEMPLATE_SPECS: list[dict[str, object]] = [
         ],
     },
 ]
+
+
+def _exact_reps(value: int) -> dict[str, object]:
+    return {"kind": "exact", "value": value}
+
+
+def _range_reps(min_reps: int, max_reps: int) -> dict[str, object]:
+    return {"kind": "range", "min_reps": min_reps, "max_reps": max_reps}
+
+
+def _amrap_reps(cap_reps: int | None = None) -> dict[str, object]:
+    result: dict[str, object] = {"kind": "amrap"}
+    if cap_reps is not None:
+        result["cap_reps"] = cap_reps
+    return result
+
+
+def _load_target(kind: str = "user_selected", value: float | None = None) -> dict[str, object]:
+    result: dict[str, object] = {"kind": kind}
+    if value is not None:
+        result["value"] = value
+    return result
+
+
+def _strength_plan(
+    rep_targets: list[dict[str, object]],
+    rest_seconds: int,
+    *,
+    roles: list[str] | None = None,
+    loads: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    segments: list[dict[str, object]] = []
+    for position, rep_target in enumerate(rep_targets, start=1):
+        segment: dict[str, object] = {
+            "position": position,
+            "role": roles[position - 1] if roles else "working",
+            "rep_target": rep_target,
+            "load_target": loads[position - 1] if loads else _load_target(),
+            "effort_target": {"kind": "none"},
+            "rest_after_seconds": rest_seconds,
+        }
+        segments.append(segment)
+    return {"version": 1, "metric_type": "strength", "segments": segments, "groups": []}
+
+
+def _straight_plan(
+    sets: int,
+    reps: str,
+    rest_seconds: int,
+    *,
+    load_kind: str = "user_selected",
+    load_value: float | None = None,
+) -> dict[str, object]:
+    if "-" in reps:
+        minimum, maximum = (int(value) for value in reps.split("-", maxsplit=1))
+        target = _range_reps(minimum, maximum)
+    else:
+        target = _exact_reps(int(reps))
+    return _strength_plan(
+        [target for _ in range(sets)],
+        rest_seconds,
+        loads=[_load_target(load_kind, load_value) for _ in range(sets)],
+    )
+
+
+def _amrap_last_plan(
+    sets: int,
+    reps: int,
+    rest_seconds: int,
+    *,
+    load_kind: str = "user_selected",
+    load_value: float | None = None,
+) -> dict[str, object]:
+    targets = [_exact_reps(reps) for _ in range(max(sets - 1, 0))]
+    targets.append(_amrap_reps())
+    return _strength_plan(
+        targets,
+        rest_seconds,
+        loads=[_load_target(load_kind, load_value) for _ in range(sets)],
+    )
+
+
+def _capped_amrap_plan(sets: int, cap_reps: int, rest_seconds: int) -> dict[str, object]:
+    return _strength_plan(
+        [_amrap_reps(cap_reps) for _ in range(sets)],
+        rest_seconds,
+    )
+
+
+def _training_max_plan(
+    percentages: list[float],
+    reps: list[int | None],
+    rest_seconds: int,
+) -> dict[str, object]:
+    targets = [_amrap_reps() if value is None else _exact_reps(value) for value in reps]
+    return _strength_plan(
+        targets,
+        rest_seconds,
+        loads=[_load_target("percent_training_max", value) for value in percentages],
+    )
+
+
+def _seed_exercise(
+    slug: str,
+    sets: int,
+    reps: str,
+    rest_seconds: int,
+    *,
+    plan: dict[str, object] | None = None,
+    group_id: int | None = None,
+    group_kind: str | None = None,
+    group_order: int | None = None,
+    notes: str | None = None,
+    weekly_plans: list[dict[str, object]] | None = None,
+) -> TemplateExerciseSeed:
+    metadata: TemplateExerciseMetadata = {}
+    if plan is not None:
+        metadata["prescription"] = plan
+    if group_id is not None:
+        metadata["group_id"] = group_id
+        metadata["group_kind"] = group_kind
+        metadata["group_order"] = group_order
+    if notes is not None:
+        metadata["notes"] = notes
+    if weekly_plans is not None:
+        metadata["weekly_plans"] = weekly_plans
+    return (slug, sets, reps, rest_seconds, metadata)
+
+
+def _source_provenance(
+    *,
+    source_program_name: str,
+    creator: str,
+    community: str | None,
+    canonical_source: str,
+    source_version: str,
+    adaptation_notes: str,
+    adaptation_ledger: list[dict[str, object]],
+    exercise_mapping: dict[str, dict[str, object]],
+) -> dict[str, object]:
+    return {
+        "source_program_name": source_program_name,
+        "creator": creator,
+        "community": community,
+        "canonical_source": canonical_source,
+        "source_version": source_version,
+        "retrieved_date": "2026-09-21",
+        "provenance_type": "SOURCE_ADAPTATION",
+        "reference_reuse_status": "PUBLIC_REFERENCE_ONLY_NO_REDISTRIBUTION_LICENSE_VERIFIED",
+        "adaptation_status": "ADAPTED",
+        "adaptation_notes": adaptation_notes,
+        "representability_status": "WITH_DECLARED_ADAPTATION",
+        "source_revision_evidence": canonical_source,
+        "mapping_gate": {
+            "stages": [
+                "source_exercise",
+                "canonical_slug",
+                "alias",
+                "variant",
+                "exercise_metadata",
+                "movement_equipment_validation",
+            ],
+            "known_false_gaps": [
+                "single-leg-rdl",
+                "skull-crusher",
+                "glute-ham-raise",
+                "chest-dip",
+                "weighted-dip",
+                "rear-delt-fly",
+            ],
+            "genuine_gaps": ["power-clean", "dumbbell-floor-press"],
+        },
+        "deferred_library_ledger": [
+            {"program": "Starting Strength", "status": "DEFERRED"},
+            {"program": "PHAT", "status": "DEFERRED"},
+            {"program": "Dumbbell Stopgap", "status": "DEFERRED"},
+            {"program": "r/Fitness Basic Beginner", "status": "DEFERRED"},
+            {"program": "Greyskull LP", "status": "DEFERRED"},
+            {"program": "Frankoman DB Only", "status": "DEFERRED"},
+            {"program": "SBS / Greg Nuckols collections", "status": "DEFERRED"},
+            {"program": "Strong Curves", "status": "DEFERRED"},
+            {"program": "WS4SB", "status": "DEFERRED"},
+            {"program": "Arnold-style", "status": "DEFERRED"},
+            {"program": "Deep Water", "status": "DEFERRED"},
+        ],
+        "adaptation_ledger": adaptation_ledger,
+        "exercise_mapping": exercise_mapping,
+    }
+
+
+def _product_metadata(
+    *,
+    level: str,
+    goal: str,
+    days_per_week: int,
+    representation_days: int,
+    split: str,
+    equipment: list[str],
+    progression_style: str,
+    cycle_length_weeks: int | None,
+    advanced_methods: list[str],
+    frequency_model: str,
+    expected_duration_minutes: dict[str, int] | None = None,
+) -> dict[str, object]:
+    return {
+        "level": level,
+        "goal": goal,
+        "days_per_week": days_per_week,
+        "representation_days": representation_days,
+        "split": split,
+        "equipment": equipment,
+        "progression_style": progression_style,
+        "cycle_length_weeks": cycle_length_weeks,
+        "advanced_method_flags": advanced_methods,
+        "frequency_model": frequency_model,
+        "expected_duration_minutes": expected_duration_minutes,
+    }
+
+
+def _five_three_one_week(
+    percentages: list[float],
+    reps: list[int | None],
+) -> dict[str, object]:
+    return _training_max_plan(percentages, reps, 180)
+
+
+def _repeat_plan(plan: dict[str, object], weeks: int) -> list[dict[str, object]]:
+    return [plan for _ in range(weeks)]
+
+
+_SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
+    {
+        "slug": "stronglifts-5x5",
+        "title": "StrongLifts 5x5",
+        "goal": "strength",
+        "level": "beginner",
+        "split_type": "full_body",
+        "default_duration_weeks": 1,
+        "provenance": _source_provenance(
+            source_program_name="StrongLifts 5x5",
+            creator="Mehdi",
+            community="StrongLifts",
+            canonical_source="https://stronglifts.com/stronglifts-5x5/",
+            source_version="official guide accessed 2026-09-21",
+            adaptation_notes="Standard A/B 3-session presentation; progression is a manual rule.",
+            adaptation_ledger=[
+                {"field": "workout_structure", "status": "EXACT"},
+                {"field": "session_load_progression", "status": "MANUAL_RULE"},
+                {"field": "source_terms", "status": "ADAPTED", "note": "Stored as provenance only"},
+            ],
+            exercise_mapping={
+                "squat": {"canonical_slug": "squat", "status": "EXACT"},
+                "bench_press": {"canonical_slug": "bench-press", "status": "EXACT"},
+                "barbell_row": {"canonical_slug": "barbell-row", "status": "EXACT"},
+                "overhead_press": {"canonical_slug": "overhead-press", "status": "EXACT"},
+                "deadlift": {"canonical_slug": "deadlift", "status": "EXACT"},
+            },
+        ),
+        "program_metadata": _product_metadata(
+            level="beginner",
+            goal="strength",
+            days_per_week=3,
+            representation_days=2,
+            split="full_body",
+            equipment=["barbell", "bench", "rack"],
+            progression_style="session_to_session_linear",
+            cycle_length_weeks=None,
+            advanced_methods=[],
+            frequency_model="A/B alternating, three sessions per week",
+        ),
+        "days": [
+            (
+                "Workout A",
+                [
+                    _seed_exercise("squat", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
+                    _seed_exercise("bench-press", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
+                    _seed_exercise("barbell-row", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
+                ],
+            ),
+            (
+                "Workout B",
+                [
+                    _seed_exercise("squat", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
+                    _seed_exercise("overhead-press", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
+                    _seed_exercise("deadlift", 1, "1", 180, plan=_straight_plan(1, "1", 180)),
+                ],
+            ),
+        ],
+    },
+    {
+        "slug": "gzclp",
+        "title": "GZCLP",
+        "goal": "strength",
+        "level": "beginner",
+        "split_type": "full_body",
+        "default_duration_weeks": 1,
+        "provenance": _source_provenance(
+            source_program_name="GZCLP",
+            creator="Cody LeFever",
+            community="u/gz / Fitness Wiki",
+            canonical_source="https://thefitness.wiki/routines/gzclp/",
+            source_version="frozen four-workout rotation accessed 2026-09-21",
+            adaptation_notes="One deterministic four-workout rotation; stage and stall transitions remain manual.",
+            adaptation_ledger=[
+                {"field": "tier_roles", "status": "EXACT"},
+                {"field": "amrap_sets", "status": "EXACT"},
+                {"field": "stage_reset", "status": "MANUAL_RULE"},
+            ],
+            exercise_mapping={
+                "squat": {"canonical_slug": "squat", "status": "EXACT"},
+                "bench_press": {"canonical_slug": "bench-press", "status": "EXACT"},
+                "overhead_press": {"canonical_slug": "overhead-press", "status": "EXACT"},
+                "deadlift": {"canonical_slug": "deadlift", "status": "EXACT"},
+                "lat_pulldown": {"canonical_slug": "lat-pulldown", "status": "EXACT"},
+                "one_arm_dumbbell_row": {
+                    "canonical_slug": "one-arm-dumbbell-row",
+                    "status": "ADAPTED",
+                    "note": "DB row variant selected for the T3 row slot.",
+                },
+            },
+        ),
+        "program_metadata": _product_metadata(
+            level="beginner",
+            goal="strength",
+            days_per_week=3,
+            representation_days=4,
+            split="full_body",
+            equipment=["barbell", "bench", "cable", "dumbbell"],
+            progression_style="tiered_t1_t2_t3_amrap",
+            cycle_length_weeks=None,
+            advanced_methods=["amrap"],
+            frequency_model="three sessions per week rotating through four workouts",
+        ),
+        "days": [
+            (
+                "Workout 1",
+                [
+                    _seed_exercise(
+                        "squat",
+                        5,
+                        "3+",
+                        180,
+                        plan=_amrap_last_plan(5, 3, 180),
+                        notes="T1; last set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "bench-press",
+                        3,
+                        "10",
+                        120,
+                        plan=_straight_plan(3, "10", 120),
+                        notes="T2",
+                    ),
+                    _seed_exercise(
+                        "lat-pulldown",
+                        3,
+                        "15+",
+                        75,
+                        plan=_amrap_last_plan(3, 15, 75),
+                        notes="T3; last set AMRAP",
+                    ),
+                ],
+            ),
+            (
+                "Workout 2",
+                [
+                    _seed_exercise(
+                        "overhead-press",
+                        5,
+                        "3+",
+                        180,
+                        plan=_amrap_last_plan(5, 3, 180),
+                        notes="T1; last set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "deadlift",
+                        3,
+                        "10",
+                        150,
+                        plan=_straight_plan(3, "10", 150),
+                        notes="T2",
+                    ),
+                    _seed_exercise(
+                        "one-arm-dumbbell-row",
+                        3,
+                        "15+",
+                        75,
+                        plan=_amrap_last_plan(3, 15, 75),
+                        notes="T3; selected DB row variant; last set AMRAP",
+                    ),
+                ],
+            ),
+            (
+                "Workout 3",
+                [
+                    _seed_exercise(
+                        "bench-press",
+                        5,
+                        "3+",
+                        180,
+                        plan=_amrap_last_plan(5, 3, 180),
+                        notes="T1; last set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "squat",
+                        3,
+                        "10",
+                        120,
+                        plan=_straight_plan(3, "10", 120),
+                        notes="T2",
+                    ),
+                    _seed_exercise(
+                        "lat-pulldown",
+                        3,
+                        "15+",
+                        75,
+                        plan=_amrap_last_plan(3, 15, 75),
+                        notes="T3; last set AMRAP",
+                    ),
+                ],
+            ),
+            (
+                "Workout 4",
+                [
+                    _seed_exercise(
+                        "deadlift",
+                        5,
+                        "3+",
+                        210,
+                        plan=_amrap_last_plan(5, 3, 210),
+                        notes="T1; last set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "overhead-press",
+                        3,
+                        "10",
+                        120,
+                        plan=_straight_plan(3, "10", 120),
+                        notes="T2",
+                    ),
+                    _seed_exercise(
+                        "one-arm-dumbbell-row",
+                        3,
+                        "15+",
+                        75,
+                        plan=_amrap_last_plan(3, 15, 75),
+                        notes="T3; selected DB row variant; last set AMRAP",
+                    ),
+                ],
+            ),
+        ],
+    },
+    {
+        "slug": "531-for-beginners",
+        "title": "5/3/1 for Beginners",
+        "goal": "strength",
+        "level": "beginner",
+        "split_type": "full_body",
+        "default_duration_weeks": 4,
+        "provenance": _source_provenance(
+            source_program_name="5/3/1 for Beginners",
+            creator="Jim Wendler",
+            community=None,
+            canonical_source="https://www.jimwendler.com/blogs/jimwendler-com/101065094-5-3-1-for-a-beginner",
+            source_version="official article accessed 2026-09-21",
+            adaptation_notes="Four-week fixed YFC block; Training Max is explicit and updates remain manual.",
+            adaptation_ledger=[
+                {"field": "three_training_days", "status": "EXACT"},
+                {"field": "two_main_lifts_per_day", "status": "EXACT"},
+                {"field": "training_max_basis", "status": "EXACT"},
+                {"field": "first_set_last", "status": "EXACT"},
+                {"field": "training_max_update", "status": "MANUAL_RULE"},
+                {"field": "assistance_selection", "status": "ADAPTED"},
+            ],
+            exercise_mapping={
+                "squat": {"canonical_slug": "squat", "status": "EXACT"},
+                "bench_press": {"canonical_slug": "bench-press", "status": "EXACT"},
+                "deadlift": {"canonical_slug": "deadlift", "status": "EXACT"},
+                "overhead_press": {"canonical_slug": "overhead-press", "status": "EXACT"},
+                "barbell_row": {"canonical_slug": "barbell-row", "status": "ADAPTED"},
+                "pull_up": {"canonical_slug": "pull-up", "status": "EXACT"},
+            },
+        ),
+        "program_metadata": _product_metadata(
+            level="beginner",
+            goal="strength",
+            days_per_week=3,
+            representation_days=3,
+            split="full_body",
+            equipment=["barbell", "bench", "rack", "bodyweight"],
+            progression_style="531_training_max_fsl",
+            cycle_length_weeks=4,
+            advanced_methods=[],
+            frequency_model="three training days",
+        ),
+        "days": [
+            (
+                "Day 1 · Squat + Bench",
+                [
+                    _seed_exercise(
+                        "squat",
+                        3,
+                        "5/3/1",
+                        180,
+                        plan=_five_three_one_week([65, 75, 85], [5, 5, None]),
+                        weekly_plans=[
+                            _five_three_one_week([65, 75, 85], [5, 5, None]),
+                            _five_three_one_week([70, 80, 90], [3, 3, None]),
+                            _five_three_one_week([75, 85, 95], [5, 3, None]),
+                            _five_three_one_week([40, 50, 60], [5, 5, 5]),
+                        ],
+                        notes="Main lift; percentage basis is TRAINING_MAX",
+                    ),
+                    _seed_exercise(
+                        "squat",
+                        5,
+                        "5",
+                        90,
+                        plan=_straight_plan(
+                            5, "5", 90, load_kind="percent_training_max", load_value=65
+                        ),
+                        weekly_plans=[
+                            _straight_plan(
+                                5, "5", 90, load_kind="percent_training_max", load_value=65
+                            ),
+                            _straight_plan(
+                                5, "5", 90, load_kind="percent_training_max", load_value=70
+                            ),
+                            _straight_plan(
+                                5, "5", 90, load_kind="percent_training_max", load_value=75
+                            ),
+                            _straight_plan(
+                                5, "5", 90, load_kind="percent_training_max", load_value=40
+                            ),
+                        ],
+                        notes="FSL; first-set Training Max load",
+                    ),
+                    _seed_exercise(
+                        "bench-press",
+                        3,
+                        "5/3/1",
+                        180,
+                        plan=_five_three_one_week([65, 75, 85], [5, 5, None]),
+                        weekly_plans=[
+                            _five_three_one_week([65, 75, 85], [5, 5, None]),
+                            _five_three_one_week([70, 80, 90], [3, 3, None]),
+                            _five_three_one_week([75, 85, 95], [5, 3, None]),
+                            _five_three_one_week([40, 50, 60], [5, 5, 5]),
+                        ],
+                        notes="Main lift; percentage basis is TRAINING_MAX",
+                    ),
+                ],
+            ),
+            (
+                "Day 2 · Deadlift + Overhead Press",
+                [
+                    _seed_exercise(
+                        "deadlift",
+                        3,
+                        "5/3/1",
+                        210,
+                        plan=_five_three_one_week([65, 75, 85], [5, 5, None]),
+                        weekly_plans=[
+                            _five_three_one_week([65, 75, 85], [5, 5, None]),
+                            _five_three_one_week([70, 80, 90], [3, 3, None]),
+                            _five_three_one_week([75, 85, 95], [5, 3, None]),
+                            _five_three_one_week([40, 50, 60], [5, 5, 5]),
+                        ],
+                        notes="Main lift; percentage basis is TRAINING_MAX",
+                    ),
+                    _seed_exercise(
+                        "overhead-press",
+                        3,
+                        "5/3/1",
+                        180,
+                        plan=_five_three_one_week([65, 75, 85], [5, 5, None]),
+                        weekly_plans=[
+                            _five_three_one_week([65, 75, 85], [5, 5, None]),
+                            _five_three_one_week([70, 80, 90], [3, 3, None]),
+                            _five_three_one_week([75, 85, 95], [5, 3, None]),
+                            _five_three_one_week([40, 50, 60], [5, 5, 5]),
+                        ],
+                        notes="Main lift; percentage basis is TRAINING_MAX",
+                    ),
+                    _seed_exercise(
+                        "pull-up",
+                        3,
+                        "6-10",
+                        90,
+                        plan=_straight_plan(3, "6-10", 90),
+                        notes="Assistance boundary",
+                    ),
+                ],
+            ),
+            (
+                "Day 3 · Bench + Squat",
+                [
+                    _seed_exercise(
+                        "bench-press",
+                        3,
+                        "5/3/1",
+                        180,
+                        plan=_five_three_one_week([65, 75, 85], [5, 5, None]),
+                        weekly_plans=[
+                            _five_three_one_week([65, 75, 85], [5, 5, None]),
+                            _five_three_one_week([70, 80, 90], [3, 3, None]),
+                            _five_three_one_week([75, 85, 95], [5, 3, None]),
+                            _five_three_one_week([40, 50, 60], [5, 5, 5]),
+                        ],
+                        notes="Main lift; percentage basis is TRAINING_MAX",
+                    ),
+                    _seed_exercise(
+                        "squat",
+                        3,
+                        "5/3/1",
+                        180,
+                        plan=_five_three_one_week([65, 75, 85], [5, 5, None]),
+                        weekly_plans=[
+                            _five_three_one_week([65, 75, 85], [5, 5, None]),
+                            _five_three_one_week([70, 80, 90], [3, 3, None]),
+                            _five_three_one_week([75, 85, 95], [5, 3, None]),
+                            _five_three_one_week([40, 50, 60], [5, 5, 5]),
+                        ],
+                        notes="Main lift; percentage basis is TRAINING_MAX",
+                    ),
+                    _seed_exercise(
+                        "barbell-row",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        notes="Assistance boundary",
+                    ),
+                ],
+            ),
+        ],
+    },
+    {
+        "slug": "phul",
+        "title": "PHUL",
+        "goal": "muscle_gain",
+        "level": "intermediate",
+        "split_type": "upper_lower",
+        "default_duration_weeks": 12,
+        "provenance": _source_provenance(
+            source_program_name="Power Hypertrophy Upper Lower",
+            creator="Brandon Campbell",
+            community="Muscle & Strength",
+            canonical_source="https://www.muscleandstrength.com/workouts/phul-workout",
+            source_version="published 2013-02-15; updated 2021-05-26; accessed 2026-09-21",
+            adaptation_notes="Source set ranges are retained in typed plans; lower bound is selected deterministically for stored set count.",
+            adaptation_ledger=[
+                {"field": "four_day_split", "status": "EXACT"},
+                {"field": "twelve_week_duration", "status": "EXACT"},
+                {
+                    "field": "set_range_materialization",
+                    "status": "ADAPTED",
+                    "decision": "lower bound",
+                },
+                {"field": "source_terms", "status": "ADAPTED", "note": "Stored as provenance only"},
+            ],
+            exercise_mapping={
+                "skull_crusher": {"canonical_slug": "skull-crusher", "status": "EXACT"},
+                "rear_delt_fly": {"canonical_slug": "rear-delt-fly", "status": "EXACT"},
+                "standing_calf_raise": {"canonical_slug": "standing-calf-raise", "status": "EXACT"},
+                "remaining_source_rows": {
+                    "status": "ADAPTED",
+                    "note": "Every stored row is validated against the canonical catalog before seeding",
+                },
+            },
+        ),
+        "program_metadata": _product_metadata(
+            level="intermediate",
+            goal="muscle_gain",
+            days_per_week=4,
+            representation_days=4,
+            split="upper_lower",
+            equipment=["barbell", "dumbbell", "bench", "cable", "machine"],
+            progression_style="power_hypertrophy_fixed_ranges",
+            cycle_length_weeks=12,
+            advanced_methods=[],
+            frequency_model="four training days",
+            expected_duration_minutes={"min": 45, "max": 60},
+        ),
+        "days": [
+            (
+                "Upper Power",
+                [
+                    _seed_exercise(
+                        "bench-press",
+                        4,
+                        "4-6",
+                        150,
+                        plan=_straight_plan(4, "4-6", 150),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "incline-bench-press",
+                        4,
+                        "6-8",
+                        120,
+                        plan=_straight_plan(4, "6-8", 120),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "barbell-row",
+                        4,
+                        "4-6",
+                        150,
+                        plan=_straight_plan(4, "4-6", 150),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "overhead-press",
+                        3,
+                        "6-8",
+                        120,
+                        plan=_straight_plan(3, "6-8", 120),
+                        notes="Source range; 3 sets selected",
+                    ),
+                    _seed_exercise(
+                        "barbell-curl",
+                        3,
+                        "8-10",
+                        90,
+                        plan=_straight_plan(3, "8-10", 90),
+                        notes="Source range; 3 sets selected",
+                    ),
+                    _seed_exercise(
+                        "skull-crusher",
+                        3,
+                        "8-10",
+                        90,
+                        plan=_straight_plan(3, "8-10", 90),
+                        notes="Source range; 3 sets selected",
+                    ),
+                ],
+            ),
+            (
+                "Lower Power",
+                [
+                    _seed_exercise(
+                        "squat",
+                        4,
+                        "4-6",
+                        180,
+                        plan=_straight_plan(4, "4-6", 180),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "deadlift",
+                        3,
+                        "3-5",
+                        210,
+                        plan=_straight_plan(3, "3-5", 210),
+                        notes="Source range; 3 sets selected",
+                    ),
+                    _seed_exercise(
+                        "leg-press",
+                        4,
+                        "8-10",
+                        120,
+                        plan=_straight_plan(4, "8-10", 120),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "leg-curl",
+                        3,
+                        "8-10",
+                        90,
+                        plan=_straight_plan(3, "8-10", 90),
+                        notes="Source range; 3 sets selected",
+                    ),
+                    _seed_exercise(
+                        "standing-calf-raise",
+                        4,
+                        "10-15",
+                        60,
+                        plan=_straight_plan(4, "10-15", 60),
+                        notes="Source range; 4 sets selected",
+                    ),
+                ],
+            ),
+            (
+                "Upper Hypertrophy",
+                [
+                    _seed_exercise(
+                        "incline-dumbbell-press",
+                        4,
+                        "8-12",
+                        120,
+                        plan=_straight_plan(4, "8-12", 120),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "dumbbell-bench-press",
+                        4,
+                        "8-12",
+                        120,
+                        plan=_straight_plan(4, "8-12", 120),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "machine-row",
+                        4,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(4, "8-12", 90),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "lat-pulldown",
+                        4,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(4, "8-12", 90),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "dumbbell-lateral-raise",
+                        3,
+                        "10-15",
+                        60,
+                        plan=_straight_plan(3, "10-15", 60),
+                        notes="Source range; 3 sets selected",
+                    ),
+                    _seed_exercise(
+                        "rope-pushdown",
+                        3,
+                        "10-15",
+                        75,
+                        plan=_straight_plan(3, "10-15", 75),
+                        notes="Source range; 3 sets selected",
+                    ),
+                ],
+            ),
+            (
+                "Lower Hypertrophy",
+                [
+                    _seed_exercise(
+                        "front-squat",
+                        4,
+                        "8-12",
+                        150,
+                        plan=_straight_plan(4, "8-12", 150),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "romanian-deadlift",
+                        4,
+                        "8-12",
+                        120,
+                        plan=_straight_plan(4, "8-12", 120),
+                        notes="Source range; 4 sets selected",
+                    ),
+                    _seed_exercise(
+                        "bulgarian-split-squat",
+                        3,
+                        "8-12",
+                        120,
+                        plan=_straight_plan(3, "8-12", 120),
+                        notes="Source range; 3 sets selected",
+                    ),
+                    _seed_exercise(
+                        "leg-extension",
+                        3,
+                        "10-15",
+                        75,
+                        plan=_straight_plan(3, "10-15", 75),
+                        notes="Source range; 3 sets selected",
+                    ),
+                    _seed_exercise(
+                        "seated-leg-curl",
+                        3,
+                        "10-15",
+                        75,
+                        plan=_straight_plan(3, "10-15", 75),
+                        notes="Source range; 3 sets selected",
+                    ),
+                    _seed_exercise(
+                        "seated-calf-raise",
+                        4,
+                        "10-15",
+                        60,
+                        plan=_straight_plan(4, "10-15", 60),
+                        notes="Source range; 4 sets selected",
+                    ),
+                ],
+            ),
+        ],
+    },
+    {
+        "slug": "nsuns-4d",
+        "title": "nSuns 4-day",
+        "goal": "strength",
+        "level": "intermediate",
+        "split_type": "hybrid",
+        "default_duration_weeks": 1,
+        "provenance": _source_provenance(
+            source_program_name="nSuns Linear Progression 4-day",
+            creator="u/nSuns",
+            community="public Fitness Wiki archive",
+            canonical_source="https://thefitness.wiki/routines/nsuns-lp/",
+            source_version="frozen 4-day YFC variant from public archive accessed 2026-09-21",
+            adaptation_notes="One frozen ordered percentage/AMRAP representation; optional accessories are intentionally omitted.",
+            adaptation_ledger=[
+                {"field": "two_programmed_lifts_per_day", "status": "EXACT"},
+                {"field": "ordered_percentage_prescriptions", "status": "ADAPTED"},
+                {"field": "training_max_basis", "status": "EXACT"},
+                {"field": "amrap_progression", "status": "MANUAL_RULE"},
+                {
+                    "field": "optional_accessories",
+                    "status": "UNSUPPORTED",
+                    "blocking": False,
+                    "note": "Not presented as official rows",
+                },
+            ],
+            exercise_mapping={
+                "bench_press": {"canonical_slug": "bench-press", "status": "EXACT"},
+                "overhead_press": {"canonical_slug": "overhead-press", "status": "EXACT"},
+                "squat": {"canonical_slug": "squat", "status": "EXACT"},
+                "deadlift": {"canonical_slug": "deadlift", "status": "EXACT"},
+                "sumo_deadlift": {"canonical_slug": "sumo-deadlift", "status": "EXACT"},
+            },
+        ),
+        "program_metadata": _product_metadata(
+            level="intermediate",
+            goal="strength",
+            days_per_week=4,
+            representation_days=4,
+            split="hybrid",
+            equipment=["barbell", "bench", "rack"],
+            progression_style="ordered_percentage_training_max_amrap",
+            cycle_length_weeks=None,
+            advanced_methods=["amrap"],
+            frequency_model="four training days",
+        ),
+        "days": [
+            (
+                "Day 1 · Bench + OHP",
+                [
+                    _seed_exercise(
+                        "bench-press",
+                        7,
+                        "5+",
+                        180,
+                        plan=_training_max_plan(
+                            [75, 80, 85, 75, 80, 85, 90], [5, 5, 5, 5, 5, 5, None], 180
+                        ),
+                        notes="T1; ordered TRAINING_MAX loads; final AMRAP",
+                    ),
+                    _seed_exercise(
+                        "overhead-press",
+                        6,
+                        "8-4",
+                        120,
+                        plan=_strength_plan(
+                            [
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _amrap_reps(),
+                            ],
+                            120,
+                            loads=[
+                                _load_target("percent_training_max", value)
+                                for value in [65, 70, 75, 65, 70, 75]
+                            ],
+                        ),
+                        notes="T2; ordered TRAINING_MAX loads; final AMRAP",
+                    ),
+                ],
+            ),
+            (
+                "Day 2 · Squat + Sumo Deadlift",
+                [
+                    _seed_exercise(
+                        "squat",
+                        7,
+                        "5+",
+                        180,
+                        plan=_training_max_plan(
+                            [75, 80, 85, 75, 80, 85, 90], [5, 5, 5, 5, 5, 5, None], 180
+                        ),
+                        notes="T1; ordered TRAINING_MAX loads; final AMRAP",
+                    ),
+                    _seed_exercise(
+                        "sumo-deadlift",
+                        6,
+                        "8-4",
+                        150,
+                        plan=_strength_plan(
+                            [
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _amrap_reps(),
+                            ],
+                            150,
+                            loads=[
+                                _load_target("percent_training_max", value)
+                                for value in [65, 70, 75, 65, 70, 75]
+                            ],
+                        ),
+                        notes="T2; ordered TRAINING_MAX loads; final AMRAP",
+                    ),
+                ],
+            ),
+            (
+                "Day 3 · OHP + Bench",
+                [
+                    _seed_exercise(
+                        "overhead-press",
+                        7,
+                        "5+",
+                        150,
+                        plan=_training_max_plan(
+                            [75, 80, 85, 75, 80, 85, 90], [5, 5, 5, 5, 5, 5, None], 150
+                        ),
+                        notes="T1; ordered TRAINING_MAX loads; final AMRAP",
+                    ),
+                    _seed_exercise(
+                        "bench-press",
+                        6,
+                        "8-4",
+                        120,
+                        plan=_strength_plan(
+                            [
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _amrap_reps(),
+                            ],
+                            120,
+                            loads=[
+                                _load_target("percent_training_max", value)
+                                for value in [65, 70, 75, 65, 70, 75]
+                            ],
+                        ),
+                        notes="T2; ordered TRAINING_MAX loads; final AMRAP",
+                    ),
+                ],
+            ),
+            (
+                "Day 4 · Deadlift + Squat",
+                [
+                    _seed_exercise(
+                        "deadlift",
+                        7,
+                        "5+",
+                        210,
+                        plan=_training_max_plan(
+                            [75, 80, 85, 75, 80, 85, 90], [5, 5, 5, 5, 5, 5, None], 210
+                        ),
+                        notes="T1; ordered TRAINING_MAX loads; final AMRAP",
+                    ),
+                    _seed_exercise(
+                        "squat",
+                        6,
+                        "8-4",
+                        150,
+                        plan=_strength_plan(
+                            [
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _range_reps(4, 8),
+                                _amrap_reps(),
+                            ],
+                            150,
+                            loads=[
+                                _load_target("percent_training_max", value)
+                                for value in [65, 70, 75, 65, 70, 75]
+                            ],
+                        ),
+                        notes="T2; ordered TRAINING_MAX loads; final AMRAP",
+                    ),
+                ],
+            ),
+        ],
+    },
+    {
+        "slug": "metallicdpa-linear-progression-ppl",
+        "title": "Metallicdpa Linear Progression PPL",
+        "goal": "muscle_gain",
+        "level": "beginner",
+        "split_type": "push_pull_legs",
+        "default_duration_weeks": 1,
+        "provenance": _source_provenance(
+            source_program_name="A Linear Progression Based PPL Program for Beginners",
+            creator="u/Metallicdpa",
+            community="r/Fitness public archive",
+            canonical_source="https://thefitness.wiki/reddit-archive/a-linear-progression-based-ppl-program-for-beginners/",
+            source_version="public archive accessed 2026-09-21",
+            adaptation_notes="Six-day PPL representation; source deload remains a manual rule.",
+            adaptation_ledger=[
+                {"field": "six_day_ppl", "status": "EXACT"},
+                {"field": "alternating_main_lifts", "status": "ADAPTED"},
+                {"field": "final_set_amrap", "status": "EXACT"},
+                {"field": "linear_progression", "status": "MANUAL_RULE"},
+                {"field": "deload", "status": "MANUAL_RULE"},
+            ],
+            exercise_mapping={
+                "bench_press": {"canonical_slug": "bench-press", "status": "EXACT"},
+                "barbell_row": {"canonical_slug": "barbell-row", "status": "EXACT"},
+                "squat": {"canonical_slug": "squat", "status": "EXACT"},
+                "deadlift": {"canonical_slug": "deadlift", "status": "EXACT"},
+                "pull_up": {"canonical_slug": "pull-up", "status": "EXACT"},
+            },
+        ),
+        "program_metadata": _product_metadata(
+            level="beginner",
+            goal="muscle_gain",
+            days_per_week=6,
+            representation_days=6,
+            split="push_pull_legs",
+            equipment=["barbell", "dumbbell", "bench", "cable"],
+            progression_style="linear_main_lift_amrap",
+            cycle_length_weeks=None,
+            advanced_methods=["amrap"],
+            frequency_model="six training days",
+        ),
+        "days": [
+            (
+                "Pull A",
+                [
+                    _seed_exercise(
+                        "deadlift",
+                        3,
+                        "5+",
+                        180,
+                        plan=_amrap_last_plan(3, 5, 180),
+                        notes="Main lift; final set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "barbell-row", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
+                    ),
+                    _seed_exercise("pull-up", 3, "6-10", 120, plan=_straight_plan(3, "6-10", 120)),
+                    _seed_exercise(
+                        "barbell-curl", 3, "8-12", 90, plan=_straight_plan(3, "8-12", 90)
+                    ),
+                ],
+            ),
+            (
+                "Push A",
+                [
+                    _seed_exercise(
+                        "bench-press",
+                        3,
+                        "5+",
+                        150,
+                        plan=_amrap_last_plan(3, 5, 150),
+                        notes="Main lift; final set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "overhead-press", 3, "6-10", 120, plan=_straight_plan(3, "6-10", 120)
+                    ),
+                    _seed_exercise(
+                        "incline-bench-press", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
+                    ),
+                    _seed_exercise(
+                        "rope-pushdown", 3, "10-15", 75, plan=_straight_plan(3, "10-15", 75)
+                    ),
+                ],
+            ),
+            (
+                "Legs A",
+                [
+                    _seed_exercise(
+                        "squat",
+                        3,
+                        "5+",
+                        180,
+                        plan=_amrap_last_plan(3, 5, 180),
+                        notes="Main lift; final set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "romanian-deadlift", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
+                    ),
+                    _seed_exercise(
+                        "leg-press", 3, "10-15", 120, plan=_straight_plan(3, "10-15", 120)
+                    ),
+                    _seed_exercise(
+                        "standing-calf-raise", 3, "12-20", 60, plan=_straight_plan(3, "12-20", 60)
+                    ),
+                ],
+            ),
+            (
+                "Pull B",
+                [
+                    _seed_exercise(
+                        "barbell-row",
+                        3,
+                        "5+",
+                        150,
+                        plan=_amrap_last_plan(3, 5, 150),
+                        notes="Alternating main lift; final set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "one-arm-dumbbell-row", 3, "8-12", 90, plan=_straight_plan(3, "8-12", 90)
+                    ),
+                    _seed_exercise(
+                        "lat-pulldown", 3, "8-12", 90, plan=_straight_plan(3, "8-12", 90)
+                    ),
+                    _seed_exercise(
+                        "hammer-curl", 3, "10-15", 75, plan=_straight_plan(3, "10-15", 75)
+                    ),
+                ],
+            ),
+            (
+                "Push B",
+                [
+                    _seed_exercise(
+                        "incline-bench-press",
+                        3,
+                        "5+",
+                        150,
+                        plan=_amrap_last_plan(3, 5, 150),
+                        notes="Alternating main lift; final set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "seated-dumbbell-press", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
+                    ),
+                    _seed_exercise(
+                        "weighted-dip", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
+                    ),
+                    _seed_exercise(
+                        "dumbbell-lateral-raise",
+                        3,
+                        "12-20",
+                        60,
+                        plan=_straight_plan(3, "12-20", 60),
+                    ),
+                ],
+            ),
+            (
+                "Legs B",
+                [
+                    _seed_exercise(
+                        "front-squat",
+                        3,
+                        "5+",
+                        180,
+                        plan=_amrap_last_plan(3, 5, 180),
+                        notes="Alternating main lift; final set AMRAP",
+                    ),
+                    _seed_exercise(
+                        "bulgarian-split-squat", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
+                    ),
+                    _seed_exercise("leg-curl", 3, "10-15", 90, plan=_straight_plan(3, "10-15", 90)),
+                    _seed_exercise(
+                        "seated-calf-raise", 3, "12-20", 60, plan=_straight_plan(3, "12-20", 60)
+                    ),
+                ],
+            ),
+        ],
+    },
+    {
+        "slug": "bwf-recommended-routine",
+        "title": "BWF Recommended Routine",
+        "goal": "muscle_gain",
+        "level": "beginner",
+        "split_type": "full_body",
+        "default_duration_weeks": 1,
+        "provenance": _source_provenance(
+            source_program_name="Recommended Routine",
+            creator="r/bodyweightfitness community",
+            community="Reddit bodyweightfitness wiki",
+            canonical_source="https://old.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine",
+            source_version="source-dated selected path accessed 2026-09-21",
+            adaptation_notes="One fixed dynamic progression path selected; the evolving progression tree and isometric alternatives are not reproduced.",
+            adaptation_ledger=[
+                {"field": "bodyweight_identity", "status": "EXACT"},
+                {"field": "paired_exercises", "status": "EXACT"},
+                {"field": "selected_progression_path", "status": "ADAPTED"},
+                {
+                    "field": "dynamic_progression_tree",
+                    "status": "UNSUPPORTED",
+                    "blocking": False,
+                    "note": "Not claimed as reproduced",
+                },
+                {
+                    "field": "isometric_alternatives",
+                    "status": "ADAPTED",
+                    "note": "Fixed dynamic core path selected",
+                },
+            ],
+            exercise_mapping={
+                "vertical_pull": {"canonical_slug": "pull-up", "status": "EXACT"},
+                "horizontal_push": {"canonical_slug": "push-up", "status": "EXACT"},
+                "horizontal_pull": {"canonical_slug": "inverted-row", "status": "EXACT"},
+                "squat_progression": {"canonical_slug": "split-squat", "status": "ADAPTED"},
+                "hinge_progression": {
+                    "canonical_slug": "bodyweight-glute-bridge",
+                    "status": "ADAPTED",
+                },
+                "core_progression": {"canonical_slug": "dead-bug", "status": "ADAPTED"},
+            },
+        ),
+        "program_metadata": _product_metadata(
+            level="beginner",
+            goal="muscle_gain",
+            days_per_week=3,
+            representation_days=3,
+            split="full_body",
+            equipment=["bodyweight", "bench"],
+            progression_style="fixed_bodyweight_variation_path",
+            cycle_length_weeks=None,
+            advanced_methods=["paired_groups"],
+            frequency_model="three training days",
+        ),
+        "days": [
+            (
+                "Recommended Routine A",
+                [
+                    _seed_exercise(
+                        "pull-up",
+                        3,
+                        "5-8",
+                        90,
+                        plan=_straight_plan(3, "5-8", 90),
+                        group_id=1,
+                        group_kind="superset",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "push-up",
+                        3,
+                        "5-8",
+                        90,
+                        plan=_straight_plan(3, "5-8", 90),
+                        group_id=1,
+                        group_kind="superset",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "split-squat",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        group_id=2,
+                        group_kind="superset",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "inverted-row",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        group_id=2,
+                        group_kind="superset",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "bodyweight-glute-bridge",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=3,
+                        group_kind="circuit",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "dead-bug",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=3,
+                        group_kind="circuit",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "reverse-crunch",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=3,
+                        group_kind="circuit",
+                        group_order=3,
+                    ),
+                ],
+            ),
+            (
+                "Recommended Routine B",
+                [
+                    _seed_exercise(
+                        "inverted-row",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        group_id=4,
+                        group_kind="superset",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "push-up",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        group_id=4,
+                        group_kind="superset",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "split-squat",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        group_id=5,
+                        group_kind="superset",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "pull-up",
+                        3,
+                        "5-8",
+                        90,
+                        plan=_straight_plan(3, "5-8", 90),
+                        group_id=5,
+                        group_kind="superset",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "bodyweight-glute-bridge",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=6,
+                        group_kind="circuit",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "dead-bug",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=6,
+                        group_kind="circuit",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "reverse-crunch",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=6,
+                        group_kind="circuit",
+                        group_order=3,
+                    ),
+                ],
+            ),
+            (
+                "Recommended Routine C",
+                [
+                    _seed_exercise(
+                        "pull-up",
+                        3,
+                        "5-8",
+                        90,
+                        plan=_straight_plan(3, "5-8", 90),
+                        group_id=7,
+                        group_kind="superset",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "push-up",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        group_id=7,
+                        group_kind="superset",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "split-squat",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        group_id=8,
+                        group_kind="superset",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "inverted-row",
+                        3,
+                        "8-12",
+                        90,
+                        plan=_straight_plan(3, "8-12", 90),
+                        group_id=8,
+                        group_kind="superset",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "bodyweight-glute-bridge",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=9,
+                        group_kind="circuit",
+                        group_order=1,
+                    ),
+                    _seed_exercise(
+                        "dead-bug",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=9,
+                        group_kind="circuit",
+                        group_order=2,
+                    ),
+                    _seed_exercise(
+                        "reverse-crunch",
+                        3,
+                        "8-12",
+                        60,
+                        plan=_straight_plan(3, "8-12", 60),
+                        group_id=9,
+                        group_kind="circuit",
+                        group_order=3,
+                    ),
+                ],
+            ),
+        ],
+    },
+    {
+        "slug": "dumbbell-ppl-gregarioushermit",
+        "title": "Dumbbell P/P/L (Proposed Alternative to Dumbbell Stopgap)",
+        "goal": "muscle_gain",
+        "level": "intermediate",
+        "split_type": "push_pull_legs",
+        "default_duration_weeks": 1,
+        "provenance": _source_provenance(
+            source_program_name="Dumbbell P/P/L (Proposed Alternative to Dumbbell Stopgap)",
+            creator="u/gregariousHermit",
+            community="r/Fitness public archive",
+            canonical_source="https://thefitness.wiki/reddit-archive/dumbbell-stopgap-ppl/",
+            source_version="public archive accessed 2026-09-21",
+            adaptation_notes="Selected deterministic six-day P/P/L/P/P/L/Rest schedule; DB variants and deloads remain explicit adaptations/manual rules.",
+            adaptation_ledger=[
+                {"field": "dumbbell_hypertrophy_identity", "status": "EXACT"},
+                {"field": "six_day_schedule", "status": "ADAPTED", "decision": "P/P/L/P/P/L/Rest"},
+                {"field": "rep_cap_progression", "status": "EXACT"},
+                {"field": "exercise_deload", "status": "MANUAL_RULE"},
+            ],
+            exercise_mapping={
+                "dumbbell_bench_press": {
+                    "canonical_slug": "dumbbell-bench-press",
+                    "status": "EXACT",
+                },
+                "incline_dumbbell_press": {
+                    "canonical_slug": "incline-dumbbell-press",
+                    "status": "EXACT",
+                },
+                "one_arm_dumbbell_row": {
+                    "canonical_slug": "one-arm-dumbbell-row",
+                    "status": "EXACT",
+                },
+                "chest_supported_dumbbell_row": {
+                    "canonical_slug": "chest-supported-dumbbell-row",
+                    "status": "EXACT",
+                },
+                "single_leg_deadlift": {
+                    "canonical_slug": "single-leg-rdl",
+                    "status": "ADAPTED",
+                    "note": "Canonical RDL variant; source intent preserved",
+                },
+                "rear_delt_fly": {"canonical_slug": "rear-delt-fly", "status": "EXACT"},
+            },
+        ),
+        "program_metadata": _product_metadata(
+            level="intermediate",
+            goal="muscle_gain",
+            days_per_week=6,
+            representation_days=6,
+            split="push_pull_legs",
+            equipment=["dumbbell", "bench", "bodyweight"],
+            progression_style="rep_cap_double_progression",
+            cycle_length_weeks=None,
+            advanced_methods=[],
+            frequency_model="six training days followed by rest",
+        ),
+        "days": [
+            (
+                "Push A",
+                [
+                    _seed_exercise(
+                        "dumbbell-bench-press",
+                        3,
+                        "AMRAP 12",
+                        120,
+                        plan=_capped_amrap_plan(3, 12, 120),
+                    ),
+                    _seed_exercise(
+                        "incline-dumbbell-press",
+                        3,
+                        "AMRAP 12",
+                        120,
+                        plan=_capped_amrap_plan(3, 12, 120),
+                    ),
+                    _seed_exercise(
+                        "seated-dumbbell-press",
+                        3,
+                        "AMRAP 12",
+                        90,
+                        plan=_capped_amrap_plan(3, 12, 90),
+                    ),
+                    _seed_exercise(
+                        "dumbbell-lateral-raise",
+                        3,
+                        "AMRAP 12",
+                        60,
+                        plan=_capped_amrap_plan(3, 12, 60),
+                    ),
+                    _seed_exercise(
+                        "dumbbell-overhead-extension",
+                        3,
+                        "AMRAP 12",
+                        75,
+                        plan=_capped_amrap_plan(3, 12, 75),
+                    ),
+                ],
+            ),
+            (
+                "Pull A",
+                [
+                    _seed_exercise(
+                        "one-arm-dumbbell-row",
+                        3,
+                        "AMRAP 12",
+                        90,
+                        plan=_capped_amrap_plan(3, 12, 90),
+                    ),
+                    _seed_exercise(
+                        "chest-supported-dumbbell-row",
+                        3,
+                        "AMRAP 12",
+                        90,
+                        plan=_capped_amrap_plan(3, 12, 90),
+                    ),
+                    _seed_exercise(
+                        "rear-delt-fly", 3, "AMRAP 12", 60, plan=_capped_amrap_plan(3, 12, 60)
+                    ),
+                    _seed_exercise(
+                        "dumbbell-curl", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                    ),
+                    _seed_exercise(
+                        "dumbbell-shrug", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                    ),
+                ],
+            ),
+            (
+                "Legs A",
+                [
+                    _seed_exercise(
+                        "goblet-squat", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
+                    ),
+                    _seed_exercise(
+                        "single-leg-rdl", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
+                    ),
+                    _seed_exercise(
+                        "walking-lunge", 3, "AMRAP 12", 90, plan=_capped_amrap_plan(3, 12, 90)
+                    ),
+                    _seed_exercise(
+                        "leg-curl", 3, "AMRAP 12", 90, plan=_capped_amrap_plan(3, 12, 90)
+                    ),
+                    _seed_exercise(
+                        "standing-calf-raise", 3, "AMRAP 12", 60, plan=_capped_amrap_plan(3, 12, 60)
+                    ),
+                ],
+            ),
+            (
+                "Push B",
+                [
+                    _seed_exercise(
+                        "incline-dumbbell-press",
+                        3,
+                        "AMRAP 12",
+                        120,
+                        plan=_capped_amrap_plan(3, 12, 120),
+                    ),
+                    _seed_exercise(
+                        "dumbbell-bench-press",
+                        3,
+                        "AMRAP 12",
+                        120,
+                        plan=_capped_amrap_plan(3, 12, 120),
+                    ),
+                    _seed_exercise(
+                        "dumbbell-fly", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                    ),
+                    _seed_exercise(
+                        "arnold-press", 3, "AMRAP 12", 90, plan=_capped_amrap_plan(3, 12, 90)
+                    ),
+                    _seed_exercise(
+                        "dumbbell-overhead-extension",
+                        3,
+                        "AMRAP 12",
+                        75,
+                        plan=_capped_amrap_plan(3, 12, 75),
+                    ),
+                ],
+            ),
+            (
+                "Pull B",
+                [
+                    _seed_exercise(
+                        "chest-supported-dumbbell-row",
+                        3,
+                        "AMRAP 12",
+                        90,
+                        plan=_capped_amrap_plan(3, 12, 90),
+                    ),
+                    _seed_exercise(
+                        "one-arm-dumbbell-row",
+                        3,
+                        "AMRAP 12",
+                        90,
+                        plan=_capped_amrap_plan(3, 12, 90),
+                    ),
+                    _seed_exercise(
+                        "rear-delt-fly", 3, "AMRAP 12", 60, plan=_capped_amrap_plan(3, 12, 60)
+                    ),
+                    _seed_exercise(
+                        "hammer-curl", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                    ),
+                    _seed_exercise(
+                        "dumbbell-shrug", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                    ),
+                ],
+            ),
+            (
+                "Legs B",
+                [
+                    _seed_exercise(
+                        "bulgarian-split-squat",
+                        3,
+                        "AMRAP 12",
+                        120,
+                        plan=_capped_amrap_plan(3, 12, 120),
+                    ),
+                    _seed_exercise(
+                        "db-squat", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
+                    ),
+                    _seed_exercise(
+                        "single-leg-rdl", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
+                    ),
+                    _seed_exercise(
+                        "seated-leg-curl", 3, "AMRAP 12", 90, plan=_capped_amrap_plan(3, 12, 90)
+                    ),
+                    _seed_exercise(
+                        "seated-calf-raise", 3, "AMRAP 12", 60, plan=_capped_amrap_plan(3, 12, 60)
+                    ),
+                ],
+            ),
+        ],
+    },
+]
+
+STRENGTH_TEMPLATE_SPECS.extend(_SOURCE_TEMPLATE_SPECS)

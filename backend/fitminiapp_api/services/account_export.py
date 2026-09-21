@@ -487,6 +487,9 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
         "split_type": template.split_type,
         "is_public": template.is_public,
         "default_duration_weeks": template.effective_duration_weeks,
+        "provenance_type": template.provenance_type or "CUSTOM",
+        "provenance": template.provenance,
+        "program_metadata": template.program_metadata,
         "created_at": template.created_at,
         "days": [
             {

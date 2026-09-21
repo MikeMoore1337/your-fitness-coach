@@ -38,6 +38,10 @@ class ProgramTemplate(Base):
             "default_duration_weeks >= 1 AND default_duration_weeks <= 24",
             name="ck_program_templates_default_duration_weeks",
         ),
+        CheckConstraint(
+            "provenance_type IN ('YFC_GENERIC', 'SOURCE_ADAPTATION', 'CUSTOM')",
+            name="ck_program_templates_provenance_type",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -58,6 +62,11 @@ class ProgramTemplate(Base):
     default_duration_weeks: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
+    provenance_type: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="CUSTOM", server_default="CUSTOM", index=True
+    )
+    provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    program_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     @property
     def effective_duration_weeks(self) -> int:

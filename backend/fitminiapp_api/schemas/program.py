@@ -13,6 +13,7 @@ ProgramRecommendationGoal = Literal[
 ]
 ProgramExperience = Literal["beginner", "intermediate", "advanced"]
 ProgramSplitType = Literal["full_body", "upper_lower", "push_pull_legs", "body_part", "hybrid"]
+ProgramProvenanceType = Literal["YFC_GENERIC", "SOURCE_ADAPTATION", "CUSTOM"]
 TrainingLocation = Literal["gym", "home", "other"]
 EquipmentIdentifier = Literal[
     "bodyweight",
@@ -97,6 +98,7 @@ PrescriptionLoadKind = Literal[
     "user_selected",
     "absolute",
     "percent_1rm",
+    "percent_training_max",
     "relative_to_top",
     "relative_to_previous",
 ]
@@ -166,8 +168,12 @@ class PrescriptionLoadTarget(BaseModel):
             raise ValueError("user_selected load must not carry a fixed value")
         if self.kind != "user_selected" and self.value is None:
             raise ValueError("non-user-selected load requires value")
-        if self.kind == "percent_1rm" and self.value is not None and self.value > 200:
-            raise ValueError("percent_1rm must not exceed 200")
+        if (
+            self.kind in {"percent_1rm", "percent_training_max"}
+            and self.value is not None
+            and self.value > 200
+        ):
+            raise ValueError(f"{self.kind} must not exceed 200")
         return self
 
 
@@ -291,7 +297,7 @@ class ProgramTemplateDayCreate(BaseModel):
 
 class ProgramTemplateCreate(BaseModel):
     title: str = Field(min_length=1, max_length=128)
-    goal: Literal["muscle_gain", "fat_loss", "maintenance", "recomposition"]
+    goal: ProgramRecommendationGoal
     level: Literal["beginner", "intermediate", "advanced"]
     mode: Literal["self", "coach"] = "self"
     target_telegram_user_id: int | None = Field(default=None, ge=1)
@@ -377,6 +383,9 @@ class ProgramTemplateResponse(BaseModel):
     assigned_program_duration_weeks: int | None = None
     current_revision_number: int | None = None
     default_duration_weeks: int = Field(default=1, ge=1, le=24)
+    provenance_type: ProgramProvenanceType = "CUSTOM"
+    provenance: dict[str, object] | None = None
+    program_metadata: dict[str, object] | None = None
     days: list[ProgramTemplateDayResponse]
 
 

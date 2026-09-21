@@ -53,7 +53,7 @@ from fitminiapp_api.services.workout_metrics import (
     exercise_metric_type,
 )
 
-GOALS = {"muscle_gain", "fat_loss", "maintenance", "recomposition"}
+GOALS = {"muscle_gain", "fat_loss", "maintenance", "recomposition", "strength"}
 LEVELS = {"beginner", "intermediate", "advanced"}
 MODES = {"self", "coach"}
 LEGACY_DEMO_TEMPLATE_SLUG = "upper-lower-4x"
@@ -121,6 +121,9 @@ def _serialize_template_with_context(
         "level": item.level,
         "default_duration_weeks": item.effective_duration_weeks,
         "split_type": item.split_type,
+        "provenance_type": item.provenance_type or "CUSTOM",
+        "provenance": item.provenance,
+        "program_metadata": item.program_metadata,
         "owner_user_id": item.owner_user_id,
         "owner_telegram_user_id": owner.telegram_user_id if owner else None,
         "owner_full_name": owner.profile.full_name if owner and owner.profile else None,
@@ -351,6 +354,9 @@ def create_template(
         owner_user_id=None if is_public else owner_user.id,
         created_by_user_id=current_user.id,
         is_public=is_public,
+        provenance_type="CUSTOM",
+        provenance=None,
+        program_metadata=None,
     )
     db.add(template)
     db.flush()

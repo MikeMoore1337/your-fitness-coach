@@ -9672,7 +9672,7 @@ export interface components {
              * @default user_selected
              * @enum {string}
              */
-            kind: "user_selected" | "absolute" | "percent_1rm" | "relative_to_top" | "relative_to_previous";
+            kind: "user_selected" | "absolute" | "percent_1rm" | "percent_training_max" | "relative_to_top" | "relative_to_previous";
             /** Value */
             value?: number | null;
         };
@@ -10091,7 +10091,7 @@ export interface components {
              * Goal
              * @enum {string}
              */
-            goal: "muscle_gain" | "fat_loss" | "maintenance" | "recomposition";
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
             /**
              * Level
              * @enum {string}
@@ -10312,6 +10312,20 @@ export interface components {
              * @default 1
              */
             default_duration_weeks: number;
+            /**
+             * Provenance Type
+             * @default CUSTOM
+             * @enum {string}
+             */
+            provenance_type: "YFC_GENERIC" | "SOURCE_ADAPTATION" | "CUSTOM";
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            } | null;
+            /** Program Metadata */
+            program_metadata?: {
+                [key: string]: unknown;
+            } | null;
             /** Days */
             days: components["schemas"]["ProgramTemplateDayResponse"][];
         };
