@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 TABLE_NAME = "hermes_egress"
 CHAIN_NAME = "forward"
+INPUT_CHAIN_NAME = "input"
 NETWORK_NAME = "hermes-net"
 PROVIDER_HOST = "api.groq.com"
 INTAKE_HOST = "app.your-fitness-coach.ru"
@@ -277,6 +278,7 @@ def build_rules(
     allowed_addresses: set[Address],
     dns_servers: set[Address],
     intake_addresses: set[Address] | None = None,
+    bridge: str | None = None,
 ) -> str:
     if not subnets:
         raise EgressError("hermes_subnet_missing")
@@ -292,6 +294,12 @@ def build_rules(
         f"add table inet {TABLE_NAME}",
         f"add chain inet {TABLE_NAME} {CHAIN_NAME} {{ type filter hook forward priority -100; policy accept; }}",
     ]
+    if bridge:
+        if not BRIDGE_NAME_PATTERN.fullmatch(bridge):
+            raise EgressError("docker_bridge_invalid")
+        lines.append(
+            f"add chain inet {TABLE_NAME} {INPUT_CHAIN_NAME} {{ type filter hook input priority -100; policy accept; }}"
+        )
     if source_v4:
         source = _elements(source_v4)
         lines.extend(
@@ -332,6 +340,44 @@ def build_rules(
             )
     source_v4_text = _elements(source_v4)
     source_v6_text = _elements(source_v6)
+    if bridge and source_v4:
+        source = _elements(source_v4)
+        lines.extend(
+            [
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ct state invalid drop',
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ct state established,related accept',
+            ]
+        )
+        if dns_v4:
+            dns = _elements(dns_v4)
+            lines.extend(
+                [
+                    f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ip daddr {{ {dns} }} udp dport 53 accept',
+                    f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ip daddr {{ {dns} }} tcp dport 53 accept',
+                ]
+            )
+        lines.append(
+            f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} drop'
+        )
+    if bridge and source_v6:
+        source = _elements(source_v6)
+        lines.extend(
+            [
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ct state invalid drop',
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ct state established,related accept',
+            ]
+        )
+        if dns_v6:
+            dns = _elements(dns_v6)
+            lines.extend(
+                [
+                    f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ip6 daddr {{ {dns} }} udp dport 53 accept',
+                    f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ip6 daddr {{ {dns} }} tcp dport 53 accept',
+                ]
+            )
+        lines.append(
+            f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} drop'
+        )
     if intake_v4 and source_v4:
         lines.append(
             f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ct original daddr {{ {_elements(intake_v4)} }} tcp dport 443 accept"
@@ -390,7 +436,7 @@ def refresh(
     addresses.update(intake_addresses)
     dns_servers = _dns_servers(resolv_conf)
     bridge, subnets = _network_details(network)
-    _apply_rules(build_rules(subnets, addresses, dns_servers, intake_addresses))
+    _apply_rules(build_rules(subnets, addresses, dns_servers, intake_addresses, bridge))
     return {
         "status": "refreshed",
         "table": TABLE_NAME,

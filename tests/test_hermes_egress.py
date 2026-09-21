@@ -122,6 +122,35 @@ def test_build_rules_allows_only_public_intake_hairpin_after_docker_dnat() -> No
     assert "ct original daddr { 172.28.0.10 }" not in rules
 
 
+def test_build_rules_adds_scoped_host_input_default_deny() -> None:
+    rules = egress.build_rules(
+        {ipaddress.ip_network("172.31.0.0/24")},
+        {ipaddress.ip_address("203.0.113.10")},
+        {ipaddress.ip_address("127.0.0.53")},
+        bridge="br-abcdef123456",
+    )
+
+    assert (
+        "add chain inet hermes_egress input { type filter hook input priority -100; "
+        "policy accept; }"
+    ) in rules
+    assert (
+        'iifname "br-abcdef123456" ip saddr { 172.31.0.0/24 } '
+        "ip daddr { 127.0.0.53 } udp dport 53 accept"
+    ) in rules
+    assert 'iifname "br-abcdef123456" ip saddr { 172.31.0.0/24 } drop' in rules
+
+
+def test_build_rules_rejects_untrusted_bridge_name() -> None:
+    with pytest.raises(egress.EgressError, match="docker_bridge_invalid"):
+        egress.build_rules(
+            {ipaddress.ip_network("172.31.0.0/24")},
+            set(),
+            set(),
+            bridge="br;drop",
+        )
+
+
 def test_selected_worker_values_require_private_file_and_ignore_secrets(tmp_path: Path) -> None:
     path = tmp_path / "worker.env"
     path.write_text(

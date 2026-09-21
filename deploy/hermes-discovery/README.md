@@ -111,6 +111,10 @@ YFC до `forward` hook. Для этого единственного случа
 `ct original daddr` текущего публичного intake IP и TCP/443; прямой доступ к приватным
 YFC/Docker subnet по-прежнему попадает под deny.
 
+Та же таблица имеет scoped `input` hook для `hermes-net`: от bridge разрешены только
+необходимые DNS-запросы и established/related state, остальные host-local порты (включая
+SSH) отбрасываются до общих YFC host rules.
+
 На co-located host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`, used swap
 `<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Он использует
 тот же canonical YFC deployment lock
