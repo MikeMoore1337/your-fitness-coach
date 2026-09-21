@@ -30,11 +30,11 @@ def discovery_root() -> Path:
 
 
 def evidence_root() -> Path:
-    return repo_root() / ".artifacts" / "tasks" / "129" / "evidence" / "discovery-scheduler"
+    return repo_root() / ".artifacts" / "tasks" / "403" / "evidence" / "discovery-scheduler"
 
 
 def image_ref() -> str:
-    return os.environ.get("HERMES_DISCOVERY_IMAGE", "task129-hermes-discovery:repo-local")
+    return os.environ.get("HERMES_DISCOVERY_IMAGE", "task403-hermes-discovery:repo-local")
 
 
 def run(
@@ -70,6 +70,8 @@ def provenance() -> None:
     )
     drain_path = root / "hermes_worker_drain.py"
     drain_source = drain_path.read_text(encoding="utf-8")
+    health_path = root / "hermes_health.py"
+    health_source = health_path.read_text(encoding="utf-8")
     guard_path = root / "hermes_resource_guard.py"
     guard_source = guard_path.read_text(encoding="utf-8")
     egress_path = root / "hermes_egress.py"
@@ -88,7 +90,7 @@ def provenance() -> None:
     )
     forbidden_imports = {"subprocess", "httpx", "playwright", "selenium", "requests"}
     checks = {
-        "schema": document.get("schemaVersion") == "task129-hermes-discovery-provenance-v1",
+        "schema": document.get("schemaVersion") == "task403-hermes-discovery-provenance-v2",
         "base.image": document.get("base", {}).get("image") == BASE_IMAGE,
         "base.digest": document.get("base", {}).get("digest") == BASE_DIGEST,
         "base.platform": document.get("base", {}).get("platform") == "linux/amd64",
@@ -99,6 +101,11 @@ def provenance() -> None:
         "dependencies.none": document.get("dependencies", {}).get("thirdPartyPython") == [],
         "dependencies.floating": document.get("dependencies", {}).get("floatingVersions") is False,
         "source.schema": (root / "source-definitions.schema.json").is_file(),
+        "runtime.health": "hermes-pipeline-health-v1" in health_source,
+        "runtime.syntax": all(
+            ast.parse(path.read_text(encoding="utf-8"), filename=str(path)) is not None
+            for path in (runner_path, drain_path, guard_path, egress_path, health_path)
+        ),
         "systemd.definitions_digest": all(
             "HERMES_DISCOVERY_DEFINITIONS_SHA256=@SOURCE_DEFINITIONS_SHA256@" in unit
             for unit in (discovery_unit, drain_unit)
@@ -373,7 +380,7 @@ def e2e() -> None:
     environment = os.environ.copy()
     environment["HERMES_DISCOVERY_IMAGE"] = image_ref()
     environment["HERMES_WORKER_IMAGE"] = os.environ.get(
-        "HERMES_WORKER_IMAGE", "task129-hermes-editorial-worker:repo-local"
+        "HERMES_WORKER_IMAGE", "task403-hermes-editorial-worker:repo-local"
     )
     environment["TASK129_DISCOVERY_ARTIFACT_ROOT"] = tempfile.mkdtemp(
         prefix="local-e2e-run-", dir=evidence_root()

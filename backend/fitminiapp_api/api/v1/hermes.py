@@ -25,6 +25,7 @@ _CLIENT_ERROR_CODES = {
     "source_packet_rejected",
     "source_content_digest_mismatch",
     "source_content_too_large",
+    "source_relevance_rejected",
     "source_publication_not_fresh",
     "source_item_missing",
     "cluster_missing",

@@ -17,13 +17,15 @@ from typing import Any
 from urllib.parse import urlsplit
 
 SCHEMA_VERSION = "hermes-source-definitions-v1"
-GENERATOR_VERSION = "task129-yfc-source-registry-renderer-v1"
+GENERATOR_VERSION = "task403-yfc-source-registry-renderer-v1"
 SOURCE_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{1,63}$")
 HOST_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
 FETCH_KINDS = frozenset({"rss", "json_feed", "html_metadata"})
 SUPPORTED_TOPICS = (
     "sports_nutrition",
     "dietary_supplements",
+    "sports_bodybuilding_pharmacology",
+    "strength_hypertrophy",
     "medicine",
     "health",
     "fitness",

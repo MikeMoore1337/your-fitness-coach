@@ -3286,6 +3286,106 @@ class TaskController:
             StateStore.replace_json(self.store.delivery_path, delivery)
         return current
 
+    def reopen_after_production(
+        self,
+        task_id: str,
+        *,
+        reason: str,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        """Safely continue a terminal task while preserving its prior production evidence."""
+
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError("reopen-after-production requires explicit owner authorization")
+        if not reason.strip():
+            raise TaskSessionError("reopen-after-production requires a non-empty reason")
+        lease, _delivery = self._require_delivery_owner(expected)
+        if self._lease_state(lease) != "production-success":
+            raise TaskSessionError(
+                f"Task {expected} cannot continue from {lease.get('lifecycle_state')}"
+            )
+        history_path = self.store.history / f"task-{expected}.json"
+        history = self.store.read_json(history_path)
+        if not isinstance(history, dict) or history.get("state") != "production-success":
+            raise TaskSessionError(
+                f"Task {expected} continuation requires production-success history"
+            )
+        worktree = Path(str(lease.get("worktree", ""))).resolve()
+        if self.repository.status(worktree):
+            raise TaskSessionError(f"Task {expected} continuation refuses dirty worktree")
+        operations = self.repository.operation_issues(worktree)
+        if operations:
+            raise TaskSessionError(
+                f"Task {expected} continuation refuses interrupted Git operation: {operations}"
+            )
+        previous = dict(history)
+        now = utc_now()
+        with self.store.lock():
+            lease_path = self.store.task_lease_path(expected)
+            current = self.store.read_json(lease_path)
+            current_delivery = self.store.delivery_state()
+            current_history = self.store.read_json(history_path)
+            owner = current_delivery.get("owner")
+            if (
+                not isinstance(current, dict)
+                or self._lease_state(current) != "production-success"
+                or not isinstance(owner, dict)
+                or str(owner.get("task_id", "")).upper() != expected
+            ):
+                raise TaskSessionError(
+                    f"Task {expected} production continuation ownership changed before reopen"
+                )
+            if current_history != history:
+                raise TaskSessionError("Task production history changed before continuation reopen")
+            for key in (
+                "delivery_owner",
+                "delivery_acquired_at",
+                "delivery_base_origin_master_sha",
+                "delivery_head_sha",
+                "delivery_anchor",
+                "ready_head_sha",
+                "ready_base_origin_master_sha",
+                "ready_for_delivery_at",
+                "ready_sequence",
+                "quality_verdict",
+                "qa_verdict",
+                "task_provenance",
+                "canonical_master_refresh",
+                "delivery_priority_override",
+                "merge_sha",
+                "deployed_sha",
+            ):
+                current.pop(key, None)
+            current.update(
+                {
+                    "lifecycle_state": "review",
+                    "review_reopened_at": now,
+                    "review_reopen_reason": reason,
+                    "continuation_of_production_success": {
+                        "merge_sha": previous.get("merge_sha"),
+                        "deployed_sha": previous.get("deployed_sha"),
+                        "pr_number": previous.get("pr_number"),
+                    },
+                    "updated_at": now,
+                }
+            )
+            continuation_history = {
+                "version": TASK_STATE_VERSION,
+                "task_id": expected,
+                "state": "continuation-in-progress",
+                "continuation_started_at": now,
+                "continuation_reason": reason,
+                "previous_production_success": previous,
+            }
+            current_delivery["owner"] = None
+            current_delivery.pop("priority_override", None)
+            current_delivery["updated_at"] = now
+            StateStore.replace_json(lease_path, current)
+            StateStore.replace_json(history_path, continuation_history)
+            StateStore.replace_json(self.store.delivery_path, current_delivery)
+        return current
+
     def resolve_recovery(
         self, task_id: str, *, reason: str, owner_authorize: bool
     ) -> dict[str, Any]:
@@ -3671,6 +3771,16 @@ class TaskController:
             raise TaskSessionError(
                 "Production deployment is not terminal-success for the exact SHA"
             )
+        history_path = self.store.history / f"task-{expected}.json"
+        prior_history = self.store.read_json(history_path)
+        continuation_history = (
+            prior_history
+            if isinstance(prior_history, dict)
+            and prior_history.get("state") == "continuation-in-progress"
+            else None
+        )
+        if prior_history is not None and continuation_history is None:
+            raise TaskSessionError(f"Production success history already exists for Task {expected}")
         history = {
             "version": TASK_STATE_VERSION,
             "task_id": expected,
@@ -3682,6 +3792,17 @@ class TaskController:
             "pr_number": pr_number,
             "completed_at": utc_now(),
         }
+        if continuation_history is not None:
+            previous = continuation_history.get("previous_production_success")
+            if not isinstance(previous, dict):
+                raise TaskSessionError("Task continuation history has no prior production evidence")
+            history.update(
+                {
+                    "continuation_started_at": continuation_history.get("continuation_started_at"),
+                    "continuation_reason": continuation_history.get("continuation_reason"),
+                    "previous_production_success": previous,
+                }
+            )
         with self.store.lock():
             current = self.store.read_json(lease_path)
             latest_delivery = self.store.delivery_state()
@@ -3706,10 +3827,10 @@ class TaskController:
                 history["queue_budget"] = current["queue_budget"]
             if "delivery_priority_override" in current:
                 history["delivery_priority_override"] = current["delivery_priority_override"]
-            history_path = self.store.history / f"task-{expected}.json"
-            if history_path.exists():
+            latest_history = self.store.read_json(history_path)
+            if latest_history != prior_history:
                 raise TaskSessionError(
-                    f"Production success history already exists for Task {expected}"
+                    "Task production history changed before production completion"
                 )
             now = utc_now()
             current["lifecycle_state"] = "production-success"
@@ -3718,7 +3839,7 @@ class TaskController:
             current["updated_at"] = now
             StateStore.replace_json(lease_path, current)
             history["closeout_required"] = True
-            self.store.create_json(history_path, history)
+            StateStore.replace_json(history_path, history)
         return history
 
     def recover(self, task_id: str) -> dict[str, Any]:
@@ -4124,6 +4245,10 @@ def _parser() -> argparse.ArgumentParser:
     reopen_review = subparsers.add_parser("reopen-for-review")
     reopen_review.add_argument("task_id")
     reopen_review.add_argument("--reason", required=True)
+    reopen_production = subparsers.add_parser("reopen-after-production")
+    reopen_production.add_argument("task_id")
+    reopen_production.add_argument("--reason", required=True)
+    reopen_production.add_argument("--owner-authorize", action="store_true")
     resolve_recovery = subparsers.add_parser("resolve-recovery")
     resolve_recovery.add_argument("task_id")
     resolve_recovery.add_argument("--reason", required=True)
@@ -4233,6 +4358,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "reopen-for-review":
             _print(controller.reopen_for_review(args.task_id, reason=args.reason))
+            return 0
+        if args.command == "reopen-after-production":
+            _print(
+                controller.reopen_after_production(
+                    args.task_id,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            )
             return 0
         if args.command == "resolve-recovery":
             _print(

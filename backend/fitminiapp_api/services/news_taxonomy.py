@@ -13,8 +13,10 @@ from typing import Literal
 TAXONOMY_VERSION = "news-taxonomy-v1"
 RISK_POLICY_VERSION = "news-risk-v1"
 VOICE_PROFILE_VERSION = "yfc-news-voice-v1"
+RELEVANCE_VERSION = "news-relevance-v1"
 
 EDITORIAL_TOPICS = (
+    "sports_bodybuilding_pharmacology",
     "medicine",
     "health",
     "public_health",
@@ -60,6 +62,7 @@ RISK_LEVELS = ("low", "moderate", "high", "critical", "unknown")
 PUBLICATION_POLICIES = ("blocked", "manual_required", "auto_eligible")
 
 Topic = Literal[
+    "sports_bodybuilding_pharmacology",
     "medicine",
     "health",
     "public_health",
@@ -86,6 +89,26 @@ def _pattern(*parts: str) -> re.Pattern[str]:
 
 
 TOPIC_MARKERS: dict[str, tuple[str, ...]] = {
+    "sports_bodybuilding_pharmacology": (
+        "anabolic steroid",
+        "anabolic-androgenic",
+        "performance-enhancing drug",
+        "performance enhancing drug",
+        "ped use",
+        "aas",
+        "sarm",
+        "selective androgen receptor",
+        "testosterone",
+        "growth hormone",
+        "bodybuilding pharmacology",
+        "анабол",
+        "стероид",
+        "допинг",
+        "тестостерон",
+        "сарм",
+        "гормон роста",
+        "фармаколог",
+    ),
     "medicine": (
         "medicine",
         "medical",
@@ -390,8 +413,241 @@ class PublicationPolicy:
     risk_policy_version: str = RISK_POLICY_VERSION
 
 
+@dataclass(frozen=True)
+class EditorialRelevance:
+    allowed: bool
+    reason_code: str
+    strength: str
+    topics: tuple[str, ...]
+    relevance_version: str = RELEVANCE_VERSION
+
+
 def _contains_any(text: str, markers: tuple[str, ...]) -> bool:
     return any(marker in text for marker in markers)
+
+
+_RELEVANCE_MARKERS: dict[str, tuple[str, ...]] = {
+    "strength_hypertrophy": (
+        "strength training",
+        "resistance training",
+        "hypertrophy",
+        "muscle growth",
+        "muscle mass",
+        "muscle",
+        "muscle hypertrophy",
+        "powerlifting",
+        "weightlifting",
+        "силов трен",
+        "гипертроф",
+        "рост мышц",
+        "мышечн масс",
+        "пауэрлифт",
+    ),
+    "bodybuilding": (
+        "bodybuilding",
+        "bodybuilder",
+        "physique competition",
+        "physique athlete",
+        "бодибилд",
+        "соревновательн подготовк",
+    ),
+    "sports_nutrition": (
+        "sports nutrition",
+        "sport nutrition",
+        "protein powder",
+        "protein supplement",
+        "dietary protein",
+        "protein intake",
+        "creatine",
+        "amino acid",
+        "bcaa",
+        "eaa",
+        "carbohydrate gel",
+        "electrolyte",
+        "pre-workout",
+        "preworkout",
+        "спортивн питани",
+        "протеин",
+        "креатин",
+        "аминокислот",
+        "электролит",
+        "изотоник",
+        "предтренировоч",
+    ),
+    "dietary_supplements": (
+        "dietary supplement",
+        "supplement use",
+        "supplementation",
+        "omega-3",
+        "omega 3",
+        "probiotic",
+        "prebiotic",
+        "бад",
+        "пищев добавк",
+        "добавк для спортсмен",
+    ),
+    "sports_bodybuilding_pharmacology": TOPIC_MARKERS["sports_bodybuilding_pharmacology"],
+    "training": (
+        "training load",
+        "training volume",
+        "periodization",
+        "workout program",
+        "interval training",
+        "endurance training",
+        "endurance performance",
+        "cardio interval",
+        "resistance exercise",
+        "тренировочн нагрузк",
+        "объем трениров",
+        "периодизац",
+        "программ трениров",
+    ),
+    "mobility_recovery_sleep": (
+        "recovery",
+        "sleep duration",
+        "sleep and recovery",
+        "sleep quality",
+        "mobility training",
+        "flexibility training",
+        "восстановлени",
+        "качество сна",
+        "мобильност",
+        "mobility exercise",
+        "гибкост",
+    ),
+}
+
+_GENERIC_REJECTION_MARKERS = {
+    "generic_clinical_medicine": (
+        "clinical",
+        "patient",
+        "disease",
+        "hospital",
+        "medicine",
+        "medical",
+        "клиническ",
+        "пациент",
+        "заболеван",
+        "медицин",
+    ),
+    "generic_public_health": (
+        "public health",
+        "population health",
+        "epidemiology",
+        "общественн здравоохран",
+        "эпидеми",
+    ),
+    "generic_food_or_product": (
+        "food science",
+        "food product",
+        "food technology",
+        "пищев технолог",
+        "food industry",
+        "company launch",
+        "новый продукт",
+    ),
+    "generic_fitness": ("fitness", "physical activity", "здоровый образ жизни", "фитнес"),
+}
+
+_WEAK_RELEVANCE_MARKERS = {
+    "strength_hypertrophy": {"muscle"},
+    "mobility_recovery_sleep": {"recovery"},
+}
+
+
+def _has_strong_subject_marker(topic: str, subject: str) -> bool:
+    weak = _WEAK_RELEVANCE_MARKERS.get(topic, set())
+    return _contains_any(
+        subject,
+        tuple(
+            marker.casefold()
+            for marker in _RELEVANCE_MARKERS[topic]
+            if marker.casefold() not in weak
+        ),
+    )
+
+
+def evaluate_editorial_relevance(
+    title: str,
+    summary: str = "",
+    content: str = "",
+) -> EditorialRelevance:
+    """Allow only bounded, deterministic training-domain candidates for Hermes editorial work."""
+
+    subject = f"{title} {summary}".casefold()
+    normalized = f"{subject} {content[:32_000]}".casefold()
+    subject_matched = tuple(
+        topic
+        for topic, markers in _RELEVANCE_MARKERS.items()
+        if _contains_any(subject, tuple(marker.casefold() for marker in markers))
+    )
+    matched = tuple(
+        topic
+        for topic, markers in _RELEVANCE_MARKERS.items()
+        if _contains_any(normalized, tuple(marker.casefold() for marker in markers))
+    )
+    sports_context = any(
+        topic in subject_matched
+        for topic in (
+            "strength_hypertrophy",
+            "bodybuilding",
+            "sports_nutrition",
+            "dietary_supplements",
+            "training",
+            "mobility_recovery_sleep",
+        )
+    )
+    sports_context = sports_context or any(
+        marker in subject
+        for marker in (
+            "sport",
+            "athlete",
+            "athletic",
+            "для спорта",
+            "спортсмен",
+            "muscle",
+            "мышц",
+        )
+    )
+    if not matched:
+        reason = next(
+            (
+                f"topic_rejected:{code}"
+                for code, markers in _GENERIC_REJECTION_MARKERS.items()
+                if _contains_any(normalized, tuple(marker.casefold() for marker in markers))
+            ),
+            "topic_rejected:no_relevant_training_domain",
+        )
+        return EditorialRelevance(False, reason, "none", ())
+    if "sports_bodybuilding_pharmacology" in matched and not sports_context:
+        return EditorialRelevance(
+            False,
+            "topic_rejected:generic_clinical_medicine",
+            "none",
+            (),
+        )
+    subject_topics = tuple(topic for topic in matched if _has_strong_subject_marker(topic, subject))
+    if not subject_topics:
+        return EditorialRelevance(
+            False,
+            "topic_rejected:weak_or_context_only",
+            "none",
+            (),
+        )
+    strong_topics = {
+        "strength_hypertrophy",
+        "bodybuilding",
+        "sports_nutrition",
+        "dietary_supplements",
+        "sports_bodybuilding_pharmacology",
+    }
+    strength = "strong" if any(topic in strong_topics for topic in matched) else "moderate"
+    return EditorialRelevance(
+        True,
+        f"topic_allowed:{matched[0]}",
+        strength,
+        matched,
+    )
 
 
 def classify_editorial_text(
@@ -462,7 +718,15 @@ def classify_editorial_text(
         risk_reasons.append("unsafe_or_prompt_injection_content")
     if evidence_level in {"preliminary", "conflicting"}:
         risk_reasons.append(f"evidence_{evidence_level}")
-    if any(topic in topics for topic in ("medicine", "peptides", "sports_medicine_injuries")):
+    if any(
+        topic in topics
+        for topic in (
+            "medicine",
+            "peptides",
+            "sports_medicine_injuries",
+            "sports_bodybuilding_pharmacology",
+        )
+    ):
         risk_reasons.append("sensitive_health_topic")
     if product_class in {"medicine", "peptide"}:
         risk_reasons.append("sensitive_product_class")

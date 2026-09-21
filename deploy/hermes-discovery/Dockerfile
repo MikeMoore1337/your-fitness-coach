@@ -11,7 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /opt/hermes
 
-COPY discovery_runner.py hermes-discovery-provenance.json license_bundle.py requirements.lock ./
+COPY discovery_runner.py hermes_health.py hermes-discovery-provenance.json license_bundle.py requirements.lock ./
 COPY source-definitions.schema.json /opt/hermes/config/source-definitions.schema.json
 COPY LICENSES /opt/licenses-source/
 

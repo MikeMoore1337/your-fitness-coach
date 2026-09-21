@@ -56,6 +56,7 @@ from fitminiapp_api.services.news_taxonomy import (
     TAXONOMY_VERSION,
     VOICE_PROFILE_VERSION,
     classify_editorial_text,
+    evaluate_editorial_relevance,
     evaluate_publication_policy,
 )
 
@@ -339,6 +340,9 @@ def accept_hermes_submission(
         raise HermesIntakeError("source_content_hash_mismatch")
     if sha256_text(payload.source.content) != payload.source.content_sha256:
         raise HermesIntakeError("source_content_digest_mismatch")
+    relevance = evaluate_editorial_relevance(title, summary, source_content)
+    if not relevance.allowed:
+        raise HermesIntakeError("source_relevance_rejected")
 
     parsed = ParsedNewsItem(
         external_id=payload.source.external_id,
@@ -346,6 +350,7 @@ def accept_hermes_submission(
         primary_url=primary_url,
         title=title,
         summary=summary,
+        content=source_content,
         author=payload.source.author,
         publisher=payload.source.publisher,
         published_at=payload.source.published_at,
@@ -442,6 +447,10 @@ def accept_hermes_submission(
         "publication_policy": policy.publication_policy,
         "risk_reasons": list(policy.risk_reasons),
         "risk_policy_version": RISK_POLICY_VERSION,
+        "relevance_version": relevance.relevance_version,
+        "relevance_reason_code": relevance.reason_code,
+        "relevance_strength": relevance.strength,
+        "relevance_topics": list(relevance.topics),
         "voice_profile_version": VOICE_PROFILE_VERSION,
         "editorial_profile": settings.news_draft_profile,
         "submitted_by": HERMES_SUBMISSION_MARKER,

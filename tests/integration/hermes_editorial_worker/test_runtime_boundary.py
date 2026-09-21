@@ -49,7 +49,7 @@ def test_provenance_and_dependency_inventory_are_exact() -> None:
     )
     assert provenance["upstream"]["tag"] == "v2026.8.31"
     assert provenance["upstream"]["commit"] == "29112bef099274229cadff79cdff7bf7b99c4b77"
-    assert provenance["worker"]["sourceBehaviorPatches"] == 0
+    assert provenance["worker"]["sourceBehaviorPatches"]["relevanceGate"]
     assert provenance["worker"]["publishCapability"] is False
     assert provenance["worker"]["telegramCapability"] is False
     assert provenance["worker"]["toolCapability"] is False

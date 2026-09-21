@@ -28,15 +28,16 @@ Canonical allowlist — `backend/fitminiapp_api/resources/news_sources.json`. В
 artifact, его нельзя редактировать вручную. Перед установкой его SHA-256 должен быть подставлен
 в оба systemd template как `HERMES_DISCOVERY_DEFINITIONS_SHA256`; external runtime отклоняет
 файл с отсутствующим или несовпадающим digest. На target host он монтируется read-only в
-`/opt/hermes/config/source-definitions.json`.
+`/etc/hermes/current/source-definitions.json`.
 
 Тестовый `local_mock` envelope может содержать только loopback/`host.docker.internal` URLs и
 существует исключительно в local E2E. Production/external mode принимает только HTTPS,
 точные hosts из этого versioned файла, без IP literal, wildcard и arbitrary URL.
 
 `pubmed-fitness-health` — включённый authoritative discovery/index source. Его RSS-запрос
-ограничен MeSH major-topic терминами для физической формы, exercise therapy, спортивной
-медицины и спортивного питания. Запись PubMed и abstract остаются только входными данными
+ограничен точными MeSH major-topic терминами для resistance training, muscle hypertrophy,
+bodybuilding, sports nutritional sciences, dietary supplements, anabolic agents и sports medicine.
+Запись PubMed и abstract остаются только входными данными
 для поиска: они не являются автоматически подтверждённым health claim. До редакционного
 использования нужно проверить primary source, study design, limitations и applicability;
 YFC intake сохраняет taxonomy/risk/manual_required boundary.
@@ -59,12 +60,14 @@ YFC intake сохраняет taxonomy/risk/manual_required boundary.
 - parser получает bounded bytes, а systemd `RuntimeMaxSec` прерывает зависший run;
 - source outage записывается в bounded state и не превращается в «нет новостей» или quota/filler.
 
-Discovery eligibility — это только высокий recall candidate generation. Unknown topic не
-отбрасывается runner'ом; `topics` — provenance source definition. Taxonomy, risk,
-`manual_required`, immutable draft revision и publication eligibility пересчитывает YFC intake.
-Topic vocabulary в definitions покрывает направления Task 129, но enabled/disabled coverage
-определяется только текущим canonical registry; discovery не добавляет фиктивные источники или
-обязательную квоту публикаций.
+Discovery eligibility начинается с bounded relevance gate до outbox: материалы без связи с
+силовыми тренировками, гипертрофией, бодибилдингом, спортивным питанием, добавками,
+восстановлением или тренировочным процессом сохраняются только как bounded rejected state и
+не передаются worker/provider. Для фармакологии требуется спортивный контекст. `topics` и
+relevance provenance сохраняются в job; YFC intake повторно проверяет title/summary/content,
+а затем отдельно пересчитывает taxonomy, risk, `manual_required`, immutable draft revision и
+publication eligibility. Discovery не добавляет фиктивные источники или обязательную квоту
+публикаций.
 
 ## State, dedupe и restart
 
@@ -91,15 +94,17 @@ YFC-контейнеров или пересекающихся подсетей;
 volume, `.env`, БД, Redis, socket или host repository.
 
 Установка выполняется только из exact merged release bundle. `source-definitions.json` должен
-быть сгенерирован из canonical registry, а discovery и worker должны быть immutable digest
-(repository digest или `sha256:<64 hex>` image ID); `latest` и floating tags запрещены.
+быть сгенерирован из canonical registry, а discovery и worker должны быть registry immutable
+refs вида `registry.example/name@sha256:<64 hex>`; local `sha256:<64>` image ID, `latest` и
+floating tags запрещены.
 Post-merge CI строит и сканирует `hermes-discovery` и `hermes-worker` images, публикуя refs,
-выведенные общим `scripts/deployment_contract.py`. На target сначала нужно pull exact merged
-ref и зафиксировать его digest или image ID; installer проверяет, что image metadata совпадает
-с переданным immutable ref.
-`scripts/hermes_colocation.py` копирует runtime и definitions в изолированные каталоги,
-устанавливает `/etc/hermes/worker.env` с mode `0600`, рендерит units и запускает
-`systemd-analyze verify`. Installer устанавливает только repository-owned таблицу
+выведенные общим `scripts/deployment_contract.py`. На target installer сначала делает exact
+`docker pull` обоих refs и проверяет `RepoDigests`; локальный image ID не принимается.
+`scripts/hermes_colocation.py` копирует runtime и definitions в versioned
+`/opt/hermes/releases/<release_id>`, атомарно переключает `/opt/hermes/current`,
+`/etc/hermes/current` и systemd links, сохраняет manifest с YFC SHA, image refs,
+compatibility и rollback parent, устанавливает worker env с mode `0600`, рендерит units и
+запускает `systemd-analyze verify`. Installer устанавливает только repository-owned таблицу
 `inet hermes_egress`: policy действует на bridge `hermes-net`, разрешает DNS и точные
 HTTPS-адреса canonical source/provider/intake, а остальные новые пакеты с этого bridge
 отбрасывает. Перед каждым discovery policy атомарно refresh'ится; сбой DNS оставляет старую
@@ -130,6 +135,7 @@ python3 scripts/hermes_colocation.py install \
   --source-root /srv/yfc/fit-mini-app/current \
   --source-definitions /srv/yfc/fit-mini-app/current/.artifacts/tasks/403/evidence/source-definitions.json \
   --worker-env /etc/hermes/worker.env \
+  --yfc-sha <40-hex-merged-commit> \
   --discovery-image registry.example/hermes-discovery@sha256:<64-hex> \
   --worker-image registry.example/hermes-worker@sha256:<64-hex> \
   --mode colocated-isolated
@@ -145,17 +151,24 @@ docker network ls
 systemd-analyze verify /etc/systemd/system/hermes-discovery.service /etc/systemd/system/hermes-worker-drain.service /etc/systemd/system/hermes-discovery.target /etc/systemd/system/hermes-discovery.timer
 systemctl cat hermes-discovery.service hermes-worker-drain.service
 systemctl status hermes-discovery.timer --no-pager
-python3 /opt/hermes/hermes_egress.py validate
+python3 /opt/hermes/current/hermes_egress.py validate
 nft list table inet hermes_egress
-python3 /opt/hermes/hermes_resource_guard.py check --phase discovery --mode colocated-isolated
+python3 /opt/hermes/current/hermes_resource_guard.py check --phase discovery --mode colocated-isolated
+python3 scripts/hermes_colocation.py health
 ```
 
-До credentials, доказанной scoped egress policy и owner-approved external shadow timer можно
-только установить и проверить. После этих gate активировать schedule одной командой:
+До credentials, доказанной scoped egress policy и ровно одного owner-approved external shadow
+timer можно только установить и проверить. `install` всегда оставляет timer disabled. После
+успешного shadow и проверки health/alerts активировать schedule одной командой:
 `systemctl enable --now hermes-discovery.timer`; timer запускает worker drain, а его
 `Requires/After` сначала запускают discovery. Missed runs не replay'ятся. Target остаётся
 доступен для ручного bounded orchestration, но не используется как timer unit, чтобы active
 target не блокировал следующие six-hour runs.
+
+Для обновления используйте новый immutable release; `/var/lib/hermes/state.json` и
+`/var/lib/hermes/outbox/` не удаляются. Перед reset/rollback сохраняется host backup. Проверка
+`python3 scripts/hermes_colocation.py rollback` переключает только на validated `release_parent`,
+делает `daemon-reload` и вновь оставляет timer disabled; при ошибке links восстанавливаются.
 
 Если `/var/lib/hermes/state.json` был создан предыдущей дефектной версией от `root:root`, перед
 первым запуском после обновления восстановить владельца state для контейнерного UID/GID:

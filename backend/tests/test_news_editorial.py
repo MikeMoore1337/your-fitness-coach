@@ -533,12 +533,10 @@ def test_ingestion_hard_gates_non_channel_topic_even_with_low_threshold() -> Non
             ],
             candidate_threshold=1,
         )
-        cluster = db.query(NewsCluster).one()
         assert counts["candidate"] == 0
-        assert counts["clustered"] == 1
-        assert cluster.topic == "other"
-        assert cluster.score == 0
-        assert "topic_not_allowlisted" in cluster.risk_flags
+        assert counts["clustered"] == 0
+        assert counts["rejected"] == 1
+        assert db.query(NewsCluster).count() == 0
 
 
 def test_scoring_rejects_esports_coaching_without_physical_health_context() -> None:
@@ -560,11 +558,9 @@ def test_scoring_rejects_esports_coaching_without_physical_health_context() -> N
             ],
             candidate_threshold=55,
         )
-        cluster = db.query(NewsCluster).one()
         assert counts["candidate"] == 0
-        assert cluster.topic == "other"
-        assert cluster.score == 0
-        assert "topic_not_allowlisted" in cluster.risk_flags
+        assert counts["rejected"] == 1
+        assert db.query(NewsCluster).count() == 0
 
 
 def test_ingestion_accepts_safe_research_in_expanded_channel_topics() -> None:

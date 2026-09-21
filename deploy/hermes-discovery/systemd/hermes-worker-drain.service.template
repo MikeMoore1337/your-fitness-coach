@@ -11,20 +11,21 @@ Type=oneshot
 User=root
 Group=root
 UMask=0077
-EnvironmentFile=/etc/hermes/worker.env
+EnvironmentFile=/etc/hermes/current/worker.env
 Environment=HERMES_DEPLOYMENT_MODE=@HERMES_DEPLOYMENT_MODE@
 Environment=COLOCATED_ISOLATED_HERMES=@COLOCATED_ISOLATED_HERMES@
 Environment=HERMES_DOCKER_NETWORK=hermes-net
 Environment=HERMES_GUARD_STATE_DIR=/var/lib/hermes
 Environment=HERMES_YFC_DEPLOYMENT_LOCK=@HERMES_YFC_DEPLOYMENT_LOCK@
-Environment=HERMES_DISCOVERY_DEFINITIONS=/etc/hermes/source-definitions.json
+Environment=HERMES_DISCOVERY_DEFINITIONS=/etc/hermes/current/source-definitions.json
 Environment=HERMES_DISCOVERY_DEFINITIONS_SHA256=@SOURCE_DEFINITIONS_SHA256@
 Environment=HERMES_DISCOVERY_STATE_DIR=/var/lib/hermes
 Environment=HERMES_DISCOVERY_OUTBOX_DIR=/var/lib/hermes/outbox
 Environment=HERMES_WORKER_TIMEOUT_SECONDS=120
 Environment=HERMES_WORKER_MAX_JOBS=1
-ExecCondition=/usr/bin/python3 /opt/hermes/hermes_resource_guard.py check --phase worker --mode ${HERMES_DEPLOYMENT_MODE}
-ExecStart=/usr/bin/python3 /opt/hermes/hermes_resource_guard.py run --phase worker --mode ${HERMES_DEPLOYMENT_MODE} -- /usr/bin/python3 /opt/hermes/hermes_worker_drain.py --once
+ExecCondition=/usr/bin/python3 /opt/hermes/current/hermes_resource_guard.py check --phase worker --mode ${HERMES_DEPLOYMENT_MODE}
+ExecStart=/usr/bin/python3 /opt/hermes/current/hermes_resource_guard.py run --phase worker --mode ${HERMES_DEPLOYMENT_MODE} -- /usr/bin/python3 /opt/hermes/current/hermes_worker_drain.py --once
+ExecStopPost=-/usr/bin/python3 /opt/hermes/current/hermes_health.py alert --state-dir /var/lib/hermes --outbox-dir /var/lib/hermes/outbox
 TimeoutStartSec=360s
 RuntimeMaxSec=360s
 KillMode=mixed
@@ -34,7 +35,7 @@ PrivateTmp=true
 PrivateDevices=true
 ProtectHome=true
 ProtectSystem=strict
-ReadOnlyPaths=/etc/hermes/source-definitions.json
+ReadOnlyPaths=/etc/hermes/current/source-definitions.json
 ReadWritePaths=/var/lib/hermes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictSUIDSGID=true

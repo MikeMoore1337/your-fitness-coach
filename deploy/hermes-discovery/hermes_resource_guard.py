@@ -172,7 +172,7 @@ def _docker_transition_active() -> bool | None:
             timeout=3,
             shell=False,
         )
-    except OSError, subprocess.TimeoutExpired:
+    except (OSError, subprocess.TimeoutExpired):
         return None
     if result.returncode != 0:
         return None

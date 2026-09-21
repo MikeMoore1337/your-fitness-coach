@@ -139,6 +139,7 @@ def test_build_rules_adds_scoped_host_input_default_deny() -> None:
         "ip daddr { 127.0.0.53 } udp dport 53 accept"
     ) in rules
     assert 'iifname "br-abcdef123456" ip saddr { 172.31.0.0/24 } drop' in rules
+    assert "tcp dport { 22, 25566 } drop" in rules
 
 
 def test_build_rules_rejects_untrusted_bridge_name() -> None:
