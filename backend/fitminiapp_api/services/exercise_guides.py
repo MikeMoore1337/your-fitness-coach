@@ -456,6 +456,7 @@ PROFILE_SLUGS = {
         "independent-lever-chest-press",
         "machine-decline-chest-press",
         "smith-bench-press",
+        "floor-press",
     },
     "chest_fly": {
         "dumbbell-fly",
@@ -464,7 +465,14 @@ PROFILE_SLUGS = {
         "low-to-high-cable-fly",
         "pec-deck",
     },
-    "pushup_dip": {"push-up", "weighted-dip", "chest-dip", "bench-dip", "machine-dip"},
+    "pushup_dip": {
+        "push-up",
+        "weighted-dip",
+        "chest-dip",
+        "bench-dip",
+        "machine-dip",
+        "assisted-dips",
+    },
     "vertical_pull": {
         "pull-up",
         "chin-up",
@@ -472,6 +480,11 @@ PROFILE_SLUGS = {
         "reverse-grip-lat-pulldown",
         "close-grip-lat-pulldown",
         "independent-lever-lat-pulldown",
+        "assisted-pull-ups",
+        "negative-pull-ups",
+        "scapular-pull-ups",
+        "muscle-ups",
+        "rope-climb",
     },
     "row": {
         "barbell-row",
@@ -505,6 +518,7 @@ PROFILE_SLUGS = {
         "kettlebell-swing",
         "sumo-deadlift",
         "reverse-hyperextension",
+        "trap-bar-deadlift",
     },
     "squat": {
         "squat",
@@ -522,6 +536,10 @@ PROFILE_SLUGS = {
         "plate-loaded-leg-press",
         "unilateral-leg-press",
         "v-squat-machine",
+        "pistol-squat",
+        "overhead-squat",
+        "safety-bar-squat",
+        "db-squat",
     },
     "lunge": {
         "lunge",
@@ -558,6 +576,7 @@ PROFILE_SLUGS = {
         "independent-lever-shoulder-press",
         "smith-shoulder-press",
         "landmine-press",
+        "push-press",
     },
     "shoulder_raise": {
         "dumbbell-lateral-raise",
@@ -569,6 +588,8 @@ PROFILE_SLUGS = {
         "barbell-shrug",
         "dumbbell-shrug",
         "y-raise",
+        "cable-external-rotation",
+        "band-pull-apart",
     },
     "arm_curl": {
         "barbell-curl",
@@ -583,7 +604,7 @@ PROFILE_SLUGS = {
         "spider-curl",
         "machine-biceps-curl",
     },
-    "wrist": {"barbell-wrist-curl", "barbell-wrist-extension"},
+    "wrist": {"barbell-wrist-curl", "barbell-wrist-extension", "wrist-roller"},
     "grip_static": {"dead-hang"},
     "triceps": {
         "skull-crusher",
@@ -603,7 +624,15 @@ PROFILE_SLUGS = {
         "calf-press",
         "single-leg-calf-raise",
     },
-    "core_static": {"plank", "side-plank", "hollow-hold", "dead-bug", "bird-dog"},
+    "core_static": {
+        "plank",
+        "side-plank",
+        "hollow-hold",
+        "dead-bug",
+        "bird-dog",
+        "dragon-flag",
+        "l-sit",
+    },
     "core_dynamic": {
         "crunch",
         "reverse-crunch",
@@ -612,9 +641,13 @@ PROFILE_SLUGS = {
         "captain-chair-leg-raise",
         "ab-wheel",
         "mountain-climber",
+        "decline-crunch",
+        "hanging-knee-raise",
+        "machine-seated-crunch",
+        "jackknife-sit-up",
     },
     "core_rotation": {"russian-twist", "pallof-press", "woodchopper"},
-    "carry": {"farmer-walk", "suitcase-carry"},
+    "carry": {"farmer-walk", "suitcase-carry", "kettlebell-overhead-carry"},
     "running": {"outdoor-run", "treadmill-run"},
     "walking": {"outdoor-walk", "treadmill-walk"},
     "cycling": {"outdoor-cycling", "stationary-bike", "recumbent-bike"},
@@ -638,6 +671,8 @@ PROFILE_SLUGS = {
         "kettlebell-snatch",
         "turkish-get-up",
         "bear-crawl",
+        "clean-and-jerk",
+        "hang-power-clean",
     },
 }
 
@@ -717,9 +752,8 @@ def get_exercise_guide(
         source_license=source_license,
         source_license_url=source_license_url,
     )
-    if not media:
-        return None
     images = [{"phase": item["phase"], "url": item["url"], "alt": item["alt"]} for item in media]
+    specific_safety_notes = profile.get("safety_notes")
 
     return {
         "technique_steps": profile["steps"],
@@ -727,9 +761,10 @@ def get_exercise_guide(
         "common_mistakes": profile["mistakes"],
         "muscles": muscles,
         "equipment": exercise_equipment_payload(exercise),
-        "safety_notes": list(metadata.safety_notes)
-        if metadata is not None
-        else list(DEFAULT_SAFETY_NOTES),
+        "safety_notes": list(
+            specific_safety_notes
+            or (metadata.safety_notes if metadata is not None else DEFAULT_SAFETY_NOTES)
+        ),
         "alternatives": alternatives or [],
         "media": media,
         "images": images,

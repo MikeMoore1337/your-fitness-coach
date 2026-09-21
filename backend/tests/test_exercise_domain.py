@@ -23,8 +23,11 @@ from fitminiapp_api.models.exercise import (
 )
 from fitminiapp_api.services.exercise_catalog_metadata import (
     CATALOG_METADATA,
+    ITEM_GUIDE_CONTENT,
     LOWER_BODY_MACHINE_SLUGS,
+    MEDIA_STATE_BY_SLUG,
     UPPER_BODY_MACHINE_SLUGS,
+    structured_catalog_metadata,
 )
 from fitminiapp_api.services.seed import seed_demo_data
 
@@ -220,6 +223,7 @@ def test_seeded_exercise_metadata_and_alternatives_are_serialized(client) -> Non
     assert bench["equipment_ids"] == ["barbell"]
     assert {item["slug"] for item in bench["alternatives"]} == {
         "dumbbell-bench-press",
+        "floor-press",
         "machine-chest-press",
     }
 
@@ -268,6 +272,7 @@ def test_seeded_exercise_metadata_and_alternatives_are_serialized(client) -> Non
     assert guide["muscles"][0]["role_id"] == "primary"
     assert {item["slug"] for item in guide["alternatives"]} == {
         "dumbbell-bench-press",
+        "floor-press",
         "machine-chest-press",
     }
     guide_response = client.get(
@@ -355,7 +360,7 @@ def test_task_120b_upper_body_machine_batch_contract(client) -> None:
     assert catalog_response.status_code == 200
     catalog = catalog_response.json()
     by_slug = {item["slug"]: item for item in catalog}
-    assert len(by_slug) == len(catalog) == 182
+    assert len(by_slug) == len(catalog) == 207
     assert set(UPPER_BODY_MACHINE_SLUGS) <= set(by_slug)
     assert len({item["title"] for item in catalog}) == len(catalog) - 1
 
@@ -634,7 +639,7 @@ def test_task_120c_lower_body_machine_batch_contract_and_workout_integration(cli
     assert catalog_response.status_code == 200
     catalog = catalog_response.json()
     by_slug = {item["slug"]: item for item in catalog}
-    assert len(by_slug) == len(catalog) == 182
+    assert len(by_slug) == len(catalog) == 207
     assert set(LOWER_BODY_MACHINE_SLUGS) <= set(by_slug)
     assert len({item["title"] for item in catalog}) == len(catalog) - 1
 
@@ -754,8 +759,8 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
     assert response.status_code == 200
     catalog = response.json()
     by_slug = {item["slug"]: item for item in catalog}
-    assert len(catalog) == 182
-    assert len({item["canonical_slug"] or item["slug"] for item in catalog}) == 181
+    assert len(catalog) == 207
+    assert len({item["canonical_slug"] or item["slug"] for item in catalog}) == 206
 
     expected_metric_types = {
         "bodyweight-squat": "strength",
@@ -834,8 +839,8 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         assert personalized_item["movement_pattern"] == "squat"
 
     personalized_catalog = client.get("/api/v1/programs/exercises", headers=headers).json()
-    assert len(personalized_catalog) == 182
-    assert len({item["canonical_slug"] or item["slug"] for item in personalized_catalog}) == 181
+    assert len(personalized_catalog) == 207
+    assert len({item["canonical_slug"] or item["slug"] for item in personalized_catalog}) == 206
 
     validator_path = (
         Path(__file__).resolve().parents[2] / "scripts" / "validate_exercise_catalog.py"
@@ -846,13 +851,140 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
     spec.loader.exec_module(validator)
     report = validator.validate_catalog()
     assert report == {
-        "catalog_records": 182,
-        "canonical_records": 181,
-        "titles": 182,
+        "catalog_records": 207,
+        "canonical_records": 206,
+        "titles": 207,
         "cardio_records": 14,
         "assets": 347,
         "derivatives": 419,
         "coverage_decisions": 36,
+        "guide_item_content_records": 49,
+        "guide_profile_records": 206,
+        "media_state_records": 25,
+        "media_state_repdb_phased": 21,
+        "media_state_repdb_single_static": 3,
+        "media_state_repdb_source_gap": 1,
+        "metadata_aliases_populated": 69,
+        "metadata_aliases_reviewed_empty": 137,
+        "metadata_execution_populated": 69,
+        "metadata_execution_reviewed_empty": 137,
+        "metadata_machine_applicable": 52,
+        "metadata_machine_populated": 23,
+        "metadata_machine_reviewed_empty": 29,
+        "metadata_records": 206,
+        "metadata_required_missing": 0,
+        "new_guide_content_records": 25,
+    }
+
+
+def test_task_395_approved_canonicals_metadata_search_and_workout(client) -> None:
+    headers = auth(client, telegram_user_id=32395, is_coach=False)
+    approved_slugs = {
+        "floor-press",
+        "push-press",
+        "assisted-pull-ups",
+        "decline-crunch",
+        "pistol-squat",
+        "overhead-squat",
+        "cable-external-rotation",
+        "hanging-knee-raise",
+        "trap-bar-deadlift",
+        "safety-bar-squat",
+        "negative-pull-ups",
+        "scapular-pull-ups",
+        "muscle-ups",
+        "assisted-dips",
+        "machine-seated-crunch",
+        "band-pull-apart",
+        "db-squat",
+        "kettlebell-overhead-carry",
+        "dragon-flag",
+        "jackknife-sit-up",
+        "l-sit",
+        "clean-and-jerk",
+        "hang-power-clean",
+        "wrist-roller",
+        "rope-climb",
+    }
+    catalog = client.get("/api/v1/programs/exercises", headers=headers).json()
+    by_slug = {item["slug"]: item for item in catalog}
+    structured = structured_catalog_metadata()
+
+    assert approved_slugs <= set(by_slug)
+    assert "roman-chair-crunch" not in by_slug
+    assert approved_slugs == set(MEDIA_STATE_BY_SLUG)
+    for slug in approved_slugs:
+        item = by_slug[slug]
+        record = structured[slug]
+        assert item["primary_muscle_ids"]
+        assert item["secondary_muscle_ids"]
+        assert item["equipment_ids"]
+        assert item["metric_type"] == record["metric_type"] == "strength"
+        assert item["difficulty_level"] == record["difficulty_level"]
+        assert item["movement_pattern"] == record["movement_pattern"]
+        assert item["aliases"]
+        assert len(ITEM_GUIDE_CONTENT[slug]["steps"]) == 3
+        assert len(ITEM_GUIDE_CONTENT[slug]["mistakes"]) >= 3
+        assert ITEM_GUIDE_CONTENT[slug]["breathing"]
+
+    assert "тяга трэп-гриф" in by_slug["trap-bar-deadlift"]["aliases"]
+    assert "safety bar squat" in by_slug["safety-bar-squat"]["aliases"]
+    assert "подтягивания в гравитроне" in by_slug["assisted-pull-ups"]["aliases"]
+    assert by_slug["machine-seated-crunch"]["equipment_ids"] == ["machine"]
+    assert by_slug["wrist-roller"]["equipment_ids"] == ["other"]
+
+    floor_press = by_slug["floor-press"]
+    seated_crunch = by_slug["machine-seated-crunch"]
+    created = client.post(
+        "/api/v1/programs/templates",
+        headers=headers,
+        json={
+            "title": "Issue 395 canonical workout",
+            "goal": "recomposition",
+            "level": "intermediate",
+            "mode": "self",
+            "assign_after_create": True,
+            "days": [
+                {
+                    "title": "Новые канонические движения",
+                    "exercises": [
+                        {
+                            "exercise_id": floor_press["id"],
+                            "prescribed_sets": 1,
+                            "prescribed_reps": "8",
+                            "rest_seconds": 90,
+                        },
+                        {
+                            "exercise_id": seated_crunch["id"],
+                            "prescribed_sets": 1,
+                            "prescribed_reps": "12",
+                            "rest_seconds": 60,
+                        },
+                    ],
+                }
+            ],
+        },
+    )
+    assert created.status_code == 200
+
+    today = client.get("/api/v1/workouts/today", headers=headers).json()
+    today_by_exercise = {item["exercise_id"]: item for item in today["exercises"]}
+    assert today_by_exercise[floor_press["id"]]["exercise_title"] == floor_press["title"]
+    assert today_by_exercise[seated_crunch["id"]]["exercise_title"] == seated_crunch["title"]
+    assert client.post(f"/api/v1/workouts/{today['id']}/start", headers=headers).status_code == 200
+    for item in today["exercises"]:
+        saved = client.patch(
+            f"/api/v1/workouts/sets/{item['sets'][0]['id']}",
+            json={"actual_reps": 8, "actual_weight": 20, "is_completed": True},
+            headers=headers,
+        )
+        assert saved.status_code == 200
+    assert client.post(f"/api/v1/workouts/{today['id']}/finish", headers=headers).status_code == 200
+    history = client.get("/api/v1/workouts/history", headers=headers).json()
+    assert len(history) == 1
+    assert {item["title"] for item in history[0]["exercises"]} == {
+        floor_press["title"],
+        seated_crunch["title"],
     }
 
 
@@ -913,6 +1045,7 @@ def test_personalized_copy_keeps_guide_provenance_and_base_alternatives(client) 
     assert details.json()["guide"]["media_reference"] == "exercise-guides:bench-press"
     assert {item["slug"] for item in details.json()["alternatives"]} == {
         "dumbbell-bench-press",
+        "floor-press",
         "machine-chest-press",
     }
 
@@ -958,5 +1091,5 @@ def test_exercise_catalog_metadata_loading_has_no_per_row_queries(client) -> Non
         event.remove(engine, "before_cursor_execute", count_selects)
 
     assert response.status_code == 200
-    assert len(response.json()) == 182
+    assert len(response.json()) == 207
     assert select_count <= 20

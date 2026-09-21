@@ -37,10 +37,13 @@ CANONICAL_EXERCISE_REDIRECTS = metadata_module.CANONICAL_EXERCISE_REDIRECTS
 CATALOG_METADATA = metadata_module.CATALOG_METADATA
 ITEM_GUIDE_CONTENT = metadata_module.ITEM_GUIDE_CONTENT
 MEDIA_ALT_BY_PHASE = metadata_module.MEDIA_ALT_BY_PHASE
+MEDIA_STATE_BY_SLUG = metadata_module.MEDIA_STATE_BY_SLUG
 REMAINING_COVERAGE_SLUGS = metadata_module.REMAINING_COVERAGE_SLUGS
+structured_catalog_metadata = metadata_module.structured_catalog_metadata
 canonical_equipment_identifier = domain_module.canonical_equipment_identifier
 canonical_muscle_identifier = domain_module.canonical_muscle_identifier
 SLUG_TO_PROFILE = guides_module.SLUG_TO_PROFILE
+PROFILES = guides_module.PROFILES
 YFC_GENERATED_120D_SLUGS = guides_module.YFC_GENERATED_120D_SLUGS
 EXERCISE_CATALOG = seed_module.EXERCISE_CATALOG
 
@@ -72,7 +75,7 @@ def _validate_aliases(catalog_slugs: set[str]) -> None:
     for slug, title, *_ in EXERCISE_CATALOG:
         search_terms[normalize_search_text(title)].add(canonical_slug(slug))
 
-    for slug, metadata in CATALOG_METADATA.items():
+    for slug, metadata in structured_catalog_metadata().items():
         _require(slug in catalog_slugs, f"Metadata references unknown exercise: {slug}")
         aliases = metadata["aliases"]
         normalized = [normalize_search_text(alias) for alias in aliases]
@@ -97,10 +100,76 @@ def _validate_aliases(catalog_slugs: set[str]) -> None:
     _require(not collisions, f"Cross-canonical search term collisions: {collisions}")
 
 
+def _validate_structured_metadata(catalog_slugs: set[str]) -> dict[str, int]:
+    canonical_slugs = {canonical_slug(slug) for slug in catalog_slugs}
+    records = structured_catalog_metadata()
+    _require(set(records) == canonical_slugs, "Structured metadata/canonical catalogue mismatch")
+    allowed_movements = set(get_args(ExerciseMovementPattern))
+    allowed_machine_tags = set(get_args(ExerciseMachineVariantTag))
+    allowed_execution_tags = set(get_args(ExerciseExecutionVariantTag))
+
+    for slug, metadata in records.items():
+        _require(metadata["primary_muscle"], f"Missing primary muscle metadata: {slug}")
+        _require(metadata["secondary_muscles"], f"Missing secondary muscle metadata: {slug}")
+        _require(metadata["equipment"], f"Missing equipment metadata: {slug}")
+        _require(metadata["movement_pattern"] in allowed_movements, f"Invalid movement: {slug}")
+        _require(
+            metadata["difficulty_level"] in {"beginner", "intermediate", "advanced"},
+            f"Invalid difficulty: {slug}",
+        )
+        _require(
+            metadata["metric_type"] in {"strength", "cardio"},
+            f"Invalid metric type: {slug}",
+        )
+        _require(
+            canonical_muscle_identifier(metadata["primary_muscle"]) is not None,
+            f"Unknown structured primary muscle: {slug}",
+        )
+        _require(
+            canonical_equipment_identifier(metadata["equipment"]) is not None,
+            f"Unknown structured equipment: {slug}",
+        )
+        _require(
+            set(metadata["machine_variant_tags"]) <= allowed_machine_tags,
+            f"Invalid structured machine tags: {slug}",
+        )
+        _require(
+            set(metadata["execution_variant_tags"]) <= allowed_execution_tags,
+            f"Invalid structured execution tags: {slug}",
+        )
+
+    machine_applicable = sum(
+        canonical_equipment_identifier(metadata["equipment"]) == "machine"
+        for metadata in records.values()
+    )
+    aliases_populated = sum(bool(metadata["aliases"]) for metadata in records.values())
+    execution_populated = sum(
+        bool(metadata["execution_variant_tags"]) for metadata in records.values()
+    )
+    machine_populated = sum(bool(metadata["machine_variant_tags"]) for metadata in records.values())
+    return {
+        "metadata_records": len(records),
+        "metadata_required_missing": 0,
+        "metadata_aliases_populated": aliases_populated,
+        "metadata_aliases_reviewed_empty": len(records) - aliases_populated,
+        "metadata_execution_populated": execution_populated,
+        "metadata_execution_reviewed_empty": len(records) - execution_populated,
+        "metadata_machine_applicable": machine_applicable,
+        "metadata_machine_populated": machine_populated,
+        "metadata_machine_reviewed_empty": machine_applicable - machine_populated,
+    }
+
+
 def _validate_media(catalog_slugs: set[str]) -> tuple[int, int]:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     exercises = manifest["exercises"]
-    _require(set(exercises) == catalog_slugs, "Manifest/catalog exercise mismatch")
+    manifest_slugs = set(exercises)
+    missing_media_state = catalog_slugs - manifest_slugs
+    _require(
+        missing_media_state <= set(MEDIA_STATE_BY_SLUG),
+        f"Manifest/catalog exercise mismatch without media state: {sorted(missing_media_state)}",
+    )
+    _require(manifest_slugs <= catalog_slugs, "Manifest references unknown exercise")
     cross_exercise_hashes: dict[str, set[str]] = defaultdict(set)
 
     for slug, item in exercises.items():
@@ -127,6 +196,35 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int]:
     }
     _require(not duplicates, f"Cross-exercise duplicate media: {duplicates}")
     return manifest["asset_count"], manifest["derivative_count"]
+
+
+def _validate_guide_content(catalog_slugs: set[str]) -> dict[str, int]:
+    canonical_slugs = {canonical_slug(slug) for slug in catalog_slugs}
+    _require(set(SLUG_TO_PROFILE) >= canonical_slugs, "Guide profile coverage is incomplete")
+    _require(
+        set(MEDIA_STATE_BY_SLUG) <= canonical_slugs,
+        "Media state references a non-canonical exercise",
+    )
+    for slug in canonical_slugs:
+        profile_name = SLUG_TO_PROFILE[slug]
+        content = ITEM_GUIDE_CONTENT.get(slug, PROFILES[profile_name])
+        _require(len(content["steps"]) == 3, f"Expected three technique steps: {slug}")
+        _require(len(content["mistakes"]) >= 3, f"Expected three common mistakes: {slug}")
+        _require(bool(content["breathing"]), f"Missing breathing guidance: {slug}")
+    for slug, state in MEDIA_STATE_BY_SLUG.items():
+        if state["state"] == "repdb_phased":
+            _require(state["phases"] == ("start", "peak"), f"Invalid phased media state: {slug}")
+        elif state["state"] == "repdb_single_static":
+            _require(state["phases"] == ("main",), f"Invalid static media state: {slug}")
+        else:
+            _require(not state["phases"], f"Source-gap media state has phases: {slug}")
+    return {
+        "guide_profile_records": len(canonical_slugs),
+        "guide_item_content_records": sum(slug in ITEM_GUIDE_CONTENT for slug in canonical_slugs),
+        "new_guide_content_records": sum(
+            slug in ITEM_GUIDE_CONTENT for slug in MEDIA_STATE_BY_SLUG
+        ),
+    }
 
 
 def _validate_pilot_media(catalog_slugs: set[str]) -> None:
@@ -250,6 +348,8 @@ def validate_catalog() -> dict[str, int]:
         _require(bool(content["breathing"]), f"Missing breathing guidance: {slug}")
 
     _validate_aliases(catalog_slugs)
+    metadata_report = _validate_structured_metadata(catalog_slugs)
+    guide_report = _validate_guide_content(catalog_slugs)
     asset_count, derivative_count = _validate_media(catalog_slugs)
     _validate_pilot_media(catalog_slugs)
     coverage_decisions = _validate_final_coverage()
@@ -264,6 +364,18 @@ def validate_catalog() -> dict[str, int]:
         "assets": asset_count,
         "derivatives": derivative_count,
         "coverage_decisions": coverage_decisions,
+        **metadata_report,
+        **guide_report,
+        "media_state_records": len(MEDIA_STATE_BY_SLUG),
+        "media_state_repdb_phased": sum(
+            state["state"] == "repdb_phased" for state in MEDIA_STATE_BY_SLUG.values()
+        ),
+        "media_state_repdb_single_static": sum(
+            state["state"] == "repdb_single_static" for state in MEDIA_STATE_BY_SLUG.values()
+        ),
+        "media_state_repdb_source_gap": sum(
+            state["state"] == "repdb_source_gap" for state in MEDIA_STATE_BY_SLUG.values()
+        ),
     }
 
 

@@ -7353,7 +7353,7 @@ export interface components {
             /** Aliases */
             aliases?: string[];
             /** Movement Pattern */
-            movement_pattern?: ("arm_curl" | "calf" | "cardio_row" | "chest_fly" | "chest_press" | "cycling" | "glute" | "grip" | "hinge" | "leg_isolation" | "lunge" | "pullover" | "row" | "running" | "shoulder_press" | "squat" | "triceps" | "vertical_pull" | "wrist") | null;
+            movement_pattern?: ("anti_extension" | "anti_rotation" | "arm_curl" | "calf" | "cardio_row" | "carry" | "chest_fly" | "chest_press" | "conditioning" | "cycling" | "glute" | "grip" | "hinge" | "leg_isolation" | "lunge" | "pullover" | "row" | "running" | "olympic_lift" | "shoulder_raise" | "shoulder_press" | "shoulder_rotation" | "squat" | "trunk_flexion" | "trunk_rotation" | "triceps" | "vertical_pull" | "wrist") | null;
             /** Machine Variant Tags */
             machine_variant_tags?: ("selectorized" | "plate_loaded" | "lever" | "independent" | "converging" | "diverging" | "smith")[];
             /** Execution Variant Tags */

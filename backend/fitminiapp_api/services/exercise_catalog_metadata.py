@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from functools import lru_cache
+from typing import Literal, NotRequired, TypedDict, cast
 
 
 class ExerciseCatalogMetadata(TypedDict):
@@ -10,11 +11,26 @@ class ExerciseCatalogMetadata(TypedDict):
     execution_variant_tags: tuple[str, ...]
 
 
+class StructuredExerciseCatalogMetadata(ExerciseCatalogMetadata):
+    primary_muscle: str
+    secondary_muscles: tuple[str, ...]
+    equipment: str
+    difficulty_level: Literal["beginner", "intermediate", "advanced"]
+    metric_type: Literal["strength", "cardio"]
+
+
 class ExerciseGuideContent(TypedDict):
     steps: list[str]
     breathing: str
     mistakes: list[str]
     secondary: list[str]
+    safety_notes: NotRequired[list[str]]
+
+
+class ExerciseMediaState(TypedDict):
+    state: Literal["repdb_phased", "repdb_single_static", "repdb_source_gap"]
+    source_slug: str | None
+    phases: tuple[str, ...]
 
 
 UPPER_BODY_MACHINE_SLUGS = (
@@ -486,6 +502,533 @@ CATALOG_METADATA: dict[str, ExerciseCatalogMetadata] = {
         "machine_variant_tags": ("selectorized",),
         "execution_variant_tags": ("bilateral",),
     },
+    "floor-press": {
+        "aliases": ("жим с пола", "floor press", "barbell floor press"),
+        "movement_pattern": "chest_press",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "push-press": {
+        "aliases": ("пуш пресс", "push press", "жим с толчком ногами"),
+        "movement_pattern": "shoulder_press",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral", "multi_stage"),
+    },
+    "assisted-pull-ups": {
+        "aliases": (
+            "подтягивания с противовесом",
+            "assisted pull up",
+            "подтягивания в гравитроне",
+            "гравитрон подтягивания",
+        ),
+        "movement_pattern": "vertical_pull",
+        "machine_variant_tags": ("selectorized",),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "decline-crunch": {
+        "aliases": (
+            "скручивания на наклонной",
+            "decline crunch",
+            "decline bench crunch",
+            "наклонные скручивания",
+        ),
+        "movement_pattern": "trunk_flexion",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "pistol-squat": {
+        "aliases": ("пистолетик", "pistol squat", "one leg squat"),
+        "movement_pattern": "squat",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("unilateral",),
+    },
+    "overhead-squat": {
+        "aliases": ("присед над головой", "overhead squat", "оверхед сквот"),
+        "movement_pattern": "squat",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "cable-external-rotation": {
+        "aliases": (
+            "внешняя ротация плеча",
+            "cable external rotation",
+            "ротация плеча в кроссовере",
+            "наружная ротация",
+        ),
+        "movement_pattern": "shoulder_rotation",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("unilateral",),
+    },
+    "hanging-knee-raise": {
+        "aliases": (
+            "подъем коленей в висе",
+            "hanging knee raise",
+            "hanging knee raises",
+            "подъем колен в висе",
+        ),
+        "movement_pattern": "trunk_flexion",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "trap-bar-deadlift": {
+        "aliases": (
+            "тяга трэп-гриф",
+            "тяга трап-гриф",
+            "trap bar deadlift",
+            "hex bar deadlift",
+        ),
+        "movement_pattern": "hinge",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "safety-bar-squat": {
+        "aliases": (
+            "safety bar squat",
+            "safety squat",
+            "приседания с safety-грифом",
+            "присед в safety bar",
+        ),
+        "movement_pattern": "squat",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "negative-pull-ups": {
+        "aliases": (
+            "негативные подтягивания",
+            "negative pull up",
+            "negative pull-ups",
+            "эксцентрические подтягивания",
+        ),
+        "movement_pattern": "vertical_pull",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "scapular-pull-ups": {
+        "aliases": (
+            "лопаточные подтягивания",
+            "scapular pull up",
+            "scap pull ups",
+        ),
+        "movement_pattern": "vertical_pull",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "muscle-ups": {
+        "aliases": (
+            "выход силой",
+            "muscle up",
+            "muscle ups",
+            "подтягивание с выходом",
+        ),
+        "movement_pattern": "vertical_pull",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral", "multi_stage"),
+    },
+    "assisted-dips": {
+        "aliases": (
+            "отжимания с противовесом",
+            "assisted dip",
+            "гравитрон брусья",
+            "брусья с противовесом",
+        ),
+        "movement_pattern": "chest_press",
+        "machine_variant_tags": ("selectorized",),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "machine-seated-crunch": {
+        "aliases": (
+            "скручивания в тренажере",
+            "machine crunch",
+            "seated machine crunch",
+            "пресс в тренажере сидя",
+        ),
+        "movement_pattern": "trunk_flexion",
+        "machine_variant_tags": ("selectorized",),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "band-pull-apart": {
+        "aliases": (
+            "разведения резинки",
+            "band pull apart",
+            "разведение эспандера",
+        ),
+        "movement_pattern": "shoulder_rotation",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "db-squat": {
+        "aliases": ("приседания с гантелями", "dumbbell squat", "db squat"),
+        "movement_pattern": "squat",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "kettlebell-overhead-carry": {
+        "aliases": (
+            "переноска гири над головой",
+            "kettlebell overhead carry",
+            "overhead kettlebell carry",
+            "марш над головой с гирей",
+        ),
+        "movement_pattern": "carry",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("cyclic",),
+    },
+    "dragon-flag": {
+        "aliases": ("драконий флаг", "dragon flag", "dragon flags"),
+        "movement_pattern": "anti_extension",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "jackknife-sit-up": {
+        "aliases": ("складка лежа", "jackknife sit up", "jackknife", "v-up"),
+        "movement_pattern": "trunk_flexion",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "l-sit": {
+        "aliases": ("l-sit", "уголок на брусьях", "уголок"),
+        "movement_pattern": "anti_extension",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("isometric",),
+    },
+    "clean-and-jerk": {
+        "aliases": (
+            "взятие на грудь и толчок",
+            "clean and jerk",
+            "clean & jerk",
+            "взятие штанги и толчок",
+        ),
+        "movement_pattern": "olympic_lift",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral", "multi_stage"),
+    },
+    "hang-power-clean": {
+        "aliases": (
+            "взятие с виса",
+            "hang power clean",
+            "power clean from hang",
+            "взятие штанги с виса",
+        ),
+        "movement_pattern": "olympic_lift",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral", "multi_stage"),
+    },
+    "wrist-roller": {
+        "aliases": (
+            "ролик для предплечий",
+            "wrist roller",
+            "forearm roller",
+            "ролик кистевой",
+        ),
+        "movement_pattern": "wrist",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("bilateral",),
+    },
+    "rope-climb": {
+        "aliases": (
+            "лазание по канату",
+            "rope climb",
+            "подъем по канату",
+            "канат лазание",
+        ),
+        "movement_pattern": "vertical_pull",
+        "machine_variant_tags": (),
+        "execution_variant_tags": ("cyclic",),
+    },
+}
+
+
+# Reviewed movement vocabulary for every canonical row. The seed remains the
+# source of identity, muscles, equipment, difficulty and metric; this map only
+# records the normalized movement axis used by search, alternatives and future
+# catalog filters.
+REVIEWED_MOVEMENT_PATTERN_SLUGS: dict[str, tuple[str, ...]] = {
+    "chest_press": (
+        "bench-press",
+        "incline-bench-press",
+        "decline-bench-press",
+        "close-grip-bench-press",
+        "dumbbell-bench-press",
+        "incline-dumbbell-press",
+        "decline-dumbbell-press",
+        "machine-chest-press",
+        "machine-incline-chest-press",
+        "independent-lever-chest-press",
+        "machine-decline-chest-press",
+        "smith-bench-press",
+        "push-up",
+        "weighted-dip",
+        "chest-dip",
+        "floor-press",
+        "assisted-dips",
+    ),
+    "chest_fly": (
+        "dumbbell-fly",
+        "incline-dumbbell-fly",
+        "cable-fly",
+        "low-to-high-cable-fly",
+        "pec-deck",
+    ),
+    "pullover": ("dumbbell-pullover", "straight-arm-pulldown", "machine-pullover"),
+    "vertical_pull": (
+        "pull-up",
+        "chin-up",
+        "lat-pulldown",
+        "reverse-grip-lat-pulldown",
+        "close-grip-lat-pulldown",
+        "independent-lever-lat-pulldown",
+        "assisted-pull-ups",
+        "negative-pull-ups",
+        "scapular-pull-ups",
+        "muscle-ups",
+        "rope-climb",
+    ),
+    "row": (
+        "barbell-row",
+        "pendlay-row",
+        "t-bar-row",
+        "one-arm-dumbbell-row",
+        "chest-supported-row",
+        "seated-cable-row",
+        "machine-row",
+        "lever-high-row",
+        "lever-low-row",
+        "chest-supported-dumbbell-row",
+        "inverted-row",
+        "meadows-row",
+        "cable-row-one-arm",
+        "face-pull",
+        "upright-row",
+        "renegade-row",
+    ),
+    "hinge": (
+        "deadlift",
+        "rack-pull",
+        "hyperextension",
+        "good-morning",
+        "romanian-deadlift",
+        "stiff-leg-deadlift",
+        "single-leg-rdl",
+        "glute-ham-raise",
+        "reverse-hyperextension",
+        "cable-pull-through",
+        "kettlebell-swing",
+        "sumo-deadlift",
+        "trap-bar-deadlift",
+    ),
+    "squat": (
+        "squat",
+        "front-squat",
+        "hack-squat",
+        "smith-squat",
+        "goblet-squat",
+        "bodyweight-squat",
+        "belt-squat",
+        "leg-press",
+        "pendulum-squat",
+        "plate-loaded-leg-press",
+        "unilateral-leg-press",
+        "v-squat-machine",
+        "sissy-squat",
+        "wall-sit",
+        "kettlebell-goblet-squat",
+        "pistol-squat",
+        "overhead-squat",
+        "safety-bar-squat",
+        "db-squat",
+    ),
+    "lunge": (
+        "lunge",
+        "walking-lunge",
+        "reverse-lunge",
+        "bulgarian-split-squat",
+        "split-squat",
+        "smith-split-squat",
+        "step-up",
+    ),
+    "leg_isolation": (
+        "leg-extension",
+        "leg-curl",
+        "seated-leg-curl",
+        "standing-leg-curl",
+        "nordic-curl",
+        "hip-abduction",
+        "hip-adduction",
+        "cable-kickback",
+        "machine-glute-kickback",
+    ),
+    "glute": (
+        "hip-thrust",
+        "single-leg-hip-thrust",
+        "bodyweight-glute-bridge",
+        "barbell-glute-bridge",
+        "machine-hip-thrust",
+    ),
+    "shoulder_press": (
+        "overhead-press",
+        "seated-dumbbell-press",
+        "arnold-press",
+        "machine-shoulder-press",
+        "independent-lever-shoulder-press",
+        "smith-shoulder-press",
+        "landmine-press",
+        "push-press",
+    ),
+    "shoulder_raise": (
+        "dumbbell-lateral-raise",
+        "cable-lateral-raise",
+        "machine-lateral-raise",
+        "dumbbell-front-raise",
+        "rear-delt-fly",
+        "reverse-pec-deck",
+        "barbell-shrug",
+        "dumbbell-shrug",
+        "y-raise",
+    ),
+    "shoulder_rotation": ("cable-external-rotation", "band-pull-apart"),
+    "arm_curl": (
+        "barbell-curl",
+        "ez-bar-curl",
+        "dumbbell-curl",
+        "hammer-curl",
+        "incline-dumbbell-curl",
+        "preacher-curl",
+        "cable-curl",
+        "concentration-curl",
+        "reverse-curl",
+        "spider-curl",
+        "machine-biceps-curl",
+    ),
+    "triceps": (
+        "skull-crusher",
+        "rope-pushdown",
+        "cable-pushdown",
+        "overhead-triceps-extension",
+        "dumbbell-overhead-extension",
+        "lying-dumbbell-triceps-extension",
+        "bench-dip",
+        "triceps-kickback",
+        "machine-dip",
+        "machine-triceps-extension",
+        "single-arm-cable-triceps-extension",
+    ),
+    "calf": (
+        "standing-calf-raise",
+        "seated-calf-raise",
+        "donkey-calf-raise",
+        "calf-press",
+        "single-leg-calf-raise",
+    ),
+    "wrist": ("barbell-wrist-curl", "barbell-wrist-extension", "wrist-roller"),
+    "grip": ("dead-hang",),
+    "trunk_flexion": (
+        "crunch",
+        "reverse-crunch",
+        "cable-crunch",
+        "hanging-leg-raise",
+        "captain-chair-leg-raise",
+        "decline-crunch",
+        "hanging-knee-raise",
+        "machine-seated-crunch",
+        "jackknife-sit-up",
+    ),
+    "anti_extension": (
+        "plank",
+        "hollow-hold",
+        "dead-bug",
+        "bird-dog",
+        "ab-wheel",
+        "dragon-flag",
+        "l-sit",
+    ),
+    "anti_rotation": ("side-plank", "pallof-press"),
+    "trunk_rotation": ("russian-twist", "woodchopper"),
+    "conditioning": (
+        "mountain-climber",
+        "burpee",
+        "box-jump",
+        "jump-rope",
+        "elliptical-trainer",
+        "outdoor-walk",
+        "treadmill-walk",
+        "stair-climber",
+        "swimming",
+        "ski-erg",
+        "battle-rope",
+        "sled-push",
+        "sled-pull",
+        "medicine-ball-slam",
+        "wall-ball",
+        "turkish-get-up",
+        "bear-crawl",
+    ),
+    "olympic_lift": (
+        "thruster",
+        "kettlebell-clean",
+        "kettlebell-snatch",
+        "clean-and-jerk",
+        "hang-power-clean",
+    ),
+    "carry": ("farmer-walk", "suitcase-carry", "kettlebell-overhead-carry"),
+    "cardio_row": ("rowing-machine",),
+    "running": ("treadmill-run", "outdoor-run"),
+    "cycling": ("assault-bike", "outdoor-cycling", "stationary-bike", "recumbent-bike"),
+}
+REVIEWED_MOVEMENT_PATTERN_BY_SLUG = {
+    slug: movement_pattern
+    for movement_pattern, slugs in REVIEWED_MOVEMENT_PATTERN_SLUGS.items()
+    for slug in slugs
+}
+
+
+MEDIA_STATE_BY_SLUG: dict[str, ExerciseMediaState] = {
+    **{
+        slug: {
+            "state": "repdb_phased",
+            "source_slug": slug,
+            "phases": ("start", "peak"),
+        }
+        for slug in (
+            "floor-press",
+            "push-press",
+            "assisted-pull-ups",
+            "decline-crunch",
+            "pistol-squat",
+            "overhead-squat",
+            "cable-external-rotation",
+            "hanging-knee-raise",
+            "negative-pull-ups",
+            "scapular-pull-ups",
+            "muscle-ups",
+            "assisted-dips",
+            "machine-seated-crunch",
+            "band-pull-apart",
+            "db-squat",
+            "dragon-flag",
+            "jackknife-sit-up",
+            "clean-and-jerk",
+            "hang-power-clean",
+            "wrist-roller",
+        )
+    },
+    "trap-bar-deadlift": {
+        "state": "repdb_phased",
+        "source_slug": "hex-bar-deadlift",
+        "phases": ("start", "peak"),
+    },
+    **{
+        slug: {
+            "state": "repdb_single_static",
+            "source_slug": slug,
+            "phases": ("main",),
+        }
+        for slug in ("kettlebell-overhead-carry", "l-sit", "rope-climb")
+    },
+    "safety-bar-squat": {
+        "state": "repdb_source_gap",
+        "source_slug": None,
+        "phases": (),
+    },
 }
 
 
@@ -826,6 +1369,422 @@ ITEM_GUIDE_CONTENT: dict[str, ExerciseGuideContent] = {
         ],
         "secondary": ["Квадрицепс", "Ягодицы", "Бицепс бедра", "Икры"],
     },
+    "floor-press": {
+        "steps": [
+            "Ляг на пол под штангой, поставь стопы устойчиво и сведи лопатки, оставив локти свободными от жёсткого упора в пол.",
+            "Опусти гриф к нижней части груди до мягкого касания трицепсами пола, сохраняя запястья над локтями.",
+            "Выжми гриф вверх по устойчивой траектории и не теряй контакт стоп и лопаток с опорой.",
+        ],
+        "breathing": "Вдох перед опусканием, выдох после прохождения тяжёлой части жима.",
+        "mistakes": [
+            "Локти резко ударяются о пол",
+            "Запястья заваливаются назад",
+            "Гриф опускается к шее вместо нижней части груди",
+        ],
+        "secondary": ["Трицепс", "Передняя дельта"],
+        "safety_notes": [
+            "Используй страховочные упоры или помощника, если штанга не может свободно покинуть стойки."
+        ],
+    },
+    "push-press": {
+        "steps": [
+            "Положи штангу на переднюю часть плеч, поставь стопы устойчиво и сохрани вертикальный корпус.",
+            "Сделай короткое сгибание коленей и резко выпрями ноги, передавая импульс штанге без наклона корпуса назад.",
+            "Дожми штангу над головой, зафиксируй корпус и верни её на плечи под контролем.",
+        ],
+        "breathing": "Вдох перед подседом, выдох во время толчка и дожима.",
+        "mistakes": [
+            "Глубокий присед превращает движение в трастер",
+            "Корпус отклоняется назад под штангой",
+            "Штанга опускается на плечи без контроля",
+        ],
+        "secondary": ["Трицепс", "Квадрицепс", "Кор"],
+    },
+    "assisted-pull-ups": {
+        "steps": [
+            "Выбери противовес, проверь платформу и возьмись за перекладину хватом, который позволяет сохранить контроль.",
+            "Опусти лопатки, подтяни локти вниз и подними грудь к перекладине без раскачивания.",
+            "Плавно выпрями руки и вернись на платформу только после полной остановки движения.",
+        ],
+        "breathing": "Выдох во время тяги, вдох при контролируемом возвращении вниз.",
+        "mistakes": [
+            "Платформа подбрасывается из-за рывка",
+            "Корпус раскачивается для набора высоты",
+            "Вес сбрасывается на стек в нижней точке",
+        ],
+        "secondary": ["Бицепс", "Предплечья", "Задняя дельта"],
+        "safety_notes": [
+            "Проверь фиксацию противовеса и не спрыгивай с платформы до полной остановки тренажёра."
+        ],
+    },
+    "decline-crunch": {
+        "steps": [
+            "Зафиксируй стопы на наклонной скамье и ляг так, чтобы таз и спина сохраняли устойчивый контакт с опорой.",
+            "Сверни грудную клетку к тазу, поднимая лопатки без тяги руками за голову.",
+            "Плавно вернись вниз до исходного положения, сохраняя напряжение корпуса.",
+        ],
+        "breathing": "Выдох при подъёме корпуса, вдох при контролируемом опускании.",
+        "mistakes": [
+            "Стопы соскальзывают с фиксаторов",
+            "Корпус поднимается рывком бёдер",
+            "Шея тянется руками вперёд",
+        ],
+        "secondary": ["Кор", "Косые мышцы"],
+        "safety_notes": [
+            "Перед подходом проверь фиксаторы ног и настрой наклон под контролируемую амплитуду."
+        ],
+    },
+    "pistol-squat": {
+        "steps": [
+            "Перенеси вес на одну стопу, вытяни вторую ногу вперёд и найди устойчивое положение корпуса.",
+            "Опустись на рабочей ноге, направляя колено по линии стопы и удерживая таз под контролем.",
+            "Надави всей стопой в пол и поднимись без рывка, затем повтори на другой стороне.",
+        ],
+        "breathing": "Вдох перед опусканием, выдох после прохождения нижней точки подъёма.",
+        "mistakes": [
+            "Колено заваливается внутрь",
+            "Пятка теряет контакт с полом",
+            "Свободная нога или корпус раскачиваются",
+        ],
+        "secondary": ["Ягодицы", "Бицепс бедра", "Икры", "Кор"],
+        "safety_notes": [
+            "Начни с опоры или частичной амплитуды, если без неё теряется равновесие."
+        ],
+    },
+    "overhead-squat": {
+        "steps": [
+            "Возьми штангу широким хватом над головой и зафиксируй рёбра, таз и стопы в устойчивом положении.",
+            "Опустись в присед, сохраняя гриф над серединой стоп и колени по линии носков.",
+            "Надави всей стопой и встань, не позволяя штанге уходить вперёд или назад.",
+        ],
+        "breathing": "Вдох перед опусканием, выдох после прохождения тяжёлой части подъёма.",
+        "mistakes": [
+            "Гриф уходит за линию стоп",
+            "Локти сгибаются в нижней точке",
+            "Таз и грудная клетка теряют устойчивое положение",
+        ],
+        "secondary": ["Ягодицы", "Бицепс бедра", "Плечи", "Кор"],
+        "safety_notes": [
+            "Начинай с пустого грифа и освободи пространство над головой до снятия штанги со стоек."
+        ],
+    },
+    "cable-external-rotation": {
+        "steps": [
+            "Установи рукоять на высоте локтя, встань боком к блоку и прижми локоть к корпусу.",
+            "Поверни предплечье наружу в небольшой контролируемой амплитуде, не разворачивая плечо и корпус.",
+            "Плавно верни рукоять к животу, сохраняя локоть на месте.",
+        ],
+        "breathing": "Дыши свободно; выдох при вращении наружу, вдох при возврате.",
+        "mistakes": [
+            "Локоть отрывается от корпуса",
+            "Корпус разворачивается вместо движения предплечья",
+            "Вес тянет руку обратно рывком",
+        ],
+        "secondary": ["Задняя дельта", "Кор"],
+        "safety_notes": [
+            "Используй небольшой вес и остановись в точке, где движение остаётся плавным и без рывка."
+        ],
+    },
+    "hanging-knee-raise": {
+        "steps": [
+            "Возьмись за перекладину устойчивым хватом, убери ноги с опоры и останови раскачивание.",
+            "Подними колени к корпусу за счёт сгибания таза, сохраняя плечи опущенными и корпус собранным.",
+            "Плавно опусти ноги до исходного положения без броска и нового замаха.",
+        ],
+        "breathing": "Выдох при подъёме коленей, вдох при контролируемом опускании.",
+        "mistakes": [
+            "Подъём выполняется махом",
+            "Плечи поднимаются к ушам",
+            "Ноги резко падают вниз",
+        ],
+        "secondary": ["Косые мышцы", "Предплечья"],
+        "safety_notes": [
+            "Проверь перекладину и хват, а завершай подход с устойчивой опорой под ногами."
+        ],
+    },
+    "trap-bar-deadlift": {
+        "steps": [
+            "Встань внутри трэп-грифа, поставь стопы по центру рукоятей и опусти таз в устойчивую стартовую позицию.",
+            "Зафиксируй корпус, надави стопами в пол и подними гриф, сохраняя плечи и таз в согласованном движении.",
+            "Отведи таз назад и плавно опусти гриф на пол, не бросая его в конце повтора.",
+        ],
+        "breathing": "Вдох и фиксация корпуса перед подъёмом, выдох после прохождения тяжёлой части.",
+        "mistakes": [
+            "Таз резко поднимается раньше плеч",
+            "Спина теряет нейтральное положение",
+            "Гриф опускается ударом о пол",
+        ],
+        "secondary": ["Ягодицы", "Бицепс бедра", "Разгибатели спины", "Хват"],
+        "safety_notes": [
+            "Проверь замки и свободное пространство вокруг трэп-грифа перед каждым подходом."
+        ],
+    },
+    "safety-bar-squat": {
+        "steps": [
+            "Настрой стойки и страховки, расположи padded yoke на плечах и возьмись за передние рукояти.",
+            "Опустись в присед, сохраняя стопы устойчивыми, корпус собранным и колени по линии носков.",
+            "Надави всей стопой и встань без рывка, затем верни гриф на стойки под контролем.",
+        ],
+        "breathing": "Вдох перед опусканием, выдох после прохождения тяжёлой части подъёма.",
+        "mistakes": [
+            "Гриф или yoke установлен несимметрично",
+            "Корпус заваливается вперёд в нижней точке",
+            "Возврат на стойки выполняется боком",
+        ],
+        "secondary": ["Ягодицы", "Бицепс бедра", "Кор"],
+        "safety_notes": [
+            "Проверь высоту стоек и страховок; используй только устойчивую safety bar без самодельных креплений."
+        ],
+    },
+    "negative-pull-ups": {
+        "steps": [
+            "Встань на устойчивую платформу и займи верхнее положение подтягивания с контролируемым хватом.",
+            "Медленно опускайся, удерживая лопатки собранными и сохраняя корпус без раскачивания.",
+            "Коснись платформы ногами, останови движение и снова поднимись на старт без прыжка.",
+        ],
+        "breathing": "Вдох перед началом опускания, спокойный выдох в течение негативной фазы.",
+        "mistakes": [
+            "Падение из верхней точки",
+            "Платформа стоит нестабильно",
+            "Старт выполняется прыжком с раскачкой",
+        ],
+        "secondary": ["Бицепс", "Предплечья", "Кор"],
+        "safety_notes": [
+            "Используй устойчивую платформу и не начинай повтор, если безопасный спуск уже не контролируется."
+        ],
+    },
+    "scapular-pull-ups": {
+        "steps": [
+            "Повисни на перекладине без раскачивания и оставь локти выпрямленными.",
+            "Опусти и слегка сведи лопатки, поднимая грудную клетку на небольшую амплитуду без сгибания рук.",
+            "Плавно отпусти лопатки и вернись в исходный вис, сохраняя хват.",
+        ],
+        "breathing": "Выдох при движении лопаток вниз и назад, вдох при возврате.",
+        "mistakes": [
+            "Движение выполняется сгибанием локтей",
+            "Корпус раскачивается",
+            "Плечи резко проваливаются в нижней точке",
+        ],
+        "secondary": ["Задняя дельта", "Нижняя трапеция", "Предплечья"],
+        "safety_notes": [
+            "Проверь устойчивость перекладины и прекращай подход до потери контроля плечевого пояса."
+        ],
+    },
+    "muscle-ups": {
+        "steps": [
+            "Возьмись за перекладину и создай собранное положение корпуса, используя только контролируемый замах.",
+            "Потяни грудь к перекладине, проведи плечи над ней и переведи корпус в верхнюю опору.",
+            "Выжми себя над перекладиной и спустись по обратной траектории без падения.",
+        ],
+        "breathing": "Выдох при тяге и переходе, вдох при контролируемом спуске.",
+        "mistakes": [
+            "Переход выполняется резким броском плеч",
+            "Корпус теряет собранную линию",
+            "Спуск завершается падением с перекладины",
+        ],
+        "secondary": ["Бицепс", "Трицепс", "Кор"],
+        "safety_notes": [
+            "Оставь свободную зону под перекладиной и используй этот вариант только при контролируемом переходе и спуске."
+        ],
+    },
+    "assisted-dips": {
+        "steps": [
+            "Выбери противовес, поставь колени или стопы на платформу и удерживай плечи ниже ушей.",
+            "Согни локти и опустись до комфортной глубины, сохраняя корпус устойчивым между рукоятями.",
+            "Надави на рукояти и вернись вверх, затем дождись остановки платформы перед сходом.",
+        ],
+        "breathing": "Вдох при опускании, выдох при разгибании локтей.",
+        "mistakes": [
+            "Платформа подбрасывается рывком",
+            "Плечи проваливаются ниже контроля",
+            "Вес сбрасывается на стек внизу",
+        ],
+        "secondary": ["Грудь", "Передняя дельта", "Кор"],
+        "safety_notes": [
+            "Проверь фиксацию платформы и противовеса, а сходи с тренажёра после полной остановки механизма."
+        ],
+    },
+    "machine-seated-crunch": {
+        "steps": [
+            "Настрой сиденье и валик по инструкции тренажёра, поставь стопы устойчиво и удерживай таз на опоре.",
+            "Сверни грудную клетку к тазу, двигая рукояти или валик корпусом, а не рывком рук.",
+            "Плавно вернись в исходное положение и не позволяй весовому стеку ударяться.",
+        ],
+        "breathing": "Выдох при сгибании корпуса, вдох при контролируемом возврате.",
+        "mistakes": [
+            "Сиденье или валик не совпадают с ростом",
+            "Вес тянется руками вместо корпуса",
+            "Стек резко возвращается на ограничитель",
+        ],
+        "secondary": ["Кор", "Косые мышцы"],
+        "safety_notes": [
+            "Настрой контакт валика и ось тренажёра до начала подхода; не используй рывок для запуска стека."
+        ],
+    },
+    "band-pull-apart": {
+        "steps": [
+            "Возьми резинку перед собой на уровне груди, слегка согни локти и опусти плечи.",
+            "Разведи кисти в стороны, сводя лопатки без прогиба в пояснице и без подъёма плеч.",
+            "Плавно верни руки вперёд, сохраняя натяжение резинки до последнего повтора.",
+        ],
+        "breathing": "Выдох при разведении рук, вдох при контролируемом возврате.",
+        "mistakes": [
+            "Руки разводятся рывком",
+            "Плечи поднимаются к ушам",
+            "Локти блокируются и резинка теряет контроль",
+        ],
+        "secondary": ["Нижняя трапеция", "Задняя дельта", "Плечи"],
+        "safety_notes": [
+            "Перед подходом осмотри резинку на повреждения и оставь натяжение, которое можно плавно вернуть."
+        ],
+    },
+    "db-squat": {
+        "steps": [
+            "Возьми по гантели в каждую руку, опусти плечи и поставь стопы устойчиво на ширине, удобной для приседа.",
+            "Отведи таз назад и согни колени, сохраняя гантели вдоль корпуса и стопы полностью на полу.",
+            "Надави всей стопой и встань без раскачивания гантелей и жёсткой блокировки коленей.",
+        ],
+        "breathing": "Вдох перед опусканием, выдох после прохождения тяжёлой части подъёма.",
+        "mistakes": [
+            "Гантели тянут корпус вперёд",
+            "Колени смещаются внутрь",
+            "Пятки отрываются от пола",
+        ],
+        "secondary": ["Ягодицы", "Бицепс бедра", "Кор"],
+    },
+    "kettlebell-overhead-carry": {
+        "steps": [
+            "Подними гирю над головой, зафиксируй запястье и расположи снаряд над плечом.",
+            "Иди короткими ровными шагами, удерживая рёбра и таз собранными, а взгляд — вперёд.",
+            "Остановись, опусти гирю к плечу и верни её на пол только после устойчивой фиксации корпуса.",
+        ],
+        "breathing": "Дыши ровно во время ходьбы, не задерживая дыхание на всём переносе.",
+        "mistakes": [
+            "Гиря уходит за линию корпуса",
+            "Шаги становятся широкими и шаткими",
+            "Снаряд бросается на пол из верхнего положения",
+        ],
+        "secondary": ["Кор", "Плечи", "Предплечья"],
+        "safety_notes": [
+            "Проверь свободное пространство над головой и по маршруту, прежде чем поднимать гирю."
+        ],
+    },
+    "dragon-flag": {
+        "steps": [
+            "Ляг на скамью, возьмись руками за край за головой и подними таз с собранным корпусом.",
+            "Опускай прямую линию тела к скамье, сохраняя рёбра и таз соединёнными без рывка.",
+            "Остановись до потери контроля и верни тело вверх через напряжение корпуса, а не мах ногами.",
+        ],
+        "breathing": "Вдох при контролируемом опускании, выдох во время возврата вверх.",
+        "mistakes": [
+            "Поясница прогибается и линия тела ломается",
+            "Ноги падают вниз без остановки",
+            "Подъём начинается махом",
+        ],
+        "secondary": ["Пресс", "Плечи", "Кор"],
+        "safety_notes": [
+            "Начинай с облегчённой амплитуды и не используй рывок, если таз уже не удерживается над скамьёй."
+        ],
+    },
+    "jackknife-sit-up": {
+        "steps": [
+            "Ляг на спину, вытяни руки и ноги, прижми таз и подготовь корпус к одновременному сгибанию.",
+            "Подними руки и ноги навстречу друг другу, формируя складку без броска поясницы в пол.",
+            "Плавно вернись в исходное положение и останови движение до начала раскачки.",
+        ],
+        "breathing": "Выдох при складывании, вдох при контролируемом возвращении.",
+        "mistakes": [
+            "Подъём выполняется только махом ног",
+            "Поясница отрывается и падает на пол",
+            "Возврат происходит без контроля",
+        ],
+        "secondary": ["Кор", "Квадрицепс"],
+    },
+    "l-sit": {
+        "steps": [
+            "Упрись прямыми руками в устойчивые брусья или паралетсы и опусти плечи вниз.",
+            "Подними таз и вытяни ноги вперёд, сохраняя корпус собранным и стопы на одной линии.",
+            "Удерживай положение ровно, затем плавно опусти ноги до потери контроля хвата.",
+        ],
+        "breathing": "Дыши спокойно и не задерживай дыхание во время удержания.",
+        "mistakes": [
+            "Плечи поднимаются к ушам",
+            "Таз провисает между опорами",
+            "Ноги опускаются резко",
+        ],
+        "secondary": ["Пресс", "Трицепс", "Плечи", "Хват"],
+        "safety_notes": [
+            "Используй только устойчивые опоры, которые не скользят при переносе веса на руки."
+        ],
+    },
+    "clean-and-jerk": {
+        "steps": [
+            "Начни со штангой у голеней, зафиксируй корпус и подними её к плечам через согласованное разгибание ног и таза.",
+            "Поймай штангу на передней части плеч, собери корпус и подготовь стопы к толчку.",
+            "Сделай короткий подсед, вытолкни штангу над головой и верни её на плечи под контролем.",
+        ],
+        "breathing": "Вдох и фиксация перед первым подъёмом, выдох после фиксации над головой.",
+        "mistakes": [
+            "Штанга уходит далеко от корпуса",
+            "Приём на плечи выполняется жёстко и без фиксации стоп",
+            "Толчок заменяется медленным жимом с потерей позиции",
+        ],
+        "secondary": ["Плечи", "Трапеции", "Квадрицепс", "Ягодицы"],
+        "safety_notes": [
+            "Проверь замки и свободное пространство над головой; используй вес, при котором обе фазы остаются контролируемыми."
+        ],
+    },
+    "hang-power-clean": {
+        "steps": [
+            "Удерживай штангу у бёдер, отведи таз назад и опусти её до позиции виса с нейтральным корпусом.",
+            "Резко выпрями таз и ноги, проведи штангу близко к телу и поймай её на плечах без глубокого приседа.",
+            "Верни штангу к бёдрам и снова займи устойчивый вис, не бросая её между повторами.",
+        ],
+        "breathing": "Вдох перед стартом из виса, выдох после стабильного приёма на плечи.",
+        "mistakes": [
+            "Колени уходят вперёд и штанга отдаляется от тела",
+            "Подъём начинается руками до разгибания таза",
+            "Приём выполняется на прямые локти",
+        ],
+        "secondary": ["Плечи", "Трапеции", "Квадрицепс", "Ягодицы"],
+        "safety_notes": [
+            "Проверь замки и оставь свободную зону вокруг штанги до начала взрывной фазы."
+        ],
+    },
+    "wrist-roller": {
+        "steps": [
+            "Возьми рукоять ролика обеими руками, вытяни её перед собой и закрепи груз на свободном пространстве.",
+            "Поворачивай рукоять кистями, поднимая груз ровно и не раскачивая локти или плечи.",
+            "Размотай груз в обратную сторону под контролем и положи ролик после полной остановки.",
+        ],
+        "breathing": "Дыши спокойно; выдох на подкручивании, вдох на контролируемой размотке.",
+        "mistakes": [
+            "Локти и плечи помогают рывком",
+            "Груз падает без контролируемой размотки",
+            "Ролик держится слишком тяжёлым хватом при потере позиции кистей",
+        ],
+        "secondary": ["Хват", "Бицепс"],
+        "safety_notes": [
+            "Убери людей и предметы из зоны падения груза и остановись до полной потери контроля кистей."
+        ],
+    },
+    "rope-climb": {
+        "steps": [
+            "Возьмись за канат, зафиксируй его стопами или замком ног и подними тело коротким тягущим движением.",
+            "Переставляй руки и ноги поочерёдно, сохраняя канат близко к корпусу и не раскачиваясь.",
+            "Спускайся небольшими шагами, удерживая канат до устойчивой опоры обеих ног.",
+        ],
+        "breathing": "Выдыхай на каждом тяговом усилии и дыши ровно во время спуска.",
+        "mistakes": [
+            "Подъём выполняется только руками без фиксации ног",
+            "Корпус раскачивается вокруг каната",
+            "Спуск завершается прыжком с высоты",
+        ],
+        "secondary": ["Бицепс", "Предплечья", "Кор"],
+        "safety_notes": [
+            "Проверь крепление каната и маты под ним; спускайся контролируемо и не прыгай с высоты."
+        ],
+    },
 }
 
 
@@ -953,9 +1912,59 @@ MEDIA_ALT_BY_PHASE: dict[str, dict[str, str]] = {
 }
 
 
+@lru_cache(maxsize=1)
+def structured_catalog_metadata() -> dict[str, StructuredExerciseCatalogMetadata]:
+    """Materialize one reviewed metadata record for every canonical seed row."""
+
+    from fitminiapp_api.services.exercise_guides import PROFILES, SLUG_TO_PROFILE
+    from fitminiapp_api.services.program_seed_data import (
+        EXERCISE_CATALOG,
+        exercise_difficulty_level,
+    )
+
+    records: dict[str, StructuredExerciseCatalogMetadata] = {}
+    for slug, _title, primary_muscle, equipment in EXERCISE_CATALOG:
+        canonical = CANONICAL_EXERCISE_REDIRECTS.get(slug, slug)
+        if canonical in records:
+            continue
+        movement_pattern = REVIEWED_MOVEMENT_PATTERN_BY_SLUG.get(canonical)
+        if movement_pattern is None:
+            raise ValueError(f"Reviewed movement pattern is missing: {canonical}")
+        profile_name = SLUG_TO_PROFILE.get(canonical)
+        if profile_name is None:
+            raise ValueError(f"Reviewed guide profile is missing: {canonical}")
+        profile = ITEM_GUIDE_CONTENT.get(canonical, PROFILES[profile_name])
+        difficulty_level = exercise_difficulty_level(canonical)
+        optional = CATALOG_METADATA.get(
+            canonical,
+            {
+                "aliases": (),
+                "movement_pattern": movement_pattern,
+                "machine_variant_tags": (),
+                "execution_variant_tags": (),
+            },
+        )
+        records[canonical] = {
+            "primary_muscle": primary_muscle,
+            "secondary_muscles": tuple(profile["secondary"]),
+            "equipment": equipment,
+            "movement_pattern": movement_pattern,
+            "difficulty_level": cast(
+                Literal["beginner", "intermediate", "advanced"], difficulty_level
+            ),
+            "metric_type": "cardio" if primary_muscle == "Кардио" else "strength",
+            "aliases": tuple(optional["aliases"]),
+            "machine_variant_tags": tuple(optional["machine_variant_tags"]),
+            "execution_variant_tags": tuple(optional["execution_variant_tags"]),
+        }
+    return records
+
+
 def base_exercise_slug(slug: str) -> str:
     return slug.split("-u-", maxsplit=1)[0]
 
 
-def exercise_catalog_metadata(slug: str) -> ExerciseCatalogMetadata | None:
-    return CATALOG_METADATA.get(base_exercise_slug(slug))
+def exercise_catalog_metadata(slug: str) -> StructuredExerciseCatalogMetadata | None:
+    base_slug = base_exercise_slug(slug)
+    canonical = CANONICAL_EXERCISE_REDIRECTS.get(base_slug, base_slug)
+    return structured_catalog_metadata().get(canonical)

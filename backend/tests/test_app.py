@@ -36,6 +36,7 @@ from fitminiapp_api.models.user import (
 )
 from fitminiapp_api.services import notifications as notifications_service
 from fitminiapp_api.services.coach_clients import create_coach_invite_link
+from fitminiapp_api.services.exercise_catalog_metadata import MEDIA_STATE_BY_SLUG
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.notifications import (
     claim_due_notifications,
@@ -1815,14 +1816,15 @@ def test_every_seeded_exercise_has_complete_guide_and_local_images(client):
     standard_exercises = [item for item in exercises if not item["is_custom"]]
     static_dir = Path(__file__).resolve().parents[2] / "backend" / "assets"
 
-    assert len(standard_exercises) == 182
-    assert len(client.get("/api/v1/programs/exercises", headers=headers).content) < 130_000
+    assert len(standard_exercises) == 207
+    assert len(client.get("/api/v1/programs/exercises", headers=headers).content) < 150_000
     assert all(
         exercise["has_guide"] and exercise["guide"] is None for exercise in standard_exercises
     )
 
+    sample_exercise = next(item for item in standard_exercises if item["slug"] == "bench-press")
     sample = client.get(
-        f"/api/v1/programs/exercises/{standard_exercises[0]['id']}/guide",
+        f"/api/v1/programs/exercises/{sample_exercise['id']}/guide",
         headers=headers,
     )
     assert sample.status_code == 200
@@ -1845,6 +1847,10 @@ def test_every_seeded_exercise_has_complete_guide_and_local_images(client):
         assert guide["breathing"]
         assert len(guide["common_mistakes"]) >= 3
         assert guide["muscles"]
+        if slug in MEDIA_STATE_BY_SLUG:
+            assert guide["images"] == []
+            assert guide["media"] == []
+            continue
         assert guide["images"]
         assert guide["media"]
         for media in guide["media"]:
