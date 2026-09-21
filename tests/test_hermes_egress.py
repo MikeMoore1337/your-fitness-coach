@@ -30,7 +30,7 @@ def test_source_hosts_include_only_enabled_canonical_fetch_hosts(tmp_path: Path)
                 "sources": [
                     {
                         "enabled": True,
-                        "url": "https://news.example.test/feed",
+                        "url": "https://news.example.test/feed?topic=fitness",
                         "allowed_redirect_hosts": ["redirect.example.test"],
                         "allowed_item_hosts": ["items.example.test"],
                     },
@@ -55,6 +55,10 @@ def test_provider_and_intake_hosts_are_fixed_to_approved_contract() -> None:
     )
     with pytest.raises(egress.EgressError, match="not_approved"):
         egress._host_from_url("https://api.openai.com/v1", expected=egress.PROVIDER_HOST)
+    with pytest.raises(egress.EgressError, match="not_https"):
+        egress._host_from_url(
+            "https://api.groq.com/openai/v1?model=unexpected", expected=egress.PROVIDER_HOST
+        )
 
 
 def test_build_rules_scopes_default_deny_to_hermes_subnet() -> None:

@@ -73,7 +73,7 @@ def _selected_worker_values(path: Path) -> dict[str, str]:
     return values
 
 
-def _host_from_url(value: str, *, expected: str | None = None) -> str:
+def _host_from_url(value: str, *, expected: str | None = None, allow_query: bool = False) -> str:
     parsed = urlsplit(value)
     try:
         port = parsed.port
@@ -84,7 +84,7 @@ def _host_from_url(value: str, *, expected: str | None = None) -> str:
         or parsed.username
         or parsed.password
         or parsed.fragment
-        or parsed.query
+        or (parsed.query and not allow_query)
         or port not in {None, 443}
         or not parsed.hostname
     ):
@@ -137,7 +137,7 @@ def _source_hosts(path: Path) -> set[str]:
         url = source.get("url")
         if not isinstance(url, str):
             raise EgressError("source_url_invalid")
-        hosts.add(_host_from_url(url))
+        hosts.add(_host_from_url(url, allow_query=True))
         for field in ("allowed_redirect_hosts", "allowed_item_hosts"):
             values = source.get(field, [])
             if not isinstance(values, list):
@@ -337,16 +337,14 @@ def build_rules(
         lines.append(
             f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ip6 daddr {{ ::/128, ::1/128, ::ffff:0:0/96, 100::/64, 2001:db8::/32, fc00::/7, fe80::/10, ff00::/8 }} drop"
         )
-    if allowed_v4:
-        if source_v4:
-            lines.append(
-                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ip daddr {{ {_elements(allowed_v4)} }} tcp dport 443 accept"
-            )
-    if allowed_v6:
-        if source_v6:
-            lines.append(
-                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ip6 daddr {{ {_elements(allowed_v6)} }} tcp dport 443 accept"
-            )
+    if allowed_v4 and source_v4:
+        lines.append(
+            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ip daddr {{ {_elements(allowed_v4)} }} tcp dport 443 accept"
+        )
+    if allowed_v6 and source_v6:
+        lines.append(
+            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ip daddr {{ {_elements(allowed_v6)} }} tcp dport 443 accept"
+        )
     if source_v4:
         lines.append(
             f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} drop"
