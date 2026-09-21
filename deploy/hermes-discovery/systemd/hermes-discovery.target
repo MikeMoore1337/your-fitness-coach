@@ -1,4 +1,5 @@
 [Unit]
-Description=Task 129 discovery and bounded editorial handoff
-Wants=hermes-discovery.service hermes-worker-drain.service
+Description=Task 403 discovery and bounded editorial handoff
+Requires=hermes-discovery.service
+Wants=hermes-worker-drain.service
 After=hermes-discovery.service

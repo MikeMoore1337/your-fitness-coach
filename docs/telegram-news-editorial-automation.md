@@ -271,7 +271,7 @@ evidence and is never a build input or commit target.
 
 The lock contains only the worker closure and has no floating versions or provider SDK:
 `httpx`, Pydantic and their exact transitive dependencies. The base is
-`python:3.13-alpine@sha256:46ee549c88617e9bc8acb843a326f1a5c0fa5608d7f9703509efe6d53b55f318`.
+`python:3.13-alpine@sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee`.
 The final image runs as UID/GID `10000:10000`, drops all capabilities, sets
 `no-new-privileges`, removes the package shell/tooling surfaces, declares `/opt/data` as the only
 state volume, and is tested with a read-only root filesystem. The verification budget is 0.50
@@ -315,21 +315,28 @@ test-process YFC server. They set the local news flags to false and cannot chang
 
 ### Deployment boundary and operations
 
-The selected production topology remains a separate Linux `x86_64` VM; it has not been created.
-The current YFC host is not a placement target: the earlier read-only baseline was 1 vCPU, about
-958 MiB RAM with about 163 MiB available and swap pressure, and about 4.37 GiB free disk. The
-planning minimum for a dedicated VM is 2 vCPU, 4 GiB RAM and 30 GiB SSD (20 GiB is only a short,
-stateless-shadow floor), with cgroup v2, default-deny host ingress/egress firewall, no public
-inbound ports, no host mounts, no Docker socket and no YFC DB/Redis/SSH access. Expected external
-LLM editor workload is an unbenchmarked 0.25-1.0 vCPU and 0.5-1.5 GiB RAM; confirm the budget in
-an owner-approved shadow run.
+Поддерживаются две production topology: отдельная Linux `x86_64` VM (`separate-vm`) и
+owner-approved co-location (`colocated-isolated`). Для Task 403 выбрана co-location на
+существующем YFC RU VPS `77.91.90.171:1337`; отдельная VM не создаётся. Это не снимает
+production flag: `COLOCATED_ISOLATED_HERMES=yes`.
+изоляционные требования: Hermes получает только `/opt/hermes`, `/etc/hermes`, `/var/lib/hermes`,
+dedicated UID/GID `10000:10000`, Docker-сеть `hermes-net` без YFC-контейнеров и без публичных
+портов. YFC volumes, `.env`, PostgreSQL/Redis, Docker socket, SSH credential и runtime repository
+в Hermes boundary не передаются.
 
-Before Gate A approval the network is local-only: the test harness uses loopback and Docker's
-`host.docker.internal` mapping solely for local services. No production allowlist is changed.
-After a separate approval, the VM allowlist must explicitly name the approved provider API host,
-the YFC intake host/path and approved source hosts; it must deny Telegram Bot API, YFC
-PostgreSQL/Redis/internal services, Docker API/socket, SSH, cloud metadata, arbitrary redirects,
-registries and wildcard internet egress. There are no inbound Hermes ports.
+Co-located host guard перед discovery и worker проверяет `MemAvailable >= 768 MiB`, used swap
+`<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Guard использует
+canonical YFC deployment lock
+`/srv/yfc/fit-mini-app/.artifacts/operations/deployments/deployment.lock` через shared `flock`
+и fail-closed останавливает Hermes при активном YFC deploy. Reason codes: `insufficient_memory`,
+`swap_pressure`, `high_load`, `insufficient_disk`, `yfc_deploy_active`; overlap Hermes-фаз также
+запрещён. Discovery ограничен `256 MiB/0.25 CPU`, worker — `512 MiB/0.50 CPU`.
+
+До внешнего shadow network остаётся local/mock. Для production egress требуется доказанная
+scoped policy: exact source hosts для discovery и exact provider/YFC intake destinations для
+worker; Telegram Bot API, PostgreSQL/Redis, внутренние YFC-сервисы, Docker API/socket, SSH,
+cloud metadata, registry, arbitrary redirects и wildcard internet должны быть запрещены.
+Task 403 не меняет глобальный firewall автоматически. Hermes inbound ports отсутствуют.
 
 Актуальные имена переменных worker:
 
@@ -421,10 +428,10 @@ safety. Фактический набор enabled/disabled источников 
 Discovery не делает обязательных publication quotas и не отбрасывает материал из-за неизвестного
 topic; taxonomy/risk/publication eligibility остаются серверной ответственностью YFC.
 
-На будущей отдельной Hermes VM systemd timer напрямую активирует `hermes-worker-drain.service`;
-его `Requires`/`After` сначала запускают `hermes-discovery.service`. Первый
-контейнер не получает provider/YFC secrets. Только второй host-side drain передаёт bounded job в
-hardened worker с provider key и YFC HMAC secret. Входящих Hermes ports нет; source discovery
+На выбранном host systemd timer активирует oneshot `hermes-worker-drain.service`; его
+`Requires/After` сначала запускают `hermes-discovery.service`, затем worker drain. Первый контейнер не получает
+provider/YFC secrets. Только второй host-side drain передаёт bounded job в hardened worker с
+provider key и YFC HMAC secret. Входящих Hermes ports нет; source discovery
 имеет exact host allowlist из definitions, HTTPS-only external mode, DNS resolution с запретом
 non-global адресов, revalidation каждого redirect, MIME/size/time/concurrency bounds и no
 JavaScript/browser. Host firewall должен быть default-deny и отдельно разрешать только approved
@@ -435,7 +442,10 @@ source hosts, Groq и YFC intake.
 `root` только для точных Docker/launcher commands; сами контейнеры остаются non-root с
 `--user 10000:10000`, read-only rootfs, cap-drop ALL и no-new-privileges. Обе units закрепляют
 одну owner-approved Docker network `hermes-net`; worker drain валидирует только bounded `hermes-*`
-имя и отвергает встроенные `bridge`/`host`/`none` сети. Этот PR не устанавливает Docker или VM.
+имя и отвергает встроенные `bridge`/`host`/`none` сети. `scripts/hermes_colocation.py` проверяет
+пересечение Docker subnet, UID/GID, immutable image references и `systemd-analyze verify`, затем
+оставляет timer disabled до прохождения Gate A, credentials и external shadow. Он не устанавливает
+новый VPS и не меняет глобальный firewall.
 
 State — только bounded hashes, fetch metadata, reason codes и candidate metadata. Stable dedupe key
 использует `source_id + canonical URL + content hash + event date`; restart/uncertain state не
