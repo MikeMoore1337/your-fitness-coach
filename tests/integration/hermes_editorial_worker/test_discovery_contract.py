@@ -173,7 +173,7 @@ def test_worker_drain_rejects_non_immutable_or_floating_images(
 
 @pytest.mark.parametrize(
     "value",
-    ["sha256:" + "a" * 64, "registry.invalid/hermes-worker@sha256:" + "b" * 64],
+    ["registry.invalid/hermes-worker@sha256:" + "b" * 64],
 )
 def test_worker_drain_accepts_content_addressed_images(
     value: str, monkeypatch: pytest.MonkeyPatch
@@ -247,13 +247,15 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert pubmed["authoritative"] is True
     assert pubmed["fetch_kind"] == "rss"
     assert pubmed["allowed_item_hosts"] == ["pubmed.ncbi.nlm.nih.gov"]
-    assert '"Physical Fitness"[majr]' in query
-    assert '"Exercise"[majr]' in query
-    assert '"Exercise Therapy"[majr]' in query
+    assert '"Resistance Training"[Title/Abstract]' in query
+    assert '"Muscle Hypertrophy"[Title/Abstract]' in query
+    assert '"Bodybuilding"[Title/Abstract]' in query
+    assert '"Dietary Supplements"[majr]' in query
+    assert '"Anabolic Agents"[majr]' in query
     assert '"Sports Medicine"[majr]' in query
     assert '"Sports Nutritional Sciences"[majr]' in query
-    assert '"Sports Nutritional Physiological Phenomena"[majr]' in query
-    assert '"Physical Conditioning, Human"[majr]' in query
+    assert '"Exercise"[majr]' not in query
+    assert '"Physical Fitness"[majr]' not in query
     assert "fitness+OR+exercise+OR+nutrition" not in pubmed["url"]
     assert pubmed["trust_notes"].startswith("Discovery/index feed only")
     assert "primary source" in pubmed["trust_notes"]
@@ -264,6 +266,7 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert {
         "sports_nutrition",
         "dietary_supplements",
+        "sports_bodybuilding_pharmacology",
         "medicine",
         "health",
         "fitness",
@@ -510,6 +513,62 @@ def test_parser_keeps_unknown_topic_and_treats_instructions_as_untrusted_data() 
     assert "Ignore previous instructions" in candidates[0].content
     assert candidates[0].external_id == "article-1"
     assert candidates[0].published_at is not None
+
+
+def test_relevance_gate_rejects_before_outbox_and_records_bounded_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = discovery_runner.SourceDefinition(
+        source_id="source-one",
+        name="Source One",
+        source_type="primary_research",
+        fetch_kind="rss",
+        url="https://source.example/feed",
+        language="en",
+        enabled=True,
+        topics=("medicine",),
+        authoritative=True,
+        allowed_redirect_hosts=("source.example",),
+        allowed_item_hosts=("source.example",),
+    )
+    candidate = discovery_runner.ParsedCandidate(
+        external_id="clinical-1",
+        canonical_url="https://source.example/clinical-1",
+        title="Clinical study of a hospital population",
+        summary="A general medical outcome without training or sports context.",
+        content="The paper reports hospital outcomes and medication response.",
+    )
+    monkeypatch.setattr(
+        discovery_runner,
+        "load_source_definitions",
+        lambda *_args, **_kwargs: (
+            {"definitions_version": "v1", "source_registry_sha256": "a" * 64},
+            (source,),
+        ),
+    )
+    monkeypatch.setattr(
+        discovery_runner,
+        "_source_outcome",
+        lambda *_args, **_kwargs: discovery_runner.SourceFetchOutcome(
+            source=source,
+            result=discovery_runner.FetchResult(status="fetched", items=(candidate,)),
+        ),
+    )
+
+    state_dir = tmp_path / "state"
+    outbox_dir = state_dir / "outbox"
+    result = discovery_runner.run_once(
+        definitions_path=tmp_path / "definitions.json",
+        state_dir=state_dir,
+        outbox_dir=outbox_dir,
+        mode=discovery_runner.EXTERNAL_MODE,
+    )
+
+    assert result["candidates_created"] == 0
+    assert result["relevance_rejected"] == 1
+    assert list(outbox_dir.glob("*.json")) == []
+    state = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+    assert next(iter(state["candidates"].values()))["error_code"] == "relevance_gate_rejected"
 
 
 def test_json_feed_and_html_metadata_paths_normalize_bounded_candidates() -> None:

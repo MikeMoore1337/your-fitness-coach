@@ -24,6 +24,7 @@ from fitminiapp_api.services.news_freshness import is_fresh_publication
 from fitminiapp_api.services.news_state import transition_news_cluster
 from fitminiapp_api.services.news_taxonomy import (
     classify_editorial_text,
+    evaluate_editorial_relevance,
     evaluate_publication_policy,
 )
 
@@ -66,6 +67,22 @@ PROHIBITED_PATTERNS = {
     ),
 }
 TOPIC_KEYWORDS = {
+    "sports_bodybuilding_pharmacology": (
+        "anabolic steroid",
+        "anabolic-androgenic",
+        "performance-enhancing drug",
+        "aas",
+        "sarm",
+        "testosterone",
+        "growth hormone",
+        "анабол",
+        "стероид",
+        "допинг",
+        "тестостерон",
+        "сарм",
+        "гормон роста",
+        "фармаколог",
+    ),
     "fitness": (
         "fitness",
         "exercise",
@@ -267,6 +284,7 @@ class ParsedNewsItem:
     canonical_url: str
     title: str
     summary: str = ""
+    content: str = ""
     primary_url: str | None = None
     author: str | None = None
     publisher: str | None = None
@@ -940,6 +958,11 @@ def ingest_items(
             counts["rejected"] += 1
             _log_candidate(item=parsed, outcome="rejected", reason="missing_title")
             continue
+        relevance = evaluate_editorial_relevance(title, summary, parsed.content)
+        if not relevance.allowed:
+            counts["rejected"] += 1
+            _log_candidate(item=parsed, outcome="rejected", reason=relevance.reason_code)
+            continue
         external_id = parsed.external_id.strip()[:512] or canonical_url
         external_hash = sha256_text(external_id)
         canonical_hash = sha256_text(canonical_url)
@@ -1081,7 +1104,9 @@ def ingest_items(
         hard_prohibited = prohibited and not allow_sensitive_manual_review
         fresh = "source_not_current_month" not in risks
         broad_recall_candidate = (
-            fresh
+            relevance.allowed
+            and relevance.strength in {"strong", "moderate"}
+            and fresh
             and source.source_type
             in {"primary_research", "systematic_review", "official_organization", "yfc"}
             and topic == "other"
@@ -1102,6 +1127,10 @@ def ingest_items(
         cluster.discovery_reasons = list(
             dict.fromkeys(
                 [
+                    relevance.reason_code,
+                    f"relevance_strength:{relevance.strength}",
+                    f"relevance_version:{relevance.relevance_version}",
+                    *(f"relevance_topic:{topic}" for topic in relevance.topics),
                     "score_threshold_met"
                     if score >= candidate_threshold
                     else "broad_source_recall",

@@ -1,6 +1,7 @@
 *
 !Dockerfile
 !discovery_runner.py
+!hermes_health.py
 !hermes-discovery-provenance.json
 !license_bundle.py
 !requirements.lock

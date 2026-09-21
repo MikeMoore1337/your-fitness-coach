@@ -1990,6 +1990,67 @@ def test_record_production_success_requires_exact_merged_master_deployment(
     ] == ("production-success")
 
 
+def test_reopen_after_production_preserves_prior_evidence_and_releases_lane(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, worktree, _, _ = _prepare_started(repository, "205")
+    lease_path = controller.store.task_lease_path("205")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    previous_history = {
+        "version": task_session.TASK_STATE_VERSION,
+        "task_id": "205",
+        "state": "production-success",
+        "head_sha": "a" * 40,
+        "base_sha": "b" * 40,
+        "merge_sha": "c" * 40,
+        "deployed_sha": "c" * 40,
+        "pr_number": 205,
+        "completed_at": task_session.utc_now(),
+        "closeout_required": True,
+    }
+    lease.update(
+        {
+            "lifecycle_state": "production-success",
+            "delivery_owner": "205",
+            "merge_sha": "c" * 40,
+            "deployed_sha": "c" * 40,
+        }
+    )
+    task_session.StateStore.replace_json(lease_path, lease)
+    task_session.StateStore.replace_json(
+        controller.store.delivery_path,
+        {
+            "version": task_session.DELIVERY_STATE_VERSION,
+            "next_sequence": 1,
+            "owner": {"task_id": "205"},
+            "updated_at": task_session.utc_now(),
+        },
+    )
+    history_path = controller.store.history / "task-205.json"
+    task_session.StateStore.replace_json(history_path, previous_history)
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit owner authorization"):
+        controller.reopen_after_production("205", reason="continue", owner_authorize=False)
+
+    reopened = controller.reopen_after_production(
+        "205", reason="Task 403 post-production remediation", owner_authorize=True
+    )
+
+    assert reopened["lifecycle_state"] == "review"
+    assert reopened["continuation_of_production_success"] == {
+        "merge_sha": "c" * 40,
+        "deployed_sha": "c" * 40,
+        "pr_number": 205,
+    }
+    continuation = controller.store.read_json(history_path)
+    assert isinstance(continuation, dict)
+    assert continuation["state"] == "continuation-in-progress"
+    assert continuation["previous_production_success"] == previous_history
+    assert controller.store.delivery_state()["owner"] is None
+    assert not controller.repository.status(worktree)
+
+
 def test_record_production_success_rejects_sha_mismatch_without_mutation(
     repository: tuple[Path, Any],
 ) -> None:

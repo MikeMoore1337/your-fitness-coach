@@ -30,7 +30,7 @@ UPSTREAM_TAG = "v2026.8.31"
 UPSTREAM_COMMIT = "29112bef099274229cadff79cdff7bf7b99c4b77"
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
 INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v2"
-PROMPT_VERSION = "task143-editorial-worker-v1"
+PROMPT_VERSION = "task403-editorial-worker-v1"
 SKILL_VERSION = "yfc-hermes-editorial-v1"
 LOCAL_MOCK_MODE = "local_mock"
 EXTERNAL_MODE = "external"
@@ -64,9 +64,11 @@ TELEGRAM_PHOTO_CAPTION_LIMIT = 1024
 NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:%|\s?(?:mg|g|kg|мг|г|кг))?")
 BLOCKER_CODE_PATTERN = re.compile(r"^[a-z0-9_.:-]{1,64}$")
 EXTERNAL_GPT_OSS_SOFT_BUDGETS = (
-    "Soft editorial budgets (not JSON Schema constraints): headline <= 140 characters; "
-    "summary uses the remaining available caption budget; why_it_matters <= 240 characters. "
-    "Keep the draft concise; "
+    "Soft editorial targets (not JSON Schema constraints): headline about 60-110 characters; "
+    "when the source contains enough evidence, use about 850-1000 UTF-16 characters for the "
+    "combined rich caption. Include two substantive paragraphs covering the design or "
+    "population, main findings, limitations or applicability, and why the result matters. "
+    "Do not pad, repeat, or invent detail; concise output is correct when the evidence is thin. "
     "the worker enforces separate hard limits locally."
 )
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "host.docker.internal"})
@@ -147,6 +149,16 @@ class SourcePacket(BaseModel):
         return value
 
 
+class RelevanceMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    allowed: bool
+    reason_code: str = Field(pattern=r"^[a-z0-9_.:-]{1,96}$")
+    strength: str = Field(pattern=r"^(strong|moderate)$")
+    topics: list[str] = Field(min_length=1, max_length=8)
+    version: str = Field(pattern=r"^hermes-relevance-v1$")
+
+
 class EditorialJob(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -154,6 +166,7 @@ class EditorialJob(BaseModel):
     job_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{16,128}$")
     idempotency_key: str = Field(pattern=r"^[A-Za-z0-9_.:-]{16,128}$")
     request_nonce: str = Field(pattern=r"^[A-Za-z0-9_.:-]{16,128}$")
+    relevance: RelevanceMetadata
     source: SourcePacket
 
 
@@ -1032,6 +1045,8 @@ def _post_preview(job: EditorialJob, result: IntakeResponse) -> PreviewResponse:
 def run_job(job: EditorialJob) -> dict[str, Any]:
     mode = _provider_mode()
     _assert_preview_boundary(mode)
+    if not job.relevance.allowed:
+        raise WorkerError("relevance_gate_rejected")
     if job.source.source_id not in _source_allowlist():
         raise WorkerError("source_not_allowlisted")
     if _contains_prompt_injection(job.source):

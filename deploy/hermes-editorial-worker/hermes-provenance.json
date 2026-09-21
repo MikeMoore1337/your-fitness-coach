@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "task129-hermes-worker-provenance-v1",
+  "schemaVersion": "task403-hermes-worker-provenance-v2",
   "upstream": {
     "repository": "https://github.com/NousResearch/hermes-agent.git",
     "version": "0.21.0",
@@ -18,9 +18,12 @@
     "version": "editorial-worker-v1",
     "jobSchema": "hermes-editorial-job-v1",
     "intakeSchema": "hermes-editorial-intake-v2",
-    "promptVersion": "task129-editorial-worker-v2",
+    "promptVersion": "task403-editorial-worker-v1",
     "skillVersion": "yfc-hermes-editorial-v1",
-    "sourceBehaviorPatches": 0,
+    "sourceBehaviorPatches": {
+      "relevanceGate": "hermes-relevance-v1 required before provider",
+      "richCaptionTarget": "850-1000 UTF-16 characters when evidence supports it"
+    },
     "provider": "OpenAI-compatible HTTP, local-only before Gate A",
     "publishCapability": false,
     "telegramCapability": false,

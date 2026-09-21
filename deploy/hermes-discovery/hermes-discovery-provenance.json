@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "task129-hermes-discovery-provenance-v1",
+  "schemaVersion": "task403-hermes-discovery-provenance-v2",
   "component": "bounded-source-discovery-runner",
   "base": {
     "image": "python:3.13-alpine",
@@ -32,6 +32,9 @@
     "shell": false,
     "sourceFetch": "explicit versioned source definitions only"
   },
-  "sourceBehaviorPatches": 0,
+  "sourceBehaviorPatches": {
+    "relevanceGate": "hermes-relevance-v1 before outbox/provider",
+    "health": "hermes-pipeline-health-v1 with bounded alerts"
+  },
   "license": "PSF-2.0 Python runtime plus Alpine package licenses recorded during build"
 }

@@ -25,8 +25,9 @@ from discovery_runner import (
     load_source_definitions,
     mark_candidate_status,
 )
+from hermes_health import record_health
 
-IMAGE_DIGEST_PATTERN = re.compile(r"^(?:sha256:[0-9a-f]{64}|[^\s@]+@sha256:[0-9a-f]{64})$")
+IMAGE_DIGEST_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 DOCKER_NETWORK_NAME_PATTERN = re.compile(r"^hermes-[a-z0-9][a-z0-9_.-]{0,56}$")
 JOB_NAME_PATTERN = re.compile(r"^[0-9a-f]{64}\.json$")
 DEFAULT_MAX_JOBS = 1
@@ -54,6 +55,8 @@ TERMINAL_WORKER_ERRORS = frozenset(
         "source_content_too_large",
         "source_not_allowlisted",
         "source_prompt_injection_blocked",
+        "relevance_gate_rejected",
+        "intake_schema_invalid",
     }
 )
 
@@ -174,6 +177,12 @@ def _result_code(completed: subprocess.CompletedProcess[str]) -> str:
         if isinstance(document, dict) and document.get("status") in {"accepted", "duplicate"}:
             return str(document["status"])
         return "worker_output_invalid"
+    stderr = (completed.stderr or "").casefold()
+    if any(
+        marker in stderr
+        for marker in ("no such image", "manifest unknown", "pull access denied", "unauthorized")
+    ):
+        return "image_unavailable"
     try:
         document = json.loads(completed.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError):  # fmt: skip
@@ -212,6 +221,7 @@ def drain_once() -> dict[str, Any]:
     ][:max_jobs]
     completed_jobs: list[dict[str, str]] = []
     failed_jobs: list[dict[str, str]] = []
+    counters: dict[str, int] = {}
     with _exclusive_lock(state_dir / ".worker-drain.lock", stale_seconds=stale_seconds):
         for job in jobs:
             try:
@@ -232,6 +242,7 @@ def drain_once() -> dict[str, Any]:
                 continue
             code = _result_code(completed)
             if code in {"accepted", "duplicate"}:
+                counters[code] = counters.get(code, 0) + 1
                 try:
                     mark_candidate_status(
                         state_dir,
@@ -248,6 +259,7 @@ def drain_once() -> dict[str, Any]:
                     completed_jobs.append({"job": job.stem, "status": code})
             else:
                 if code in TERMINAL_WORKER_ERRORS:
+                    counters["terminal"] = counters.get("terminal", 0) + 1
                     try:
                         mark_candidate_status(
                             state_dir,
@@ -257,17 +269,40 @@ def drain_once() -> dict[str, Any]:
                             error_code=code,
                         )
                         job.unlink()
-                    except DiscoveryError, OSError:
+                    except (DiscoveryError, OSError):
                         failed_jobs.append({"job": job.stem, "code": "state_update_failed"})
                     else:
                         failed_jobs.append({"job": job.stem, "code": code, "status": "terminal"})
                 else:
+                    counters["transient"] = counters.get("transient", 0) + 1
+                    if code == "image_unavailable":
+                        counters["image_unavailable"] = counters.get("image_unavailable", 0) + 1
+                    if code == "provider_rate_limited":
+                        counters["provider_rate_limited"] = counters.get(
+                            "provider_rate_limited", 0
+                        ) + 1
+                    if code.startswith("intake_"):
+                        counters["intake_schema_failures"] = counters.get(
+                            "intake_schema_failures", 0
+                        ) + 1
                     failed_jobs.append({"job": job.stem, "code": code})
+    try:
+        health = record_health(
+            state_dir,
+            outbox_dir,
+            stage="drain",
+            status="completed" if not failed_jobs else "failed",
+            counters=counters,
+            stale_seconds=float(stale_seconds),
+        )
+    except (DiscoveryError, OSError, ValueError):
+        health = {"status": "unavailable", "secrets_logged": False}
     return {
         "status": "completed" if not failed_jobs else "partial",
         "processed": completed_jobs,
         "failed": failed_jobs,
         "provider_fallback": "disabled; manual/no-provider only",
+        "health": health,
         "secrets_logged": False,
     }
 

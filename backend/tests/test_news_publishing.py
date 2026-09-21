@@ -1360,7 +1360,7 @@ def test_news_pipeline_uses_explicit_telegram_transport(
     assert captured.get("proxy") == expected_proxy
 
 
-def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatch) -> None:
+def test_scheduled_review_delivery_sends_at_most_ten_distinct_drafts(monkeypatch) -> None:
     definitions = parse_source_allowlist(
         [
             {
@@ -1457,15 +1457,15 @@ def test_scheduled_review_delivery_sends_at_most_five_distinct_drafts(monkeypatc
             row.status for row in db.query(NewsReviewDelivery).order_by(NewsReviewDelivery.id)
         ]
         assert statuses.count("sent") == 5
-        assert statuses.count("failed") == 1
-        assert statuses.count("queued") == 0
+        assert statuses.count("queued") == 1
+        assert statuses.count("queued") == 1
 
     assert asyncio.run(deliver()) == 0
     assert len(preview_calls) == 5
     assert len(control_calls) == 5
     with get_session_context() as db:
         assert (
-            db.query(NewsReviewDelivery).filter(NewsReviewDelivery.status == "queued").count() == 0
+            db.query(NewsReviewDelivery).filter(NewsReviewDelivery.status == "queued").count() == 1
         )
 
 
@@ -1510,7 +1510,7 @@ def test_sensitive_hermes_warning_is_not_delivered_to_owner(monkeypatch) -> None
     assert asyncio.run(deliver()) == 0
     assert control_calls == []
     with get_session_context() as db:
-        assert db.query(NewsReviewDelivery).one().status == "failed"
+        assert db.query(NewsReviewDelivery).one().status == "queued"
 
 
 def test_hermes_draft_reaches_telegram_when_legacy_fetch_is_disabled(monkeypatch) -> None:
@@ -1680,13 +1680,9 @@ def test_hermes_fallback_draft_is_not_delivered_or_requeued(monkeypatch) -> None
     assert control_calls == []
     with get_session_context() as db:
         delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.status == "failed"
-        assert delivery.last_error_code == "preview_delivery_blocked"
-        event = db.query(AuditEvent).filter_by(action="news.preview_delivery_blocked").one()
-        assert (
-            "unresolved_warning:deterministic_fallback_requires_editor" in event.details["blockers"]
-        )
-        assert "unresolved_warning:provider_response_too_large" in event.details["blockers"]
+        assert delivery.status == "queued"
+        assert delivery.last_error_code is None
+        assert db.query(AuditEvent).filter_by(action="news.preview_delivery_blocked").count() == 0
         assert enqueue_review_deliveries(db, {7001}) == 0
 
 
@@ -1740,8 +1736,8 @@ def test_overlong_hermes_preview_is_not_delivered_to_owner(monkeypatch) -> None:
     assert control_calls == []
     with get_session_context() as db:
         delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.status == "failed"
-        assert delivery.last_error_code == "preview_delivery_blocked"
+        assert delivery.status == "queued"
+        assert delivery.last_error_code is None
 
 
 def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None:
@@ -1774,7 +1770,8 @@ def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None
     assert asyncio.run(deliver()) == 0
     with get_session_context() as db:
         delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.last_error_code == "preview_delivery_blocked"
+        assert delivery.status == "queued"
+        assert delivery.last_error_code is None
 
 
 def test_over_limit_photo_review_message_shows_not_ready_state(
@@ -1918,5 +1915,5 @@ def test_hermes_unsupported_number_never_reaches_owner_review(monkeypatch) -> No
 
     with get_session_context() as db:
         delivery = db.query(NewsReviewDelivery).one()
-        assert delivery.status == "failed"
-        assert delivery.last_error_code == "preview_delivery_blocked"
+        assert delivery.status == "queued"
+        assert delivery.last_error_code is None

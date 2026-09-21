@@ -345,6 +345,7 @@ def build_rules(
         lines.extend(
             [
                 f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ct state invalid drop',
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ip daddr {{ 10.0.0.0/8, 127.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 }} tcp dport {{ 22, 25566 }} drop',
                 f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ct state established,related accept',
             ]
         )
@@ -364,6 +365,7 @@ def build_rules(
         lines.extend(
             [
                 f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ct state invalid drop',
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ip6 daddr {{ ::1/128, fc00::/7, fe80::/10 }} tcp dport {{ 22, 25566 }} drop',
                 f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ct state established,related accept',
             ]
         )
@@ -445,6 +447,7 @@ def refresh(
         "resolved_addresses": len(addresses),
         "dns_servers": len(dns_servers),
         "default_deny": True,
+        "host_local_ssh_denied": True,
         "secrets_logged": False,
     }
 
@@ -471,7 +474,14 @@ def validate() -> dict[str, object]:
         "dport 53 accept" in line and " daddr " not in line for line in lines
     ):
         raise EgressError("hermes_egress_policy_incomplete")
-    return {"status": "validated", "table": TABLE_NAME, "default_deny": True}
+    if not any("25566" in line and " drop" in line for line in lines):
+        raise EgressError("hermes_host_local_ssh_denied_missing")
+    return {
+        "status": "validated",
+        "table": TABLE_NAME,
+        "default_deny": True,
+        "host_local_ssh_denied": True,
+    }
 
 
 def remove() -> dict[str, object]:
@@ -498,7 +508,7 @@ def main(argv: list[str] | None = None) -> int:
             result = validate()
         else:
             result = remove()
-    except EgressError, OSError, subprocess.CalledProcessError:
+    except (EgressError, OSError, subprocess.CalledProcessError):
         print(
             json.dumps({"error": "hermes_egress_failed", "secrets_logged": False}), file=sys.stderr
         )

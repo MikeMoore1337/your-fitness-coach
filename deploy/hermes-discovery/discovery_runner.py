@@ -40,10 +40,11 @@ except ImportError:  # pragma: no cover - Windows unit-test fallback
     fcntl = None
 
 SCHEMA_VERSION = "hermes-source-definitions-v1"
-GENERATOR_VERSION = "task129-yfc-source-registry-renderer-v1"
+GENERATOR_VERSION = "task403-yfc-source-registry-renderer-v1"
 SOURCE_REGISTRY_PATH = "backend/fitminiapp_api/resources/news_sources.json"
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
 STATE_SCHEMA_VERSION = "hermes-discovery-state-v1"
+RELEVANCE_VERSION = "hermes-relevance-v1"
 LOCAL_MOCK_MODE = "local_mock"
 EXTERNAL_MODE = "external"
 DISCOVERY_MODES = frozenset({LOCAL_MOCK_MODE, EXTERNAL_MODE})
@@ -64,6 +65,8 @@ SUPPORTED_TOPICS = frozenset(
     {
         "sports_nutrition",
         "dietary_supplements",
+        "sports_bodybuilding_pharmacology",
+        "strength_hypertrophy",
         "medicine",
         "health",
         "fitness",
@@ -102,6 +105,87 @@ DEFAULT_MAX_ITEMS_PER_SOURCE = 20
 DEFAULT_LOCK_STALE_SECONDS = 900.0
 USER_AGENT = "YourFitnessCoach-HermesDiscovery/1.0"
 TRACKING_PARAMS = frozenset({"fbclid", "gclid", "mc_cid", "mc_eid", "ref", "ref_src"})
+RELEVANCE_MARKERS = {
+    "strength_hypertrophy": (
+        "strength training",
+        "resistance training",
+        "hypertrophy",
+        "muscle growth",
+        "muscle mass",
+        "muscle",
+        "powerlifting",
+        "силов трен",
+        "гипертроф",
+        "рост мышц",
+    ),
+    "bodybuilding": ("bodybuilding", "bodybuilder", "physique competition", "бодибилд"),
+    "sports_nutrition": (
+        "sports nutrition",
+        "protein powder",
+        "protein supplement",
+        "dietary protein",
+        "protein intake",
+        "creatine",
+        "electrolyte",
+        "pre-workout",
+        "спортивн питани",
+        "протеин",
+        "креатин",
+        "электролит",
+        "предтренировоч",
+    ),
+    "dietary_supplements": (
+        "dietary supplement",
+        "supplement use",
+        "supplementation",
+        "omega-3",
+        "probiotic",
+        "бад",
+        "пищев добавк",
+    ),
+    "sports_bodybuilding_pharmacology": (
+        "anabolic steroid",
+        "anabolic-androgenic",
+        "performance-enhancing drug",
+        "aas",
+        "sarm",
+        "testosterone",
+        "growth hormone",
+        "анабол",
+        "стероид",
+        "допинг",
+        "тестостерон",
+        "сарм",
+        "гормон роста",
+        "фармаколог",
+    ),
+    "training": (
+        "training load",
+        "training volume",
+        "periodization",
+        "workout program",
+        "interval training",
+        "endurance training",
+        "endurance performance",
+        "cardio interval",
+        "тренировочн нагрузк",
+        "объем трениров",
+        "периодизац",
+        "программ трениров",
+    ),
+    "mobility_recovery_sleep": (
+        "recovery",
+        "sleep duration",
+        "sleep quality",
+        "mobility training",
+        "flexibility training",
+        "восстановлени",
+        "качество сна",
+        "мобильност",
+        "mobility exercise",
+        "гибкост",
+    ),
+}
 
 
 class DiscoveryError(RuntimeError):
@@ -177,6 +261,68 @@ def _clean_text(value: object, *, maximum: int) -> str:
     text = html.unescape(str(value or ""))
     text = "".join(char for char in text if ord(char) >= 32 or char in "\n\t")
     return " ".join(text.split())[:maximum].strip()
+
+
+def _evaluate_relevance(candidate: ParsedCandidate) -> dict[str, Any]:
+    text = " ".join((candidate.title, candidate.summary, candidate.content[:MAX_CONTENT_CHARS])).casefold()
+    topics = tuple(
+        topic
+        for topic, markers in RELEVANCE_MARKERS.items()
+        if any(marker in text for marker in markers)
+    )
+    sports_context = any(
+        topic in topics
+        for topic in (
+            "strength_hypertrophy",
+            "bodybuilding",
+            "sports_nutrition",
+            "dietary_supplements",
+            "training",
+            "mobility_recovery_sleep",
+        )
+    )
+    sports_context = sports_context or any(
+        marker in text
+        for marker in (
+            "sport",
+            "athlete",
+            "athletic",
+            "для спорта",
+            "спортсмен",
+            "muscle",
+            "мышц",
+        )
+    )
+    if "sports_bodybuilding_pharmacology" in topics and not sports_context:
+        return {
+            "allowed": False,
+            "reason_code": "topic_rejected:generic_clinical_medicine",
+            "strength": "none",
+            "topics": [],
+            "version": RELEVANCE_VERSION,
+        }
+    if not topics:
+        return {
+            "allowed": False,
+            "reason_code": "topic_rejected:no_relevant_training_domain",
+            "strength": "none",
+            "topics": [],
+            "version": RELEVANCE_VERSION,
+        }
+    strong = {
+        "strength_hypertrophy",
+        "bodybuilding",
+        "sports_nutrition",
+        "dietary_supplements",
+        "sports_bodybuilding_pharmacology",
+    }
+    return {
+        "allowed": True,
+        "reason_code": f"topic_allowed:{topics[0]}",
+        "strength": "strong" if any(topic in strong for topic in topics) else "moderate",
+        "topics": list(topics),
+        "version": RELEVANCE_VERSION,
+    }
 
 
 class _PlainTextParser(HTMLParser):
@@ -1037,12 +1183,19 @@ def _candidate_key(source_id: str, candidate: ParsedCandidate) -> str:
     return hashlib.sha256("\n".join(values).encode("utf-8")).hexdigest()
 
 
-def _job_document(source_id: str, candidate: ParsedCandidate, key: str) -> dict[str, Any]:
+def _job_document(
+    source_id: str,
+    candidate: ParsedCandidate,
+    key: str,
+    relevance: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    relevance = relevance or _evaluate_relevance(candidate)
     return {
         "schema_version": JOB_SCHEMA_VERSION,
         "job_id": f"job-{key}",
         "idempotency_key": f"discovery-{key}",
         "request_nonce": f"nonce-{key}",
+        "relevance": dict(relevance),
         "source": {
             "source_id": source_id,
             "external_id": candidate.external_id,
@@ -1204,6 +1357,7 @@ def run_once(
         duplicates = 0
         source_errors: list[dict[str, str]] = []
         fetched_sources = 0
+        relevance_rejected = 0
         for outcome in outcomes:
             source = outcome.source
             source_state = state["sources"].setdefault(source.source_id, {})
@@ -1269,7 +1423,21 @@ def run_once(
                 }:
                     duplicates += 1
                     continue
-                document = _job_document(source.source_id, normalized_candidate, key)
+                relevance = _evaluate_relevance(normalized_candidate)
+                if not relevance["allowed"]:
+                    relevance_rejected += 1
+                    state["candidates"][key] = {
+                        "status": "rejected",
+                        "error_code": "relevance_gate_rejected",
+                        "relevance": relevance,
+                        "source_id": source.source_id,
+                        "canonical_url": normalized_url,
+                        "content_hash": _candidate_content_hash(normalized_candidate),
+                        "event_date": _event_date(normalized_candidate),
+                        "created_at": state["last_run_at"],
+                    }
+                    continue
+                document = _job_document(source.source_id, normalized_candidate, key, relevance)
                 if _write_job(outbox_dir, key, document):
                     created += 1
                     state["candidates"][key] = {
@@ -1281,10 +1449,27 @@ def run_once(
                         "content_hash": _candidate_content_hash(normalized_candidate),
                         "event_date": _event_date(normalized_candidate),
                         "created_at": state["last_run_at"],
+                        "relevance": relevance,
                     }
                 else:
                     duplicates += 1
         _trim_state(state)
+        from hermes_health import _pending_snapshot, update_health
+
+        pending_jobs, oldest_pending_age = _pending_snapshot(outbox_dir)
+        health = update_health(
+            state,
+            stage="discovery",
+            status="failed" if not fetched_sources and source_errors else "completed",
+            counters={
+                "accepted": created,
+                "duplicate": duplicates,
+                "relevance_rejected": relevance_rejected,
+                "source_errors": len(source_errors),
+            },
+            pending_jobs=pending_jobs,
+            oldest_pending_age_seconds=oldest_pending_age,
+        )
         _atomic_write_json(state_path, state)
     status = "completed" if not source_errors else ("partial" if fetched_sources else "failed")
     return {
@@ -1297,7 +1482,9 @@ def run_once(
         "source_errors": source_errors,
         "candidates_created": created,
         "duplicates": duplicates,
+        "relevance_rejected": relevance_rejected,
         "outbox_pending": len(list(outbox_dir.glob("*.json"))),
+        "health": health,
         "publication": "not evaluated by discovery; YFC intake owns taxonomy/risk/publication",
     }
 
@@ -1315,6 +1502,7 @@ def mark_candidate_status(
         "duplicate",
         "failed",
         "pending",
+        "rejected",
     }:
         raise DiscoveryError("candidate_status_invalid")
     state_path = state_dir / "state.json"
@@ -1349,6 +1537,12 @@ def _self_check() -> dict[str, Any]:
         "shell_browser_plugins": False,
         "dedupe": "source_id + canonical URL + content hash + event date",
         "publication_quota": False,
+        "relevance_gate": {
+            "version": RELEVANCE_VERSION,
+            "before_outbox": True,
+            "provider_call": False,
+            "bounded_content_chars": MAX_CONTENT_CHARS,
+        },
     }
 
 

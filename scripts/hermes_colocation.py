@@ -15,7 +15,23 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-IMAGE_REF_PATTERN = re.compile(r"^(?:sha256:[0-9a-f]{64}|[^\s@]+@sha256:[0-9a-f]{64})$")
+try:
+    from hermes_release import (
+        ReleaseManifestError,
+        build_manifest,
+        sha256_file,
+        validate_manifest,
+    )
+except ModuleNotFoundError:  # pragma: no cover - direct import from a test loader
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from hermes_release import (  # type: ignore[no-redef]
+        ReleaseManifestError,
+        build_manifest,
+        sha256_file,
+        validate_manifest,
+    )
+
+IMAGE_REF_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 HERMES_UID = 10000
 HERMES_GID = 10000
 DEFAULT_DEPLOYMENT_LOCK = "/srv/yfc/fit-mini-app/.artifacts/operations/deployments/deployment.lock"
@@ -46,7 +62,7 @@ def validate_image_ref(value: str) -> str:
         or IMAGE_REF_PATTERN.fullmatch(value) is None
         or "latest" in value.casefold()
     ):
-        raise ColocationError("image reference must be an immutable digest or image ID")
+        raise ColocationError("image reference must be a registry@sha256 digest")
     return value
 
 
@@ -183,14 +199,19 @@ def verify_image(value: str, *, role: str) -> None:
         raise ColocationError(f"{role} image inspection returned invalid JSON") from exc
     if not isinstance(document, dict):
         raise ColocationError(f"{role} image inspection returned invalid metadata")
-    image_id = document.get("Id")
     repo_digests = document.get("RepoDigests")
-    if value.startswith("sha256:"):
-        matches = image_id == value
-    else:
-        matches = isinstance(repo_digests, list) and value in repo_digests
+    matches = isinstance(repo_digests, list) and value in repo_digests
     if not matches:
         raise ColocationError(f"{role} image metadata does not match the pinned reference")
+
+
+def pull_and_verify_image(value: str, *, role: str) -> None:
+    validate_image_ref(value)
+    try:
+        _run(["docker", "pull", value])
+    except subprocess.CalledProcessError as exc:
+        raise ColocationError(f"{role} image pull failed") from exc
+    verify_image(value, role=role)
 
 
 def _network_subnets(
@@ -343,12 +364,261 @@ def _atomic_copy_text(value: str, target: Path, *, mode: int) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _git_head(source_root: Path) -> str:
+    result = _run(["git", "-C", str(source_root), "rev-parse", "HEAD"], capture=True)
+    value = result.stdout.strip()
+    if re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        raise ColocationError("source Git HEAD is not a full lowercase SHA")
+    return value
+
+
+def _current_manifest(runtime_root: Path) -> dict[str, Any] | None:
+    current = runtime_root / "current"
+    if not current.is_symlink():
+        if current.exists():
+            raise ColocationError("/opt/hermes/current must be a symlink")
+        return None
+    manifest_path = current.resolve(strict=True) / "manifest.json"
+    try:
+        document = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return validate_manifest(document)
+    except (OSError, json.JSONDecodeError, ReleaseManifestError) as exc:
+        raise ColocationError("current Hermes release manifest is invalid") from exc
+
+
+def _atomic_symlink(target: Path, link: Path) -> None:
+    link.parent.mkdir(parents=True, exist_ok=True)
+    if (link.exists() or link.is_symlink()) and not link.is_symlink():
+        raise ColocationError(f"Hermes link target is not a symlink: {link}")
+    temporary = link.parent / f".{link.name}.new-{os.getpid()}"
+    temporary.unlink(missing_ok=True)
+    try:
+        os.symlink(str(target), temporary, target_is_directory=True)
+        os.replace(temporary, link)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _release_paths(release_dir: Path) -> tuple[tuple[str, Path], ...]:
+    return (
+        ("discovery_runner.py", release_dir / "discovery_runner.py"),
+        ("hermes_worker_drain.py", release_dir / "hermes_worker_drain.py"),
+        ("hermes_resource_guard.py", release_dir / "hermes_resource_guard.py"),
+        ("hermes_egress.py", release_dir / "hermes_egress.py"),
+        ("hermes_health.py", release_dir / "hermes_health.py"),
+        ("editorial_worker.py", release_dir / "editorial-worker" / "editorial_worker.py"),
+    )
+
+
+def _validate_staged_release(release_dir: Path, manifest: dict[str, Any]) -> None:
+    components = manifest.get("components")
+    if not isinstance(components, dict):
+        raise ColocationError("release manifest components are invalid")
+    staged = {
+        "deploy/hermes-discovery/discovery_runner.py": release_dir / "discovery_runner.py",
+        "deploy/hermes-discovery/hermes_worker_drain.py": release_dir / "hermes_worker_drain.py",
+        "deploy/hermes-discovery/hermes_resource_guard.py": release_dir
+        / "hermes_resource_guard.py",
+        "deploy/hermes-discovery/hermes_egress.py": release_dir / "hermes_egress.py",
+        "deploy/hermes-discovery/hermes_health.py": release_dir / "hermes_health.py",
+        "deploy/hermes-discovery/hermes-discovery-provenance.json": release_dir
+        / "hermes-discovery-provenance.json",
+        "deploy/hermes-editorial-worker/editorial_worker.py": release_dir
+        / "editorial-worker"
+        / "editorial_worker.py",
+        "deploy/hermes-editorial-worker/hermes-provenance.json": release_dir
+        / "editorial-worker"
+        / "hermes-provenance.json",
+        "source-definitions.json": release_dir / "config" / "source-definitions.json",
+    }
+    for component, path in staged.items():
+        expected = components.get(component)
+        if not isinstance(expected, str) or sha256_file(path) != expected:
+            raise ColocationError(f"staged Hermes component does not match manifest: {component}")
+
+
+def _stage_release(
+    *,
+    source_root: Path,
+    source_definitions: Path,
+    worker_env: Path,
+    release_dir: Path,
+    manifest: dict[str, Any],
+    definitions_digest: str,
+    discovery_image: str,
+    mode: str,
+    deployment_lock: str,
+) -> None:
+    if release_dir.exists():
+        existing = release_dir / "manifest.json"
+        try:
+            existing_manifest = validate_manifest(json.loads(existing.read_text(encoding="utf-8")))
+            if existing_manifest != manifest:
+                raise ColocationError(
+                    "immutable Hermes release ID already contains another manifest"
+                )
+            existing_worker_env = release_dir / "config" / "worker.env"
+            if (
+                hashlib.sha256(existing_worker_env.read_bytes()).hexdigest()
+                != manifest["worker_env_sha256"]
+            ):
+                raise ColocationError("immutable Hermes release worker environment was modified")
+            _validate_staged_release(release_dir, manifest)
+        except (OSError, json.JSONDecodeError, ReleaseManifestError) as exc:
+            raise ColocationError("immutable Hermes release directory is invalid") from exc
+        return
+    release_dir.parent.mkdir(parents=True, exist_ok=True)
+    temporary = release_dir.parent / f".{release_dir.name}.staging-{os.getpid()}"
+    if temporary.exists():
+        raise ColocationError("Hermes release staging path already exists")
+    _prepare_directory(temporary, mode=0o755, uid=0, gid=0)
+    try:
+        discovery_root = source_root / "deploy" / "hermes-discovery"
+        for name in (
+            "discovery_runner.py",
+            "hermes_worker_drain.py",
+            "hermes_resource_guard.py",
+            "hermes_egress.py",
+            "hermes_health.py",
+            "hermes-discovery-provenance.json",
+            "source-definitions.schema.json",
+            "deployment-mode.schema.json",
+        ):
+            _atomic_copy(discovery_root / name, temporary / name, mode=0o444, uid=0, gid=0)
+        editorial_root = source_root / "deploy" / "hermes-editorial-worker"
+        for name in ("editorial_worker.py", "hermes-provenance.json"):
+            _atomic_copy(
+                editorial_root / name,
+                temporary / "editorial-worker" / name,
+                mode=0o444,
+                uid=0,
+                gid=0,
+            )
+        _atomic_copy(
+            source_definitions,
+            temporary / "config" / "source-definitions.json",
+            mode=0o444,
+            uid=0,
+            gid=0,
+        )
+        _atomic_copy(worker_env, temporary / "config" / "worker.env", mode=0o600, uid=0, gid=0)
+        _render_units(
+            source_root,
+            temporary / "systemd",
+            definitions_digest=definitions_digest,
+            discovery_image=discovery_image,
+            mode=mode,
+            deployment_lock="none" if mode == "separate-vm" else deployment_lock,
+        )
+        _atomic_copy_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            temporary / "manifest.json",
+            mode=0o444,
+        )
+        _validate_staged_release(temporary, manifest)
+        py_compile_targets = [path for _, path in _release_paths(temporary)]
+        _run([sys.executable, "-m", "py_compile", *(str(path) for path in py_compile_targets)])
+        _run(
+            [
+                "systemd-analyze",
+                "verify",
+                *(
+                    str(temporary / "systemd" / name)
+                    for name in (
+                        "hermes-discovery.service",
+                        "hermes-worker-drain.service",
+                        "hermes-discovery.target",
+                        "hermes-discovery.timer",
+                    )
+                ),
+            ]
+        )
+        os.replace(temporary, release_dir)
+    except BaseException:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+
+
+def _restore_link_state(
+    records: list[tuple[Path, str, str | Path | None]],
+) -> None:
+    for link, kind, value in reversed(records):
+        if link.is_symlink() or link.exists():
+            if link.is_dir() and not link.is_symlink():
+                raise ColocationError(f"cannot restore Hermes link over directory: {link}")
+            link.unlink()
+        if kind == "symlink":
+            assert isinstance(value, str)
+            os.symlink(value, link, target_is_directory=True)
+        elif kind == "file":
+            assert isinstance(value, Path)
+            os.replace(value, link)
+
+
+def _install_release_links(
+    *,
+    runtime_root: Path,
+    config_root: Path,
+    systemd_root: Path,
+    release_dir: Path,
+    backup_dir: Path,
+) -> list[tuple[Path, str, str | Path | None]]:
+    targets = [
+        (runtime_root / "current", release_dir),
+        (config_root / "current", runtime_root / "current" / "config"),
+        *[
+            (systemd_root / name, release_dir / "systemd" / name)
+            for name in (
+                "hermes-discovery.service",
+                "hermes-worker-drain.service",
+                "hermes-discovery.target",
+                "hermes-discovery.timer",
+            )
+        ],
+    ]
+    records: list[tuple[Path, str, str | Path | None]] = []
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        for index, (link, target) in enumerate(targets):
+            if link.is_symlink():
+                records.append((link, "symlink", os.readlink(link)))
+            elif link.exists():
+                if not link.is_file():
+                    raise ColocationError(f"Hermes link target is not a regular file: {link}")
+                backup = backup_dir / f"previous-{index}-{os.getpid()}"
+                os.replace(link, backup)
+                records.append((link, "file", backup))
+            else:
+                records.append((link, "missing", None))
+            _atomic_symlink(target, link)
+    except BaseException:
+        _restore_link_state(records)
+        raise
+    return records
+
+
+def _disable_timer() -> None:
+    _run(["systemctl", "disable", "--now", "hermes-discovery.timer"], check=False)
+    status = _run(["systemctl", "is-enabled", "hermes-discovery.timer"], check=False, capture=True)
+    if status.returncode == 0 or status.stdout.strip() in {"enabled", "enabled-runtime"}:
+        raise ColocationError("Hermes timer must remain disabled until shadow approval")
+
+
+def _runtime_release(args: argparse.Namespace) -> Path:
+    current = args.runtime_root / "current"
+    if not current.is_symlink():
+        raise ColocationError("current Hermes release is not installed")
+    return current.resolve(strict=True)
+
+
 def install(args: argparse.Namespace) -> dict[str, object]:
     discovery_image = validate_image_ref(args.discovery_image)
     worker_image = validate_image_ref(args.worker_image)
     source_root = args.source_root.resolve(strict=True)
     definitions = args.source_definitions.resolve(strict=True)
     worker_env = args.worker_env.resolve(strict=True)
+    if _git_head(source_root) != args.yfc_sha:
+        raise ColocationError("--yfc-sha does not match source-root HEAD")
     definitions_digest = validate_definitions(definitions)
     validate_worker_env(worker_env)
     worker_env_values = _env_values(worker_env)
@@ -356,8 +626,8 @@ def install(args: argparse.Namespace) -> dict[str, object]:
         raise ColocationError(
             "worker.env HERMES_WORKER_IMAGE does not match the pinned worker image"
         )
-    verify_image(discovery_image, role="discovery")
-    verify_image(worker_image, role="worker")
+    pull_and_verify_image(discovery_image, role="discovery")
+    pull_and_verify_image(worker_image, role="worker")
     subnets = [] if args.skip_network else ensure_network(mode=args.mode)
     _ensure_identity()
     runtime_root = args.runtime_root
@@ -367,57 +637,59 @@ def install(args: argparse.Namespace) -> dict[str, object]:
     _prepare_directory(config_root, mode=0o755, uid=0, gid=0)
     _prepare_directory(state_root, mode=0o700, uid=HERMES_UID, gid=HERMES_GID)
     _prepare_directory(state_root / "outbox", mode=0o700, uid=HERMES_UID, gid=HERMES_GID)
-    hermes_root = source_root / "deploy" / "hermes-discovery"
-    for name in (
-        "discovery_runner.py",
-        "hermes_worker_drain.py",
-        "hermes_resource_guard.py",
-        "hermes_egress.py",
-        "hermes-discovery-provenance.json",
-        "source-definitions.schema.json",
-        "deployment-mode.schema.json",
-    ):
-        _atomic_copy(hermes_root / name, runtime_root / name, mode=0o444, uid=0, gid=0)
-    _atomic_copy(definitions, config_root / "source-definitions.json", mode=0o444, uid=0, gid=0)
-    _atomic_copy(worker_env, config_root / "worker.env", mode=0o600, uid=0, gid=0)
+    previous_manifest = _current_manifest(runtime_root)
+    manifest = build_manifest(
+        source_root=source_root,
+        source_definitions=definitions,
+        worker_env_sha256=hashlib.sha256(worker_env.read_bytes()).hexdigest(),
+        yfc_sha=args.yfc_sha,
+        discovery_image=discovery_image,
+        worker_image=worker_image,
+        mode=args.mode,
+        deployment_lock=args.deployment_lock,
+        release_parent=previous_manifest.get("release_id") if previous_manifest else None,
+    )
+    release_dir = runtime_root / "releases" / manifest["release_id"]
+    _stage_release(
+        source_root=source_root,
+        source_definitions=definitions,
+        worker_env=worker_env,
+        release_dir=release_dir,
+        manifest=manifest,
+        definitions_digest=definitions_digest,
+        discovery_image=discovery_image,
+        mode=args.mode,
+        deployment_lock=args.deployment_lock,
+    )
     _run(
         [
             sys.executable,
-            str(runtime_root / "hermes_egress.py"),
+            str(release_dir / "hermes_egress.py"),
             "refresh",
             "--definitions",
-            str(config_root / "source-definitions.json"),
+            str(release_dir / "config" / "source-definitions.json"),
             "--worker-env",
-            str(config_root / "worker.env"),
+            str(release_dir / "config" / "worker.env"),
             "--network",
             "hermes-net",
         ]
     )
-    _render_units(
-        source_root,
-        args.systemd_root,
-        definitions_digest=definitions_digest,
-        discovery_image=discovery_image,
-        mode=args.mode,
-        deployment_lock="none" if args.mode == "separate-vm" else args.deployment_lock,
+    link_records = _install_release_links(
+        runtime_root=runtime_root,
+        config_root=config_root,
+        systemd_root=args.systemd_root,
+        release_dir=release_dir,
+        backup_dir=runtime_root
+        / "rollback-predecessor"
+        / f"{manifest['release_id']}-{os.getpid()}",
     )
-    _run(
-        [
-            "systemd-analyze",
-            "verify",
-            *(
-                str(args.systemd_root / name)
-                for name in (
-                    "hermes-discovery.service",
-                    "hermes-worker-drain.service",
-                    "hermes-discovery.target",
-                    "hermes-discovery.timer",
-                )
-            ),
-        ]
-    )
-    _run(["systemctl", "daemon-reload"])
-    _run(["systemctl", "disable", "hermes-discovery.timer"], check=False)
+    try:
+        _run(["systemctl", "daemon-reload"])
+        _disable_timer()
+    except BaseException:
+        _restore_link_state(link_records)
+        _run(["systemctl", "daemon-reload"], check=False)
+        raise
     return {
         "status": "installed",
         "mode": args.mode,
@@ -427,16 +699,84 @@ def install(args: argparse.Namespace) -> dict[str, object]:
             "runtime": str(runtime_root),
             "config": str(config_root),
             "state": str(state_root),
+            "release": str(release_dir),
         },
         "network": "hermes-net",
         "network_subnets": subnets,
         "public_ports": [],
         "images": {"discovery": discovery_image, "worker": worker_image},
         "source_definitions_sha256": definitions_digest,
+        "release_manifest": manifest,
+        "repulled_images": True,
+        "atomic_current_switch": True,
+        "rollback_parent": manifest["release_parent"],
         "timer_enabled": False,
         "worker_env_names": sorted(WORKER_ENV_NAMES),
         "secrets_logged": False,
     }
+
+
+def rollback(args: argparse.Namespace) -> dict[str, object]:
+    current = _runtime_release(args)
+    manifest = validate_manifest(
+        json.loads((current / "manifest.json").read_text(encoding="utf-8"))
+    )
+    parent_id = manifest.get("release_parent")
+    if (
+        not isinstance(parent_id, str)
+        or re.fullmatch(r"hermes-[0-9a-f]{12}-[0-9a-f]{16}", parent_id) is None
+    ):
+        raise ColocationError("no validated Hermes parent release is available")
+    parent = args.runtime_root / "releases" / parent_id
+    parent_manifest = validate_manifest(
+        json.loads((parent / "manifest.json").read_text(encoding="utf-8"))
+    )
+    link_records = _install_release_links(
+        runtime_root=args.runtime_root,
+        config_root=args.config_root,
+        systemd_root=args.systemd_root,
+        release_dir=parent,
+        backup_dir=args.runtime_root / "rollback-predecessor" / f"{parent_id}-{os.getpid()}",
+    )
+    try:
+        _run(["systemctl", "daemon-reload"])
+        _disable_timer()
+    except BaseException:
+        _restore_link_state(link_records)
+        _run(["systemctl", "daemon-reload"], check=False)
+        raise
+    return {
+        "status": "rolled_back",
+        "release_id": parent_manifest["release_id"],
+        "from_release_id": manifest["release_id"],
+        "state_preserved": True,
+        "outbox_preserved": True,
+        "timer_enabled": False,
+        "secrets_logged": False,
+    }
+
+
+def health(args: argparse.Namespace) -> dict[str, object]:
+    release = _runtime_release(args)
+    result = _run(
+        [
+            sys.executable,
+            str(release / "hermes_health.py"),
+            "health",
+            "--state-dir",
+            str(args.state_root),
+            "--outbox-dir",
+            str(args.state_root / "outbox"),
+        ],
+        capture=True,
+    )
+    try:
+        document = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise ColocationError("Hermes health output is invalid") from exc
+    if not isinstance(document, dict):
+        raise ColocationError("Hermes health output is invalid")
+    return document
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -446,6 +786,7 @@ def _parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--source-root", type=Path, required=True)
     install_parser.add_argument("--source-definitions", type=Path, required=True)
     install_parser.add_argument("--worker-env", type=Path, required=True)
+    install_parser.add_argument("--yfc-sha", required=True, help="exact source-root Git HEAD")
     install_parser.add_argument("--discovery-image", required=True)
     install_parser.add_argument("--worker-image", required=True)
     install_parser.add_argument(
@@ -457,15 +798,29 @@ def _parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--state-root", type=Path, default=Path("/var/lib/hermes"))
     install_parser.add_argument("--systemd-root", type=Path, default=Path("/etc/systemd/system"))
     install_parser.add_argument("--skip-network", action="store_true")
+    rollback_parser = subparsers.add_parser("rollback")
+    rollback_parser.add_argument("--runtime-root", type=Path, default=Path("/opt/hermes"))
+    rollback_parser.add_argument("--config-root", type=Path, default=Path("/etc/hermes"))
+    rollback_parser.add_argument("--state-root", type=Path, default=Path("/var/lib/hermes"))
+    rollback_parser.add_argument("--systemd-root", type=Path, default=Path("/etc/systemd/system"))
+    health_parser = subparsers.add_parser("health")
+    health_parser.add_argument("--runtime-root", type=Path, default=Path("/opt/hermes"))
+    health_parser.add_argument("--state-root", type=Path, default=Path("/var/lib/hermes"))
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        print(json.dumps(install(args), ensure_ascii=False, sort_keys=True))
+        if args.command == "install":
+            result = install(args)
+        elif args.command == "rollback":
+            result = rollback(args)
+        else:
+            result = health(args)
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
         return 0
-    except (ColocationError, OSError, subprocess.CalledProcessError) as exc:
+    except (ColocationError, OSError, subprocess.CalledProcessError, ReleaseManifestError) as exc:
         print(f"Hermes co-location install failed: {type(exc).__name__}", file=sys.stderr)
         return 1
 

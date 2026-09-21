@@ -1,4 +1,4 @@
-"""Reproducible local build and verification commands for Task 129."""
+"""Reproducible local build and verification commands for Task 403."""
 
 from __future__ import annotations
 
@@ -36,11 +36,11 @@ def worker_root() -> Path:
 
 
 def evidence_root() -> Path:
-    return repo_root() / ".artifacts" / "tasks" / "129" / "evidence" / "hermes-worker-integration"
+    return repo_root() / ".artifacts" / "tasks" / "403" / "evidence" / "hermes-worker-integration"
 
 
 def image_ref() -> str:
-    return os.environ.get("HERMES_WORKER_IMAGE", "task129-hermes-editorial-worker:repo-local")
+    return os.environ.get("HERMES_WORKER_IMAGE", "task403-hermes-editorial-worker:repo-local")
 
 
 def run(
@@ -270,7 +270,7 @@ def scanner_run(args: list[str], *, check: bool = True) -> subprocess.CompletedP
         "--volume",
         f"{evidence_root()}:/output",
         "--volume",
-        "task129-trivy-cache:/root/.cache/trivy",
+        "task403-trivy-cache:/root/.cache/trivy",
         TRIVY_IMAGE,
         "image",
         "--input",

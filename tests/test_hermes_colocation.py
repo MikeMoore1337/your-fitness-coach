@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -21,12 +22,14 @@ def _load_module():
 hermes = _load_module()
 
 
-@pytest.mark.parametrize(
-    "value",
-    ["sha256:" + "a" * 64, "registry.invalid/hermes-worker@sha256:" + "b" * 64],
-)
-def test_colocation_accepts_only_content_addressed_images(value: str) -> None:
+@pytest.mark.parametrize("value", ["registry.invalid/hermes-worker@sha256:" + "b" * 64])
+def test_colocation_accepts_only_registry_content_addressed_images(value: str) -> None:
     assert hermes.validate_image_ref(value) == value
+
+
+def test_colocation_rejects_local_image_ids() -> None:
+    with pytest.raises(hermes.ColocationError):
+        hermes.validate_image_ref("sha256:" + "a" * 64)
 
 
 @pytest.mark.parametrize(
@@ -175,3 +178,82 @@ def test_network_guard_rejects_yfc_container_attachment(monkeypatch: pytest.Monk
 
 def test_network_subnets_tolerate_builtin_networks_without_ipam_config() -> None:
     assert hermes._network_subnets({"IPAM": {"Config": None}}) == []
+
+
+def test_release_manifest_is_immutable_and_self_validating(tmp_path: Path) -> None:
+    root = Path(__file__).parents[1]
+    definitions = tmp_path / "source-definitions.json"
+    definitions.write_text(
+        json.dumps(
+            {
+                "schema_version": "hermes-source-definitions-v1",
+                "source_registry_sha256": "a" * 64,
+                "definitions_version": "yfc-news-sources:" + "a" * 64,
+                "sources": [{"id": "source"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = hermes.build_manifest(
+        source_root=root,
+        source_definitions=definitions,
+        worker_env_sha256="f" * 64,
+        yfc_sha="b" * 40,
+        discovery_image="registry.invalid/hermes-discovery@sha256:" + "c" * 64,
+        worker_image="registry.invalid/hermes-worker@sha256:" + "d" * 64,
+        mode="colocated-isolated",
+        deployment_lock="/srv/yfc/deployment.lock",
+    )
+
+    assert hermes.validate_manifest(manifest) == manifest
+    tampered = {**manifest, "yfc_sha": "e" * 40}
+    with pytest.raises(hermes.ReleaseManifestError):
+        hermes.validate_manifest(tampered)
+
+
+def test_staged_release_components_must_match_manifest(tmp_path: Path) -> None:
+    root = Path(__file__).parents[1]
+    definitions = tmp_path / "source-definitions.json"
+    definitions.write_text(
+        json.dumps(
+            {
+                "schema_version": "hermes-source-definitions-v1",
+                "source_registry_sha256": "a" * 64,
+                "definitions_version": "yfc-news-sources:" + "a" * 64,
+                "sources": [{"id": "source"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest = hermes.build_manifest(
+        source_root=root,
+        source_definitions=definitions,
+        worker_env_sha256="f" * 64,
+        yfc_sha="b" * 40,
+        discovery_image="registry.invalid/hermes-discovery@sha256:" + "c" * 64,
+        worker_image="registry.invalid/hermes-worker@sha256:" + "d" * 64,
+        mode="colocated-isolated",
+        deployment_lock="/srv/yfc/deployment.lock",
+    )
+    release = tmp_path / "release"
+    for source, target in {
+        "deploy/hermes-discovery/discovery_runner.py": "discovery_runner.py",
+        "deploy/hermes-discovery/hermes_worker_drain.py": "hermes_worker_drain.py",
+        "deploy/hermes-discovery/hermes_resource_guard.py": "hermes_resource_guard.py",
+        "deploy/hermes-discovery/hermes_egress.py": "hermes_egress.py",
+        "deploy/hermes-discovery/hermes_health.py": "hermes_health.py",
+        "deploy/hermes-discovery/hermes-discovery-provenance.json": "hermes-discovery-provenance.json",
+        "deploy/hermes-editorial-worker/editorial_worker.py": "editorial-worker/editorial_worker.py",
+        "deploy/hermes-editorial-worker/hermes-provenance.json": "editorial-worker/hermes-provenance.json",
+    }.items():
+        destination = release / target
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(root / source, destination)
+    definitions_target = release / "config" / "source-definitions.json"
+    definitions_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(definitions, definitions_target)
+
+    hermes._validate_staged_release(release, manifest)
+    (release / "hermes_health.py").write_text("tampered\n", encoding="utf-8")
+    with pytest.raises(hermes.ColocationError, match="does not match manifest"):
+        hermes._validate_staged_release(release, manifest)

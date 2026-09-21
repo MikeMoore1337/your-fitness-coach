@@ -329,6 +329,13 @@ def write_job(
         "job_id": f"job-task129-{name}-20260903",
         "idempotency_key": f"idempotency-task129-{name}-20260903",
         "request_nonce": f"nonce-task129-{name}-20260903",
+        "relevance": {
+            "allowed": True,
+            "reason_code": "topic_allowed:strength_hypertrophy",
+            "strength": "strong",
+            "topics": ["strength_hypertrophy", "mobility_recovery_sleep"],
+            "version": "hermes-relevance-v1",
+        },
         "source": source,
     }
     if extra:
