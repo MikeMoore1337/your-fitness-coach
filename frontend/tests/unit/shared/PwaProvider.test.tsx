@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PwaProvider, usePwa } from '../../../src/shared/pwa/PwaProvider';
@@ -43,6 +44,16 @@ beforeEach(() => {
 });
 
 describe('PwaProvider', () => {
+  it('keeps the mobile update CTA content-sized instead of giving it a vertical flex basis', () => {
+    const css = readFileSync('src/styles/react.css', 'utf8');
+    const mobileBlock = css.match(/@media \\(max-width: 640px\\) \\{[\\s\\S]*?\\n\\}/)?.[0] ?? '';
+
+    expect(mobileBlock).toContain('.pwa-update-notice button {');
+    expect(mobileBlock).toContain('flex: 0 0 auto;');
+    expect(mobileBlock).toContain('width: 100%;');
+    expect(mobileBlock).not.toContain('.pwa-install-prompt__actions button,\\n  .pwa-update-notice button');
+  });
+
   it('captures the browser install option but does not expose it before product value', async () => {
     render(
       <PwaProvider>
