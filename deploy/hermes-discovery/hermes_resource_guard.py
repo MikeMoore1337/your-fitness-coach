@@ -1,4 +1,4 @@
-"""Fail-closed host guard for bounded Hermes phases on a co-located YFC host."""
+"""Fail-closed host guard for bounded Hermes phases on a Hermes production host."""
 
 from __future__ import annotations
 
@@ -37,7 +37,6 @@ MAX_SWAP_USED_MIB = 512
 MAX_LOAD1 = 1.50
 MIN_DISK_FREE_MIB = 5 * 1024
 DEFAULT_STATE_DIR = "/var/lib/hermes"
-DEFAULT_DEPLOYMENT_LOCK = "/srv/yfc/fit-mini-app/.artifacts/operations/deployments/deployment.lock"
 DEPLOYMENT_MODES = frozenset({"separate-vm", "colocated-isolated"})
 SKIP_REASON_CODES = frozenset(
     {
@@ -216,7 +215,9 @@ def _flock(
 
 
 @contextlib.contextmanager
-def _deployment_boundary(state_dir: Path, deployment_lock: Path, mode: str) -> Iterator[None]:
+def _deployment_boundary(
+    state_dir: Path, deployment_lock: Path | None, mode: str
+) -> Iterator[None]:
     if state_dir.is_symlink() or not state_dir.is_dir():
         raise GuardError("hermes_state_path_missing")
     with _flock(
@@ -229,7 +230,8 @@ def _deployment_boundary(state_dir: Path, deployment_lock: Path, mode: str) -> I
             yield
             return
         if (
-            deployment_lock.is_symlink()
+            deployment_lock is None
+            or deployment_lock.is_symlink()
             or not deployment_lock.is_file()
             or not deployment_lock.parent.is_dir()
         ):
@@ -243,7 +245,7 @@ def _deployment_boundary(state_dir: Path, deployment_lock: Path, mode: str) -> I
             yield
 
 
-def _decision(state_dir: Path, deployment_lock: Path, mode: str) -> GuardDecision:
+def _decision(state_dir: Path, deployment_lock: Path | None, mode: str) -> GuardDecision:
     with _deployment_boundary(state_dir, deployment_lock, mode):
         facts = read_host_facts(state_dir)
         return evaluate_facts(facts)
@@ -260,7 +262,7 @@ def _parser() -> argparse.ArgumentParser:
         subparser = subparsers.add_parser(name)
         subparser.add_argument("--phase", choices=("discovery", "worker"), required=True)
         subparser.add_argument(
-            "--mode", choices=sorted(DEPLOYMENT_MODES), default="colocated-isolated"
+            "--mode", choices=sorted(DEPLOYMENT_MODES), default="separate-vm"
         )
         subparser.add_argument(
             "--state-dir",
@@ -270,7 +272,11 @@ def _parser() -> argparse.ArgumentParser:
         subparser.add_argument(
             "--deployment-lock",
             type=Path,
-            default=Path(os.getenv("HERMES_YFC_DEPLOYMENT_LOCK", DEFAULT_DEPLOYMENT_LOCK)),
+            default=(
+                Path(os.environ["HERMES_YFC_DEPLOYMENT_LOCK"])
+                if os.environ.get("HERMES_YFC_DEPLOYMENT_LOCK")
+                else None
+            ),
         )
         if name == "run":
             subparser.add_argument("child_command", nargs=argparse.REMAINDER)

@@ -48,6 +48,9 @@ def test_state_rewrite_preserves_existing_owner(tmp_path: Path) -> None:
 def test_install_instructions_start_enabled_timer_after_gate_a() -> None:
     readme = (DISCOVERY_ROOT / "README.md").read_text(encoding="utf-8")
 
+    assert "production default `separate-vm`" in readme
+    assert "--deployment-lock" in readme
+    assert "Для Task 403 выбрана co-location" not in readme
     assert "systemctl enable --now hermes-discovery.timer" in readme
     assert "systemctl enable hermes-discovery.timer\n" not in readme
     assert "`install` всегда оставляет timer disabled" in readme

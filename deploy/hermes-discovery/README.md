@@ -1,4 +1,4 @@
-# Hermes discovery runner и scheduler (Task 403)
+# Hermes discovery runner и scheduler (Task 415)
 
 `discovery_runner.py` — отдельный stdlib-only runtime для получения public RSS/JSON
 Feed/HTML metadata. Он не импортирует hardened editorial worker и не имеет provider key,
@@ -83,12 +83,16 @@ state не создаёт новый idempotency key автоматически.
 только после bounded age threshold. Missed timer run не replay'ится (`Persistent=false`), а
 следующий запуск снова применяет dedupe без publication quota.
 
-## Установка и production topology Task 403
+## Установка и production topology Task 415
 
-Поддерживаются режимы `separate-vm` и `colocated-isolated`. Для текущего запуска владелец
-выбрал `colocated-isolated` на существующем YFC RU VPS: отдельная VM не создаётся. Hermes
-production flag: `COLOCATED_ISOLATED_HERMES=yes`.
-изолируется каталогами `/opt/hermes`, `/etc/hermes`, `/var/lib/hermes`, пользователем
+Поддерживаются режимы `separate-vm` и `colocated-isolated`. Без явного `--mode` installer
+использует безопасный production default `separate-vm`: Hermes работает на выделенной Linux
+`x86_64` VM, а `COLOCATED_ISOLATED_HERMES=no`. Режим `colocated-isolated` оставлен только для
+отдельно owner-approved запуска и требует явного `--deployment-lock`; без этого параметра
+installer останавливается до изменения хоста и не может неявно выбрать RU YFC VPS.
+В `separate-vm` до pull/activation также проверяется отсутствие Docker Compose network с label
+`com.docker.compose.project=fit-mini-app`; при его наличии нужен явный co-location режим.
+Hermes изолируется каталогами `/opt/hermes`, `/etc/hermes`, `/var/lib/hermes`, пользователем
 `hermes` с UID/GID `10000:10000` и Docker-сетью `hermes-net`. В этой сети не должно быть
 YFC-контейнеров или пересекающихся подсетей; Hermes не публикует порты и не получает YFC
 volume, `.env`, БД, Redis, socket или host repository.
@@ -120,11 +124,11 @@ YFC/Docker subnet по-прежнему попадает под deny.
 необходимые DNS-запросы и established/related state, остальные host-local порты (включая
 SSH) отбрасываются до общих YFC host rules.
 
-На co-located host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`, used swap
-`<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Он использует
-тот же canonical YFC deployment lock
-`/srv/yfc/fit-mini-app/.artifacts/operations/deployments/deployment.lock` в shared-lock режиме
-и не меняет его права. При нарушении возвращаются reason codes `insufficient_memory`,
+На каждом Hermes host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`, used swap
+`<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. На
+`separate-vm` YFC deployment lock не читается и не требуется. Только для явного
+`colocated-isolated` используется переданный оператором canonical YFC deployment lock в
+shared-lock режиме без изменения его прав. При нарушении возвращаются reason codes `insufficient_memory`,
 `swap_pressure`, `high_load`, `insufficient_disk` или `yfc_deploy_active`; Hermes discovery и
 worker не запускаются одновременно. Фазы ограничены `256 MiB/0.25 CPU` и `512 MiB/0.50 CPU`.
 
@@ -132,14 +136,18 @@ worker не запускаются одновременно. Фазы огран
 
 ```sh
 python3 scripts/hermes_colocation.py install \
-  --source-root /srv/yfc/fit-mini-app/current \
-  --source-definitions /srv/yfc/fit-mini-app/current/.artifacts/tasks/403/evidence/source-definitions.json \
+  --source-root /opt/hermes/input/repository \
+  --source-definitions /opt/hermes/input/source-definitions.json \
   --worker-env /etc/hermes/worker.env \
   --yfc-sha <40-hex-merged-commit> \
   --discovery-image registry.example/hermes-discovery@sha256:<64-hex> \
   --worker-image registry.example/hermes-worker@sha256:<64-hex> \
-  --mode colocated-isolated
+  --mode separate-vm
 ```
+
+Для отдельного owner-approved co-location к этой команде нужно явно добавить
+`--mode colocated-isolated --deployment-lock <canonical-YFC-lock>`; отсутствие lock является
+fail-closed ошибкой.
 
 Перед включением timer проверить boundary без запуска job:
 
@@ -153,7 +161,7 @@ systemctl cat hermes-discovery.service hermes-worker-drain.service
 systemctl status hermes-discovery.timer --no-pager
 python3 /opt/hermes/current/hermes_egress.py validate
 nft list table inet hermes_egress
-python3 /opt/hermes/current/hermes_resource_guard.py check --phase discovery --mode colocated-isolated
+python3 /opt/hermes/current/hermes_resource_guard.py check --phase discovery --mode separate-vm
 python3 scripts/hermes_colocation.py health
 ```
 

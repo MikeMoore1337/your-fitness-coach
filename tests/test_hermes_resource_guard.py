@@ -53,6 +53,16 @@ def test_deployment_lock_failure_has_priority_over_capacity() -> None:
     assert decision.reason_code == "yfc_deploy_active"
 
 
+def test_guard_defaults_to_separate_vm_without_an_implicit_yfc_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("HERMES_YFC_DEPLOYMENT_LOCK", raising=False)
+    args = guard._parser().parse_args(["check", "--phase", "discovery"])
+
+    assert args.mode == "separate-vm"
+    assert args.deployment_lock is None
+
+
 def test_decision_output_contains_thresholds_without_environment_values() -> None:
     output = guard.evaluate_facts(_facts()).as_dict(phase="discovery", mode="colocated-isolated")
 
