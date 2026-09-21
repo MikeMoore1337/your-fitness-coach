@@ -276,6 +276,7 @@ def build_rules(
     subnets: set[Network],
     allowed_addresses: set[Address],
     dns_servers: set[Address],
+    intake_addresses: set[Address] | None = None,
 ) -> str:
     if not subnets:
         raise EgressError("hermes_subnet_missing")
@@ -283,6 +284,8 @@ def build_rules(
     source_v6 = {value for value in subnets if value.version == 6}
     allowed_v4 = {value for value in allowed_addresses if value.version == 4}
     allowed_v6 = {value for value in allowed_addresses if value.version == 6}
+    intake_v4 = {value for value in (intake_addresses or set()) if value.version == 4}
+    intake_v6 = {value for value in (intake_addresses or set()) if value.version == 6}
     dns_v4 = {value for value in dns_servers if value.version == 4}
     dns_v6 = {value for value in dns_servers if value.version == 6}
     lines = [
@@ -329,6 +332,14 @@ def build_rules(
             )
     source_v4_text = _elements(source_v4)
     source_v6_text = _elements(source_v6)
+    if intake_v4 and source_v4:
+        lines.append(
+            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ct original daddr {{ {_elements(intake_v4)} }} tcp dport 443 accept"
+        )
+    if intake_v6 and source_v6:
+        lines.append(
+            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ct original daddr {{ {_elements(intake_v6)} }} tcp dport 443 accept"
+        )
     if source_v4:
         lines.append(
             f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ip daddr {{ 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.0.2.0/24, 192.168.0.0/16, 198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24, 224.0.0.0/4, 240.0.0.0/4 }} drop"
@@ -372,11 +383,14 @@ def refresh(
     values = _selected_worker_values(worker_env)
     source_hosts = _source_hosts(definitions)
     source_hosts.add(_host_from_url(values["HERMES_PROVIDER_BASE_URL"], expected=PROVIDER_HOST))
-    source_hosts.add(_host_from_url(values["YFC_INTAKE_URL"], expected=INTAKE_HOST))
+    intake_host = _host_from_url(values["YFC_INTAKE_URL"], expected=INTAKE_HOST)
+    source_hosts.add(intake_host)
     addresses = _resolve_hosts(source_hosts)
+    intake_addresses = _resolve_public(intake_host)
+    addresses.update(intake_addresses)
     dns_servers = _dns_servers(resolv_conf)
     bridge, subnets = _network_details(network)
-    _apply_rules(build_rules(subnets, addresses, dns_servers))
+    _apply_rules(build_rules(subnets, addresses, dns_servers, intake_addresses))
     return {
         "status": "refreshed",
         "table": TABLE_NAME,

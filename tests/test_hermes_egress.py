@@ -108,6 +108,20 @@ def test_build_rules_scopes_default_deny_to_hermes_subnet() -> None:
     assert "ip saddr { 172.31.0.0/24 } ip daddr" in rules
 
 
+def test_build_rules_allows_only_public_intake_hairpin_after_docker_dnat() -> None:
+    rules = egress.build_rules(
+        {ipaddress.ip_network("172.31.0.0/24")},
+        {ipaddress.ip_address("203.0.113.10"), ipaddress.ip_address("77.91.90.171")},
+        {ipaddress.ip_address("127.0.0.53")},
+        {ipaddress.ip_address("77.91.90.171")},
+    )
+
+    assert (
+        "ip saddr { 172.31.0.0/24 } ct original daddr { 77.91.90.171 } tcp dport 443 accept"
+    ) in rules
+    assert "ct original daddr { 172.28.0.10 }" not in rules
+
+
 def test_selected_worker_values_require_private_file_and_ignore_secrets(tmp_path: Path) -> None:
     path = tmp_path / "worker.env"
     path.write_text(
