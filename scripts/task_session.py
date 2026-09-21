@@ -3857,24 +3857,54 @@ class TaskController:
             raise TaskSessionError("finish requires exact ready and deployed SHAs")
         if self.repository.current_worktree != root:
             raise TaskSessionError("finish cleanup must run from the canonical repository worktree")
-        if self.repository.ref("origin/master") != deployed_sha:
-            raise TaskSessionError("finish requires current origin/master at deployed SHA")
+        origin_master_sha = self.repository.ref("origin/master")
+        if origin_master_sha != deployed_sha:
+            if not origin_master_sha or not self.repository.is_ancestor(
+                deployed_sha, origin_master_sha
+            ):
+                raise TaskSessionError(
+                    "finish requires deployed SHA to be an ancestor of origin/master"
+                )
+            drift_subjects = self.repository.git(
+                "log", "--format=%s", f"{deployed_sha}..{origin_master_sha}", check=False
+            ).splitlines()
+            drift_paths = {
+                path
+                for path in self.repository.git(
+                    "diff", "--name-only", f"{deployed_sha}..{origin_master_sha}", check=False
+                ).splitlines()
+                if path
+            }
+            if (
+                not drift_subjects
+                or any(
+                    not (
+                        CONTROLLER_COMMIT_RE.match(subject)
+                        or subject.startswith("Merge pull request #")
+                    )
+                    for subject in drift_subjects
+                )
+                or not any(CONTROLLER_COMMIT_RE.match(subject) for subject in drift_subjects)
+                or not drift_paths
+                or not drift_paths.issubset(CONTROLLER_ALLOWED_PATHS)
+            ):
+                raise TaskSessionError("finish refuses non-controller drift after deployed master")
         if self.repository.current_branch(cwd=root) != "master":
             raise TaskSessionError("finish cleanup requires canonical worktree on local master")
-        local_master_was_stale = self.repository.ref("master") != deployed_sha
+        local_master_was_stale = self.repository.ref("master") != origin_master_sha
         if local_master_was_stale:
-            if not self.repository.is_ancestor(self.repository.ref("master"), deployed_sha):
+            if not self.repository.is_ancestor(self.repository.ref("master"), origin_master_sha):
                 raise TaskSessionError(
-                    "finish refuses to fast-forward local master because it diverged from deployed master"
+                    "finish refuses to fast-forward local master because it diverged from origin/master"
                 )
             try:
                 self.repository.fast_forward_current("origin/master", cwd=root)
             except Exception as error:
                 raise TaskSessionError(
-                    f"finish could not fast-forward local master to deployed master: {error}"
+                    f"finish could not fast-forward local master to origin/master: {error}"
                 ) from error
-            if self.repository.ref("master") != deployed_sha:
-                raise TaskSessionError("finish local master did not reach deployed master")
+            if self.repository.ref("master") != origin_master_sha:
+                raise TaskSessionError("finish local master did not reach origin/master")
         branches = [
             line.removeprefix("refs/heads/")
             for line in self.repository.git(
