@@ -12,6 +12,12 @@ const captureTelegramAccess =
       process?: { env?: Record<string, string | undefined> };
     }
   ).process?.env?.YFC_CAPTURE_TELEGRAM_ACCESS === '1';
+const captureTask401 =
+  (
+    globalThis as typeof globalThis & {
+      process?: { env?: Record<string, string | undefined> };
+    }
+  ).process?.env?.YFC_CAPTURE_TASK_401 === '1';
 const captureEvidence =
   captureTask109 ||
   captureTelegramAccess ||
@@ -169,6 +175,23 @@ test('landing hero fills the desktop first viewport without horizontal overflow'
     await page.setViewportSize(viewport);
     await openLanding(page, 'dark');
     await expect(page.locator('.landing-hero')).toBeVisible();
+    if (viewport.width === 1366) {
+      const headerStyle = await page.locator('.landing-header').evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          backdropFilter: style.backdropFilter,
+          borderWidth: style.borderBottomWidth,
+        };
+      });
+      expect(headerStyle.background).not.toBe('rgba(0, 0, 0, 0)');
+      expect(headerStyle.backdropFilter).toContain('blur');
+      expect(headerStyle.borderWidth).toBe('1px');
+      const navigation = page.getByRole('navigation', { name: 'Навигация по странице' });
+      await expect(navigation.getByRole('link', { name: 'Продукт', exact: true })).toBeVisible();
+      await expect(navigation.getByRole('link', { name: 'Демо', exact: true })).toBeVisible();
+      await expect(navigation.getByRole('link', { name: 'Вопросы', exact: true })).toBeVisible();
+    }
     await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
     await page
       .locator('.landing-hero__image')
@@ -214,6 +237,10 @@ test('landing hero fills the desktop first viewport without horizontal overflow'
   await expect(page.locator('.landing-hero')).toBeVisible();
   await expect(page.locator('.landing-hero__actions')).toBeVisible();
   await expect(page.locator('.landing-hero__platform-note')).toBeVisible();
+  const mobileHeaderHeight = await page
+    .locator('.landing-header')
+    .evaluate((element) => element.getBoundingClientRect().height);
+  expect(mobileHeaderHeight).toBeLessThanOrEqual(82);
   await expectNoHorizontalOverflow(page, 390);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: testInfo.outputPath('landing-390x844-hero.png') });
@@ -401,6 +428,56 @@ test('keyboard, menu, FAQ and canonical public actions stay operable', async ({ 
     knowledgeDetails.getByRole('link', { name: 'Тренировки и программы' }),
   ).toBeVisible();
 
+  const knowledgeLinks = page.locator('.landing-assurance__links a');
+  await expect(knowledgeLinks).toHaveCount(4);
+  const linkLayout = await knowledgeLinks.evaluateAll((elements) => {
+    const parent = elements[0]?.parentElement;
+    const parentStyle = parent ? getComputedStyle(parent) : null;
+    const rects = elements.map((element) => element.getBoundingClientRect());
+    return {
+      display: parentStyle?.display,
+      columnGap: Number.parseFloat(parentStyle?.columnGap ?? '0'),
+      rowGap: Number.parseFloat(parentStyle?.rowGap ?? '0'),
+      minHeight: Math.min(...rects.map((rect) => rect.height)),
+      overlap: rects.some((left, index) =>
+        rects
+          .slice(index + 1)
+          .some(
+            (right) =>
+              left.left < right.right &&
+              left.right > right.left &&
+              left.top < right.bottom &&
+              left.bottom > right.top,
+          ),
+      ),
+    };
+  });
+  expect(linkLayout.display).toBe('flex');
+  expect(linkLayout.columnGap).toBeGreaterThanOrEqual(12);
+  expect(linkLayout.rowGap).toBeGreaterThanOrEqual(12);
+  expect(linkLayout.minHeight).toBeGreaterThanOrEqual(44);
+  expect(linkLayout.overlap).toBe(false);
+
+  const sectionSpacing = await page.evaluate(() => {
+    const bounds = (selector: string) =>
+      document.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+    const practiceImage = bounds('.landing-practice__entry img');
+    const practiceAction = bounds('.landing-practice__entry .ui-button');
+    const continuityCopy = bounds('.landing-continuity__copy > p');
+    const continuityAction = bounds('.landing-continuity__action');
+    const contactCopy = bounds('#contact > div:first-child');
+    const contactActions = bounds('.landing-contact__actions');
+    return {
+      practiceGap: practiceAction && practiceImage ? practiceAction.top - practiceImage.bottom : 0,
+      continuityGap:
+        continuityAction && continuityCopy ? continuityAction.top - continuityCopy.bottom : 0,
+      contactGap: contactActions && contactCopy ? contactActions.top - contactCopy.bottom : 0,
+    };
+  });
+  expect(sectionSpacing.practiceGap).toBeGreaterThanOrEqual(16);
+  expect(sectionSpacing.continuityGap).toBeGreaterThanOrEqual(10);
+  expect(sectionSpacing.contactGap).toBeGreaterThanOrEqual(20);
+
   const mobileReadability = await page.evaluate(() => {
     const linkSelectors = [
       '.landing-hero__telegram-link',
@@ -472,6 +549,49 @@ test('keyboard, menu, FAQ and canonical public actions stay operable', async ({ 
   await page.getByRole('link', { name: 'Приватность и данные' }).click();
   await expect(page).toHaveURL(/#privacy$/);
   await expect(page.locator('#privacy')).toBeInViewport();
+});
+
+test('captures Task 401 landing readability and spacing evidence when requested', async ({
+  page,
+}) => {
+  if (!captureTask401) return;
+
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  for (const item of [
+    { name: 'desktop-1440-dark', width: 1440, height: 900, theme: 'dark' as const },
+    { name: 'mobile-390-light', width: 390, height: 844, theme: 'light' as const },
+  ]) {
+    await page.setViewportSize({ width: item.width, height: item.height });
+    await openLanding(page, item.theme);
+    await expectLandingReady(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({
+      path: `../.artifacts/tasks/401/deliverables/visual/${item.name}-hero-header.png`,
+    });
+
+    await page.locator('#product').scrollIntoViewIfNeeded();
+    await page.locator('#product').screenshot({
+      path: `../.artifacts/tasks/401/deliverables/visual/${item.name}-practice-cta.png`,
+    });
+
+    await page.locator('.landing-assurance__platform').scrollIntoViewIfNeeded();
+    await page.locator('.landing-assurance__platform').screenshot({
+      path: `../.artifacts/tasks/401/deliverables/visual/${item.name}-telegram-cta.png`,
+    });
+
+    const knowledgeDetails = page.locator('.landing-assurance__details > details').first();
+    await knowledgeDetails.locator('summary').click();
+    await knowledgeDetails.screenshot({
+      path: `../.artifacts/tasks/401/deliverables/visual/${item.name}-knowledge-links.png`,
+    });
+
+    await page.locator('#contact').scrollIntoViewIfNeeded();
+    await page.locator('#contact').screenshot({
+      path: `../.artifacts/tasks/401/deliverables/visual/${item.name}-final-cta.png`,
+    });
+  }
 });
 
 test('motion has an immediate reduced-motion final state', async ({ page }) => {
