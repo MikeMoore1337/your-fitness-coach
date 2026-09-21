@@ -235,7 +235,7 @@ def _network_details(network: str) -> tuple[str, set[Network]]:
     if BRIDGE_NAME_PATTERN.fullmatch(bridge) is None:
         raise EgressError("hermes_bridge_invalid")
     subnets: set[Network] = set()
-    for config in (document.get("IPAM") or {}).get("Config", []):
+    for config in (document.get("IPAM") or {}).get("Config") or []:
         if not isinstance(config, dict) or not isinstance(config.get("Subnet"), str):
             continue
         try:
@@ -256,7 +256,7 @@ def _network_details(network: str) -> tuple[str, set[Network]]:
         for other_document in other_documents:
             if not isinstance(other_document, dict):
                 raise EgressError("docker_network_inspection_invalid")
-            for config in (other_document.get("IPAM") or {}).get("Config", []):
+            for config in (other_document.get("IPAM") or {}).get("Config") or []:
                 if not isinstance(config, dict) or not isinstance(config.get("Subnet"), str):
                     continue
                 try:

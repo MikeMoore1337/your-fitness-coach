@@ -4,6 +4,7 @@ import importlib.util
 import ipaddress
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -59,6 +60,34 @@ def test_provider_and_intake_hosts_are_fixed_to_approved_contract() -> None:
         egress._host_from_url(
             "https://api.groq.com/openai/v1?model=unexpected", expected=egress.PROVIDER_HOST
         )
+
+
+def test_network_details_tolerates_builtin_network_without_ipam_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hermes_network = {
+        "Id": "abcdef1234567890",
+        "Driver": "bridge",
+        "Options": {},
+        "IPAM": {"Config": [{"Subnet": "172.31.0.0/24"}]},
+        "Containers": {},
+    }
+    builtin_network = {"Driver": "host", "IPAM": {"Config": None}}
+
+    def fake_run(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        if args[:3] == ["docker", "network", "inspect"]:
+            document = hermes_network if args[3] == "hermes-net" else builtin_network
+            return subprocess.CompletedProcess(args, 0, json.dumps([document]), "")
+        if args[:3] == ["docker", "network", "ls"]:
+            return subprocess.CompletedProcess(args, 0, "hermes-net\nhost\n", "")
+        raise AssertionError(args)
+
+    monkeypatch.setattr(egress, "_run", fake_run)
+
+    bridge, subnets = egress._network_details("hermes-net")
+
+    assert bridge == "br-abcdef123456"
+    assert subnets == {ipaddress.ip_network("172.31.0.0/24")}
 
 
 def test_build_rules_scopes_default_deny_to_hermes_subnet() -> None:
