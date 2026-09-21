@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from fitminiapp_api.schemas.program import (
+    ExercisePrescriptionPlan,
     ProgramTargetUserResponse,
     ProgramTemplateResponse,
 )
@@ -82,6 +83,7 @@ class ProgramImportRow(BaseModel):
     source_auxiliary: str | None = Field(default=None, max_length=512)
     superset_group: int | None = Field(default=None, ge=1)
     superset_order: int | None = Field(default=None, ge=1, le=2)
+    prescription: ExercisePrescriptionPlan | None = None
     resolved_exercise_id: int | None = Field(default=None, ge=1)
     resolved_exercise_title: str | None = Field(default=None, max_length=128)
     match_status: ImportMatchStatus

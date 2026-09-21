@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fitminiapp_api.schemas.nutrition import NutritionTargetResponse
 from fitminiapp_api.schemas.user import BodyPriorityPreference, TrainingPreferencesResponse
@@ -74,6 +74,179 @@ ExerciseExecutionVariantTag = Literal[
     "multi_stage",
 ]
 
+PrescriptionRole = Literal[
+    "warmup",
+    "working",
+    "top",
+    "backoff",
+    "drop",
+    "activation",
+    "mini_set",
+    "cluster_member",
+]
+PrescriptionGroupKind = Literal[
+    "sequence",
+    "superset",
+    "rest_pause",
+    "myo_reps",
+    "cluster",
+    "drop_chain",
+    "circuit",
+]
+PrescriptionLoadKind = Literal[
+    "user_selected",
+    "absolute",
+    "percent_1rm",
+    "relative_to_top",
+    "relative_to_previous",
+]
+PrescriptionEffortKind = Literal["none", "rir", "rpe", "failure"]
+
+
+class PrescriptionRepTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["exact", "range", "amrap"]
+    value: int | None = Field(default=None, ge=1, le=1_000)
+    min_reps: int | None = Field(default=None, ge=1, le=1_000)
+    max_reps: int | None = Field(default=None, ge=1, le=1_000)
+    cap_reps: int | None = Field(default=None, ge=1, le=1_000)
+
+    @model_validator(mode="after")
+    def validate_shape(self):
+        if self.kind == "exact" and self.value is None:
+            raise ValueError("exact rep target requires value")
+        if self.kind == "range" and (
+            self.min_reps is None or self.max_reps is None or self.max_reps < self.min_reps
+        ):
+            raise ValueError("range rep target requires an ordered min/max")
+        if self.kind != "exact" and self.value is not None:
+            raise ValueError("value is only valid for an exact rep target")
+        if self.kind != "range" and (self.min_reps is not None or self.max_reps is not None):
+            raise ValueError("min_reps/max_reps are only valid for a range rep target")
+        if self.kind != "amrap" and self.cap_reps is not None:
+            raise ValueError("cap_reps is only valid for an AMRAP target")
+        return self
+
+
+class PrescriptionDurationTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["exact", "range"] = "exact"
+    value_minutes: int | None = Field(default=None, ge=1, le=600)
+    min_minutes: int | None = Field(default=None, ge=1, le=600)
+    max_minutes: int | None = Field(default=None, ge=1, le=600)
+
+    @model_validator(mode="after")
+    def validate_shape(self):
+        if self.kind == "exact" and self.value_minutes is None:
+            raise ValueError("exact duration target requires value_minutes")
+        if self.kind == "range" and (
+            self.min_minutes is None
+            or self.max_minutes is None
+            or self.max_minutes < self.min_minutes
+        ):
+            raise ValueError("range duration target requires an ordered min/max")
+        if self.kind != "exact" and self.value_minutes is not None:
+            raise ValueError("value_minutes is only valid for an exact duration target")
+        if self.kind != "range" and (self.min_minutes is not None or self.max_minutes is not None):
+            raise ValueError("min_minutes/max_minutes are only valid for a range target")
+        return self
+
+
+class PrescriptionLoadTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: PrescriptionLoadKind = "user_selected"
+    value: float | None = Field(default=None, ge=0, le=100_000)
+
+    @model_validator(mode="after")
+    def validate_value(self):
+        if self.kind == "user_selected" and self.value is not None:
+            raise ValueError("user_selected load must not carry a fixed value")
+        if self.kind != "user_selected" and self.value is None:
+            raise ValueError("non-user-selected load requires value")
+        if self.kind == "percent_1rm" and self.value is not None and self.value > 200:
+            raise ValueError("percent_1rm must not exceed 200")
+        return self
+
+
+class PrescriptionEffortTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: PrescriptionEffortKind = "none"
+    value: float | Literal["4+"] | None = None
+
+    @model_validator(mode="after")
+    def validate_value(self):
+        if self.kind in {"none", "failure"} and self.value is not None:
+            raise ValueError("this effort target does not accept a value")
+        if self.kind == "rir" and not (
+            (isinstance(self.value, (int, float)) and 0 <= float(self.value) <= 10)
+            or self.value == "4+"
+        ):
+            raise ValueError("RIR must be between 0 and 10 or 4+")
+        if self.kind == "rpe" and not (
+            isinstance(self.value, (int, float)) and 1 <= float(self.value) <= 10
+        ):
+            raise ValueError("RPE must be between 1 and 10")
+        return self
+
+
+class PrescriptionSegment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    position: int = Field(ge=1, le=100)
+    role: PrescriptionRole
+    rep_target: PrescriptionRepTarget | None = None
+    duration_target: PrescriptionDurationTarget | None = None
+    load_target: PrescriptionLoadTarget = Field(default_factory=PrescriptionLoadTarget)
+    effort_target: PrescriptionEffortTarget = Field(default_factory=PrescriptionEffortTarget)
+    rest_after_seconds: int = Field(default=90, ge=0, le=600)
+    group_id: int | None = Field(default=None, ge=1)
+    group_position: int | None = Field(default=None, ge=1, le=100)
+    round_number: int | None = Field(default=None, ge=1, le=100)
+
+
+class PrescriptionGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    group_id: int = Field(ge=1)
+    kind: PrescriptionGroupKind
+    intra_group_rest_seconds: int = Field(default=0, ge=0, le=600)
+    rest_after_group_seconds: int = Field(default=90, ge=0, le=600)
+    rounds: int | None = Field(default=None, ge=1, le=100)
+    exercise_slot: int | None = Field(default=None, ge=1, le=20)
+
+
+class ExercisePrescriptionPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal[1] = 1
+    metric_type: ExerciseMetricType
+    segments: list[PrescriptionSegment] = Field(min_length=1, max_length=100)
+    groups: list[PrescriptionGroup] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_plan(self):
+        positions = [segment.position for segment in self.segments]
+        if positions != list(range(1, len(positions) + 1)):
+            raise ValueError("prescription segment positions must be contiguous and ordered")
+        group_ids = {group.group_id for group in self.groups}
+        if len(group_ids) != len(self.groups):
+            raise ValueError("prescription group ids must be unique")
+        for segment in self.segments:
+            if self.metric_type == "strength":
+                if segment.rep_target is None or segment.duration_target is not None:
+                    raise ValueError("strength segments require rep targets only")
+            elif segment.duration_target is None or segment.rep_target is not None:
+                raise ValueError("cardio segments require duration targets only")
+            if segment.group_id is not None and segment.group_id not in group_ids:
+                raise ValueError("segment references an unknown prescription group")
+            if segment.group_id is not None and segment.group_position is None:
+                raise ValueError("grouped segments require group_position")
+        return self
+
 
 class ProgramTemplateExerciseCreate(BaseModel):
     exercise_id: int = Field(ge=1)
@@ -84,11 +257,20 @@ class ProgramTemplateExerciseCreate(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
     superset_group: int | None = Field(default=None, ge=1)
     superset_order: int | None = Field(default=None, ge=1, le=2)
+    prescription: ExercisePrescriptionPlan | None = None
+    group_id: int | None = Field(default=None, ge=1)
+    group_kind: PrescriptionGroupKind | None = None
+    group_order: int | None = Field(default=None, ge=1, le=100)
 
     @model_validator(mode="after")
     def validate_superset_pair(self):
         if (self.superset_group is None) != (self.superset_order is None):
             raise ValueError("superset_group and superset_order must be provided together")
+        group_values = (self.group_id, self.group_kind, self.group_order)
+        if any(value is not None for value in group_values) and any(
+            value is None for value in group_values
+        ):
+            raise ValueError("group_id, group_kind and group_order must be provided together")
         return self
 
 
@@ -141,6 +323,7 @@ class ProgramTemplateExerciseWeekResponse(BaseModel):
     prescribed_reps: str = Field(max_length=32)
     prescribed_duration_minutes: int | None = Field(default=None, ge=1, le=600)
     rest_seconds: int = Field(ge=0, le=600)
+    prescription: ExercisePrescriptionPlan | None = None
 
 
 class ProgramTemplateExerciseResponse(BaseModel):
@@ -155,6 +338,10 @@ class ProgramTemplateExerciseResponse(BaseModel):
     notes: str | None = None
     superset_group: int | None = None
     superset_order: int | None = None
+    prescription: ExercisePrescriptionPlan | None = None
+    group_id: int | None = None
+    group_kind: PrescriptionGroupKind | None = None
+    group_order: int | None = None
     has_guide: bool = False
     weekly_prescriptions: list[ProgramTemplateExerciseWeekResponse] = Field(default_factory=list)
 
@@ -301,6 +488,8 @@ ProgramRevisionChangeKind = Literal[
     "block_created",
     "block_updated",
     "block_status_changed",
+    "exercise_replaced",
+    "prescription_updated",
 ]
 TrainingBlockStatus = Literal["planned", "active", "completed", "archived"]
 
@@ -401,18 +590,33 @@ class CoachProgramExerciseCreate(BaseModel):
     notes: str | None = Field(default=None, max_length=2000)
     superset_group: int | None = Field(default=None, ge=1)
     superset_order: int | None = Field(default=None, ge=1, le=2)
+    prescription: ExercisePrescriptionPlan | None = None
+    group_id: int | None = Field(default=None, ge=1)
+    group_kind: PrescriptionGroupKind | None = None
+    group_order: int | None = Field(default=None, ge=1, le=100)
+    target_template_exercise_id: int | None = Field(default=None, ge=1)
     reason: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def validate_superset_pair(self):
         if (self.superset_group is None) != (self.superset_order is None):
             raise ValueError("superset_group and superset_order must be provided together")
+        group_values = (self.group_id, self.group_kind, self.group_order)
+        if any(value is not None for value in group_values) and any(
+            value is None for value in group_values
+        ):
+            raise ValueError("group_id, group_kind and group_order must be provided together")
         return self
 
 
 class CoachProgramExerciseAssignmentResponse(BaseModel):
     workouts_updated: int
     current_revision_number: int
+
+
+class TemplateExerciseReplacementRequest(BaseModel):
+    replacement_exercise_id: int = Field(ge=1)
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class AssignTemplateRequest(BaseModel):

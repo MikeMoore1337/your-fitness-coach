@@ -129,6 +129,13 @@ class ProgramTemplateExercise(Base):
             "superset_group >= 1 AND superset_order IN (1, 2))",
             name="ck_program_template_exercises_superset",
         ),
+        CheckConstraint(
+            "(group_id IS NULL AND group_kind IS NULL AND group_order IS NULL) OR "
+            "(group_id IS NOT NULL AND group_kind IN "
+            "('sequence', 'superset', 'rest_pause', 'myo_reps', 'cluster', 'drop_chain', 'circuit') "
+            "AND group_order IS NOT NULL AND group_order >= 1)",
+            name="ck_program_template_exercises_group",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -142,6 +149,10 @@ class ProgramTemplateExercise(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     superset_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    group_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     day: Mapped[ProgramTemplateDay] = relationship("ProgramTemplateDay", back_populates="exercises")
     exercise: Mapped[Exercise] = relationship("Exercise")
@@ -189,6 +200,7 @@ class ProgramTemplateExerciseWeekPrescription(Base):
     prescribed_reps: Mapped[str] = mapped_column(String(32))
     prescribed_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rest_seconds: Mapped[int] = mapped_column(Integer, default=90)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     template_exercise: Mapped[ProgramTemplateExercise] = relationship(
         "ProgramTemplateExercise", back_populates="weekly_prescriptions"
@@ -284,7 +296,8 @@ class ProgramRevision(Base):
         CheckConstraint(
             "change_kind IN "
             "('assigned', 'program_archived', 'plan_updated', 'block_created', "
-            "'block_updated', 'block_status_changed')",
+            "'block_updated', 'block_status_changed', 'exercise_replaced', "
+            "'prescription_updated')",
             name="ck_program_revisions_change_kind",
         ),
     )
@@ -499,11 +512,28 @@ class UserWorkoutExercise(Base):
             "superset_group >= 1 AND superset_order IN (1, 2))",
             name="ck_user_workout_exercises_superset",
         ),
+        CheckConstraint(
+            "(group_id IS NULL AND group_kind IS NULL AND group_order IS NULL) OR "
+            "(group_id IS NOT NULL AND group_kind IN "
+            "('sequence', 'superset', 'rest_pause', 'myo_reps', 'cluster', 'drop_chain', 'circuit') "
+            "AND group_order IS NOT NULL AND group_order >= 1)",
+            name="ck_user_workout_exercises_group",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     workout_id: Mapped[int] = mapped_column(ForeignKey("user_workouts.id"), index=True)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
+    source_template_exercise_id: Mapped[int | None] = mapped_column(
+        ForeignKey("program_template_exercises.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
+    source_weekly_prescription_id: Mapped[int | None] = mapped_column(
+        ForeignKey("program_template_exercise_weeks.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
     metric_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
     prescribed_sets: Mapped[int] = mapped_column(Integer)
@@ -513,6 +543,10 @@ class UserWorkoutExercise(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     superset_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    group_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     workout: Mapped[UserWorkout] = relationship("UserWorkout", back_populates="exercises")
     exercise: Mapped[Exercise] = relationship("Exercise")
@@ -557,6 +591,11 @@ class UserWorkoutSet(Base):
     rir: Mapped[str | None] = mapped_column(String(2), nullable=True)
     set_kind: Mapped[str | None] = mapped_column(String(16), nullable=True, default="working")
     reached_failure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    planned_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    planned_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    planned_group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    planned_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    planned_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 

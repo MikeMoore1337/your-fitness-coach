@@ -366,6 +366,12 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                 "notes": item.notes,
                 "superset_group": item.superset_group,
                 "superset_order": item.superset_order,
+                "prescription": item.prescription,
+                "source_template_exercise_id": item.source_template_exercise_id,
+                "source_weekly_prescription_id": item.source_weekly_prescription_id,
+                "group_id": item.group_id,
+                "group_kind": item.group_kind,
+                "group_order": item.group_order,
                 "has_guide": bool(
                     (visible_map.get(item.exercise_id) or item.exercise)
                     and get_exercise_guide(visible_map.get(item.exercise_id) or item.exercise)
@@ -388,6 +394,11 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                         "reached_failure": set_item.reached_failure,
                         "is_completed": set_item.is_completed,
                         "version": set_item.version,
+                        "planned_role": set_item.planned_role,
+                        "planned_group_id": set_item.planned_group_id,
+                        "planned_group_kind": set_item.planned_group_kind,
+                        "planned_position": set_item.planned_position,
+                        "planned_round": set_item.planned_round,
                     }
                     for set_item in sorted(item.sets, key=lambda x: x.set_number)
                 ],

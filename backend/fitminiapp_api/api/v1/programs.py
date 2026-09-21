@@ -20,6 +20,7 @@ from fitminiapp_api.schemas.program import (
     ProgramTemplateCreate,
     ProgramTemplateCreateResponse,
     ProgramTemplateResponse,
+    TemplateExerciseReplacementRequest,
     TrainingBlockCreate,
     TrainingBlockMutationResponse,
     TrainingBlockResponse,
@@ -63,6 +64,7 @@ from fitminiapp_api.services.programs import (
     list_clients,
     list_hidden_example_templates,
     list_user_templates,
+    replace_template_exercise_for_user,
     restore_example_template_for_user,
     update_template_for_user,
 )
@@ -431,6 +433,36 @@ def edit_template(
             raise HTTPException(status_code=403, detail=detail)
         raise HTTPException(status_code=400, detail=detail)
 
+    return build_template_response(template, db, current_user)
+
+
+@router.post(
+    "/templates/{template_id}/exercises/{template_exercise_id}/replace",
+    response_model=ProgramTemplateResponse,
+)
+def replace_template_exercise(
+    template_id: int,
+    template_exercise_id: int,
+    payload: TemplateExerciseReplacementRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        template = replace_template_exercise_for_user(
+            db,
+            current_user,
+            template_id,
+            template_exercise_id,
+            payload.replacement_exercise_id,
+            payload.reason,
+        )
+    except ProgramError as exc:
+        detail = str(exc)
+        if detail in {"Template not found", "Template exercise not found"}:
+            raise HTTPException(status_code=404, detail=detail) from exc
+        if detail == "No permission to edit template":
+            raise HTTPException(status_code=403, detail=detail) from exc
+        raise HTTPException(status_code=422, detail=detail) from exc
     return build_template_response(template, db, current_user)
 
 

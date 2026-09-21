@@ -42,13 +42,15 @@ from fitminiapp_api.services.exercise_catalog import (
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.notifications import cancel_workout_reminder, queue_notification
 from fitminiapp_api.services.nutrition import build_nutrition_target_response_from_users
+from fitminiapp_api.services.prescription_semantics import (
+    ensure_plan,
+)
 from fitminiapp_api.services.program_common import ProgramError
 from fitminiapp_api.services.program_versioning import record_program_revision
 from fitminiapp_api.services.root_admin import has_verified_root_identity
 from fitminiapp_api.services.workout_metrics import (
     ExercisePrescription,
     exercise_metric_type,
-    normalize_exercise_prescription,
 )
 
 GOALS = {"muscle_gain", "fat_loss", "maintenance", "recomposition"}
@@ -57,6 +59,41 @@ MODES = {"self", "coach"}
 LEGACY_DEMO_TEMPLATE_SLUG = "upper-lower-4x"
 MAX_PROGRAM_DURATION_WEEKS = 24
 MAX_GENERATED_SETS = 20_000
+
+
+def _input_prescription(
+    exercise: Exercise,
+    *,
+    prescription: object | None,
+    prescribed_sets: int | None,
+    prescribed_reps: str | None,
+    prescribed_duration_minutes: int | None,
+    rest_seconds: int,
+) -> tuple[dict, ExercisePrescription]:
+    plan, projection = ensure_plan(
+        prescription,
+        metric_type=exercise_metric_type(exercise),
+        prescribed_sets=prescribed_sets,
+        prescribed_reps=prescribed_reps,
+        prescribed_duration_minutes=prescribed_duration_minutes,
+        rest_seconds=rest_seconds,
+    )
+    if exercise_metric_type(exercise) == "strength" and projection.rest_seconds < 15:
+        raise ProgramError("Strength rest must be at least 15 seconds")
+    return plan.model_dump(mode="json"), ExercisePrescription(
+        prescribed_sets=projection.prescribed_sets,
+        prescribed_reps=projection.prescribed_reps,
+        prescribed_duration_minutes=projection.prescribed_duration_minutes,
+        rest_seconds=projection.rest_seconds,
+    )
+
+
+def _group_projection(payload) -> tuple[int | None, str | None, int | None]:
+    if payload.group_id is not None:
+        return payload.group_id, payload.group_kind, payload.group_order
+    if payload.superset_group is not None:
+        return payload.superset_group, "superset", payload.superset_order
+    return None, None, None
 
 
 def _serialize_template_with_context(
@@ -126,6 +163,10 @@ def _serialize_template_with_context(
                         "notes": ex.notes,
                         "superset_group": ex.superset_group,
                         "superset_order": ex.superset_order,
+                        "group_id": ex.group_id,
+                        "group_kind": ex.group_kind,
+                        "group_order": ex.group_order,
+                        "prescription": ex.prescription,
                         "weekly_prescriptions": [
                             {
                                 "exercise_id": week.exercise_id,
@@ -134,6 +175,7 @@ def _serialize_template_with_context(
                                 "prescribed_reps": week.prescribed_reps,
                                 "prescribed_duration_minutes": week.prescribed_duration_minutes,
                                 "rest_seconds": week.rest_seconds,
+                                "prescription": week.prescription,
                             }
                             for week in sorted(
                                 ex.weekly_prescriptions,
@@ -332,13 +374,15 @@ def create_template(
             exercise = visible_by_effective_id.get(ex.exercise_id)
             if exercise is None:
                 raise ProgramError("Exercise is not available for current user")
-            prescription = normalize_exercise_prescription(
+            structured_prescription, prescription = _input_prescription(
                 exercise,
+                prescription=ex.prescription,
                 prescribed_sets=ex.prescribed_sets,
                 prescribed_reps=ex.prescribed_reps,
                 prescribed_duration_minutes=ex.prescribed_duration_minutes,
                 rest_seconds=ex.rest_seconds,
             )
+            group_id, group_kind, group_order = _group_projection(ex)
 
             db.add(
                 ProgramTemplateExercise(
@@ -352,6 +396,10 @@ def create_template(
                     notes=ex.notes,
                     superset_group=ex.superset_group,
                     superset_order=ex.superset_order,
+                    group_id=group_id,
+                    group_kind=group_kind,
+                    group_order=group_order,
+                    prescription=(structured_prescription if ex.prescription is not None else None),
                 )
             )
 
@@ -444,9 +492,12 @@ def assign_template_to_user(
     visible_by_effective_id = get_visible_exercise_display_map(db, target_user)
     assignment_exercises: dict[int, Exercise] = {}
     assignment_prescriptions: dict[int, ExercisePrescription] = {}
+    assignment_plans: dict[int, dict] = {}
     assignment_week_exercises: dict[tuple[int, int], Exercise] = {}
     assignment_week_exercise_ids: dict[tuple[int, int], int] = {}
+    assignment_week_prescription_ids: dict[tuple[int, int], int] = {}
     assignment_week_prescriptions: dict[tuple[int, int], ExercisePrescription] = {}
+    assignment_week_plans: dict[tuple[int, int], dict] = {}
     effective_duration_weeks = template.effective_duration_weeks
     has_weekly_prescriptions = effective_duration_weeks > 1 or any(
         exercise_item.weekly_prescriptions
@@ -463,13 +514,16 @@ def assign_template_to_user(
             if exercise is None:
                 raise ProgramError("Exercise is not available for program owner")
             assignment_exercises[exercise_item.id] = exercise
-            assignment_prescriptions[exercise_item.id] = normalize_exercise_prescription(
+            base_plan, base_prescription = _input_prescription(
                 exercise,
+                prescription=exercise_item.prescription,
                 prescribed_sets=exercise_item.prescribed_sets,
                 prescribed_reps=exercise_item.prescribed_reps,
                 prescribed_duration_minutes=exercise_item.prescribed_duration_minutes,
                 rest_seconds=exercise_item.rest_seconds,
             )
+            assignment_plans[exercise_item.id] = base_plan
+            assignment_prescriptions[exercise_item.id] = base_prescription
             for weekly in exercise_item.weekly_prescriptions:
                 weekly_exercise = visible_by_effective_id.get(weekly.exercise_id)
                 if weekly_exercise is None:
@@ -478,14 +532,18 @@ def assign_template_to_user(
                 assignment_week_exercise_ids[(exercise_item.id, weekly.week_number)] = (
                     weekly.exercise_id
                 )
+                assignment_week_prescription_ids[(exercise_item.id, weekly.week_number)] = weekly.id
+                weekly_plan, weekly_prescription = _input_prescription(
+                    weekly_exercise,
+                    prescription=weekly.prescription or exercise_item.prescription,
+                    prescribed_sets=weekly.prescribed_sets,
+                    prescribed_reps=weekly.prescribed_reps,
+                    prescribed_duration_minutes=weekly.prescribed_duration_minutes,
+                    rest_seconds=weekly.rest_seconds,
+                )
+                assignment_week_plans[(exercise_item.id, weekly.week_number)] = weekly_plan
                 assignment_week_prescriptions[(exercise_item.id, weekly.week_number)] = (
-                    normalize_exercise_prescription(
-                        weekly_exercise,
-                        prescribed_sets=weekly.prescribed_sets,
-                        prescribed_reps=weekly.prescribed_reps,
-                        prescribed_duration_minutes=weekly.prescribed_duration_minutes,
-                        rest_seconds=weekly.rest_seconds,
-                    )
+                    weekly_prescription
                 )
     if has_weekly_prescriptions:
         for week_number in range(1, duration_weeks + 1):
@@ -497,9 +555,11 @@ def assign_template_to_user(
                 raise ProgramError("Periodized template has an incomplete weekly prescription")
     generated_sets = sum(
         (
-            assignment_week_prescriptions.get(
-                (exercise_id, week_number), base_prescription
-            ).prescribed_sets
+            len(
+                assignment_week_plans.get(
+                    (exercise_id, week_number), assignment_plans[exercise_id]
+                )["segments"]
+            )
         )
         for week_number in range(1, duration_weeks + 1)
         for exercise_id, base_prescription in assignment_prescriptions.items()
@@ -576,12 +636,30 @@ def assign_template_to_user(
                     (exercise_item.id, week_index + 1),
                     assignment_prescriptions[exercise_item.id],
                 )
+                structured_plan = assignment_week_plans.get(
+                    (exercise_item.id, week_index + 1),
+                    assignment_plans[exercise_item.id],
+                )
+                has_structured_plan = bool(
+                    exercise_item.prescription is not None
+                    or any(
+                        weekly.prescription is not None
+                        for weekly in exercise_item.weekly_prescriptions
+                        if weekly.week_number == week_index + 1
+                    )
+                )
                 selected_weekly_exercise_id = assignment_week_exercise_ids.get(
                     (exercise_item.id, week_index + 1)
                 )
+                selected_weekly_prescription_id = assignment_week_prescription_ids.get(
+                    (exercise_item.id, week_index + 1)
+                )
+                group_id, group_kind, group_order = _group_projection(exercise_item)
                 workout_exercise = UserWorkoutExercise(
                     workout=workout,
                     exercise_id=selected_weekly_exercise_id or exercise_item.exercise_id,
+                    source_template_exercise_id=exercise_item.id,
+                    source_weekly_prescription_id=selected_weekly_prescription_id,
                     metric_type=exercise_metric_type(exercise),
                     sort_order=exercise_item.sort_order,
                     prescribed_sets=prescription.prescribed_sets,
@@ -591,10 +669,14 @@ def assign_template_to_user(
                     notes=exercise_item.notes,
                     superset_group=exercise_item.superset_group,
                     superset_order=exercise_item.superset_order,
+                    group_id=group_id,
+                    group_kind=group_kind,
+                    group_order=group_order,
+                    prescription=structured_plan if has_structured_plan else None,
                 )
                 db.add(workout_exercise)
 
-                for set_number in range(1, prescription.prescribed_sets + 1):
+                for set_number, segment in enumerate(structured_plan["segments"], start=1):
                     db.add(
                         UserWorkoutSet(
                             workout_exercise=workout_exercise,
@@ -604,6 +686,26 @@ def assign_template_to_user(
                             set_kind="working",
                             reached_failure=None,
                             is_completed=False,
+                            planned_role=segment["role"] if has_structured_plan else None,
+                            planned_group_id=segment.get("group_id")
+                            if has_structured_plan
+                            else None,
+                            planned_group_kind=(
+                                next(
+                                    (
+                                        group["kind"]
+                                        for group in structured_plan.get("groups", [])
+                                        if group["group_id"] == segment.get("group_id")
+                                    ),
+                                    None,
+                                )
+                                if has_structured_plan and segment.get("group_id") is not None
+                                else None
+                            ),
+                            planned_position=segment["position"] if has_structured_plan else None,
+                            planned_round=segment.get("round_number")
+                            if has_structured_plan
+                            else None,
                         )
                     )
 
@@ -854,6 +956,7 @@ def _update_periodized_template_preserving_structure(
                 tuple[
                     ProgramTemplateExercise,
                     ProgramTemplateExerciseCreate,
+                    dict,
                     ExercisePrescription,
                     ProgramTemplateExerciseWeekPrescription,
                 ]
@@ -871,6 +974,7 @@ def _update_periodized_template_preserving_structure(
             tuple[
                 ProgramTemplateExercise,
                 ProgramTemplateExerciseCreate,
+                dict,
                 ExercisePrescription,
                 ProgramTemplateExerciseWeekPrescription,
             ]
@@ -898,19 +1002,28 @@ def _update_periodized_template_preserving_structure(
                 if visible_by_effective_id.get(weekly.exercise_id) is None:
                     raise ProgramError("Exercise is not available for current user")
             base_weekly = weekly_by_number[1]
-            prescription = normalize_exercise_prescription(
+            structured_plan, prescription = _input_prescription(
                 exercise,
+                prescription=payload_exercise.prescription,
                 prescribed_sets=payload_exercise.prescribed_sets,
                 prescribed_reps=payload_exercise.prescribed_reps,
                 prescribed_duration_minutes=payload_exercise.prescribed_duration_minutes,
                 rest_seconds=payload_exercise.rest_seconds,
             )
-            day_rows.append((existing_exercise, payload_exercise, prescription, base_weekly))
+            day_rows.append(
+                (existing_exercise, payload_exercise, structured_plan, prescription, base_weekly)
+            )
         prepared.append((existing_day, payload_day, day_rows))
 
     for existing_day, payload_day, day_rows in prepared:
         existing_day.title = payload_day.title
-        for existing_exercise, payload_exercise, prescription, base_weekly in day_rows:
+        for (
+            existing_exercise,
+            payload_exercise,
+            structured_plan,
+            prescription,
+            base_weekly,
+        ) in day_rows:
             existing_exercise.prescribed_sets = prescription.prescribed_sets
             existing_exercise.prescribed_reps = prescription.prescribed_reps
             existing_exercise.prescribed_duration_minutes = prescription.prescribed_duration_minutes
@@ -918,11 +1031,22 @@ def _update_periodized_template_preserving_structure(
             existing_exercise.notes = payload_exercise.notes
             existing_exercise.superset_group = payload_exercise.superset_group
             existing_exercise.superset_order = payload_exercise.superset_order
+            (
+                existing_exercise.group_id,
+                existing_exercise.group_kind,
+                existing_exercise.group_order,
+            ) = _group_projection(payload_exercise)
+            existing_exercise.prescription = (
+                structured_plan if payload_exercise.prescription is not None else None
+            )
             base_weekly.exercise_id = payload_exercise.exercise_id
             base_weekly.prescribed_sets = prescription.prescribed_sets
             base_weekly.prescribed_reps = prescription.prescribed_reps
             base_weekly.prescribed_duration_minutes = prescription.prescribed_duration_minutes
             base_weekly.rest_seconds = prescription.rest_seconds
+            base_weekly.prescription = (
+                structured_plan if payload_exercise.prescription is not None else None
+            )
 
 
 def update_template_for_user(
@@ -1008,8 +1132,9 @@ def update_template_for_user(
                 exercise = visible_by_effective_id.get(ex.exercise_id)
                 if exercise is None:
                     raise ProgramError("Exercise is not available for current user")
-                prescription = normalize_exercise_prescription(
+                structured_prescription, prescription = _input_prescription(
                     exercise,
+                    prescription=ex.prescription,
                     prescribed_sets=ex.prescribed_sets,
                     prescribed_reps=ex.prescribed_reps,
                     prescribed_duration_minutes=ex.prescribed_duration_minutes,
@@ -1028,6 +1153,12 @@ def update_template_for_user(
                         notes=ex.notes,
                         superset_group=ex.superset_group,
                         superset_order=ex.superset_order,
+                        group_id=_group_projection(ex)[0],
+                        group_kind=_group_projection(ex)[1],
+                        group_order=_group_projection(ex)[2],
+                        prescription=(
+                            structured_prescription if ex.prescription is not None else None
+                        ),
                     )
                 )
 
@@ -1074,6 +1205,98 @@ def update_template_for_user(
             action_url="/app?section=programs",
         )
 
+    db.commit()
+    return get_template_for_user(db, current_user, template.id)
+
+
+def replace_template_exercise_for_user(
+    db: Session,
+    current_user: User,
+    template_id: int,
+    template_exercise_id: int,
+    replacement_exercise_id: int,
+    reason: str | None = None,
+) -> ProgramTemplate:
+    template = (
+        db.query(ProgramTemplate)
+        .options(
+            joinedload(ProgramTemplate.days)
+            .joinedload(ProgramTemplateDay.exercises)
+            .joinedload(ProgramTemplateExercise.weekly_prescriptions),
+        )
+        .filter(
+            ProgramTemplate.id == template_id,
+            ProgramTemplate.slug != LEGACY_DEMO_TEMPLATE_SLUG,
+        )
+        .first()
+    )
+    if template is None:
+        raise ProgramError("Template not found")
+    if not _can_manage_template(db, current_user, template):
+        raise ProgramError("No permission to edit template")
+
+    target = next(
+        (
+            exercise
+            for day in template.days
+            for exercise in day.exercises
+            if exercise.id == template_exercise_id
+        ),
+        None,
+    )
+    if target is None:
+        raise ProgramError("Template exercise not found")
+    owner = _template_owner(db, template) or current_user
+    visible = get_visible_exercise_display_map(db, owner)
+    replacement = visible.get(replacement_exercise_id)
+    if replacement is None:
+        raise ProgramError("Exercise is not available for template owner")
+    if exercise_metric_type(target.exercise) != exercise_metric_type(replacement):
+        raise ProgramError("Replacement must preserve the exercise metric type")
+    original_exercise_id = target.exercise_id
+
+    def preserve_plan(row, exercise: Exercise) -> None:
+        if row.prescription is None:
+            return
+        plan, _projection = _input_prescription(
+            exercise,
+            prescription=row.prescription,
+            prescribed_sets=row.prescribed_sets,
+            prescribed_reps=row.prescribed_reps,
+            prescribed_duration_minutes=row.prescribed_duration_minutes,
+            rest_seconds=row.rest_seconds,
+        )
+        row.prescription = plan
+
+    target.exercise_id = replacement_exercise_id
+    preserve_plan(target, replacement)
+    for weekly in target.weekly_prescriptions:
+        weekly.exercise_id = replacement_exercise_id
+        if weekly.prescription is not None:
+            plan, _projection = _input_prescription(
+                replacement,
+                prescription=weekly.prescription,
+                prescribed_sets=weekly.prescribed_sets,
+                prescribed_reps=weekly.prescribed_reps,
+                prescribed_duration_minutes=weekly.prescribed_duration_minutes,
+                rest_seconds=weekly.rest_seconds,
+            )
+            weekly.prescription = plan
+
+    record_audit_event(
+        db,
+        actor_user_id=current_user.id,
+        target_user_id=template.owner_user_id or current_user.id,
+        action="program.template_exercise_replaced",
+        resource_type="program_template",
+        resource_id=template.id,
+        details={
+            "template_exercise_id": template_exercise_id,
+            "from_exercise_id": original_exercise_id,
+            "to_exercise_id": replacement_exercise_id,
+            "reason": reason.strip() if reason and reason.strip() else None,
+        },
+    )
     db.commit()
     return get_template_for_user(db, current_user, template.id)
 

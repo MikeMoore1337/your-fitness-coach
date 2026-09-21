@@ -507,6 +507,10 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
                             "notes",
                             "superset_group",
                             "superset_order",
+                            "group_id",
+                            "group_kind",
+                            "group_order",
+                            "prescription",
                         ),
                     )
                     | {
@@ -523,6 +527,7 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
                                     "prescribed_reps",
                                     "prescribed_duration_minutes",
                                     "rest_seconds",
+                                    "prescription",
                                 ),
                             )
                             for prescription in exercise.weekly_prescriptions
@@ -637,6 +642,12 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
                                 "notes",
                                 "superset_group",
                                 "superset_order",
+                                "source_template_exercise_id",
+                                "source_weekly_prescription_id",
+                                "group_id",
+                                "group_kind",
+                                "group_order",
+                                "prescription",
                             ),
                         ),
                         "title": exercise.exercise.title if exercise.exercise else None,
@@ -661,6 +672,11 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
                                     "rir",
                                     "set_kind",
                                     "reached_failure",
+                                    "planned_role",
+                                    "planned_group_id",
+                                    "planned_group_kind",
+                                    "planned_position",
+                                    "planned_round",
                                     "is_completed",
                                     "version",
                                 ),

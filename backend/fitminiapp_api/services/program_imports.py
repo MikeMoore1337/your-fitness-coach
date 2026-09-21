@@ -4,6 +4,7 @@ import csv
 import hashlib
 import html
 import io
+import json
 import logging
 import posixpath
 import re
@@ -31,6 +32,7 @@ from fitminiapp_api.models.program import (
 from fitminiapp_api.models.program_import import ProgramImport
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.program import (
+    ExercisePrescriptionPlan,
     ProgramTemplateCreate,
     ProgramTemplateDayCreate,
     ProgramTemplateExerciseCreate,
@@ -46,6 +48,7 @@ from fitminiapp_api.services.exercise_catalog_metadata import (
     CANONICAL_EXERCISE_REDIRECTS,
     exercise_catalog_metadata,
 )
+from fitminiapp_api.services.prescription_semantics import ensure_plan
 from fitminiapp_api.services.program_common import ProgramError
 from fitminiapp_api.services.program_import_ai import (
     PROGRAM_IMPORT_AI_CONTRACT_VERSION,
@@ -75,6 +78,7 @@ PROGRAM_IMPORT_TEXT_LAYOUT: Final = "text-list-v1"
 PROGRAM_IMPORT_DOCX_LAYOUT: Final = "docx-document-v1"
 PROGRAM_IMPORT_MARKER: Final = "#yfc_template_version"
 PROGRAM_IMPORT_MARKER_VALUE: Final = "1"
+PROGRAM_IMPORT_MAX_PRESCRIPTION_CHARS: Final = 12_000
 PROGRAM_IMPORT_COLUMNS: Final = (
     "program_title",
     "goal",
@@ -92,6 +96,7 @@ PROGRAM_IMPORT_COLUMNS: Final = (
     "notes",
     "superset_group",
     "superset_order",
+    "prescription",
 )
 PROGRAM_IMPORT_REQUIRED_COLUMNS: Final = frozenset(
     {
@@ -169,6 +174,9 @@ _GENERIC_HEADER_ALIASES: dict[str, frozenset[str]] = {
     "rest_seconds": frozenset({"rest", "restseconds", "отдых", "отдыхсекунды"}),
     "notes": frozenset({"notes", "note", "comment", "comments", "заметки", "примечание"}),
     "source_auxiliary": frozenset({"weight", "load", "вес", "нагрузка", "рабочийвес", "вескг"}),
+    "prescription": frozenset(
+        {"prescription", "advancedprescription", "structuredprescription", "предписание"}
+    ),
 }
 _SOURCE_EXERCISE_ALIASES: dict[str, tuple[str, ...]] = {
     "выпадынаместе": ("Выпады",),
@@ -339,6 +347,7 @@ class _RowDraft(TypedDict, total=False):
     notes: str | None
     superset_group: int | None
     superset_order: int | None
+    prescription: dict | None
     manual_exercise_id: int | None
     resolved_exercise_id: int | None
     resolved_exercise_title: str | None
@@ -440,15 +449,24 @@ def _append_issue(
         issues.append(item)
 
 
-def _validate_text_cells(rows: list[tuple[int, tuple[str, ...]]]) -> None:
+def _validate_text_cells(
+    rows: list[tuple[int, tuple[str, ...]]],
+    *,
+    large_column_indices: set[int] | frozenset[int] = frozenset(),
+) -> None:
     for row_number, row in rows:
-        for value in row:
+        for column_index, value in enumerate(row):
             if "\x00" in value or any(character in _CONTROL_CHARACTERS for character in value):
                 raise ProgramImportError(
                     "control_character",
                     f"Недопустимый управляющий символ в строке {row_number}",
                 )
-            if len(value) > settings.program_import_max_cell_chars:
+            max_chars = (
+                PROGRAM_IMPORT_MAX_PRESCRIPTION_CHARS
+                if column_index in large_column_indices
+                else settings.program_import_max_cell_chars
+            )
+            if len(value) > max_chars:
                 raise ProgramImportError(
                     "cell_too_long",
                     f"Значение в строке {row_number} превышает лимит длины ячейки",
@@ -507,7 +525,10 @@ def _validate_table(
                 f"В строке {row_number} больше значений, чем колонок в заголовке",
             )
         normalized_rows.append((row_number, tuple(row) + ("",) * (width - len(row))))
-    _validate_text_cells(normalized_rows)
+    large_columns = {
+        index for index, value in enumerate(normalized_header) if value == "prescription"
+    }
+    _validate_text_cells(normalized_rows, large_column_indices=large_columns)
     return _Table(
         header=normalized_header,
         rows=tuple(normalized_rows),
@@ -550,7 +571,9 @@ def _parse_csv(source: bytes) -> _Table:
     except UnicodeDecodeError as exc:
         raise ProgramImportError("csv_encoding", "CSV должен быть сохранён в UTF-8") from exc
     delimiter = _detect_csv_delimiter(text)
-    csv.field_size_limit(settings.program_import_max_cell_chars)
+    csv.field_size_limit(
+        max(settings.program_import_max_cell_chars, PROGRAM_IMPORT_MAX_PRESCRIPTION_CHARS)
+    )
     try:
         rows = list(csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, strict=True))
     except (csv.Error, UnicodeError) as exc:
@@ -561,9 +584,13 @@ def _parse_csv(source: bytes) -> _Table:
     if raw_rows and raw_rows[0][1] == (PROGRAM_IMPORT_MARKER, PROGRAM_IMPORT_MARKER_VALUE):
         if len(raw_rows) < 2:
             raise ProgramImportError("header_missing", "В CSV отсутствует строка заголовков")
+        header = raw_rows[1][1]
+        large_columns = {
+            index for index, value in enumerate(header) if _text(value).lower() == "prescription"
+        }
         return _validate_table(
             marker=raw_rows[0][1],
-            header=raw_rows[1][1],
+            header=header,
             rows=[
                 (row_number, row)
                 for row_number, row in raw_rows[2:]
@@ -571,13 +598,17 @@ def _parse_csv(source: bytes) -> _Table:
             ],
             cell_count=sum(1 for _, row in raw_rows for value in row if _text(value)),
             sheet_name=None,
-            grid=_grid_from_rows(raw_rows),
+            grid=_grid_from_rows(raw_rows, large_column_indices=large_columns),
         )
 
     return _generic_table_from_rows(raw_rows, sheet_name=None)
 
 
-def _grid_from_rows(rows: list[tuple[int, tuple[str, ...]]]) -> tuple[_GridCell, ...]:
+def _grid_from_rows(
+    rows: list[tuple[int, tuple[str, ...]]],
+    *,
+    large_column_indices: set[int] | frozenset[int] = frozenset(),
+) -> tuple[_GridCell, ...]:
     cells: list[_GridCell] = []
     for row_number, values in rows:
         if len(values) > settings.program_import_max_columns:
@@ -597,7 +628,8 @@ def _grid_from_rows(rows: list[tuple[int, tuple[str, ...]]]) -> tuple[_GridCell,
     if len(cells) > settings.program_import_max_cells:
         raise ProgramImportError("cell_limit", "Файл превышает лимит ячеек")
     _validate_text_cells(
-        [(row_number, tuple(_text(value) for value in values)) for row_number, values in rows]
+        [(row_number, tuple(_text(value) for value in values)) for row_number, values in rows],
+        large_column_indices=large_column_indices,
     )
     return tuple(cells)
 
@@ -982,7 +1014,10 @@ def _parse_xlsx(source: bytes) -> _Table:
                         "control_character",
                         f"Недопустимый управляющий символ в строке {row_number}",
                     )
-                if len(value) > settings.program_import_max_cell_chars:
+                if len(value) > max(
+                    settings.program_import_max_cell_chars,
+                    PROGRAM_IMPORT_MAX_PRESCRIPTION_CHARS,
+                ):
                     raise ProgramImportError(
                         "cell_too_long", "XLSX содержит слишком длинное значение"
                     )
@@ -2436,6 +2471,42 @@ def _parse_integer(
     return int(normalized)
 
 
+def _parse_structured_prescription(
+    value: object,
+    *,
+    row_number: int,
+    issues: list[_Issue],
+) -> dict | None:
+    raw = _optional_text(value)
+    if raw is None:
+        return None
+    if len(raw) > PROGRAM_IMPORT_MAX_PRESCRIPTION_CHARS:
+        _append_issue(
+            issues,
+            "prescription_too_large",
+            "blocking",
+            "Структурированное предписание слишком большое",
+            row_number=row_number,
+            field="prescription",
+        )
+        return None
+    try:
+        parsed = json.loads(raw)
+        plan = ExercisePrescriptionPlan.model_validate(parsed)
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        _append_issue(
+            issues,
+            "invalid_prescription",
+            "blocking",
+            "Структурированное предписание не прошло проверку схемы",
+            row_number=row_number,
+            field="prescription",
+        )
+        del exc
+        return None
+    return plan.model_dump(mode="json")
+
+
 def _row_from_values(
     *,
     row_number: int,
@@ -2489,6 +2560,9 @@ def _row_from_values(
             row_number=row_number,
             field="superset_order",
             issues=issues,
+        ),
+        "prescription": _parse_structured_prescription(
+            values.get("prescription"), row_number=row_number, issues=issues
         ),
         "manual_exercise_id": None,
         "resolved_exercise_id": None,
@@ -2785,6 +2859,10 @@ def _resolve_row(
                 prescribed_duration_minutes=prescribed_duration_minutes,
                 rest_seconds=90 if rest_seconds is None else rest_seconds,
             )
+            if row.get("prescription") is not None:
+                plan = ExercisePrescriptionPlan.model_validate(row["prescription"])
+                if plan.metric_type != candidate.metric_type:
+                    raise ProgramError("Prescription metric type does not match the exercise")
         except (ProgramError, TypeError, ValueError) as exc:
             _append_issue(
                 row_issues,
@@ -4014,6 +4092,12 @@ def _program_payload_from_draft(draft: _Draft) -> ProgramTemplateCreate:
                     "domain_invalid", "Все упражнения должны быть сопоставлены"
                 )
             rest_seconds = row.get("rest_seconds")
+            raw_prescription = row.get("prescription")
+            parsed_prescription = (
+                None
+                if raw_prescription is None
+                else ExercisePrescriptionPlan.model_validate(raw_prescription)
+            )
             exercises.append(
                 ProgramTemplateExerciseCreate(
                     exercise_id=resolved_id,
@@ -4024,6 +4108,7 @@ def _program_payload_from_draft(draft: _Draft) -> ProgramTemplateCreate:
                     notes=_optional_text(row.get("notes")),
                     superset_group=row.get("superset_group"),
                     superset_order=row.get("superset_order"),
+                    prescription=parsed_prescription,
                 )
             )
         day_payloads.append(ProgramTemplateDayCreate(title=title, exercises=exercises))
@@ -4134,13 +4219,16 @@ def _create_weekly_prescriptions(
                 if exercise is None:
                     raise ProgramError("Exercise is not available for imported program")
                 rest_seconds = source_row.get("rest_seconds")
-                prescription = normalize_exercise_prescription(
-                    exercise,
+                structured_plan, prescription = ensure_plan(
+                    source_row.get("prescription"),
+                    metric_type=exercise_metric_type(exercise),
                     prescribed_sets=source_row.get("prescribed_sets"),
                     prescribed_reps=_optional_text(source_row.get("prescribed_reps")),
                     prescribed_duration_minutes=source_row.get("prescribed_duration_minutes"),
                     rest_seconds=90 if rest_seconds is None else rest_seconds,
                 )
+                if exercise_metric_type(exercise) == "strength" and prescription.rest_seconds < 15:
+                    raise ProgramError("Strength rest must be at least 15 seconds")
                 db.add(
                     ProgramTemplateExerciseWeekPrescription(
                         template_exercise_id=template_exercise.id,
@@ -4150,6 +4238,7 @@ def _create_weekly_prescriptions(
                         prescribed_reps=prescription.prescribed_reps,
                         prescribed_duration_minutes=prescription.prescribed_duration_minutes,
                         rest_seconds=prescription.rest_seconds,
+                        prescription=structured_plan.model_dump(mode="json"),
                     )
                 )
     template.default_duration_weeks = duration_weeks
@@ -4285,7 +4374,7 @@ def _safe_export_value(value: object) -> str:
 def _template_matrix() -> list[list[str]]:
     return [
         [PROGRAM_IMPORT_MARKER, PROGRAM_IMPORT_MARKER_VALUE],
-        list(PROGRAM_IMPORT_COLUMNS),
+        list(PROGRAM_IMPORT_COLUMNS[:-1]),
         [
             "Пример импортируемой программы",
             "maintenance",

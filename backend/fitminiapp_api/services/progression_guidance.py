@@ -14,7 +14,12 @@ from fitminiapp_api.models.program import (
     UserWorkoutExercise,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.services.prescription_semantics import (
+    is_pr_record_role,
+    parse_prescription_plan,
+)
 from fitminiapp_api.services.workout_metrics import workout_exercise_metric_type
+from fitminiapp_api.services.workouts import is_pr_record_set
 
 ProgressionOutcome = Literal[
     "consider_progressing",
@@ -66,9 +71,7 @@ def parse_rep_target(value: str) -> RepTarget | None:
 
 
 def _session_facts(exercise: UserWorkoutExercise) -> SessionFacts:
-    working_sets = [
-        item for item in exercise.sets if item.is_completed and item.set_kind in {None, "working"}
-    ]
+    working_sets = [item for item in exercise.sets if item.is_completed and is_pr_record_set(item)]
     reps = [item.actual_reps for item in working_sets if item.actual_reps is not None]
     weights = [float(item.actual_weight) for item in working_sets if item.actual_weight is not None]
     unique_weights = set(weights)
@@ -280,6 +283,22 @@ def build_progression_guidance(
     guidance: dict[int, dict] = {}
     for current in workout.exercises:
         if workout_exercise_metric_type(current) == "cardio":
+            continue
+        plan = parse_prescription_plan(current.prescription, metric_type="strength")
+        if plan is not None and (
+            any(not is_pr_record_role(segment.role) for segment in plan.segments)
+            or any(group.kind != "sequence" for group in plan.groups)
+        ):
+            unsupported = evaluate_progression(
+                prescribed_sets=current.prescribed_sets,
+                prescribed_reps=current.prescribed_reps,
+                sessions=[],
+                load_unit="kg",
+            )
+            unsupported["evidence"]["reason_keys"] = [
+                "advanced_prescription_requires_method_aware_review"
+            ]
+            guidance[current.id] = unsupported
             continue
         target = parse_rep_target(current.prescribed_reps)
         same_exercise = [item for item in candidates if item.exercise_id == current.exercise_id]

@@ -29,6 +29,8 @@ from fitminiapp_api.services.exercise_catalog import get_visible_exercise_displa
 from fitminiapp_api.services.period_bounds import MAX_REPORT_DAYS, resolve_progress_bounds
 from fitminiapp_api.services.workouts import (
     counts_toward_working_volume,
+    is_pr_record_set,
+    set_analytics_bucket,
     working_volume_set_filter,
 )
 
@@ -144,7 +146,7 @@ def build_user_progress(db: Session, user: User) -> dict:
                 record["best_set_volume_kg"] = max(record["best_set_volume_kg"], volume)
                 if (
                     workout_set.is_completed
-                    and counts_toward_working_volume(workout_set)
+                    and is_pr_record_set(workout_set)
                     and workout_set.actual_weight is not None
                 ):
                     current_max = record["max_weight_kg"]
@@ -276,6 +278,8 @@ def _bounded_exercise_history(
             UserWorkoutSet.rir,
             UserWorkoutSet.set_kind,
             UserWorkoutSet.reached_failure,
+            UserWorkoutSet.planned_role,
+            UserWorkoutSet.planned_position,
         )
         .join(
             UserWorkoutSet,
@@ -387,19 +391,24 @@ def _serialize_training_session(rows: list) -> dict:
         if set_volume is not None:
             external_load_volume += set_volume
             volume_recorded_sets += 1
-        sets.append(
-            {
-                "set_number": row.set_number,
-                "reps": reps,
-                "external_load_kg": external_load,
-                "external_load_volume_kg": (
-                    round(set_volume, 2) if set_volume is not None else None
-                ),
-                "rir": row.rir,
-                "set_kind": row.set_kind,
-                "reached_failure": row.reached_failure,
-            }
-        )
+        serialized = {
+            "set_number": row.set_number,
+            "reps": reps,
+            "external_load_kg": external_load,
+            "external_load_volume_kg": (round(set_volume, 2) if set_volume is not None else None),
+            "rir": row.rir,
+            "set_kind": row.set_kind,
+            "reached_failure": row.reached_failure,
+        }
+        if row.planned_role is not None:
+            serialized.update(
+                {
+                    "planned_role": row.planned_role,
+                    "planned_position": row.planned_position,
+                    "analytics_bucket": set_analytics_bucket(row),
+                }
+            )
+        sets.append(serialized)
     first = rows[0]
     return {
         "workout_id": first.workout_id,
@@ -623,17 +632,23 @@ def build_workout_timeline(
             for workout_set in sorted(exercise.sets, key=lambda item: item.set_number):
                 completed_sets += int(workout_set.is_completed)
                 volume += _completed_set_volume(workout_set)
-                sets.append(
-                    {
-                        "set_number": workout_set.set_number,
-                        "actual_reps": workout_set.actual_reps,
-                        "actual_weight": workout_set.actual_weight,
-                        "rir": workout_set.rir,
-                        "set_kind": workout_set.set_kind,
-                        "reached_failure": workout_set.reached_failure,
-                        "is_completed": workout_set.is_completed,
-                    }
-                )
+                serialized_set = {
+                    "set_number": workout_set.set_number,
+                    "actual_reps": workout_set.actual_reps,
+                    "actual_weight": workout_set.actual_weight,
+                    "rir": workout_set.rir,
+                    "set_kind": workout_set.set_kind,
+                    "reached_failure": workout_set.reached_failure,
+                    "is_completed": workout_set.is_completed,
+                }
+                if workout_set.planned_role is not None:
+                    serialized_set.update(
+                        {
+                            "planned_role": workout_set.planned_role,
+                            "planned_position": workout_set.planned_position,
+                        }
+                    )
+                sets.append(serialized_set)
             exercises.append(
                 {
                     "workout_exercise_id": exercise.id,
