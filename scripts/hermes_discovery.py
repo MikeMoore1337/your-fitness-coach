@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 BASE_IMAGE = "python:3.13-alpine"
-BASE_DIGEST = "sha256:46ee549c88617e9bc8acb843a326f1a5c0fa5608d7f9703509efe6d53b55f318"
+BASE_DIGEST = "sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee"
 DOCKERFILE_SYNTAX_DIGEST = "sha256:ecfaec9ed6d810b56388c508f4121597bfbba70d41a6dfeee4d8cad5f295fc32"
 TRIVY_IMAGE = (
     "aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969"

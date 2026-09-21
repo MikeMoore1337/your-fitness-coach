@@ -271,7 +271,7 @@ evidence and is never a build input or commit target.
 
 The lock contains only the worker closure and has no floating versions or provider SDK:
 `httpx`, Pydantic and their exact transitive dependencies. The base is
-`python:3.13-alpine@sha256:46ee549c88617e9bc8acb843a326f1a5c0fa5608d7f9703509efe6d53b55f318`.
+`python:3.13-alpine@sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee`.
 The final image runs as UID/GID `10000:10000`, drops all capabilities, sets
 `no-new-privileges`, removes the package shell/tooling surfaces, declares `/opt/data` as the only
 state volume, and is tested with a read-only root filesystem. The verification budget is 0.50
