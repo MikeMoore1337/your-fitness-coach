@@ -46,7 +46,7 @@ beforeEach(() => {
 describe('PwaProvider', () => {
   it('keeps the mobile update CTA content-sized instead of giving it a vertical flex basis', () => {
     const css = readFileSync('src/styles/react.css', 'utf8');
-    const mobileBlock = css.match(/@media \\(max-width: 640px\\) \\{[\\s\\S]*?\\n\\}/)?.[0] ?? '';
+    const mobileBlock = css.split('@media (max-width: 640px) {')[1]?.split('.fatal-error {')[0] ?? '';
 
     expect(mobileBlock).toContain('.pwa-update-notice button {');
     expect(mobileBlock).toContain('flex: 0 0 auto;');
