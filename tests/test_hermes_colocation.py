@@ -22,6 +22,27 @@ def _load_module():
 hermes = _load_module()
 
 
+def _install_args(*extra: str):
+    return hermes._parser().parse_args(
+        [
+            "install",
+            "--source-root",
+            "source",
+            "--source-definitions",
+            "definitions",
+            "--worker-env",
+            "worker.env",
+            "--yfc-sha",
+            "a" * 40,
+            "--discovery-image",
+            "registry.invalid/hermes-discovery@sha256:" + "a" * 64,
+            "--worker-image",
+            "registry.invalid/hermes-worker@sha256:" + "b" * 64,
+            *extra,
+        ]
+    )
+
+
 @pytest.mark.parametrize("value", ["registry.invalid/hermes-worker@sha256:" + "b" * 64])
 def test_colocation_accepts_only_registry_content_addressed_images(value: str) -> None:
     assert hermes.validate_image_ref(value) == value
@@ -38,6 +59,20 @@ def test_colocation_rejects_local_image_ids() -> None:
 def test_colocation_rejects_floating_images(value: str) -> None:
     with pytest.raises(hermes.ColocationError):
         hermes.validate_image_ref(value)
+
+
+def test_install_defaults_to_separate_vm_without_a_yfc_deployment_lock() -> None:
+    args = _install_args()
+
+    assert args.mode == "separate-vm"
+    assert args.deployment_lock is None
+
+
+def test_colocation_requires_an_explicit_deployment_lock() -> None:
+    args = _install_args("--mode", "colocated-isolated")
+
+    with pytest.raises(hermes.ColocationError, match="explicit --deployment-lock"):
+        hermes.install(args)
 
 
 def test_image_inspection_must_match_the_pinned_identity(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,6 +107,27 @@ def test_unit_rendering_preserves_repository_digest_separator(tmp_path: Path) ->
     assert "COLOCATED_ISOLATED_HERMES=yes" in rendered
     assert "hermes_egress.py refresh" in rendered
     assert "@DISCOVERY_IMAGE@" not in rendered
+
+
+def test_separate_vm_unit_rendering_does_not_embed_yfc_deployment_target(tmp_path: Path) -> None:
+    root = Path(__file__).parents[1]
+    target = tmp_path / "systemd"
+    image = "registry.invalid/hermes-discovery@sha256:" + "d" * 64
+
+    hermes._render_units(
+        root,
+        target,
+        definitions_digest="e" * 64,
+        discovery_image=image,
+        mode="separate-vm",
+        deployment_lock="none",
+    )
+
+    rendered = (target / "hermes-discovery.service").read_text(encoding="utf-8")
+    assert "HERMES_DEPLOYMENT_MODE=separate-vm" in rendered
+    assert "COLOCATED_ISOLATED_HERMES=no" in rendered
+    assert "HERMES_YFC_DEPLOYMENT_LOCK=none" in rendered
+    assert "/srv/yfc" not in rendered
 
 
 def test_definitions_provenance_is_content_addressed(tmp_path: Path) -> None:
@@ -151,6 +207,7 @@ def test_mode_schema_declares_both_supported_topologies() -> None:
     )
 
     assert schema["properties"]["mode"]["enum"] == ["separate-vm", "colocated-isolated"]
+    assert schema["properties"]["mode"]["default"] == "separate-vm"
     assert schema["properties"]["network"]["properties"]["public_ports"]["const"] == []
 
 
@@ -173,6 +230,17 @@ def test_network_guard_rejects_yfc_container_attachment(monkeypatch: pytest.Monk
     )
 
     with pytest.raises(hermes.ColocationError, match="YFC container"):
+        hermes.ensure_network(mode="colocated-isolated")
+
+
+def test_separate_vm_rejects_a_yfc_compose_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Result:
+        returncode = 0
+        stdout = "fit-mini-app_default\n"
+
+    monkeypatch.setattr(hermes, "_run", lambda *args, **kwargs: Result())
+
+    with pytest.raises(hermes.ColocationError, match="explicit colocated-isolated"):
         hermes.ensure_network()
 
 

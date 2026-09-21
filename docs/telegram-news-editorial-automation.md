@@ -316,19 +316,22 @@ test-process YFC server. They set the local news flags to false and cannot chang
 ### Deployment boundary and operations
 
 Поддерживаются две production topology: отдельная Linux `x86_64` VM (`separate-vm`) и
-owner-approved co-location (`colocated-isolated`). Для Task 403 выбрана co-location на
-существующем YFC RU VPS `77.91.90.171:1337`; отдельная VM не создаётся. Это не снимает
-production flag: `COLOCATED_ISOLATED_HERMES=yes`.
+owner-approved co-location (`colocated-isolated`). Production default — `separate-vm`; Hermes
+работает на выделенной VM, а `COLOCATED_ISOLATED_HERMES=no`. Co-location остаётся только
+явным операторским выбором и требует `--mode colocated-isolated` вместе с явным
+`--deployment-lock`; без lock installer fail-closed и не может неявно выбрать RU YFC VPS.
+В `separate-vm` до pull/activation installer также проверяет отсутствие Docker Compose network с
+label `com.docker.compose.project=fit-mini-app`; обнаружение YFC boundary требует явного co-location.
 изоляционные требования: Hermes получает только `/opt/hermes`, `/etc/hermes`, `/var/lib/hermes`,
 dedicated UID/GID `10000:10000`, Docker-сеть `hermes-net` без YFC-контейнеров и без публичных
 портов. YFC volumes, `.env`, PostgreSQL/Redis, Docker socket, SSH credential и runtime repository
 в Hermes boundary не передаются.
 
-Co-located host guard перед discovery и worker проверяет `MemAvailable >= 768 MiB`, used swap
-`<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Guard использует
-canonical YFC deployment lock
-`/srv/yfc/fit-mini-app/.artifacts/operations/deployments/deployment.lock` через shared `flock`
-и fail-closed останавливает Hermes при активном YFC deploy. Reason codes: `insufficient_memory`,
+Host guard перед discovery и worker проверяет `MemAvailable >= 768 MiB`, used swap `<= 512 MiB`,
+`load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. В `separate-vm` guard не
+читает YFC deployment lock. В явном `colocated-isolated` режиме переданный canonical YFC lock
+используется через shared `flock` и fail-closed останавливает Hermes при активном YFC deploy.
+Reason codes: `insufficient_memory`,
 `swap_pressure`, `high_load`, `insufficient_disk`, `yfc_deploy_active`; overlap Hermes-фаз также
 запрещён. Discovery ограничен `256 MiB/0.25 CPU`, worker — `512 MiB/0.50 CPU`.
 
@@ -336,7 +339,7 @@ canonical YFC deployment lock
 scoped policy: exact source hosts для discovery и exact provider/YFC intake destinations для
 worker; Telegram Bot API, PostgreSQL/Redis, внутренние YFC-сервисы, Docker API/socket, SSH,
 cloud metadata, registry, arbitrary redirects и wildcard internet должны быть запрещены.
-Task 403 устанавливает только repository-owned `inet hermes_egress` с hook на forward traffic:
+Текущий Hermes release устанавливает только repository-owned `inet hermes_egress` с hook на forward traffic:
 правила применяются к bridge `hermes-net`, содержат exact resolved IP set для canonical hosts,
 разрешённые DNS-серверы и scoped default-deny для новых пакетов Hermes. Глобальные firewall
 defaults и traffic YFC не меняются. Hermes inbound ports отсутствуют.

@@ -34,7 +34,6 @@ except ModuleNotFoundError:  # pragma: no cover - direct import from a test load
 IMAGE_REF_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 HERMES_UID = 10000
 HERMES_GID = 10000
-DEFAULT_DEPLOYMENT_LOCK = "/srv/yfc/fit-mini-app/.artifacts/operations/deployments/deployment.lock"
 WORKER_ENV_NAMES = frozenset(
     {
         "HERMES_WORKER_IMAGE",
@@ -228,7 +227,31 @@ def _network_subnets(
     return subnets
 
 
-def ensure_network(name: str = "hermes-net", *, mode: str = "colocated-isolated") -> list[str]:
+def _assert_dedicated_host() -> None:
+    result = _run(
+        [
+            "docker",
+            "network",
+            "ls",
+            "--filter",
+            "label=com.docker.compose.project=fit-mini-app",
+            "--format",
+            "{{.Name}}",
+        ],
+        check=False,
+        capture=True,
+    )
+    if result.returncode != 0:
+        raise ColocationError("dedicated Hermes host boundary could not be established")
+    if any(line.strip() for line in result.stdout.splitlines()):
+        raise ColocationError(
+            "YFC Docker network detected; explicit colocated-isolated mode is required"
+        )
+
+
+def ensure_network(name: str = "hermes-net", *, mode: str = "separate-vm") -> list[str]:
+    if mode == "separate-vm":
+        _assert_dedicated_host()
     existing = _run(["docker", "network", "inspect", name], check=False, capture=True)
     if existing.returncode != 0:
         _run(
@@ -612,6 +635,9 @@ def _runtime_release(args: argparse.Namespace) -> Path:
 
 
 def install(args: argparse.Namespace) -> dict[str, object]:
+    if args.mode == "colocated-isolated" and args.deployment_lock in {None, "none"}:
+        raise ColocationError("colocated-isolated requires explicit --deployment-lock")
+    deployment_lock = args.deployment_lock or "none"
     discovery_image = validate_image_ref(args.discovery_image)
     worker_image = validate_image_ref(args.worker_image)
     source_root = args.source_root.resolve(strict=True)
@@ -626,6 +652,8 @@ def install(args: argparse.Namespace) -> dict[str, object]:
         raise ColocationError(
             "worker.env HERMES_WORKER_IMAGE does not match the pinned worker image"
         )
+    if args.mode == "separate-vm":
+        _assert_dedicated_host()
     pull_and_verify_image(discovery_image, role="discovery")
     pull_and_verify_image(worker_image, role="worker")
     subnets = [] if args.skip_network else ensure_network(mode=args.mode)
@@ -646,7 +674,7 @@ def install(args: argparse.Namespace) -> dict[str, object]:
         discovery_image=discovery_image,
         worker_image=worker_image,
         mode=args.mode,
-        deployment_lock=args.deployment_lock,
+        deployment_lock=deployment_lock,
         release_parent=previous_manifest.get("release_id") if previous_manifest else None,
     )
     release_dir = runtime_root / "releases" / manifest["release_id"]
@@ -659,7 +687,7 @@ def install(args: argparse.Namespace) -> dict[str, object]:
         definitions_digest=definitions_digest,
         discovery_image=discovery_image,
         mode=args.mode,
-        deployment_lock=args.deployment_lock,
+        deployment_lock=deployment_lock,
     )
     _run(
         [
@@ -790,9 +818,9 @@ def _parser() -> argparse.ArgumentParser:
     install_parser.add_argument("--discovery-image", required=True)
     install_parser.add_argument("--worker-image", required=True)
     install_parser.add_argument(
-        "--mode", choices=("separate-vm", "colocated-isolated"), default="colocated-isolated"
+        "--mode", choices=("separate-vm", "colocated-isolated"), default="separate-vm"
     )
-    install_parser.add_argument("--deployment-lock", default=DEFAULT_DEPLOYMENT_LOCK)
+    install_parser.add_argument("--deployment-lock", default=None)
     install_parser.add_argument("--runtime-root", type=Path, default=Path("/opt/hermes"))
     install_parser.add_argument("--config-root", type=Path, default=Path("/etc/hermes"))
     install_parser.add_argument("--state-root", type=Path, default=Path("/var/lib/hermes"))
