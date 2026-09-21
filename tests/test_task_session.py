@@ -302,6 +302,21 @@ def _publish_task_merge_without_advancing_local_master(root: Path, branch: str) 
     return merge_sha
 
 
+def _publish_task_squash_without_advancing_local_master(root: Path, branch: str) -> str:
+    base_sha = _git(root, "rev-parse", "master")
+    remote_worktree = root.parent / f"remote-task-squash-{uuid.uuid4().hex[:8]}"
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), base_sha)
+    try:
+        _git(remote_worktree, "merge", "--squash", branch)
+        _git(remote_worktree, "commit", "-m", f"[Task 207C] Squash task {branch}")
+        merge_sha = _git(remote_worktree, "rev-parse", "HEAD")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    _git(root, "fetch", "origin", "master")
+    return merge_sha
+
+
 def _prepare_delivery(controller: Any, task_id: str, *, branch: str) -> dict[str, Any]:
     del branch
     acquired = controller.acquire_delivery(task_id)
@@ -2200,6 +2215,36 @@ def test_finish_fast_forwards_stale_local_master_before_cleanup(
     assert result["local_master_fast_forwarded"] is True
     assert result["worktree_already_removed"] is False
     assert git_repository.ref("master") == merge_sha
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
+
+
+def test_finish_accepts_verified_squash_merge(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "207C"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready("207C", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _prepare_delivery(controller, "207C", branch=branch)
+    merge_sha = _publish_task_squash_without_advancing_local_master(root, branch)
+
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    github.pulls[207] = _task_pr(207, "207C", base_sha, head_sha, merge_sha=merge_sha)
+    github.commits[207] = [_task_commit("207C")]
+    github.files[207] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.successful_deployments.add((merge_sha, "production"))
+    controller.record_production_success(
+        "207C", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
+    )
+
+    result = controller.finish("207C")
+
+    assert result["cleanup_performed"] is True
     assert not worktree.exists()
     assert not git_repository.ref_exists(branch)
 

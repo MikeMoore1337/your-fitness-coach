@@ -462,8 +462,8 @@ class GitRepository:
     def remove_worktree(self, path: Path) -> None:
         self.git("worktree", "remove", "--", str(path), cwd=self.current_worktree)
 
-    def delete_local_branch(self, branch: str) -> None:
-        self.git("branch", "--delete", "--", branch, cwd=self.current_worktree)
+    def delete_local_branch(self, branch: str, *, force: bool = False) -> None:
+        self.git("branch", "-D" if force else "--delete", "--", branch, cwd=self.current_worktree)
 
     def upstream(self, branch: str) -> str | None:
         result = _run(
@@ -3914,9 +3914,16 @@ class TaskController:
             raise TaskSessionError(
                 f"finish cleanup refuses interrupted Git operation: {operations}"
             )
-        if not self.repository.is_ancestor(expected_head, deployed_sha):
+        task_head_is_merged = self.repository.is_ancestor(expected_head, deployed_sha)
+        squash_merge_is_verified = (
+            not task_head_is_merged
+            and history.get("head_sha") == expected_head
+            and history.get("merge_sha") == deployed_sha
+            and history.get("deployed_sha") == deployed_sha
+        )
+        if not task_head_is_merged and not squash_merge_is_verified:
             raise TaskSessionError("finish cleanup refuses task head absent from deployed master")
-        if self.repository.unique_commits(branch):
+        if self.repository.unique_commits(branch) and not squash_merge_is_verified:
             raise TaskSessionError("finish cleanup refuses task branch with unique commits")
         artifact_cleanup: dict[str, Any] = {"status": "noop", "removed_count": 0}
         try:
@@ -3938,7 +3945,10 @@ class TaskController:
             self.repository.remove_worktree(worktree_path)
         if self.repository.ref(branch) != expected_head:
             raise TaskSessionError("finish cleanup branch changed after worktree removal")
-        self.repository.delete_local_branch(branch)
+        if squash_merge_is_verified:
+            self.repository.delete_local_branch(branch, force=True)
+        else:
+            self.repository.delete_local_branch(branch)
         with self.store.lock():
             current = self.store.read_json(lease_path)
             latest_delivery = self.store.delivery_state()
