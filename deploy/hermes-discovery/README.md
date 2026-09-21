@@ -106,6 +106,11 @@ HTTPS-адреса canonical source/provider/intake, а остальные но�
 policy и не расширяет egress. Глобальные defaults и YFC traffic не меняются, timer остаётся
 disabled.
 
+На co-located YFC публичный intake может быть преобразован Docker DNAT в приватный адрес
+YFC до `forward` hook. Для этого единственного случая policy разрешает только пакет с
+`ct original daddr` текущего публичного intake IP и TCP/443; прямой доступ к приватным
+YFC/Docker subnet по-прежнему попадает под deny.
+
 На co-located host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`, used swap
 `<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Он использует
 тот же canonical YFC deployment lock
