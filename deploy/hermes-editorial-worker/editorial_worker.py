@@ -63,6 +63,12 @@ DRAFT_FIELD_LIMITS = {
 TELEGRAM_PHOTO_CAPTION_LIMIT = 1024
 NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:%|\s?(?:mg|g|kg|мг|г|кг))?")
 BLOCKER_CODE_PATTERN = re.compile(r"^[a-z0-9_.:-]{1,64}$")
+SAFE_PROVIDER_ERROR_VALUE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
+SAFE_PROVIDER_ERROR_FIELDS = (
+    "provider_error_type",
+    "provider_error_code",
+    "provider_error_param",
+)
 EXTERNAL_GPT_OSS_SOFT_BUDGETS = (
     "Soft editorial targets (not JSON Schema constraints): headline about 60-110 characters; "
     "when the source contains enough evidence, use about 850-1000 UTF-16 characters for the "
@@ -78,9 +84,21 @@ FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 class WorkerError(RuntimeError):
     """A safe, stable error that can be emitted without exposing source or secrets."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, *, safe_details: dict[str, object] | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.safe_details = dict(safe_details or {})
+
+    def as_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {"error": self.code}
+        status = self.safe_details.get("http_status")
+        if type(status) is int and 100 <= status <= 599:
+            payload["http_status"] = status
+        for field_name in SAFE_PROVIDER_ERROR_FIELDS:
+            value = self.safe_details.get(field_name)
+            if isinstance(value, str) and SAFE_PROVIDER_ERROR_VALUE_PATTERN.fullmatch(value):
+                payload[field_name] = value
+        return payload
 
 
 class IntakeRemediationRequired(WorkerError):
@@ -678,7 +696,7 @@ def _provider_request_body(
             "messages": messages,
             "max_completion_tokens": 2048,
             "reasoning_effort": "low",
-            "reasoning_format": "hidden",
+            "include_reasoning": False,
             "temperature": 0.6,
             "response_format": _draft_response_format(),
         }
@@ -701,6 +719,55 @@ def _read_bounded_response(response: httpx.Response, limit: int) -> bytes:
     except httpx.StreamError as exc:
         raise WorkerError("provider_response_read_failed") from exc
     return bytes(body)
+
+
+def _provider_http_error_code(status: int) -> str:
+    if status == 400:
+        return "provider_bad_request"
+    if status == 401:
+        return "provider_unauthorized"
+    if status == 403:
+        return "provider_forbidden"
+    if status == 404:
+        return "provider_not_found"
+    if status == 429:
+        return "provider_rate_limited"
+    if status >= 500:
+        return "provider_server_error"
+    return "provider_http_error"
+
+
+def _safe_provider_error_value(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if SAFE_PROVIDER_ERROR_VALUE_PATTERN.fullmatch(normalized) is None:
+        return None
+    return normalized
+
+
+def _provider_http_error(response: httpx.Response) -> WorkerError:
+    safe_details: dict[str, object] = {"http_status": response.status_code}
+    try:
+        raw = _read_bounded_response(response, MAX_PROVIDER_RESPONSE_BYTES)
+    except WorkerError:
+        raw = b""
+    if raw:
+        try:
+            document = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            document = None
+        error_document = document.get("error") if isinstance(document, dict) else None
+        if isinstance(error_document, dict):
+            for provider_name, payload_name in (
+                ("type", "provider_error_type"),
+                ("code", "provider_error_code"),
+                ("param", "provider_error_param"),
+            ):
+                safe_value = _safe_provider_error_value(error_document.get(provider_name))
+                if safe_value is not None:
+                    safe_details[payload_name] = safe_value
+    return WorkerError(_provider_http_error_code(response.status_code), safe_details=safe_details)
 
 
 def _provider_request_once(
@@ -739,12 +806,8 @@ def _provider_request_once(
         ):
             if 300 <= response.status_code < 400:
                 raise WorkerError("provider_redirect_rejected")
-            if response.status_code == 429:
-                raise WorkerError("provider_rate_limited")
-            if response.status_code >= 500:
-                raise WorkerError("provider_server_error")
             if response.status_code >= 400:
-                raise WorkerError("provider_http_error")
+                raise _provider_http_error(response)
             raw = _read_bounded_response(response, MAX_PROVIDER_RESPONSE_BYTES)
     except WorkerError:
         raise
@@ -1205,7 +1268,7 @@ def main(argv: list[str] | None = None) -> int:
         print("bounded worker supports only --self-check or --job-file", file=sys.stderr)
         return 2
     except WorkerError as exc:
-        print(json.dumps({"error": exc.code}, ensure_ascii=False, sort_keys=True))
+        print(json.dumps(exc.as_payload(), ensure_ascii=False, sort_keys=True))
         return 1
     except Exception as exc:  # fail closed without dumping source, URLs, or credentials
         print(

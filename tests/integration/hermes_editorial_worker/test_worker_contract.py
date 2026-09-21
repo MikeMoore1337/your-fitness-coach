@@ -149,6 +149,51 @@ def _provider_request_with_capture(
         _CaptureProviderHandler.response_document = previous_response_document
 
 
+class _ErrorProviderHandler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    status_code: ClassVar[int] = 400
+    response_document: ClassVar[dict[str, object]] = {}
+
+    def log_message(self, *_args: object) -> None:
+        return
+
+    def do_POST(self) -> None:
+        length = int(self.headers.get("Content-Length", "0"))
+        self.rfile.read(length)
+        body = json.dumps(self.__class__.response_document, ensure_ascii=False).encode("utf-8")
+        self.send_response(self.__class__.status_code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def _provider_request_error(
+    status_code: int, response_document: dict[str, object]
+) -> editorial_worker.WorkerError:
+    _ErrorProviderHandler.status_code = status_code
+    _ErrorProviderHandler.response_document = response_document
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _ErrorProviderHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with pytest.raises(editorial_worker.WorkerError) as raised:
+            editorial_worker._provider_request_once(
+                valid_job().source,
+                base_url=f"http://127.0.0.1:{server.server_port}/v1",
+                api_key="test-only-key",
+                model=editorial_worker.EXTERNAL_PROVIDER_MODEL,
+                timeout_seconds=3,
+                provider_mode=editorial_worker.EXTERNAL_MODE,
+            )
+        return raised.value
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()
+
+
 def _provider_request_with_sequence(
     monkeypatch: pytest.MonkeyPatch,
     response_documents: list[dict[str, object]],
@@ -475,7 +520,7 @@ def test_external_mode_accepts_only_exact_approved_https_destinations(
     assert editorial_worker._provider_model() == "openai/gpt-oss-120b"
 
 
-def test_external_gpt_oss_request_uses_hidden_reasoning_and_strict_schema() -> None:
+def test_external_gpt_oss_request_uses_supported_reasoning_and_strict_schema() -> None:
     _CaptureProviderHandler.captured = {}
     server = ThreadingHTTPServer(("127.0.0.1", 0), _CaptureProviderHandler)
     thread = Thread(target=server.serve_forever, daemon=True)
@@ -510,7 +555,8 @@ def test_external_gpt_oss_request_uses_hidden_reasoning_and_strict_schema() -> N
     assert request["max_completion_tokens"] == 2048
     assert "max_tokens" not in request
     assert request["reasoning_effort"] == "low"
-    assert request["reasoning_format"] == "hidden"
+    assert request["include_reasoning"] is False
+    assert "reasoning_format" not in request
     assert request["temperature"] == 0.6
     response_format = request["response_format"]
     assert isinstance(response_format, dict)
@@ -561,9 +607,75 @@ def test_external_repair_keeps_the_pinned_provider_contract() -> None:
     assert valid_job().source.canonical_url in request["messages"][0]["content"]
     assert request["max_completion_tokens"] == 2048
     assert request["reasoning_effort"] == "low"
-    assert request["reasoning_format"] == "hidden"
+    assert request["include_reasoning"] is False
+    assert "reasoning_format" not in request
     assert request["temperature"] == 0.6
     assert "tools" not in request
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_code"),
+    [
+        (400, "provider_bad_request"),
+        (401, "provider_unauthorized"),
+        (403, "provider_forbidden"),
+        (404, "provider_not_found"),
+        (429, "provider_rate_limited"),
+        (500, "provider_server_error"),
+        (503, "provider_server_error"),
+        (422, "provider_http_error"),
+    ],
+)
+def test_provider_http_statuses_have_bounded_safe_classification(
+    status_code: int, expected_code: str
+) -> None:
+    error = _provider_request_error(
+        status_code,
+        {
+            "error": {
+                "type": "invalid_request_error",
+                "code": "invalid_parameter",
+                "param": "reasoning_format",
+            }
+        },
+    )
+
+    assert error.code == expected_code
+    assert error.as_payload() == {
+        "error": expected_code,
+        "http_status": status_code,
+        "provider_error_type": "invalid_request_error",
+        "provider_error_code": "invalid_parameter",
+        "provider_error_param": "reasoning_format",
+    }
+
+
+def test_provider_error_diagnostics_drop_body_message_and_unsafe_values() -> None:
+    response_body = {
+        "error": {
+            "type": "invalid request with spaces",
+            "code": "x" * 65,
+            "param": "reasoning_format",
+            "message": "Bearer test-only-key; source=private prompt text",
+            "failed_generation": "source and model output must not escape",
+        }
+    }
+    error = _provider_request_error(400, response_body)
+    diagnostic = json.dumps(error.as_payload(), ensure_ascii=False, sort_keys=True)
+
+    assert diagnostic == json.dumps(
+        {
+            "error": "provider_bad_request",
+            "http_status": 400,
+            "provider_error_param": "reasoning_format",
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    assert "test-only-key" not in diagnostic
+    assert "private prompt text" not in diagnostic
+    assert "failed_generation" not in diagnostic
+    assert "message" not in diagnostic
 
 
 @pytest.mark.parametrize(
