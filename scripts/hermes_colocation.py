@@ -102,6 +102,13 @@ def _env_names(path: Path) -> set[str]:
     return set(_env_values(path))
 
 
+def _env_value_is_nonempty(value: str) -> bool:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1].strip()
+    return bool(value)
+
+
 def validate_worker_env(path: Path) -> set[str]:
     if path.is_symlink() or not path.is_file():
         raise ColocationError("worker.env must be a regular file")
@@ -113,6 +120,15 @@ def validate_worker_env(path: Path) -> set[str]:
     missing = sorted(WORKER_ENV_NAMES - names)
     if missing:
         raise ColocationError(f"worker.env is missing required variable names: {','.join(missing)}")
+    unexpected = sorted(names - WORKER_ENV_NAMES)
+    if unexpected:
+        raise ColocationError(
+            f"worker.env contains unexpected variable names: {','.join(unexpected)}"
+        )
+    values = _env_values(path)
+    empty = sorted(name for name in WORKER_ENV_NAMES if not _env_value_is_nonempty(values[name]))
+    if empty:
+        raise ColocationError(f"worker.env contains empty required values: {','.join(empty)}")
     return names
 
 
@@ -356,6 +372,7 @@ def install(args: argparse.Namespace) -> dict[str, object]:
         "discovery_runner.py",
         "hermes_worker_drain.py",
         "hermes_resource_guard.py",
+        "hermes_egress.py",
         "hermes-discovery-provenance.json",
         "source-definitions.schema.json",
         "deployment-mode.schema.json",
@@ -363,6 +380,19 @@ def install(args: argparse.Namespace) -> dict[str, object]:
         _atomic_copy(hermes_root / name, runtime_root / name, mode=0o444, uid=0, gid=0)
     _atomic_copy(definitions, config_root / "source-definitions.json", mode=0o444, uid=0, gid=0)
     _atomic_copy(worker_env, config_root / "worker.env", mode=0o600, uid=0, gid=0)
+    _run(
+        [
+            sys.executable,
+            str(runtime_root / "hermes_egress.py"),
+            "refresh",
+            "--definitions",
+            str(config_root / "source-definitions.json"),
+            "--worker-env",
+            str(config_root / "worker.env"),
+            "--network",
+            "hermes-net",
+        ]
+    )
     _render_units(
         source_root,
         args.systemd_root,

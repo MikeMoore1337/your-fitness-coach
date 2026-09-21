@@ -99,7 +99,12 @@ ref и зафиксировать его digest или image ID; installer пр�
 с переданным immutable ref.
 `scripts/hermes_colocation.py` копирует runtime и definitions в изолированные каталоги,
 устанавливает `/etc/hermes/worker.env` с mode `0600`, рендерит units и запускает
-`systemd-analyze verify`. Installer не меняет глобальный firewall и оставляет timer disabled.
+`systemd-analyze verify`. Installer устанавливает только repository-owned таблицу
+`inet hermes_egress`: policy действует на bridge `hermes-net`, разрешает DNS и точные
+HTTPS-адреса canonical source/provider/intake, а остальные новые пакеты с этого bridge
+отбрасывает. Перед каждым discovery policy атомарно refresh'ится; сбой DNS оставляет старую
+policy и не расширяет egress. Глобальные defaults и YFC traffic не меняются, timer остаётся
+disabled.
 
 На co-located host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`, used swap
 `<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Он использует
@@ -131,6 +136,8 @@ docker network ls
 systemd-analyze verify /etc/systemd/system/hermes-discovery.service /etc/systemd/system/hermes-worker-drain.service /etc/systemd/system/hermes-discovery.target /etc/systemd/system/hermes-discovery.timer
 systemctl cat hermes-discovery.service hermes-worker-drain.service
 systemctl status hermes-discovery.timer --no-pager
+python3 /opt/hermes/hermes_egress.py validate
+nft list table inet hermes_egress
 python3 /opt/hermes/hermes_resource_guard.py check --phase discovery --mode colocated-isolated
 ```
 

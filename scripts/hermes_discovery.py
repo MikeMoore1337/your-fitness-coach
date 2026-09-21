@@ -72,6 +72,8 @@ def provenance() -> None:
     drain_source = drain_path.read_text(encoding="utf-8")
     guard_path = root / "hermes_resource_guard.py"
     guard_source = guard_path.read_text(encoding="utf-8")
+    egress_path = root / "hermes_egress.py"
+    egress_source = egress_path.read_text(encoding="utf-8")
     timer_unit = (root / "systemd" / "hermes-discovery.timer").read_text(encoding="utf-8")
     tree = ast.parse(runner_path.read_text(encoding="utf-8"), filename=str(runner_path))
     imports = {
@@ -111,6 +113,11 @@ def provenance() -> None:
         "systemd.discovery_network": (
             "Environment=HERMES_DOCKER_NETWORK=hermes-net" in discovery_unit
             and "--network=${HERMES_DOCKER_NETWORK}" in discovery_unit
+        ),
+        "systemd.scoped_egress": "hermes_egress.py refresh" in discovery_unit,
+        "egress.host_runtime": all(
+            token in egress_source
+            for token in ('TABLE_NAME = "hermes_egress"', "hook forward", "shell=False")
         ),
         "systemd.drain_network": "Environment=HERMES_DOCKER_NETWORK=hermes-net" in drain_unit,
         "systemd.shared_host_root_launchers": all(

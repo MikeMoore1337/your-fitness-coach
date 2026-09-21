@@ -17,6 +17,7 @@ Environment=HERMES_DOCKER_NETWORK=hermes-net
 Environment=HERMES_GUARD_STATE_DIR=/var/lib/hermes
 Environment=HERMES_YFC_DEPLOYMENT_LOCK=@HERMES_YFC_DEPLOYMENT_LOCK@
 ExecCondition=/usr/bin/python3 /opt/hermes/hermes_resource_guard.py check --phase discovery --mode ${HERMES_DEPLOYMENT_MODE}
+ExecStartPre=/usr/bin/python3 /opt/hermes/hermes_egress.py refresh --definitions /etc/hermes/source-definitions.json --worker-env /etc/hermes/worker.env --network ${HERMES_DOCKER_NETWORK}
 ExecStart=/usr/bin/python3 /opt/hermes/hermes_resource_guard.py run --phase discovery --mode ${HERMES_DEPLOYMENT_MODE} -- /usr/bin/docker run --rm --name hermes-discovery-once --network=${HERMES_DOCKER_NETWORK} --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,uid=10000,gid=10000,mode=700 --mount type=bind,source=/etc/hermes/source-definitions.json,target=/opt/hermes/config/source-definitions.json,readonly --mount type=bind,source=/var/lib/hermes,target=/opt/data --cap-drop ALL --security-opt no-new-privileges:true --oom-score-adj 500 --pids-limit 32 --memory 256m --cpus 0.25 --user 10000:10000 --env HERMES_DISCOVERY_MODE=external --env HERMES_DISCOVERY_MAX_SOURCES=20 --env HERMES_DISCOVERY_MAX_CONCURRENCY=4 --env HERMES_DISCOVERY_TIMEOUT_SECONDS=10 --env HERMES_DISCOVERY_MAX_RESPONSE_BYTES=524288 --env HERMES_DISCOVERY_MAX_ITEMS_PER_SOURCE=20 --env HERMES_DISCOVERY_DEFINITIONS=/opt/hermes/config/source-definitions.json --env HERMES_DISCOVERY_DEFINITIONS_SHA256=@SOURCE_DEFINITIONS_SHA256@ @DISCOVERY_IMAGE@ --once
 TimeoutStartSec=180s
 RuntimeMaxSec=180s
