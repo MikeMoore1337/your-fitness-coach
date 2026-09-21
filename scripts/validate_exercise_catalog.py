@@ -18,7 +18,6 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 BACKEND_DIR = ROOT_DIR / "backend"
 MEDIA_DIR = BACKEND_DIR / "assets" / "exercise-guides"
 MANIFEST_PATH = MEDIA_DIR / "manifest.json"
-PILOT_MANIFEST_PATH = MEDIA_DIR / "pilot-manifest.json"
 COVERAGE_PATH = ROOT_DIR / "docs" / "exercises" / "catalog-v2" / "COVERAGE_MATRIX.csv"
 
 if str(BACKEND_DIR) not in sys.path:
@@ -36,7 +35,6 @@ ExerciseMovementPattern = schema.ExerciseMovementPattern
 CANONICAL_EXERCISE_REDIRECTS = metadata_module.CANONICAL_EXERCISE_REDIRECTS
 CATALOG_METADATA = metadata_module.CATALOG_METADATA
 ITEM_GUIDE_CONTENT = metadata_module.ITEM_GUIDE_CONTENT
-MEDIA_ALT_BY_PHASE = metadata_module.MEDIA_ALT_BY_PHASE
 MEDIA_STATE_BY_SLUG = metadata_module.MEDIA_STATE_BY_SLUG
 REMAINING_COVERAGE_SLUGS = metadata_module.REMAINING_COVERAGE_SLUGS
 structured_catalog_metadata = metadata_module.structured_catalog_metadata
@@ -160,42 +158,95 @@ def _validate_structured_metadata(catalog_slugs: set[str]) -> dict[str, int]:
     }
 
 
-def _validate_media(catalog_slugs: set[str]) -> tuple[int, int]:
+def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     exercises = manifest["exercises"]
     manifest_slugs = set(exercises)
-    missing_media_state = catalog_slugs - manifest_slugs
+    canonical_slugs = {canonical_slug(slug) for slug in catalog_slugs}
+    _require(manifest.get("schema_version") == 3, "Stage 4 media manifest is not active")
+    _require(manifest_slugs == canonical_slugs, "Stage 4 manifest/catalog canonical mismatch")
+    _require(manifest.get("counts", {}).get("canonical_exercises") == 206, "Canonical count drift")
+    _require(manifest.get("counts", {}).get("approved_animated") == 167, "Approved count drift")
+    _require(manifest.get("counts", {}).get("blocked") == 39, "Blocked count drift")
+    _require(manifest.get("counts", {}).get("static_only") == 0, "Static-only count drift")
     _require(
-        missing_media_state <= set(MEDIA_STATE_BY_SLUG),
-        f"Manifest/catalog exercise mismatch without media state: {sorted(missing_media_state)}",
+        manifest.get("counts", {}).get("remote_runtime_assets") == 0,
+        "Remote runtime asset count drift",
     )
-    _require(manifest_slugs <= catalog_slugs, "Manifest references unknown exercise")
-    cross_exercise_hashes: dict[str, set[str]] = defaultdict(set)
-
     for slug, item in exercises.items():
         source = item.get("source", {})
-        _require(source.get("name") and source.get("license"), f"Invalid provenance: {slug}")
-        _require(item.get("media"), f"Missing guide media: {slug}")
+        status = item.get("status")
+        if status == "blocked":
+            _require(not source and not item.get("media"), f"Blocked media is not empty: {slug}")
+            continue
+        _require(status == "approved", f"Invalid Stage 4 media status: {slug}")
+        _require(
+            source.get("name") == "Gym visual"
+            and source.get("url") == "https://github.com/hasaneyldrm/exercises-dataset"
+            and source.get("license") == "Owner-purchased GymVisual license",
+            f"Invalid provenance: {slug}",
+        )
+        _require(len(item.get("media", [])) == 1, f"Approved media must have one animation: {slug}")
         for media in item["media"]:
+            _require(media.get("type") == "animation", f"Approved media is not animated: {slug}")
+            for field in ("path", "poster_path"):
+                relative = Path(media[field])
+                _require(
+                    not relative.is_absolute() and ".." not in relative.parts,
+                    f"Invalid media path: {slug}/{field}",
+                )
+                _require(
+                    (MEDIA_DIR / relative).is_file(),
+                    f"Referenced media is missing: {media[field]}",
+                )
             path = MEDIA_DIR / media["path"]
-            _require(path.is_file(), f"Referenced media is missing: {media['path']}")
+            poster_path = MEDIA_DIR / media["poster_path"]
             _require(
                 media.get("width", 0) > 0 and media.get("height", 0) > 0,
                 f"Invalid dimensions: {slug}",
             )
             _require(
-                media.get("alt") == MEDIA_ALT_BY_PHASE.get(slug, {}).get(media["phase_id"]),
-                f"Missing or stale media alt: {slug}/{media['phase_id']}",
+                media.get("animated") is True and media.get("frame_count", 0) > 1,
+                f"Animation metadata is invalid: {slug}",
             )
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             _require(media.get("asset_sha256") == digest, f"Stale media hash: {media['path']}")
-            cross_exercise_hashes[digest].add(canonical_slug(slug))
-
-    duplicates = {
-        digest: sorted(slugs) for digest, slugs in cross_exercise_hashes.items() if len(slugs) > 1
-    }
-    _require(not duplicates, f"Cross-exercise duplicate media: {duplicates}")
-    return manifest["asset_count"], manifest["derivative_count"]
+            poster_digest = hashlib.sha256(poster_path.read_bytes()).hexdigest()
+            _require(
+                media.get("poster_sha256") == poster_digest,
+                f"Stale poster hash: {media['poster_path']}",
+            )
+            _require(
+                media.get("sources")
+                == [
+                    {
+                        "path": media["path"],
+                        "mime_type": "image/gif",
+                        "width": media["width"],
+                        "height": media["height"],
+                        "byte_size": media["byte_size"],
+                    }
+                ],
+                f"Animation source metadata drifted: {slug}",
+            )
+    # Some approved canonical variants intentionally point to the same source
+    # record. The manifest keeps the source asset identity explicit instead of
+    # inventing a derivative to make hashes unique.
+    _require(
+        len([item for item in exercises.values() if item["status"] == "approved"]) == 167,
+        "Approved media total drift",
+    )
+    _require(
+        len([item for item in exercises.values() if item["status"] == "blocked"]) == 39,
+        "Blocked media total drift",
+    )
+    return (
+        manifest["asset_count"],
+        manifest["derivative_count"],
+        manifest["counts"]["approved_animated"],
+        manifest["counts"]["blocked"],
+        manifest["counts"]["static_only"],
+    )
 
 
 def _validate_guide_content(catalog_slugs: set[str]) -> dict[str, int]:
@@ -225,49 +276,6 @@ def _validate_guide_content(catalog_slugs: set[str]) -> dict[str, int]:
             slug in ITEM_GUIDE_CONTENT for slug in MEDIA_STATE_BY_SLUG
         ),
     }
-
-
-def _validate_pilot_media(catalog_slugs: set[str]) -> None:
-    if not PILOT_MANIFEST_PATH.is_file():
-        return
-    manifest = json.loads(PILOT_MANIFEST_PATH.read_text(encoding="utf-8"))
-    exercises = manifest.get("exercises", {})
-    _require(set(exercises) <= catalog_slugs, "Pilot references unknown exercise")
-    for slug, item in exercises.items():
-        source = item.get("source", {})
-        _require(
-            source.get("name") and source.get("url") and source.get("license"),
-            f"Invalid pilot provenance: {slug}",
-        )
-        _require(item.get("media"), f"Missing pilot media: {slug}")
-        for media in item["media"]:
-            _require(media.get("type") == "image", f"Pilot media must be static: {slug}")
-            for field in ("path", "poster_path"):
-                relative = Path(media[field])
-                _require(
-                    not relative.is_absolute() and ".." not in relative.parts,
-                    f"Invalid pilot path: {slug}/{field}",
-                )
-                _require(
-                    (MEDIA_DIR / relative).is_file(),
-                    f"Referenced pilot media is missing: {media[field]}",
-                )
-            asset_path = MEDIA_DIR / media["path"]
-            _require(
-                media.get("width", 0) > 0 and media.get("height", 0) > 0,
-                f"Invalid pilot dimensions: {slug}",
-            )
-            _require(
-                media.get("asset_sha256") == hashlib.sha256(asset_path.read_bytes()).hexdigest(),
-                f"Stale pilot media hash: {media['path']}",
-            )
-            poster_hash = media.get("poster_sha256")
-            if poster_hash:
-                poster_path = MEDIA_DIR / media["poster_path"]
-                _require(
-                    poster_hash == hashlib.sha256(poster_path.read_bytes()).hexdigest(),
-                    f"Stale pilot poster hash: {media['poster_path']}",
-                )
 
 
 def _validate_final_coverage() -> int:
@@ -350,8 +358,9 @@ def validate_catalog() -> dict[str, int]:
     _validate_aliases(catalog_slugs)
     metadata_report = _validate_structured_metadata(catalog_slugs)
     guide_report = _validate_guide_content(catalog_slugs)
-    asset_count, derivative_count = _validate_media(catalog_slugs)
-    _validate_pilot_media(catalog_slugs)
+    asset_count, derivative_count, approved_media, blocked_media, static_only_media = (
+        _validate_media(catalog_slugs)
+    )
     coverage_decisions = _validate_final_coverage()
     cardio_count = sum(
         canonical_muscle_identifier(muscle) == "cardio" for _, _, muscle, _ in EXERCISE_CATALOG
@@ -364,18 +373,12 @@ def validate_catalog() -> dict[str, int]:
         "assets": asset_count,
         "derivatives": derivative_count,
         "coverage_decisions": coverage_decisions,
+        "media_approved_animated": approved_media,
+        "media_blocked": blocked_media,
+        "media_static_only": static_only_media,
+        "media_remote_runtime_assets": 0,
         **metadata_report,
         **guide_report,
-        "media_state_records": len(MEDIA_STATE_BY_SLUG),
-        "media_state_repdb_phased": sum(
-            state["state"] == "repdb_phased" for state in MEDIA_STATE_BY_SLUG.values()
-        ),
-        "media_state_repdb_single_static": sum(
-            state["state"] == "repdb_single_static" for state in MEDIA_STATE_BY_SLUG.values()
-        ),
-        "media_state_repdb_source_gap": sum(
-            state["state"] == "repdb_source_gap" for state in MEDIA_STATE_BY_SLUG.values()
-        ),
     }
 
 

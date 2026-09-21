@@ -699,7 +699,7 @@ class ExerciseGuideMediaSource(BaseModel):
 
 
 class ExerciseGuideMedia(BaseModel):
-    type: Literal["image"]
+    type: Literal["image", "animation"]
     url: str
     poster: str
     phase_id: str
@@ -759,6 +759,9 @@ class ExerciseCatalogItem(BaseModel):
     created_by_user_id: int | None = None
     source_exercise_id: int | None = None
     has_guide: bool = False
+    media_state: Literal["approved_animated", "blocked"] | None = None
+    media_thumbnail_url: str | None = None
+    media_animation_url: str | None = None
     guide: ExerciseGuide | None = None
 
 

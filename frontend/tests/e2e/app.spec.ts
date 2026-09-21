@@ -5,6 +5,8 @@ import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platf
 
 type AppDestination = 'Сегодня' | 'План' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
 const TASK_293_EVIDENCE_DIR = process.env.TASK_293_EVIDENCE_DIR;
+const STAGE4_THUMBNAIL_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
+const STAGE4_ANIMATION_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
 
 async function captureTask293Evidence(page: Page, fileName: string): Promise<void> {
   if (!TASK_293_EVIDENCE_DIR) return;
@@ -812,6 +814,9 @@ async function mockApi(
           is_custom: false,
           is_personalized: false,
           has_guide: true,
+          media_state: 'approved_animated',
+          media_thumbnail_url: STAGE4_THUMBNAIL_URL,
+          media_animation_url: STAGE4_ANIMATION_URL,
           guide: {
             technique_steps: ['Зафиксируйте корпус', 'Выполните движение под контролем'],
             breathing: 'Выдох в фазе усилия, вдох при возврате.',
@@ -931,6 +936,9 @@ async function mockApi(
             is_custom: false,
             is_personalized: false,
             has_guide: true,
+            media_state: 'approved_animated',
+            media_thumbnail_url: STAGE4_THUMBNAIL_URL,
+            media_animation_url: STAGE4_ANIMATION_URL,
             guide: null,
           },
         ],
@@ -2879,6 +2887,18 @@ test('клиент собирает и переупорядочивает лич
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockApi(page);
+  await page.route(`**${STAGE4_THUMBNAIL_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg',
+      contentType: 'image/jpeg',
+    }),
+  );
+  await page.route(`**${STAGE4_ANIMATION_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif',
+      contentType: 'image/gif',
+    }),
+  );
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'План');
@@ -2917,6 +2937,13 @@ test('клиент собирает и переупорядочивает лич
   await closeGuide.click();
   await expect(exercisePicker).toHaveValue('Тяга');
   await exercisePicker.focus();
+  await expect(
+    builder.locator('.exercise-picker__option img[data-media-mode="static-poster"]'),
+  ).toHaveCount(1);
+  await page.screenshot({
+    path: '../.artifacts/tasks/390/evidence/screenshots/program-builder-mobile-390x844-picker.png',
+    fullPage: true,
+  });
   await builder.getByRole('option', { name: /Тяга блока/ }).click();
   await expect(exercisePicker).toHaveValue('Тяга блока');
   await expect(builder.getByText('1 тренировка · 1 упр.', { exact: true })).toBeVisible();

@@ -226,6 +226,9 @@ class WorkoutExerciseItem(BaseModel):
     group_kind: PrescriptionGroupKind | None = None
     group_order: int | None = None
     has_guide: bool = False
+    media_state: Literal["approved_animated", "blocked"] | None = None
+    media_thumbnail_url: str | None = None
+    media_animation_url: str | None = None
     progression_guidance: ProgressionGuidance | None = None
     sets: list[LoggedSetItem]
 

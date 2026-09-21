@@ -7416,6 +7416,12 @@ export interface components {
              * @default false
              */
             has_guide: boolean;
+            /** Media State */
+            media_state?: ("approved_animated" | "blocked") | null;
+            /** Media Thumbnail Url */
+            media_thumbnail_url?: string | null;
+            /** Media Animation Url */
+            media_animation_url?: string | null;
             guide?: components["schemas"]["ExerciseGuide"] | null;
         };
         /** ExerciseGuide */
@@ -7462,9 +7468,9 @@ export interface components {
         ExerciseGuideMedia: {
             /**
              * Type
-             * @constant
+             * @enum {string}
              */
-            type: "image";
+            type: "image" | "animation";
             /** Url */
             url: string;
             /** Poster */
@@ -12518,6 +12524,12 @@ export interface components {
              * @default false
              */
             has_guide: boolean;
+            /** Media State */
+            media_state?: ("approved_animated" | "blocked") | null;
+            /** Media Thumbnail Url */
+            media_thumbnail_url?: string | null;
+            /** Media Animation Url */
+            media_animation_url?: string | null;
             progression_guidance?: components["schemas"]["ProgressionGuidance"] | null;
             /** Sets */
             sets: components["schemas"]["LoggedSetItem"][];

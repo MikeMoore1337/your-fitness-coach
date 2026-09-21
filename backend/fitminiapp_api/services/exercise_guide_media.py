@@ -6,24 +6,13 @@ from pathlib import Path
 
 MEDIA_ROOT = Path(__file__).resolve().parents[2] / "assets" / "exercise-guides"
 MANIFEST_PATH = MEDIA_ROOT / "manifest.json"
-PILOT_MANIFEST_PATH = MEDIA_ROOT / "pilot-manifest.json"
 
 
 @lru_cache(maxsize=1)
 def _manifest() -> dict:
     payload = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    if payload.get("schema_version") not in {1, 2}:
+    if payload.get("schema_version") not in {1, 2, 3}:
         raise RuntimeError("Unsupported exercise guide media manifest version")
-    return payload
-
-
-@lru_cache(maxsize=1)
-def _pilot_manifest() -> dict:
-    if not PILOT_MANIFEST_PATH.is_file():
-        return {"exercises": {}}
-    payload = json.loads(PILOT_MANIFEST_PATH.read_text(encoding="utf-8"))
-    if payload.get("schema_version") != 1:
-        raise RuntimeError("Unsupported exercise guide media pilot manifest version")
     return payload
 
 
@@ -32,6 +21,8 @@ def _public_url(path: str) -> str:
 
 
 def _image_mime_type(path: str) -> str:
+    if path.endswith(".gif"):
+        return "image/gif"
     if path.endswith(".jpg"):
         return "image/jpeg"
     if path.endswith(".png"):
@@ -49,7 +40,7 @@ def resolve_guide_source(
     source_license: str,
     source_license_url: str | None,
 ) -> tuple[str, str, str, str | None]:
-    source = (_pilot_manifest().get("exercises", {}).get(slug) or {}).get("source")
+    source = (_manifest().get("exercises", {}).get(slug) or {}).get("source")
     if not source:
         return source_name, source_url, source_license, source_license_url
     return (
@@ -58,6 +49,22 @@ def resolve_guide_source(
         str(source.get("license") or source_license),
         source.get("license_url") or source_license_url,
     )
+
+
+def get_guide_media_preview(slug: str) -> dict[str, str | None]:
+    item = _manifest().get("exercises", {}).get(slug) or {}
+    media = (item.get("media") or [None])[0]
+    if item.get("status") != "approved" or not media:
+        return {
+            "state": "blocked",
+            "thumbnail_url": None,
+            "animation_url": None,
+        }
+    return {
+        "state": "approved_animated",
+        "thumbnail_url": _public_url(str(media["poster_path"])),
+        "animation_url": _public_url(str(media["path"])),
+    }
 
 
 def get_guide_media(
@@ -69,8 +76,8 @@ def get_guide_media(
     source_license: str,
     source_license_url: str | None,
 ) -> list[dict]:
-    item = _pilot_manifest().get("exercises", {}).get(slug) or _manifest()["exercises"].get(slug)
-    if item is None:
+    item = _manifest().get("exercises", {}).get(slug)
+    if item is None or item.get("status") != "approved":
         return []
     result = []
     manifest_source = item.get("source") or {}

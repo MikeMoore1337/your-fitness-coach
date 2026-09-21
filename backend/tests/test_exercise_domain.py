@@ -231,39 +231,29 @@ def test_seeded_exercise_metadata_and_alternatives_are_serialized(client) -> Non
     assert details.status_code == 200
     guide = details.json()["guide"]
     assert guide["media_reference"] == "exercise-guides:bench-press"
-    assert guide["source_name"] == "Exercise data by RepDB (repdb.co)"
-    assert guide["source_license"] == "RepDB Free Tier License v1.0"
-    assert guide["source_license_url"].endswith("/LICENSE-DATA.md")
-    assert [item["type"] for item in guide["media"]] == ["image", "image"]
-    assert [item["url"] for item in guide["media"]] == [
-        "/static/exercise-guides/pilot/bench-press/bench-press-start.webp",
-        "/static/exercise-guides/pilot/bench-press/bench-press-peak.webp",
-    ]
-    assert [item["poster"] for item in guide["media"]] == [
-        "/static/exercise-guides/pilot/bench-press/bench-press-start.webp",
-        "/static/exercise-guides/pilot/bench-press/bench-press-peak.webp",
-    ]
-    assert guide["media"][0]["source_name"] == "Exercise data by RepDB (repdb.co)"
-    assert guide["media"][0]["source_license"] == "RepDB Free Tier License v1.0"
+    assert guide["source_name"] == "Gym visual"
+    assert guide["source_license"] == "Owner-purchased GymVisual license"
+    assert guide["source_license_url"].endswith("terms-and-conditions-of-use")
+    assert [item["type"] for item in guide["media"]] == ["animation"]
+    assert guide["media"][0]["url"].endswith(".gif")
+    assert guide["media"][0]["poster"].endswith(".jpg")
+    assert guide["media"][0]["phase"] == "Движение"
+    assert guide["media"][0]["source_name"] == "Gym visual"
+    assert guide["media"][0]["source_license"] == "Owner-purchased GymVisual license"
     assert guide["media"][0]["sources"] == [
         {
-            "url": "/static/exercise-guides/pilot/bench-press/bench-press-start.webp",
-            "mime_type": "image/webp",
-            "width": 512,
-            "height": 512,
-            "byte_size": 21554,
+            "url": guide["media"][0]["url"],
+            "mime_type": "image/gif",
+            "width": 180,
+            "height": 180,
+            "byte_size": guide["media"][0]["byte_size"],
         }
     ]
     assert guide["images"] == [
         {
-            "phase": "Начало",
-            "url": "/static/exercise-guides/pilot/bench-press/bench-press-start.webp",
-            "alt": "Жим лежа: начало",
-        },
-        {
-            "phase": "Пик",
-            "url": "/static/exercise-guides/pilot/bench-press/bench-press-peak.webp",
-            "alt": "Жим лежа: пик",
+            "phase": "Движение",
+            "url": guide["media"][0]["url"],
+            "alt": "Жим лежа: движение",
         },
     ]
     assert guide["safety_notes"]
@@ -281,76 +271,47 @@ def test_seeded_exercise_metadata_and_alternatives_are_serialized(client) -> Non
     )
     assert guide_response.status_code == 200
     assert guide_response.json()["media_reference"] == "exercise-guides:bench-press"
-    assert guide_response.json()["source_license_url"].endswith("/LICENSE-DATA.md")
+    assert guide_response.json()["source_license_url"].endswith("terms-and-conditions-of-use")
 
     lat_pulldown = next(item for item in catalog.json() if item["slug"] == "lat-pulldown")
     lat_pulldown_guide = client.get(
         f"/api/v1/programs/exercises/{lat_pulldown['id']}/guide",
         headers=headers,
     ).json()
-    assert [item["phase"] for item in lat_pulldown_guide["media"]] == [
-        "Фаза усилия",
-        "Фаза возврата",
-    ]
+    assert [item["phase"] for item in lat_pulldown_guide["media"]] == ["Движение"]
 
     plank = next(item for item in catalog.json() if item["slug"] == "plank")
     plank_guide = client.get(
         f"/api/v1/programs/exercises/{plank['id']}/guide",
         headers=headers,
     ).json()
-    assert [item["phase"] for item in plank_guide["media"]] == ["Подготовка", "Удержание"]
+    assert [item["phase"] for item in plank_guide["media"]] == ["Движение"]
 
-    reviewed_pairs = {
-        "hyperextension": [
-            ("hyperextension-start.jpg", "Фаза усилия"),
-            ("hyperextension-active.jpg", "Фаза возврата"),
-        ],
-        "lying-dumbbell-triceps-extension": [
-            ("lying-dumbbell-triceps-extension-active.jpg", "Фаза усилия"),
-            ("lying-dumbbell-triceps-extension-start.jpg", "Фаза возврата"),
-        ],
-        "romanian-deadlift": [
-            ("romanian-deadlift-active.jpg", "Фаза усилия"),
-            ("romanian-deadlift-start.jpg", "Фаза возврата"),
-        ],
-        "smith-squat": [
-            ("smith-squat-active.jpg", "Фаза усилия"),
-            ("smith-squat-start.jpg", "Фаза возврата"),
-        ],
-        "triceps-kickback": [
-            ("triceps-kickback-start.jpg", "Фаза усилия"),
-            ("triceps-kickback-active.jpg", "Фаза возврата"),
-        ],
-        "upright-row": [
-            ("upright-row-start.jpg", "Фаза усилия"),
-            ("upright-row-active.jpg", "Фаза возврата"),
-        ],
-        "pallof-press": [
-            ("pallof-press-start.jpg", "Подготовка"),
-            ("pallof-press-active.jpg", "Удержание"),
-        ],
-        "rowing-machine": [
-            ("rowing-machine-start.webp", "Начало"),
-            ("rowing-machine-peak.webp", "Пик"),
-        ],
-        "walking-lunge": [
-            ("walking-lunge-start.jpg", "Первое положение"),
-            ("walking-lunge-active.jpg", "Второе положение"),
-        ],
-        "wall-ball": [
-            ("wall-ball-start.jpg", "Начало движения"),
-            ("wall-ball-active.jpg", "Следующая позиция"),
-        ],
+    reviewed_slugs = {
+        "hyperextension",
+        "lying-dumbbell-triceps-extension",
+        "romanian-deadlift",
+        "smith-squat",
+        "triceps-kickback",
+        "upright-row",
+        "pallof-press",
+        "rowing-machine",
+        "walking-lunge",
+        "wall-ball",
     }
     catalog_by_slug = {item["slug"]: item for item in catalog.json()}
-    for slug, expected_media in reviewed_pairs.items():
+    for slug in reviewed_slugs:
         reviewed_guide = client.get(
             f"/api/v1/programs/exercises/{catalog_by_slug[slug]['id']}/guide",
             headers=headers,
         ).json()
-        assert [
-            (item["url"].rsplit("/", 1)[-1], item["phase"]) for item in reviewed_guide["media"]
-        ] == expected_media
+        if catalog_by_slug[slug]["media_state"] == "approved_animated":
+            assert len(reviewed_guide["media"]) == 1
+            assert reviewed_guide["media"][0]["type"] == "animation"
+            assert reviewed_guide["media"][0]["url"].endswith(".gif")
+            assert reviewed_guide["media"][0]["phase"] == "Движение"
+        else:
+            assert reviewed_guide["media"] == []
 
 
 def test_task_120b_upper_body_machine_batch_contract(client) -> None:
@@ -387,29 +348,22 @@ def test_task_120b_upper_body_machine_batch_contract(client) -> None:
     )
     assert guide_response.status_code == 200
     guide = guide_response.json()
-    assert guide["source_name"] == "Your Fitness Coach"
-    assert guide["source_license"] == "Иллюстрация создана для приложения"
-    assert guide["source_license_url"] is None
+    assert guide["source_name"] == "Gym visual"
+    assert guide["source_license"] == "Owner-purchased GymVisual license"
+    assert guide["source_license_url"].endswith("terms-and-conditions-of-use")
     assert guide["technique_steps"][0].startswith("Настрой сиденье и грудной упор")
     assert {item["identifier"] for item in guide["muscles"] if item["role_id"] == "secondary"} == {
         "biceps",
         "posterior_deltoid",
         "forearms",
     }
-    assert [item["url"].rsplit("/", 1)[-1] for item in guide["media"]] == [
-        "concentric_end-480w.webp",
-        "eccentric_end-480w.webp",
-    ]
-    assert [item["phase_id"] for item in guide["media"]] == [
-        "concentric_end",
-        "eccentric_end",
-    ]
-    assert all(item["asset_version"] == "120e-v1" for item in guide["media"])
-    assert all(len(item["sources"]) == 3 for item in guide["media"])
-    assert [item["phase"] for item in guide["media"]] == [
-        "Фаза усилия",
-        "Фаза возврата",
-    ]
+    assert len(guide["media"]) == 1
+    assert guide["media"][0]["type"] == "animation"
+    assert guide["media"][0]["url"].endswith(".gif")
+    assert guide["media"][0]["poster"].endswith(".jpg")
+    assert guide["media"][0]["phase"] == "Движение"
+    assert guide["media"][0]["asset_version"].startswith("gymvisual-")
+    assert len(guide["media"][0]["sources"]) == 1
     assert all("Верхняя рычажная тяга" in item["alt"] for item in guide["media"])
 
     machine_biceps = by_slug["machine-biceps-curl"]
@@ -432,68 +386,52 @@ def test_task_120b_upper_body_machine_batch_contract(client) -> None:
 def test_task_120e_human_visual_manifest_provenance_and_integrity() -> None:
     assets = Path(__file__).resolve().parents[1] / "assets" / "exercise-guides"
     manifest = json.loads((assets / "manifest.json").read_text(encoding="utf-8"))
-    slugs = set(UPPER_BODY_MACHINE_SLUGS) | set(LOWER_BODY_MACHINE_SLUGS)
-
-    assert manifest["schema_version"] == 2
-    assert manifest["asset_count"] == 347
-    assert manifest["derivative_count"] == 419
-    assert len(manifest["exercises"]) == 182
-    derivative_hashes: dict[str, str] = {}
-    for slug in slugs:
-        exercise = manifest["exercises"][slug]
+    assert manifest["schema_version"] == 3
+    assert manifest["asset_count"] == 334
+    assert manifest["derivative_count"] == 0
+    assert len(manifest["exercises"]) == 206
+    assert manifest["counts"] == {
+        "canonical_exercises": 206,
+        "approved_animated": 167,
+        "blocked": 39,
+        "approved_coverage_percent": 81.07,
+        "static_only": 0,
+        "remote_runtime_assets": 0,
+    }
+    approved = [item for item in manifest["exercises"].values() if item["status"] == "approved"]
+    blocked = [item for item in manifest["exercises"].values() if item["status"] == "blocked"]
+    assert len(approved) == 167
+    assert len(blocked) == 39
+    assert manifest["source"]["name"] == "Gym visual"
+    assert manifest["source"]["license"] == "Owner-purchased GymVisual license"
+    assert manifest["source"]["source_revision"] == ("7455efae41b330c265e7cd4b78dfa848e7ce5ebd")
+    for exercise in approved:
         source = exercise["source"]
-        assert source["source_kind"] == "yfc_ai_generated"
-        assert source["source_revision_or_retrieved_at"] == "2026-08-31"
-        assert source["license_url_or_local_notice"] == "backend/assets/exercise-guides/NOTICE.md"
-        assert source["origin"] == "ai_generated"
-        assert source["asset_type"] == "render_3d"
-        assert source["asset_version"] == "120e-v1"
-        assert source["variant_key"].startswith("canonical_")
-        assert source["generation"]["provider"] == "OpenAI built-in image_gen"
-        assert source["rights"]["commercial_use_verified"] is True
-        assert source["rights"]["redistribution_verified"] is True
-        assert source["rights"]["modification_verified"] is True
-        assert source["owner_gates"]["gate_a"]["status"] == "approved"
-        assert source["owner_gates"]["gate_b"]["status"] == "approved"
-        assert source["owner_gates"]["gate_b"]["verdict"] == "APPROVE_120E_EXACT_ASSET_REVISION"
-        assert len(exercise["media"]) == 2
-        assert [item["phase_id"] for item in exercise["media"]] == [
-            "concentric_end",
-            "eccentric_end",
+        assert source["url"] == "https://github.com/hasaneyldrm/exercises-dataset"
+        assert len(exercise["media"]) == 1
+        media = exercise["media"][0]
+        path = assets / media["path"]
+        poster = assets / media["poster_path"]
+        assert path.suffix == ".gif"
+        assert poster.suffix == ".jpg"
+        assert path.is_file() and poster.is_file()
+        assert media["type"] == "animation"
+        assert media["animated"] is True
+        assert media["frame_count"] > 1
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == media["asset_sha256"]
+        assert hashlib.sha256(poster.read_bytes()).hexdigest() == media["poster_sha256"]
+        assert media["sources"] == [
+            {
+                "path": media["path"],
+                "mime_type": "image/gif",
+                "width": media["width"],
+                "height": media["height"],
+                "byte_size": media["byte_size"],
+            }
         ]
-        mobile_pair_bytes = 0
-        for media in exercise["media"]:
-            path = assets / media["path"]
-            assert path.suffix == ".webp"
-            assert path.is_file()
-            assert media["alt"]
-            assert media["width"] == 480
-            assert media["height"] == 320
-            assert media["asset_version"] == "120e-v1"
-            assert media["variant_key"] == source["variant_key"]
-            assert media["asset_id"].endswith(":120e-v1")
-            assert len(media["sources"]) == 3
-            assert [item["width"] for item in media["sources"]] == [480, 768, 1280]
-            assert hashlib.sha256(path.read_bytes()).hexdigest() == media["asset_sha256"]
-            mobile_pair_bytes += media["byte_size"]
-            assert media["byte_size"] <= 160 * 1024
-            assert all(
-                value in {"pass", "pass_with_limitations"}
-                for value in media["reviews"].values()
-                if isinstance(value, str) and value != "2026-08-31"
-            )
-            for derivative in media["sources"]:
-                derivative_path = assets / derivative["path"]
-                assert derivative_path.is_file()
-                assert derivative_path.stat().st_size == derivative["byte_size"]
-                digest = hashlib.sha256(derivative_path.read_bytes()).hexdigest()
-                assert digest == derivative["sha256"]
-                assert digest not in derivative_hashes
-                derivative_hashes[digest] = derivative["path"]
-        assert mobile_pair_bytes <= 320 * 1024
-
-    legacy_names = {f"{slug}-{phase}.svg" for slug in slugs for phase in ("start", "active")}
-    assert not any((assets / name).exists() for name in legacy_names)
+    for exercise in blocked:
+        assert exercise["source"] is None
+        assert exercise["media"] == []
 
 
 def test_task_120e_builder_cannot_mint_semantic_approval(tmp_path: Path) -> None:
@@ -672,33 +610,16 @@ def test_task_120c_lower_body_machine_batch_contract_and_workout_integration(cli
         assert len(guide["technique_steps"]) == 3
         assert len(guide["common_mistakes"]) == 3
         assert guide["safety_notes"]
-        if slug == "plate-loaded-leg-press":
-            assert guide["source_name"] == "Exercise data by RepDB (repdb.co)"
-            assert guide["source_license"] == "RepDB Free Tier License v1.0"
-            assert [media["url"].rsplit("/", 1)[-1] for media in guide["media"]] == [
-                "plate-loaded-leg-press-start.webp",
-                "plate-loaded-leg-press-peak.webp",
-            ]
+        if item["media_state"] == "approved_animated":
+            assert guide["source_name"] == "Gym visual"
+            assert guide["source_license"] == "Owner-purchased GymVisual license"
+            assert len(guide["media"]) == 1
+            assert guide["media"][0]["type"] == "animation"
+            assert guide["media"][0]["url"].endswith(".gif")
+            assert guide["media"][0]["poster"].endswith(".jpg")
         else:
-            assert guide["source_name"] == "Your Fitness Coach"
-            assert guide["source_license"] == "Иллюстрация создана для приложения"
-            assert [media["url"].rsplit("/", 1)[-1] for media in guide["media"]] == [
-                "concentric_end-480w.webp",
-                "eccentric_end-480w.webp",
-            ]
-        if slug == "plate-loaded-leg-press":
-            assert [media["phase_id"] for media in guide["media"]] == [
-                "eccentric_end",
-                "concentric_end",
-            ]
-        else:
-            assert [media["phase_id"] for media in guide["media"]] == [
-                "concentric_end",
-                "eccentric_end",
-            ]
-        if slug != "plate-loaded-leg-press":
-            assert all(media["asset_version"] == "120e-v1" for media in guide["media"])
-        assert all(media["alt"] for media in guide["media"])
+            assert item["media_state"] == "blocked"
+            assert guide["media"] == []
 
     assert "жим ногами на блинах" in by_slug["plate-loaded-leg-press"]["aliases"]
     assert "pendulum squat" in by_slug["pendulum-squat"]["aliases"]
@@ -781,8 +702,15 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         assert len(guide["technique_steps"]) == 3
         assert len(guide["common_mistakes"]) >= 3
         assert guide["breathing"]
-        assert guide["media"]
-        assert all(media["alt"] and media["sources"] for media in guide["media"])
+        if item["media_state"] == "approved_animated":
+            assert guide["media"]
+            assert all(
+                media["type"] == "animation" and media["alt"] and media["sources"]
+                for media in guide["media"]
+            )
+        else:
+            assert item["media_state"] == "blocked"
+            assert guide["media"] == []
 
     assert by_slug["recumbent-bike"]["equipment_ids"] == ["cardio"]
     assert by_slug["rowing-machine"]["equipment"] == "Гребной тренажёр"
@@ -855,15 +783,15 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         "canonical_records": 206,
         "titles": 207,
         "cardio_records": 14,
-        "assets": 347,
-        "derivatives": 419,
+        "assets": 334,
+        "derivatives": 0,
         "coverage_decisions": 36,
         "guide_item_content_records": 49,
         "guide_profile_records": 206,
-        "media_state_records": 25,
-        "media_state_repdb_phased": 21,
-        "media_state_repdb_single_static": 3,
-        "media_state_repdb_source_gap": 1,
+        "media_approved_animated": 167,
+        "media_blocked": 39,
+        "media_remote_runtime_assets": 0,
+        "media_static_only": 0,
         "metadata_aliases_populated": 69,
         "metadata_aliases_reviewed_empty": 137,
         "metadata_execution_populated": 69,
@@ -1041,7 +969,7 @@ def test_personalized_copy_keeps_guide_provenance_and_base_alternatives(client) 
     details = client.get(f"/api/v1/programs/exercises/{bench['id']}", headers=headers)
     assert details.status_code == 200
     assert details.json()["title"] == "Мой жим лежа"
-    assert details.json()["guide"]["source_name"] == "Exercise data by RepDB (repdb.co)"
+    assert details.json()["guide"]["source_name"] == "Gym visual"
     assert details.json()["guide"]["media_reference"] == "exercise-guides:bench-press"
     assert {item["slug"] for item in details.json()["alternatives"]} == {
         "dumbbell-bench-press",

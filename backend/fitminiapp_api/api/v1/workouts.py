@@ -71,7 +71,12 @@ from fitminiapp_api.services.cardio import (
     update_cardio_session,
 )
 from fitminiapp_api.services.coach_clients import get_client_managed_by_coach
-from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
+from fitminiapp_api.services.exercise_catalog import (
+    _source_exercise_slug,
+    get_visible_exercise_display_map,
+)
+from fitminiapp_api.services.exercise_catalog_metadata import CANONICAL_EXERCISE_REDIRECTS
+from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.measurements import (
     CustomMeasurementDefinitionError,
@@ -342,6 +347,15 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
     progression_guidance = build_progression_guidance(db, current_user, workout)
     metric_types = {item.id: workout_exercise_metric_type(item) for item in workout.exercises}
 
+    def media_preview(item: UserWorkoutExercise) -> dict[str, str | None]:
+        exercise = visible_map.get(item.exercise_id) or item.exercise
+        if exercise is None:
+            return {"state": "blocked", "thumbnail_url": None, "animation_url": None}
+        source_slug = _source_exercise_slug(exercise)
+        return get_guide_media_preview(CANONICAL_EXERCISE_REDIRECTS.get(source_slug, source_slug))
+
+    media_previews = {item.id: media_preview(item) for item in workout.exercises}
+
     return {
         "id": workout.id,
         "scheduled_date": str(workout.scheduled_date),
@@ -376,6 +390,9 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                     (visible_map.get(item.exercise_id) or item.exercise)
                     and get_exercise_guide(visible_map.get(item.exercise_id) or item.exercise)
                 ),
+                "media_state": media_previews[item.id]["state"],
+                "media_thumbnail_url": media_previews[item.id]["thumbnail_url"],
+                "media_animation_url": media_previews[item.id]["animation_url"],
                 "progression_guidance": (
                     progression_guidance[item.id] if metric_types[item.id] == "strength" else None
                 ),

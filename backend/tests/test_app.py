@@ -36,7 +36,6 @@ from fitminiapp_api.models.user import (
 )
 from fitminiapp_api.services import notifications as notifications_service
 from fitminiapp_api.services.coach_clients import create_coach_invite_link
-from fitminiapp_api.services.exercise_catalog_metadata import MEDIA_STATE_BY_SLUG
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.notifications import (
     claim_due_notifications,
@@ -1817,20 +1816,35 @@ def test_every_seeded_exercise_has_complete_guide_and_local_images(client):
     static_dir = Path(__file__).resolve().parents[2] / "backend" / "assets"
 
     assert len(standard_exercises) == 207
-    assert len(client.get("/api/v1/programs/exercises", headers=headers).content) < 150_000
+    # Stage 4 adds one local poster URL and an explicit media state per catalog
+    # item; retain a bounded response-size guard with that metadata included.
+    assert len(client.get("/api/v1/programs/exercises", headers=headers).content) < 190_000
     assert all(
         exercise["has_guide"] and exercise["guide"] is None for exercise in standard_exercises
     )
 
     sample_exercise = next(item for item in standard_exercises if item["slug"] == "bench-press")
+    assert sample_exercise["media_state"] == "approved_animated"
+    assert sample_exercise["media_thumbnail_url"].endswith(".jpg")
+    assert sample_exercise["media_animation_url"] is None
     sample = client.get(
         f"/api/v1/programs/exercises/{sample_exercise['id']}/guide",
         headers=headers,
     )
     assert sample.status_code == 200
-    assert len(sample.json()["images"]) == 2
-    assert len(sample.json()["media"]) == 2
-    assert [item["sort_order"] for item in sample.json()["media"]] == [0, 1]
+    sample_payload = sample.json()
+    assert len(sample_payload["images"]) == 1
+    assert len(sample_payload["media"]) == 1
+    assert sample_payload["media"][0]["type"] == "animation"
+    assert sample_payload["media"][0]["poster"] != sample_payload["media"][0]["url"]
+    assert [item["sort_order"] for item in sample_payload["media"]] == [0]
+    detail = client.get(
+        f"/api/v1/programs/exercises/{sample_exercise['id']}",
+        headers=headers,
+    )
+    assert detail.status_code == 200
+    assert detail.json()["media_state"] == "approved_animated"
+    assert detail.json()["media_animation_url"].endswith(".gif")
 
     with get_session_context() as session:
         seeded_guides = [
@@ -1841,21 +1855,25 @@ def test_every_seeded_exercise_has_complete_guide_and_local_images(client):
                 .all()
             )
         ]
+    media_manifest = json.loads(
+        (static_dir / "exercise-guides" / "manifest.json").read_text(encoding="utf-8")
+    )
     for slug, guide in seeded_guides:
         assert guide is not None, slug
         assert len(guide["technique_steps"]) >= 3
         assert guide["breathing"]
         assert len(guide["common_mistakes"]) >= 3
         assert guide["muscles"]
-        if slug in MEDIA_STATE_BY_SLUG:
+        manifest_item = media_manifest["exercises"].get(slug)
+        if not manifest_item or manifest_item["status"] != "approved":
             assert guide["images"] == []
             assert guide["media"] == []
             continue
         assert guide["images"]
         assert guide["media"]
         for media in guide["media"]:
-            assert media["type"] == "image"
-            assert media["poster"] == media["url"]
+            assert media["type"] == "animation"
+            assert media["poster"] != media["url"]
             assert media["width"] > 0
             assert media["height"] > 0
             assert media["byte_size"] > 0
@@ -1867,24 +1885,21 @@ def test_every_seeded_exercise_has_complete_guide_and_local_images(client):
 
 
 def test_exercise_guide_assets_have_cache_headers_and_missing_asset_is_safe(client):
-    asset = client.get("/static/exercise-guides/bench-press-start.jpg")
+    asset = client.get("/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif")
 
     assert asset.status_code == 200
-    assert asset.headers["content-type"] == "image/jpeg"
+    assert asset.headers["content-type"] == "image/gif"
     assert asset.headers["cache-control"] == (
         "public, max-age=2592000, stale-while-revalidate=86400"
     )
     assert asset.headers["etag"]
 
-    pilot_start = client.get("/static/exercise-guides/pilot/bench-press/bench-press-start.webp")
-    assert pilot_start.status_code == 200
-    assert pilot_start.headers["content-type"] == "image/webp"
-    assert pilot_start.headers["cache-control"] == (
+    poster = client.get("/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg")
+    assert poster.status_code == 200
+    assert poster.headers["content-type"] == "image/jpeg"
+    assert poster.headers["cache-control"] == (
         "public, max-age=2592000, stale-while-revalidate=86400"
     )
-    pilot_peak = client.get("/static/exercise-guides/pilot/bench-press/bench-press-peak.webp")
-    assert pilot_peak.status_code == 200
-    assert pilot_peak.headers["content-type"] == "image/webp"
 
     missing = client.get("/static/exercise-guides/not-a-real-exercise-start.jpg")
     assert missing.status_code == 404
@@ -1915,9 +1930,14 @@ def test_cardio_exercises_have_specific_guides_and_generated_images(client):
         assert response.status_code == 200
         guide = response.json()
         assert len(guide["technique_steps"]) >= 3
-        assert guide["source_name"] == "Your Fitness Coach"
-        assert guide["images"][0]["phase"] == "Техника движения"
-        assert guide["media"][0]["source_license"] == "Иллюстрация создана для приложения"
+        if exercise["media_state"] == "approved_animated":
+            assert guide["source_name"] == "Gym visual"
+            assert guide["images"][0]["phase"] == "Движение"
+            assert guide["media"][0]["type"] == "animation"
+            assert guide["media"][0]["source_license"] == "Owner-purchased GymVisual license"
+        else:
+            assert exercise["media_state"] == "blocked"
+            assert guide["media"] == []
 
 
 def test_custom_exercise_has_no_incorrect_stock_guide(client):
@@ -3912,14 +3932,16 @@ def test_public_exercise_api_uses_allowlisted_domain_data_and_excludes_private_r
     assert squat.json()["technique_steps"]
     assert squat.json()["safety_notes"]
     assert squat.json()["media"]
-    assert squat.json()["source_name"] == "free-exercise-db"
+    assert squat.json()["source_name"] == "Gym visual"
 
     bench = client.get("/api/v1/public/exercises/bench-press")
     assert bench.status_code == 200
     assert bench.json()["difficulty_level"] == "intermediate"
-    assert len(bench.json()["media"]) == 2
+    assert len(bench.json()["media"]) == 1
     assert all(
-        item["source_license"] == "RepDB Free Tier License v1.0" for item in bench.json()["media"]
+        item["type"] == "animation"
+        and item["source_license"] == "Owner-purchased GymVisual license"
+        for item in bench.json()["media"]
     )
 
     private_slug = client.get("/api/v1/public/exercises/squat-u-private")
@@ -3991,8 +4013,8 @@ def test_public_exercise_route_has_domain_fallback_and_webpage_schema(client, mo
     assert "Техника выполнения" in response.text
     assert "Колени заваливаются внутрь" in response.text
     assert "Что важно для безопасности" in response.text
-    assert "/static/exercise-guides/squat-start.jpg" in response.text
-    assert "free-exercise-db" in response.text
+    assert "/static/exercise-guides/gymvisual/squat-" in response.text
+    assert "Gym visual" in response.text
     structured_data = re.search(
         r'<script type="application/ld\+json">(.*?)</script>', response.text, re.DOTALL
     )
@@ -4020,9 +4042,8 @@ def test_bench_press_public_page_has_one_canonical_seo_exemplar(client, monkeypa
     assert "Дыхание" in response.text
     assert "Частые ошибки" in response.text
     assert "Что важно для безопасности" in response.text
-    assert "/static/exercise-guides/pilot/bench-press/bench-press-start.webp" in response.text
-    assert "/static/exercise-guides/pilot/bench-press/bench-press-peak.webp" in response.text
-    assert "RepDB Free Tier License v1.0" in response.text
+    assert "/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif" in response.text
+    assert "Owner-purchased GymVisual license" in response.text
     assert "<video" not in response.text
     assert "Открыть тренировки в Your Fitness Coach" in response.text
     assert "exercise_added_from_public_page" not in response.text

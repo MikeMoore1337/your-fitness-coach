@@ -19,6 +19,7 @@ import {
 } from '../../shared/ui/common';
 import { readStorage, removeStorage, writeStorage } from '../../shared/storage';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
+import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
 import {
   activeWorkoutRestKey,
   loadCurrentActiveWorkoutSnapshot,
@@ -1249,6 +1250,17 @@ export function TodayWorkout({
                     </button>
                   </div>
                 </header>
+
+                {isCurrentExercise && exercise.media_state === 'approved_animated' && (
+                  <div className="active-workout-exercise__media">
+                    <ExerciseMediaAsset
+                      animationUrl={exercise.media_animation_url}
+                      alt={`${exercise.exercise_title}: техника движения`}
+                      thumbnailUrl={exercise.media_thumbnail_url}
+                      variant="animation"
+                    />
+                  </div>
+                )}
 
                 <div id={`workout-exercise-${exercise.id}-details`} hidden={!exerciseOpen}>
                   {metricType === 'strength' &&

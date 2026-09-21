@@ -43,6 +43,7 @@ from fitminiapp_api.services.exercise_domain import (
     exercise_equipment_payload,
     exercise_muscle_payload,
 )
+from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.program_common import ProgramError, assignment_error_status
 from fitminiapp_api.services.program_recommendation import recommend_program_templates
@@ -105,6 +106,7 @@ def _serialize_exercise(
     equipment = exercise_equipment_payload(exercise)
     source_slug = _source_exercise_slug(exercise)
     redirected_slug = CANONICAL_EXERCISE_REDIRECTS.get(source_slug)
+    media_preview = get_guide_media_preview(redirected_slug or source_slug)
     catalog_metadata = exercise_catalog_metadata(redirected_slug or source_slug)
     canonical_slug = redirected_slug
     if exercise.source_exercise_id is not None:
@@ -139,6 +141,11 @@ def _serialize_exercise(
         "created_by_user_id": exercise.created_by_user_id,
         "source_exercise_id": exercise.source_exercise_id,
         "has_guide": guide is not None,
+        "media_state": media_preview["state"],
+        "media_thumbnail_url": media_preview["thumbnail_url"],
+        # The catalog/picker only needs posters. Keep animated media on the
+        # detail response and workout payloads to avoid inflating the list.
+        "media_animation_url": media_preview["animation_url"] if include_guide else None,
         "guide": guide if include_guide else None,
     }
 

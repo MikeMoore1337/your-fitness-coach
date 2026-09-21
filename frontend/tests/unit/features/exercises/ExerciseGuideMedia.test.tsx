@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExerciseGuideMedia } from '../../../../src/features/exercises/ExerciseGuideMedia';
 import type { ExerciseGuide } from '../../../../src/shared/api/types';
 
@@ -70,7 +70,100 @@ const media = [
 ] satisfies ExerciseGuide['media'];
 
 describe('ExerciseGuideMedia', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('uses the approved animation by default and the local poster for reduced motion', () => {
+    const animated: ExerciseGuide['media'] = [
+      {
+        type: 'animation',
+        url: '/static/exercise-guides/gymvisual/bench-press.gif',
+        poster: '/static/exercise-guides/gymvisual/bench-press.jpg',
+        phase_id: 'movement',
+        phase: 'Движение',
+        alt: 'Пример: движение',
+        source_name: 'Gym visual',
+        source_url: 'https://github.com/hasaneyldrm/exercises-dataset',
+        source_license: 'Owner-purchased GymVisual license',
+        source_license_url: 'https://gymvisual.com/',
+        width: 180,
+        height: 180,
+        byte_size: 120_000,
+        sort_order: 0,
+        sources: [
+          {
+            url: '/static/exercise-guides/gymvisual/bench-press.gif',
+            mime_type: 'image/gif',
+            width: 180,
+            height: 180,
+            byte_size: 120_000,
+          },
+        ],
+      },
+    ];
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+
+    render(<ExerciseGuideMedia items={animated} />);
+
+    const image = screen.getByAltText('Пример: движение');
+    expect(image).toHaveAttribute('src', '/static/exercise-guides/gymvisual/bench-press.jpg');
+    expect(image).toHaveAttribute('data-media-mode', 'static-poster');
+  });
+
+  it('keeps the GIF as the default animation source instead of selecting the poster', () => {
+    const animated: ExerciseGuide['media'] = [
+      {
+        type: 'animation',
+        url: '/static/exercise-guides/gymvisual/bench-press.gif',
+        poster: '/static/exercise-guides/gymvisual/bench-press.jpg',
+        phase_id: 'movement',
+        phase: 'Движение',
+        alt: 'Пример: движение',
+        source_name: 'Gym visual',
+        source_url: 'https://github.com/hasaneyldrm/exercises-dataset',
+        source_license: 'Owner-purchased GymVisual license',
+        source_license_url: 'https://gymvisual.com/',
+        width: 180,
+        height: 180,
+        byte_size: 120_000,
+        sort_order: 0,
+        sources: [
+          {
+            url: '/static/exercise-guides/gymvisual/bench-press.gif',
+            mime_type: 'image/gif',
+            width: 180,
+            height: 180,
+            byte_size: 120_000,
+          },
+          {
+            url: '/static/exercise-guides/gymvisual/bench-press.jpg',
+            mime_type: 'image/jpeg',
+            width: 180,
+            height: 180,
+            byte_size: 12_000,
+          },
+        ],
+      },
+    ];
+
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    render(<ExerciseGuideMedia items={animated} />);
+
+    const image = screen.getByAltText('Пример: движение');
+    expect(image).toHaveAttribute('src', '/static/exercise-guides/gymvisual/bench-press.gif');
+    expect(image).not.toHaveAttribute('srcset');
+    expect(image).toHaveAttribute('data-media-mode', 'animation');
+  });
 
   it('uses explicit phase ids and responsive sources without eagerly opening the lightbox', () => {
     render(<ExerciseGuideMedia items={media} />);
