@@ -50,6 +50,27 @@ def test_install_instructions_start_enabled_timer_after_gate_a() -> None:
 
     assert "systemctl enable --now hermes-discovery.timer" in readme
     assert "systemctl enable hermes-discovery.timer\n" not in readme
+    assert "`install` всегда оставляет timer disabled" in readme
+    assert "После\nуспешного shadow" in readme
+
+
+def test_discovery_egress_refresh_has_netlink_without_broadening_sandbox() -> None:
+    """nft/libmnl needs AF_NETLINK for the host-scoped egress control plane."""
+    discovery_unit = _systemd_unit("hermes-discovery.service.template")
+    worker_unit = _systemd_unit("hermes-worker-drain.service.template")
+
+    discovery_families = next(
+        line.split("=", 1)[1].split()
+        for line in discovery_unit.splitlines()
+        if line.startswith("RestrictAddressFamilies=")
+    )
+    assert discovery_families == ["AF_UNIX", "AF_INET", "AF_INET6", "AF_NETLINK"]
+    assert not {"AF_PACKET", "AF_VSOCK"}.intersection(discovery_families)
+    assert discovery_unit.index("ExecStartPre=") < discovery_unit.index("ExecStart=")
+
+    assert "ExecStartPre=" not in worker_unit
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6" in worker_unit
+    assert "AF_NETLINK" not in worker_unit
 
 
 def test_discovery_timer_runs_worker_drain_and_preserves_scheduler_guardrails() -> None:
