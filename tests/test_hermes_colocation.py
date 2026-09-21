@@ -67,6 +67,7 @@ def test_unit_rendering_preserves_repository_digest_separator(tmp_path: Path) ->
     rendered = (target / "hermes-discovery.service").read_text(encoding="utf-8")
     assert image in rendered
     assert "COLOCATED_ISOLATED_HERMES=yes" in rendered
+    assert "hermes_egress.py refresh" in rendered
     assert "@DISCOVERY_IMAGE@" not in rendered
 
 
@@ -111,6 +112,29 @@ def test_worker_env_names_are_required_and_image_is_checked(tmp_path: Path) -> N
 
     assert hermes.validate_worker_env(path) == hermes.WORKER_ENV_NAMES
     assert hermes._env_values(path)["HERMES_WORKER_IMAGE"] == image
+
+
+def test_worker_env_rejects_unexpected_names(tmp_path: Path) -> None:
+    path = tmp_path / "worker.env"
+    path.write_text(
+        "\n".join(
+            [
+                "HERMES_WORKER_IMAGE=registry.invalid/hermes-worker@sha256:" + "a" * 64,
+                *(
+                    f"{name}=value"
+                    for name in sorted(hermes.WORKER_ENV_NAMES - {"HERMES_WORKER_IMAGE"})
+                ),
+                "TELEGRAM_BOT_TOKEN=must-not-be-present",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    if os.name == "posix":
+        path.chmod(0o600)
+
+    with pytest.raises(hermes.ColocationError, match="unexpected variable names"):
+        hermes.validate_worker_env(path)
 
 
 def test_mode_schema_declares_both_supported_topologies() -> None:

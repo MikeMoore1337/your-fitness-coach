@@ -336,7 +336,10 @@ canonical YFC deployment lock
 scoped policy: exact source hosts для discovery и exact provider/YFC intake destinations для
 worker; Telegram Bot API, PostgreSQL/Redis, внутренние YFC-сервисы, Docker API/socket, SSH,
 cloud metadata, registry, arbitrary redirects и wildcard internet должны быть запрещены.
-Task 403 не меняет глобальный firewall автоматически. Hermes inbound ports отсутствуют.
+Task 403 устанавливает только repository-owned `inet hermes_egress` с hook на forward traffic:
+правила применяются к bridge `hermes-net`, содержат exact resolved IP set для canonical hosts,
+разрешённые DNS-серверы и scoped default-deny для новых пакетов Hermes. Глобальные firewall
+defaults и traffic YFC не меняются. Hermes inbound ports отсутствуют.
 
 Актуальные имена переменных worker:
 
@@ -443,9 +446,9 @@ source hosts, Groq и YFC intake.
 `--user 10000:10000`, read-only rootfs, cap-drop ALL и no-new-privileges. Обе units закрепляют
 одну owner-approved Docker network `hermes-net`; worker drain валидирует только bounded `hermes-*`
 имя и отвергает встроенные `bridge`/`host`/`none` сети. `scripts/hermes_colocation.py` проверяет
-пересечение Docker subnet, UID/GID, immutable image references и `systemd-analyze verify`, затем
-оставляет timer disabled до прохождения Gate A, credentials и external shadow. Он не устанавливает
-новый VPS и не меняет глобальный firewall.
+пересечение Docker subnet, UID/GID, immutable image references, scoped `inet hermes_egress` и
+`systemd-analyze verify`, затем оставляет timer disabled до прохождения Gate A, credentials и
+external shadow. Он не устанавливает новый VPS и не меняет глобальные firewall defaults.
 
 State — только bounded hashes, fetch metadata, reason codes и candidate metadata. Stable dedupe key
 использует `source_id + canonical URL + content hash + event date`; restart/uncertain state не
