@@ -171,3 +171,7 @@ def test_network_guard_rejects_yfc_container_attachment(monkeypatch: pytest.Monk
 
     with pytest.raises(hermes.ColocationError, match="YFC container"):
         hermes.ensure_network()
+
+
+def test_network_subnets_tolerate_builtin_networks_without_ipam_config() -> None:
+    assert hermes._network_subnets({"IPAM": {"Config": None}}) == []

@@ -197,7 +197,7 @@ def _network_subnets(
     document: dict[str, Any],
 ) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
     subnets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
-    for config in document.get("IPAM", {}).get("Config", []):
+    for config in (document.get("IPAM") or {}).get("Config") or []:
         if not isinstance(config, dict) or not isinstance(config.get("Subnet"), str):
             continue
         try:
