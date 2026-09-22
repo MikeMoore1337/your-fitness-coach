@@ -24,9 +24,33 @@ type SetState = {
   reached_failure: boolean | null;
   is_completed: boolean;
   version: number;
+  planned_role?:
+    | 'warmup'
+    | 'working'
+    | 'top'
+    | 'backoff'
+    | 'drop'
+    | 'activation'
+    | 'mini_set'
+    | 'cluster_member'
+    | null;
+  planned_group_id?: number | null;
+  planned_group_kind?:
+    | 'sequence'
+    | 'superset'
+    | 'rest_pause'
+    | 'myo_reps'
+    | 'cluster'
+    | 'drop_chain'
+    | 'circuit'
+    | null;
 };
 
-async function mockActiveWorkout(page: Page, mixed = false) {
+async function mockActiveWorkout(
+  page: Page,
+  mixed = false,
+  mediaState: 'approved_animated' | 'blocked' = 'approved_animated',
+) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   let finished = false;
   let failSetPatch = false;
@@ -45,6 +69,7 @@ async function mockActiveWorkout(page: Page, mixed = false) {
         reached_failure: false,
         is_completed: false,
         version: 1,
+        planned_role: 'top',
       },
     ],
     [
@@ -57,6 +82,7 @@ async function mockActiveWorkout(page: Page, mixed = false) {
         reached_failure: false,
         is_completed: false,
         version: 1,
+        planned_role: 'backoff',
       },
     ],
     [
@@ -69,6 +95,7 @@ async function mockActiveWorkout(page: Page, mixed = false) {
         reached_failure: false,
         is_completed: false,
         version: 1,
+        planned_role: 'backoff',
       },
     ],
     ...(mixed
@@ -113,9 +140,9 @@ async function mockActiveWorkout(page: Page, mixed = false) {
         rest_seconds: 90,
         notes: 'Сохраняйте устойчивое положение корпуса.',
         has_guide: true,
-        media_state: 'approved_animated',
-        media_thumbnail_url: mediaThumbnailUrl,
-        media_animation_url: mediaAnimationUrl,
+        media_state: mediaState,
+        media_thumbnail_url: mediaState === 'approved_animated' ? mediaThumbnailUrl : null,
+        media_animation_url: mediaState === 'approved_animated' ? mediaAnimationUrl : null,
         sets: [...sets]
           .filter(([id]) => id !== 204)
           .map(([id, state], index) => ({
@@ -420,6 +447,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
 
   const firstSet = page.locator('[data-workout-set-id="201"]');
   await expect(firstSet).toHaveAttribute('aria-current', 'step');
+  await expect(firstSet.getByText('Топ-сет', { exact: true })).toBeVisible();
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   const firstDone = firstSet.getByRole('button', {
@@ -430,6 +458,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
 
   const secondSet = page.locator('[data-workout-set-id="202"]');
   await expect(secondSet).toHaveAttribute('aria-current', 'step');
+  await expect(secondSet.getByText('Бэкофф', { exact: true })).toBeVisible();
   await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
   await secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }).fill('35');
   await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
@@ -491,6 +520,132 @@ test('active workout keeps one obvious next action through logging, timer and fi
   );
   expect(JSON.stringify(analyticsEvents)).not.toContain('actual_weight');
   expect(JSON.stringify(analyticsEvents)).not.toContain('actual_reps');
+});
+
+test('active workout keeps the current exercise primary and exposes keyboard handoff', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const currentSet = page.locator('[data-workout-set-id="201"]');
+  const weight = currentSet.getByRole('spinbutton', {
+    name: 'Вес, Жим штанги лёжа, подход 1',
+  });
+  const reps = currentSet.getByRole('spinbutton', {
+    name: 'Повторы, Жим штанги лёжа, подход 1',
+  });
+  const done = currentSet.getByRole('button', {
+    name: 'Завершить: Жим штанги лёжа, подход 1',
+  });
+  await weight.focus();
+  await weight.press('Enter');
+  await expect(reps).toBeFocused();
+  await reps.press('Enter');
+  await expect(done).toBeFocused();
+
+  const nextExercise = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await expect(nextExercise.getByRole('button', { name: 'Открыть упражнение' })).toBeVisible();
+  await expect(nextExercise.locator('[id$="-details"][hidden]')).toHaveCount(1);
+  await nextExercise.getByRole('button', { name: 'Открыть упражнение' }).click();
+  await expect(
+    nextExercise.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }),
+  ).toBeVisible();
+});
+
+test('active workout checkpoint evidence covers light dark reduced and responsive states', async ({
+  page,
+}) => {
+  const enterWorkout = async () => {
+    const clientEntry = page.getByRole('button', { name: 'Клиент' });
+    const continueButton = page.getByRole('button', { name: 'Продолжить тренировку' });
+    await Promise.race([
+      clientEntry.waitFor({ state: 'visible', timeout: 5000 }),
+      continueButton.waitFor({ state: 'visible', timeout: 5000 }),
+    ]);
+    if (await continueButton.isVisible()) {
+      await continueButton.click();
+      return;
+    }
+    await clientEntry.click();
+    await expect(continueButton).toBeVisible();
+    await continueButton.click();
+  };
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'light' });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await enterWorkout();
+  await expect(page.locator('.active-workout-exercise__media img')).toHaveAttribute(
+    'data-media-mode',
+    'animated',
+  );
+  await page.screenshot({
+    path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-light-390x844.png',
+    fullPage: true,
+  });
+
+  await page.evaluate(() => localStorage.setItem('app-theme', 'dark'));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await enterWorkout();
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await page.screenshot({
+    path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-dark-390x844.png',
+    fullPage: true,
+  });
+
+  await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await enterWorkout();
+  await expect(page.locator('.active-workout-exercise__media img')).toHaveAttribute(
+    'data-media-mode',
+    'static-poster',
+  );
+  await page.screenshot({
+    path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-reduced-390x844.png',
+    fullPage: true,
+  });
+
+  for (const viewport of [
+    { width: 320, height: 800 },
+    { width: 430, height: 932 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      )
+      .toBe(true);
+    await page.screenshot({
+      path: `../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-${viewport.width}x${viewport.height}.png`,
+      fullPage: true,
+    });
+  }
+});
+
+test('blocked exercise media stays compact and neutral in active workout', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page, false, 'blocked');
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const media = page.locator('.active-workout-exercise__media--blocked').first();
+  await expect(media).toContainText('Изображение пока недоступно');
+  await expect(media.locator('img')).toHaveCount(0);
+  const box = await media.boundingBox();
+  expect(box?.height).toBeGreaterThanOrEqual(150);
+  expect(box?.height).toBeLessThan(220);
+  await page.screenshot({
+    path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-blocked-mobile-390x844.png',
+    fullPage: true,
+  });
 });
 
 test('active workout has touch-size controls and no horizontal overflow', async ({ page }) => {
@@ -585,6 +740,7 @@ test('touch Mobile Web keeps mixed controls usable with hover none', async ({
       'static-poster',
     );
     const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+    await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
     const done = cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' });
     expect((await done.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     await expect
@@ -608,6 +764,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
   await expect(cardio.getByRole('heading', { name: 'Велотренажёр' })).toBeVisible();
   await expect(cardio.getByText('План: 25 мин')).toBeVisible();
   await expect(cardio.getByText(/Рабочие подходы|Повторы|Отдых, сек/)).toHaveCount(0);
@@ -744,6 +901,7 @@ test('TMA active workout keeps in-page back while native back stays hidden and k
     ),
   ).toBe('844px');
   const tmaCardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await tmaCardio.getByRole('button', { name: 'Открыть упражнение' }).click();
   await expect(
     tmaCardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }),
   ).toBeVisible();

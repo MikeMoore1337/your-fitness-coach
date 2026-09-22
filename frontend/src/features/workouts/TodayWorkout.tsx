@@ -46,6 +46,8 @@ import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
 type SetKind = NonNullable<WorkoutSet['set_kind']>;
+type PlannedRole = NonNullable<WorkoutSet['planned_role']>;
+type PlannedGroupKind = NonNullable<WorkoutSet['planned_group_kind']>;
 type PreviousSetValues = {
   actual_reps: number | null | undefined;
   actual_weight: number | null | undefined;
@@ -123,6 +125,41 @@ export function formatCardioResult(
   ]
     .filter(Boolean)
     .join(' · ');
+}
+
+const plannedRoleLabels: Record<PlannedRole, string> = {
+  warmup: 'Разминка',
+  working: 'Рабочий подход',
+  top: 'Топ-сет',
+  backoff: 'Бэкофф',
+  drop: 'Дроп-сет',
+  activation: 'Активация',
+  mini_set: 'Мини-сет',
+  cluster_member: 'Кластерный мини-сет',
+};
+
+const plannedGroupKindLabels: Record<PlannedGroupKind, string> = {
+  sequence: 'Последовательность',
+  superset: 'Суперсет',
+  rest_pause: 'Rest-pause',
+  myo_reps: 'Myo-reps',
+  cluster: 'Кластер',
+  drop_chain: 'Дроп-сет',
+  circuit: 'Круг',
+};
+
+export function formatPlannedSetRole(role: WorkoutSet['planned_role']): string | null {
+  return role ? plannedRoleLabels[role] : null;
+}
+
+export function formatPlannedGroupKind(kind: WorkoutSet['planned_group_kind']): string | null {
+  return kind ? plannedGroupKindLabels[kind] : null;
+}
+
+function focusWorkoutControl(row: HTMLDivElement | null, field: 'reps' | 'distance' | 'done') {
+  const control = row?.querySelector<HTMLElement>(`[data-workout-field="${field}"]`);
+  control?.focus();
+  control?.scrollIntoView({ block: 'nearest' });
 }
 
 function WorkoutDuration({ startedAt, completedAt }: { startedAt: string; completedAt?: string }) {
@@ -204,6 +241,7 @@ function WorkoutSetRow({
   const [justConfirmed, setJustConfirmed] = useState(false);
   const editing = useRef(false);
   const lastCompletionActionAt = useRef(0);
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const serverVersion = set.version ?? 1;
   const canPrefillReps = reps === '' && previousValues?.actual_reps != null;
   const canPrefillWeight = weight === '' && previousValues?.actual_weight != null;
@@ -290,9 +328,12 @@ function WorkoutSetRow({
   ]
     .filter(Boolean)
     .join(' ');
+  const plannedRoleLabel = formatPlannedSetRole(set.planned_role);
+  const plannedGroupLabel = formatPlannedGroupKind(set.planned_group_kind);
 
   return (
     <div
+      ref={rowRef}
       className={classes}
       data-workout-set-id={set.id}
       data-motion-confirm={justConfirmed || undefined}
@@ -312,6 +353,18 @@ function WorkoutSetRow({
             {isCurrent && <span>Сначала вес, затем повторы</span>}
           </div>
         </div>
+        {(plannedRoleLabel || plannedGroupLabel) && (
+          <div className="active-workout-set__roles" aria-label="Структура подхода">
+            {plannedRoleLabel && (
+              <span className="active-workout-set__role">{plannedRoleLabel}</span>
+            )}
+            {plannedGroupLabel && (
+              <span className="active-workout-set__role active-workout-set__role--group">
+                {plannedGroupLabel}
+              </span>
+            )}
+          </div>
+        )}
         {completed && (
           <span className="active-workout-set__complete-label">
             <CheckIcon /> Выполнен
@@ -355,6 +408,7 @@ function WorkoutSetRow({
         <label className="active-workout-input">
           <span>Вес, кг</span>
           <input
+            data-workout-field="weight"
             disabled={disabled}
             aria-label={`Вес, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="next"
@@ -363,6 +417,12 @@ function WorkoutSetRow({
             min="0"
             step="0.5"
             value={weight}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                focusWorkoutControl(rowRef.current, 'reps');
+              }
+            }}
             onChange={(event) => {
               const nextWeight = event.target.value;
               editing.current = true;
@@ -374,6 +434,7 @@ function WorkoutSetRow({
         <label className="active-workout-input">
           <span>Повторы</span>
           <input
+            data-workout-field="reps"
             disabled={disabled}
             aria-label={`Повторы, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="done"
@@ -382,6 +443,12 @@ function WorkoutSetRow({
             min="0"
             step="1"
             value={reps}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                focusWorkoutControl(rowRef.current, 'done');
+              }
+            }}
             onChange={(event) => {
               const nextReps = event.target.value;
               editing.current = true;
@@ -396,6 +463,7 @@ function WorkoutSetRow({
           aria-label={`${completed ? 'Отметить невыполненным' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
           aria-pressed={completed}
           className="active-workout-set__done"
+          data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
           onClick={() => {
             const now = Date.now();
@@ -538,6 +606,7 @@ function CardioWorkoutRow({
   const [validation, setValidation] = useState<string | null>(null);
   const editing = useRef(false);
   const lastCompletionActionAt = useRef(0);
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const serverVersion = set.version ?? 1;
   const canPrefillDuration = duration === '' && previousValues?.duration_minutes != null;
   const canPrefillDistance = distance === '' && previousValues?.distance_km != null;
@@ -613,8 +682,11 @@ function CardioWorkoutRow({
   ]);
 
   const intervalLabel = set.set_number > 1 ? `Интервал ${set.set_number}` : 'Результат кардио';
+  const plannedRoleLabel = formatPlannedSetRole(set.planned_role);
+  const plannedGroupLabel = formatPlannedGroupKind(set.planned_group_kind);
   return (
     <div
+      ref={rowRef}
       className={`active-workout-set active-workout-set--cardio ${isCurrent ? 'is-current' : ''} ${completed ? 'is-completed' : ''}`}
       data-workout-set-id={set.id}
       aria-busy={syncing || undefined}
@@ -627,6 +699,18 @@ function CardioWorkoutRow({
             {isCurrent && <span>Запишите время, затем завершите</span>}
           </div>
         </div>
+        {(plannedRoleLabel || plannedGroupLabel) && (
+          <div className="active-workout-set__roles" aria-label="Структура подхода">
+            {plannedRoleLabel && (
+              <span className="active-workout-set__role">{plannedRoleLabel}</span>
+            )}
+            {plannedGroupLabel && (
+              <span className="active-workout-set__role active-workout-set__role--group">
+                {plannedGroupLabel}
+              </span>
+            )}
+          </div>
+        )}
         {completed && (
           <span className="active-workout-set__complete-label">
             <CheckIcon /> Выполнено
@@ -666,6 +750,7 @@ function CardioWorkoutRow({
         <label className="active-workout-input">
           <span>Длительность, мин</span>
           <input
+            data-workout-field="duration"
             disabled={disabled}
             aria-label={`Длительность, ${exerciseTitle}`}
             enterKeyHint="next"
@@ -675,6 +760,12 @@ function CardioWorkoutRow({
             max="600"
             step="1"
             value={duration}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                focusWorkoutControl(rowRef.current, 'distance');
+              }
+            }}
             onChange={(event) => {
               editing.current = true;
               setValidation(null);
@@ -686,6 +777,7 @@ function CardioWorkoutRow({
         <label className="active-workout-input">
           <span>Дистанция, км</span>
           <input
+            data-workout-field="distance"
             disabled={disabled}
             aria-label={`Дистанция, ${exerciseTitle}`}
             enterKeyHint="done"
@@ -695,6 +787,12 @@ function CardioWorkoutRow({
             max="1000"
             step="0.01"
             value={distance}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                focusWorkoutControl(rowRef.current, 'done');
+              }
+            }}
             onChange={(event) => {
               editing.current = true;
               setDistance(event.target.value);
@@ -708,6 +806,7 @@ function CardioWorkoutRow({
           aria-label={`${completed ? 'Отметить кардио незавершённым' : 'Завершить кардио'}: ${exerciseTitle}`}
           aria-pressed={completed}
           className="active-workout-set__done"
+          data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
           onClick={() => {
             const now = Date.now();
@@ -891,9 +990,7 @@ export function TodayWorkout({
   const queryClient = useQueryClient();
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [dismissedGuidance, setDismissedGuidance] = useState<Set<number>>(() => new Set());
-  const [expandedCompletedExercises, setExpandedCompletedExercises] = useState<Set<number>>(
-    () => new Set(),
-  );
+  const [expandedExercises, setExpandedExercises] = useState<Set<number>>(() => new Set());
   const workout = useQuery({
     queryKey: ['workout', 'today'],
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
@@ -1162,9 +1259,8 @@ export function TodayWorkout({
             const isPersistedComplete = shouldCollapseCompletedExercise(exercise.sets, (setId) =>
               activeSync.pendingBySet.has(setId),
             );
-            const exerciseOpen =
-              !isPersistedComplete || expandedCompletedExercises.has(exercise.id);
             const isCurrentExercise = currentSet?.exercise.id === exercise.id;
+            const exerciseOpen = isCurrentExercise || expandedExercises.has(exercise.id);
             const supersetLabel = exercise.superset_group
               ? `Суперсет — упражнение ${exercise.superset_order ?? exerciseIndex + 1} из 2`
               : null;
@@ -1215,14 +1311,14 @@ export function TodayWorkout({
                     {exercise.notes && <p className="exercise-note">{exercise.notes}</p>}
                   </div>
                   <div className="active-workout-exercise__head-actions">
-                    {isPersistedComplete && (
+                    {(!isCurrentExercise || isPersistedComplete) && (
                       <button
                         type="button"
                         className="secondary active-workout-exercise__toggle"
                         aria-expanded={exerciseOpen}
                         aria-controls={`workout-exercise-${exercise.id}-details`}
                         onClick={() =>
-                          setExpandedCompletedExercises((current) => {
+                          setExpandedExercises((current) => {
                             const next = new Set(current);
                             if (next.has(exercise.id)) next.delete(exercise.id);
                             else next.add(exercise.id);
@@ -1234,9 +1330,11 @@ export function TodayWorkout({
                           ? metricType === 'cardio'
                             ? 'Скрыть результат'
                             : 'Скрыть подходы'
-                          : metricType === 'cardio'
-                            ? 'Кардио сохранено'
-                            : `${exerciseCompleted} из ${exercise.sets.length} сохранено`}
+                          : isPersistedComplete
+                            ? metricType === 'cardio'
+                              ? 'Кардио сохранено'
+                              : `${exerciseCompleted} из ${exercise.sets.length} сохранено`
+                            : 'Открыть упражнение'}
                       </button>
                     )}
                     <button
@@ -1251,16 +1349,32 @@ export function TodayWorkout({
                   </div>
                 </header>
 
-                {isCurrentExercise && exercise.media_state === 'approved_animated' && (
-                  <div className="active-workout-exercise__media">
-                    <ExerciseMediaAsset
-                      animationUrl={exercise.media_animation_url}
-                      alt={`${exercise.exercise_title}: техника движения`}
-                      thumbnailUrl={exercise.media_thumbnail_url}
-                      variant="animation"
-                    />
-                  </div>
-                )}
+                {isCurrentExercise &&
+                  (exercise.media_state === 'approved_animated' ||
+                    exercise.media_state === 'blocked') && (
+                    <div
+                      className={`active-workout-exercise__media ${exercise.media_state === 'blocked' ? 'active-workout-exercise__media--blocked' : ''}`}
+                    >
+                      <ExerciseMediaAsset
+                        animationUrl={
+                          exercise.media_state === 'approved_animated'
+                            ? exercise.media_animation_url
+                            : undefined
+                        }
+                        alt={
+                          exercise.media_state === 'approved_animated'
+                            ? `${exercise.exercise_title}: техника движения`
+                            : `${exercise.exercise_title}: визуальный материал недоступен`
+                        }
+                        thumbnailUrl={
+                          exercise.media_state === 'approved_animated'
+                            ? exercise.media_thumbnail_url
+                            : undefined
+                        }
+                        variant="animation"
+                      />
+                    </div>
+                  )}
 
                 <div id={`workout-exercise-${exercise.id}-details`} hidden={!exerciseOpen}>
                   {metricType === 'strength' &&
