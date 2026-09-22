@@ -22,14 +22,8 @@ import {
   isPublicKnowledgePath,
   publicKnowledgePathFromLegacyRoute,
 } from './shared/navigation/knowledgeRoutes';
-import { applyRouteMetadata } from './shared/seo/metadata';
 import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
-import {
-  initializeYandexMetrica,
-  setYandexPrivateContentMask,
-  trackYandexPageView,
-} from './shared/analytics/yandexMetrica';
 import { captureFirstTouchAttribution } from './shared/analytics/attribution';
 import './styles/legacy.css';
 import './styles/fonts.css';
@@ -46,6 +40,28 @@ const publicContentRoots = new Set([
   '/knowledge',
   '/exercises',
 ]);
+
+function applyPrivateRouteMetadata(path: string): void {
+  void import('./shared/seo/metadata').then(({ applyRouteMetadata }) => {
+    if (window.location.pathname === path) applyRouteMetadata(path);
+  });
+}
+
+function initializeYandexMetrica(): void {
+  void import('./shared/analytics/yandexMetrica').then(({ initializeYandexMetrica }) => {
+    initializeYandexMetrica();
+  });
+}
+
+function trackYandexPageView(path: string, title?: string): void {
+  void import('./shared/analytics/yandexMetrica').then(({ trackYandexPageView }) => {
+    trackYandexPageView(path, title);
+  });
+}
+
+function setYandexPrivateContentMask(masked: boolean): void {
+  document.getElementById('root')?.classList.toggle('ym-hide-content', masked);
+}
 
 function isArticleRoute(path: string): boolean {
   return path === '/articles' || path.startsWith('/articles/');
@@ -125,7 +141,7 @@ function AppRoutes() {
   const legacyKnowledgePath = publicKnowledgePathFromLegacyRoute(path);
   useEffect(() => {
     if (path !== '/' && !isPublicContentRoute(path) && !isArticleRoute(path)) {
-      applyRouteMetadata(path);
+      applyPrivateRouteMetadata(path);
     }
   }, [path]);
   if (path === '/') return <LandingPage />;

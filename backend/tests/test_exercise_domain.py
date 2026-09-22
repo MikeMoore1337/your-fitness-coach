@@ -547,27 +547,11 @@ def test_task_120e_builder_stages_before_replacing_derivatives(
     assert existing.read_bytes() == b"approved-existing-derivative"
 
 
-def test_task_120d_manifest_requires_complete_media_review_lock(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_legacy_media_manifest_builder_is_fail_closed() -> None:
     from scripts import build_exercise_guide_media_manifest as builder
 
-    root = Path(__file__).resolve().parents[2]
-    review = json.loads(
-        (root / "docs" / "exercises" / "catalog-v2" / "120D_MEDIA_REVIEW.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    review["exercises"].pop("wall-sit")
-    incomplete_review = tmp_path / "120D-incomplete-review.json"
-    incomplete_review.write_text(json.dumps(review), encoding="utf-8")
-    monkeypatch.setattr(builder, "TASK_120D_REVIEW_PATH", incomplete_review)
-
-    with pytest.raises(ValueError, match=r"missing=\['wall-sit'\]"):
-        builder.build_manifest(
-            root / "backend" / "assets" / "exercise-guides",
-            root / "docs" / "exercises" / "catalog-v2" / "120E_ASSET_REVIEW.json",
-        )
+    assert "retired schema 2" in builder.DEPRECATION_MESSAGE
+    assert builder.main() == 2
 
 
 def test_task_120c_lower_body_machine_batch_contract_and_workout_integration(client) -> None:

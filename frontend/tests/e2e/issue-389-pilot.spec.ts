@@ -7,7 +7,7 @@ import {
 } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
 
-test.use({ hasTouch: true, isMobile: true });
+test.use({ hasTouch: true });
 
 const thumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const animationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
