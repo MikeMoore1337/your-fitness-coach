@@ -11,13 +11,57 @@ requires-python = ">=3.14"
 dependencies = []
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=9.1",
-    "httpx>=0.28",
-    "pre-commit>=4.6",
-    "ruff>=0.16.1",
-    "mypy>=2.3",
+backend = [
+    "fastapi",
+    "msgpack>=1.2.1",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "psycopg[binary]",
+    "pydantic-settings",
+    "pydantic",
+    "alembic",
+    "authlib",
+    "cryptography",
+    "PyJWT",
+    "pwdlib[argon2]",
+    "httpx[socks]",
+    "pywebpush==2.5.0",
+    "itsdangerous",
+    "python-multipart",
+    "qrcode[pil]",
+    "reportlab",
+    "setuptools>=78.1.1",
+    "slowapi",
+    "onnxruntime==1.30.0",
+    "rapidocr==3.9.2",
 ]
+bot = [
+    "aiogram",
+    "aiohttp-socks",
+    "httpx",
+    "pydantic-settings",
+    "tzdata",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28",
+    "mypy>=2.3",
+    "pre-commit>=4.6",
+    "pytest>=9.1",
+    "pytest-xdist",
+    "ruff>=0.16.1",
+]
+scheduled-report = [
+    "allure-pytest==2.16.0",
+]
+
+[tool.uv]
+package = false
+default-groups = []
+required-version = ">=0.11.32,<0.12"
+# Starlette 1.6 still references the deprecated anyio.abc.BlockingPortal alias; pytest treats it as an error.
+constraint-dependencies = ["anyio>=4.14.2,<4.15"]
 
 # Backend и bot имеют уникальные имена пакетов, чтобы локальные инструменты типизации
 # не зависели от порядка PYTHONPATH.

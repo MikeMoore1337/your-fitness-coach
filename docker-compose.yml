@@ -8,7 +8,9 @@ x-backend-image: &backend-image
 
 x-bot-image: &bot-image
   image: ${BOT_IMAGE:-yfc-bot:local}
-  build: ./bot
+  build:
+    context: .
+    dockerfile: bot/Dockerfile
 
 services:
   db:

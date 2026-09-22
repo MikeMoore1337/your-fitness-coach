@@ -31,10 +31,8 @@ jobs:
           enable-cache: true
           cache-local-path: ${{ github.workspace }}/.artifacts/runtime/cache/uv
           cache-suffix: graphify-tooling
-      - name: Install pytest only
-        run: python -m pip install "pytest>=9.1,<10"
       - name: Run wrapper tests
-        run: python -m pytest -c /dev/null -p no:cacheprovider tests/test_graphify_yfc.py -q
+        run: uv run --isolated --no-project --with "pytest>=9.1,<10" python -m pytest -c /dev/null -p no:cacheprovider tests/test_graphify_yfc.py -q
       - name: Bootstrap pinned Graphify and build code graph
         run: python scripts/graphify_yfc.py bootstrap
       - name: Verify incremental bootstrap
