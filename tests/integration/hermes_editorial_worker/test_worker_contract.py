@@ -300,6 +300,25 @@ def test_preflight_drops_only_sentences_with_unsupported_numbers_after_bounded_r
     assert editorial_worker._preflight_warnings(proposal, valid_job().source) == ()
 
 
+def test_numeric_fallback_splits_plain_sentences_and_newlines() -> None:
+    source_numbers = {"2026"}
+    value = (
+        "Подтверждённый факт 2026 года. Лишнее число 999. "
+        "Ещё один подтверждённый факт.\nФинальный факт без чисел."
+    )
+
+    cleaned = editorial_worker._drop_sentences_with_unsupported_numbers(
+        value,
+        source_numbers=source_numbers,
+    )
+
+    assert "999" not in cleaned
+    assert (
+        cleaned
+        == "Подтверждённый факт 2026 года. Ещё один подтверждённый факт. Финальный факт без чисел."
+    )
+
+
 def test_preflight_repairs_photo_caption_with_trusted_source_url(monkeypatch) -> None:
     rejected = {
         "headline": "З" * 180,

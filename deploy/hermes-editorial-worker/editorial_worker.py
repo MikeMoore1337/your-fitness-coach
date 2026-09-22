@@ -610,7 +610,7 @@ def _drop_sentences_with_unsupported_numbers(
 ) -> str:
     sentences = [
         sentence.strip()
-        for sentence in re.split(r"(?<=[.!?…])\\s+|\\n+", value.strip())
+        for sentence in re.split(r"(?<=[.!?…])\s+|\n+", value.strip())
         if sentence.strip()
     ]
     kept = [
