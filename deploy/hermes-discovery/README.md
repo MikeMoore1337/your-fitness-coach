@@ -109,11 +109,17 @@ Post-merge CI строит и сканирует `hermes-discovery` и `hermes-w
 `/etc/hermes/current` и systemd links, сохраняет manifest с YFC SHA, image refs,
 compatibility и rollback parent, устанавливает worker env с mode `0600`, рендерит units и
 запускает `systemd-analyze verify`. Installer устанавливает только repository-owned таблицу
-`inet hermes_egress`: policy действует на bridge `hermes-net`, разрешает DNS и точные
-HTTPS-адреса canonical source/provider/intake, а остальные новые пакеты с этого bridge
-отбрасывает. Перед каждым discovery policy атомарно refresh'ится; сбой DNS оставляет старую
-policy и не расширяет egress. Глобальные defaults и YFC traffic не меняются, timer остаётся
-disabled.
+`inet hermes_egress`: policy действует на bridge `hermes-net`, разрешает DNS только к
+настроенным resolver'ам и оставляет scoped default-deny для новых пакетов Hermes. В явном
+`separate-vm` разрешён TCP/443 к public Internet только после отбрасывания loopback,
+private/RFC1918, link-local, carrier-grade NAT, documentation/reserved, multicast и других
+non-routable адресов; policy не привязывается к host-side DNS snapshot и переживает CDN rotation.
+В явном `colocated-isolated` сохраняется более строгая exact resolved destination allowlist и
+отдельный intake hairpin для Docker DNAT. Глобальные defaults и YFC traffic не меняются, timer
+остаётся disabled. Mode передаётся явно из rendered systemd contract; его отсутствие в
+`refresh`/`validate` является fail-closed ошибкой. При установке `separate-vm` legacy
+`hermes-egress-refresh.timer` и его `inet hermes_guard` stale-IP policy выводятся из dedicated
+контура, чтобы старый allowlist не мог перекрыть новый mode-aware профиль.
 
 На co-located YFC публичный intake может быть преобразован Docker DNAT в приватный адрес
 YFC до `forward` hook. Для этого единственного случая policy разрешает только пакет с
@@ -159,7 +165,7 @@ docker network ls
 systemd-analyze verify /etc/systemd/system/hermes-discovery.service /etc/systemd/system/hermes-worker-drain.service /etc/systemd/system/hermes-discovery.target /etc/systemd/system/hermes-discovery.timer
 systemctl cat hermes-discovery.service hermes-worker-drain.service
 systemctl status hermes-discovery.timer --no-pager
-python3 /opt/hermes/current/hermes_egress.py validate
+python3 /opt/hermes/current/hermes_egress.py validate --mode separate-vm
 nft list table inet hermes_egress
 python3 /opt/hermes/current/hermes_resource_guard.py check --phase discovery --mode separate-vm
 python3 scripts/hermes_colocation.py health

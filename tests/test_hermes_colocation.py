@@ -128,6 +128,31 @@ def test_separate_vm_unit_rendering_does_not_embed_yfc_deployment_target(tmp_pat
     assert "COLOCATED_ISOLATED_HERMES=no" in rendered
     assert "HERMES_YFC_DEPLOYMENT_LOCK=none" in rendered
     assert "/srv/yfc" not in rendered
+    assert "hermes_egress.py refresh" in rendered
+    assert "--mode ${HERMES_DEPLOYMENT_MODE}" in rendered
+
+
+def test_separate_vm_retires_legacy_host_dns_egress(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[list[str], bool, bool]] = []
+
+    class Result:
+        returncode = 1
+        stdout = "inactive\n"
+
+    def fake_run(args: list[str], *, check: bool = True, capture: bool = False) -> Result:
+        calls.append((args, check, capture))
+        return Result()
+
+    monkeypatch.setattr(hermes, "_run", fake_run)
+
+    hermes._retire_legacy_egress()
+
+    assert calls == [
+        (["systemctl", "disable", "--now", "hermes-egress-refresh.timer"], False, False),
+        (["systemctl", "is-active", "hermes-egress-refresh.timer"], False, True),
+        (["nft", "delete", "table", "inet", "hermes_guard"], False, False),
+        (["nft", "list", "table", "inet", "hermes_guard"], False, True),
+    ]
 
 
 def test_definitions_provenance_is_content_addressed(tmp_path: Path) -> None:

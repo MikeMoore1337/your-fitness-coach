@@ -72,6 +72,7 @@ def test_discovery_egress_refresh_has_netlink_without_broadening_sandbox() -> No
     assert discovery_unit.index("ExecStartPre=") < discovery_unit.index("ExecStart=")
 
     assert "ExecStartPre=" not in worker_unit
+    assert "--mode ${HERMES_DEPLOYMENT_MODE}" in discovery_unit
     assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6" in worker_unit
     assert "AF_NETLINK" not in worker_unit
 

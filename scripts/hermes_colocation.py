@@ -34,6 +34,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct import from a test load
 IMAGE_REF_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 HERMES_UID = 10000
 HERMES_GID = 10000
+LEGACY_EGRESS_REFRESH_TIMER = "hermes-egress-refresh.timer"
+LEGACY_EGRESS_TABLE = "hermes_guard"
 WORKER_ENV_NAMES = frozenset(
     {
         "HERMES_WORKER_IMAGE",
@@ -627,6 +629,19 @@ def _disable_timer() -> None:
         raise ColocationError("Hermes timer must remain disabled until shadow approval")
 
 
+def _retire_legacy_egress() -> None:
+    _run(["systemctl", "disable", "--now", LEGACY_EGRESS_REFRESH_TIMER], check=False)
+    status = _run(
+        ["systemctl", "is-active", LEGACY_EGRESS_REFRESH_TIMER], check=False, capture=True
+    )
+    if status.returncode == 0 or status.stdout.strip() == "active":
+        raise ColocationError("legacy Hermes egress refresh timer must be retired")
+    _run(["nft", "delete", "table", "inet", LEGACY_EGRESS_TABLE], check=False)
+    table = _run(["nft", "list", "table", "inet", LEGACY_EGRESS_TABLE], check=False, capture=True)
+    if table.returncode == 0:
+        raise ColocationError("legacy Hermes egress table must be retired")
+
+
 def _runtime_release(args: argparse.Namespace) -> Path:
     current = args.runtime_root / "current"
     if not current.is_symlink():
@@ -700,8 +715,12 @@ def install(args: argparse.Namespace) -> dict[str, object]:
             str(release_dir / "config" / "worker.env"),
             "--network",
             "hermes-net",
+            "--mode",
+            args.mode,
         ]
     )
+    if args.mode == "separate-vm":
+        _retire_legacy_egress()
     link_records = _install_release_links(
         runtime_root=runtime_root,
         config_root=config_root,
@@ -739,6 +758,7 @@ def install(args: argparse.Namespace) -> dict[str, object]:
         "atomic_current_switch": True,
         "rollback_parent": manifest["release_parent"],
         "timer_enabled": False,
+        "legacy_egress_retired": args.mode == "separate-vm",
         "worker_env_names": sorted(WORKER_ENV_NAMES),
         "secrets_logged": False,
     }
