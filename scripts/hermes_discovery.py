@@ -122,9 +122,18 @@ def provenance() -> None:
             and "--network=${HERMES_DOCKER_NETWORK}" in discovery_unit
         ),
         "systemd.scoped_egress": "hermes_egress.py refresh" in discovery_unit,
+        "systemd.egress_mode_explicit": "--mode ${HERMES_DEPLOYMENT_MODE}" in discovery_unit,
         "egress.host_runtime": all(
             token in egress_source
-            for token in ('TABLE_NAME = "hermes_egress"', "hook forward", "shell=False")
+            for token in (
+                'TABLE_NAME = "hermes_egress"',
+                "hook forward",
+                "shell=False",
+                "DEPLOYMENT_MODES",
+                "ip daddr !=",
+                "SEPARATE_VM_MODE",
+                "COLOCATED_ISOLATED_MODE",
+            )
         ),
         "systemd.drain_network": "Environment=HERMES_DOCKER_NETWORK=hermes-net" in drain_unit,
         "systemd.shared_host_root_launchers": all(

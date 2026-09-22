@@ -340,9 +340,14 @@ scoped policy: exact source hosts для discovery и exact provider/YFC intake 
 worker; Telegram Bot API, PostgreSQL/Redis, внутренние YFC-сервисы, Docker API/socket, SSH,
 cloud metadata, registry, arbitrary redirects и wildcard internet должны быть запрещены.
 Текущий Hermes release устанавливает только repository-owned `inet hermes_egress` с hook на forward traffic:
-правила применяются к bridge `hermes-net`, содержат exact resolved IP set для canonical hosts,
-разрешённые DNS-серверы и scoped default-deny для новых пакетов Hermes. Глобальные firewall
-defaults и traffic YFC не меняются. Hermes inbound ports отсутствуют.
+правила применяются к bridge `hermes-net`, а deployment mode передаётся явно из systemd contract.
+В `separate-vm` DNS snapshot не используется для обычного public HTTPS: сначала блокируются
+private/reserved/local адреса, затем разрешается только TCP/443 к public Internet. В
+`colocated-isolated` сохраняется exact resolved IP set для canonical hosts и отдельный intake
+hairpin. В обоих режимах DNS ограничен настроенными resolver'ами, действует scoped default-deny,
+глобальные firewall defaults и traffic YFC не меняются, Hermes inbound ports отсутствуют.
+При установке `separate-vm` прежний `hermes-egress-refresh.timer` и таблица `hermes_guard`
+выводятся из dedicated-контура, чтобы stale-IP policy не перекрывала mode-aware policy.
 
 Актуальные имена переменных worker:
 

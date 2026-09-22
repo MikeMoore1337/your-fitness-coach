@@ -19,17 +19,55 @@ NETWORK_NAME = "hermes-net"
 PROVIDER_HOST = "api.groq.com"
 INTAKE_HOST = "app.your-fitness-coach.ru"
 SCHEMA_VERSION = "hermes-source-definitions-v1"
+DEPLOYMENT_MODES = frozenset({"separate-vm", "colocated-isolated"})
+SEPARATE_VM_MODE = "separate-vm"
+COLOCATED_ISOLATED_MODE = "colocated-isolated"
 MAX_SOURCE_HOSTS = 128
 MAX_RESOLVED_ADDRESSES = 256
 MAX_DNS_SERVERS = 4
 NETWORK_NAME_PATTERN = re.compile(r"^hermes-[a-z0-9][a-z0-9_.-]{0,56}$")
 BRIDGE_NAME_PATTERN = re.compile(r"^br-[a-f0-9]{6,64}$")
+PUBLIC_IPV4_EXCLUSIONS = (
+    "0.0.0.0/8",
+    "10.0.0.0/8",
+    "100.64.0.0/10",
+    "127.0.0.0/8",
+    "169.254.0.0/16",
+    "172.16.0.0/12",
+    "192.0.0.0/24",
+    "192.0.2.0/24",
+    "192.168.0.0/16",
+    "198.18.0.0/15",
+    "198.51.100.0/24",
+    "203.0.113.0/24",
+    "224.0.0.0/4",
+    "240.0.0.0/4",
+)
+PUBLIC_IPV6_EXCLUSIONS = (
+    "::/128",
+    "::1/128",
+    "::ffff:0:0/96",
+    "100::/64",
+    "2001:db8::/32",
+    "fc00::/7",
+    "fe80::/10",
+    "fec0::/10",
+    "ff00::/8",
+)
+PUBLIC_IPV4_EXCLUSIONS_TEXT = ", ".join(PUBLIC_IPV4_EXCLUSIONS)
+PUBLIC_IPV6_EXCLUSIONS_TEXT = ", ".join(PUBLIC_IPV6_EXCLUSIONS)
 Address = ipaddress.IPv4Address | ipaddress.IPv6Address
 Network = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 
 class EgressError(RuntimeError):
     """The scoped policy cannot be refreshed safely."""
+
+
+def _validate_mode(mode: str) -> str:
+    if mode not in DEPLOYMENT_MODES:
+        raise EgressError("hermes_deployment_mode_invalid")
+    return mode
 
 
 def _run(
@@ -279,9 +317,14 @@ def build_rules(
     dns_servers: set[Address],
     intake_addresses: set[Address] | None = None,
     bridge: str | None = None,
+    *,
+    mode: str,
 ) -> str:
+    _validate_mode(mode)
     if not subnets:
         raise EgressError("hermes_subnet_missing")
+    if mode == SEPARATE_VM_MODE and (allowed_addresses or intake_addresses):
+        raise EgressError("separate_vm_must_not_use_destination_allowlist")
     source_v4 = {value for value in subnets if value.version == 4}
     source_v6 = {value for value in subnets if value.version == 6}
     allowed_v4 = {value for value in allowed_addresses if value.version == 4}
@@ -304,7 +347,7 @@ def build_rules(
         source = _elements(source_v4)
         lines.extend(
             [
-                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source} }} ct state invalid drop",
+                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source} }} ct state invalid counter drop",
                 f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source} }} ct state established,related accept",
                 f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip daddr {{ {source} }} ct state established,related accept",
             ]
@@ -313,7 +356,7 @@ def build_rules(
         source = _elements(source_v6)
         lines.extend(
             [
-                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source} }} ct state invalid drop",
+                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source} }} ct state invalid counter drop",
                 f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source} }} ct state established,related accept",
                 f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 daddr {{ {source} }} ct state established,related accept",
             ]
@@ -344,8 +387,8 @@ def build_rules(
         source = _elements(source_v4)
         lines.extend(
             [
-                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ct state invalid drop',
-                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ip daddr {{ 10.0.0.0/8, 127.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 }} tcp dport {{ 22, 25566 }} drop',
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ct state invalid counter drop',
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ip daddr {{ 10.0.0.0/8, 127.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 }} tcp dport {{ 22, 25566 }} counter drop',
                 f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} ct state established,related accept',
             ]
         )
@@ -358,14 +401,14 @@ def build_rules(
                 ]
             )
         lines.append(
-            f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} drop'
+            f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip saddr {{ {source} }} counter drop'
         )
     if bridge and source_v6:
         source = _elements(source_v6)
         lines.extend(
             [
-                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ct state invalid drop',
-                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ip6 daddr {{ ::1/128, fc00::/7, fe80::/10 }} tcp dport {{ 22, 25566 }} drop',
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ct state invalid counter drop',
+                f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ip6 daddr {{ ::1/128, fc00::/7, fe80::/10 }} tcp dport {{ 22, 25566 }} counter drop',
                 f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} ct state established,related accept',
             ]
         )
@@ -378,7 +421,7 @@ def build_rules(
                 ]
             )
         lines.append(
-            f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} drop'
+            f'add rule inet {TABLE_NAME} {INPUT_CHAIN_NAME} iifname "{bridge}" ip6 saddr {{ {source} }} counter drop'
         )
     if intake_v4 and source_v4:
         lines.append(
@@ -390,27 +433,37 @@ def build_rules(
         )
     if source_v4:
         lines.append(
-            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ip daddr {{ 0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.0.2.0/24, 192.168.0.0/16, 198.18.0.0/15, 198.51.100.0/24, 203.0.113.0/24, 224.0.0.0/4, 240.0.0.0/4 }} drop"
+            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ip daddr {{ {PUBLIC_IPV4_EXCLUSIONS_TEXT} }} counter drop"
         )
     if source_v6:
         lines.append(
-            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ip6 daddr {{ ::/128, ::1/128, ::ffff:0:0/96, 100::/64, 2001:db8::/32, fc00::/7, fe80::/10, ff00::/8 }} drop"
+            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ip6 daddr {{ {PUBLIC_IPV6_EXCLUSIONS_TEXT} }} counter drop"
         )
-    if allowed_v4 and source_v4:
-        lines.append(
-            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ip daddr {{ {_elements(allowed_v4)} }} tcp dport 443 accept"
-        )
-    if allowed_v6 and source_v6:
-        lines.append(
-            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ip daddr {{ {_elements(allowed_v6)} }} tcp dport 443 accept"
-        )
+    if mode == SEPARATE_VM_MODE:
+        if source_v4:
+            lines.append(
+                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ip daddr != {{ {PUBLIC_IPV4_EXCLUSIONS_TEXT} }} tcp dport 443 accept"
+            )
+        if source_v6:
+            lines.append(
+                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ip6 daddr != {{ {PUBLIC_IPV6_EXCLUSIONS_TEXT} }} tcp dport 443 accept"
+            )
+    else:
+        if allowed_v4 and source_v4:
+            lines.append(
+                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} ip daddr {{ {_elements(allowed_v4)} }} tcp dport 443 accept"
+            )
+        if allowed_v6 and source_v6:
+            lines.append(
+                f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} ip daddr {{ {_elements(allowed_v6)} }} tcp dport 443 accept"
+            )
     if source_v4:
         lines.append(
-            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} drop"
+            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip saddr {{ {source_v4_text} }} counter drop"
         )
     if source_v6:
         lines.append(
-            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} drop"
+            f"add rule inet {TABLE_NAME} {CHAIN_NAME} ip6 saddr {{ {source_v6_text} }} counter drop"
         )
     return "\n".join(lines) + "\n"
 
@@ -426,22 +479,46 @@ def _apply_rules(rules: str) -> None:
 
 
 def refresh(
-    definitions: Path, worker_env: Path, network: str, resolv_conf: Path
+    definitions: Path,
+    worker_env: Path,
+    network: str,
+    resolv_conf: Path,
+    mode: str,
 ) -> dict[str, object]:
+    _validate_mode(mode)
     values = _selected_worker_values(worker_env)
     source_hosts = _source_hosts(definitions)
     source_hosts.add(_host_from_url(values["HERMES_PROVIDER_BASE_URL"], expected=PROVIDER_HOST))
     intake_host = _host_from_url(values["YFC_INTAKE_URL"], expected=INTAKE_HOST)
     source_hosts.add(intake_host)
-    addresses = _resolve_hosts(source_hosts)
-    intake_addresses = _resolve_public(intake_host)
-    addresses.update(intake_addresses)
+    if mode == COLOCATED_ISOLATED_MODE:
+        addresses = _resolve_hosts(source_hosts)
+        intake_addresses = _resolve_public(intake_host)
+        addresses.update(intake_addresses)
+    else:
+        addresses = set()
+        intake_addresses = set()
     dns_servers = _dns_servers(resolv_conf)
     bridge, subnets = _network_details(network)
-    _apply_rules(build_rules(subnets, addresses, dns_servers, intake_addresses, bridge))
+    _apply_rules(
+        build_rules(
+            subnets,
+            addresses,
+            dns_servers,
+            intake_addresses,
+            bridge,
+            mode=mode,
+        )
+    )
     return {
         "status": "refreshed",
         "table": TABLE_NAME,
+        "deployment_mode": mode,
+        "destination_policy": (
+            "public_https_after_private_destination_deny"
+            if mode == SEPARATE_VM_MODE
+            else "resolved_destination_allowlist"
+        ),
         "bridge": bridge,
         "allowed_destinations": len(source_hosts),
         "resolved_addresses": len(addresses),
@@ -452,7 +529,8 @@ def refresh(
     }
 
 
-def validate() -> dict[str, object]:
+def validate(mode: str) -> dict[str, object]:
+    _validate_mode(mode)
     result = _run(["nft", "list", "table", "inet", TABLE_NAME], check=False, capture=True)
     if result.returncode != 0:
         raise EgressError("hermes_egress_table_missing")
@@ -466,6 +544,8 @@ def validate() -> dict[str, object]:
         raise EgressError("hermes_egress_policy_incomplete")
     if not any("ip saddr" in line and " drop" in line for line in lines):
         raise EgressError("hermes_egress_default_deny_missing")
+    if not any("counter" in line and " drop" in line for line in lines):
+        raise EgressError("hermes_egress_drop_counters_missing")
     if not any("dport 443" in line for line in lines) or not any(
         "dport 53" in line for line in lines
     ):
@@ -474,12 +554,22 @@ def validate() -> dict[str, object]:
         "dport 53 accept" in line and " daddr " not in line for line in lines
     ):
         raise EgressError("hermes_egress_policy_incomplete")
+    https_accepts = [line for line in lines if "tcp dport 443 accept" in line]
+    if mode == SEPARATE_VM_MODE:
+        if not any("ip daddr !=" in line for line in https_accepts):
+            raise EgressError("hermes_separate_vm_public_https_allow_missing")
+        if any("ip daddr {" in line for line in https_accepts):
+            raise EgressError("hermes_separate_vm_destination_allowlist_present")
+    elif not any("ip daddr {" in line for line in https_accepts):
+        raise EgressError("hermes_colocated_destination_allowlist_missing")
     if not any("25566" in line and " drop" in line for line in lines):
         raise EgressError("hermes_host_local_ssh_denied_missing")
     return {
         "status": "validated",
         "table": TABLE_NAME,
+        "deployment_mode": mode,
         "default_deny": True,
+        "drop_counters": True,
         "host_local_ssh_denied": True,
     }
 
@@ -498,17 +588,21 @@ def main(argv: list[str] | None = None) -> int:
     refresh_parser.add_argument("--worker-env", type=Path, required=True)
     refresh_parser.add_argument("--network", default=NETWORK_NAME)
     refresh_parser.add_argument("--resolv-conf", type=Path, default=Path("/etc/resolv.conf"))
-    subparsers.add_parser("validate")
+    refresh_parser.add_argument("--mode", choices=sorted(DEPLOYMENT_MODES), required=True)
+    validate_parser = subparsers.add_parser("validate")
+    validate_parser.add_argument("--mode", choices=sorted(DEPLOYMENT_MODES), required=True)
     subparsers.add_parser("remove")
     args = parser.parse_args(list(argv) if argv is not None else None)
     try:
         if args.command == "refresh":
-            result = refresh(args.definitions, args.worker_env, args.network, args.resolv_conf)
+            result = refresh(
+                args.definitions, args.worker_env, args.network, args.resolv_conf, args.mode
+            )
         elif args.command == "validate":
-            result = validate()
+            result = validate(args.mode)
         else:
             result = remove()
-    except (EgressError, OSError, subprocess.CalledProcessError):
+    except EgressError, OSError, subprocess.CalledProcessError:
         print(
             json.dumps({"error": "hermes_egress_failed", "secrets_logged": False}), file=sys.stderr
         )

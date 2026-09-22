@@ -95,6 +95,7 @@ def test_build_rules_scopes_default_deny_to_hermes_subnet() -> None:
         {ipaddress.ip_network("172.31.0.0/24")},
         {ipaddress.ip_address("203.0.113.10"), ipaddress.ip_address("2001:db8::10")},
         {ipaddress.ip_address("127.0.0.53")},
+        mode=egress.COLOCATED_ISOLATED_MODE,
     )
 
     assert "type filter hook forward priority -100; policy accept" in rules
@@ -103,7 +104,7 @@ def test_build_rules_scopes_default_deny_to_hermes_subnet() -> None:
     assert "ip daddr { 203.0.113.10 } tcp dport 443 accept" in rules
     assert "ip6 daddr { 2001:db8::10 } tcp dport 443 accept" not in rules
     assert "ip daddr { 0.0.0.0/8" in rules
-    assert rules.rstrip().endswith("ip saddr { 172.31.0.0/24 } drop")
+    assert rules.rstrip().endswith("ip saddr { 172.31.0.0/24 } counter drop")
     assert "tcp dport 443 accept" in rules
     assert "ip saddr { 172.31.0.0/24 } ip daddr" in rules
 
@@ -114,6 +115,7 @@ def test_build_rules_allows_only_public_intake_hairpin_after_docker_dnat() -> No
         {ipaddress.ip_address("203.0.113.10"), ipaddress.ip_address("77.91.90.171")},
         {ipaddress.ip_address("127.0.0.53")},
         {ipaddress.ip_address("77.91.90.171")},
+        mode=egress.COLOCATED_ISOLATED_MODE,
     )
 
     assert (
@@ -128,6 +130,7 @@ def test_build_rules_adds_scoped_host_input_default_deny() -> None:
         {ipaddress.ip_address("203.0.113.10")},
         {ipaddress.ip_address("127.0.0.53")},
         bridge="br-abcdef123456",
+        mode=egress.COLOCATED_ISOLATED_MODE,
     )
 
     assert (
@@ -138,8 +141,8 @@ def test_build_rules_adds_scoped_host_input_default_deny() -> None:
         'iifname "br-abcdef123456" ip saddr { 172.31.0.0/24 } '
         "ip daddr { 127.0.0.53 } udp dport 53 accept"
     ) in rules
-    assert 'iifname "br-abcdef123456" ip saddr { 172.31.0.0/24 } drop' in rules
-    assert "tcp dport { 22, 25566 } drop" in rules
+    assert 'iifname "br-abcdef123456" ip saddr { 172.31.0.0/24 } counter drop' in rules
+    assert "tcp dport { 22, 25566 } counter drop" in rules
 
 
 def test_build_rules_rejects_untrusted_bridge_name() -> None:
@@ -149,7 +152,205 @@ def test_build_rules_rejects_untrusted_bridge_name() -> None:
             set(),
             set(),
             bridge="br;drop",
+            mode=egress.COLOCATED_ISOLATED_MODE,
         )
+
+
+def _separate_vm_rules(*, include_ipv6: bool = False) -> str:
+    subnets = {ipaddress.ip_network("172.31.0.0/24")}
+    if include_ipv6:
+        subnets.add(ipaddress.ip_network("fd00:415::/64"))
+    return egress.build_rules(
+        subnets,
+        set(),
+        {ipaddress.ip_address("127.0.0.53")},
+        bridge="br-abcdef123456",
+        mode=egress.SEPARATE_VM_MODE,
+    )
+
+
+def test_separate_vm_public_https_does_not_use_host_dns_snapshot() -> None:
+    rules = _separate_vm_rules()
+
+    assert "ip daddr != {" in rules
+    assert "tcp dport 443 accept" in rules
+    assert "ip daddr { 150.171.109.196 } tcp dport 443 accept" not in rules
+    assert "ip daddr { 150.171.109.198 } tcp dport 443 accept" not in rules
+
+
+def test_separate_vm_dns_rotation_from_public_a_to_b_is_allowed() -> None:
+    host_snapshot = ipaddress.ip_address("150.171.109.196")
+    container_answer = ipaddress.ip_address("150.171.109.198")
+    assert host_snapshot != container_answer
+
+    rules = _separate_vm_rules()
+
+    public_https = next(line for line in rules.splitlines() if "dport 443 accept" in line)
+    assert "ip daddr !=" in public_https
+    assert str(container_answer) not in public_https
+
+
+def test_separate_vm_blocks_private_loopback_and_link_local_before_public_allow() -> None:
+    rules = _separate_vm_rules(include_ipv6=True)
+
+    for destination in ("10.0.0.0/8", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12"):
+        assert destination in rules
+    for destination in ("::1/128", "fc00::/7", "fe80::/10", "2001:db8::/32"):
+        assert destination in rules
+    assert "counter drop" in rules
+
+
+def test_separate_vm_keeps_protected_host_ports_and_non_https_blocked() -> None:
+    rules = _separate_vm_rules()
+
+    assert "tcp dport { 22, 25566 } counter drop" in rules
+    assert "tcp dport 80 accept" not in rules
+    assert "tcp dport 25 accept" not in rules
+    assert "tcp dport 443 accept" in rules
+    assert "daddr { 127.0.0.53 } udp dport 53 accept" in rules
+    assert "daddr { 127.0.0.53 } tcp dport 53 accept" in rules
+    assert "9.9.9.9" not in rules
+
+
+def test_separate_vm_rejects_destination_allowlist_inputs() -> None:
+    with pytest.raises(egress.EgressError, match="destination_allowlist"):
+        egress.build_rules(
+            {ipaddress.ip_network("172.31.0.0/24")},
+            {ipaddress.ip_address("150.171.109.196")},
+            set(),
+            mode=egress.SEPARATE_VM_MODE,
+        )
+
+
+def _refresh_inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
+    definitions = tmp_path / "source-definitions.json"
+    definitions.write_text(
+        json.dumps(
+            {
+                "schema_version": "hermes-source-definitions-v1",
+                "sources": [{"enabled": True, "url": "https://source.example.test/feed"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    worker_env = tmp_path / "worker.env"
+    worker_env.write_text(
+        "HERMES_PROVIDER_BASE_URL=https://api.groq.com/openai/v1\n"
+        "YFC_INTAKE_URL=https://app.your-fitness-coach.ru/api/v1/hermes/editorial/intake\n",
+        encoding="utf-8",
+    )
+    resolv_conf = tmp_path / "resolv.conf"
+    resolv_conf.write_text("nameserver 127.0.0.53\n", encoding="utf-8")
+    return definitions, worker_env, resolv_conf
+
+
+def test_separate_vm_refresh_skips_host_resolution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    definitions, worker_env, resolv_conf = _refresh_inputs(tmp_path)
+    captured: dict[str, str] = {}
+
+    def unexpected_resolution(*_: object) -> set[object]:
+        pytest.fail("separate-vm must not resolve destination hosts on the host")
+
+    monkeypatch.setattr(egress, "_resolve_hosts", unexpected_resolution)
+    monkeypatch.setattr(egress, "_resolve_public", unexpected_resolution)
+    monkeypatch.setattr(
+        egress,
+        "_network_details",
+        lambda _network: ("br-abcdef123456", {ipaddress.ip_network("172.31.0.0/24")}),
+    )
+    monkeypatch.setattr(egress, "_apply_rules", lambda rules: captured.setdefault("rules", rules))
+
+    result = egress.refresh(
+        definitions,
+        worker_env,
+        "hermes-net",
+        resolv_conf,
+        egress.SEPARATE_VM_MODE,
+    )
+
+    assert result["deployment_mode"] == egress.SEPARATE_VM_MODE
+    assert result["destination_policy"] == "public_https_after_private_destination_deny"
+    assert result["resolved_addresses"] == 0
+    assert "ip daddr != {" in captured["rules"]
+
+
+def test_colocated_refresh_preserves_resolved_destination_allowlist(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    definitions, worker_env, resolv_conf = _refresh_inputs(tmp_path)
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        egress,
+        "_resolve_hosts",
+        lambda _hosts: {ipaddress.ip_address("8.8.8.8")},
+    )
+    monkeypatch.setattr(
+        egress,
+        "_resolve_public",
+        lambda _host: {ipaddress.ip_address("1.1.1.1")},
+    )
+    monkeypatch.setattr(
+        egress,
+        "_network_details",
+        lambda _network: ("br-abcdef123456", {ipaddress.ip_network("172.31.0.0/24")}),
+    )
+    monkeypatch.setattr(egress, "_apply_rules", lambda rules: captured.setdefault("rules", rules))
+
+    result = egress.refresh(
+        definitions,
+        worker_env,
+        "hermes-net",
+        resolv_conf,
+        egress.COLOCATED_ISOLATED_MODE,
+    )
+
+    assert result["destination_policy"] == "resolved_destination_allowlist"
+    assert "ip daddr != {" not in captured["rules"]
+    assert "ip daddr { 1.1.1.1, 8.8.8.8 } tcp dport 443 accept" in captured["rules"]
+
+
+@pytest.mark.parametrize(
+    "mode, allow_rule",
+    [
+        (
+            egress.SEPARATE_VM_MODE,
+            "ip saddr { 172.31.0.0/24 } ip daddr != { 0.0.0.0/8 } tcp dport 443 accept",
+        ),
+        (
+            egress.COLOCATED_ISOLATED_MODE,
+            "ip saddr { 172.31.0.0/24 } ip daddr { 8.8.8.8 } tcp dport 443 accept",
+        ),
+    ],
+)
+def test_validate_understands_both_deployment_profiles(
+    monkeypatch: pytest.MonkeyPatch, mode: str, allow_rule: str
+) -> None:
+    nft_output = "\n".join(
+        [
+            "table inet hermes_egress {",
+            " chain forward { type filter hook forward priority -100; policy accept; }",
+            " ip saddr { 172.31.0.0/24 } ct state established,related accept",
+            " ip saddr { 172.31.0.0/24 } ip daddr { 127.0.0.53 } udp dport 53 accept",
+            " ip saddr { 172.31.0.0/24 } ip daddr { 127.0.0.53 } tcp dport 53 accept",
+            " ip saddr { 172.31.0.0/24 } ip daddr { 10.0.0.0/8 } counter drop",
+            f" {allow_rule}",
+            " ip saddr { 172.31.0.0/24 } counter drop",
+            " input tcp dport { 22, 25566 } counter drop",
+            "}",
+        ]
+    )
+    monkeypatch.setattr(
+        egress,
+        "_run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, nft_output, ""),
+    )
+
+    result = egress.validate(mode)
+
+    assert result["deployment_mode"] == mode
+    assert result["drop_counters"] is True
 
 
 def test_selected_worker_values_require_private_file_and_ignore_secrets(tmp_path: Path) -> None:
