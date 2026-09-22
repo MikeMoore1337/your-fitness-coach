@@ -327,10 +327,12 @@ dedicated UID/GID `10000:10000`, Docker-сеть `hermes-net` без YFC-кон�
 портов. YFC volumes, `.env`, PostgreSQL/Redis, Docker socket, SSH credential и runtime repository
 в Hermes boundary не передаются.
 
-Host guard перед discovery и worker проверяет `MemAvailable >= 768 MiB`, used swap `<= 512 MiB`,
-`load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. В `separate-vm` guard не
-читает YFC deployment lock. В явном `colocated-isolated` режиме переданный canonical YFC lock
-используется через shared `flock` и fail-closed останавливает Hermes при активном YFC deploy.
+Host guard перед discovery и worker проверяет `MemAvailable >= 768 MiB`, `load1 <= 1.50` на
+2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Порог used swap зависит от deployment mode:
+`<= 1024 MiB` для выделенного `separate-vm` и `<= 512 MiB` для `colocated-isolated`. В
+`separate-vm` guard не читает YFC deployment lock. В явном `colocated-isolated` режиме переданный
+canonical YFC lock используется через shared `flock` и fail-closed останавливает Hermes при
+активном YFC deploy.
 Reason codes: `insufficient_memory`,
 `swap_pressure`, `high_load`, `insufficient_disk`, `yfc_deploy_active`; overlap Hermes-фаз также
 запрещён. Discovery ограничен `256 MiB/0.25 CPU`, worker — `512 MiB/0.50 CPU`.
