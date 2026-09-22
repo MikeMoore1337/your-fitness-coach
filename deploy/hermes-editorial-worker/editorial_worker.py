@@ -551,6 +551,60 @@ def _external_gpt_oss_soft_budgets(source: SourcePacket) -> str:
     )
 
 
+def _truncate_utf16_text(value: str, limit: int) -> str:
+    normalized = value.strip()
+    if limit <= 0:
+        return ""
+    if _telegram_character_count(normalized) <= limit:
+        return normalized
+
+    suffix = "…"
+    suffix_units = _telegram_character_count(suffix)
+    if limit <= suffix_units:
+        return suffix
+
+    budget = limit - suffix_units
+    prefix_chars: list[str] = []
+    used_units = 0
+    for character in normalized:
+        character_units = _telegram_character_count(character)
+        if used_units + character_units > budget:
+            break
+        prefix_chars.append(character)
+        used_units += character_units
+
+    prefix = "".join(prefix_chars).rstrip()
+    last_whitespace = max(
+        (index for index, character in enumerate(prefix) if character.isspace()),
+        default=-1,
+    )
+    if last_whitespace > 0:
+        prefix = prefix[:last_whitespace].rstrip()
+    if not prefix:
+        return suffix
+    return f"{prefix}{suffix}"
+
+
+def _fit_photo_caption_limit(proposal: DraftProposal, source: SourcePacket) -> DraftProposal:
+    fitted = proposal
+    if _telegram_photo_caption_length(fitted, source) <= TELEGRAM_PHOTO_CAPTION_LIMIT:
+        return fitted
+
+    for field_name, minimum_units in (("why_it_matters", 0), ("summary", 1)):
+        current_length = _telegram_photo_caption_length(fitted, source)
+        excess = current_length - TELEGRAM_PHOTO_CAPTION_LIMIT
+        if excess <= 0:
+            break
+
+        value = getattr(fitted, field_name)
+        value_units = _telegram_character_count(value)
+        target_units = max(minimum_units, value_units - excess)
+        compacted = _truncate_utf16_text(value, target_units)
+        fitted = fitted.model_copy(update={field_name: compacted})
+
+    return fitted
+
+
 def _preflight_warnings(proposal: DraftProposal, source: SourcePacket) -> tuple[str, ...]:
     warnings: list[str] = []
     source_numbers = _normalized_numeric_tokens(_source_grounding_text(source))
@@ -931,6 +985,15 @@ def _provider_request_bounded(
                 original_blockers=tuple(dict.fromkeys(original_blockers)),
             )
         if attempt + 1 >= max_attempts:
+            if warnings == ("telegram_photo_caption_too_long",):
+                proposal = _fit_photo_caption_limit(proposal, source)
+                warnings = _preflight_warnings(proposal, source)
+                if not warnings:
+                    return ProviderResult(
+                        proposal,
+                        attempts=attempt + 1,
+                        original_blockers=tuple(dict.fromkeys(original_blockers)),
+                    )
             raise WorkerError(
                 "editorial_preflight_repair_failed",
                 safe_details={"preflight_blockers": warnings},

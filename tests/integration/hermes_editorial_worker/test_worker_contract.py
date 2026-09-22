@@ -310,6 +310,34 @@ def test_preflight_repairs_photo_caption_with_trusted_source_url(monkeypatch) ->
     assert editorial_worker._telegram_photo_caption_length(proposal, source) <= 1024
 
 
+def test_preflight_applies_caption_hard_limit_after_bounded_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rejected = {
+        "headline": "Исследование о силовой подготовке",
+        "summary": "Первичный длинный текст " * 42,
+        "why_it_matters": "Практический контекст " * 12,
+    }
+    still_too_long = {
+        "headline": "Исследование о силовой подготовке",
+        "summary": "Подробный источник-обоснованный текст " * 20,
+        "why_it_matters": "Практический контекст " * 12,
+    }
+
+    proposal, requests = _provider_request_with_sequence(monkeypatch, [rejected, still_too_long])
+
+    assert len(requests) == 2
+    assert "telegram_photo_caption_too_long" in requests[1]["messages"][-1]["content"]
+    assert proposal.headline == still_too_long["headline"]
+    assert proposal.summary == still_too_long["summary"].strip()
+    assert proposal.why_it_matters.endswith("…")
+    assert (
+        editorial_worker._telegram_photo_caption_length(proposal, valid_job().source)
+        <= editorial_worker.TELEGRAM_PHOTO_CAPTION_LIMIT
+    )
+    assert editorial_worker._preflight_warnings(proposal, valid_job().source) == ()
+
+
 def test_unresolved_repair_fails_closed_before_hmac_intake(monkeypatch) -> None:
     rejected = {
         "headline": "Что показала новая работа",
