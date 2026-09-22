@@ -17,6 +17,7 @@ SYSTEMD_ROOT = DISCOVERY_ROOT / "systemd"
 sys.path.insert(0, str(DISCOVERY_ROOT))
 
 import discovery_runner  # noqa: E402
+import hermes_health  # noqa: E402
 import hermes_worker_drain  # noqa: E402
 
 GENERATOR_SPEC = importlib.util.spec_from_file_location(
@@ -43,6 +44,30 @@ def test_state_rewrite_preserves_existing_owner(tmp_path: Path) -> None:
     if hasattr(before, "st_uid") and hasattr(before, "st_gid"):
         assert (after.st_uid, after.st_gid) == (before.st_uid, before.st_gid)
     assert json.loads(state_path.read_text(encoding="utf-8")) == {"after": True}
+
+
+def test_source_error_alert_tracks_latest_discovery_run_not_lifetime_total() -> None:
+    state: dict[str, object] = {}
+
+    first = hermes_health.update_health(
+        state,
+        stage="discovery",
+        status="completed",
+        counters={"source_errors": 3},
+    )
+    assert first["counters"]["source_errors"] == 3
+    assert first["last_source_error_count"] == 3
+    assert "source_errors" in first["active_alerts"]
+
+    recovered = hermes_health.update_health(
+        state,
+        stage="discovery",
+        status="completed",
+        counters={"source_errors": 1},
+    )
+    assert recovered["counters"]["source_errors"] == 4
+    assert recovered["last_source_error_count"] == 1
+    assert "source_errors" not in recovered["active_alerts"]
 
 
 def test_install_instructions_start_enabled_timer_after_gate_a() -> None:
