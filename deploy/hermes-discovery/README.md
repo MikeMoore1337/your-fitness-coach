@@ -130,11 +130,12 @@ YFC/Docker subnet по-прежнему попадает под deny.
 необходимые DNS-запросы и established/related state, остальные host-local порты (включая
 SSH) отбрасываются до общих YFC host rules.
 
-На каждом Hermes host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`, used swap
-`<= 512 MiB`, `load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. На
-`separate-vm` YFC deployment lock не читается и не требуется. Только для явного
-`colocated-isolated` используется переданный оператором canonical YFC deployment lock в
-shared-lock режиме без изменения его прав. При нарушении возвращаются reason codes `insufficient_memory`,
+На каждом Hermes host guard перед каждой фазой требует: `MemAvailable >= 768 MiB`,
+`load1 <= 1.50` на 2 vCPU и свободный `/var/lib/hermes >= 5 GiB`. Порог used swap зависит
+от deployment mode: `<= 1024 MiB` для выделенного `separate-vm` и `<= 512 MiB` для
+`colocated-isolated`. На `separate-vm` YFC deployment lock не читается и не требуется. Только
+для явного `colocated-isolated` используется переданный оператором canonical YFC deployment lock
+в shared-lock режиме без изменения его прав. При нарушении возвращаются reason codes `insufficient_memory`,
 `swap_pressure`, `high_load`, `insufficient_disk` или `yfc_deploy_active`; Hermes discovery и
 worker не запускаются одновременно. Фазы ограничены `256 MiB/0.25 CPU` и `512 MiB/0.50 CPU`.
 
