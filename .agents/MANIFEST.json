@@ -1,16 +1,23 @@
 {
   "package": "your-fitness-coach-agents",
-  "version": "7",
+  "version": "8",
   "root": ".agents",
-  "skill_count": 32,
+  "skill_count": 43,
   "skills": [
     "accessibility-engineer",
+    "allure-reporting",
+    "api-testing",
     "backend-engineer",
     "billing-engineer",
+    "coverage-analysis",
     "data-engineer",
+    "database-validation",
     "document-import-engineer",
+    "e2e-review",
     "evidence-content-editor",
+    "failure-triage",
     "fitness-domain-reviewer",
+    "flaky-analysis",
     "frontend-engineer",
     "landing-art-director",
     "llm-engineer",
@@ -20,10 +27,13 @@
     "observability-engineer",
     "performance-engineer",
     "platform-engineer",
+    "playwright-testing",
     "privacy-engineer",
     "product-analytics-engineer",
     "product-designer",
     "product-discovery",
+    "pydantic-contracts",
+    "pytest-test-design",
     "python-engineer",
     "qa-engineer",
     "release-manager",
@@ -33,6 +43,7 @@
     "solution-architect",
     "technical-writer",
     "telegram-engineer",
+    "test-data-management",
     "ui-audit",
     "ui-prototyper",
     "ux-researcher"
@@ -59,7 +70,7 @@
     ],
     "wow_is_first_class_quality": true
   },
-  "routing_model": "focused-core-plus-conditional-skills; task-declared-lifecycle-roles",
+  "routing_model": "focused-core-plus-conditional-skills; task-declared-lifecycle-roles; qa-strategy-plus-specialists",
   "role_count": 6,
   "notes": [
     "commercial-product-builder removed because orchestration belongs to role orchestrator",
@@ -68,6 +79,8 @@
     "llm-engineer expanded to AI/LLM product engineering and AI Coach",
     "motion-design-engineer and ui-prototyper added",
     "role contracts slimmed; lifecycle policy remains canonical in TASK_EXECUTION_LIFECYCLE.md",
-    "product-lawyer and ru-legal-risk provide read-only Russian legal-risk audit and owner decision routing"
+    "product-lawyer and ru-legal-risk provide read-only Russian legal-risk audit and owner decision routing",
+    "QA v8 keeps qa-engineer as strategy/router and adds focused testing, E2E review, triage, flakiness and coverage skills",
+    "QA work profiles are modes, not additional lifecycle roles"
   ]
 }
