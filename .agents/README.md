@@ -1,4 +1,4 @@
-# YFC Codex skills v6 - focused contracts
+# YFC Codex skills v8 - focused contracts
 
 Skills задают профессиональный способ выполнения работы. Role задаёт ответственность прохода, task - scope и результат.
 
@@ -8,44 +8,42 @@ Skills задают профессиональный способ выполне
 2. `Условные skills` открываются только при фактическом trigger.
 3. Skill не расширяет scope.
 4. Для обычной implementation task держи примерно 2-5 core skills.
-5. QA: base skill роли + обычно не более 1-2 профильных skills.
-6. Не создавать отдельного агента на каждый skill.
+5. QA: `$qa-engineer` как strategy/router + обычно не более 1-2 профильных skills.
+6. Не создавать отдельного lifecycle agent на каждый skill или QA-профиль.
 7. Большой end-to-end scope координирует role `orchestrator`, а не специальный meta-skill.
-8. `commercial-product-builder` удалён в v6 как дублирующий orchestration/lifecycle.
-9. Отдельного `ai-engineer` нет: AI/LLM/AI Coach scope принадлежит `$llm-engineer`.
-10. `$ui-prototyper` используется только явно для design exploration.
-11. `$motion-design-engineer` используется для существенного motion design/implementation/review, а не автоматически для любой CSS transition.
-12. `$ru-legal-risk` обязателен для dedicated legal-risk audit и подключается условно к обычной
-    task только при фактическом legal trigger; он требует актуальных источников, не является
-    гарантией compliance и не принимает owner decision.
-13. Dedicated legal-risk audit использует primary role `product-lawyer`; remediation после owner
-    decision возвращается в отдельную task с обычной implementation-ролью.
+8. QA work profiles описаны в `references/QA_AUTOMATION_ARCHITECTURE.md`; это modes существующих roles.
+9. `commercial-product-builder` удалён как дублирующий orchestration/lifecycle.
+10. Отдельного `ai-engineer` нет: AI/LLM/AI Coach scope принадлежит `$llm-engineer`.
+11. `$ui-prototyper` используется только явно для design exploration.
+12. `$motion-design-engineer` используется для существенного motion design/implementation/review.
+13. `$ru-legal-risk` обязателен для dedicated legal-risk audit и условен для обычной feature task по trigger.
 
-## Design v6
+## QA v8
 
-Для обычных задач текущая production design system остаётся baseline, чтобы не создавать случайный visual drift.
+QA разделён на strategy и узкие рабочие контракты:
 
-Для отдельной owner-approved design exploration/redesign task весь Design V2/V2.1 может быть пересмотрен.
+- `qa-engineer` - risk strategy/router;
+- `playwright-testing` - browser implementation;
+- `e2e-review` - доверие к E2E/false-green review;
+- `pytest-test-design` - Python test design;
+- `api-testing`, `database-validation`, `pydantic-contracts` - boundary contracts;
+- `test-data-management` - deterministic fixtures/data;
+- `allure-reporting` - evidence/report quality;
+- `failure-triage` - конкретное падение;
+- `flaky-analysis` - intermittent failures;
+- `coverage-analysis` - risk/behavior gaps.
 
-Устойчивые YFC anchors:
+UI visual/product audit остаётся отдельным `$ui-audit`.
 
-- sport-tech;
-- mobile-first для client-facing flows;
-- lime + black + white как фирменное цветовое ядро;
-- product truth;
-- accessibility;
-- usability;
-- performance.
+## Design
 
-Эстетические приёмы не запрещаются по названию. Glow, gradients, glass, cards, 3D, bold motion и другие решения допустимы, если они усиливают YFC и не ломают пользовательскую задачу.
-
-Запоминаемость, delight и "вау" - first-class критерии качества наряду с практичностью.
+Для обычных задач текущая production design system остаётся baseline.
+Для owner-approved redesign task дизайн может быть пересмотрен при сохранении YFC anchors:
+sport-tech, mobile-first, lime/black/white, product truth, accessibility, usability, performance.
 
 См.:
 
 - `references/SKILL_ROUTING_GUIDE.md`;
 - `references/ROLE_ROUTING_GUIDE.md`;
+- `references/QA_AUTOMATION_ARCHITECTURE.md`;
 - `references/DESIGN_GUARDRAILS.md`.
-- `skills/ru-legal-risk/references/RU_LEGAL_SOURCE_POLICY.md` для юридической source freshness.
-
-Исторические overlap/release audits являются owner-only material и в public Git не публикуются.
