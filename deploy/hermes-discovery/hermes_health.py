@@ -79,6 +79,7 @@ def ensure_health(state: dict[str, Any]) -> dict[str, Any]:
     health.setdefault("consecutive_drain_failures", 0)
     health.setdefault("pending_jobs", 0)
     health.setdefault("oldest_pending_age_seconds", 0)
+    health.setdefault("last_source_error_count", 0)
     counters = health.setdefault("counters", {})
     if not isinstance(counters, dict):
         counters = {}
@@ -127,10 +128,11 @@ def _active_alerts(health: Mapping[str, Any]) -> list[str]:
             ("intake_schema_failures", "intake_schema_failures"),
             ("terminal", "terminal_failures"),
             ("transient", "transient_failures"),
-            ("source_errors", "source_errors"),
         ):
             if counters.get(counter, 0) >= ALERT_THRESHOLDS[counter]:
                 alerts.append(alert)
+    if health.get("last_source_error_count", 0) >= ALERT_THRESHOLDS["source_errors"]:
+        alerts.append("source_errors")
     return alerts
 
 
@@ -158,6 +160,13 @@ def update_health(
         health[failure_key] = int(health.get(failure_key, 0)) + 1
     health["pending_jobs"] = max(0, int(pending_jobs))
     health["oldest_pending_age_seconds"] = max(0, int(oldest_pending_age_seconds))
+    if stage == "discovery":
+        current_source_errors = (counters or {}).get("source_errors", 0)
+        health["last_source_error_count"] = (
+            current_source_errors
+            if isinstance(current_source_errors, int) and current_source_errors >= 0
+            else 0
+        )
     totals = health["counters"]
     for name, amount in (counters or {}).items():
         if name in HEALTH_COUNTERS and isinstance(amount, int) and amount >= 0:
