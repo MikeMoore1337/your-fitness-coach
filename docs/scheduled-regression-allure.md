@@ -71,6 +71,47 @@ publisher и Cloudflare credentials для локальной проверки �
     npm --prefix frontend\scheduled-report ci --omit=peer --ignore-scripts --no-audit --no-fund
     & .venv\Scripts\python.exe scripts\publish_allure_report.py publish --report-root .artifacts\runtime\tests\allure-report --metadata .artifacts\runtime\tests\allure-report-metadata.json --publication .artifacts\runtime\tests\allure-publication.json --dry-run
 
+## SSH preflight publisher (Task 400)
+
+После merge Task 400 канонической проверкой границы GitHub Actions -> RU publisher является
+ручной workflow [`Allure SSH preflight`](../.github/workflows/allure-ssh-preflight.yml). Он
+запускается только через `workflow_dispatch` на `master`, имеет только `contents: read` и
+вызывает:
+
+    python scripts/publish_allure_report.py ssh-preflight
+
+Preflight использует те же repository variables, secrets, нормализацию credential-файлов,
+`ssh-keygen`, SSH arguments и pinned `known_hosts`, что и реальная публикация. Отчёт, архив,
+publication metadata, `.staging` и `.publish.lock` не создаются и не изменяются. Неподдержанная
+команда `yfc-allure-preflight-v1` должна дойти до текущего forced publisher и вернуть только
+его закреплённый безопасный ответ `publication rejected`; это доказывает TCP/key exchange,
+public-key authentication и forced-command boundary без публикации.
+
+Ожидаемый безопасный результат для текущего RU target:
+
+    ALLURE_REPORT_SSH_HOST=77.91.90.171
+    ALLURE_REPORT_SSH_PORT=1337
+    ALLURE_REPORT_SSH_USER=yfc-allure-publisher
+    ALLURE_SSH_PRIVATE_KEY_PARSE_OK=yes
+    ALLURE_SSH_PRIVATE_KEY_FINGERPRINT=SHA256:bpj3tuNRqs6oQavdPb8jYz2hgGRqZZCqZ5YAP4b4uaU
+    ALLURE_SSH_KNOWN_HOSTS_MATCH=yes
+    ALLURE_SSH_HOST_KEY_FINGERPRINT=SHA256:xJzhLGqAJTQ5RPiH6ziuju98JV3B5YwRF0TNAGE/rlE
+    ALLURE_SSH_AUTH_ACCEPTED=yes
+    ALLURE_SSH_FORCED_COMMAND_REACHED=yes
+    ALLURE_SSH_PREFLIGHT=pass
+
+При ошибке workflow завершается с `ALLURE_SSH_PREFLIGHT=fail` и печатает только bounded
+`ALLURE_SSH_FAILURE_CLASS`: `private_key_invalid`, `known_hosts_invalid`,
+`host_key_entry_missing`, `host_key_mismatch`, `publickey_auth_failed`, `connection_refused`,
+`connection_timeout`, `connection_unreachable`, `remote_command_failed`,
+`publication_stream_failed` или `unknown_ssh_failure`. Raw `stderr`, private key, base64 payload,
+значения environment и полный body `known_hosts` в лог не выводятся.
+
+При key rotation последовательность fail-closed: установить новый key/host entry в GitHub
+Actions, запустить один manual preflight, сверить только public fingerprints и RU `auth.log`,
+затем выполнить одну контролируемую Daily publication. До успешного preflight Daily не
+запускается; до успешной новой публикации старый origin не отключается.
+
 ## Aggregation в GitHub Actions
 
 Каждый parallel job пишет в отдельный result directory. Composite action
@@ -202,12 +243,13 @@ write methods и служебные пути origin не публикуются.
 
 - ALLURE_REPORT_ENCRYPTION_KEY — уже используемый ключ encrypted bundles;
 - ALLURE_REPORT_SSH_PRIVATE_KEY — отдельный ed25519 private key publisher;
-- ALLURE_REPORT_SSH_KNOWN_HOSTS — pinned host-key entry для app.your-fitness-coach.ru.
+- ALLURE_REPORT_SSH_KNOWN_HOSTS — pinned host-key entry для настроенных host/port (текущий RU
+  target: `[77.91.90.171]:1337`).
 
 GitHub Actions variables:
 
-- ALLURE_REPORT_SSH_HOST — app.your-fitness-coach.ru;
-- ALLURE_REPORT_SSH_PORT — 22;
+- ALLURE_REPORT_SSH_HOST — 77.91.90.171;
+- ALLURE_REPORT_SSH_PORT — 1337;
 - ALLURE_REPORT_SSH_USER — yfc-allure-publisher.
 
 PROD_SSH_KEY, PROD_SSH_KNOWN_HOSTS, CLOUDFLARED_TOKEN, application .env и любые production
@@ -329,8 +371,8 @@ permissions; команды не должны молча менять чужог
     chmod 0600 /srv/yfc-allure/.ssh/authorized_keys
 
 В ALLURE_REPORT_SSH_KNOWN_HOSTS записывается pinned строка вида
-app.your-fitness-coach.ru ssh-ed25519 <VERIFIED_BASE64_HOST_KEY>. <VERIFIED_BASE64_HOST_KEY>
-нужно получить и сверить с fingerprint из доверенной VPS/provider console; один лишь
+`[77.91.90.171]:1337 ssh-ed25519 <VERIFIED_BASE64_HOST_KEY>`.
+Её нужно получить и сверить с fingerprint из доверенной VPS/provider console; один лишь
 непроверенный ssh-keyscan источником доверия не является.
 
 ### 3. Добавить connector token в существующий VPS .env

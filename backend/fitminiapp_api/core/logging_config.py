@@ -38,6 +38,7 @@ SAFE_EVENT_NAMES = frozenset(
         "http_request_rejected",
         "notification_delivery_failed",
         "notification_delivery_completed",
+        "notification_delivery_cancelled",
         "news_draft_generation_failed",
         "news_draft_generation_succeeded",
         "news_candidate_evaluated",

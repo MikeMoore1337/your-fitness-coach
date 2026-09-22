@@ -5,9 +5,15 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 NEWS_REVIEW_TIMEZONE = ZoneInfo("Europe/Moscow")
-NEWS_REVIEW_BATCH_SIZE = 5
+NEWS_REVIEW_BATCH_SIZE = 10
 NEWS_REVIEW_SLOT_WINDOW = timedelta(minutes=15)
 NEWS_REVIEW_SLOT_STARTS = (time(hour=8), time(hour=13), time(hour=18))
+
+
+def news_review_batch_size() -> int:
+    from fitminiapp_api.core.config import settings
+
+    return settings.news_review_batch_size
 
 
 @dataclass(frozen=True)

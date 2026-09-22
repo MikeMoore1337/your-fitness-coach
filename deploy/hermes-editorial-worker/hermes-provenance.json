@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "task129-hermes-worker-provenance-v1",
+  "schemaVersion": "task403-hermes-worker-provenance-v2",
   "upstream": {
     "repository": "https://github.com/NousResearch/hermes-agent.git",
     "version": "0.21.0",
@@ -10,7 +10,7 @@
   },
   "base": {
     "image": "python:3.13-alpine",
-    "digest": "sha256:46ee549c88617e9bc8acb843a326f1a5c0fa5608d7f9703509efe6d53b55f318",
+    "digest": "sha256:f3ebba2ace255c93267a0278da88c7f1044432991abc4e6ad20d22e34dd0f8ee",
     "platform": "linux/amd64",
     "alpine": "3.24.1"
   },
@@ -18,9 +18,12 @@
     "version": "editorial-worker-v1",
     "jobSchema": "hermes-editorial-job-v1",
     "intakeSchema": "hermes-editorial-intake-v2",
-    "promptVersion": "task129-editorial-worker-v2",
+    "promptVersion": "task403-editorial-worker-v1",
     "skillVersion": "yfc-hermes-editorial-v1",
-    "sourceBehaviorPatches": 0,
+    "sourceBehaviorPatches": {
+      "relevanceGate": "hermes-relevance-v1 required before provider",
+      "richCaptionTarget": "850-1000 UTF-16 characters when evidence supports it"
+    },
     "provider": "OpenAI-compatible HTTP, local-only before Gate A",
     "publishCapability": false,
     "telegramCapability": false,

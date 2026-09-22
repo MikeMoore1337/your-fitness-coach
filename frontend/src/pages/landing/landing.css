@@ -23,13 +23,13 @@
   border-bottom: 1px solid #363b3b;
 }
 
-/* Хедер главной — прозрачный слой навигации без подложки и декоративных кромок. */
+/* Хедер главной — лёгкая матовая подложка для читаемости поверх hero-image. */
 .landing-page.public-shell:has(> #landing-content) .public-shell__header {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  background: rgb(9 11 11 / 28%);
+  border-bottom: 1px solid rgb(255 255 255 / 12%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 8%);
+  -webkit-backdrop-filter: blur(12px) saturate(115%);
+  backdrop-filter: blur(12px) saturate(115%);
 }
 
 /* Фото проходит под хедером без дублирования изображения. */
@@ -256,7 +256,7 @@
 }
 .landing-practice__entry .ui-button {
   display: flex;
-  margin-top: 8px;
+  margin-top: 16px;
   background: #b2f520;
   color: #090b0b;
   border-radius: var(--radius-control);
@@ -470,6 +470,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  margin-top: 20px;
 }
 .landing-chapter[data-motion-phase='enter'] {
   animation: strength-chapter-enter 700ms cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -532,6 +533,14 @@
   }
 }
 @media (max-width: 640px) {
+  .landing-page.public-shell:has(> #landing-content) .public-shell__header {
+    background: rgb(9 11 11 / 22%);
+    border-bottom-color: rgb(255 255 255 / 9%);
+    box-shadow: none;
+    -webkit-backdrop-filter: blur(8px) saturate(110%);
+    backdrop-filter: blur(8px) saturate(110%);
+  }
+
   .landing-nav {
     display: none;
   }
@@ -616,8 +625,9 @@
   display: block;
 }
 .landing-assurance__links {
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
 }
 .landing-assurance__links a {
   color: inherit;
@@ -649,6 +659,10 @@
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+}
+
+.landing-continuity__action {
+  margin-top: 10px;
 }
 
 .landing-progress__heading {

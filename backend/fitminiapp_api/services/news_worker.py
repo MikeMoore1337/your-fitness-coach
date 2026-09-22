@@ -8,14 +8,15 @@ from time import monotonic
 from typing import Protocol
 
 import httpx
-from sqlalchemy import func
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.news import (
     NewsCluster,
     NewsDraftRevision,
+    NewsItem,
     NewsReviewDelivery,
+    NewsSource,
 )
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.news_editorial import (
@@ -30,6 +31,7 @@ from fitminiapp_api.services.news_editorial import (
     review_delivery_blockers,
     review_message,
 )
+from fitminiapp_api.services.news_freshness import source_metadata_is_fresh
 from fitminiapp_api.services.news_images import create_image_revision
 from fitminiapp_api.services.news_ingestion import utcnow
 from fitminiapp_api.services.news_publication import (
@@ -39,8 +41,8 @@ from fitminiapp_api.services.news_publication import (
     publication_payload,
 )
 from fitminiapp_api.services.news_review_schedule import (
-    NEWS_REVIEW_BATCH_SIZE,
     NewsReviewSlot,
+    news_review_batch_size,
 )
 from fitminiapp_api.services.notifications import safe_delivery_error
 from fitminiapp_api.services.telegram_transport import (
@@ -141,10 +143,103 @@ async def generate_pending_images(client: httpx.AsyncClient) -> int:
     return generated
 
 
+def _review_candidate(
+    db,
+    delivery: NewsReviewDelivery,
+    *,
+    channel_ready: bool,
+) -> tuple[NewsDraftRevision, NewsCluster, tuple[object, ...], dict[str, int]] | None:
+    draft = db.get(NewsDraftRevision, delivery.draft_id)
+    cluster = db.get(NewsCluster, draft.cluster_id) if draft is not None else None
+    if (
+        draft is None
+        or cluster is None
+        or cluster.status != "awaiting_review"
+        or draft.revision != cluster.latest_draft_revision
+        or cluster.discovery_eligible is not True
+        or not is_hermes_origin_draft(draft)
+    ):
+        return None
+    metadata = draft.evidence_metadata if isinstance(draft.evidence_metadata, dict) else {}
+    if not source_metadata_is_fresh(metadata, now=utcnow()):
+        return None
+    try:
+        review = compose_review_artifact(db, draft, channel_ready=channel_ready)
+        if review_delivery_blockers(draft, review):
+            return None
+    except LookupError, ValueError:
+        return None
+    primary = db.get(NewsItem, draft.primary_item_id)
+    if primary is None:
+        return None
+    source = db.get(NewsSource, primary.source_id)
+    relevance_topics = metadata.get("relevance_topics", ())
+    if not isinstance(relevance_topics, (list, tuple)):
+        relevance_topics = ()
+    relevance_strength = {"strong": 2, "moderate": 1}.get(
+        str(metadata.get("relevance_strength", "")),
+    )
+    if not relevance_strength:
+        relevance_strength = (
+            2
+            if any(
+                reason.startswith("topic_allowed:")
+                for reason in (cluster.discovery_reasons or [])
+                if isinstance(reason, str)
+            )
+            else 1
+        )
+    specific_topic = int(
+        any(
+            topic
+            in {
+                "strength_hypertrophy",
+                "bodybuilding",
+                "sports_nutrition",
+                "dietary_supplements",
+                "sports_bodybuilding_pharmacology",
+            }
+            for topic in relevance_topics
+            if isinstance(topic, str)
+        )
+    )
+    evidence_rank = {
+        "high": 4,
+        "moderate": 3,
+        "limited": 2,
+        "preliminary": 1,
+    }.get(str(metadata.get("evidence_level", cluster.evidence_level)), 0)
+    source_rank = {
+        "systematic_review": 4,
+        "primary_research": 3,
+        "official_organization": 2,
+        "reputable_secondary": 1,
+    }.get(str(source.source_type) if source is not None else "", 0)
+    published_at = primary.published_at or datetime.min
+    rank = (
+        relevance_strength,
+        evidence_rank,
+        source_rank,
+        int(cluster.score or 0),
+        published_at,
+        specific_topic,
+        -delivery.id,
+    )
+    components = {
+        "relevance_strength": relevance_strength,
+        "specific_topic": specific_topic,
+        "evidence_level": evidence_rank,
+        "source_quality": source_rank,
+        "cluster_score": int(cluster.score or 0),
+    }
+    return draft, cluster, rank, components
+
+
 def _claim_deliveries(
     *,
     draft_limit: int | None = None,
     review_slot: NewsReviewSlot | None = None,
+    channel_ready: bool = True,
 ) -> list[int]:
     now = utcnow()
     stale_before = now - PROCESSING_TTL
@@ -165,6 +260,8 @@ def _claim_deliveries(
             NewsReviewDelivery.next_attempt_at <= now,
         )
         effective_draft_limit = draft_limit
+        configured_batch_size = news_review_batch_size()
+        sent_count = 0
         if review_slot is not None:
             slot_start_utc = review_slot.local_start.astimezone(UTC).replace(tzinfo=None)
             sent_drafts_in_slot = (
@@ -177,42 +274,49 @@ def _claim_deliveries(
                 .distinct()
             )
             eligible = eligible.filter(~NewsReviewDelivery.draft_id.in_(sent_drafts_in_slot))
-            remaining_batch_size = max(0, NEWS_REVIEW_BATCH_SIZE - sent_drafts_in_slot.count())
+            sent_count = sent_drafts_in_slot.count()
+            remaining_batch_size = max(0, configured_batch_size - sent_count)
             if effective_draft_limit is not None:
                 effective_draft_limit = min(effective_draft_limit, remaining_batch_size)
         if effective_draft_limit is None:
-            rows = (
-                eligible.order_by(
-                    NewsReviewDelivery.next_attempt_at.asc(), NewsReviewDelivery.id.asc()
-                )
-                .limit(MAX_DELIVERIES_PER_CYCLE)
-                .with_for_update(skip_locked=True)
-                .all()
-            )
-        else:
-            selected_drafts = (
-                eligible.with_entities(
-                    NewsReviewDelivery.draft_id,
-                    func.min(NewsReviewDelivery.next_attempt_at).label("next_attempt_at"),
-                    func.min(NewsReviewDelivery.id).label("delivery_id"),
-                )
-                .group_by(NewsReviewDelivery.draft_id)
-                .order_by(
-                    func.min(NewsReviewDelivery.next_attempt_at).asc(),
-                    func.min(NewsReviewDelivery.id).asc(),
-                )
-                .limit(effective_draft_limit)
-                .all()
-            )
-            draft_ids = [row[0] for row in selected_drafts]
-            rows = (
-                eligible.filter(NewsReviewDelivery.draft_id.in_(draft_ids))
-                .order_by(NewsReviewDelivery.next_attempt_at.asc(), NewsReviewDelivery.id.asc())
-                .with_for_update(skip_locked=True)
-                .all()
-                if draft_ids
-                else []
-            )
+            effective_draft_limit = min(MAX_DELIVERIES_PER_CYCLE, configured_batch_size)
+        candidate_rows = (
+            eligible.order_by(NewsReviewDelivery.next_attempt_at.asc(), NewsReviewDelivery.id.asc())
+            .limit(200)
+            .with_for_update(skip_locked=True)
+            .all()
+        )
+        candidates: dict[str, tuple[tuple[object, ...], dict[str, int]]] = {}
+        for delivery in candidate_rows:
+            if delivery.draft_id in candidates:
+                continue
+            candidate = _review_candidate(db, delivery, channel_ready=channel_ready)
+            if candidate is not None:
+                _, _, rank, components = candidate
+                candidates[delivery.draft_id] = (rank, components)
+        ranked = sorted(candidates.items(), key=lambda item: item[1][0], reverse=True)
+        selected_drafts = ranked[: max(0, effective_draft_limit)]
+        draft_ids = [draft_id for draft_id, _ in selected_drafts]
+        rows = (
+            eligible.filter(NewsReviewDelivery.draft_id.in_(draft_ids))
+            .order_by(NewsReviewDelivery.next_attempt_at.asc(), NewsReviewDelivery.id.asc())
+            .with_for_update(skip_locked=True)
+            .all()
+            if draft_ids
+            else []
+        )
+        logger.info(
+            "news_review_queue_ranked",
+            extra={
+                "pipeline_stage": "owner_delivery",
+                "configured_batch_size": configured_batch_size,
+                "sent_in_slot_count": sent_count,
+                "ready_candidate_count": len(candidates),
+                "selected_count": len(selected_drafts),
+                "blocked_count": len({row.draft_id for row in candidate_rows}) - len(candidates),
+                "ranking_components": [components for _, (_, components) in selected_drafts[:8]],
+            },
+        )
         result = []
         for row in rows:
             row.status = "processing"
@@ -305,6 +409,7 @@ async def deliver_review_queue(
     for delivery_id in _claim_deliveries(
         draft_limit=None,
         review_slot=review_slot,
+        channel_ready=channel_ready,
     ):
         with get_session_context() as db:
             delivery = db.get(NewsReviewDelivery, delivery_id)
@@ -355,7 +460,7 @@ async def deliver_review_queue(
         if (
             review_slot is not None
             and draft_resource_id not in sent_draft_ids
-            and len(sent_draft_ids) >= NEWS_REVIEW_BATCH_SIZE
+            and len(sent_draft_ids) >= news_review_batch_size()
         ):
             _release_claimed_delivery(delivery_id)
             continue

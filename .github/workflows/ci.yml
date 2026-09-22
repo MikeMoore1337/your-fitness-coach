@@ -844,6 +844,14 @@ jobs:
             dockerfile: bot/Dockerfile
             # Keep the bot image fail-closed until shared COPY-cache provenance is proven.
             no_cache: true
+          - image: hermes-discovery
+            context: deploy/hermes-discovery
+            dockerfile: deploy/hermes-discovery/Dockerfile
+            no_cache: false
+          - image: hermes-worker
+            context: deploy/hermes-editorial-worker
+            dockerfile: deploy/hermes-editorial-worker/Dockerfile
+            no_cache: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -851,6 +859,16 @@ jobs:
           python-version: "3.14"
       - name: Run shared container contract group
         run: python scripts/ci_contract.py run-group container-contract
+      - name: Verify Hermes source provenance
+        if: startsWith(matrix.image, 'hermes-')
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [ "${{ matrix.image }}" = hermes-discovery ]; then
+            python scripts/hermes_discovery.py provenance
+          else
+            python scripts/hermes_worker.py provenance
+          fi
       - uses: docker/setup-buildx-action@v4
       - name: Resolve immutable image reference
         id: image
@@ -881,6 +899,18 @@ jobs:
             --env BOT_INTERNAL_TOKEN=ci-image-contract-internal-token \
             "$LOCAL_TAG" \
             python -c "import fitminiapp_bot.profile_sync; import fitminiapp_bot.public_profile; import fitminiapp_bot.telegram_client"
+      - name: Verify Hermes discovery runtime contract
+        if: matrix.image == 'hermes-discovery'
+        shell: bash
+        env:
+          LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
+        run: docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true --user 10000:10000 "$LOCAL_TAG" --self-check
+      - name: Verify Hermes worker runtime contract
+        if: matrix.image == 'hermes-worker'
+        shell: bash
+        env:
+          LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
+        run: docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true --user 10000:10000 "$LOCAL_TAG" --self-check
       - name: Scan image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
@@ -930,9 +960,9 @@ jobs:
       REPORT_ROOT: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report
       REPORT_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-report-metadata.json
       PUBLICATION_METADATA: ${{ github.workspace }}/.artifacts/runtime/tests/allure-publication.json
-      ALLURE_REPORT_SSH_HOST: ${{ vars.ALLURE_REPORT_SSH_HOST || 'app.your-fitness-coach.ru' }}
-      ALLURE_REPORT_SSH_PORT: ${{ vars.ALLURE_REPORT_SSH_PORT || '22' }}
-      ALLURE_REPORT_SSH_USER: ${{ vars.ALLURE_REPORT_SSH_USER || 'yfc-allure-publisher' }}
+      ALLURE_REPORT_SSH_HOST: ${{ vars.ALLURE_REPORT_SSH_HOST }}
+      ALLURE_REPORT_SSH_PORT: ${{ vars.ALLURE_REPORT_SSH_PORT }}
+      ALLURE_REPORT_SSH_USER: ${{ vars.ALLURE_REPORT_SSH_USER }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

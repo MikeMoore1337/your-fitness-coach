@@ -10,6 +10,9 @@ def test_image_refs_are_derived_from_one_repository_contract() -> None:
         == "ghcr.io/mikemoore1337/your-fitness-coach-backend:" + "a" * 40
     )
     assert deployment_contract.local_tag("bot", "b" * 40) == "yfc-bot:ci-" + "b" * 12
+    assert deployment_contract.image_ref("owner/repo", "hermes-worker", "c" * 40) == (
+        "ghcr.io/owner/repo-hermes-worker:" + "c" * 40
+    )
 
 
 @pytest.mark.parametrize("kind", ["api", "frontend", ""])

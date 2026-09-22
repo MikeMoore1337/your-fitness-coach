@@ -302,6 +302,21 @@ def _publish_task_merge_without_advancing_local_master(root: Path, branch: str) 
     return merge_sha
 
 
+def _publish_task_squash_without_advancing_local_master(root: Path, branch: str) -> str:
+    base_sha = _git(root, "rev-parse", "master")
+    remote_worktree = root.parent / f"remote-task-squash-{uuid.uuid4().hex[:8]}"
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), base_sha)
+    try:
+        _git(remote_worktree, "merge", "--squash", branch)
+        _git(remote_worktree, "commit", "-m", f"[Task 207C] Squash task {branch}")
+        merge_sha = _git(remote_worktree, "rev-parse", "HEAD")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    _git(root, "fetch", "origin", "master")
+    return merge_sha
+
+
 def _prepare_delivery(controller: Any, task_id: str, *, branch: str) -> dict[str, Any]:
     del branch
     acquired = controller.acquire_delivery(task_id)
@@ -798,7 +813,7 @@ def test_missing_lease_worktree_fails_closed_before_new_start(
         controller.start("226K", owner_launch=True, session_label="candidate", offline=True)
 
 
-def test_dirty_exclusive_task_worktree_blocks_new_writer(
+def test_unrelated_dirty_task_worktree_does_not_block_new_writer(
     repository: tuple[Path, Any],
 ) -> None:
     root, _, controller, worktree, _, _ = _prepare_started(
@@ -809,10 +824,71 @@ def test_dirty_exclusive_task_worktree_blocks_new_writer(
 
     report = controller.doctor(offline=True)
 
+    inventory = next(
+        item for item in report["inventory"] if item["branch"] == "task/226H-synthetic-task"
+    )
+    assert report["safe_for_implementation"] is True
+    assert report["ok"] is True
+    assert inventory["classification"] == "DIRTY_NEEDS_OWNER"
+    assert any("Task 226H worktree is dirty" in item for item in report["recovery_findings"])
+    assert not any(
+        "Task 226H worktree is dirty" in item for item in report["implementation_blockers"]
+    )
+
+    started = controller.start("226I", owner_launch=True, session_label="candidate", offline=True)
+
+    assert started["lease"]["lifecycle_state"] == "implementation"
+    assert (worktree / "uncommitted.txt").read_text(encoding="utf-8") == "preserve\n"
+
+
+def test_unrelated_interrupted_task_worktree_does_not_block_new_writer(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, _, _ = _prepare_started(
+        repository, "226L", concurrency="independent-write"
+    )
+    _write_task(root, "226M", "candidate")
+    marker = git_repository.git_dir(worktree) / "MERGE_HEAD"
+    marker.write_text("synthetic\n", encoding="utf-8")
+
+    try:
+        report = controller.doctor(offline=True)
+
+        inventory = next(
+            item for item in report["inventory"] if item["branch"] == "task/226L-synthetic-task"
+        )
+        assert report["safe_for_implementation"] is True
+        assert inventory["classification"] == "DIRTY_NEEDS_OWNER"
+        assert any(
+            "Task 226L worktree is dirty or interrupted" in item
+            for item in report["recovery_findings"]
+        )
+
+        started = controller.start(
+            "226M", owner_launch=True, session_label="candidate", offline=True
+        )
+
+        assert started["lease"]["lifecycle_state"] == "implementation"
+        assert marker.read_text(encoding="utf-8") == "synthetic\n"
+    finally:
+        marker.unlink(missing_ok=True)
+
+
+def test_dirty_canonical_worktree_remains_global_implementation_blocker(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "226N", "candidate")
+    (root / "canonical-uncommitted.txt").write_text("preserve\n", encoding="utf-8")
+    controller = task_session.TaskController(git_repository)
+
+    report = controller.doctor(offline=True)
+
     assert report["safe_for_implementation"] is False
-    assert any("Task 226H worktree is dirty" in item for item in report["implementation_blockers"])
-    with pytest.raises(task_session.TaskSessionError, match="implementation/start blockers"):
-        controller.start("226I", owner_launch=True, session_label="candidate", offline=True)
+    assert "controller worktree is dirty" in report["implementation_blockers"]
+    with pytest.raises(task_session.TaskSessionError, match="canonical master refresh"):
+        controller.start("226N", owner_launch=True, session_label="candidate", offline=True)
+    assert (root / "canonical-uncommitted.txt").read_text(encoding="utf-8") == "preserve\n"
 
 
 def test_adopt_current_uses_same_compatible_lease_contract(
@@ -833,6 +909,25 @@ def test_adopt_current_uses_same_compatible_lease_contract(
 
     assert lease["task_id"] == "228"
     assert lease["concurrency_class"] == "independent-write"
+
+
+def test_adopt_current_refuses_dirty_task_worktree_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _ = repository
+    _write_task(root, "228A", "adopted", concurrency="independent-write")
+    adopted_path = root / ".artifacts" / "worktrees" / "adopted-228A"
+    _git(root, "worktree", "add", "-b", "task/228A-adopted", str(adopted_path), "origin/master")
+    (adopted_path / "uncommitted.txt").write_text("preserve\n", encoding="utf-8")
+    adopted_controller = task_session.TaskController(task_session.GitRepository(adopted_path))
+
+    with pytest.raises(task_session.TaskSessionError, match="adoption refuses dirty worktree"):
+        adopted_controller.adopt_current(
+            "228A", owner_launch=True, session_label="adopted", offline=True
+        )
+
+    assert not adopted_controller.store.task_lease_path("228A").exists()
+    assert (adopted_path / "uncommitted.txt").read_text(encoding="utf-8") == "preserve\n"
 
 
 def test_active_production_deploy_blocks_only_delivery_acquisition(
@@ -1895,6 +1990,67 @@ def test_record_production_success_requires_exact_merged_master_deployment(
     ] == ("production-success")
 
 
+def test_reopen_after_production_preserves_prior_evidence_and_releases_lane(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, worktree, _, _ = _prepare_started(repository, "205")
+    lease_path = controller.store.task_lease_path("205")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    previous_history = {
+        "version": task_session.TASK_STATE_VERSION,
+        "task_id": "205",
+        "state": "production-success",
+        "head_sha": "a" * 40,
+        "base_sha": "b" * 40,
+        "merge_sha": "c" * 40,
+        "deployed_sha": "c" * 40,
+        "pr_number": 205,
+        "completed_at": task_session.utc_now(),
+        "closeout_required": True,
+    }
+    lease.update(
+        {
+            "lifecycle_state": "production-success",
+            "delivery_owner": "205",
+            "merge_sha": "c" * 40,
+            "deployed_sha": "c" * 40,
+        }
+    )
+    task_session.StateStore.replace_json(lease_path, lease)
+    task_session.StateStore.replace_json(
+        controller.store.delivery_path,
+        {
+            "version": task_session.DELIVERY_STATE_VERSION,
+            "next_sequence": 1,
+            "owner": {"task_id": "205"},
+            "updated_at": task_session.utc_now(),
+        },
+    )
+    history_path = controller.store.history / "task-205.json"
+    task_session.StateStore.replace_json(history_path, previous_history)
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit owner authorization"):
+        controller.reopen_after_production("205", reason="continue", owner_authorize=False)
+
+    reopened = controller.reopen_after_production(
+        "205", reason="Task 403 post-production remediation", owner_authorize=True
+    )
+
+    assert reopened["lifecycle_state"] == "review"
+    assert reopened["continuation_of_production_success"] == {
+        "merge_sha": "c" * 40,
+        "deployed_sha": "c" * 40,
+        "pr_number": 205,
+    }
+    continuation = controller.store.read_json(history_path)
+    assert isinstance(continuation, dict)
+    assert continuation["state"] == "continuation-in-progress"
+    assert continuation["previous_production_success"] == previous_history
+    assert controller.store.delivery_state()["owner"] is None
+    assert not controller.repository.status(worktree)
+
+
 def test_record_production_success_rejects_sha_mismatch_without_mutation(
     repository: tuple[Path, Any],
 ) -> None:
@@ -2122,6 +2278,128 @@ def test_finish_fast_forwards_stale_local_master_before_cleanup(
     assert git_repository.ref("master") == merge_sha
     assert not worktree.exists()
     assert not git_repository.ref_exists(branch)
+
+
+def test_finish_accepts_verified_squash_merge(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "207C"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready("207C", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _prepare_delivery(controller, "207C", branch=branch)
+    merge_sha = _publish_task_squash_without_advancing_local_master(root, branch)
+
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    github.pulls[207] = _task_pr(207, "207C", base_sha, head_sha, merge_sha=merge_sha)
+    github.commits[207] = [_task_commit("207C")]
+    github.files[207] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.successful_deployments.add((merge_sha, "production"))
+    controller.record_production_success(
+        "207C", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
+    )
+
+    result = controller.finish("207C")
+
+    assert result["cleanup_performed"] is True
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
+
+
+def test_finish_accepts_controller_only_master_drift_after_deployment(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "207D"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready("207D", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _prepare_delivery(controller, "207D", branch=branch)
+    merge_sha = _publish_task_merge_without_advancing_local_master(root, branch)
+
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    github.pulls[207] = _task_pr(207, "207D", base_sha, head_sha, merge_sha=merge_sha)
+    github.commits[207] = [_task_commit("207D")]
+    github.files[207] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.successful_deployments.add((merge_sha, "production"))
+    controller.record_production_success(
+        "207D", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
+    )
+
+    _git(root, "merge", "--ff-only", "origin/master")
+    remote_worktree = root.parent / f"remote-controller-drift-{uuid.uuid4().hex[:8]}"
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), merge_sha)
+    try:
+        (remote_worktree / "AGENTS.md").write_text("controller-only drift\n", encoding="utf-8")
+        _git(remote_worktree, "add", "AGENTS.md")
+        _git(remote_worktree, "commit", "-m", "[Controller] Advance governance after deployment")
+        drift_sha = _git(remote_worktree, "rev-parse", "HEAD")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    _git(root, "fetch", "origin", "master")
+
+    result = controller.finish("207D")
+
+    assert result["cleanup_performed"] is True
+    assert result["local_master_fast_forwarded"] is True
+    assert git_repository.ref("master") == drift_sha
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
+
+
+def test_finish_rejects_product_master_drift_after_deployment(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "207E"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready("207E", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _prepare_delivery(controller, "207E", branch=branch)
+    merge_sha = _publish_task_merge_without_advancing_local_master(root, branch)
+
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    github.pulls[207] = _task_pr(207, "207E", base_sha, head_sha, merge_sha=merge_sha)
+    github.commits[207] = [_task_commit("207E")]
+    github.files[207] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.successful_deployments.add((merge_sha, "production"))
+    controller.record_production_success(
+        "207E", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
+    )
+
+    _git(root, "merge", "--ff-only", "origin/master")
+    remote_worktree = root.parent / f"remote-product-drift-{uuid.uuid4().hex[:8]}"
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), merge_sha)
+    try:
+        (remote_worktree / "frontend").mkdir()
+        (remote_worktree / "frontend" / "product-drift.txt").write_text(
+            "product drift\n", encoding="utf-8"
+        )
+        _git(remote_worktree, "add", "frontend/product-drift.txt")
+        _git(remote_worktree, "commit", "-m", "[Task 999] Product drift after deployment")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    _git(root, "fetch", "origin", "master")
+
+    with pytest.raises(task_session.TaskSessionError, match="non-controller drift"):
+        controller.finish("207E")
+
+    assert worktree.exists()
+    assert git_repository.ref_exists(branch)
+    assert controller.store.task_lease_path("207E").exists()
+    assert controller.store.delivery_state()["owner"]["task_id"] == "207E"
 
 
 def test_finish_recovers_after_worktree_removed_before_branch_cleanup(

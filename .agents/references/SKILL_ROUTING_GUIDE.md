@@ -1,4 +1,4 @@
-# Skill routing guide v7
+# Skill routing guide v8
 
 ## Принцип
 
@@ -26,6 +26,35 @@ Task = scope и результат.
 | Юридический риск РФ | `$ru-legal-risk` | privacy/security/data/AI/billing/Telegram/technical writing только по фактической поверхности |
 | Product discovery | `$product-discovery` | `$ux-researcher` только для real-user evidence |
 | Release | `$release-manager` + `$platform-engineer` по необходимости | observability/security/privacy только по реальному release risk |
+| QA strategy | `$qa-engineer` | обычно 1-2 QA/domain skills по фактическому риску |
+| Playwright/Web/TMA tests | `$qa-engineer` + `$playwright-testing` | `$e2e-review` для critical/new/AI-generated E2E trust review |
+| pytest tests | `$qa-engineer` + `$pytest-test-design` | test-data/API/DB/Pydantic по boundary |
+| API verification | `$qa-engineer` + `$api-testing` | Pydantic/DB/security/privacy по risk |
+| DB verification | `$qa-engineer` + `$database-validation` | `$test-data-management` при сложном state |
+| CI/test failure | `$failure-triage` + relevant framework skill | `$flaky-analysis` только при intermittent/retry signal |
+| Flaky test | `$flaky-analysis` + relevant framework skill | data/platform при подтверждённом trigger |
+| Coverage audit | `$coverage-analysis` + `$qa-engineer` | domain skill для непонятного contract |
+| Allure evidence | relevant test skill + `$allure-reporting` | не подключать только ради обычного pass/fail |
+
+## QA specialization v8
+
+`qa-engineer` остаётся base strategy/router для QA pass.
+
+Профильные skills:
+
+- `$playwright-testing` - Playwright implementation, browser evidence, Web/TMA verification;
+- `$e2e-review` - независимая проверка false-green/test-intent risk;
+- `$pytest-test-design` - Python unit/integration test design;
+- `$api-testing` - HTTP/API contract verification;
+- `$database-validation` - persistence/migration/transaction verification;
+- `$test-data-management` - fixtures/factories/seeds/isolation;
+- `$pydantic-contracts` - Pydantic validation/serialization contract;
+- `$allure-reporting` - report/evidence quality;
+- `$failure-triage` - классификация конкретного test/CI failure;
+- `$flaky-analysis` - intermittent/retry-only failures;
+- `$coverage-analysis` - risk/behavior coverage gaps.
+
+Рабочие профили `qa-architect`, `test-implementer`, `test-reviewer`, `ci-investigator`, `flaky-analyst`, `coverage-analyst` описаны в `QA_AUTOMATION_ARCHITECTURE.md`. Это modes существующих lifecycle roles, а не новые roles.
 
 ## `mobile-engineer` v6
 

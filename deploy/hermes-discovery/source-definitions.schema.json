@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema_version": {"const": "hermes-source-definitions-v1"},
-    "generator": {"const": "task129-yfc-source-registry-renderer-v1"},
+    "generator": {"const": "task403-yfc-source-registry-renderer-v1"},
     "source_registry": {"const": "backend/fitminiapp_api/resources/news_sources.json"},
     "source_registry_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "definitions_version": {"type": "string", "pattern": "^yfc-news-sources:[0-9a-f]{64}$"},

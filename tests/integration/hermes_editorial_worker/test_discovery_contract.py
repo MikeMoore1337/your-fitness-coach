@@ -48,8 +48,32 @@ def test_state_rewrite_preserves_existing_owner(tmp_path: Path) -> None:
 def test_install_instructions_start_enabled_timer_after_gate_a() -> None:
     readme = (DISCOVERY_ROOT / "README.md").read_text(encoding="utf-8")
 
+    assert "production default `separate-vm`" in readme
+    assert "--deployment-lock" in readme
+    assert "Для Task 403 выбрана co-location" not in readme
     assert "systemctl enable --now hermes-discovery.timer" in readme
     assert "systemctl enable hermes-discovery.timer\n" not in readme
+    assert "`install` всегда оставляет timer disabled" in readme
+    assert "После\nуспешного shadow" in readme
+
+
+def test_discovery_egress_refresh_has_netlink_without_broadening_sandbox() -> None:
+    """nft/libmnl needs AF_NETLINK for the host-scoped egress control plane."""
+    discovery_unit = _systemd_unit("hermes-discovery.service.template")
+    worker_unit = _systemd_unit("hermes-worker-drain.service.template")
+
+    discovery_families = next(
+        line.split("=", 1)[1].split()
+        for line in discovery_unit.splitlines()
+        if line.startswith("RestrictAddressFamilies=")
+    )
+    assert discovery_families == ["AF_UNIX", "AF_INET", "AF_INET6", "AF_NETLINK"]
+    assert not {"AF_PACKET", "AF_VSOCK"}.intersection(discovery_families)
+    assert discovery_unit.index("ExecStartPre=") < discovery_unit.index("ExecStart=")
+
+    assert "ExecStartPre=" not in worker_unit
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6" in worker_unit
+    assert "AF_NETLINK" not in worker_unit
 
 
 def test_discovery_timer_runs_worker_drain_and_preserves_scheduler_guardrails() -> None:
@@ -57,7 +81,7 @@ def test_discovery_timer_runs_worker_drain_and_preserves_scheduler_guardrails() 
 
     assert timer == (
         "[Unit]\n"
-        "Description=Task 129 bounded Hermes discovery schedule\n"
+        "Description=Task 403 bounded Hermes discovery schedule\n"
         "\n"
         "[Timer]\n"
         "Unit=hermes-worker-drain.service\n"
@@ -82,6 +106,11 @@ def test_shared_host_systemd_launchers_are_root_only_and_container_hardening_is_
     assert "User=hermes" not in discovery_unit
     assert "Group=hermes" not in discovery_unit
     assert "Environment=HERMES_DOCKER_NETWORK=hermes-net" in discovery_unit
+    assert "HERMES_DEPLOYMENT_MODE=@HERMES_DEPLOYMENT_MODE@" in discovery_unit
+    assert "COLOCATED_ISOLATED_HERMES=@COLOCATED_ISOLATED_HERMES@" in discovery_unit
+    assert "hermes_resource_guard.py check --phase discovery" in discovery_unit
+    assert "hermes_resource_guard.py run --phase discovery" in discovery_unit
+    assert "--oom-score-adj 500" in discovery_unit
     assert "--network=${HERMES_DOCKER_NETWORK}" in discovery_unit
     assert "@DISCOVERY_IMAGE@ --once" in discovery_unit
     assert "--read-only" in discovery_unit
@@ -100,13 +129,20 @@ def test_shared_host_systemd_launchers_are_root_only_and_container_hardening_is_
     assert "User=hermes" not in drain_unit
     assert "Group=hermes" not in drain_unit
     assert "Environment=HERMES_DOCKER_NETWORK=hermes-net" in drain_unit
-    assert "ExecStart=/usr/bin/python3 /opt/hermes/hermes_worker_drain.py --once" in drain_unit
+    assert "hermes_resource_guard.py check --phase worker" in drain_unit
+    assert "hermes_resource_guard.py run --phase worker" in drain_unit
+    assert "hermes_worker_drain.py --once" in drain_unit
+    assert "OOMScoreAdjust=500" in drain_unit
     assert "TasksMax=32" in drain_unit
     assert "MemoryMax=512M" in drain_unit
     assert "CPUQuota=50%" in drain_unit
 
     for unit in (discovery_unit, drain_unit):
         assert "docker.sock" not in unit
+        assert "/srv/yfc" not in unit
+        assert "/var/lib/docker" not in unit
+        assert "--publish" not in unit
+        assert " -p " not in unit
         assert "--privileged" not in unit
         assert ":latest" not in unit
 
@@ -157,6 +193,17 @@ def test_worker_drain_rejects_non_immutable_or_floating_images(
     monkeypatch.setenv("HERMES_WORKER_IMAGE", value)
     with pytest.raises(hermes_worker_drain.DrainError, match="hermes_worker_image_not_immutable"):
         hermes_worker_drain._worker_image()
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["registry.invalid/hermes-worker@sha256:" + "b" * 64],
+)
+def test_worker_drain_accepts_content_addressed_images(
+    value: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HERMES_WORKER_IMAGE", value)
+    assert hermes_worker_drain._worker_image() == value
 
 
 def test_canonical_registry_is_lf_only() -> None:
@@ -224,13 +271,15 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert pubmed["authoritative"] is True
     assert pubmed["fetch_kind"] == "rss"
     assert pubmed["allowed_item_hosts"] == ["pubmed.ncbi.nlm.nih.gov"]
-    assert '"Physical Fitness"[majr]' in query
-    assert '"Exercise"[majr]' in query
-    assert '"Exercise Therapy"[majr]' in query
+    assert '"Resistance Training"[Title/Abstract]' in query
+    assert '"Muscle Hypertrophy"[Title/Abstract]' in query
+    assert '"Bodybuilding"[Title/Abstract]' in query
+    assert '"Dietary Supplements"[majr]' in query
+    assert '"Anabolic Agents"[majr]' in query
     assert '"Sports Medicine"[majr]' in query
     assert '"Sports Nutritional Sciences"[majr]' in query
-    assert '"Sports Nutritional Physiological Phenomena"[majr]' in query
-    assert '"Physical Conditioning, Human"[majr]' in query
+    assert '"Exercise"[majr]' not in query
+    assert '"Physical Fitness"[majr]' not in query
     assert "fitness+OR+exercise+OR+nutrition" not in pubmed["url"]
     assert pubmed["trust_notes"].startswith("Discovery/index feed only")
     assert "primary source" in pubmed["trust_notes"]
@@ -241,6 +290,7 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert {
         "sports_nutrition",
         "dietary_supplements",
+        "sports_bodybuilding_pharmacology",
         "medicine",
         "health",
         "fitness",
@@ -385,6 +435,7 @@ def test_worker_drain_handoff_is_immutable_and_does_not_put_secret_values_in_arg
     assert command[command.index("--memory") + 1] == "512m"
     assert command[command.index("--cpus") + 1] == "0.50"
     assert command[command.index("--user") + 1] == "10000:10000"
+    assert command[command.index("--oom-score-adj") + 1] == "500"
     assert "--read-only" in command
     assert "--cap-drop" in command
     assert "docker.sock" not in command
@@ -486,6 +537,62 @@ def test_parser_keeps_unknown_topic_and_treats_instructions_as_untrusted_data() 
     assert "Ignore previous instructions" in candidates[0].content
     assert candidates[0].external_id == "article-1"
     assert candidates[0].published_at is not None
+
+
+def test_relevance_gate_rejects_before_outbox_and_records_bounded_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = discovery_runner.SourceDefinition(
+        source_id="source-one",
+        name="Source One",
+        source_type="primary_research",
+        fetch_kind="rss",
+        url="https://source.example/feed",
+        language="en",
+        enabled=True,
+        topics=("medicine",),
+        authoritative=True,
+        allowed_redirect_hosts=("source.example",),
+        allowed_item_hosts=("source.example",),
+    )
+    candidate = discovery_runner.ParsedCandidate(
+        external_id="clinical-1",
+        canonical_url="https://source.example/clinical-1",
+        title="Clinical study of a hospital population",
+        summary="A general medical outcome without training or sports context.",
+        content="The paper reports hospital outcomes and medication response.",
+    )
+    monkeypatch.setattr(
+        discovery_runner,
+        "load_source_definitions",
+        lambda *_args, **_kwargs: (
+            {"definitions_version": "v1", "source_registry_sha256": "a" * 64},
+            (source,),
+        ),
+    )
+    monkeypatch.setattr(
+        discovery_runner,
+        "_source_outcome",
+        lambda *_args, **_kwargs: discovery_runner.SourceFetchOutcome(
+            source=source,
+            result=discovery_runner.FetchResult(status="fetched", items=(candidate,)),
+        ),
+    )
+
+    state_dir = tmp_path / "state"
+    outbox_dir = state_dir / "outbox"
+    result = discovery_runner.run_once(
+        definitions_path=tmp_path / "definitions.json",
+        state_dir=state_dir,
+        outbox_dir=outbox_dir,
+        mode=discovery_runner.EXTERNAL_MODE,
+    )
+
+    assert result["candidates_created"] == 0
+    assert result["relevance_rejected"] == 1
+    assert list(outbox_dir.glob("*.json")) == []
+    state = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+    assert next(iter(state["candidates"].values()))["error_code"] == "relevance_gate_rejected"
 
 
 def test_json_feed_and_html_metadata_paths_normalize_bounded_candidates() -> None:

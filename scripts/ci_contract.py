@@ -353,6 +353,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "tests/test_zero_downtime_deploy.py",
                 "-q",
             ),
+            _cmd("hermes-runtime-contract", "python", "scripts/hermes_ci_contract.py"),
         ),
         prerequisites=("python",),
     ),
