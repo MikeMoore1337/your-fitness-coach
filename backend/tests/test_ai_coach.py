@@ -866,7 +866,8 @@ def test_groq_adapter_sends_docs_compatible_strict_request_without_tools(monkeyp
     assert "max_tokens" not in payload
     assert payload["max_completion_tokens"] == 2048
     assert payload["reasoning_effort"] == "low"
-    assert payload["reasoning_format"] == "hidden"
+    assert payload["include_reasoning"] is False
+    assert "reasoning_format" not in payload
     assert "tools" not in payload
     assert payload["response_format"]["json_schema"]["strict"] is True
 
