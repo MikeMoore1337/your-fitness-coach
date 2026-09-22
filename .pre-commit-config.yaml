@@ -1,4 +1,4 @@
-# Запуск: pip install pre-commit && pre-commit install
+# Запуск: uv sync --locked --group dev && uv run --no-sync pre-commit install
 # Все файлы: pre-commit run --all-files
 #
 # Ruff закрывает автофикс, сортировку импортов (isort), lint (flake8-подобные правила)

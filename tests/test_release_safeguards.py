@@ -1,3 +1,4 @@
+import tomllib
 from pathlib import Path
 
 import yaml
@@ -78,13 +79,33 @@ def test_dependabot_allows_only_patch_minor_version_updates() -> None:
                 assert set(group.get("update-types", ())) <= {"minor", "patch"}
         assert "ignore" not in update
 
+    python_update = updates[0]
+    assert python_update["package-ecosystem"] == "uv"
+    assert python_update["directory"] == "/"
+    assert "directories" not in python_update
+
     root = Path(__file__).resolve().parents[1]
-    dev_lock = root / "backend" / "requirements-dev.txt"
-    assert dev_lock.is_file()
-    assert not (root / "backend" / "requirements.txt").exists()
-    dev_lock_text = dev_lock.read_text(encoding="utf-8")
-    for package in ("pytest==", "mypy==", "ruff==", "pre-commit=="):
-        assert package in dev_lock_text
+    uv_lock = root / "uv.lock"
+    assert uv_lock.is_file()
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert project["tool"]["uv"]["package"] is False
+    assert project["tool"]["uv"]["default-groups"] == []
+    assert project["tool"]["uv"]["required-version"] == ">=0.11.32,<0.12"
+    assert {"backend", "bot"} <= set(project["project"]["optional-dependencies"])
+    dev = project["dependency-groups"]["dev"]
+    for package in ("pytest>=9.1", "mypy>=2.3", "ruff>=0.16.1", "pre-commit>=4.6"):
+        assert package in dev
+    for legacy in (
+        root / "backend" / "requirements.in",
+        root / "backend" / "requirements-runtime.txt",
+        root / "backend" / "requirements-dev.in",
+        root / "backend" / "requirements-dev.txt",
+        root / "backend" / "requirements-scheduled-report.in",
+        root / "backend" / "requirements-scheduled-report.txt",
+        root / "bot" / "requirements.in",
+        root / "bot" / "requirements.txt",
+    ):
+        assert not legacy.exists()
 
 
 def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() -> None:

@@ -159,8 +159,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-      - name: Install pre-commit
-        run: python -m pip install pre-commit==4.6.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-local-path: ${{ env.UV_CACHE_DIR }}
+          cache-suffix: quality
+      - name: Sync quality dependencies
+        run: |
+          uv sync --locked --no-default-groups --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Run shared quality group
         run: python scripts/ci_contract.py run-group quality
 
@@ -179,13 +188,13 @@ jobs:
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: |
-            backend/requirements-dev.txt
-            bot/requirements.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: policy
-      - name: Install Python dependencies
-        run: uv pip install -r backend/requirements-dev.txt -r bot/requirements.txt
+      - name: Sync Python dependencies
+        run: |
+          uv sync --locked --no-default-groups --extra backend --extra bot --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Prepare pytest runtime directories
         run: mkdir -p .artifacts/runtime/tests
       - name: Run shared delivery policy group
@@ -227,7 +236,7 @@ jobs:
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: backend/requirements-runtime.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: frontend
       - name: Install frontend dependencies
@@ -241,9 +250,11 @@ jobs:
         if: matrix.lane == 'unit' && needs.scope-router.outputs.run_scheduled_report == 'true'
         working-directory: frontend
         run: npm ci --prefix scheduled-report --omit=peer --ignore-scripts --no-audit --no-fund
-      - name: Install API schema dependencies
+      - name: Sync API schema dependencies
         if: matrix.lane == 'checks'
-        run: uv pip install -r backend/requirements-runtime.txt
+        run: |
+          uv sync --locked --no-default-groups --extra backend
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Run shared frontend checks group
         if: matrix.lane == 'checks'
         run: python scripts/ci_contract.py run-group frontend-checks
@@ -596,17 +607,16 @@ jobs:
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: |
-            backend/requirements-dev.txt
-            backend/requirements-scheduled-report.txt
-            bot/requirements.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: python-tests
-      - name: Install Python dependencies
-        run: uv pip install -r backend/requirements-dev.txt -r bot/requirements.txt
-      - name: Install scheduled Pytest Allure adapter
+      - name: Sync Python dependencies
+        run: |
+          uv sync --locked --no-default-groups --extra backend --extra bot --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Sync scheduled Pytest Allure adapter
         if: needs.scope-router.outputs.run_scheduled_report == 'true'
-        run: uv pip install -r backend/requirements-scheduled-report.txt
+        run: uv sync --locked --no-default-groups --extra backend --extra bot --group dev --group scheduled-report
       - name: Run shared Python tests group
         env:
           TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
@@ -670,9 +680,7 @@ jobs:
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: |
-            backend/requirements-dev.txt
-            backend/requirements-scheduled-report.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: migrated-stack
       - name: Cache Playwright browsers
@@ -680,13 +688,14 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
-      - name: Install stack dependencies
+      - name: Sync stack dependencies
         run: |
-          uv pip install -r backend/requirements-dev.txt
+          uv sync --locked --no-default-groups --extra backend --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
           npm --prefix frontend ci
-      - name: Install scheduled Pytest Allure adapter
+      - name: Sync scheduled Pytest Allure adapter
         if: needs.scope-router.outputs.run_scheduled_report == 'true'
-        run: uv pip install -r backend/requirements-scheduled-report.txt
+        run: uv sync --locked --no-default-groups --extra backend --group dev --group scheduled-report
       - name: Install scheduled Playwright reporter
         if: needs.scope-router.outputs.run_scheduled_report == 'true'
         working-directory: frontend
@@ -756,9 +765,7 @@ jobs:
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: |
-            backend/requirements-runtime.txt
-            bot/requirements.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: dependency-audit
       - name: Run shared full dependency audit group
@@ -786,13 +793,13 @@ jobs:
         with:
           version: "0.11.32"
           enable-cache: true
-          cache-dependency-glob: |
-            backend/requirements-runtime.txt
-            bot/requirements.txt
+          cache-dependency-glob: uv.lock
           cache-local-path: ${{ env.UV_CACHE_DIR }}
           cache-suffix: critical-smoke
-      - name: Install application runtime dependencies
-        run: uv pip install -r backend/requirements-runtime.txt -r bot/requirements.txt
+      - name: Sync application runtime dependencies
+        run: |
+          uv sync --locked --no-default-groups --extra backend --extra bot
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Run shared critical smoke group
         run: python scripts/ci_contract.py run-group critical-smoke
 
@@ -840,7 +847,7 @@ jobs:
             dockerfile: backend/Dockerfile
             no_cache: false
           - image: bot
-            context: bot
+            context: .
             dockerfile: bot/Dockerfile
             # Keep the bot image fail-closed until shared COPY-cache provenance is proven.
             no_cache: true

@@ -210,7 +210,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
     "python-tests": GroupSpec(
         name="python-tests",
         commands=(
-            _cmd("python-dependency-consistency", "python", "-m", "pip", "check"),
+            _cmd("python-dependency-consistency", "uv", "lock", "--check"),
             _cmd(
                 "python-suite",
                 "python",
@@ -257,31 +257,20 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 retry_delays_seconds=(2,),
             ),
             _cmd(
-                "backend-dependency-audit",
-                "uvx",
-                "--from",
-                "pip-audit==2.10.1",
-                "pip-audit",
-                "-r",
-                "backend/requirements-runtime.txt",
-                retry_on_transient=True,
-                retry_max_attempts=2,
-                retry_delays_seconds=(2,),
-            ),
-            _cmd(
-                "bot-dependency-audit",
-                "uvx",
-                "--from",
-                "pip-audit==2.10.1",
-                "pip-audit",
-                "-r",
-                "bot/requirements.txt",
+                "python-dependency-audit",
+                "uv",
+                "audit",
+                "--locked",
+                "--no-group",
+                "dev",
+                "--no-group",
+                "scheduled-report",
                 retry_on_transient=True,
                 retry_max_attempts=2,
                 retry_delays_seconds=(2,),
             ),
         ),
-        prerequisites=("npm", "uvx"),
+        prerequisites=("npm", "uv"),
     ),
     "frontend-dependency-audit": GroupSpec(
         name="frontend-dependency-audit",
@@ -304,31 +293,20 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
         name="python-dependency-audit",
         commands=(
             _cmd(
-                "backend-dependency-audit",
-                "uvx",
-                "--from",
-                "pip-audit==2.10.1",
-                "pip-audit",
-                "-r",
-                "backend/requirements-runtime.txt",
-                retry_on_transient=True,
-                retry_max_attempts=2,
-                retry_delays_seconds=(2,),
-            ),
-            _cmd(
-                "bot-dependency-audit",
-                "uvx",
-                "--from",
-                "pip-audit==2.10.1",
-                "pip-audit",
-                "-r",
-                "bot/requirements.txt",
+                "python-dependency-audit",
+                "uv",
+                "audit",
+                "--locked",
+                "--no-group",
+                "dev",
+                "--no-group",
+                "scheduled-report",
                 retry_on_transient=True,
                 retry_max_attempts=2,
                 retry_delays_seconds=(2,),
             ),
         ),
-        prerequisites=("uvx",),
+        prerequisites=("uv",),
     ),
     "policy": GroupSpec(
         name="policy",
@@ -587,9 +565,7 @@ _DOCUMENTATION_POLICY_PATHS = frozenset(
     {"AGENTS.md", "codex-backlog/GLOBAL_RULES.md", "codex-backlog/TASK_EXECUTION_LIFECYCLE.md"}
 )
 _FRONTEND_DEPENDENCY_PATHS = frozenset({"frontend/package.json", "frontend/package-lock.json"})
-_PYTHON_DEPENDENCY_FILENAMES = frozenset(
-    {"requirements.txt", "requirements-runtime.txt", "requirements-dev.txt", "uv.lock"}
-)
+_PYTHON_DEPENDENCY_FILENAMES = frozenset({"uv.lock"})
 _WORKFLOW_FILENAMES = frozenset(
     {
         "Dockerfile",
@@ -644,7 +620,7 @@ def _is_workflow_path(path: str) -> bool:
         or path.startswith((".github/", "scripts/", "deploy/"))
         or name in _WORKFLOW_FILENAMES
         or path.startswith(("docker-compose", "security/", ".docker/"))
-        or path in {".pre-commit-config.yaml", "pyproject.toml"}
+        or path == ".pre-commit-config.yaml"
     )
 
 
@@ -653,7 +629,9 @@ def _is_frontend_path(path: str) -> bool:
 
 
 def _is_backend_path(path: str) -> bool:
-    return path in {"backend", "bot"} or path.startswith(("backend/", "bot/", "tests/integration/"))
+    return path in {"backend", "bot", "pyproject.toml", "uv.lock"} or path.startswith(
+        ("backend/", "bot/", "tests/integration/")
+    )
 
 
 def _is_api_path(path: str) -> bool:
@@ -675,11 +653,8 @@ def _dependency_kind(path: str) -> tuple[bool, bool, bool]:
     normalized = path.casefold()
     name = Path(path).name.casefold()
     frontend = normalized in {item.casefold() for item in _FRONTEND_DEPENDENCY_PATHS}
-    python = (
-        name in _PYTHON_DEPENDENCY_FILENAMES
-        and (path.startswith(("backend/", "bot/")) or path in {"uv.lock", "requirements.txt"})
-    ) or normalized == "pyproject.toml"
-    runtime = python and name in {"requirements.txt", "requirements-runtime.txt", "uv.lock"}
+    python = name in _PYTHON_DEPENDENCY_FILENAMES or normalized == "pyproject.toml"
+    runtime = python
     if normalized.endswith("/package-lock.json") or normalized.endswith("/package.json"):
         frontend = True
     return frontend, python, runtime

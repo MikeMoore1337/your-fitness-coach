@@ -1,9 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: pip
-    directories:
-      - /backend
-      - /bot
+  - package-ecosystem: uv
+    directory: /
     # Ordinary version updates stay on patch/minor. Security updates are not
     # filtered by allow.update-types and remain eligible for explicit review.
     allow:
