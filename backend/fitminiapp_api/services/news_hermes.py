@@ -191,6 +191,21 @@ def _canonical_source_hash(
     )
 
 
+def _source_grounding_context(
+    source_content: str,
+    *,
+    publisher: str | None,
+    published_at: datetime | None,
+) -> str:
+    return "\n".join(
+        (
+            source_content,
+            publisher or "",
+            published_at.isoformat() if published_at else "",
+        )
+    )
+
+
 def _submission_response(
     db: Session,
     submission: HermesEditorialSubmission,
@@ -402,12 +417,17 @@ def accept_hermes_submission(
         f"{summary} {fields['summary']} {fields['why_it_matters']}",
         source_type=source.source_type,
     )
+    source_grounding_context = _source_grounding_context(
+        source_content,
+        publisher=payload.source.publisher,
+        published_at=payload.source.published_at,
+    )
     warnings = tuple(
         quality_warnings(
             fields,
             source_title=title,
             source_summary=summary,
-            source_context=source_content,
+            source_context=source_grounding_context,
         )
     )
     policy = evaluate_publication_policy(
@@ -424,7 +444,7 @@ def accept_hermes_submission(
     source_number_tokens = grounded_number_tokens(
         source_title=title,
         source_summary=summary,
-        source_context=source_content,
+        source_context=source_grounding_context,
     )
     evidence_metadata = {
         "source_packet_hash": payload.source.content_hash,

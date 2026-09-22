@@ -29,7 +29,7 @@ PRESCRIPTION_PATTERN = re.compile(
     r"\b(?:take \d|prescribe|dosage|принимайте \d|назнач(?:ить|ается)|дозировк\w*)\b",
     re.IGNORECASE,
 )
-NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:\s?%|\s?(?:mg|g|kg|мг|г|кг))?")
+NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:\s?%|\s?(?:mg|g|kg|мг|г|кг)(?![\w]))?")
 CYRILLIC_PATTERN = re.compile(r"[А-Яа-яЁё]")
 SENTENCE_END_PATTERN = re.compile(r"[.!?…](?=\s|$)")
 

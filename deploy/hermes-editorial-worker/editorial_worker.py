@@ -61,7 +61,7 @@ DRAFT_FIELD_LIMITS = {
     "why_it_matters": WHY_IT_MATTERS_MAX_LENGTH,
 }
 TELEGRAM_PHOTO_CAPTION_LIMIT = 1024
-NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:\s?%|\s?(?:mg|g|kg|мг|г|кг))?")
+NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:\s?%|\s?(?:mg|g|kg|мг|г|кг)(?![\w]))?")
 BLOCKER_CODE_PATTERN = re.compile(r"^[a-z0-9_.:-]{1,64}$")
 SAFE_PROVIDER_ERROR_VALUE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
 SAFE_PROVIDER_ERROR_FIELDS = (
