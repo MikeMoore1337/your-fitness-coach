@@ -454,6 +454,28 @@ def test_worker_drain_handoff_is_immutable_and_does_not_put_secret_values_in_arg
     assert updated["candidates"][key]["status"] == "accepted"
 
 
+def test_worker_drain_exposes_only_safe_preflight_blockers() -> None:
+    completed = CompletedProcess(
+        ["worker"],
+        1,
+        json.dumps(
+            {
+                "error": "editorial_preflight_repair_failed",
+                "preflight_blockers": [
+                    "unsupported_number",
+                    "not-a-safe-blocker",
+                    "unsupported_number",
+                ],
+            }
+        ),
+        "",
+    )
+
+    assert hermes_worker_drain._result_preflight_blockers(completed) == [
+        "unsupported_number"
+    ]
+
+
 @pytest.mark.parametrize(
     "value",
     [
