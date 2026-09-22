@@ -313,10 +313,7 @@ def test_numeric_fallback_splits_plain_sentences_and_newlines() -> None:
     )
 
     assert "999" not in cleaned
-    assert cleaned == (
-        "Подтверждённый факт 2026 года. Ещё один подтверждённый факт. "
-        "Финальный факт без чисел."
-    )
+    assert cleaned == "Подтверждённый факт 2026 года. Ещё один подтверждённый факт. Финальный факт без чисел."
 
 
 def test_preflight_repairs_photo_caption_with_trusted_source_url(monkeypatch) -> None:
