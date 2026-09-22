@@ -1764,7 +1764,7 @@ test('desktop sidebar keeps trainer workspaces reachable at a short viewport', a
   await expect(
     page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }),
   ).not.toBeVisible();
-  await expect(page.getByRole('link', { name: 'Тренер', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Сегодня', exact: true })).toBeVisible();
   expect(await navigation.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
     true,
   );
@@ -2500,10 +2500,10 @@ test('активные клиенты блокируют отключение р
   await mockApi(page, { coachClientName: longClientName, withCoachClient: true });
   await page.goto('/app');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page
-    .locator('#appMorePanel')
-    .getByRole('link', { name: 'Кабинет тренера', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
     .click();
   await page.getByText(longClientName, { exact: true }).first().click();
   const clientContext = page.locator('.trainer-mode-context__copy small');
@@ -3081,6 +3081,11 @@ test('поля даты остаются внутри анкеты клиент�
   await mockApi(page, { withCoachClient: true });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
+    .click();
   await page.getByRole('button', { name: /Тестовый клиент/ }).click();
   await page.getByText('Профиль клиента', { exact: true }).click();
 

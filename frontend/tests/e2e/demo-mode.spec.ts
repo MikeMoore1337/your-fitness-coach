@@ -1305,7 +1305,10 @@ test('trainer demo follows the connected Today-to-Today route', async ({ page })
   await captureTask293Evidence(page, `${TASK_293_VARIANT}-trainer-demo-operations.png`);
 
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Задачи клиентов', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: /Задачи клиентов/ }).click();
+  await expect(page.locator('#coach-tasks-title')).toBeVisible();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page.locator('#coach-tasks-title')).toBeFocused();
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
   await expect(page).toHaveURL(/section=trainer.*demo_step=return/);
   await expect(page.getByRole('heading', { name: 'Сегодня', level: 1 })).toBeVisible();

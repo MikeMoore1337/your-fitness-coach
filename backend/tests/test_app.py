@@ -3727,7 +3727,7 @@ def test_yandex_verification_file_is_served_directly(client):
     assert response.headers["content-type"].startswith("text/html")
     assert response.headers["x-robots-tag"] == "noindex, nofollow"
     assert (
-        response.text
+        response.text.replace("\r\n", "\n")
         == """<html>
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
