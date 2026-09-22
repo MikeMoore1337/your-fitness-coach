@@ -275,6 +275,33 @@ def test_preflight_repairs_unsupported_number_with_same_provider(monkeypatch) ->
     assert editorial_worker._preflight_warnings(proposal, valid_job().source) == ()
 
 
+def test_preflight_drops_only_sentences_with_unsupported_numbers_after_bounded_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rejected = {
+        "headline": "Что показала новая работа",
+        "summary": "Авторы описали результат с улучшением на 99%.",
+        "why_it_matters": "Материал требует редакторской проверки.",
+    }
+    still_mixed = {
+        "headline": "Что показала новая работа",
+        "summary": (
+            "Авторы описали результат с улучшением на 99%. "
+            "Исследование также содержит ограничения, которые важно учитывать."
+        ),
+        "why_it_matters": "Материал требует редакторской проверки.",
+    }
+
+    proposal, requests = _provider_request_with_sequence(monkeypatch, [rejected, still_mixed])
+
+    assert len(requests) == 2
+    assert "unsupported_number" in requests[1]["messages"][-1]["content"]
+    assert proposal.summary == (
+        "Исследование также содержит ограничения, которые важно учитывать."
+    )
+    assert editorial_worker._preflight_warnings(proposal, valid_job().source) == ()
+
+
 def test_preflight_repairs_photo_caption_with_trusted_source_url(monkeypatch) -> None:
     rejected = {
         "headline": "З" * 180,
