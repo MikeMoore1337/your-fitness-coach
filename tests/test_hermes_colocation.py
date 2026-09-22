@@ -155,6 +155,49 @@ def test_separate_vm_retires_legacy_host_dns_egress(monkeypatch: pytest.MonkeyPa
     ]
 
 
+def test_disable_timer_preserves_installed_unit_link(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    target = tmp_path / "release" / "hermes-discovery.timer"
+    target.parent.mkdir()
+    target.write_text("[Timer]\n", encoding="utf-8")
+    unit = tmp_path / "hermes-discovery.timer"
+    unit.symlink_to(target)
+
+    wants = tmp_path / "timers.target.wants" / "hermes-discovery.timer"
+    wants.parent.mkdir()
+    wants.symlink_to(unit)
+
+    calls: list[tuple[list[str], bool, bool]] = []
+
+    class Result:
+        def __init__(self, returncode: int = 0, stdout: str = "") -> None:
+            self.returncode = returncode
+            self.stdout = stdout
+
+    def fake_run(args: list[str], *, check: bool = True, capture: bool = False) -> Result:
+        calls.append((args, check, capture))
+        if args[:2] == ["systemctl", "is-enabled"]:
+            return Result(1, "linked\n")
+        if args[:2] == ["systemctl", "is-active"]:
+            return Result(3, "inactive\n")
+        return Result()
+
+    monkeypatch.setattr(hermes, "_run", fake_run)
+
+    hermes._disable_timer(tmp_path)
+
+    assert unit.is_symlink()
+    assert unit.resolve() == target
+    assert not wants.exists()
+    assert calls == [
+        (["systemctl", "stop", "hermes-discovery.timer"], False, False),
+        (["systemctl", "daemon-reload"], False, False),
+        (["systemctl", "is-enabled", "hermes-discovery.timer"], False, True),
+        (["systemctl", "is-active", "hermes-discovery.timer"], False, True),
+    ]
+
+
 def test_definitions_provenance_is_content_addressed(tmp_path: Path) -> None:
     registry_hash = "a" * 64
     path = tmp_path / "source-definitions.json"

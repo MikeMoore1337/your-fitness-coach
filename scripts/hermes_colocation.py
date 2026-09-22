@@ -622,11 +622,16 @@ def _install_release_links(
     return records
 
 
-def _disable_timer() -> None:
-    _run(["systemctl", "disable", "--now", "hermes-discovery.timer"], check=False)
-    status = _run(["systemctl", "is-enabled", "hermes-discovery.timer"], check=False, capture=True)
-    if status.returncode == 0 or status.stdout.strip() in {"enabled", "enabled-runtime"}:
+def _disable_timer(systemd_root: Path) -> None:
+    _run(["systemctl", "stop", "hermes-discovery.timer"], check=False)
+    (systemd_root / "timers.target.wants" / "hermes-discovery.timer").unlink(missing_ok=True)
+    _run(["systemctl", "daemon-reload"], check=False)
+    enabled = _run(["systemctl", "is-enabled", "hermes-discovery.timer"], check=False, capture=True)
+    if enabled.stdout.strip() in {"enabled", "enabled-runtime"}:
         raise ColocationError("Hermes timer must remain disabled until shadow approval")
+    active = _run(["systemctl", "is-active", "hermes-discovery.timer"], check=False, capture=True)
+    if active.returncode == 0 or active.stdout.strip() == "active":
+        raise ColocationError("Hermes timer must remain inactive until shadow approval")
 
 
 def _retire_legacy_egress() -> None:
@@ -732,7 +737,7 @@ def install(args: argparse.Namespace) -> dict[str, object]:
     )
     try:
         _run(["systemctl", "daemon-reload"])
-        _disable_timer()
+        _disable_timer(args.systemd_root)
     except BaseException:
         _restore_link_state(link_records)
         _run(["systemctl", "daemon-reload"], check=False)
@@ -788,7 +793,7 @@ def rollback(args: argparse.Namespace) -> dict[str, object]:
     )
     try:
         _run(["systemctl", "daemon-reload"])
-        _disable_timer()
+        _disable_timer(args.systemd_root)
     except BaseException:
         _restore_link_state(link_records)
         _run(["systemctl", "daemon-reload"], check=False)
