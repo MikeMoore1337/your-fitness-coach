@@ -34,6 +34,9 @@ DEFAULT_MAX_JOBS = 1
 MAX_JOBS = 20
 DEFAULT_DOCKER_NETWORK = "hermes-net"
 RESERVED_DOCKER_NETWORK_NAMES = frozenset({"bridge", "default", "host", "none"})
+SAFE_PREFLIGHT_BLOCKERS = frozenset(
+    {"unsupported_number", "telegram_photo_caption_too_long"}
+)
 WORKER_ENV_NAMES = (
     "HERMES_PROVIDER_BASE_URL",
     "HERMES_PROVIDER_API_KEY",
@@ -196,6 +199,27 @@ def _result_code(completed: subprocess.CompletedProcess[str]) -> str:
     return "worker_failed"
 
 
+def _result_preflight_blockers(
+    completed: subprocess.CompletedProcess[str],
+) -> list[str]:
+    try:
+        document = json.loads(completed.stdout.strip().splitlines()[-1])
+    except (IndexError, json.JSONDecodeError):
+        return []
+    if not isinstance(document, dict):
+        return []
+    raw = document.get("preflight_blockers")
+    if not isinstance(raw, list):
+        return []
+    return list(
+        dict.fromkeys(
+            blocker
+            for blocker in raw
+            if isinstance(blocker, str) and blocker in SAFE_PREFLIGHT_BLOCKERS
+        )
+    )
+
+
 def drain_once() -> dict[str, Any]:
     definitions_path = _definitions_path()
     state_dir = _state_dir()
@@ -224,7 +248,7 @@ def drain_once() -> dict[str, Any]:
         if JOB_NAME_PATTERN.fullmatch(path.name) is not None
     ][:max_jobs]
     completed_jobs: list[dict[str, str]] = []
-    failed_jobs: list[dict[str, str]] = []
+    failed_jobs: list[dict[str, Any]] = []
     counters: dict[str, int] = {}
     with _exclusive_lock(state_dir / ".worker-drain.lock", stale_seconds=stale_seconds):
         for job in jobs:
@@ -262,6 +286,11 @@ def drain_once() -> dict[str, Any]:
                 else:
                     completed_jobs.append({"job": job.stem, "status": code})
             else:
+                safe_details: dict[str, Any] = {}
+                if code == "editorial_preflight_repair_failed":
+                    blockers = _result_preflight_blockers(completed)
+                    if blockers:
+                        safe_details["preflight_blockers"] = blockers
                 if code in TERMINAL_WORKER_ERRORS:
                     counters["terminal"] = counters.get("terminal", 0) + 1
                     try:
@@ -276,7 +305,14 @@ def drain_once() -> dict[str, Any]:
                     except (DiscoveryError, OSError):
                         failed_jobs.append({"job": job.stem, "code": "state_update_failed"})
                     else:
-                        failed_jobs.append({"job": job.stem, "code": code, "status": "terminal"})
+                        failed_jobs.append(
+                            {
+                                "job": job.stem,
+                                "code": code,
+                                "status": "terminal",
+                                **safe_details,
+                            }
+                        )
                 else:
                     counters["transient"] = counters.get("transient", 0) + 1
                     if code == "image_unavailable":
@@ -289,7 +325,7 @@ def drain_once() -> dict[str, Any]:
                         counters["intake_schema_failures"] = counters.get(
                             "intake_schema_failures", 0
                         ) + 1
-                    failed_jobs.append({"job": job.stem, "code": code})
+                    failed_jobs.append({"job": job.stem, "code": code, **safe_details})
     try:
         health = record_health(
             state_dir,

@@ -1038,9 +1038,9 @@ test('AI Coach history supports switching, scoped deletion, and clear-all confir
     const sendMessage = async (message: string) => {
       await input.fill(message);
       await input.press('Enter');
-      await expect(
-        workspace.getByText('Проверенный ответ по материалам YFC.', { exact: false }),
-      ).toBeVisible();
+      await expect(workspace.getByTestId('ai-coach-message-assistant').last()).toContainText(
+        'Проверенный ответ по материалам YFC.',
+      );
     };
 
     await sendMessage('Сколько отдыхать между подходами?');

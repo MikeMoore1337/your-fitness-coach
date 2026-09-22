@@ -61,7 +61,7 @@ DRAFT_FIELD_LIMITS = {
     "why_it_matters": WHY_IT_MATTERS_MAX_LENGTH,
 }
 TELEGRAM_PHOTO_CAPTION_LIMIT = 1024
-NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:%|\s?(?:mg|g|kg|мг|г|кг))?")
+NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:\s?%|\s?(?:mg|g|kg|мг|г|кг))?")
 BLOCKER_CODE_PATTERN = re.compile(r"^[a-z0-9_.:-]{1,64}$")
 SAFE_PROVIDER_ERROR_VALUE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$")
 SAFE_PROVIDER_ERROR_FIELDS = (
@@ -79,6 +79,9 @@ EXTERNAL_GPT_OSS_SOFT_BUDGETS = (
 )
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "host.docker.internal"})
 FALSE_VALUES = frozenset({"0", "false", "no", "off"})
+SAFE_PREFLIGHT_BLOCKERS = frozenset(
+    {"unsupported_number", "telegram_photo_caption_too_long"}
+)
 
 
 class WorkerError(RuntimeError):
@@ -98,6 +101,15 @@ class WorkerError(RuntimeError):
             value = self.safe_details.get(field_name)
             if isinstance(value, str) and SAFE_PROVIDER_ERROR_VALUE_PATTERN.fullmatch(value):
                 payload[field_name] = value
+        blockers = self.safe_details.get("preflight_blockers")
+        if isinstance(blockers, (list, tuple)):
+            safe_blockers = [
+                blocker
+                for blocker in blockers
+                if isinstance(blocker, str) and blocker in SAFE_PREFLIGHT_BLOCKERS
+            ]
+            if safe_blockers:
+                payload["preflight_blockers"] = list(dict.fromkeys(safe_blockers))
         return payload
 
 
@@ -461,7 +473,35 @@ def _trusted_source_url(source: SourcePacket) -> str:
 
 
 def _source_grounding_text(source: SourcePacket) -> str:
-    return "\n".join((source.title, source.summary, source.content))
+    published_at = source.published_at.isoformat() if source.published_at else ""
+    return "\n".join(
+        (
+            source.title,
+            source.summary,
+            source.content,
+            source.publisher or "",
+            published_at,
+        )
+    )
+
+
+def _normalized_numeric_tokens(value: str) -> set[str]:
+    tokens: set[str] = set()
+    for raw in NUMBER_PATTERN.findall(value):
+        token = "".join(raw.casefold().split()).replace(",", ".")
+        for suffix, canonical in (
+            ("kg", "кг"),
+            ("кг", "кг"),
+            ("mg", "мг"),
+            ("мг", "мг"),
+            ("g", "г"),
+            ("г", "г"),
+        ):
+            if token.endswith(suffix):
+                token = token[: -len(suffix)] + canonical
+                break
+        tokens.add(token)
+    return tokens
 
 
 def _proposal_text(proposal: DraftProposal) -> str:
@@ -513,8 +553,8 @@ def _external_gpt_oss_soft_budgets(source: SourcePacket) -> str:
 
 def _preflight_warnings(proposal: DraftProposal, source: SourcePacket) -> tuple[str, ...]:
     warnings: list[str] = []
-    source_numbers = set(NUMBER_PATTERN.findall(_source_grounding_text(source)))
-    output_numbers = set(NUMBER_PATTERN.findall(_proposal_text(proposal)))
+    source_numbers = _normalized_numeric_tokens(_source_grounding_text(source))
+    output_numbers = _normalized_numeric_tokens(_proposal_text(proposal))
     if output_numbers - source_numbers:
         warnings.append("unsupported_number")
     if _telegram_photo_caption_length(proposal, source) > TELEGRAM_PHOTO_CAPTION_LIMIT:
@@ -535,7 +575,7 @@ def _repair_request_content(
     ]
     if "unsupported_number" in warnings:
         instructions.append(
-            "unsupported_number: every numeric token in the repaired draft must be grounded verbatim in the source title, summary, content, or supplied source metadata. Do not use ids or URLs as evidence, and do not add any number, date, dosage, sample size, duration, or percentage."
+            "unsupported_number: every numeric token in the repaired draft must be grounded in the source title, summary, content, publisher, or published_at metadata. Decimal comma/dot, spacing, and equivalent Russian/Latin mg/g/kg unit labels may differ, but the value and unit magnitude must not change. Do not use ids or URLs as evidence, and do not add any number, date, dosage, sample size, duration, or percentage."
         )
     if "telegram_photo_caption_too_long" in warnings:
         instructions.append(
@@ -891,7 +931,10 @@ def _provider_request_bounded(
                 original_blockers=tuple(dict.fromkeys(original_blockers)),
             )
         if attempt + 1 >= max_attempts:
-            raise WorkerError("editorial_preflight_repair_failed")
+            raise WorkerError(
+                "editorial_preflight_repair_failed",
+                safe_details={"preflight_blockers": warnings},
+            )
         original_blockers.extend(warnings)
         repair_warnings = tuple(dict.fromkeys(warnings))
         previous_proposal = proposal
@@ -1123,7 +1166,10 @@ def run_job(job: EditorialJob) -> dict[str, Any]:
     while True:
         preflight_warnings = _preflight_warnings(proposal, job.source)
         if preflight_warnings:
-            raise WorkerError("editorial_preflight_repair_failed")
+            raise WorkerError(
+                "editorial_preflight_repair_failed",
+                safe_details={"preflight_blockers": preflight_warnings},
+            )
         revision_id = _revision_value(job.job_id, provider_attempt, suffix="revision-")
         body = _build_intake_payload(
             job,
