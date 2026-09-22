@@ -575,7 +575,7 @@ def _repair_request_content(
     ]
     if "unsupported_number" in warnings:
         instructions.append(
-            "unsupported_number: every numeric token in the repaired draft must be grounded verbatim in the source title, summary, content, or supplied source metadata. Do not use ids or URLs as evidence, and do not add any number, date, dosage, sample size, duration, or percentage."
+            "unsupported_number: every numeric token in the repaired draft must be grounded in the source title, summary, content, publisher, or published_at metadata. Decimal comma/dot, spacing, and equivalent Russian/Latin mg/g/kg unit labels may differ, but the value and unit magnitude must not change. Do not use ids or URLs as evidence, and do not add any number, date, dosage, sample size, duration, or percentage."
         )
     if "telegram_photo_caption_too_long" in warnings:
         instructions.append(
