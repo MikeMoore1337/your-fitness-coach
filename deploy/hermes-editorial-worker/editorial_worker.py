@@ -605,6 +605,41 @@ def _fit_photo_caption_limit(proposal: DraftProposal, source: SourcePacket) -> D
     return fitted
 
 
+def _drop_sentences_with_unsupported_numbers(
+    value: str, *, source_numbers: set[str]
+) -> str:
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?…])\\s+|\\n+", value.strip())
+        if sentence.strip()
+    ]
+    kept = [
+        sentence
+        for sentence in sentences
+        if not (_normalized_numeric_tokens(sentence) - source_numbers)
+    ]
+    return " ".join(kept).strip()
+
+
+def _strip_unsupported_number_sentences(
+    proposal: DraftProposal, source: SourcePacket
+) -> DraftProposal | None:
+    source_numbers = _normalized_numeric_tokens(_source_grounding_text(source))
+    fields = {
+        field_name: _drop_sentences_with_unsupported_numbers(
+            getattr(proposal, field_name),
+            source_numbers=source_numbers,
+        )
+        for field_name in ("headline", "summary", "why_it_matters")
+    }
+    if not fields["headline"] or not fields["summary"]:
+        return None
+    try:
+        return DraftProposal.model_validate(fields)
+    except ValidationError:
+        return None
+
+
 def _preflight_warnings(proposal: DraftProposal, source: SourcePacket) -> tuple[str, ...]:
     warnings: list[str] = []
     source_numbers = _normalized_numeric_tokens(_source_grounding_text(source))
@@ -985,15 +1020,20 @@ def _provider_request_bounded(
                 original_blockers=tuple(dict.fromkeys(original_blockers)),
             )
         if attempt + 1 >= max_attempts:
-            if warnings == ("telegram_photo_caption_too_long",):
+            if "unsupported_number" in warnings:
+                stripped = _strip_unsupported_number_sentences(proposal, source)
+                if stripped is not None:
+                    proposal = stripped
+                    warnings = _preflight_warnings(proposal, source)
+            if "telegram_photo_caption_too_long" in warnings:
                 proposal = _fit_photo_caption_limit(proposal, source)
                 warnings = _preflight_warnings(proposal, source)
-                if not warnings:
-                    return ProviderResult(
-                        proposal,
-                        attempts=attempt + 1,
-                        original_blockers=tuple(dict.fromkeys(original_blockers)),
-                    )
+            if not warnings:
+                return ProviderResult(
+                    proposal,
+                    attempts=attempt + 1,
+                    original_blockers=tuple(dict.fromkeys(original_blockers)),
+                )
             raise WorkerError(
                 "editorial_preflight_repair_failed",
                 safe_details={"preflight_blockers": warnings},

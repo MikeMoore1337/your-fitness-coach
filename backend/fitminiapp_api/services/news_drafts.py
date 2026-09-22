@@ -29,7 +29,7 @@ PRESCRIPTION_PATTERN = re.compile(
     r"\b(?:take \d|prescribe|dosage|принимайте \d|назнач(?:ить|ается)|дозировк\w*)\b",
     re.IGNORECASE,
 )
-NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:%|\s?(?:mg|g|kg|мг|г|кг))?")
+NUMBER_PATTERN = re.compile(r"(?<![\w])\d+(?:[.,]\d+)?(?:\s?%|\s?(?:mg|g|kg|мг|г|кг))?")
 CYRILLIC_PATTERN = re.compile(r"[А-Яа-яЁё]")
 SENTENCE_END_PATTERN = re.compile(r"[.!?…](?=\s|$)")
 
@@ -174,6 +174,25 @@ def _validated_fields(raw: object) -> dict[str, str]:
     return fields
 
 
+def _normalized_numeric_tokens(value: str) -> set[str]:
+    tokens: set[str] = set()
+    for raw in NUMBER_PATTERN.findall(value):
+        token = "".join(raw.casefold().split()).replace(",", ".")
+        for suffix, canonical in (
+            ("kg", "кг"),
+            ("кг", "кг"),
+            ("mg", "мг"),
+            ("мг", "мг"),
+            ("g", "г"),
+            ("г", "г"),
+        ):
+            if token.endswith(suffix):
+                token = token[: -len(suffix)] + canonical
+                break
+        tokens.add(token)
+    return tokens
+
+
 def quality_warnings(
     fields: dict[str, str],
     *,
@@ -188,8 +207,8 @@ def quality_warnings(
     if PRESCRIPTION_PATTERN.search(output):
         warnings.append("medical_prescription_language")
     source_text = f"{source_title} {source_summary} {source_context}"
-    source_numbers = set(NUMBER_PATTERN.findall(source_text))
-    output_numbers = set(NUMBER_PATTERN.findall(output))
+    source_numbers = _normalized_numeric_tokens(source_text)
+    output_numbers = _normalized_numeric_tokens(output)
     if output_numbers - source_numbers:
         warnings.append("unsupported_number")
     if (
@@ -221,7 +240,7 @@ def grounded_number_tokens(
     """Return bounded numeric evidence tokens without retaining the source body."""
 
     source_text = f"{source_title} {source_summary} {source_context}"
-    return tuple(sorted(set(NUMBER_PATTERN.findall(source_text))))
+    return tuple(sorted(_normalized_numeric_tokens(source_text)))
 
 
 def render_draft(fields: dict[str, str], packet: NewsEvidencePacket) -> str:
