@@ -1014,7 +1014,11 @@ def test_aggregate_results_merges_current_run_and_adds_allowlisted_metadata(tmp_
     environment = (tmp_path / "merged" / "environment.properties").read_text(encoding="utf-8")
     assert "allure.report.kind=daily" in environment
     assert "DATABASE_URL" not in environment
-    result_path = next((tmp_path / "merged").glob("*-result.json"))
+    result_path = (
+        tmp_path
+        / "merged"
+        / "frontend-checks__node-unit__frontend-checks-result.json"
+    )
     result = json.loads(result_path.read_text(encoding="utf-8"))
     assert {label["name"] for label in result["labels"]} >= {
         "feature",
