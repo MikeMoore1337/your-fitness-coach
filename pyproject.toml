@@ -60,6 +60,8 @@ scheduled-report = [
 package = false
 default-groups = []
 required-version = ">=0.11.32,<0.12"
+# Starlette 1.6 still references the deprecated anyio.abc.BlockingPortal alias; pytest treats it as an error.
+constraint-dependencies = ["anyio>=4.14.2,<4.15"]
 
 # Backend и bot имеют уникальные имена пакетов, чтобы локальные инструменты типизации
 # не зависели от порядка PYTHONPATH.

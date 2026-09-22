@@ -38,6 +38,16 @@ def test_contract_digest_changes_when_contract_changes(monkeypatch) -> None:
     assert ci_contract.contract_digest() != original_digest
 
 
+def test_uv_is_treated_as_an_executable_prerequisite(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        ci_contract.shutil,
+        "which",
+        lambda executable: "/usr/bin/uv" if executable == "uv" else None,
+    )
+
+    assert ci_contract._check_prerequisite(tmp_path, "uv", {}) is None
+
+
 def test_shards_parse_and_select_deterministically() -> None:
     assert ci_contract.parse_shard("1/4") == (0, 4)
     assert ci_contract.parse_shard("4/4") == (3, 4)

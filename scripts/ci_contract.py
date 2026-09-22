@@ -1188,7 +1188,7 @@ def _check_prerequisite(root: Path, prerequisite: str, env: Mapping[str, str]) -
             return None
         except ImportError:
             return "python package alembic"
-    if prerequisite in {"python", "npm", "uvx", "pre_commit"}:
+    if prerequisite in {"python", "npm", "uv", "uvx", "pre_commit"}:
         executable = {
             "python": sys.executable,
             "pre_commit": "pre-commit",
