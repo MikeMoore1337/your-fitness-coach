@@ -88,9 +88,9 @@ def test_guard_defaults_to_separate_vm_without_an_implicit_yfc_lock(
 
 
 def test_decision_output_contains_thresholds_without_environment_values() -> None:
-    output = guard.evaluate_facts(
-        _facts(), mode="colocated-isolated"
-    ).as_dict(phase="discovery", mode="colocated-isolated")
+    output = guard.evaluate_facts(_facts(), mode="colocated-isolated").as_dict(
+        phase="discovery", mode="colocated-isolated"
+    )
 
     assert output["status"] == "ready"
     assert output["thresholds"]["memory_available_min_mib"] == 768
