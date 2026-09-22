@@ -34,6 +34,7 @@ else:
 MIB = 1024 * 1024
 MIN_MEMORY_AVAILABLE_MIB = 768
 MAX_SWAP_USED_MIB = 512
+MAX_SWAP_USED_MIB_SEPARATE_VM = 1024
 MAX_LOAD1 = 1.50
 MIN_DISK_FREE_MIB = 5 * 1024
 DEFAULT_STATE_DIR = "/var/lib/hermes"
@@ -100,7 +101,7 @@ class GuardDecision:
             "facts": asdict(self.facts) if self.facts is not None else None,
             "thresholds": {
                 "memory_available_min_mib": MIN_MEMORY_AVAILABLE_MIB,
-                "swap_used_max_mib": MAX_SWAP_USED_MIB,
+                "swap_used_max_mib": _max_swap_used_mib(mode),
                 "load1_max": MAX_LOAD1,
                 "disk_free_min_mib": MIN_DISK_FREE_MIB,
             },
@@ -141,11 +142,22 @@ def read_host_facts(state_dir: Path) -> HostFacts:
     return HostFacts(memory_available_mib, swap_used_mib, _read_load1(), disk_free_mib)
 
 
-def evaluate_facts(facts: HostFacts, *, deployment_active: bool = False) -> GuardDecision:
+def _max_swap_used_mib(mode: str) -> int:
+    if mode == "separate-vm":
+        return MAX_SWAP_USED_MIB_SEPARATE_VM
+    if mode == "colocated-isolated":
+        return MAX_SWAP_USED_MIB
+    raise GuardError("host_facts_unavailable")
+
+
+def evaluate_facts(
+    facts: HostFacts, *, deployment_active: bool = False, mode: str = "separate-vm"
+) -> GuardDecision:
+    max_swap_used_mib = _max_swap_used_mib(mode)
     checks = (
         (deployment_active, "yfc_deploy_active"),
         (facts.memory_available_mib < MIN_MEMORY_AVAILABLE_MIB, "insufficient_memory"),
-        (facts.swap_used_mib > MAX_SWAP_USED_MIB, "swap_pressure"),
+        (facts.swap_used_mib > max_swap_used_mib, "swap_pressure"),
         (facts.load1 > MAX_LOAD1, "high_load"),
         (facts.disk_free_mib < MIN_DISK_FREE_MIB, "insufficient_disk"),
     )
@@ -248,7 +260,7 @@ def _deployment_boundary(
 def _decision(state_dir: Path, deployment_lock: Path | None, mode: str) -> GuardDecision:
     with _deployment_boundary(state_dir, deployment_lock, mode):
         facts = read_host_facts(state_dir)
-        return evaluate_facts(facts)
+        return evaluate_facts(facts, mode=mode)
 
 
 def _emit(decision: GuardDecision, *, phase: str, mode: str) -> None:
@@ -294,7 +306,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         try:
             with _deployment_boundary(args.state_dir, args.deployment_lock, args.mode):
-                decision = evaluate_facts(read_host_facts(args.state_dir))
+                decision = evaluate_facts(read_host_facts(args.state_dir), mode=args.mode)
                 _emit(decision, phase=args.phase, mode=args.mode)
                 if not decision.allowed:
                     return 0
