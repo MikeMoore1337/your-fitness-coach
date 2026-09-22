@@ -14,35 +14,49 @@ Task = scope и результат.
 | --- | --- | --- |
 | Обычный React UI | `$frontend-engineer` | `$product-designer` при реальном UX/visual decision |
 | Client-facing smartphone UI | `$frontend-engineer` | `$mobile-engineer` при keyboard/safe-area/lifecycle/device runtime; `$product-designer` при composition decision |
-| Существенный motion | `$motion-design-engineer` + implementation skill | `$apple-design` при Apple-like physical/gesture trigger; perf/a11y по риску |
-| Design exploration | `$product-designer` + explicit `$ui-prototyper` | landing/apple/motion по фактическому scope |
-| UI audit | `$ui-audit` | apple/motion/a11y/perf только по риску |
-| Backend/API | `$backend-engineer` | python/data/security/privacy по границе |
+| Существенный motion | `$motion-design-engineer` + implementation skill | `$apple-design` при Apple-like physical/gesture trigger; `$performance-engineer` при подтверждённой стоимости; `$accessibility-engineer` при сложном reduced-motion/a11y |
+| Design exploration | `$product-designer` + explicit `$ui-prototyper` | `$landing-art-director` для Landing; `$apple-design` при Apple/Liquid Glass/native-feel direction; `$motion-design-engineer` если motion является частью концепции |
+| Landing | `$landing-art-director` + `$product-designer` | `$frontend-engineer` при реализации; SEO/performance только по scope |
+| UI audit | `$ui-audit` | `$apple-design` только при аудите Apple/Liquid Glass/native-feel contract; `$motion-design-engineer` при существенном motion review; a11y/perf по риску |
+| Backend/API | `$backend-engineer` | `$python-engineer` при Python implementation; data/security/privacy по границе |
 | Python | `$python-engineer` | domain skill по фактическому коду |
-| DB/schema/query | `$data-engineer` | backend/privacy по contract/lifecycle |
-| Telegram Bot/TMA platform API | `$telegram-engineer` | mobile для smartphone runtime; security при trust boundary |
-| AI Coach / LLM | `$llm-engineer` | backend/python/fitness/privacy/security/evidence/analytics/observability по scope |
-| Юридический риск РФ | `$ru-legal-risk` | privacy/security/data/AI/billing/Telegram/technical writing по поверхности |
-| Product discovery | `$product-discovery` | `$ux-researcher` для real-user evidence |
-| Release | `$release-manager` + `$platform-engineer` по необходимости | observability/security/privacy по реальному release risk |
-| QA strategy | `$qa-engineer` | обычно 1-2 QA/domain skills ниже |
+| DB/schema/query | `$data-engineer` | backend/privacy по изменению contract/lifecycle |
+| Telegram Bot/TMA platform API | `$telegram-engineer` | `$mobile-engineer` для smartphone runtime; security при trust boundary |
+| AI Coach / LLM | `$llm-engineer` | backend/python для implementation; fitness/privacy/security/evidence/analytics/observability по scope |
+| Юридический риск РФ | `$ru-legal-risk` | privacy/security/data/AI/billing/Telegram/technical writing только по фактической поверхности |
+| Product discovery | `$product-discovery` | `$ux-researcher` только для real-user evidence |
+| Release | `$release-manager` + `$platform-engineer` по необходимости | observability/security/privacy только по реальному release risk |
+| QA strategy | `$qa-engineer` | обычно 1-2 QA/domain skills по фактическому риску |
 | Playwright/Web/TMA tests | `$qa-engineer` + `$playwright-testing` | `$e2e-review` для critical/new/AI-generated E2E trust review |
-| pytest tests | `$qa-engineer` + `$pytest-test-design` | data/api/db/pydantic по boundary |
-| API verification | `$qa-engineer` + `$api-testing` | pydantic/db/security/privacy по risk |
-| DB verification | `$qa-engineer` + `$database-validation` | test-data-management при сложном state |
-| Test data | relevant test skill + `$test-data-management` | только если fixtures/seeds/isolation существенны |
-| CI/test failure | `$failure-triage` + framework skill | `$flaky-analysis` только при intermittent/retry signal |
-| Flaky test | `$flaky-analysis` + framework skill | data/platform при подтверждённом trigger |
+| pytest tests | `$qa-engineer` + `$pytest-test-design` | test-data/API/DB/Pydantic по boundary |
+| API verification | `$qa-engineer` + `$api-testing` | Pydantic/DB/security/privacy по risk |
+| DB verification | `$qa-engineer` + `$database-validation` | `$test-data-management` при сложном state |
+| CI/test failure | `$failure-triage` + relevant framework skill | `$flaky-analysis` только при intermittent/retry signal |
+| Flaky test | `$flaky-analysis` + relevant framework skill | data/platform при подтверждённом trigger |
 | Coverage audit | `$coverage-analysis` + `$qa-engineer` | domain skill для непонятного contract |
 | Allure evidence | relevant test skill + `$allure-reporting` | не подключать только ради обычного pass/fail |
 
-## QA profiles
+## QA specialization v8
 
-См. `QA_AUTOMATION_ARCHITECTURE.md`.
+`qa-engineer` остаётся base strategy/router для QA pass.
 
-`qa-architect`, `test-implementer`, `test-reviewer`, `ci-investigator`, `flaky-analyst`, `coverage-analyst` - рабочие профили, не lifecycle roles.
+Профильные skills:
 
-## Mobile engineer
+- `$playwright-testing` - Playwright implementation, browser evidence, Web/TMA verification;
+- `$e2e-review` - независимая проверка false-green/test-intent risk;
+- `$pytest-test-design` - Python unit/integration test design;
+- `$api-testing` - HTTP/API contract verification;
+- `$database-validation` - persistence/migration/transaction verification;
+- `$test-data-management` - fixtures/factories/seeds/isolation;
+- `$pydantic-contracts` - Pydantic validation/serialization contract;
+- `$allure-reporting` - report/evidence quality;
+- `$failure-triage` - классификация конкретного test/CI failure;
+- `$flaky-analysis` - intermittent/retry-only failures;
+- `$coverage-analysis` - risk/behavior coverage gaps.
+
+Рабочие профили `qa-architect`, `test-implementer`, `test-reviewer`, `ci-investigator`, `flaky-analyst`, `coverage-analyst` описаны в `QA_AUTOMATION_ARCHITECTURE.md`. Это modes существующих lifecycle roles, а не новые roles.
+
+## `mobile-engineer` v6
 
 Не загружай его только потому, что UI виден на телефоне.
 
@@ -60,23 +74,83 @@ Trigger:
 
 Responsive layout сам по себе принадлежит `$frontend-engineer`.
 
+## Motion
+
+`$motion-design-engineer` нужен, когда task:
+
+- создаёт/перерабатывает motion language;
+- добавляет transition/gesture/data animation как заметную часть UX;
+- проверяет качество существующих animations;
+- ищет motion opportunities;
+- выполняет dedicated motion hardening.
+
+Одна короткая стандартная CSS transition не требует отдельного skill.
+
 ## Apple Design
 
-`$apple-design` - conditional reference skill для Apple/Liquid Glass/native-like interaction/material physics.
-Он не заменяет YFC product design, accessibility, performance или product truth.
+`$apple-design` - условный reference skill для Apple-подобной interaction/material физики на web/TMA.
+
+Trigger:
+
+- Apple-style или Liquid Glass design direction;
+- native-like mobile web/TMA interaction;
+- translucent material/depth hierarchy;
+- gesture-driven drag/swipe/sheet/drawer;
+- spring physics, interruptibility, velocity handoff, momentum projection;
+- rubber-banding или physical direct manipulation.
+
+Не загружай его для обычной формы, layout fix, icon audit, backend task или короткой стандартной
+transition только потому, что продукт должен выглядеть качественно.
+
+Authority:
+
+- `$product-designer` владеет YFC visual direction, composition и brand;
+- `$motion-design-engineer` владеет production motion contract;
+- `$apple-design` даёт Apple-specific interaction/material techniques и не превращает YFC в iOS clone;
+- YFC sport-tech + lime/black/white anchors, task scope, accessibility, performance и product truth выше
+  Apple-like reference patterns.
 
 ## UI prototyping
 
 `$ui-prototyper` - explicit only.
 
+Он не должен сам запускаться из обычной feature-task. Используй его, когда владелец хочет несколько действительно разных visual/interaction directions до production implementation.
+
 ## AI Coach
 
-`$llm-engineer` - canonical AI/LLM skill.
+Не создавать `$ai-engineer`.
+
+`$llm-engineer` - canonical AI/LLM skill для:
+
+- provider decision/routing;
+- AI Coach jobs;
+- prompts;
+- retrieval;
+- tools;
+- memory;
+- safety;
+- evals;
+- product AI UX;
+- provider reliability/cost/privacy.
+
+## Удалённый skill
+
+`commercial-product-builder` удалён. Крупный multi-stage scope координирует role `orchestrator`, подбирая реальные domain skills по streams.
+
+## Legal risk РФ
+
+`$ru-legal-risk` обязателен для dedicated legal-risk audit. В обычной feature/fix task он является
+условным skill только при изменении персональных/health-related данных, external providers, AI,
+payments, legal/consent UI, analytics/cookies, data residency, recommendation logic,
+advertising/claims или external content licenses.
+
+Skill готовит `SAFE / BALANCED / ACCEPT_RISK / AVOID`, recommendation, остаточный риск и
+`LEGAL_COUNSEL_REQUIRED`, но не принимает решение за владельца и не превращает `HIGH` legal risk
+в lifecycle blocker без отдельного task/release gate.
 
 ## Бюджет контекста
 
 - обычная implementation task: примерно 2-5 core skills;
-- review/QA: `$qa-engineer` + обычно 1-2 профильных skills;
+- review/QA: base skill роли + 1-2 профильных;
 - audit/release: последовательные streams;
-- failure investigation начинается с evidence и не требует загрузки всей QA-библиотеки;
-- не загружать одинаковые общие правила из нескольких skills.
+- не загружать одинаковые общие правила из нескольких skills, если один уже владеет областью.

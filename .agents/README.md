@@ -11,23 +11,28 @@ Skills задают профессиональный способ выполне
 5. QA: `$qa-engineer` как strategy/router + обычно не более 1-2 профильных skills.
 6. Не создавать отдельного lifecycle agent на каждый skill или QA-профиль.
 7. Большой end-to-end scope координирует role `orchestrator`, а не специальный meta-skill.
-8. QA work profiles описаны в `references/QA_AUTOMATION_ARCHITECTURE.md`; это modes существующих roles.
-9. `commercial-product-builder` удалён как дублирующий orchestration/lifecycle.
-10. Отдельного `ai-engineer` нет: AI/LLM/AI Coach scope принадлежит `$llm-engineer`.
-11. `$ui-prototyper` используется только явно для design exploration.
-12. `$motion-design-engineer` используется для существенного motion design/implementation/review.
-13. `$ru-legal-risk` обязателен для dedicated legal-risk audit и условен для обычной feature task по trigger.
+8. `commercial-product-builder` удалён в v6 как дублирующий orchestration/lifecycle.
+9. Отдельного `ai-engineer` нет: AI/LLM/AI Coach scope принадлежит `$llm-engineer`.
+10. `$ui-prototyper` используется только явно для design exploration.
+11. `$motion-design-engineer` используется для существенного motion design/implementation/review, а не автоматически для любой CSS transition.
+12. `$ru-legal-risk` обязателен для dedicated legal-risk audit и подключается условно к обычной
+    task только при фактическом legal trigger; он требует актуальных источников, не является
+    гарантией compliance и не принимает owner decision.
+13. Dedicated legal-risk audit использует primary role `product-lawyer`; remediation после owner
+    decision возвращается в отдельную task с обычной implementation-ролью.
+14. QA work profiles описаны в `references/QA_AUTOMATION_ARCHITECTURE.md`; это modes существующих roles, а не отдельный lifecycle.
 
 ## QA v8
 
-QA разделён на strategy и узкие рабочие контракты:
+`qa-engineer` отвечает за risk strategy и routing, а не пытается содержать весь test stack.
 
-- `qa-engineer` - risk strategy/router;
-- `playwright-testing` - browser implementation;
-- `e2e-review` - доверие к E2E/false-green review;
+Профильные контракты:
+
+- `playwright-testing` - browser/Web/TMA implementation;
+- `e2e-review` - false-green и test-intent review;
 - `pytest-test-design` - Python test design;
 - `api-testing`, `database-validation`, `pydantic-contracts` - boundary contracts;
-- `test-data-management` - deterministic fixtures/data;
+- `test-data-management` - deterministic fixtures/data/isolation;
 - `allure-reporting` - evidence/report quality;
 - `failure-triage` - конкретное падение;
 - `flaky-analysis` - intermittent failures;
@@ -35,15 +40,31 @@ QA разделён на strategy и узкие рабочие контракт�
 
 UI visual/product audit остаётся отдельным `$ui-audit`.
 
-## Design
+## Design v8
 
-Для обычных задач текущая production design system остаётся baseline.
-Для owner-approved redesign task дизайн может быть пересмотрен при сохранении YFC anchors:
-sport-tech, mobile-first, lime/black/white, product truth, accessibility, usability, performance.
+Для обычных задач текущая production design system остаётся baseline, чтобы не создавать случайный visual drift.
+
+Для отдельной owner-approved design exploration/redesign task весь Design V2/V2.1 может быть пересмотрен.
+
+Устойчивые YFC anchors:
+
+- sport-tech;
+- mobile-first для client-facing flows;
+- lime + black + white как фирменное цветовое ядро;
+- product truth;
+- accessibility;
+- usability;
+- performance.
+
+Эстетические приёмы не запрещаются по названию. Glow, gradients, glass, cards, 3D, bold motion и другие решения допустимы, если они усиливают YFC и не ломают пользовательскую задачу.
+
+Запоминаемость, delight и "вау" - first-class критерии качества наряду с практичностью.
 
 См.:
 
 - `references/SKILL_ROUTING_GUIDE.md`;
 - `references/ROLE_ROUTING_GUIDE.md`;
-- `references/QA_AUTOMATION_ARCHITECTURE.md`;
 - `references/DESIGN_GUARDRAILS.md`.
+- `skills/ru-legal-risk/references/RU_LEGAL_SOURCE_POLICY.md` для юридической source freshness.
+
+Исторические overlap/release audits являются owner-only material и в public Git не публикуются.
