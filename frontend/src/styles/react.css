@@ -4244,6 +4244,9 @@ button.today-text-link {
   min-height: 150px;
   gap: 6px;
 }
+.active-workout-exercise__media--blocked {
+  width: 100%;
+}
 .active-workout-set {
   display: grid;
   gap: 12px;

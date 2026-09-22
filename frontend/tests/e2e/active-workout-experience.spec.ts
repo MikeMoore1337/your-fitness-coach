@@ -683,6 +683,23 @@ test('blocked exercise media stays compact and neutral in active workout', async
   const box = await media.boundingBox();
   expect(box?.height).toBeGreaterThanOrEqual(150);
   expect(box?.height).toBeLessThan(220);
+  const widthGeometry = await media.evaluate((element) => {
+    const exercise = element.closest<HTMLElement>('.active-workout-exercise');
+    if (!exercise) return null;
+    const style = getComputedStyle(exercise);
+    const contentWidth =
+      exercise.getBoundingClientRect().width -
+      parseFloat(style.paddingLeft) -
+      parseFloat(style.paddingRight) -
+      parseFloat(style.borderLeftWidth) -
+      parseFloat(style.borderRightWidth);
+    return {
+      contentWidth,
+      mediaWidth: element.getBoundingClientRect().width,
+    };
+  });
+  expect(widthGeometry).not.toBeNull();
+  expect(widthGeometry?.mediaWidth).toBeGreaterThanOrEqual((widthGeometry?.contentWidth ?? 0) - 1);
   await page.screenshot({
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-blocked-mobile-390x844.png',
     fullPage: true,
