@@ -420,7 +420,7 @@ class GroqDirectAdapter:
             "messages": build_messages(request, policy, context_refs),
             "max_completion_tokens": settings.ai_coach_max_output_tokens,
             "reasoning_effort": "low",
-            "reasoning_format": "hidden",
+            "include_reasoning": False,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
