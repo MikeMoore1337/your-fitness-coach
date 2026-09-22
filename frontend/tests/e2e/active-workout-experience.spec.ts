@@ -433,6 +433,60 @@ async function expectClearOfBottomDock(target: Locator, label: string) {
   }
 }
 
+async function expectRealMediaFullWidth(page: Page, label: string) {
+  const geometry = await page.evaluate(() => {
+    const media = document.querySelector<HTMLElement>(
+      '.active-workout-exercise__media:not(.active-workout-exercise__media--blocked)',
+    );
+    const technique = document.querySelector<HTMLElement>(
+      '.active-workout-exercise__head .exercise-guide-trigger',
+    );
+    const image = media?.querySelector<HTMLImageElement>('img');
+    if (!media || !technique || !image) return null;
+
+    const mediaRect = media.getBoundingClientRect();
+    const techniqueRect = technique.getBoundingClientRect();
+    const imageRect = image.getBoundingClientRect();
+    return {
+      imageWidth: imageRect.width,
+      mediaLeft: mediaRect.left,
+      mediaRight: mediaRect.right,
+      mediaWidth: mediaRect.width,
+      techniqueLeft: techniqueRect.left,
+      techniqueRight: techniqueRect.right,
+      techniqueWidth: techniqueRect.width,
+    };
+  });
+
+  expect(geometry, `${label}: real media geometry must be measurable`).not.toBeNull();
+  const tolerance = 2;
+  expect(
+    Math.abs((geometry?.mediaLeft ?? 0) - (geometry?.techniqueLeft ?? 0)),
+    `${label}: media and Technique left edges must align`,
+  ).toBeLessThanOrEqual(tolerance);
+  expect(
+    Math.abs((geometry?.mediaRight ?? 0) - (geometry?.techniqueRight ?? 0)),
+    `${label}: media and Technique right edges must align`,
+  ).toBeLessThanOrEqual(tolerance);
+  expect(
+    geometry?.mediaWidth ?? 0,
+    `${label}: media wrapper must fill the workout content column`,
+  ).toBeGreaterThanOrEqual((geometry?.techniqueWidth ?? 0) - tolerance);
+  expect(
+    geometry?.imageWidth ?? 0,
+    `${label}: rendered image must fill the media wrapper`,
+  ).toBeGreaterThanOrEqual((geometry?.mediaWidth ?? 0) - tolerance);
+}
+
+async function resetPageScroll(page: Page) {
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelector<HTMLElement>('#appContent')?.scrollTo(0, 0);
+  });
+}
+
 test('active workout keeps one obvious next action through logging, timer and finish', async ({
   page,
 }) => {
@@ -615,16 +669,12 @@ test('active workout checkpoint evidence covers light dark reduced and responsiv
     'data-media-mode',
     'animated',
   );
+  await expectRealMediaFullWidth(page, '390px light animated');
   await page.screenshot({
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-light-390x844.png',
     fullPage: true,
   });
-  await page.evaluate(() => {
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    document.querySelector<HTMLElement>('#appContent')?.scrollTo(0, 0);
-  });
+  await resetPageScroll(page);
   await page.screenshot({
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-light-390x844-viewport.png',
   });
@@ -633,9 +683,18 @@ test('active workout checkpoint evidence covers light dark reduced and responsiv
   await page.reload({ waitUntil: 'domcontentloaded' });
   await enterWorkout();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await expect(page.locator('.active-workout-exercise__media img')).toHaveAttribute(
+    'data-media-mode',
+    'animated',
+  );
+  await expectRealMediaFullWidth(page, '390px dark animated');
   await page.screenshot({
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-dark-390x844.png',
     fullPage: true,
+  });
+  await resetPageScroll(page);
+  await page.screenshot({
+    path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-dark-390x844-viewport.png',
   });
 
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'dark' });
@@ -645,9 +704,14 @@ test('active workout checkpoint evidence covers light dark reduced and responsiv
     'data-media-mode',
     'static-poster',
   );
+  await expectRealMediaFullWidth(page, '390px dark reduced motion');
   await page.screenshot({
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-reduced-390x844.png',
     fullPage: true,
+  });
+  await resetPageScroll(page);
+  await page.screenshot({
+    path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-reduced-390x844-viewport.png',
   });
 
   for (const viewport of [
@@ -655,6 +719,16 @@ test('active workout checkpoint evidence covers light dark reduced and responsiv
     { width: 430, height: 932 },
   ]) {
     await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'light' });
+    await page.evaluate(() => localStorage.setItem('app-theme', 'light'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await enterWorkout();
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
+    await expect(page.locator('.active-workout-exercise__media img')).toHaveAttribute(
+      'data-media-mode',
+      'animated',
+    );
+    await expectRealMediaFullWidth(page, `${viewport.width}px light animated`);
     await expect
       .poll(() =>
         page.evaluate(
@@ -665,6 +739,10 @@ test('active workout checkpoint evidence covers light dark reduced and responsiv
     await page.screenshot({
       path: `../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-${viewport.width}x${viewport.height}.png`,
       fullPage: true,
+    });
+    await resetPageScroll(page);
+    await page.screenshot({
+      path: `../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-light-${viewport.width}x${viewport.height}-viewport.png`,
     });
   }
 });

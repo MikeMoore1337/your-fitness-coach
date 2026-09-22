@@ -4843,6 +4843,9 @@ button.today-text-link {
     padding: 15px 13px;
     border-radius: 17px;
   }
+  .active-workout-exercise__media {
+    width: 100%;
+  }
   .active-workout-exercise__head .exercise-guide-trigger {
     width: 100%;
   }
