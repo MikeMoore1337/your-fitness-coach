@@ -237,6 +237,23 @@ def test_preflight_uses_source_packet_numbers_and_trusted_url_budget() -> None:
     )
 
 
+def test_preflight_accepts_numeric_source_metadata_and_equivalent_unit_formatting() -> None:
+    source = valid_job().source.model_copy(
+        update={
+            "content": "В протоколе использовали 1.5 g вещества.",
+            "publisher": "Journal 7",
+        }
+    )
+    proposal = editorial_worker.DraftProposal(
+        headline="Исследование 2026 года",
+        summary="В протоколе использовали 1,5 г вещества.",
+        why_it_matters="Материал из Journal 7 требует редакторской проверки.",
+    )
+
+    assert source.published_at is not None
+    assert editorial_worker._preflight_warnings(proposal, source) == ()
+
+
 def test_preflight_repairs_unsupported_number_with_same_provider(monkeypatch) -> None:
     rejected = {
         "headline": "Что показала новая работа",
@@ -320,8 +337,14 @@ def test_unresolved_repair_fails_closed_before_hmac_intake(monkeypatch) -> None:
         lambda _job, _body: pytest.fail("HMAC intake must not run after unresolved preflight"),
     )
 
-    with pytest.raises(editorial_worker.WorkerError, match="editorial_preflight_repair_failed"):
+    with pytest.raises(
+        editorial_worker.WorkerError, match="editorial_preflight_repair_failed"
+    ) as exc_info:
         editorial_worker.run_job(valid_job())
+    assert exc_info.value.as_payload() == {
+        "error": "editorial_preflight_repair_failed",
+        "preflight_blockers": ["unsupported_number"],
+    }
     assert calls == 2
 
 
