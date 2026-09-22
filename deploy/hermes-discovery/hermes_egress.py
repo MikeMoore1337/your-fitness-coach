@@ -602,7 +602,7 @@ def main(argv: list[str] | None = None) -> int:
             result = validate(args.mode)
         else:
             result = remove()
-    except EgressError, OSError, subprocess.CalledProcessError:
+    except (EgressError, OSError, subprocess.CalledProcessError):
         print(
             json.dumps({"error": "hermes_egress_failed", "secrets_logged": False}), file=sys.stderr
         )
