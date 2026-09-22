@@ -324,9 +324,7 @@ def test_preflight_applies_caption_hard_limit_after_bounded_repair(
         "why_it_matters": "Практический контекст " * 12,
     }
 
-    proposal, requests = _provider_request_with_sequence(
-        monkeypatch, [rejected, still_too_long]
-    )
+    proposal, requests = _provider_request_with_sequence(monkeypatch, [rejected, still_too_long])
 
     assert len(requests) == 2
     assert "telegram_photo_caption_too_long" in requests[1]["messages"][-1]["content"]
