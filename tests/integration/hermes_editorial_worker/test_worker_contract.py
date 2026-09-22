@@ -320,8 +320,8 @@ def test_preflight_applies_caption_hard_limit_after_bounded_repair(
     }
     still_too_long = {
         "headline": "Исследование о силовой подготовке",
-        "summary": "Подробный источник-обоснованный текст " * 28,
-        "why_it_matters": "Практический контекст " * 10,
+        "summary": "Подробный источник-обоснованный текст " * 20,
+        "why_it_matters": "Практический контекст " * 12,
     }
 
     proposal, requests = _provider_request_with_sequence(
