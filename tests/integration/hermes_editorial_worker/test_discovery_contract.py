@@ -496,9 +496,7 @@ def test_worker_drain_exposes_only_safe_preflight_blockers() -> None:
         "",
     )
 
-    assert hermes_worker_drain._result_preflight_blockers(completed) == [
-        "unsupported_number"
-    ]
+    assert hermes_worker_drain._result_preflight_blockers(completed) == ["unsupported_number"]
 
 
 @pytest.mark.parametrize(
