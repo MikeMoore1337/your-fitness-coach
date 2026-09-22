@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const mediaThumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
@@ -402,6 +402,37 @@ function waitForCompletedSetPatch(page: Page, setId: number) {
   });
 }
 
+async function expectClearOfBottomDock(target: Locator, label: string) {
+  await target.scrollIntoViewIfNeeded();
+  const geometry = await target.evaluate((element) => {
+    const dock = document.querySelector<HTMLElement>('#appBottomNav');
+    const targetRect = element.getBoundingClientRect();
+    const dockRect = dock?.getBoundingClientRect();
+    const dockStyle = dock ? getComputedStyle(dock) : null;
+    const dockVisible = Boolean(
+      dockRect &&
+      dockRect.width > 0 &&
+      dockRect.height > 0 &&
+      dockStyle?.display !== 'none' &&
+      dockStyle?.visibility !== 'hidden',
+    );
+    return {
+      dockTop: dockRect ? Math.round(dockRect.top) : null,
+      dockVisible,
+      targetBottom: Math.round(targetRect.bottom),
+      targetHeight: Math.round(targetRect.height),
+    };
+  });
+
+  expect(geometry.targetHeight, `${label} must be in the viewport`).toBeGreaterThan(0);
+  if (geometry.dockVisible) {
+    expect(
+      geometry.targetBottom,
+      `${label} bottom ${geometry.targetBottom}px must stay above dock top ${geometry.dockTop}px with 8px clearance`,
+    ).toBeLessThanOrEqual((geometry.dockTop ?? 0) - 8);
+  }
+}
+
 test('active workout keeps one obvious next action through logging, timer and finish', async ({
   page,
 }) => {
@@ -588,6 +619,10 @@ test('active workout checkpoint evidence covers light dark reduced and responsiv
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-light-390x844.png',
     fullPage: true,
   });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-light-390x844-viewport.png',
+  });
 
   await page.evaluate(() => localStorage.setItem('app-theme', 'dark'));
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -638,6 +673,7 @@ test('blocked exercise media stays compact and neutral in active workout', async
 
   const media = page.locator('.active-workout-exercise__media--blocked').first();
   await expect(media).toContainText('Изображение пока недоступно');
+  await expect(media).toContainText('Для этого упражнения нет проверенного визуального материала.');
   await expect(media.locator('img')).toHaveCount(0);
   const box = await media.boundingBox();
   expect(box?.height).toBeGreaterThanOrEqual(150);
@@ -646,6 +682,58 @@ test('blocked exercise media stays compact and neutral in active workout', async
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-blocked-mobile-390x844.png',
     fullPage: true,
   });
+});
+
+test('active workout actionable controls clear the mobile bottom dock', async ({
+  browser,
+  baseURL,
+}) => {
+  for (const viewport of [
+    { width: 320, height: 800 },
+    { width: 390, height: 844 },
+    { width: 430, height: 932 },
+  ]) {
+    const context = await browser.newContext({
+      baseURL,
+      viewport,
+      serviceWorkers: 'block',
+    });
+    const page = await context.newPage();
+    try {
+      await mockActiveWorkout(page);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+      await expect(page.locator('#appBottomNav')).toBeVisible();
+      const currentSet = page.locator('[data-workout-set-id="201"]');
+      const weight = currentSet.getByRole('spinbutton', {
+        name: 'Вес, Жим штанги лёжа, подход 1',
+      });
+      const reps = currentSet.getByRole('spinbutton', {
+        name: 'Повторы, Жим штанги лёжа, подход 1',
+      });
+      const done = currentSet.getByRole('button', {
+        name: 'Завершить: Жим штанги лёжа, подход 1',
+      });
+      await expectClearOfBottomDock(weight, `${viewport.width}px focused input`);
+      await weight.focus();
+      await expectClearOfBottomDock(weight, `${viewport.width}px focused input`);
+      await expectClearOfBottomDock(done, `${viewport.width}px complete CTA`);
+
+      await weight.fill('40');
+      await reps.fill('8');
+      await Promise.all([waitForCompletedSetPatch(page, 201), done.dblclick()]);
+      const rest = page.locator('.active-workout-rest');
+      await expect(rest).toBeVisible();
+      await expectClearOfBottomDock(
+        rest.getByRole('button', { name: '+30 сек' }),
+        `${viewport.width}px rest timer control`,
+      );
+    } finally {
+      await context.close();
+    }
+  }
 });
 
 test('active workout has touch-size controls and no horizontal overflow', async ({ page }) => {

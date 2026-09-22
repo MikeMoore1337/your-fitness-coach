@@ -1355,24 +1355,23 @@ export function TodayWorkout({
                     <div
                       className={`active-workout-exercise__media ${exercise.media_state === 'blocked' ? 'active-workout-exercise__media--blocked' : ''}`}
                     >
-                      <ExerciseMediaAsset
-                        animationUrl={
-                          exercise.media_state === 'approved_animated'
-                            ? exercise.media_animation_url
-                            : undefined
-                        }
-                        alt={
-                          exercise.media_state === 'approved_animated'
-                            ? `${exercise.exercise_title}: техника движения`
-                            : `${exercise.exercise_title}: визуальный материал недоступен`
-                        }
-                        thumbnailUrl={
-                          exercise.media_state === 'approved_animated'
-                            ? exercise.media_thumbnail_url
-                            : undefined
-                        }
-                        variant="animation"
-                      />
+                      {exercise.media_state === 'blocked' ? (
+                        <div
+                          className="exercise-media-asset--missing"
+                          role="img"
+                          aria-label={`${exercise.exercise_title}: Изображение пока недоступно. Для этого упражнения нет проверенного визуального материала.`}
+                        >
+                          <strong>Изображение пока недоступно</strong>
+                          <span>Для этого упражнения нет проверенного визуального материала.</span>
+                        </div>
+                      ) : (
+                        <ExerciseMediaAsset
+                          animationUrl={exercise.media_animation_url}
+                          alt={`${exercise.exercise_title}: техника движения`}
+                          thumbnailUrl={exercise.media_thumbnail_url}
+                          variant="animation"
+                        />
+                      )}
                     </div>
                   )}
 

@@ -4242,6 +4242,7 @@ button.today-text-link {
 .active-workout-exercise__media--blocked .exercise-media-asset--missing {
   aspect-ratio: auto;
   min-height: 150px;
+  gap: 6px;
 }
 .active-workout-set {
   display: grid;
