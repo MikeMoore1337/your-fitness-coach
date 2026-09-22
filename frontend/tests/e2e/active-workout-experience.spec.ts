@@ -619,7 +619,12 @@ test('active workout checkpoint evidence covers light dark reduced and responsiv
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-light-390x844.png',
     fullPage: true,
   });
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    document.querySelector<HTMLElement>('#appContent')?.scrollTo(0, 0);
+  });
   await page.screenshot({
     path: '../.artifacts/tasks/391/evidence/screenshots/active-workout-mobile-light-390x844-viewport.png',
   });
