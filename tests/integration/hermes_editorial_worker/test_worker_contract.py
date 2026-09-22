@@ -296,9 +296,7 @@ def test_preflight_drops_only_sentences_with_unsupported_numbers_after_bounded_r
 
     assert len(requests) == 2
     assert "unsupported_number" in requests[1]["messages"][-1]["content"]
-    assert proposal.summary == (
-        "Исследование также содержит ограничения, которые важно учитывать."
-    )
+    assert proposal.summary == ("Исследование также содержит ограничения, которые важно учитывать.")
     assert editorial_worker._preflight_warnings(proposal, valid_job().source) == ()
 
 
