@@ -164,7 +164,7 @@ def test_discovery_success_drains_batch_and_network_anchor_keeps_bridge_warm() -
     assert "RestartSec=60s" in discovery_unit
     assert "Requires=hermes-discovery.service" not in drain_unit
     assert "After=hermes-discovery.service" in drain_unit
-    assert "Environment=HERMES_WORKER_MAX_JOBS=5" in drain_unit
+    assert "Environment=HERMES_WORKER_MAX_JOBS=10" in drain_unit
     assert "--name hermes-network-anchor" in anchor_unit
     assert "--network=hermes-net" in anchor_unit
     assert "Restart=always" in anchor_unit
@@ -220,6 +220,33 @@ def test_shared_host_systemd_launchers_are_root_only_and_container_hardening_is_
         assert " -p " not in unit
         assert "--privileged" not in unit
         assert ":latest" not in unit
+
+
+def test_worker_drain_batch_defaults_to_ten_and_hard_caps_at_twenty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert hermes_worker_drain.DEFAULT_MAX_JOBS == 10
+    assert hermes_worker_drain.MAX_JOBS == 20
+
+    monkeypatch.delenv("HERMES_WORKER_MAX_JOBS", raising=False)
+    assert (
+        hermes_worker_drain._bounded_int(
+            "HERMES_WORKER_MAX_JOBS",
+            hermes_worker_drain.DEFAULT_MAX_JOBS,
+            1,
+            hermes_worker_drain.MAX_JOBS,
+        )
+        == 10
+    )
+
+    monkeypatch.setenv("HERMES_WORKER_MAX_JOBS", "21")
+    with pytest.raises(hermes_worker_drain.DrainError, match="hermes_worker_max_jobs_invalid"):
+        hermes_worker_drain._bounded_int(
+            "HERMES_WORKER_MAX_JOBS",
+            hermes_worker_drain.DEFAULT_MAX_JOBS,
+            1,
+            hermes_worker_drain.MAX_JOBS,
+        )
 
 
 def test_worker_drain_network_has_a_safe_default_and_strict_validation(
