@@ -173,6 +173,10 @@ read-only model files и `appuser`. Tesseract 5.5.0 с `eng`, `rus`, `osd` ос�
 fallback через явный `argv`, `shell=False`, timeout и ограничение вывода. Raw image/OCR и cloud/
 paid Vision payloads в pipeline не сохраняются и не логируются.
 
+В адаптере RapidOCR единый монотонный срок `8 s` охватывает ожидание единственного слота
+распознавания и ожидание результата ONNX. Если ожидающая future отменена до начала работы, слот
+освобождается; уже работающий inference удерживает его до собственного завершения.
+
 ## Verification status
 
 - parser/image/API regression tests — deterministic local tests;

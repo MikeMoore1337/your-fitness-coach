@@ -412,10 +412,11 @@ class RapidOcr:
         return tuple(tokens)
 
     def extract_candidates(self, normalized_png: bytes) -> tuple[OcrCandidate, ...]:
-        acquired = self._inference_slots.acquire(timeout=self._timeout_seconds)
+        started = time.monotonic()
+        deadline = started + self._timeout_seconds
+        acquired = self._inference_slots.acquire(timeout=max(0.0, deadline - time.monotonic()))
         if not acquired:
             raise LocalOcrError("local_ocr_timeout")
-        started = time.monotonic()
 
         def run_and_release():
             try:
@@ -429,9 +430,10 @@ class RapidOcr:
             self._inference_slots.release()
             raise LocalOcrError("local_ocr_unavailable") from exc
         try:
-            result = future.result(timeout=self._timeout_seconds)
+            result = future.result(timeout=max(0.0, deadline - time.monotonic()))
         except FutureTimeoutError as exc:
-            future.cancel()
+            if future.cancel():
+                self._inference_slots.release()
             raise LocalOcrError("local_ocr_timeout") from exc
         except Exception as exc:
             raise LocalOcrError("local_ocr_failed") from exc

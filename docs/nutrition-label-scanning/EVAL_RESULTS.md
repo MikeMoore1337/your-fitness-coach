@@ -201,10 +201,36 @@ Enabling the ONNX CPU memory arena was explicitly rejected: the diagnostic proce
 1000-1600 px long side did not meet the 3 s p50 target and is not accepted as a quality tradeoff;
 the earlier Task 128G 1000 px corpus profile also had materially worse completeness.
 
-Task 128H therefore permits only the evidence-backed `intra_op_num_threads=2` tuning while keeping
-single-inference concurrency, the quality profile and 8 s timeout unchanged. The rollout verdict
-remains **NO-GO for public enablement**: warm p95 is within the target, but warm p50 remains above
-3 s on the canonical 2-vCPU host, and the original raw same-photo HUMAN_EVIDENCE image is not
-available for a valid final replay. `NUTRITION_LABEL_SCAN_ENABLED=false` must remain in production
-until both gates are satisfied; synthetic or screenshot-derived evidence must not be substituted
-for the required original-photo validation.
+На этапе PR #438 Task 128H разрешила только подтверждённую настройку `intra_op_num_threads=2`,
+сохранив `max_side_len=2000`, один inference slot и timeout `8 s`. Этот профиль не прошёл порог
+warm p50; следующий раздел фиксирует проверку меньшего `max_side_len=1750` из PR #440.
+Публичное включение остаётся **NO-GO**, пока не пройдены применимые пороги задержки/ресурсов и
+HUMAN_EVIDENCE на том же исходном фото. `NUTRITION_LABEL_SCAN_ENABLED=false` сохраняется;
+синтетические данные и скриншоты не заменяют исходное фото.
+
+### Проверка post-deploy профиля 1750 px (2026-09-23)
+
+PR #440 (`586ae2b463c085804031fe9a67780f0d33729405`) развернул профиль `max_side_len=1750`,
+`intra_op=2`, `inter_op=1`, отключённую CPU memory arena и один одновременный inference. До deploy
+контролируемый A/B на тех же чистых метках дал warm p50 `2.61–2.63 s`, p95 `2.82–3.03 s`, все
+целевые факты без предупреждений; `1700 px` был отвергнут из-за регрессии распознавания
+энергетического значения. Сканирование оставалось выключенным.
+
+После deploy выполнена отдельная диагностическая проверка только скорости на сгенерированном
+изображении `1800×2400` (20 warm запусков, без БД/API и пользовательских данных). Временный
+второй OCR process в существующем backend-контейнере измерил end-to-end p50 `3235.1 ms` (порог
+`3000 ms` не пройден), p95 `4261.5 ms`, max `4495.5 ms`; OCR inference p50 `2978.0 ms`, p95
+`3985.4 ms`; peak RSS `1090508 KiB`. Два одновременных вызова сохранили
+`max_parallel_inference=1`, их задержка составила `3404.0/7086.3 ms`. Синтетический draft
+сохранил `0/20` целевых фактов, поэтому этот запуск не подтверждает качество и не считается тестом
+приёмки. Пока процесс работал, backend-контейнер достиг `803.2 MiB`, использование swap на хосте
+выросло примерно на `117 MiB`; после завершения backend оставался healthy, без рестарта, и вернулся
+к `162.9 MiB`. Результат отмечен как ограниченный диагностический FAIL, а не основание для новой
+настройки OCR.
+
+Production остаётся на SHA `586ae2b463c085804031fe9a67780f0d33729405` с выключенным сканированием.
+Изменение адаптера в ветке задачи, объединяющее ожидание slot и inference в общий монотонный срок
+`8 s`, в этом deployed probe ещё не участвовало. Исходное фото для обязательного HUMAN_EVIDENCE на
+том же снимке отсутствует в доступных материалах задачи; до повторного deploy и успешной проверки
+владельцем вместе с подтверждёнными порогами задержки/ресурсов публичное включение остаётся
+**NO-GO**.

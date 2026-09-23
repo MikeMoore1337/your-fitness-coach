@@ -146,6 +146,52 @@ def test_rapidocr_timeout_is_controlled_without_unbounded_concurrency() -> None:
 
     with pytest.raises(LocalOcrError, match="local_ocr_timeout"):
         adapter.extract_candidates(b"normalized-png")
+    assert adapter._inference_slots.acquire(timeout=0) is True
+    adapter._inference_slots.release()
+
+
+def test_rapidocr_uses_one_deadline_for_slot_wait_and_inference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _adapter_without_runtime()
+    adapter._timeout_seconds = 1.0
+    elapsed = 0.0
+    result_timeouts: list[float | None] = []
+
+    class _DelayedSemaphore:
+        def acquire(self, *, timeout: float) -> bool:
+            nonlocal elapsed
+            assert timeout == pytest.approx(1.0)
+            elapsed += 0.4
+            return True
+
+        def release(self) -> None:
+            return None
+
+    class _ObservedFuture(Future):
+        def result(self, timeout: float | None = None):
+            result_timeouts.append(timeout)
+            return super().result(timeout=timeout)
+
+    class _ImmediateExecutor:
+        def submit(self, fn):
+            future = _ObservedFuture()
+            future.set_result(fn())
+            return future
+
+    adapter._inference_slots = _DelayedSemaphore()
+    adapter._executor = _ImmediateExecutor()
+    adapter._run_inference = lambda payload: SimpleNamespace(
+        boxes=[[[12, 30], [112, 30], [112, 58], [12, 58]]],
+        txts=["Protein 8,0 g"],
+        scores=[0.98],
+    )
+    monkeypatch.setattr("fitminiapp_api.nutrition_label.ocr.time.monotonic", lambda: elapsed)
+
+    candidates = adapter.extract_candidates(b"normalized-png")
+
+    assert result_timeouts == [pytest.approx(0.6)]
+    assert candidates[0].text == "Protein 8,0 g"
 
 
 def test_rapidocr_executor_failure_is_controlled_and_releases_slot() -> None:
