@@ -358,7 +358,11 @@ def _render_units(
         "@COLOCATED_ISOLATED_HERMES@": "yes" if mode == "colocated-isolated" else "no",
         "@HERMES_YFC_DEPLOYMENT_LOCK@": deployment_lock,
     }
-    for name in ("hermes-discovery.service.template", "hermes-worker-drain.service.template"):
+    for name in (
+        "hermes-network-anchor.service.template",
+        "hermes-discovery.service.template",
+        "hermes-worker-drain.service.template",
+    ):
         rendered = (source / name).read_text(encoding="utf-8")
         for marker, value in replacements.items():
             rendered = rendered.replace(marker, value)
@@ -550,6 +554,7 @@ def _stage_release(
                 *(
                     str(temporary / "systemd" / name)
                     for name in (
+                        "hermes-network-anchor.service",
                         "hermes-discovery.service",
                         "hermes-worker-drain.service",
                         "hermes-discovery.target",
@@ -594,6 +599,7 @@ def _install_release_links(
         *[
             (systemd_root / name, release_dir / "systemd" / name)
             for name in (
+                "hermes-network-anchor.service",
                 "hermes-discovery.service",
                 "hermes-worker-drain.service",
                 "hermes-discovery.target",
