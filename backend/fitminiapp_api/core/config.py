@@ -182,7 +182,6 @@ class Settings(BaseSettings):
     news_defer_hours: int = Field(default=24, ge=1, le=168)
     news_max_regenerations: int = Field(default=3, ge=0, le=10)
     news_draft_max_chars: int = Field(default=2600, ge=800, le=3200)
-    news_daily_draft_limit: int = Field(default=3, ge=1, le=20)
     news_review_batch_size: int = Field(default=10, ge=1, le=20)
     news_draft_profile: Literal["standard", "extended"] = "standard"
     news_auto_publish_low_risk: bool = False
