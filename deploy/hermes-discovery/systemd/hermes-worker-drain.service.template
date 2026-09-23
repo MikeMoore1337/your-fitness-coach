@@ -21,7 +21,7 @@ Environment=HERMES_DISCOVERY_DEFINITIONS_SHA256=@SOURCE_DEFINITIONS_SHA256@
 Environment=HERMES_DISCOVERY_STATE_DIR=/var/lib/hermes
 Environment=HERMES_DISCOVERY_OUTBOX_DIR=/var/lib/hermes/outbox
 Environment=HERMES_WORKER_TIMEOUT_SECONDS=120
-Environment=HERMES_WORKER_MAX_JOBS=5
+Environment=HERMES_WORKER_MAX_JOBS=10
 ExecCondition=/usr/bin/python3 /opt/hermes/current/hermes_resource_guard.py check --phase worker --mode ${HERMES_DEPLOYMENT_MODE}
 ExecStart=/usr/bin/python3 /opt/hermes/current/hermes_resource_guard.py run --phase worker --mode ${HERMES_DEPLOYMENT_MODE} -- /usr/bin/python3 /opt/hermes/current/hermes_worker_drain.py --once
 ExecStopPost=-/usr/bin/python3 /opt/hermes/current/hermes_health.py alert --state-dir /var/lib/hermes --outbox-dir /var/lib/hermes/outbox
