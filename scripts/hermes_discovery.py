@@ -65,6 +65,9 @@ def provenance() -> None:
     discovery_unit = (root / "systemd" / "hermes-discovery.service.template").read_text(
         encoding="utf-8"
     )
+    anchor_unit = (root / "systemd" / "hermes-network-anchor.service.template").read_text(
+        encoding="utf-8"
+    )
     drain_unit = (root / "systemd" / "hermes-worker-drain.service.template").read_text(
         encoding="utf-8"
     )
@@ -135,6 +138,15 @@ def provenance() -> None:
                 "COLOCATED_ISOLATED_MODE",
             )
         ),
+        "systemd.network_anchor": all(
+            token in anchor_unit
+            for token in (
+                "--name hermes-network-anchor",
+                "--network=hermes-net",
+                "@DISCOVERY_IMAGE@",
+                "Restart=always",
+            )
+        ),
         "systemd.drain_network": "Environment=HERMES_DOCKER_NETWORK=hermes-net" in drain_unit,
         "systemd.shared_host_root_launchers": all(
             "User=root" in unit
@@ -162,7 +174,7 @@ def provenance() -> None:
             for token in ("TasksMax=32", "MemoryMax=512M", "CPUQuota=50%", "OOMScoreAdjust=500")
         ),
         "systemd.discovery_oom_priority": "--oom-score-adj 500" in discovery_unit,
-        "systemd.timer_worker": "Unit=hermes-worker-drain.service" in timer_unit,
+        "systemd.timer_discovery": "Unit=hermes-discovery.service" in timer_unit,
         "resource_guard.thresholds": all(
             token in guard_source
             for token in (
