@@ -170,9 +170,12 @@ Local YFC catalog checked first. Exact local barcode lookup завершаетс
 `NUTRITION_LABEL_SCAN_OCR_ENGINE=rapidocr`, если там сохранено прежнее явное значение
 `tesseract`; новых secrets не требуется. `NUTRITION_LABEL_SCAN_OCR_MODEL_DIR` задавать не нужно,
 если используется стандартный image path `/opt/rapidocr/models`. Для фактического public rollout
-после HUMAN_EVIDENCE также потребуется операционная смена `NUTRITION_LABEL_SCAN_ENABLED=true`
-при сохранении `NUTRITION_LABEL_SCAN_KILL_SWITCH=false`; это rollout action, а не новая credential
-или provider настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны.
+после PASS exact-photo HUMAN_EVIDENCE production deploy однократно применяет
+`scripts/configure_production_nutrition_label_scan.py`: `NUTRITION_LABEL_SCAN_ENABLED=true` и
+`NUTRITION_LABEL_SCAN_KILL_SWITCH=false`. Маркер Task 128I хранится в persistent
+`.artifacts/operations/deployments`; последующие deploy сохраняют текущие значения host `.env`,
+включая аварийное включение kill switch. Это rollout action, а не новая credential или provider
+настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны.
 
 ## Runtime OCR
 
