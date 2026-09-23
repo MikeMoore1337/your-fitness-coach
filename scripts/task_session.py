@@ -3918,6 +3918,153 @@ class TaskController:
             },
         }
 
+    def _verified_post_merge_anchor(
+        self,
+        task_id: str,
+        lease: Mapping[str, Any],
+        anchor: Mapping[str, Any],
+        original: Mapping[str, Any],
+        final_pr: Mapping[str, Any],
+        deployed_sha: str,
+    ) -> dict[str, Any] | None:
+        branch = str(lease.get("branch", ""))
+        canonical_refresh = lease.get("canonical_master_refresh")
+        original_base_sha = str(lease.get("original_base_origin_master_sha", ""))
+        provenance = {
+            "task_id": task_id,
+            "branch": branch,
+            "base_sha": deployed_sha,
+            "head_sha": deployed_sha,
+            "original_base_sha": original_base_sha,
+        }
+        expected_anchor = {
+            "task_id": task_id,
+            "branch": branch,
+            "base_sha": deployed_sha,
+            "head_sha": deployed_sha,
+        }
+        if (
+            not isinstance(canonical_refresh, Mapping)
+            or not original_base_sha
+            or original.get("branch") != branch
+            or original.get("base_sha") != original_base_sha
+            or final_pr.get("branch") != branch
+            or final_pr.get("merge_sha") != deployed_sha
+            or any(
+                lease.get(key) != deployed_sha
+                for key in (
+                    "base_origin_master_sha",
+                    "ready_base_origin_master_sha",
+                    "ready_head_sha",
+                    "delivery_base_origin_master_sha",
+                    "delivery_head_sha",
+                )
+            )
+            or lease.get("task_provenance") != provenance
+            or dict(anchor) != expected_anchor
+            or lease.get("delivery_anchor") != expected_anchor
+            or any(
+                canonical_refresh.get(key) != value
+                for key, value in (
+                    ("operation", "canonical-master-refresh"),
+                    ("result", "REFRESHED"),
+                    ("canonical_worktree", str(self._canonical_root())),
+                    ("old_sha", final_pr.get("base_sha")),
+                    ("new_sha", deployed_sha),
+                    ("local_master_before", final_pr.get("base_sha")),
+                    ("local_master_after", deployed_sha),
+                    ("origin_master_sha", deployed_sha),
+                    ("verified_remote_sha", deployed_sha),
+                    ("live_master_sha", deployed_sha),
+                    ("ahead_before", 0),
+                    ("ahead_after", 0),
+                    ("behind_after", 0),
+                    ("mutation_performed", True),
+                    ("mutated_ref", "refs/heads/master"),
+                    ("reread_after_contention", False),
+                    ("delivery_task_id", task_id),
+                )
+            )
+        ):
+            return None
+
+        transition_ref = f"refs/heads/{branch}"
+        transition_message = f"rebase (finish): {transition_ref} onto {deployed_sha}"
+        try:
+            reflog = self.repository.git(
+                "reflog", "show", "--format=%H%x09%gs", branch
+            ).splitlines()
+        except TaskSessionError, OSError:
+            return None
+        if len(reflog) < 2:
+            return None
+        try:
+            current_ref, current_message = reflog[0].split("\t", maxsplit=1)
+            prior_ref = reflog[1].split("\t", maxsplit=1)[0]
+        except ValueError:
+            return None
+        if (
+            current_ref != deployed_sha
+            or prior_ref != final_pr.get("head_sha")
+            or current_message != transition_message
+        ):
+            return None
+
+        behind_before = canonical_refresh.get("behind_before")
+        updated_commits = canonical_refresh.get("updated_commits")
+        refresh_counts = (
+            canonical_refresh.get("ahead_before"),
+            behind_before,
+            canonical_refresh.get("ahead_after"),
+            canonical_refresh.get("behind_after"),
+            updated_commits,
+        )
+        try:
+            refresh_ahead, refresh_behind = self.repository.ahead_behind(
+                str(final_pr.get("base_sha", "")), deployed_sha
+            )
+        except TaskSessionError:
+            return None
+        if (
+            type(behind_before) is not int
+            or behind_before <= 0
+            or any(type(value) is not int for value in refresh_counts)
+            or updated_commits != behind_before
+            or refresh_ahead != 0
+            or refresh_behind != behind_before
+            or not self.repository.is_ancestor(str(final_pr.get("base_sha", "")), deployed_sha)
+        ):
+            return None
+
+        return {
+            "classification": "post_merge_collapsed_anchor",
+            "observed_recovery_anchor": dict(anchor),
+            "collapsed_from_delivery_anchor": {
+                "task_id": task_id,
+                "branch": branch,
+                "base_sha": final_pr["base_sha"],
+                "head_sha": final_pr["head_sha"],
+            },
+            "task_branch_transition": {
+                "ref": transition_ref,
+                "operation": "rebase (finish)",
+                "from_sha": final_pr["head_sha"],
+                "to_sha": deployed_sha,
+                "reflog_message": transition_message,
+            },
+            "controller_master_refresh": {
+                "operation": canonical_refresh["operation"],
+                "result": canonical_refresh["result"],
+                "old_sha": canonical_refresh["old_sha"],
+                "new_sha": canonical_refresh["new_sha"],
+                "delivery_task_id": canonical_refresh["delivery_task_id"],
+                "mutation_performed": canonical_refresh["mutation_performed"],
+                "mutated_ref": canonical_refresh["mutated_ref"],
+                "behind_before": behind_before,
+                "updated_commits": updated_commits,
+            },
+        }
+
     def reconcile_production_success(
         self,
         task_id: str,
@@ -4050,13 +4197,6 @@ class TaskController:
             raise TaskSessionError("origin/master changed non-fast-forward during reconciliation")
         self._verify_live_master(master_sha)
         original = self._verified_reconciliation_pr(original_pr_number, expected, master_sha)
-        if (
-            original["branch"] != branch
-            or original["base_sha"] != base_sha
-            or original["head_sha"] != head_sha
-        ):
-            raise TaskSessionError("Original PR does not match the preserved delivery anchor")
-
         evidence = [original]
         previous = original
         for number in superseding_pr_numbers:
@@ -4073,6 +4213,21 @@ class TaskController:
             raise TaskSessionError("Deployed SHA must equal the final superseding PR merge SHA")
         if not self.repository.is_ancestor(deployed_sha, master_sha):
             raise TaskSessionError("Deployed SHA is not an ancestor of current protected master")
+
+        exact_anchor = (
+            original["branch"] == branch
+            and original["base_sha"] == base_sha
+            and original["head_sha"] == head_sha
+        )
+        collapsed_anchor = None
+        if not exact_anchor:
+            collapsed_anchor = self._verified_post_merge_anchor(
+                expected, lease, anchor, original, evidence[-1], deployed_sha
+            )
+            if collapsed_anchor is None:
+                raise TaskSessionError(
+                    "Original PR does not match the preserved delivery anchor and no verified post-merge anchor exists"
+                )
         if self._active_production_deployment():
             raise TaskSessionError(
                 "Production reconciliation refuses while a production deployment is active"
@@ -4097,15 +4252,20 @@ class TaskController:
         now = utc_now()
         reconciliation = {
             "version": 1,
+            "anchor_classification": (
+                "post_merge_collapsed_anchor"
+                if collapsed_anchor is not None
+                else "exact_delivery_anchor"
+            ),
             "owner_authorized": True,
             "authorized_at": now,
             "reconciled_at": now,
             "reconciled_against_master_sha": master_sha,
             "original_delivery": {
                 "pr_number": original_pr_number,
-                "branch": branch,
-                "base_sha": base_sha,
-                "head_sha": head_sha,
+                "branch": original["branch"],
+                "base_sha": original["base_sha"],
+                "head_sha": original["head_sha"],
                 "merge_sha": original["merge_sha"],
                 "merged_at": original["merged_at"],
                 "required_check": original["required_check"],
@@ -4120,12 +4280,14 @@ class TaskController:
                 "deployment_success_verified": True,
             },
         }
+        if collapsed_anchor is not None:
+            reconciliation["post_merge_collapsed_anchor"] = collapsed_anchor
         history = {
             "version": TASK_STATE_VERSION,
             "task_id": expected,
             "state": "production-success",
-            "head_sha": head_sha,
-            "base_sha": base_sha,
+            "head_sha": original["head_sha"],
+            "base_sha": original["base_sha"],
             "merge_sha": deployed_sha,
             "deployed_sha": deployed_sha,
             "pr_number": original_pr_number,
@@ -4297,6 +4459,8 @@ class TaskController:
         original = audit.get("original_delivery")
         superseding = audit.get("superseding_prs")
         production = audit.get("production")
+        anchor_classification = audit.get("anchor_classification", "exact_delivery_anchor")
+        collapsed = audit.get("post_merge_collapsed_anchor")
         master_sha = str(audit.get("reconciled_against_master_sha", ""))
         deployed_sha = str(history.get("deployed_sha", ""))
         head_sha = str(history.get("head_sha", ""))
@@ -4310,10 +4474,16 @@ class TaskController:
         if (
             audit.get("version") != 1
             or audit.get("owner_authorized") is not True
+            or anchor_classification not in {"exact_delivery_anchor", "post_merge_collapsed_anchor"}
             or not isinstance(original, Mapping)
             or not isinstance(superseding, list)
             or not superseding
             or not isinstance(production, Mapping)
+            or (
+                anchor_classification == "post_merge_collapsed_anchor"
+                and not isinstance(collapsed, Mapping)
+            )
+            or (anchor_classification == "exact_delivery_anchor" and collapsed is not None)
             or any(
                 re.fullmatch(r"[0-9a-f]{40}", sha) is None
                 for sha in (master_sha, deployed_sha, head_sha, base_sha)
@@ -4323,7 +4493,6 @@ class TaskController:
             or history.get("merge_sha") != deployed_sha
             or lease.get("merge_sha") != deployed_sha
             or lease.get("deployed_sha") != deployed_sha
-            or lease.get("delivery_anchor") != anchor
             or history.get("pr_number") != original.get("pr_number")
             or original.get("branch") != lease.get("branch")
             or original.get("base_sha") != base_sha
@@ -4366,6 +4535,24 @@ class TaskController:
                 raise TaskSessionError(invalid)
             numbers.add(number)
             prior_merge_sha = item_merge
+
+        if anchor_classification == "exact_delivery_anchor":
+            if lease.get("delivery_anchor") != anchor:
+                raise TaskSessionError(invalid)
+        else:
+            if not isinstance(collapsed, Mapping):
+                raise TaskSessionError(invalid)
+            observed_anchor = collapsed.get("observed_recovery_anchor")
+            final_pr = entries[-1]
+            verified = (
+                self._verified_post_merge_anchor(
+                    expected, lease, observed_anchor, original, final_pr, deployed_sha
+                )
+                if isinstance(observed_anchor, Mapping)
+                else None
+            )
+            if verified != collapsed:
+                raise TaskSessionError(invalid)
 
         if (
             prior_merge_sha != deployed_sha

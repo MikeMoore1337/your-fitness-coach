@@ -429,6 +429,295 @@ def _prepare_superseding_production_reconciliation(
     return root, git_repository, controller, worktree, branch, superseding_numbers, prior_merge_sha
 
 
+def _collapse_reconciliation_anchor_after_refresh(
+    root: Path,
+    git_repository: Any,
+    controller: Any,
+    worktree: Path,
+    branch: str,
+    superseding_prs: list[int],
+    deployed_sha: str,
+) -> None:
+    lease_path = controller.store.task_lease_path("415")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    final_pr = controller.github.pulls[superseding_prs[-1]]
+    final_pr["head"]["ref"] = branch
+    ref = f"refs/heads/{branch}"
+    previous_sha = git_repository.ref(branch)
+    _git(
+        root,
+        "update-ref",
+        "-m",
+        "commit: [Task 415] superseding PR head",
+        ref,
+        final_pr["head"]["sha"],
+        previous_sha,
+    )
+    _git(
+        root,
+        "update-ref",
+        "-m",
+        f"rebase (finish): {ref} onto {deployed_sha}",
+        ref,
+        deployed_sha,
+        final_pr["head"]["sha"],
+    )
+
+    original_base_sha = lease["original_base_origin_master_sha"]
+    lease.update(
+        {
+            "base_origin_master_sha": deployed_sha,
+            "ready_head_sha": deployed_sha,
+            "ready_base_origin_master_sha": deployed_sha,
+            "delivery_base_origin_master_sha": deployed_sha,
+            "delivery_head_sha": deployed_sha,
+            "task_provenance": {
+                "task_id": "415",
+                "branch": branch,
+                "base_sha": deployed_sha,
+                "head_sha": deployed_sha,
+                "original_base_sha": original_base_sha,
+            },
+            "delivery_anchor": {
+                "task_id": "415",
+                "branch": branch,
+                "base_sha": deployed_sha,
+                "head_sha": deployed_sha,
+            },
+            "canonical_master_refresh": {
+                "operation": "canonical-master-refresh",
+                "result": "REFRESHED",
+                "canonical_worktree": str(root),
+                "old_sha": final_pr["base"]["sha"],
+                "new_sha": deployed_sha,
+                "local_master_before": final_pr["base"]["sha"],
+                "local_master_after": deployed_sha,
+                "origin_master_sha": deployed_sha,
+                "verified_remote_sha": deployed_sha,
+                "live_master_sha": deployed_sha,
+                "ahead_before": 0,
+                "behind_before": int(
+                    _git(root, "rev-list", "--count", f"{final_pr['base']['sha']}..{deployed_sha}")
+                ),
+                "ahead_after": 0,
+                "behind_after": 0,
+                "updated_commits": int(
+                    _git(root, "rev-list", "--count", f"{final_pr['base']['sha']}..{deployed_sha}")
+                ),
+                "mutation_performed": True,
+                "mutated_ref": "refs/heads/master",
+                "reread_after_contention": False,
+                "delivery_task_id": "415",
+            },
+        }
+    )
+    task_session.StateStore.replace_json(lease_path, lease)
+    assert git_repository.head(cwd=worktree) == deployed_sha
+
+
+def test_reconcile_verified_post_merge_anchor_preserves_pr_chain_and_finishes(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(
+            repository, superseding_count=1, post_deploy_drift=False
+        )
+    )
+    _collapse_reconciliation_anchor_after_refresh(
+        root, git_repository, controller, worktree, branch, superseding_prs, deployed_sha
+    )
+
+    history = controller.reconcile_production_success(
+        "415",
+        original_pr_number=423,
+        superseding_pr_numbers=superseding_prs,
+        deployed_sha=deployed_sha,
+        production_run_id=35783412553,
+        owner_authorize=True,
+    )
+
+    reconciliation = history["superseding_production_reconciliation"]
+    collapsed = reconciliation["post_merge_collapsed_anchor"]
+    assert reconciliation["anchor_classification"] == "post_merge_collapsed_anchor"
+    assert history["base_sha"] == controller.github.pulls[423]["base"]["sha"]
+    assert history["head_sha"] == controller.github.pulls[423]["head"]["sha"]
+    assert [reconciliation["original_delivery"], *reconciliation["superseding_prs"]] == [
+        {
+            "pr_number": 423,
+            "branch": branch,
+            "base_sha": controller.github.pulls[423]["base"]["sha"],
+            "head_sha": controller.github.pulls[423]["head"]["sha"],
+            "merge_sha": controller.github.pulls[423]["merge_commit_sha"],
+            "merged_at": "2026-09-22T13:34:24+00:00",
+            "required_check": _success_check(controller.github.pulls[423]["head"]["sha"]),
+        },
+        {
+            "pr_number": superseding_prs[0],
+            "branch": branch,
+            "base_sha": controller.github.pulls[superseding_prs[0]]["base"]["sha"],
+            "head_sha": controller.github.pulls[superseding_prs[0]]["head"]["sha"],
+            "merge_sha": controller.github.pulls[superseding_prs[0]]["merge_commit_sha"],
+            "merged_at": "2026-09-22T20:20:29+00:00",
+            "required_check": _success_check(
+                controller.github.pulls[superseding_prs[0]]["head"]["sha"]
+            ),
+        },
+    ]
+    assert collapsed["classification"] == "post_merge_collapsed_anchor"
+    assert collapsed["observed_recovery_anchor"]["head_sha"] == deployed_sha
+    assert (
+        collapsed["collapsed_from_delivery_anchor"]["head_sha"]
+        == controller.github.pulls[superseding_prs[0]]["head"]["sha"]
+    )
+    assert (
+        collapsed["task_branch_transition"]["from_sha"]
+        == controller.github.pulls[superseding_prs[0]]["head"]["sha"]
+    )
+    assert collapsed["task_branch_transition"]["to_sha"] == deployed_sha
+    assert collapsed["controller_master_refresh"]["new_sha"] == deployed_sha
+
+    result = controller.finish("415")
+
+    assert result["cleanup_performed"] is True
+    assert not worktree.exists()
+    finished = controller.store.read_json(controller.store.history / "task-415.json")
+    assert finished["state"] == "finished"
+    assert finished["superseding_production_reconciliation"] == reconciliation
+
+
+@pytest.mark.parametrize(
+    ("invalid_case", "expected_error"),
+    [
+        ("intermediate_anchor", "no verified post-merge anchor"),
+        ("dirty_worktree", "dirty or interrupted task worktree"),
+        ("unique_commit", "unmerged unique task commits"),
+        ("missing_deployment", "No successful production deployment"),
+        ("wrong_task", "does not belong to Task 415"),
+        ("broken_chain", "breaks the chronological master ancestry chain"),
+        ("deployed_mismatch", "must equal the final superseding PR merge SHA"),
+        ("ambiguous_branch", "one unambiguous task branch/worktree"),
+        ("owner_authorization", "explicit owner authorization"),
+        ("unverified_refresh", "no verified post-merge anchor"),
+        ("arbitrary_branch_move", "no verified post-merge anchor"),
+    ],
+)
+def test_reconcile_verified_post_merge_anchor_rejects_unsafe_recovery(
+    repository: tuple[Path, Any], invalid_case: str, expected_error: str
+) -> None:
+    root, git_repository, controller, worktree, branch, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(
+            repository, superseding_count=1, post_deploy_drift=False
+        )
+    )
+    _collapse_reconciliation_anchor_after_refresh(
+        root, git_repository, controller, worktree, branch, superseding_prs, deployed_sha
+    )
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    final_pr = github.pulls[superseding_prs[0]]
+    deployed_argument = deployed_sha
+    owner_authorize = True
+    lease_path = controller.store.task_lease_path("415")
+
+    if invalid_case == "intermediate_anchor":
+        intermediate_sha = final_pr["base"]["sha"]
+        _git(worktree, "reset", "--hard", intermediate_sha)
+        lease = controller.store.read_json(lease_path)
+        assert isinstance(lease, dict)
+        lease.update(
+            {
+                "base_origin_master_sha": intermediate_sha,
+                "ready_head_sha": intermediate_sha,
+                "ready_base_origin_master_sha": intermediate_sha,
+                "delivery_base_origin_master_sha": intermediate_sha,
+                "delivery_head_sha": intermediate_sha,
+                "task_provenance": {
+                    **lease["task_provenance"],
+                    "base_sha": intermediate_sha,
+                    "head_sha": intermediate_sha,
+                },
+                "delivery_anchor": {
+                    "task_id": "415",
+                    "branch": branch,
+                    "base_sha": intermediate_sha,
+                    "head_sha": intermediate_sha,
+                },
+            }
+        )
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif invalid_case == "dirty_worktree":
+        (worktree / "untracked.txt").write_text("preserve\n", encoding="utf-8")
+    elif invalid_case == "unique_commit":
+        _git(worktree, "config", "user.name", "Task Session Tests")
+        _git(worktree, "config", "user.email", "task-session@example.invalid")
+        (worktree / "unique.txt").write_text("unmerged\n", encoding="utf-8")
+        _git(worktree, "add", "unique.txt")
+        _git(worktree, "commit", "-m", "chore: unmerged unique change")
+        unique_sha = _git(worktree, "rev-parse", "HEAD")
+        lease = controller.store.read_json(lease_path)
+        assert isinstance(lease, dict)
+        lease["ready_head_sha"] = unique_sha
+        lease["delivery_head_sha"] = unique_sha
+        lease["task_provenance"]["head_sha"] = unique_sha
+        lease["delivery_anchor"]["head_sha"] = unique_sha
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif invalid_case == "missing_deployment":
+        github.successful_deployments.clear()
+    elif invalid_case == "wrong_task":
+        final_pr["title"] = "[Task 416] Synthetic task"
+        final_pr["head"]["ref"] = "task/416-synthetic-task"
+        github.commits[superseding_prs[0]] = [_task_commit("416")]
+    elif invalid_case == "broken_chain":
+        final_pr["base"]["sha"] = controller.store.read_json(lease_path)[
+            "original_base_origin_master_sha"
+        ]
+    elif invalid_case == "deployed_mismatch":
+        deployed_argument = final_pr["base"]["sha"]
+    elif invalid_case == "ambiguous_branch":
+        _git(root, "branch", "task/415-duplicate", "origin/master")
+    elif invalid_case == "owner_authorization":
+        owner_authorize = False
+    elif invalid_case == "unverified_refresh":
+        lease = controller.store.read_json(lease_path)
+        assert isinstance(lease, dict)
+        lease["canonical_master_refresh"]["delivery_task_id"] = "416"
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif invalid_case == "arbitrary_branch_move":
+        ref = f"refs/heads/{branch}"
+        _git(
+            root,
+            "update-ref",
+            "-m",
+            "reset: moving to PR head",
+            ref,
+            final_pr["head"]["sha"],
+            deployed_sha,
+        )
+        _git(
+            root,
+            "update-ref",
+            "-m",
+            "reset: moving back to merge",
+            ref,
+            deployed_sha,
+            final_pr["head"]["sha"],
+        )
+
+    with pytest.raises(task_session.TaskSessionError, match=expected_error):
+        controller.reconcile_production_success(
+            "415",
+            original_pr_number=423,
+            superseding_pr_numbers=superseding_prs,
+            deployed_sha=deployed_argument,
+            production_run_id=35783412553,
+            owner_authorize=owner_authorize,
+        )
+
+    assert controller.store.read_json(lease_path)["lifecycle_state"] == "recovery-required"
+    assert not (controller.store.history / "task-415.json").exists()
+
+
 @pytest.mark.parametrize("superseding_count", [1, 2])
 def test_reconcile_superseding_production_preserves_anchor_and_all_evidence(
     repository: tuple[Path, Any], superseding_count: int

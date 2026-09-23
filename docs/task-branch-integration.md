@@ -274,6 +274,23 @@ PR в `master` обязан быть same-repository task branch с `[Task <ID>]
 merged task PR provenance и публикует immutable backend/bot images через
 `scripts/deployment_contract.py`.
 
+`reconcile-production-success` по умолчанию требует точного совпадения исходного PR с сохранённым
+`delivery_anchor`. Единственное исключение — подтверждённый `post_merge_collapsed_anchor`: recovery
+lease, task branch/ref/worktree и все текущие lease anchors должны указывать ровно на финальный
+deployed merge SHA; исходный и superseding PRs должны образовывать проверенную same-task/same-repo
+цепочку с exact-head `checks`; финальный PR должен использовать leased task branch; production run и
+deployment должны совпадать с его merge SHA. Дополнительно lease обязан сохранять реальный
+`canonical-master-refresh` `REFRESHED`, привязанный к этой task, от base SHA финального PR до его
+merge SHA, и branch reflog должен подтверждать переход `rebase (finish)` с exact PR head на deployed
+merge SHA. Любой промежуточный SHA, произвольный reset, уникальный commit, грязный или неоднозначный
+worktree, разрыв PR цепочки либо неподтверждённое production состояние остаётся fail-closed.
+
+Для такого восстановления history сохраняет фактические base/head/merge/checks исходного PR и всех
+superseding PRs, production run/deployment, классификацию `post_merge_collapsed_anchor` и полный
+observed recovery anchor вместе с подтверждённым переходом task branch. `finish` повторно проверяет
+эту связь и принимает только controller-only drift после зафиксированного master snapshot. Этот путь
+не меняет exact-anchor semantics обычного `complete-production`.
+
 `deploy.yml` принимает только successful `master` workflow run, ещё раз проверяет association с
 merged task PR и current master, checkout выполняется только на GitHub runner. Runner создаёт
 bundle из exact commit и migration manifest. Production host получает bundle по SSH, распаковывает
