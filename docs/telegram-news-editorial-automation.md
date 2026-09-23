@@ -30,8 +30,8 @@ revision через bounded remediation contract.
 
 Для editorial intake действует rolling-окно свежести в 60 дней: границы включаются, будущие и
 неизвестные даты отклоняются. Это product/discovery heuristic, а не медицинская норма. Owner-
-карточки отправляются из очереди пачками до 5 различных drafts в окнах 08:00, 13:00 и 18:00
-по `Europe/Moscow`; если доступно меньше пяти, отправляется доступное количество без filler.
+карточки отправляются из очереди пачками до 10 различных drafts в окнах 08:00, 13:00 и 18:00
+по `Europe/Moscow`; если доступно меньше десяти, отправляется доступное количество без filler.
 Пятнадцатиминутное окно допускает обычный polling worker и не меняет расписание самого Hermes.
 Очередь, изображения и другие downstream-этапы продолжают обрабатываться между слотами, но новые
 Telegram review cards вне этих окон не отправляются.
@@ -127,7 +127,7 @@ artifact, artifact hash, обязательным image и пустым спис
 warnings, fallback/provider failure, missing image, disabled publication и missing channel rights
 не отправляются владельцу. Поэтому карточка ready-публикации содержит как минимум
 `Опубликовать сейчас`, `Запланировать`, `Отклонить` и `Открыть источник`; edit/image
-controls остаются только вторичными emergency actions. Batch size 5 считает только отправленные
+controls остаются только вторичными emergency actions. Batch size 10 считает только отправленные
 ready-публикации, а blocked/failed candidates слот не расходуют. Автопубликации нет.
 
 ## Taxonomy and policy
