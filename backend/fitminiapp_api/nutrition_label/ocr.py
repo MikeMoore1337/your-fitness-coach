@@ -312,7 +312,7 @@ class RapidOcr:
             params = {
                 "Global.model_root_dir": str(self._model_dir),
                 "Global.log_level": "error",
-                "Global.max_side_len": 2000,
+                "Global.max_side_len": 1750,
                 "Global.return_word_box": False,
                 # Task 128H: canonical production has 2 vCPU; one in-flight OCR inference
                 # may use both cores while the outer semaphore still prevents concurrent heavy runs.
@@ -324,7 +324,7 @@ class RapidOcr:
                 "Det.model_type": ModelType.MOBILE,
                 "Det.ocr_version": OCRVersion.PPOCRV5,
                 "Det.model_path": str(self._model_dir / RAPIDOCR_MODEL_FILES[0]),
-                "Det.limit_side_len": 2000,
+                "Det.limit_side_len": 1750,
                 "Cls.engine_type": EngineType.ONNXRUNTIME,
                 "Cls.model_type": ModelType.MOBILE,
                 "Cls.ocr_version": OCRVersion.PPOCRV5,
