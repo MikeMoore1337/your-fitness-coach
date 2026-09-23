@@ -30,7 +30,7 @@ from hermes_health import record_health
 IMAGE_DIGEST_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 DOCKER_NETWORK_NAME_PATTERN = re.compile(r"^hermes-[a-z0-9][a-z0-9_.-]{0,56}$")
 JOB_NAME_PATTERN = re.compile(r"^[0-9a-f]{64}\.json$")
-DEFAULT_MAX_JOBS = 1
+DEFAULT_MAX_JOBS = 10
 MAX_JOBS = 20
 DEFAULT_DOCKER_NETWORK = "hermes-net"
 RESERVED_DOCKER_NETWORK_NAMES = frozenset({"bridge", "default", "host", "none"})
