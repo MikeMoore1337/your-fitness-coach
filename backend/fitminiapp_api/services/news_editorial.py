@@ -829,13 +829,9 @@ def review_message(
     metadata = draft.evidence_metadata
     warnings = ", ".join(draft.warnings) if draft.warnings else "нет автоматических флагов"
     score_reasons = ", ".join(
-        reason
-        for reason in (cluster.score_reasons or [])[:6]
-        if isinstance(reason, str) and reason
+        reason for reason in (cluster.score_reasons or [])[:6] if isinstance(reason, str) and reason
     )
-    evidence_ids = [
-        item_id for item_id in draft.evidence_item_ids if isinstance(item_id, int)
-    ]
+    evidence_ids = [item_id for item_id in draft.evidence_item_ids if isinstance(item_id, int)]
     source_count = len(dict.fromkeys(evidence_ids))
     supporting_count = max(0, source_count - 1)
     artifact_line = "Точный preview: недоступен до исправления блокеров"
