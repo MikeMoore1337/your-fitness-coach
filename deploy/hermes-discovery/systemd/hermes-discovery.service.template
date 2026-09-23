@@ -1,11 +1,17 @@
 [Unit]
 Description=Task 403 bounded Hermes source discovery container
 Wants=network-online.target
-After=network-online.target
+Requires=hermes-network-anchor.service
+After=network-online.target hermes-network-anchor.service
+OnSuccess=hermes-worker-drain.service
+StartLimitIntervalSec=15min
+StartLimitBurst=3
 RequiresMountsFor=/opt/hermes /etc/hermes /var/lib/hermes
 
 [Service]
 Type=oneshot
+Restart=on-failure
+RestartSec=60s
 # The host-side launcher is the only root process here.  The container itself
 # remains non-root and has no Docker socket or host tooling mounted into it.
 User=root
