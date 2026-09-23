@@ -94,6 +94,9 @@ python3 scripts/configure_production_ai_coach.py .env
 echo "Applying the one-time Task 128I Nutrition Label rollout configuration"
 python3 scripts/configure_production_nutrition_label_scan.py .env "$NUTRITION_LABEL_SCAN_ROLLOUT_MARKER"
 
+echo "Ensuring the bounded production journald policy before rollout"
+python3 scripts/configure_production_log_retention.py --revision "$TARGET_SHA"
+
 echo "Validating Compose configuration for $TARGET_SHA"
 docker compose config --quiet
 
@@ -119,6 +122,14 @@ case "$ROLLOUT_MODE" in
     exit 1
     ;;
 esac
+
+echo "Rechecking production journald after rollout"
+python3 scripts/configure_production_log_retention.py --revision "$TARGET_SHA"
+
+echo "Verifying bounded logging for active YFC application containers"
+python3 scripts/configure_production_log_retention.py \
+  --verify-application-logs \
+  --revision "$TARGET_SHA"
 
 echo "Checking the public Telegram bot profile"
 set +e
