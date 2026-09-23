@@ -70,6 +70,34 @@ def test_source_error_alert_tracks_latest_discovery_run_not_lifetime_total() -> 
     assert "source_errors" not in recovered["active_alerts"]
 
 
+def test_drain_alerts_track_latest_run_not_lifetime_totals() -> None:
+    state: dict[str, object] = {}
+
+    first = hermes_health.update_health(
+        state,
+        stage="drain",
+        status="failed",
+        counters={"terminal": 3, "provider_rate_limited": 5},
+    )
+    assert first["counters"]["terminal"] == 3
+    assert first["counters"]["provider_rate_limited"] == 5
+    assert "terminal_failures" in first["active_alerts"]
+    assert "provider_rate_limited" in first["active_alerts"]
+
+    recovered = hermes_health.update_health(
+        state,
+        stage="drain",
+        status="completed",
+        counters={},
+    )
+    assert recovered["counters"]["terminal"] == 3
+    assert recovered["counters"]["provider_rate_limited"] == 5
+    assert recovered["last_drain_error_counts"]["terminal"] == 0
+    assert recovered["last_drain_error_counts"]["provider_rate_limited"] == 0
+    assert "terminal_failures" not in recovered["active_alerts"]
+    assert "provider_rate_limited" not in recovered["active_alerts"]
+
+
 def test_install_instructions_start_enabled_timer_after_gate_a() -> None:
     readme = (DISCOVERY_ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -722,12 +750,28 @@ def test_candidate_key_and_job_are_stable_across_restarts() -> None:
 
 def test_scheduler_overlap_fails_closed(tmp_path: Path) -> None:
     lock = tmp_path / ".discovery-run.lock"
-    lock.write_text("live", encoding="ascii")
-    with (
-        pytest.raises(discovery_runner.DiscoveryError, match="scheduler_overlap"),
-        discovery_runner._exclusive_lock(lock, stale_seconds=900),
-    ):
-        pass
+    if discovery_runner.fcntl is None:
+        lock.write_text("live", encoding="ascii")
+        with (
+            pytest.raises(discovery_runner.DiscoveryError, match="scheduler_overlap"),
+            discovery_runner._exclusive_lock(lock, stale_seconds=900),
+        ):
+            pass
+        return
+
+    with lock.open("a+", encoding="ascii") as handle:
+        discovery_runner.fcntl.flock(
+            handle.fileno(),
+            discovery_runner.fcntl.LOCK_EX | discovery_runner.fcntl.LOCK_NB,
+        )
+        try:
+            with (
+                pytest.raises(discovery_runner.DiscoveryError, match="scheduler_overlap"),
+                discovery_runner._exclusive_lock(lock, stale_seconds=900),
+            ):
+                pass
+        finally:
+            discovery_runner.fcntl.flock(handle.fileno(), discovery_runner.fcntl.LOCK_UN)
 
 
 def test_runtime_contract_has_no_external_secrets_or_publish_surface() -> None:

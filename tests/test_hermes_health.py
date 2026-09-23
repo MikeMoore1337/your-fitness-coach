@@ -20,8 +20,8 @@ def test_health_records_bounded_counters_and_recomputes_backlog_alert(tmp_path: 
     health = hermes_health.record_health(
         state_dir,
         outbox_dir,
-        stage="discovery",
-        status="completed",
+        stage="drain",
+        status="failed",
         counters={"provider_rate_limited": 5, "not_a_counter": 999},
     )
 
@@ -36,3 +36,15 @@ def test_health_records_bounded_counters_and_recomputes_backlog_alert(tmp_path: 
     snapshot = hermes_health.snapshot(state_dir, outbox_dir)
     assert snapshot["status"] == "attention"
     assert "outbox_backlog" in snapshot["health"]["active_alerts"]
+
+    recovered = hermes_health.record_health(
+        state_dir,
+        outbox_dir,
+        stage="drain",
+        status="completed",
+        counters={},
+    )
+    assert recovered["counters"]["provider_rate_limited"] == 5
+    assert recovered["last_drain_error_counts"]["provider_rate_limited"] == 0
+    assert "provider_rate_limited" not in recovered["active_alerts"]
+    assert "outbox_backlog" in recovered["active_alerts"]
