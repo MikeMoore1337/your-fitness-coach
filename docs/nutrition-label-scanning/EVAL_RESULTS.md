@@ -177,3 +177,34 @@ RapidOCR выбран primary, потому что на том же corpus он 
 evidence и existing deterministic parser. Tesseract остаётся только explicit fallback и не
 запускается безусловно вместе с RapidOCR. Это не доказывает real-label accuracy: после deploy
 нужна HUMAN_EVIDENCE на том же исходном фото, без коммита изображения и EXIF в repository.
+
+## Addendum Task 128H (2026-09-23)
+
+Post-migration validation was repeated on the canonical YFC production host with 2 vCPU,
+1962 MiB RAM and 2047 MiB swap. Production remained configured for local RapidOCR,
+`Global.max_side_len=2000`, one heavy inference at a time and an 8 s OCR timeout; public
+nutrition-label scanning remained disabled during validation.
+
+On the same reproducible clean representative label, the deployed 1-thread ONNX profile produced
+first inference `7399.6 ms`, warm p50 `6034.3 ms`, warm p95 `6495.2 ms` and peak RSS
+`1,167,276 KiB`. The draft preserved `per_100_g`, `281.4 kJ`, `66.8 kcal` and P/F/C
+`8.0/2.0/4.2` without warnings, but failed the Task 128H latency targets.
+
+A bounded 2-thread intra-op profile kept `inter_op=1`, CPU memory arena disabled, the same models,
+`max_side_len=2000` and `BoundedSemaphore(1)`. On clean representative inputs it preserved all
+mandatory facts without warnings and reduced p95 below 5 s: the 1200x1600 case measured first
+`4672.6 ms`, warm p50 `4147.4 ms`, p95 `4627.7 ms`; the 1800x2400 case measured first
+`4318.2 ms`, warm p50 `3385.9 ms`, p95 `3612.6 ms`. Peak RSS remained about `1.11 GiB`.
+
+Enabling the ONNX CPU memory arena was explicitly rejected: the diagnostic process was OOM-killed
+(exit 137, about `1.36 GiB` anonymous RSS) on this 2 GiB host. Reducing the diagnostic input to a
+1000-1600 px long side did not meet the 3 s p50 target and is not accepted as a quality tradeoff;
+the earlier Task 128G 1000 px corpus profile also had materially worse completeness.
+
+Task 128H therefore permits only the evidence-backed `intra_op_num_threads=2` tuning while keeping
+single-inference concurrency, the quality profile and 8 s timeout unchanged. The rollout verdict
+remains **NO-GO for public enablement**: warm p95 is within the target, but warm p50 remains above
+3 s on the canonical 2-vCPU host, and the original raw same-photo HUMAN_EVIDENCE image is not
+available for a valid final replay. `NUTRITION_LABEL_SCAN_ENABLED=false` must remain in production
+until both gates are satisfied; synthetic or screenshot-derived evidence must not be substituted
+for the required original-photo validation.

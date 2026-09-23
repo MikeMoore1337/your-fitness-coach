@@ -314,7 +314,9 @@ class RapidOcr:
                 "Global.log_level": "error",
                 "Global.max_side_len": 2000,
                 "Global.return_word_box": False,
-                "EngineConfig.onnxruntime.intra_op_num_threads": 1,
+                # Task 128H: canonical production has 2 vCPU; one in-flight OCR inference
+                # may use both cores while the outer semaphore still prevents concurrent heavy runs.
+                "EngineConfig.onnxruntime.intra_op_num_threads": 2,
                 "EngineConfig.onnxruntime.inter_op_num_threads": 1,
                 "EngineConfig.onnxruntime.enable_cpu_mem_arena": False,
                 "Det.engine_type": EngineType.ONNXRUNTIME,
