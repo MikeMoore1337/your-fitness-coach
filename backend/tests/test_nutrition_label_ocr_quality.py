@@ -136,6 +136,134 @@ def test_ocr_gram_glyph_shape_is_repaired_only_for_gram_nutrient_rows() -> None:
     assert draft.normalized_facts.carbohydrate_g.value == Decimal("4.2")
 
 
+def test_captured_kazakh_label_rows_and_reordered_energy_units_parse_safely() -> None:
+    captured_geometry = (
+        ("Пищевая", 221, 650, 104, 40, 93.238, 11),
+        ("ценность", 314, 651, 119, 36, 98.323, 12),
+        ("100 г продукта", 423, 641, 203, 58, 92.56, 13),
+        ("(средние з", 614, 641, 134, 59, 92.005, 14),
+        ("значения)", 731, 653, 122, 42, 95.503, 15),
+        ("(орташа", 648, 686, 113, 58, 93.422, 16),
+        ("мәндер):", 746, 687, 116, 58, 86.441, 17),
+        ("6enkи", 218, 740, 80, 56, 64.137, 18),
+        ("акуыздар", 302, 748, 131, 62, 89.391, 19),
+        ("8,0r", 792, 751, 72, 62, 94.037, 20),
+        ("*уры", 217, 807, 77, 55, 58.454, 21),
+        ("майлар", 295, 809, 109, 63, 93.229, 22),
+        ("2,0r", 796, 816, 67, 61, 95.057, 23),
+        ("yгеводы", 216, 866, 121, 63, 66.505, 24),
+        ("көмирсулар", 340, 875, 163, 71, 92.226, 25),
+        ("4,2r", 796, 877, 64, 59, 89.695, 26),
+        ("Энергeтичecкaя", 216, 925, 180, 73, 59.217, 27),
+        ("ценность", 385, 949, 121, 54, 98.552, 28),
+        ("(калорийность)/", 497, 947, 223, 66, 97.814, 29),
+        ("281,4 KДж", 734, 941, 135, 66, 73.271, 30),
+        ("Энеpreтикaлbк", 214, 969, 179, 79, 55.984, 31),
+        ("КұНДЫЛЫғЫ", 379, 993, 151, 61, 69.959, 32),
+        ("(Кунарлылыы)(66,8", 520, 986, 288, 80, 70.626, 33),
+        ("ккал)", 786, 994, 75, 56, 82.857, 34),
+    )
+    captured_tokens = tuple(
+        OcrToken(
+            text=text,
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            confidence=confidence,
+            block_num=1,
+            paragraph_num=1,
+            line_num=line_num,
+            word_num=1,
+        )
+        for text, left, top, width, height, confidence, line_num in captured_geometry
+    )
+    captured_photo_text = structured_text_from_tokens(captured_tokens)
+    assert captured_photo_text == "\n".join(
+        (
+            "Пищевая ценность 100 г продукта (средние з (орташа значения) мәндер):",
+            "6enkи акуыздар 8,0r",
+            "*уры майлар 2,0r",
+            "yгеводы көмирсулар 4,2r",
+            "Энеpreтикaлbк Энергeтичecкaя КұНДЫЛЫғЫ ценность (калорийность)/ "
+            "(Кунарлылыы)(66,8 281,4 KДж ккал)",
+        )
+    )
+
+    draft = build_draft_from_ocr(captured_photo_text, structured_tokens=captured_tokens)
+
+    assert draft.source_basis == "per_100_g"
+    for field_name, expected in (
+        ("protein_g", "8.0"),
+        ("fat_g", "2.0"),
+        ("carbohydrate_g", "4.2"),
+        ("energy_kj", "281.4"),
+        ("energy_kcal", "66.8"),
+    ):
+        fact = getattr(draft.normalized_facts, field_name)
+        assert fact is not None
+        assert fact.value == Decimal(expected)
+    assert draft.warnings == []
+    assert draft.normalized_facts.energy_kcal.value != Decimal("2814")
+
+
+def test_native_kazakh_nutrient_names_are_bounded_aliases() -> None:
+    draft = build_draft_from_ocr(
+        "Пищевая ценность 100 г продукта\nақуыздар 8 г\nмайлар 2 г\nкөмірсулар 4 г"
+    )
+
+    assert draft.normalized_facts.protein_g is not None
+    assert draft.normalized_facts.protein_g.value == Decimal("8")
+    assert draft.normalized_facts.fat_g is not None
+    assert draft.normalized_facts.fat_g.value == Decimal("2")
+    assert draft.normalized_facts.carbohydrate_g is not None
+    assert draft.normalized_facts.carbohydrate_g.value == Decimal("4")
+
+
+def test_unordered_energy_units_stay_ambiguous_when_pairing_is_not_unique() -> None:
+    draft = build_draft_from_ocr("Пищевая ценность 100 г продукта\nEnergy 1 1 KДж ккал")
+
+    assert draft.normalized_facts.energy_kj is None
+    assert draft.normalized_facts.energy_kcal is None
+    assert draft.field_evidence.energy_kj == "ambiguous"
+    assert draft.field_evidence.energy_kcal == "ambiguous"
+    assert "energy_unit_ambiguous" in draft.warnings
+
+
+@pytest.mark.parametrize(
+    "energy_line",
+    (
+        "Energy 66,8 281,4 KДж",
+        "Energy 66,8 281,4",
+        "Energy 66,8 281,4 KДж ккал 100",
+        "Energy 2814 66,8 KДж ккал",
+        "Energy 1195 5000 KДж ккал",
+    ),
+)
+def test_degraded_energy_pair_with_missing_extra_or_unsafe_evidence_stays_ambiguous(
+    energy_line: str,
+) -> None:
+    draft = build_draft_from_ocr(f"Пищевая ценность 100 г продукта\n{energy_line}")
+
+    assert draft.normalized_facts.energy_kj is None
+    assert draft.normalized_facts.energy_kcal is None
+    assert draft.field_evidence.energy_kj == "ambiguous"
+    assert draft.field_evidence.energy_kcal == "ambiguous"
+    assert "energy_unit_ambiguous" in draft.warnings
+    assert "2814" not in {
+        str(draft.normalized_facts.energy_kj),
+        str(draft.normalized_facts.energy_kcal),
+    }
+
+
+def test_explicit_inverse_energy_pair_remains_rejected() -> None:
+    draft = build_draft_from_ocr("Пищевая ценность 100 г продукта\nEnergy 66,8 кДж / 281,4 ккал")
+
+    assert draft.normalized_facts.energy_kj is None
+    assert draft.normalized_facts.energy_kcal is None
+    assert "energy_unit_conflict" in draft.warnings
+
+
 def test_energy_kj_only_does_not_fill_kcal() -> None:
     draft = build_draft_from_ocr("Пищевая ценность 100 г продукта\nEnergy 281,4 кДж\nProtein 8 г")
 

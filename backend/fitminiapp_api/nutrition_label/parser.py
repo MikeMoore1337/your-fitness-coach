@@ -27,11 +27,16 @@ from fitminiapp_api.nutrition_label.contracts import (
 from fitminiapp_api.nutrition_label.ocr import OcrToken, structured_text_from_tokens
 
 _NUMBER = r"(?P<number>\d{1,6}(?:[\.,]\d{1,4})?)"
-_UNIT = r"(?P<unit>ккал|kcal|кдж|kj|мг|mg|мл|ml|г|g|%)?"
+_UNIT = r"(?P<unit>ккал|kcal|кдж|kдж|kj|мг|mg|мл|ml|г|g|%)?"
 _VALUE_PATTERN = re.compile(rf"(?<![\w])[-+]?{_NUMBER}\s*{_UNIT}(?![\w])", re.IGNORECASE)
 _EXPLICIT_ENERGY_PATTERN = re.compile(
     r"(?<![\w])(?P<number>\d{1,6}(?:[\.,]\d{1,4})?)\s*"
-    r"(?P<unit>ккал|kcal|кдж|kj)\b",
+    r"(?P<unit>ккал|kcal|кдж|kдж|kj)\b",
+    re.IGNORECASE,
+)
+_ENERGY_NUMBER_PATTERN = re.compile(r"(?<![\w])(?P<number>[-+]?\d{1,6}(?:[\.,]\d{1,4})?)(?![\w])")
+_ENERGY_UNIT_TOKEN_PATTERN = re.compile(
+    r"(?<![\w])(?P<unit>ккал|kcal|кдж|kдж|kj)(?![\w])",
     re.IGNORECASE,
 )
 _OCR_GRAM_GLYPH_PATTERN = re.compile(
@@ -82,9 +87,21 @@ _LABELS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("saturated_fat_g", ("насыщенн", "saturated fat")),
     ("trans_fat_g", ("трансжир", "trans fat")),
     ("added_sugars_g", ("добавленн.*сахар", "added sugars")),
-    ("carbohydrate_g", ("углевод", "carbohydrate", "total carbs", "carbs")),
-    ("protein_g", ("белк", "protein")),
-    ("fat_g", ("жир", "fat")),
+    (
+        "carbohydrate_g",
+        (
+            "углевод",
+            r"(?<!\w)(?:көмірсулар|көмирсулар)(?!\w)",
+            "carbohydrate",
+            "total carbs",
+            "carbs",
+        ),
+    ),
+    (
+        "protein_g",
+        ("белк", r"(?<!\w)(?:ақуыздар|акуыздар)(?!\w)", "protein"),
+    ),
+    ("fat_g", ("жир", r"(?<!\w)майлар(?!\w)", "fat")),
     ("sugars_g", ("сахар", "sugars", "sugar")),
     ("fiber_g", ("клетчат", "пищев.*волок", "fiber")),
     ("salt_g", ("соль", "salt")),
@@ -234,6 +251,7 @@ def _canonical_unit(raw: str | None) -> str | None:
         "мл": "ml",
         "ккал": "kcal",
         "кдж": "kJ",
+        "kдж": "kJ",
         "kj": "kJ",
         "kcal": "kcal",
         "mg": "mg",
@@ -394,7 +412,46 @@ def _set_read_fact(
         normalized[field_name] = None
 
 
-def _energy_values(line: str) -> tuple[dict[str, list[Decimal]], bool]:
+def _energy_pair_is_consistent(kj_value: Decimal, kcal_value: Decimal) -> bool:
+    expected_kcal = kj_value / Decimal("4.184")
+    tolerance = max(Decimal("5"), expected_kcal * Decimal("0.10"))
+    return abs(expected_kcal - kcal_value) <= tolerance
+
+
+def _energy_value_exceeds_outlier_limit(field_name: str, value: Decimal, source_basis: str) -> bool:
+    if source_basis not in {"per_100_g", "per_100_ml"}:
+        return False
+    limit = Decimal("1000") if field_name == "energy_kcal" else Decimal("10000")
+    return value > limit
+
+
+def _recover_unique_energy_pair(line: str, source_basis: str) -> dict[str, list[Decimal]] | None:
+    numbers: list[Decimal] = []
+    for match in _ENERGY_NUMBER_PATTERN.finditer(line):
+        try:
+            numbers.append(parse_decimal_token(match.group("number")))
+        except CanonicalNormalizationError:
+            return None
+    units = [
+        _canonical_unit(match.group("unit")) for match in _ENERGY_UNIT_TOKEN_PATTERN.finditer(line)
+    ]
+    if len(numbers) != 2 or len(units) != 2 or set(units) != {"kJ", "kcal"}:
+        return None
+
+    consistent_pairs = [
+        (kj_value, kcal_value)
+        for kj_value, kcal_value in ((numbers[0], numbers[1]), (numbers[1], numbers[0]))
+        if _energy_pair_is_consistent(kj_value, kcal_value)
+        and not _energy_value_exceeds_outlier_limit("energy_kj", kj_value, source_basis)
+        and not _energy_value_exceeds_outlier_limit("energy_kcal", kcal_value, source_basis)
+    ]
+    if len(consistent_pairs) != 1:
+        return None
+    kj_value, kcal_value = consistent_pairs[0]
+    return {"energy_kcal": [kcal_value], "energy_kj": [kj_value]}
+
+
+def _energy_values(line: str, source_basis: str) -> tuple[dict[str, list[Decimal]], bool]:
     values: dict[str, list[Decimal]] = {"energy_kcal": [], "energy_kj": []}
     explicit_spans: list[tuple[int, int]] = []
     for match in _EXPLICIT_ENERGY_PATTERN.finditer(line):
@@ -413,6 +470,10 @@ def _energy_values(line: str) -> tuple[dict[str, list[Decimal]], bool]:
         if any(start <= match.start() < end for start, end in explicit_spans):
             continue
         had_unqualified = True
+    if had_unqualified:
+        recovered = _recover_unique_energy_pair(line, source_basis)
+        if recovered is not None:
+            return recovered, False
     return values, had_unqualified
 
 
@@ -433,30 +494,31 @@ def _apply_energy_safety(
 ) -> None:
     kj_value = _read_source_value(source_facts, "energy_kj")
     kcal_value = _read_source_value(source_facts, "energy_kcal")
-    if kj_value is not None and kcal_value is not None:
-        expected_kcal = kj_value / Decimal("4.184")
-        tolerance = max(Decimal("5"), expected_kcal * Decimal("0.10"))
-        if abs(expected_kcal - kcal_value) > tolerance:
-            _mark_ambiguous(
-                "energy_kj",
-                source_basis=source_basis,
-                source_facts=source_facts,
-                normalized=normalized,
-                evidence=evidence,
-                column_ref="energy_pair_kj",
-                warnings=warnings,
-                warning="energy_unit_conflict",
-            )
-            _mark_ambiguous(
-                "energy_kcal",
-                source_basis=source_basis,
-                source_facts=source_facts,
-                normalized=normalized,
-                evidence=evidence,
-                column_ref="energy_pair_kcal",
-                warnings=warnings,
-                warning="energy_unit_conflict",
-            )
+    if (
+        kj_value is not None
+        and kcal_value is not None
+        and not _energy_pair_is_consistent(kj_value, kcal_value)
+    ):
+        _mark_ambiguous(
+            "energy_kj",
+            source_basis=source_basis,
+            source_facts=source_facts,
+            normalized=normalized,
+            evidence=evidence,
+            column_ref="energy_pair_kj",
+            warnings=warnings,
+            warning="energy_unit_conflict",
+        )
+        _mark_ambiguous(
+            "energy_kcal",
+            source_basis=source_basis,
+            source_facts=source_facts,
+            normalized=normalized,
+            evidence=evidence,
+            column_ref="energy_pair_kcal",
+            warnings=warnings,
+            warning="energy_unit_conflict",
+        )
 
 
 def _apply_outlier_safety(
@@ -473,12 +535,12 @@ def _apply_outlier_safety(
         fact = normalized[field_name]
         if fact is None:
             continue
-        limit = Decimal("100") if fact.unit == "g" else Decimal("100000")
-        if field_name == "energy_kcal":
-            limit = Decimal("1000")
-        elif field_name == "energy_kj":
-            limit = Decimal("10000")
-        if fact.value > limit:
+        if field_name in {"energy_kcal", "energy_kj"}:
+            is_outlier = _energy_value_exceeds_outlier_limit(field_name, fact.value, source_basis)
+        else:
+            limit = Decimal("100") if fact.unit == "g" else Decimal("100000")
+            is_outlier = fact.value > limit
+        if is_outlier:
             _mark_ambiguous(
                 field_name,
                 source_basis=source_basis,
@@ -562,7 +624,7 @@ def build_draft_from_ocr(
     for line_number, line in lines:
         field_name = _field_for_line(line)
         if field_name in {"energy_kcal", "energy_kj"}:
-            energy_values, had_unqualified = _energy_values(line)
+            energy_values, had_unqualified = _energy_values(line, source_basis)
             if had_unqualified:
                 for energy_field in ("energy_kcal", "energy_kj"):
                     _mark_ambiguous(
