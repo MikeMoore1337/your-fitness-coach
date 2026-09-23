@@ -828,10 +828,16 @@ def review_message(
     delivery_blockers = review_delivery_blockers(draft, review)
     metadata = draft.evidence_metadata
     warnings = ", ".join(draft.warnings) if draft.warnings else "нет автоматических флагов"
-    score_reasons = ", ".join(metadata.get("score_reasons", [])[:6])
-    supporting_count = metadata.get("supporting_source_count", 0)
-    if not isinstance(supporting_count, int):
-        supporting_count = 0
+    score_reasons = ", ".join(
+        reason
+        for reason in (cluster.score_reasons or [])[:6]
+        if isinstance(reason, str) and reason
+    )
+    evidence_ids = [
+        item_id for item_id in draft.evidence_item_ids if isinstance(item_id, int)
+    ]
+    source_count = len(dict.fromkeys(evidence_ids))
+    supporting_count = max(0, source_count - 1)
     artifact_line = "Точный preview: недоступен до исправления блокеров"
     if review.artifact is not None:
         artifact_line = (
@@ -860,10 +866,10 @@ def review_message(
         f"{artifact_line}\n"
         f"Artifact: {artifact_hash}\n"
         f"Блокеры публикации: {blocker_text}\n"
-        f"Topic: {metadata.get('topic', 'other')} · score {metadata.get('score', 0)}/100 "
-        f"({metadata.get('score_version', 'unknown')})\n"
+        f"Topic: {cluster.topic} · score {cluster.score}/100 "
+        f"({cluster.score_version})\n"
         f"Причины: {score_reasons}\n"
-        f"Supporting sources: {max(0, supporting_count)}\n"
+        f"Sources: {source_count} total · supporting: {supporting_count}\n"
         f"Warnings: {warnings}"
     )
     failure = (

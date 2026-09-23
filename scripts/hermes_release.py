@@ -26,6 +26,7 @@ COMPONENT_PATHS = (
     "deploy/hermes-discovery/hermes-discovery-provenance.json",
     "deploy/hermes-editorial-worker/editorial_worker.py",
     "deploy/hermes-editorial-worker/hermes-provenance.json",
+    "deploy/hermes-discovery/systemd/hermes-network-anchor.service.template",
     "deploy/hermes-discovery/systemd/hermes-discovery.service.template",
     "deploy/hermes-discovery/systemd/hermes-worker-drain.service.template",
     "deploy/hermes-discovery/systemd/hermes-discovery.timer",

@@ -8,12 +8,13 @@ Source text всегда data: prompt/source instructions не исполняю�
 Поток после отдельного Gate A:
 
 ```text
-systemd timer
-  -> hermes-discovery.service (source-only container)
+systemd timer (hourly recovery cadence; source fetch intervals remain authoritative)
+  -> hermes-network-anchor.service (keeps dedicated bridge datapath warm)
+  -> hermes-discovery.service (source-only container, bounded retry on failure)
   -> versioned YFC source definitions
   -> explicit HTTPS source hosts + DNS/redirect revalidation
   -> /var/lib/hermes/outbox/<stable-key>.json
-  -> hermes-worker-drain.service (secrets только здесь)
+  -> OnSuccess=hermes-worker-drain.service (up to 5 queued jobs per drain; secrets only here)
   -> hardened editorial worker
   -> approved provider + HMAC YFC intake
 ```
@@ -163,8 +164,8 @@ id hermes
 id -nG hermes
 docker network inspect hermes-net
 docker network ls
-systemd-analyze verify /etc/systemd/system/hermes-discovery.service /etc/systemd/system/hermes-worker-drain.service /etc/systemd/system/hermes-discovery.target /etc/systemd/system/hermes-discovery.timer
-systemctl cat hermes-discovery.service hermes-worker-drain.service
+systemd-analyze verify /etc/systemd/system/hermes-network-anchor.service /etc/systemd/system/hermes-discovery.service /etc/systemd/system/hermes-worker-drain.service /etc/systemd/system/hermes-discovery.target /etc/systemd/system/hermes-discovery.timer
+systemctl cat hermes-network-anchor.service hermes-discovery.service hermes-worker-drain.service
 systemctl status hermes-discovery.timer --no-pager
 python3 /opt/hermes/current/hermes_egress.py validate --mode separate-vm
 nft list table inet hermes_egress
@@ -175,10 +176,13 @@ python3 scripts/hermes_colocation.py health
 До credentials, доказанной scoped egress policy и ровно одного owner-approved external shadow
 timer можно только установить и проверить. `install` всегда оставляет timer disabled. После
 успешного shadow и проверки health/alerts активировать schedule одной командой:
-`systemctl enable --now hermes-discovery.timer`; timer запускает worker drain, а его
-`Requires/After` сначала запускают discovery. Missed runs не replay'ятся. Target остаётся
-доступен для ручного bounded orchestration, но не используется как timer unit, чтобы active
-target не блокировал следующие six-hour runs.
+`systemctl enable --now hermes-discovery.timer`; timer запускает discovery. Успешный discovery
+через `OnSuccess` запускает bounded worker drain, поэтому неуспешный fetch не тратит provider
+quota и не блокирует последующий retry. Network anchor стартует как dependency discovery и
+остаётся активным, чтобы dedicated Docker bridge не терял datapath между короткими job.
+Missed runs не replay'ятся. Hourly timer является recovery cadence: собственные
+`fetch_interval_minutes` источников остаются source-of-truth и не превращаются в hourly fetch.
+Target остаётся доступен для ручного bounded orchestration.
 
 Для обновления используйте новый immutable release; `/var/lib/hermes/state.json` и
 `/var/lib/hermes/outbox/` не удаляются. Перед reset/rollback сохраняется host backup. Проверка

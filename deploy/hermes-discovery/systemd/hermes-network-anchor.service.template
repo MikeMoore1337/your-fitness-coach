@@ -1,0 +1,21 @@
+[Unit]
+Description=Keep Hermes Docker network datapath warm
+Requires=docker.service
+After=docker.service network-online.target
+Before=hermes-discovery.service
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5s
+ExecStartPre=-/usr/bin/docker rm -f hermes-network-anchor
+ExecStart=/usr/bin/docker run --rm --name hermes-network-anchor --network=hermes-net --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=8m,uid=10000,gid=10000,mode=700 --cap-drop ALL --security-opt no-new-privileges=true --pids-limit 8 --memory 32m --cpus 0.05 --user 10000:10000 --entrypoint python @DISCOVERY_IMAGE@ -c "import time; time.sleep(31536000)"
+ExecStop=-/usr/bin/docker stop -t 5 hermes-network-anchor
+TimeoutStopSec=10s
+NoNewPrivileges=true
+TasksMax=16
+MemoryMax=64M
+CPUQuota=10%
+
+[Install]
+WantedBy=multi-user.target
