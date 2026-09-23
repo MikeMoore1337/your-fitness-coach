@@ -102,7 +102,7 @@ def test_discovery_egress_refresh_has_netlink_without_broadening_sandbox() -> No
     assert "AF_NETLINK" not in worker_unit
 
 
-def test_discovery_timer_runs_worker_drain_and_preserves_scheduler_guardrails() -> None:
+def test_discovery_timer_runs_discovery_hourly_and_preserves_scheduler_guardrails() -> None:
     timer = _systemd_unit("hermes-discovery.timer")
 
     assert timer == (
@@ -110,17 +110,38 @@ def test_discovery_timer_runs_worker_drain_and_preserves_scheduler_guardrails() 
         "Description=Task 403 bounded Hermes discovery schedule\n"
         "\n"
         "[Timer]\n"
-        "Unit=hermes-worker-drain.service\n"
+        "Unit=hermes-discovery.service\n"
         "OnBootSec=5min\n"
-        "OnUnitActiveSec=6h\n"
-        "RandomizedDelaySec=5min\n"
+        "OnUnitActiveSec=1h\n"
+        "RandomizedDelaySec=2min\n"
         "AccuracySec=1min\n"
         "Persistent=false\n"
         "\n"
         "[Install]\n"
         "WantedBy=timers.target\n"
     )
+    assert "Unit=hermes-worker-drain.service" not in timer
     assert "Unit=hermes-discovery.target" not in timer
+
+
+def test_discovery_success_drains_batch_and_network_anchor_keeps_bridge_warm() -> None:
+    anchor_unit = _systemd_unit("hermes-network-anchor.service.template")
+    discovery_unit = _systemd_unit("hermes-discovery.service.template")
+    drain_unit = _systemd_unit("hermes-worker-drain.service.template")
+
+    assert "Requires=hermes-network-anchor.service" in discovery_unit
+    assert "After=network-online.target hermes-network-anchor.service" in discovery_unit
+    assert "OnSuccess=hermes-worker-drain.service" in discovery_unit
+    assert "Restart=on-failure" in discovery_unit
+    assert "RestartSec=60s" in discovery_unit
+    assert "Requires=hermes-discovery.service" not in drain_unit
+    assert "After=hermes-discovery.service" in drain_unit
+    assert "Environment=HERMES_WORKER_MAX_JOBS=5" in drain_unit
+    assert "--name hermes-network-anchor" in anchor_unit
+    assert "--network=hermes-net" in anchor_unit
+    assert "Restart=always" in anchor_unit
+    assert "--cap-drop ALL" in anchor_unit
+    assert "--read-only" in anchor_unit
 
 
 def test_shared_host_systemd_launchers_are_root_only_and_container_hardening_is_explicit() -> None:
