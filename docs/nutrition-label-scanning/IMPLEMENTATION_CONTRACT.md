@@ -26,11 +26,13 @@ Task 128G добавляет primary engine `RapidOCR 3.9.2` на `ONNX Runtime 
 три явных `model_path` и не скачивает модели по пользовательскому запросу. Каталог по умолчанию —
 `/opt/rapidocr/models`, разрешённые файлы перечислены в `RAPIDOCR_MODEL_FILES`.
 
-RapidOCR работает CPU-only, с `intra_op_num_threads=2`, `inter_op_num_threads=1`, одним in-flight
-inference на singleton engine и явным cleanup OCR buffers после каждого результата. Task 128H
-разрешил двум ONNX intra-op threads использовать оба vCPU canonical production host без увеличения
-числа одновременных heavy inference; CPU memory
-arena отключён: это ограничивает рост RSS на повторных вызовах. Model initialization кэшируется
+RapidOCR работает CPU-only, с `intra_op_num_threads=2`, `inter_op_num_threads=1`, quality max-side
+`1750`, одним in-flight inference на singleton engine и явным cleanup OCR buffers после каждого
+результата. Task 128H разрешил двум ONNX intra-op threads использовать оба vCPU canonical
+production host без увеличения числа одновременных heavy inference и после post-migration A/B
+снизил max-side с `2000` до `1750`: `1800` не давал стабильного запаса по p50, а `1700`
+уже терял energy на locked target fixture. CPU memory arena отключён: это ограничивает рост RSS
+на повторных вызовах. Model initialization кэшируется
 процессом; timeout остаётся общим bounded OCR budget `8 s`, а отсутствие модели, timeout или
 ошибка runtime переводятся в controlled `local_ocr_*` error. `Tesseract 5.5.0` и `rus+eng`
 остаются только явным bounded fallback при `NUTRITION_LABEL_SCAN_OCR_ENGINE=tesseract`.
