@@ -180,6 +180,26 @@ anchor и ordered PR/deployment evidence в task history, переводит lea
 исторический ancestor проверенного master snapshot, а новые commits после snapshot по-прежнему
 должны быть controller-only и затрагивать только allowlist controller paths.
 
+Если canonical checkout ещё не содержит merged controller fix из-за заблокированного refresh,
+запустите этот код из чистого worktree merged controller PR и передайте `--repo` путь к canonical
+checkout с общим Git common dir. Пример для уже проверенной цепочки Task 415:
+
+```powershell
+$repo = 'C:\path\to\your-fitness-coach' # абсолютный путь к canonical checkout
+& "$repo\.venv\Scripts\python.exe" scripts\task_session.py --repo $repo `
+    reconcile-production-success 415 `
+    --original-pr 423 `
+    --superseding-pr 432 `
+    --superseding-pr 435 `
+    --deployed-sha 67e906bdb34c8889091ae2e72a2e89624e94fe60 `
+    --production-run 35783412553 `
+    --owner-authorize
+```
+
+Для другой задачи заново получите все PR/run/deployment evidence из GitHub; повторяйте
+`--superseding-pr` в merge-порядке. После успешной reconciliation выполните штатный
+`task_session.py finish <ID>`. Не правьте lease, `delivery.json` или history вручную.
+
 ## Один пользовательский запуск
 
 ```powershell
