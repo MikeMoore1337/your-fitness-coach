@@ -92,6 +92,7 @@ def repository():
 class FakeGitHub:
     def __init__(self, master_sha: str) -> None:
         self.master_sha = master_sha
+        self.repo_slug = "owner/repository"
         self.pulls: dict[int, dict[str, Any]] = {}
         self.commits: dict[int, list[dict[str, Any]]] = {}
         self.files: dict[int, list[dict[str, Any]]] = {}
@@ -101,10 +102,13 @@ class FakeGitHub:
         self.ruleset_payload: list[dict[str, Any]] = []
         self.successful_deployments: set[tuple[str, str]] = set()
         self.associated_pulls: list[dict[str, Any]] = []
+        self.runs: dict[int, dict[str, Any]] = {}
 
     def api(self, endpoint: str) -> Any:
         if endpoint.startswith("commits/") and endpoint.endswith("/pulls"):
             return self.associated_pulls
+        if endpoint.startswith("actions/runs/"):
+            return self.runs[int(endpoint.rsplit("/", maxsplit=1)[1])]
         raise AssertionError(f"Unexpected fake GitHub API endpoint: {endpoint}")
 
     def open_pull_requests(self) -> list[dict[str, Any]]:
@@ -323,6 +327,466 @@ def _prepare_delivery(controller: Any, task_id: str, *, branch: str) -> dict[str
     assert acquired["acquired"] is True
     controller.refresh_for_delivery(task_id)
     return controller.validate_delivery(task_id)
+
+
+def _prepare_superseding_production_reconciliation(
+    repository: tuple[Path, Any],
+    *,
+    task_id: str = "415",
+    superseding_count: int = 2,
+    post_deploy_drift: bool = True,
+) -> tuple[Path, Any, Any, Path, str, list[int], str]:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, task_id
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready(task_id, head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _prepare_delivery(controller, task_id, branch=branch)
+    _git(root, "merge", "--no-ff", branch, "-m", f"Merge task {task_id}")
+    original_merge_sha = _git(root, "rev-parse", "HEAD")
+    _git(root, "push", "origin", "master")
+
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    original_pr = 423
+    original = _task_pr(original_pr, task_id, base_sha, head_sha, merge_sha=original_merge_sha)
+    original["state"] = "closed"
+    original["merged_at"] = "2026-09-22T13:34:24Z"
+    github.pulls[original_pr] = original
+    github.commits[original_pr] = [_task_commit(task_id)]
+    github.files[original_pr] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+
+    superseding_numbers: list[int] = []
+    prior_merge_sha = original_merge_sha
+    for index in range(superseding_count):
+        number = (432, 435, 438, 441)[index]
+        tree_sha = _git(root, "rev-parse", f"{prior_merge_sha}^{{tree}}")
+        superseding_head = _git(
+            root,
+            "commit-tree",
+            tree_sha,
+            "-p",
+            prior_merge_sha,
+            "-m",
+            f"feat: [Task {task_id}] superseding change {index + 1}",
+        )
+        superseding_merge = _git(
+            root,
+            "commit-tree",
+            tree_sha,
+            "-p",
+            prior_merge_sha,
+            "-m",
+            f"Merge pull request #{number}",
+        )
+        pull_request = _task_pr(
+            number,
+            task_id,
+            prior_merge_sha,
+            superseding_head,
+            merge_sha=superseding_merge,
+        )
+        pull_request["state"] = "closed"
+        pull_request["head"]["ref"] = f"task/{task_id}-superseding-{index + 1}"
+        pull_request["merged_at"] = f"2026-09-22T20:{20 + index * 33:02}:29Z"
+        github.pulls[number] = pull_request
+        github.commits[number] = [_task_commit(task_id)]
+        github.files[number] = [{"filename": "change.txt"}]
+        github.checks[superseding_head] = [_success_check(superseding_head)]
+        superseding_numbers.append(number)
+        prior_merge_sha = superseding_merge
+
+    master_sha = prior_merge_sha
+    if post_deploy_drift:
+        tree_sha = _git(root, "rev-parse", f"{prior_merge_sha}^{{tree}}")
+        master_sha = _git(
+            root,
+            "commit-tree",
+            tree_sha,
+            "-p",
+            prior_merge_sha,
+            "-m",
+            "feat: [Task 416] subsequent master change",
+        )
+    _git(root, "reset", "--hard", master_sha)
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+    github.master_sha = master_sha
+    github.successful_deployments.add((prior_merge_sha, "production"))
+    github.runs[35783412553] = {
+        "id": 35783412553,
+        "name": "Release production",
+        "head_sha": prior_merge_sha,
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://example.invalid/actions/runs/35783412553",
+    }
+    controller.release_delivery(
+        task_id,
+        reason="Synthetic recovery lease for superseding production reconciliation",
+    )
+    return root, git_repository, controller, worktree, branch, superseding_numbers, prior_merge_sha
+
+
+@pytest.mark.parametrize("superseding_count", [1, 2])
+def test_reconcile_superseding_production_preserves_anchor_and_all_evidence(
+    repository: tuple[Path, Any], superseding_count: int
+) -> None:
+    _, git_repository, controller, worktree, branch, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(
+            repository, superseding_count=superseding_count
+        )
+    )
+    lease_path = controller.store.task_lease_path("415")
+    original_lease = controller.store.read_json(lease_path)
+    assert isinstance(original_lease, dict)
+    original_anchor = original_lease["delivery_anchor"]
+
+    history = controller.reconcile_production_success(
+        "415",
+        original_pr_number=423,
+        superseding_pr_numbers=superseding_prs,
+        deployed_sha=deployed_sha,
+        production_run_id=35783412553,
+        owner_authorize=True,
+    )
+
+    reconciliation = history["superseding_production_reconciliation"]
+    assert history["state"] == "production-success"
+    assert history["head_sha"] == original_anchor["head_sha"]
+    assert history["base_sha"] == original_anchor["base_sha"]
+    assert history["merge_sha"] == deployed_sha
+    assert history["deployed_sha"] == deployed_sha
+    assert reconciliation["reconciled_against_master_sha"] != deployed_sha
+    assert git_repository.is_ancestor(deployed_sha, reconciliation["reconciled_against_master_sha"])
+    assert reconciliation["original_delivery"]["pr_number"] == 423
+    assert reconciliation["original_delivery"]["merge_sha"] != deployed_sha
+    assert [item["pr_number"] for item in reconciliation["superseding_prs"]] == superseding_prs
+    assert all(
+        item["required_check"]["conclusion"] == "SUCCESS"
+        for item in reconciliation["superseding_prs"]
+    )
+    assert reconciliation["production"]["run_id"] == 35783412553
+    assert reconciliation["production"]["deployed_sha"] == deployed_sha
+    reconciled_lease = controller.store.read_json(lease_path)
+    assert isinstance(reconciled_lease, dict)
+    assert reconciled_lease["lifecycle_state"] == "production-success"
+    assert reconciled_lease["delivery_anchor"] == original_anchor
+    assert controller.store.delivery_state()["owner"] is None
+
+    result = controller.finish("415")
+
+    assert result["cleanup_performed"] is True
+    assert result["deleted_local_branch"] == branch
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
+    assert not lease_path.exists()
+    finished_history = controller.store.read_json(controller.store.history / "task-415.json")
+    assert finished_history["state"] == "finished"
+    assert finished_history["superseding_production_reconciliation"] == reconciliation
+
+
+def test_reconcile_refreshes_stale_tracking_master_before_verification(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, _, _, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(repository)
+    )
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    tracked_before = git_repository.ref("origin/master")
+    tree_sha = _git(root, "rev-parse", f"{tracked_before}^{{tree}}")
+    live_master = _git(
+        root,
+        "commit-tree",
+        tree_sha,
+        "-p",
+        tracked_before,
+        "-m",
+        "feat: [Task 416] master advanced before controller reconciliation",
+    )
+    _git(root, "reset", "--hard", live_master)
+    _git(root, "push", "origin", "master")
+    _git(root, "update-ref", "refs/remotes/origin/master", tracked_before)
+    github.master_sha = live_master
+    assert git_repository.ref("origin/master") == tracked_before
+
+    history = controller.reconcile_production_success(
+        "415",
+        original_pr_number=423,
+        superseding_pr_numbers=superseding_prs,
+        deployed_sha=deployed_sha,
+        production_run_id=35783412553,
+        owner_authorize=True,
+    )
+
+    assert git_repository.ref("origin/master") == live_master
+    assert (
+        history["superseding_production_reconciliation"]["reconciled_against_master_sha"]
+        == live_master
+    )
+    assert git_repository.ref("master") == live_master
+
+
+def test_finish_rejects_non_controller_drift_after_reconciliation_snapshot(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(repository, post_deploy_drift=False)
+    )
+    controller.reconcile_production_success(
+        "415",
+        original_pr_number=423,
+        superseding_pr_numbers=superseding_prs,
+        deployed_sha=deployed_sha,
+        production_run_id=35783412553,
+        owner_authorize=True,
+    )
+    tree_sha = _git(root, "rev-parse", f"{deployed_sha}^{{tree}}")
+    product_drift = _git(
+        root,
+        "commit-tree",
+        tree_sha,
+        "-p",
+        deployed_sha,
+        "-m",
+        "feat: [Task 416] later product change",
+    )
+    _git(root, "reset", "--hard", product_drift)
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = product_drift
+
+    with pytest.raises(
+        task_session.TaskSessionError, match="non-controller drift after reconciled master"
+    ):
+        controller.finish("415")
+
+    assert worktree.exists()
+    assert git_repository.ref_exists(branch)
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("415"))["lifecycle_state"]
+        == "production-success"
+    )
+
+
+def test_reconcile_superseding_production_requires_owner_authorization(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(repository)
+    )
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit owner authorization"):
+        controller.reconcile_production_success(
+            "415",
+            original_pr_number=423,
+            superseding_pr_numbers=superseding_prs,
+            deployed_sha=deployed_sha,
+            production_run_id=35783412553,
+            owner_authorize=False,
+        )
+
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("415"))["lifecycle_state"]
+        == "recovery-required"
+    )
+    assert not (controller.store.history / "task-415.json").exists()
+
+
+@pytest.mark.parametrize(
+    "superseding_numbers,error",
+    [
+        ([], "one or more superseding PRs"),
+        ([423], "positive and unique"),
+        ([432, 432], "positive and unique"),
+    ],
+)
+def test_reconcile_superseding_production_rejects_missing_or_duplicate_pr_numbers(
+    repository: tuple[Path, Any], superseding_numbers: list[int], error: str
+) -> None:
+    _, _, controller, _, _, _, deployed_sha = _prepare_superseding_production_reconciliation(
+        repository
+    )
+
+    with pytest.raises(task_session.TaskSessionError, match=error):
+        controller.reconcile_production_success(
+            "415",
+            original_pr_number=423,
+            superseding_pr_numbers=superseding_numbers,
+            deployed_sha=deployed_sha,
+            production_run_id=35783412553,
+            owner_authorize=True,
+        )
+
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("415"))["lifecycle_state"]
+        == "recovery-required"
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_case,expected_error",
+    [
+        ("wrong_task", "does not belong to Task 415"),
+        ("wrong_repository", "same repository"),
+        ("wrong_base_branch", "base must be master"),
+        ("unmerged", "not a closed pull request"),
+        ("failed_check", "Exact-head required check"),
+        ("broken_chain", "breaks the chronological master ancestry chain"),
+        ("wrong_order", "breaks the chronological master ancestry chain"),
+        ("malformed_pr", "invalid changed_files count"),
+        ("final_sha_mismatch", "must equal the final superseding PR merge SHA"),
+        ("missing_deployment", "No successful production deployment"),
+        ("failed_run", "not successful for the exact deployed SHA"),
+        ("active_deployment", "while a production deployment is active"),
+        ("active_delivery_owner", "active delivery owner"),
+        ("duplicate_history", "Production history already exists"),
+        ("malformed_anchor", "does not preserve one exact delivery anchor"),
+        ("dirty_worktree", "dirty or interrupted task worktree"),
+        ("dirty_controller", "clean controller worktree"),
+        ("duplicate_branch", "one unambiguous task branch/worktree"),
+        ("out_of_master", "not an ancestor of current master"),
+    ],
+)
+def test_reconcile_superseding_production_rejects_ambiguous_or_invalid_evidence(
+    repository: tuple[Path, Any], invalid_case: str, expected_error: str
+) -> None:
+    root, git_repository, controller, worktree, _, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(repository)
+    )
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    final_pr = github.pulls[superseding_prs[-1]]
+    final_head_sha = final_pr["head"]["sha"]
+
+    if invalid_case == "wrong_task":
+        final_pr["title"] = "[Task 416] Synthetic task"
+        final_pr["head"]["ref"] = "task/416-synthetic-task"
+        github.commits[superseding_prs[-1]] = [_task_commit("416")]
+    elif invalid_case == "wrong_repository":
+        final_pr["head"]["repo"]["full_name"] = "another/repository"
+    elif invalid_case == "wrong_base_branch":
+        final_pr["base"]["ref"] = "develop"
+    elif invalid_case == "unmerged":
+        final_pr["state"] = "open"
+        final_pr["merged_at"] = None
+    elif invalid_case == "failed_check":
+        github.checks[final_head_sha] = [
+            {
+                "name": "checks",
+                "head_sha": final_head_sha,
+                "status": "completed",
+                "conclusion": "FAILURE",
+            }
+        ]
+    elif invalid_case == "broken_chain":
+        final_pr["base"]["sha"] = controller.store.read_json(
+            controller.store.task_lease_path("415")
+        )["base_origin_master_sha"]
+    elif invalid_case == "wrong_order":
+        superseding_prs.reverse()
+    elif invalid_case == "malformed_pr":
+        final_pr["changed_files"] = "two"
+    elif invalid_case == "final_sha_mismatch":
+        deployed_sha = "f" * 40
+    elif invalid_case == "missing_deployment":
+        github.successful_deployments.clear()
+    elif invalid_case == "failed_run":
+        github.runs[35783412553]["conclusion"] = "failure"
+    elif invalid_case == "active_deployment":
+        github.active_runs = [{"name": "Release production", "status": "in_progress"}]
+    elif invalid_case == "active_delivery_owner":
+        delivery = controller.store.delivery_state()
+        delivery["owner"] = {"task_id": "416"}
+        task_session.StateStore.replace_json(controller.store.delivery_path, delivery)
+    elif invalid_case == "duplicate_history":
+        task_session.StateStore.replace_json(
+            controller.store.history / "task-415.json", {"state": "stale"}
+        )
+    elif invalid_case == "malformed_anchor":
+        lease_path = controller.store.task_lease_path("415")
+        lease = controller.store.read_json(lease_path)
+        lease["delivery_anchor"] = None
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif invalid_case == "dirty_worktree":
+        (worktree / "untracked.txt").write_text("preserve\n", encoding="utf-8")
+    elif invalid_case == "dirty_controller":
+        (root / "uncommitted-controller-file.txt").write_text("preserve\n", encoding="utf-8")
+    elif invalid_case == "duplicate_branch":
+        _git(root, "branch", "task/415-duplicate", "origin/master")
+    elif invalid_case == "out_of_master":
+        final_base = final_pr["base"]["sha"]
+        tree_sha = _git(root, "rev-parse", f"{final_base}^{{tree}}")
+        final_pr["merge_commit_sha"] = _git(
+            root,
+            "commit-tree",
+            tree_sha,
+            "-p",
+            final_base,
+            "-m",
+            "Merge pull request with unmerged final SHA",
+        )
+        deployed_sha = final_pr["merge_commit_sha"]
+
+    master_before = git_repository.ref("master")
+
+    with pytest.raises(task_session.TaskSessionError, match=expected_error):
+        controller.reconcile_production_success(
+            "415",
+            original_pr_number=423,
+            superseding_pr_numbers=superseding_prs,
+            deployed_sha=deployed_sha,
+            production_run_id=35783412553,
+            owner_authorize=True,
+        )
+
+    lease = controller.store.read_json(controller.store.task_lease_path("415"))
+    assert lease["lifecycle_state"] == "recovery-required"
+    if invalid_case != "duplicate_history":
+        assert not (controller.store.history / "task-415.json").exists()
+    if invalid_case != "active_delivery_owner":
+        assert controller.store.delivery_state()["owner"] is None
+    assert git_repository.ref("master") == master_before
+
+
+def test_reconcile_superseding_production_rechecks_live_master_before_write(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, _, controller, _, _, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(repository)
+    )
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    original_branch_head = github.branch_head
+    calls = 0
+
+    def change_live_master(branch: str) -> str:
+        nonlocal calls
+        calls += 1
+        return original_branch_head(branch) if calls == 1 else "f" * 40
+
+    monkeypatch.setattr(github, "branch_head", change_live_master)
+
+    with pytest.raises(task_session.TaskSessionError, match="not the live protected master"):
+        controller.reconcile_production_success(
+            "415",
+            original_pr_number=423,
+            superseding_pr_numbers=superseding_prs,
+            deployed_sha=deployed_sha,
+            production_run_id=35783412553,
+            owner_authorize=True,
+        )
+
+    assert calls == 2
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("415"))["lifecycle_state"]
+        == "recovery-required"
+    )
+    assert not (controller.store.history / "task-415.json").exists()
 
 
 def test_run_scopes_git_safety_to_exact_worktree(
