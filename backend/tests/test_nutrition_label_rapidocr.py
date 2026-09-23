@@ -111,11 +111,11 @@ def test_rapidocr_passes_explicit_model_paths_and_bounded_runtime_params(
     engine = RapidOcr(model_dir=tmp_path, timeout_seconds=8, max_output_chars=50_000)
     engine._executor.shutdown(wait=True)
 
-    assert captured["Global.max_side_len"] == 1800
+    assert captured["Global.max_side_len"] == 1750
     assert captured["EngineConfig.onnxruntime.intra_op_num_threads"] == 2
     assert captured["EngineConfig.onnxruntime.inter_op_num_threads"] == 1
     assert captured["EngineConfig.onnxruntime.enable_cpu_mem_arena"] is False
-    assert captured["Det.limit_side_len"] == 1800
+    assert captured["Det.limit_side_len"] == 1750
     assert captured["Det.model_path"] == str(tmp_path / RAPIDOCR_MODEL_FILES[0])
     assert captured["Cls.model_path"] == str(tmp_path / RAPIDOCR_MODEL_FILES[2])
     assert captured["Rec.model_path"] == str(tmp_path / RAPIDOCR_MODEL_FILES[1])
