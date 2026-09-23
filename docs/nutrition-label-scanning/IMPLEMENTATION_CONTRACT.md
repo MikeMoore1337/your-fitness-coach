@@ -52,8 +52,9 @@ synthetic probe не доказал устойчивого улучшения.
 
 Parser использует token text + `left/top/width/height`, block/paragraph/line/word и confidence
 для детерминированной строковой/колоночной association. Кандидат выбирается по basis,
-unit-qualified value adjacency, required-field completeness, pair consistency, impossible-value
-и column-collision checks; длина распознанного текста не является критерием.
+явной связи value/unit либо единственной физически согласованной восстановленной паре kJ/kcal,
+required-field completeness, pair consistency, impossible-value и column-collision checks; длина
+распознанного текста не является критерием.
 
 RapidOCR и upstream PaddleOCR-модели распространяются под Apache License 2.0, ONNX Runtime —
 под MIT; Tesseract core и официальные `tessdata` сохраняют Apache-2.0 fallback-контракт.
@@ -91,6 +92,14 @@ normalized facts, evidence и confidence. Обязательная основа 
 
 Правила parser:
 
+- стандартные казахские названия белков (`ақуыздар`, ограниченная OCR-форма `акуыздар`), жиров
+  (`майлар`) и углеводов (`көмірсулар`, ограниченная OCR-форма `көмирсулар`) распознаются как
+  варианты соответствующих строк; для граммовой массы сохраняется только существующая узкая
+  поправка OCR-формы `r` после распознавания строки;
+- смешанный вариант `KДж` принимается только как bounded energy unit. Если на строке energy
+  остались ровно два числа и единицы kJ/kcal, а их порядок повреждён OCR, parser проверяет обе
+  привязки по существующему соотношению `1 kcal ~= 4.184 kJ` и принимает только единственную
+  согласованную пару; при отсутствии единственной пары значения остаются ambiguous/null;
 - `%DV` не является массой и не конвертируется в `g`/`mg`;
 - salt и sodium — разные поля;
 - manufacturer kcal никогда не заменяются расчётом; unitless energy, mismatch пары kJ/kcal,
