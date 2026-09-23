@@ -42,6 +42,13 @@ HEALTH_COUNTERS = (
     "quarantined",
     "source_errors",
 )
+DRAIN_ALERT_COUNTERS = (
+    "provider_rate_limited",
+    "image_unavailable",
+    "intake_schema_failures",
+    "terminal",
+    "transient",
+)
 PUBLIC_COUNTER_ALIASES = {
     "accepted": "accepted_count",
     "duplicate": "duplicate_count",
@@ -80,6 +87,13 @@ def ensure_health(state: dict[str, Any]) -> dict[str, Any]:
     health.setdefault("pending_jobs", 0)
     health.setdefault("oldest_pending_age_seconds", 0)
     health.setdefault("last_source_error_count", 0)
+    last_drain_error_counts = health.setdefault("last_drain_error_counts", {})
+    if not isinstance(last_drain_error_counts, dict):
+        last_drain_error_counts = {}
+        health["last_drain_error_counts"] = last_drain_error_counts
+    for name in DRAIN_ALERT_COUNTERS:
+        value = last_drain_error_counts.get(name, 0)
+        last_drain_error_counts[name] = value if isinstance(value, int) and value >= 0 else 0
     counters = health.setdefault("counters", {})
     if not isinstance(counters, dict):
         counters = {}
@@ -102,34 +116,39 @@ def _sync_public_fields(health: dict[str, Any]) -> None:
 
 
 def _active_alerts(health: Mapping[str, Any]) -> list[str]:
-    counters = health.get("counters", {})
     alerts: list[str] = []
-    if health.get("consecutive_discovery_failures", 0) >= ALERT_THRESHOLDS[
-        "consecutive_discovery_failures"
-    ]:
+    if (
+        health.get("consecutive_discovery_failures", 0)
+        >= ALERT_THRESHOLDS["consecutive_discovery_failures"]
+    ):
         alerts.append("discovery_failures")
-    if health.get("consecutive_drain_failures", 0) >= ALERT_THRESHOLDS[
-        "consecutive_drain_failures"
-    ]:
+    if (
+        health.get("consecutive_drain_failures", 0)
+        >= ALERT_THRESHOLDS["consecutive_drain_failures"]
+    ):
         alerts.append("drain_failures")
     if health.get("pending_jobs", 0) >= ALERT_THRESHOLDS["pending_jobs"]:
         alerts.append("outbox_backlog")
-    if health.get("oldest_pending_age_seconds", 0) >= ALERT_THRESHOLDS[
-        "oldest_pending_age_seconds"
-    ]:
+    if (
+        health.get("oldest_pending_age_seconds", 0)
+        >= ALERT_THRESHOLDS["oldest_pending_age_seconds"]
+    ):
         alerts.append("oldest_pending_job")
-    if isinstance(counters, Mapping) and counters.get("provider_rate_limited", 0) >= ALERT_THRESHOLDS[
-        "provider_rate_limited"
-    ]:
+    last_drain_error_counts = health.get("last_drain_error_counts", {})
+    if (
+        isinstance(last_drain_error_counts, Mapping)
+        and last_drain_error_counts.get("provider_rate_limited", 0)
+        >= ALERT_THRESHOLDS["provider_rate_limited"]
+    ):
         alerts.append("provider_rate_limited")
-    if isinstance(counters, Mapping):
+    if isinstance(last_drain_error_counts, Mapping):
         for counter, alert in (
             ("image_unavailable", "image_failures"),
             ("intake_schema_failures", "intake_schema_failures"),
             ("terminal", "terminal_failures"),
             ("transient", "transient_failures"),
         ):
-            if counters.get(counter, 0) >= ALERT_THRESHOLDS[counter]:
+            if last_drain_error_counts.get(counter, 0) >= ALERT_THRESHOLDS[counter]:
                 alerts.append(alert)
     if health.get("last_source_error_count", 0) >= ALERT_THRESHOLDS["source_errors"]:
         alerts.append("source_errors")
@@ -167,6 +186,11 @@ def update_health(
             if isinstance(current_source_errors, int) and current_source_errors >= 0
             else 0
         )
+    else:
+        last_drain_error_counts = health["last_drain_error_counts"]
+        for name in DRAIN_ALERT_COUNTERS:
+            amount = (counters or {}).get(name, 0)
+            last_drain_error_counts[name] = amount if isinstance(amount, int) and amount >= 0 else 0
     totals = health["counters"]
     for name, amount in (counters or {}).items():
         if name in HEALTH_COUNTERS and isinstance(amount, int) and amount >= 0:
