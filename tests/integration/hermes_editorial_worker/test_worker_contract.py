@@ -237,6 +237,23 @@ def test_preflight_uses_source_packet_numbers_and_trusted_url_budget() -> None:
     )
 
 
+def test_preflight_accepts_numeric_source_metadata_and_equivalent_unit_formatting() -> None:
+    source = valid_job().source.model_copy(
+        update={
+            "content": "В протоколе использовали 1.5 g вещества.",
+            "publisher": "Journal 7",
+        }
+    )
+    proposal = editorial_worker.DraftProposal(
+        headline="Исследование 2026 года",
+        summary="В протоколе использовали 1,5 г вещества.",
+        why_it_matters="Материал из Journal 7 требует редакторской проверки.",
+    )
+
+    assert source.published_at is not None
+    assert editorial_worker._preflight_warnings(proposal, source) == ()
+
+
 def test_preflight_repairs_unsupported_number_with_same_provider(monkeypatch) -> None:
     rejected = {
         "headline": "Что показала новая работа",
@@ -256,6 +273,50 @@ def test_preflight_repairs_unsupported_number_with_same_provider(monkeypatch) ->
     assert "REPAIR_REQUEST" in requests[1]["messages"][-1]["content"]
     assert "unsupported_number" in requests[1]["messages"][-1]["content"]
     assert editorial_worker._preflight_warnings(proposal, valid_job().source) == ()
+
+
+def test_preflight_drops_only_sentences_with_unsupported_numbers_after_bounded_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rejected = {
+        "headline": "Что показала новая работа",
+        "summary": "Авторы описали результат с улучшением на 99%.",
+        "why_it_matters": "Материал требует редакторской проверки.",
+    }
+    still_mixed = {
+        "headline": "Что показала новая работа",
+        "summary": (
+            "Авторы описали результат с улучшением на 99%. "
+            "Исследование также содержит ограничения, которые важно учитывать."
+        ),
+        "why_it_matters": "Материал требует редакторской проверки.",
+    }
+
+    proposal, requests = _provider_request_with_sequence(monkeypatch, [rejected, still_mixed])
+
+    assert len(requests) == 2
+    assert "unsupported_number" in requests[1]["messages"][-1]["content"]
+    assert proposal.summary == ("Исследование также содержит ограничения, которые важно учитывать.")
+    assert editorial_worker._preflight_warnings(proposal, valid_job().source) == ()
+
+
+def test_numeric_fallback_splits_plain_sentences_and_newlines() -> None:
+    source_numbers = {"2026"}
+    value = (
+        "Подтверждённый факт 2026 года. Лишнее число 999. "
+        "Ещё один подтверждённый факт.\nФинальный факт без чисел."
+    )
+
+    cleaned = editorial_worker._drop_sentences_with_unsupported_numbers(
+        value,
+        source_numbers=source_numbers,
+    )
+
+    assert "999" not in cleaned
+    assert (
+        cleaned
+        == "Подтверждённый факт 2026 года. Ещё один подтверждённый факт. Финальный факт без чисел."
+    )
 
 
 def test_preflight_repairs_photo_caption_with_trusted_source_url(monkeypatch) -> None:
@@ -293,6 +354,34 @@ def test_preflight_repairs_photo_caption_with_trusted_source_url(monkeypatch) ->
     assert editorial_worker._telegram_photo_caption_length(proposal, source) <= 1024
 
 
+def test_preflight_applies_caption_hard_limit_after_bounded_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rejected = {
+        "headline": "Исследование о силовой подготовке",
+        "summary": "Первичный длинный текст " * 42,
+        "why_it_matters": "Практический контекст " * 12,
+    }
+    still_too_long = {
+        "headline": "Исследование о силовой подготовке",
+        "summary": "Подробный источник-обоснованный текст " * 20,
+        "why_it_matters": "Практический контекст " * 12,
+    }
+
+    proposal, requests = _provider_request_with_sequence(monkeypatch, [rejected, still_too_long])
+
+    assert len(requests) == 2
+    assert "telegram_photo_caption_too_long" in requests[1]["messages"][-1]["content"]
+    assert proposal.headline == still_too_long["headline"]
+    assert proposal.summary == still_too_long["summary"].strip()
+    assert proposal.why_it_matters.endswith("…")
+    assert (
+        editorial_worker._telegram_photo_caption_length(proposal, valid_job().source)
+        <= editorial_worker.TELEGRAM_PHOTO_CAPTION_LIMIT
+    )
+    assert editorial_worker._preflight_warnings(proposal, valid_job().source) == ()
+
+
 def test_unresolved_repair_fails_closed_before_hmac_intake(monkeypatch) -> None:
     rejected = {
         "headline": "Что показала новая работа",
@@ -320,8 +409,14 @@ def test_unresolved_repair_fails_closed_before_hmac_intake(monkeypatch) -> None:
         lambda _job, _body: pytest.fail("HMAC intake must not run after unresolved preflight"),
     )
 
-    with pytest.raises(editorial_worker.WorkerError, match="editorial_preflight_repair_failed"):
+    with pytest.raises(
+        editorial_worker.WorkerError, match="editorial_preflight_repair_failed"
+    ) as exc_info:
         editorial_worker.run_job(valid_job())
+    assert exc_info.value.as_payload() == {
+        "error": "editorial_preflight_repair_failed",
+        "preflight_blockers": ["unsupported_number"],
+    }
     assert calls == 2
 
 

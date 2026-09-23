@@ -26,9 +26,13 @@ Task 128G добавляет primary engine `RapidOCR 3.9.2` на `ONNX Runtime 
 три явных `model_path` и не скачивает модели по пользовательскому запросу. Каталог по умолчанию —
 `/opt/rapidocr/models`, разрешённые файлы перечислены в `RAPIDOCR_MODEL_FILES`.
 
-RapidOCR работает CPU-only, с `intra_op_num_threads=1`, `inter_op_num_threads=1`, одним in-flight
-inference на singleton engine и явным cleanup OCR buffers после каждого результата. CPU memory
-arena отключён: это ограничивает рост RSS на повторных вызовах. Model initialization кэшируется
+RapidOCR работает CPU-only, с `intra_op_num_threads=2`, `inter_op_num_threads=1`, quality max-side
+`1750`, одним in-flight inference на singleton engine и явным cleanup OCR buffers после каждого
+результата. Task 128H разрешил двум ONNX intra-op threads использовать оба vCPU canonical
+production host без увеличения числа одновременных heavy inference и после post-migration A/B
+снизил max-side с `2000` до `1750`: `1800` не давал стабильного запаса по p50, а `1700`
+уже терял energy на locked target fixture. CPU memory arena отключён: это ограничивает рост RSS
+на повторных вызовах. Model initialization кэшируется
 процессом; timeout остаётся общим bounded OCR budget `8 s`, а отсутствие модели, timeout или
 ошибка runtime переводятся в controlled `local_ocr_*` error. `Tesseract 5.5.0` и `rus+eng`
 остаются только явным bounded fallback при `NUTRITION_LABEL_SCAN_OCR_ENGINE=tesseract`.
@@ -48,8 +52,9 @@ synthetic probe не доказал устойчивого улучшения.
 
 Parser использует token text + `left/top/width/height`, block/paragraph/line/word и confidence
 для детерминированной строковой/колоночной association. Кандидат выбирается по basis,
-unit-qualified value adjacency, required-field completeness, pair consistency, impossible-value
-и column-collision checks; длина распознанного текста не является критерием.
+явной связи value/unit либо единственной физически согласованной восстановленной паре kJ/kcal,
+required-field completeness, pair consistency, impossible-value и column-collision checks; длина
+распознанного текста не является критерием.
 
 RapidOCR и upstream PaddleOCR-модели распространяются под Apache License 2.0, ONNX Runtime —
 под MIT; Tesseract core и официальные `tessdata` сохраняют Apache-2.0 fallback-контракт.
@@ -87,6 +92,14 @@ normalized facts, evidence и confidence. Обязательная основа 
 
 Правила parser:
 
+- стандартные казахские названия белков (`ақуыздар`, ограниченная OCR-форма `акуыздар`), жиров
+  (`майлар`) и углеводов (`көмірсулар`, ограниченная OCR-форма `көмирсулар`) распознаются как
+  варианты соответствующих строк; для граммовой массы сохраняется только существующая узкая
+  поправка OCR-формы `r` после распознавания строки;
+- смешанный вариант `KДж` принимается только как bounded energy unit. Если на строке energy
+  остались ровно два числа и единицы kJ/kcal, а их порядок повреждён OCR, parser проверяет обе
+  привязки по существующему соотношению `1 kcal ~= 4.184 kJ` и принимает только единственную
+  согласованную пару; при отсутствии единственной пары значения остаются ambiguous/null;
 - `%DV` не является массой и не конвертируется в `g`/`mg`;
 - salt и sodium — разные поля;
 - manufacturer kcal никогда не заменяются расчётом; unitless energy, mismatch пары kJ/kcal,
@@ -157,9 +170,12 @@ Local YFC catalog checked first. Exact local barcode lookup завершаетс
 `NUTRITION_LABEL_SCAN_OCR_ENGINE=rapidocr`, если там сохранено прежнее явное значение
 `tesseract`; новых secrets не требуется. `NUTRITION_LABEL_SCAN_OCR_MODEL_DIR` задавать не нужно,
 если используется стандартный image path `/opt/rapidocr/models`. Для фактического public rollout
-после HUMAN_EVIDENCE также потребуется операционная смена `NUTRITION_LABEL_SCAN_ENABLED=true`
-при сохранении `NUTRITION_LABEL_SCAN_KILL_SWITCH=false`; это rollout action, а не новая credential
-или provider настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны.
+после PASS exact-photo HUMAN_EVIDENCE production deploy однократно применяет
+`scripts/configure_production_nutrition_label_scan.py`: `NUTRITION_LABEL_SCAN_ENABLED=true` и
+`NUTRITION_LABEL_SCAN_KILL_SWITCH=false`. Маркер Task 128I хранится в persistent
+`.artifacts/operations/deployments`; последующие deploy сохраняют текущие значения host `.env`,
+включая аварийное включение kill switch. Это rollout action, а не новая credential или provider
+настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны.
 
 ## Runtime OCR
 
@@ -168,6 +184,10 @@ Backend runtime устанавливает локальный RapidOCR/ONNX Runt
 read-only model files и `appuser`. Tesseract 5.5.0 с `eng`, `rus`, `osd` остаётся explicit
 fallback через явный `argv`, `shell=False`, timeout и ограничение вывода. Raw image/OCR и cloud/
 paid Vision payloads в pipeline не сохраняются и не логируются.
+
+В адаптере RapidOCR единый монотонный срок `8 s` охватывает ожидание единственного слота
+распознавания и ожидание результата ONNX. Если ожидающая future отменена до начала работы, слот
+освобождается; уже работающий inference удерживает его до собственного завершения.
 
 ## Verification status
 

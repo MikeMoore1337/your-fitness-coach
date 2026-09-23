@@ -1774,6 +1774,37 @@ def test_hermes_without_image_is_not_delivered_as_text_only(monkeypatch) -> None
         assert delivery.last_error_code is None
 
 
+def test_review_message_uses_cluster_scoring_when_hermes_metadata_omits_it() -> None:
+    cluster_id = _source_and_candidate(external_id="hermes-review-canonical-score")
+    draft_id, _ = _draft(cluster_id)
+
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        draft = db.get(NewsDraftRevision, draft_id)
+        assert cluster is not None and draft is not None
+
+        cluster.topic = "nutrition"
+        cluster.score = 85
+        cluster.score_version = "news-score-v1"
+        cluster.score_reasons = [
+            "source_quality:25",
+            "topic:nutrition",
+            "priority:new_research",
+        ]
+        metadata = dict(draft.evidence_metadata)
+        metadata.update({"submitted_by": "hermes_narrow_intake"})
+        for key in ("topic", "score", "score_version", "score_reasons", "supporting_source_count"):
+            metadata.pop(key, None)
+        draft.evidence_metadata = metadata
+
+        message, _, _ = review_message(db, draft)
+
+        assert "Topic: nutrition · score 85/100 (news-score-v1)" in message
+        assert "Причины: source_quality:25, topic:nutrition, priority:new_research" in message
+        assert "Sources: 1 total · supporting: 0" in message
+        assert "other · score 0/100" not in message
+
+
 def test_over_limit_photo_review_message_shows_not_ready_state(
     monkeypatch,
 ) -> None:

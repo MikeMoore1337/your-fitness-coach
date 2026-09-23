@@ -100,8 +100,7 @@ Bot запускайте только с отдельным тестовым tok
 Создайте окружение и установите locked project dependencies:
 
 ```bash
-python3.14 -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements-dev.txt -r bot/requirements.txt
+uv sync --locked --extra backend --extra bot --group dev
 npm --prefix frontend ci
 docker compose up -d db
 ```

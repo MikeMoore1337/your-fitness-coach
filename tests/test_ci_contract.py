@@ -1,3 +1,4 @@
+import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,6 +36,16 @@ def test_contract_digest_changes_when_contract_changes(monkeypatch) -> None:
         ),
     )
     assert ci_contract.contract_digest() != original_digest
+
+
+def test_uv_is_treated_as_an_executable_prerequisite(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        ci_contract.shutil,
+        "which",
+        lambda executable: "/usr/bin/uv" if executable == "uv" else None,
+    )
+
+    assert ci_contract._check_prerequisite(tmp_path, "uv", {}) is None
 
 
 def test_shards_parse_and_select_deterministically() -> None:
@@ -215,24 +226,21 @@ def test_allure_dependencies_are_scheduled_only() -> None:
     scheduled_package = (root / "frontend" / "scheduled-report" / "package.json").read_text(
         encoding="utf-8"
     )
-    development_requirements = (root / "backend" / "requirements-dev.in").read_text(
-        encoding="utf-8"
-    )
-    scheduled_requirements = (root / "backend" / "requirements-scheduled-report.in").read_text(
-        encoding="utf-8"
-    )
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    development_dependencies = project["dependency-groups"]["dev"]
+    scheduled_dependencies = project["dependency-groups"]["scheduled-report"]
 
     assert '"allure-vitest"' not in package
     assert '"allure-playwright"' not in package
     assert '"allure-commandline"' not in package
-    assert "allure-pytest" not in development_requirements
+    assert not any(item.startswith("allure-pytest") for item in development_dependencies)
     assert '"allure-vitest": "3.12.0"' in scheduled_package
     assert '"allure-playwright": "3.12.0"' in scheduled_package
     assert '"allure-commandline": "2.43.0"' in scheduled_package
-    assert "allure-pytest==2.16.0" in scheduled_requirements
+    assert "allure-pytest==2.16.0" in scheduled_dependencies
     assert workflow.count("npm ci --prefix scheduled-report") == 7
     assert workflow.count("--omit=peer") == 7
-    assert workflow.count("requirements-scheduled-report.txt") == 4
+    assert workflow.count("--group scheduled-report") == 2
     assert "./scheduled-report/node_modules/.bin/allure generate" in workflow
     assert "python scripts/publish_allure_report.py publish" in workflow
     assert "ALLURE_REPORT_SSH_PRIVATE_KEY" in workflow
@@ -387,7 +395,13 @@ def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
             {"python-dependency-audit", "container-contract"},
         ),
         (
-            ["backend/requirements-runtime.txt"],
+            ["uv.lock"],
+            "backend",
+            {"python-dependency-audit", "container-contract"},
+            {"frontend-e2e", "migrated-stack"},
+        ),
+        (
+            ["pyproject.toml"],
             "backend",
             {"python-dependency-audit", "container-contract"},
             {"frontend-e2e", "migrated-stack"},

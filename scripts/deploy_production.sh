@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 readonly EXPECTED_ROOT="${DEPLOY_ROOT:-$(pwd -P)}"
+readonly DEPLOY_STATE_ROOT="${DEPLOY_STATE_ROOT:-$EXPECTED_ROOT/.artifacts/operations/deployments}"
+readonly NUTRITION_LABEL_SCAN_ROLLOUT_MARKER="$DEPLOY_STATE_ROOT/nutrition-label-scan-task-128I-configured.json"
 readonly TARGET_SHA="${1:?usage: deploy_production.sh TARGET_SHA BASE_URL}"
 readonly BASE_URL="${2:?usage: deploy_production.sh TARGET_SHA BASE_URL}"
 readonly PUBLIC_BASE_URL="${3:-https://your-fitness-coach.ru}"
@@ -89,6 +91,12 @@ python3 scripts/normalize_production_news_image_provider.py .env
 echo "Enabling the production AI Coach runtime"
 python3 scripts/configure_production_ai_coach.py .env
 
+echo "Applying the one-time Task 128I Nutrition Label rollout configuration"
+python3 scripts/configure_production_nutrition_label_scan.py .env "$NUTRITION_LABEL_SCAN_ROLLOUT_MARKER"
+
+echo "Ensuring the bounded production journald policy before rollout"
+python3 scripts/configure_production_log_retention.py --revision "$TARGET_SHA"
+
 echo "Validating Compose configuration for $TARGET_SHA"
 docker compose config --quiet
 
@@ -114,6 +122,14 @@ case "$ROLLOUT_MODE" in
     exit 1
     ;;
 esac
+
+echo "Rechecking production journald after rollout"
+python3 scripts/configure_production_log_retention.py --revision "$TARGET_SHA"
+
+echo "Verifying bounded logging for active YFC application containers"
+python3 scripts/configure_production_log_retention.py \
+  --verify-application-logs \
+  --revision "$TARGET_SHA"
 
 echo "Checking the public Telegram bot profile"
 set +e

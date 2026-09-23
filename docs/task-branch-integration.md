@@ -142,7 +142,8 @@ Task lease содержит task ID/path, branch, абсолютный worktree,
 label без secrets. `delivery.json` содержит только минимальный owner delivery lane и FIFO sequence;
 это не старый release-freeze lease. Production success удерживает delivery owner до завершения
 `finish`; только terminal closeout освобождает lane и передаёт её следующему FIFO candidate. `finish` запускается
-из canonical controller worktree только после exact merged master SHA и terminal production success.
+из canonical controller worktree после terminal production success; если после deploy прошли только
+controller PR, deployed SHA должен оставаться ancestor актуального `origin/master`.
 Он удаляет только matching clean task worktree и локальную task branch без `--force`; unique
 commits, divergence refs, changed head и artifact cleanup error останавливают closeout с
 сохранением данных.
@@ -160,6 +161,44 @@ delete или несанкционированное восстановлени�
 `resolve-recovery <ID> --owner-authorize --reason <...>`. Команда проверяет branch/worktree,
 base ancestry и отсутствие delivery owner, затем атомарно инвалидирует старый readiness snapshot;
 она не удаляет файлы, ветки или lease и не выполняет `reset`/`stash`.
+
+`complete-production` остаётся строгим обычным путём: PR, merge и deployment должны совпадать по
+exact SHA текущего `origin/master` и по текущему delivery anchor. Для редкого случая, когда
+начальная delivery-задача уже была superseded несколькими PR той же Task и более поздний SHA уже
+успешно deployed, есть отдельная owner-authorized команда `reconcile-production-success`. Она
+принимает только clean и однозначный `recovery-required` lease без владельца delivery lane,
+проверяет исходный PR против сохранённого anchor, каждый последующий PR против Task ID, same-repo
+provenance, `master`, exact-head `checks` и chronological merge ancestry, затем сверяет успешный
+`Release production` run и deployment для точного финального SHA. Финальный SHA должен быть
+ancestor текущего live protected `master`; активный production deployment, race, неполная цепочка,
+неверный owner flag или уже существующая history блокируют запись. Команда сохраняет original
+anchor и ordered PR/deployment evidence в task history, переводит lease в `production-success` и
+оставляет обычный `finish` единственным путём terminal closeout. Она не заменяет и не ослабляет
+`complete-production`, `refresh-canonical-master`, `resolve-recovery` или проверки `finish`.
+Она обновляет только tracking ref через fast-forward fetch; локальный canonical `master` не
+перемещается. Для reconciliation history `finish` принимает подтверждённый deployed SHA как
+исторический ancestor проверенного master snapshot, а новые commits после snapshot по-прежнему
+должны быть controller-only и затрагивать только allowlist controller paths.
+
+Если canonical checkout ещё не содержит merged controller fix из-за заблокированного refresh,
+запустите этот код из чистого worktree merged controller PR и передайте `--repo` путь к canonical
+checkout с общим Git common dir. Пример для уже проверенной цепочки Task 415:
+
+```powershell
+$repo = 'C:\path\to\your-fitness-coach' # абсолютный путь к canonical checkout
+& "$repo\.venv\Scripts\python.exe" scripts\task_session.py --repo $repo `
+    reconcile-production-success 415 `
+    --original-pr 423 `
+    --superseding-pr 432 `
+    --superseding-pr 435 `
+    --deployed-sha 67e906bdb34c8889091ae2e72a2e89624e94fe60 `
+    --production-run 35783412553 `
+    --owner-authorize
+```
+
+Для другой задачи заново получите все PR/run/deployment evidence из GitHub; повторяйте
+`--superseding-pr` в merge-порядке. После успешной reconciliation выполните штатный
+`task_session.py finish <ID>`. Не правьте lease, `delivery.json` или history вручную.
 
 ## Один пользовательский запуск
 
@@ -234,6 +273,23 @@ PR в `master` обязан быть same-repository task branch с `[Task <ID>]
 полный применимый профиль. После merge push-CI не повторяет full regression suite: он подтверждает
 merged task PR provenance и публикует immutable backend/bot images через
 `scripts/deployment_contract.py`.
+
+`reconcile-production-success` по умолчанию требует точного совпадения исходного PR с сохранённым
+`delivery_anchor`. Единственное исключение — подтверждённый `post_merge_collapsed_anchor`: recovery
+lease, task branch/ref/worktree и все текущие lease anchors должны указывать ровно на финальный
+deployed merge SHA; исходный и superseding PRs должны образовывать проверенную same-task/same-repo
+цепочку с exact-head `checks`; финальный PR должен использовать leased task branch; production run и
+deployment должны совпадать с его merge SHA. Дополнительно lease обязан сохранять реальный
+`canonical-master-refresh` `REFRESHED`, привязанный к этой task, от base SHA финального PR до его
+merge SHA, и branch reflog должен подтверждать переход `rebase (finish)` с exact PR head на deployed
+merge SHA. Любой промежуточный SHA, произвольный reset, уникальный commit, грязный или неоднозначный
+worktree, разрыв PR цепочки либо неподтверждённое production состояние остаётся fail-closed.
+
+Для такого восстановления history сохраняет фактические base/head/merge/checks исходного PR и всех
+superseding PRs, production run/deployment, классификацию `post_merge_collapsed_anchor` и полный
+observed recovery anchor вместе с подтверждённым переходом task branch. `finish` повторно проверяет
+эту связь и принимает только controller-only drift после зафиксированного master snapshot. Этот путь
+не меняет exact-anchor semantics обычного `complete-production`.
 
 `deploy.yml` принимает только successful `master` workflow run, ещё раз проверяет association с
 merged task PR и current master, checkout выполняется только на GitHub runner. Runner создаёт

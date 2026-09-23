@@ -111,10 +111,11 @@ def test_rapidocr_passes_explicit_model_paths_and_bounded_runtime_params(
     engine = RapidOcr(model_dir=tmp_path, timeout_seconds=8, max_output_chars=50_000)
     engine._executor.shutdown(wait=True)
 
-    assert captured["Global.max_side_len"] == 2000
-    assert captured["EngineConfig.onnxruntime.intra_op_num_threads"] == 1
+    assert captured["Global.max_side_len"] == 1750
+    assert captured["EngineConfig.onnxruntime.intra_op_num_threads"] == 2
     assert captured["EngineConfig.onnxruntime.inter_op_num_threads"] == 1
     assert captured["EngineConfig.onnxruntime.enable_cpu_mem_arena"] is False
+    assert captured["Det.limit_side_len"] == 1750
     assert captured["Det.model_path"] == str(tmp_path / RAPIDOCR_MODEL_FILES[0])
     assert captured["Cls.model_path"] == str(tmp_path / RAPIDOCR_MODEL_FILES[2])
     assert captured["Rec.model_path"] == str(tmp_path / RAPIDOCR_MODEL_FILES[1])
@@ -133,7 +134,7 @@ def test_rapidocr_rejects_mismatched_positioned_result_lengths() -> None:
         )
 
 
-def test_rapidocr_timeout_is_controlled_without_unbounded_concurrency() -> None:
+def test_rapidocr_cancels_pending_future_and_releases_slot_after_timeout() -> None:
     adapter = _adapter_without_runtime()
 
     class _PendingExecutor:
@@ -145,6 +146,170 @@ def test_rapidocr_timeout_is_controlled_without_unbounded_concurrency() -> None:
 
     with pytest.raises(LocalOcrError, match="local_ocr_timeout"):
         adapter.extract_candidates(b"normalized-png")
+    assert adapter._inference_slots.acquire(timeout=0) is True
+    adapter._inference_slots.release()
+
+
+def test_rapidocr_slot_wait_timeout_is_controlled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _adapter_without_runtime()
+    adapter._timeout_seconds = 1.0
+    acquire_timeouts: list[float] = []
+
+    class _UnavailableSemaphore:
+        def acquire(self, *, timeout: float) -> bool:
+            acquire_timeouts.append(timeout)
+            return False
+
+        def release(self) -> None:
+            raise AssertionError("an unavailable semaphore cannot be released")
+
+    class _UnusedExecutor:
+        def submit(self, fn):
+            del fn
+            raise AssertionError("inference must not be submitted without a slot")
+
+    adapter._inference_slots = _UnavailableSemaphore()
+    adapter._executor = _UnusedExecutor()
+    monkeypatch.setattr("fitminiapp_api.nutrition_label.ocr.time.monotonic", lambda: 10.0)
+
+    with pytest.raises(LocalOcrError, match="local_ocr_timeout"):
+        adapter.extract_candidates(b"normalized-png")
+
+    assert acquire_timeouts == [pytest.approx(1.0)]
+
+
+def test_rapidocr_running_timeout_keeps_slot_until_worker_finishes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _adapter_without_runtime()
+    adapter._timeout_seconds = 1.0
+    active = 0
+    max_active = 0
+    inference_calls = 0
+    captured_workers = []
+
+    class _DeterministicSemaphore:
+        available = True
+
+        def acquire(self, *, timeout: float) -> bool:
+            del timeout
+            if not self.available:
+                return False
+            self.available = False
+            return True
+
+        def release(self) -> None:
+            assert not self.available
+            self.available = True
+
+    class _TimedOutRunningFuture:
+        def result(self, timeout: float | None = None):
+            assert timeout == pytest.approx(1.0)
+            raise TimeoutError
+
+        def cancel(self) -> bool:
+            return False
+
+    class _CompletedFuture:
+        def __init__(self, worker) -> None:
+            self._worker = worker
+
+        def result(self, timeout: float | None = None):
+            assert timeout == pytest.approx(1.0)
+            return self._worker()
+
+    class _SerialExecutor:
+        submissions = 0
+
+        def submit(self, worker):
+            self.submissions += 1
+            if self.submissions == 1:
+                captured_workers.append(worker)
+                return _TimedOutRunningFuture()
+            return _CompletedFuture(worker)
+
+    def run_inference(payload: bytes):
+        nonlocal active, max_active, inference_calls
+        assert payload == b"normalized-png"
+        active += 1
+        inference_calls += 1
+        max_active = max(max_active, active)
+        try:
+            return SimpleNamespace(
+                boxes=[[[12, 30], [112, 30], [112, 58], [12, 58]]],
+                txts=["Protein 8,0 g"],
+                scores=[0.98],
+            )
+        finally:
+            active -= 1
+
+    adapter._inference_slots = _DeterministicSemaphore()
+    adapter._executor = _SerialExecutor()
+    adapter._run_inference = run_inference
+    monkeypatch.setattr("fitminiapp_api.nutrition_label.ocr.time.monotonic", lambda: 10.0)
+
+    with pytest.raises(LocalOcrError, match="local_ocr_timeout"):
+        adapter.extract_candidates(b"normalized-png")
+
+    assert adapter._inference_slots.available is False
+    with pytest.raises(LocalOcrError, match="local_ocr_timeout"):
+        adapter.extract_candidates(b"normalized-png")
+    assert len(captured_workers) == 1
+    assert inference_calls == 0
+
+    captured_workers[0]()
+
+    assert adapter._inference_slots.available is True
+    candidates = adapter.extract_candidates(b"normalized-png")
+    assert candidates[0].text == "Protein 8,0 g"
+    assert inference_calls == 2
+    assert max_active == 1
+
+
+def test_rapidocr_uses_one_deadline_for_slot_wait_and_inference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = _adapter_without_runtime()
+    adapter._timeout_seconds = 1.0
+    elapsed = 0.0
+    result_timeouts: list[float | None] = []
+
+    class _DelayedSemaphore:
+        def acquire(self, *, timeout: float) -> bool:
+            nonlocal elapsed
+            assert timeout == pytest.approx(1.0)
+            elapsed += 0.4
+            return True
+
+        def release(self) -> None:
+            return None
+
+    class _ObservedFuture(Future):
+        def result(self, timeout: float | None = None):
+            result_timeouts.append(timeout)
+            return super().result(timeout=timeout)
+
+    class _ImmediateExecutor:
+        def submit(self, fn):
+            future = _ObservedFuture()
+            future.set_result(fn())
+            return future
+
+    adapter._inference_slots = _DelayedSemaphore()
+    adapter._executor = _ImmediateExecutor()
+    adapter._run_inference = lambda payload: SimpleNamespace(
+        boxes=[[[12, 30], [112, 30], [112, 58], [12, 58]]],
+        txts=["Protein 8,0 g"],
+        scores=[0.98],
+    )
+    monkeypatch.setattr("fitminiapp_api.nutrition_label.ocr.time.monotonic", lambda: elapsed)
+
+    candidates = adapter.extract_candidates(b"normalized-png")
+
+    assert result_timeouts == [pytest.approx(0.6)]
+    assert candidates[0].text == "Protein 8,0 g"
 
 
 def test_rapidocr_executor_failure_is_controlled_and_releases_slot() -> None:

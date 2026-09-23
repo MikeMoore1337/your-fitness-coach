@@ -196,6 +196,56 @@ digests и проверяет public smoke. Schema автоматически н
 `state.json`; переход к blue/green в будущем по-прежнему требует отдельного bootstrap и фактического
 parallel-slot headroom.
 
+## Удержание production-логов
+
+Для journald в production используется политика из репозитория
+`deploy/production/journald/90-yfc-retention.conf`; helper устанавливает её на хост как drop-in
+`/etc/systemd/journald.conf.d/99-yfc-retention.conf`:
+
+Имя файла на хосте сортируется после существующего `99-yfc-limits.conf`. Helper проверяет итоговую
+конфигурацию и прекращает установку без рестарта journald, если более поздний drop-in переопределяет
+политику.
+
+- `SystemMaxUse=256M` ограничивает persistent journal до 256 MiB;
+- `SystemKeepFree=3G` сохраняет минимум 3 GiB свободного места;
+- `RuntimeMaxUse=64M` ограничивает runtime journal до 64 MiB;
+- `MaxRetentionSec=14day` ограничивает срок хранения четырнадцатью днями;
+- `Compress=yes` включает сжатие journal-файлов.
+
+`scripts/deploy_production.sh` до проверки Compose вызывает
+`scripts/configure_production_log_retention.py`. Изменённую или отсутствующую политику может
+установить только root; штатный deploy identity проверяет уже установленное точное содержимое и
+эффективную конфигурацию без привилегий. Несовпадение fail-closed до application rollout. После
+установки helper перезапускает только `systemd-journald`; Docker и application services он не
+перезапускает. При usage выше 256 MiB после применения политики helper использует только
+`journalctl --rotate` и bounded `journalctl --vacuum-time=14days --vacuum-size=256M`.
+
+Проверка journald выполняется командами:
+
+```bash
+systemd-analyze cat-config systemd/journald.conf
+journalctl --disk-usage
+```
+
+Все длительно работающие Compose-варианты `backend`, `worker` и `bot` используют драйвер
+`json-file`, `max-size: 10m` и `max-file: 5`: это не более примерно 50 MiB файлов логов на один
+container. Однократный `setup` не получает отдельную настройку: rollout запускает его через
+`docker compose run --rm`, поэтому container удаляется после завершения.
+
+PostgreSQL, Caddy, `edge`, Cloudflare tunnels и Allure services остаются вне этого logging policy:
+они не принадлежат application slot и не пересоздаются ради retention. PostgreSQL data,
+`bot_polling_lock`, `edge_config`, `caddy_data` и `caddy_config` не очищаются и не пересоздаются этой
+политикой; никакие Docker volumes не удаляются.
+
+Effective container policy проверяется так:
+
+```bash
+docker inspect <container> --format '{{json .HostConfig.LogConfig}}'
+```
+
+Журнальные файлы нельзя удалять вручную; retention journald и контейнеров действует независимо от
+PostgreSQL backup, immutable release и Docker image/build-cache cleanup.
+
 ## Bootstrap и production boundary
 
 Существующий single-slot host не получает state/`edge_config` автоматически: первый bootstrap

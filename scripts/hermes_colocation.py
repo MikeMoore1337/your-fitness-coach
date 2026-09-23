@@ -358,7 +358,11 @@ def _render_units(
         "@COLOCATED_ISOLATED_HERMES@": "yes" if mode == "colocated-isolated" else "no",
         "@HERMES_YFC_DEPLOYMENT_LOCK@": deployment_lock,
     }
-    for name in ("hermes-discovery.service.template", "hermes-worker-drain.service.template"):
+    for name in (
+        "hermes-network-anchor.service.template",
+        "hermes-discovery.service.template",
+        "hermes-worker-drain.service.template",
+    ):
         rendered = (source / name).read_text(encoding="utf-8")
         for marker, value in replacements.items():
             rendered = rendered.replace(marker, value)
@@ -550,6 +554,7 @@ def _stage_release(
                 *(
                     str(temporary / "systemd" / name)
                     for name in (
+                        "hermes-network-anchor.service",
                         "hermes-discovery.service",
                         "hermes-worker-drain.service",
                         "hermes-discovery.target",
@@ -594,6 +599,7 @@ def _install_release_links(
         *[
             (systemd_root / name, release_dir / "systemd" / name)
             for name in (
+                "hermes-network-anchor.service",
                 "hermes-discovery.service",
                 "hermes-worker-drain.service",
                 "hermes-discovery.target",
@@ -622,11 +628,16 @@ def _install_release_links(
     return records
 
 
-def _disable_timer() -> None:
-    _run(["systemctl", "disable", "--now", "hermes-discovery.timer"], check=False)
-    status = _run(["systemctl", "is-enabled", "hermes-discovery.timer"], check=False, capture=True)
-    if status.returncode == 0 or status.stdout.strip() in {"enabled", "enabled-runtime"}:
+def _disable_timer(systemd_root: Path) -> None:
+    _run(["systemctl", "stop", "hermes-discovery.timer"], check=False)
+    (systemd_root / "timers.target.wants" / "hermes-discovery.timer").unlink(missing_ok=True)
+    _run(["systemctl", "daemon-reload"], check=False)
+    enabled = _run(["systemctl", "is-enabled", "hermes-discovery.timer"], check=False, capture=True)
+    if enabled.stdout.strip() in {"enabled", "enabled-runtime"}:
         raise ColocationError("Hermes timer must remain disabled until shadow approval")
+    active = _run(["systemctl", "is-active", "hermes-discovery.timer"], check=False, capture=True)
+    if active.returncode == 0 or active.stdout.strip() == "active":
+        raise ColocationError("Hermes timer must remain inactive until shadow approval")
 
 
 def _retire_legacy_egress() -> None:
@@ -732,7 +743,7 @@ def install(args: argparse.Namespace) -> dict[str, object]:
     )
     try:
         _run(["systemctl", "daemon-reload"])
-        _disable_timer()
+        _disable_timer(args.systemd_root)
     except BaseException:
         _restore_link_state(link_records)
         _run(["systemctl", "daemon-reload"], check=False)
@@ -788,7 +799,7 @@ def rollback(args: argparse.Namespace) -> dict[str, object]:
     )
     try:
         _run(["systemctl", "daemon-reload"])
-        _disable_timer()
+        _disable_timer(args.systemd_root)
     except BaseException:
         _restore_link_state(link_records)
         _run(["systemctl", "daemon-reload"], check=False)

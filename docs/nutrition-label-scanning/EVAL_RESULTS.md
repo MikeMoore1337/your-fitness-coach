@@ -177,3 +177,60 @@ RapidOCR выбран primary, потому что на том же corpus он 
 evidence и existing deterministic parser. Tesseract остаётся только explicit fallback и не
 запускается безусловно вместе с RapidOCR. Это не доказывает real-label accuracy: после deploy
 нужна HUMAN_EVIDENCE на том же исходном фото, без коммита изображения и EXIF в repository.
+
+## Addendum Task 128H (2026-09-23)
+
+Post-migration validation was repeated on the canonical YFC production host with 2 vCPU,
+1962 MiB RAM and 2047 MiB swap. Production remained configured for local RapidOCR,
+`Global.max_side_len=2000`, one heavy inference at a time and an 8 s OCR timeout; public
+nutrition-label scanning remained disabled during validation.
+
+On the same reproducible clean representative label, the deployed 1-thread ONNX profile produced
+first inference `7399.6 ms`, warm p50 `6034.3 ms`, warm p95 `6495.2 ms` and peak RSS
+`1,167,276 KiB`. The draft preserved `per_100_g`, `281.4 kJ`, `66.8 kcal` and P/F/C
+`8.0/2.0/4.2` without warnings, but failed the Task 128H latency targets.
+
+A bounded 2-thread intra-op profile kept `inter_op=1`, CPU memory arena disabled, the same models,
+`max_side_len=2000` and `BoundedSemaphore(1)`. On clean representative inputs it preserved all
+mandatory facts without warnings and reduced p95 below 5 s: the 1200x1600 case measured first
+`4672.6 ms`, warm p50 `4147.4 ms`, p95 `4627.7 ms`; the 1800x2400 case measured first
+`4318.2 ms`, warm p50 `3385.9 ms`, p95 `3612.6 ms`. Peak RSS remained about `1.11 GiB`.
+
+Enabling the ONNX CPU memory arena was explicitly rejected: the diagnostic process was OOM-killed
+(exit 137, about `1.36 GiB` anonymous RSS) on this 2 GiB host. Reducing the diagnostic input to a
+1000-1600 px long side did not meet the 3 s p50 target and is not accepted as a quality tradeoff;
+the earlier Task 128G 1000 px corpus profile also had materially worse completeness.
+
+На этапе PR #438 Task 128H разрешила только подтверждённую настройку `intra_op_num_threads=2`,
+сохранив `max_side_len=2000`, один inference slot и timeout `8 s`. Этот профиль не прошёл порог
+warm p50; следующий раздел фиксирует проверку меньшего `max_side_len=1750` из PR #440.
+Публичное включение остаётся **NO-GO**, пока не пройдены применимые пороги задержки/ресурсов и
+HUMAN_EVIDENCE на том же исходном фото. `NUTRITION_LABEL_SCAN_ENABLED=false` сохраняется;
+синтетические данные и скриншоты не заменяют исходное фото.
+
+### Проверка post-deploy профиля 1750 px (2026-09-23)
+
+PR #440 (`586ae2b463c085804031fe9a67780f0d33729405`) развернул профиль `max_side_len=1750`,
+`intra_op=2`, `inter_op=1`, отключённую CPU memory arena и один одновременный inference. До deploy
+контролируемый A/B на тех же чистых метках дал warm p50 `2.61–2.63 s`, p95 `2.82–3.03 s`, все
+целевые факты без предупреждений; `1700 px` был отвергнут из-за регрессии распознавания
+энергетического значения. Сканирование оставалось выключенным.
+
+После deploy выполнена отдельная диагностическая проверка только скорости на сгенерированном
+изображении `1800×2400` (20 warm запусков, без БД/API и пользовательских данных). Временный
+второй OCR process в существующем backend-контейнере измерил end-to-end p50 `3235.1 ms` (порог
+`3000 ms` не пройден), p95 `4261.5 ms`, max `4495.5 ms`; OCR inference p50 `2978.0 ms`, p95
+`3985.4 ms`; peak RSS `1090508 KiB`. Два одновременных вызова сохранили
+`max_parallel_inference=1`, их задержка составила `3404.0/7086.3 ms`. Синтетический draft
+сохранил `0/20` целевых фактов, поэтому этот запуск не подтверждает качество и не считается тестом
+приёмки. Пока процесс работал, backend-контейнер достиг `803.2 MiB`, использование swap на хосте
+выросло примерно на `117 MiB`; после завершения backend оставался healthy, без рестарта, и вернулся
+к `162.9 MiB`. Результат отмечен как ограниченный диагностический FAIL, а не основание для новой
+настройки OCR.
+
+Production остаётся на SHA `586ae2b463c085804031fe9a67780f0d33729405` с выключенным сканированием.
+Изменение адаптера в ветке задачи, объединяющее ожидание slot и inference в общий монотонный срок
+`8 s`, в этом deployed probe ещё не участвовало. Исходное фото для обязательного HUMAN_EVIDENCE на
+том же снимке отсутствует в доступных материалах задачи; до повторного deploy и успешной проверки
+владельцем вместе с подтверждёнными порогами задержки/ресурсов публичное включение остаётся
+**NO-GO**.

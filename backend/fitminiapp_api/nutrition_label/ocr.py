@@ -312,9 +312,11 @@ class RapidOcr:
             params = {
                 "Global.model_root_dir": str(self._model_dir),
                 "Global.log_level": "error",
-                "Global.max_side_len": 2000,
+                "Global.max_side_len": 1750,
                 "Global.return_word_box": False,
-                "EngineConfig.onnxruntime.intra_op_num_threads": 1,
+                # Task 128H: canonical production has 2 vCPU; one in-flight OCR inference
+                # may use both cores while the outer semaphore still prevents concurrent heavy runs.
+                "EngineConfig.onnxruntime.intra_op_num_threads": 2,
                 "EngineConfig.onnxruntime.inter_op_num_threads": 1,
                 "EngineConfig.onnxruntime.enable_cpu_mem_arena": False,
                 "Det.engine_type": EngineType.ONNXRUNTIME,
@@ -322,7 +324,7 @@ class RapidOcr:
                 "Det.model_type": ModelType.MOBILE,
                 "Det.ocr_version": OCRVersion.PPOCRV5,
                 "Det.model_path": str(self._model_dir / RAPIDOCR_MODEL_FILES[0]),
-                "Det.limit_side_len": 2000,
+                "Det.limit_side_len": 1750,
                 "Cls.engine_type": EngineType.ONNXRUNTIME,
                 "Cls.model_type": ModelType.MOBILE,
                 "Cls.ocr_version": OCRVersion.PPOCRV5,
@@ -410,10 +412,11 @@ class RapidOcr:
         return tuple(tokens)
 
     def extract_candidates(self, normalized_png: bytes) -> tuple[OcrCandidate, ...]:
-        acquired = self._inference_slots.acquire(timeout=self._timeout_seconds)
+        started = time.monotonic()
+        deadline = started + self._timeout_seconds
+        acquired = self._inference_slots.acquire(timeout=max(0.0, deadline - time.monotonic()))
         if not acquired:
             raise LocalOcrError("local_ocr_timeout")
-        started = time.monotonic()
 
         def run_and_release():
             try:
@@ -427,9 +430,10 @@ class RapidOcr:
             self._inference_slots.release()
             raise LocalOcrError("local_ocr_unavailable") from exc
         try:
-            result = future.result(timeout=self._timeout_seconds)
+            result = future.result(timeout=max(0.0, deadline - time.monotonic()))
         except FutureTimeoutError as exc:
-            future.cancel()
+            if future.cancel():
+                self._inference_slots.release()
             raise LocalOcrError("local_ocr_timeout") from exc
         except Exception as exc:
             raise LocalOcrError("local_ocr_failed") from exc
