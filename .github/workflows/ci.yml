@@ -518,10 +518,35 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_cross_browser == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
     env:
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-cross-browser', github.workspace) || '' }}
       ALLURE_PLAYWRIGHT_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-playwright
+      APP_ENV: test
+      APP_NAME: Your Fitness Coach CI
+      APP_DEBUG: "false"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      REFRESH_TOKEN_EXPIRE_DAYS: "30"
+      DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
+      ENABLE_DEV_AUTH: "true"
+      TELEGRAM_BOT_TOKEN: test-token
+      BOT_INTERNAL_TOKEN: test-bot-internal-token
+      SECRET_KEY: test-secret-key-at-least-thirty-two-characters
+      PW_API_SERVER: "true"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: fitminiapp_test
+          POSTGRES_USER: fitminiapp
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fitminiapp -d fitminiapp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -533,6 +558,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-local-path: ${{ env.UV_CACHE_DIR }}
+          cache-suffix: cross-browser
+      - name: Sync backend dependencies
+        run: |
+          uv sync --locked --no-default-groups --extra backend --group dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Report npm cache
         run: |
           echo "CI_CACHE package=npm hit=${{ steps.npm-setup.outputs.cache-hit }}"

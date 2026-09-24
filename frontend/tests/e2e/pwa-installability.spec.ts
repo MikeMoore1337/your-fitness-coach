@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+test.use({ serviceWorkers: 'allow' });
+
 test('serves the install manifest, canonical icons and service worker contract', async ({
   page,
   request,

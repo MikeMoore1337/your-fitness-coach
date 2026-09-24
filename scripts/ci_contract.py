@@ -190,6 +190,15 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
     "frontend-cross-browser": GroupSpec(
         name="frontend-cross-browser",
         commands=(
+            _cmd(
+                "cross-browser-migrations-upgrade",
+                "python",
+                "-m",
+                "alembic",
+                "upgrade",
+                "head",
+                cwd="backend",
+            ),
             _cmd("frontend-cross-browser", "npm", "run", "e2e:cross-browser", cwd="frontend"),
             _cmd(
                 "frontend-ui-quality-sweep",
@@ -205,6 +214,9 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
             "frontend/playwright.cross-browser.config.ts",
             "frontend/playwright.ui-quality-sweep.config.ts",
             "frontend/tests/e2e/ui-quality-sweep.spec.ts",
+            "python",
+            "alembic",
+            "DATABASE_URL",
         ),
     ),
     "python-tests": GroupSpec(

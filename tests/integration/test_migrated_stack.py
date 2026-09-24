@@ -355,6 +355,27 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
                         "(SELECT version_num FROM alembic_version)"
                     )
                 ).one()
+                template_schema = connection.execute(
+                    text(
+                        "SELECT n.nspname FROM pg_class AS c "
+                        "JOIN pg_namespace AS n ON n.oid = c.relnamespace "
+                        "WHERE c.oid = 'program_templates'::regclass"
+                    )
+                ).scalar_one()
+                template_count = connection.execute(
+                    text("SELECT count(*) FROM program_templates")
+                ).scalar_one()
+                backfill_batch = (
+                    connection.execute(
+                        text(
+                            "SELECT id FROM program_templates WHERE provenance_type IS NULL "
+                            "ORDER BY CASE WHEN owner_user_id IS NULL AND created_by_user_id IS NULL "
+                            "AND is_public = TRUE THEN 0 ELSE 1 END, id LIMIT 10"
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
                 provenance = dict(
                     connection.execute(
                         text("SELECT slug, provenance_type FROM program_templates")
@@ -369,11 +390,16 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
                 ).scalar_one()
             assert migration_context[0] == schema_name, migration_context
             assert migration_context[2] == "0095_program_provenance_backfill", migration_context
+            assert template_schema == schema_name, template_schema
             assert provenance == {
                 "stronglifts-5x5": "SOURCE_ADAPTATION",
                 "legacy-yfc-template": "YFC_GENERIC",
                 "private-custom-template": "CUSTOM",
-            }, f"migration_context={migration_context!r}; provenance={provenance!r}"
+            }, (
+                f"migration_context={migration_context!r}; template_schema={template_schema!r}; "
+                f"template_count={template_count}; backfill_batch={backfill_batch!r}; "
+                f"provenance={provenance!r}"
+            )
             assert "exercise_replaced" not in revision_check
             assert "prescription_updated" not in revision_check
         finally:
