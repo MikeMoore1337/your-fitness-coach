@@ -44,7 +44,7 @@ GENERATOR_VERSION = "task403-yfc-source-registry-renderer-v1"
 SOURCE_REGISTRY_PATH = "backend/fitminiapp_api/resources/news_sources.json"
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
 STATE_SCHEMA_VERSION = "hermes-discovery-state-v1"
-RELEVANCE_VERSION = "hermes-relevance-v1"
+RELEVANCE_VERSION = "hermes-relevance-v2"
 LOCAL_MOCK_MODE = "local_mock"
 EXTERNAL_MODE = "external"
 DISCOVERY_MODES = frozenset({LOCAL_MOCK_MODE, EXTERNAL_MODE})
@@ -61,36 +61,22 @@ BLOCKED_HOSTS = frozenset(
         "instance-data.ec2.internal",
     }
 )
-SUPPORTED_TOPICS = frozenset(
-    {
-        "sports_nutrition",
-        "dietary_supplements",
-        "sports_bodybuilding_pharmacology",
-        "strength_hypertrophy",
-        "medicine",
-        "health",
-        "fitness",
-        "exercise",
-        "training",
-        "cardio_endurance",
-        "sports_medicine_injuries",
-        "bodybuilding",
-        "peptides",
-        "nutrition",
-        "food_products",
-        "public_health",
-        "healthy_lifestyle",
-        "fitness_technology",
-        "research",
-        "guideline",
-        "regulation",
-        "product",
-        "safety",
-    }
+OWNER_EDITORIAL_TOPICS = (
+    "fitness_training",
+    "bodybuilding",
+    "sports_bodybuilding_pharmacology",
+    "peptides",
+    "nutrition",
+    "sports_nutrition",
+    "dietary_supplements",
+    "healthy_lifestyle",
 )
+SUPPORTED_TOPICS = frozenset(OWNER_EDITORIAL_TOPICS)
+
 MAX_DEFINITIONS_BYTES = 512 * 1024
 MAX_SOURCES = 50
 MAX_ITEMS_PER_SOURCE = 50
+PUBMED_EUTILS_MAX_ITEMS = 10
 MAX_SOURCE_RESPONSE_BYTES = 512 * 1024
 MAX_TITLE_CHARS = 500
 MAX_SUMMARY_CHARS = 4000
@@ -106,51 +92,60 @@ DEFAULT_LOCK_STALE_SECONDS = 900.0
 USER_AGENT = "YourFitnessCoach-HermesDiscovery/1.0"
 TRACKING_PARAMS = frozenset({"fbclid", "gclid", "mc_cid", "mc_eid", "ref", "ref_src"})
 RELEVANCE_MARKERS = {
-    "strength_hypertrophy": (
+    "fitness_training": (
         "strength training",
         "resistance training",
+        "resistance exercise",
         "hypertrophy",
         "muscle growth",
-        "muscle mass",
-        "muscle",
         "powerlifting",
+        "weightlifting",
+        "training load",
+        "training volume",
+        "periodization",
+        "workout program",
+        "interval training",
+        "endurance training",
+        "endurance performance",
+        "aerobic training",
+        "athletic performance",
+        "sports performance",
+        "sports injury",
+        "injury prevention",
+        "sports rehabilitation",
         "силов трен",
         "гипертроф",
         "рост мышц",
+        "пауэрлифт",
+        "тренировочн нагрузк",
+        "объем трениров",
+        "периодизац",
+        "программ трениров",
+        "спортивн травм",
+        "реабилитац спортсмен",
     ),
-    "bodybuilding": ("bodybuilding", "bodybuilder", "physique competition", "бодибилд"),
-    "sports_nutrition": (
-        "sports nutrition",
-        "protein powder",
-        "protein supplement",
-        "dietary protein",
-        "protein intake",
-        "creatine",
-        "electrolyte",
-        "pre-workout",
-        "спортивн питани",
-        "протеин",
-        "креатин",
-        "электролит",
-        "предтренировоч",
-    ),
-    "dietary_supplements": (
-        "dietary supplement",
-        "supplement use",
-        "supplementation",
-        "omega-3",
-        "probiotic",
-        "бад",
-        "пищев добавк",
+    "bodybuilding": (
+        "bodybuilding",
+        "bodybuilder",
+        "physique competition",
+        "physique athlete",
+        "contest preparation",
+        "contest prep",
+        "бодибилд",
+        "соревновательн подготовк",
     ),
     "sports_bodybuilding_pharmacology": (
         "anabolic steroid",
         "anabolic-androgenic",
         "performance-enhancing drug",
+        "performance enhancing drug",
+        "ped use",
         "aas",
         "sarm",
+        "selective androgen receptor",
         "testosterone",
         "growth hormone",
+        "bodybuilding pharmacology",
         "анабол",
         "стероид",
         "допинг",
@@ -159,33 +154,293 @@ RELEVANCE_MARKERS = {
         "гормон роста",
         "фармаколог",
     ),
-    "training": (
-        "training load",
-        "training volume",
-        "periodization",
-        "workout program",
-        "interval training",
-        "endurance training",
-        "endurance performance",
-        "cardio interval",
-        "тренировочн нагрузк",
-        "объем трениров",
-        "периодизац",
-        "программ трениров",
+    "peptides": (
+        "peptide",
+        "glp-1",
+        "glp 1",
+        "semaglutide",
+        "tirzepatide",
+        "retatrutide",
+        "пептид",
+        "гпп-1",
+        "семаглутид",
+        "тирзепатид",
+        "ретатрутид",
     ),
-    "mobility_recovery_sleep": (
-        "recovery",
-        "sleep duration",
+    "nutrition": (
+        "sports nutrition",
+        "nutrition",
+        "dietary pattern",
+        "diet quality",
+        "energy intake",
+        "calorie intake",
+        "energy balance",
+        "body composition",
+        "weight management",
+        "weight loss",
+        "fat loss",
+        "muscle preservation",
+        "sarcopenic obesity",
+        "appetite",
+        "питани",
+        "рацион",
+        "энергетическ баланс",
+        "состав тел",
+        "снижен веса",
+        "снижен жира",
+        "контроль веса",
+        "аппетит",
+        "саркопеническ ожирен",
+    ),
+    "sports_nutrition": (
+        "sports nutrition",
+        "sport nutrition",
+        "protein powder",
+        "protein supplement",
+        "dietary protein",
+        "protein intake",
+        "creatine",
+        "bcaa",
+        "eaa",
+        "carbohydrate gel",
+        "electrolyte",
+        "pre-workout",
+        "preworkout",
+        "спортивн питани",
+        "протеин",
+        "креатин",
+        "электролит",
+        "изотоник",
+        "предтренировоч",
+    ),
+    "dietary_supplements": (
+        "dietary supplement",
+        "supplement use",
+        "supplementation",
+        "supplement safety",
+        "supplement efficacy",
+        "omega-3",
+        "omega 3",
+        "probiotic",
+        "prebiotic",
+        "vitamin d supplement",
+        "mineral supplement",
+        "бад",
+        "пищев добавк",
+        "безопасност добавк",
+        "эффективност добавк",
+        "омега-3",
+        "пробиотик",
+        "пребиотик",
+    ),
+    "healthy_lifestyle": (
+        "physical activity",
         "sleep quality",
-        "mobility training",
-        "flexibility training",
-        "восстановлени",
+        "sleep duration",
+        "sleep and recovery",
+        "exercise recovery",
+        "training recovery",
+        "healthy lifestyle",
+        "behavior change",
+        "habit formation",
+        "sedentary behavior",
+        "физическ актив",
         "качество сна",
-        "мобильност",
-        "mobility exercise",
-        "гибкост",
+        "продолжительност сна",
+        "восстановлени после трениров",
+        "здоров образ жизни",
+        "изменен привыч",
+        "малоподвижн",
     ),
 }
+
+GENERIC_REJECTION_MARKERS = {
+    "generic_clinical_medicine": (
+        "clinical",
+        "clinic",
+        "clinical treatment",
+        "clinical care",
+        "patient",
+        "patients",
+        "hospital",
+        "diagnostic",
+        "diagnosis",
+        "disease treatment",
+        "therapy",
+        "treatment-naïve",
+        "treatment-naive",
+        "treatment naive",
+        "osteoarthritis",
+        "oncology",
+        "cancer",
+        "клиническ лечен",
+        "пациент",
+        "диагност",
+        "терапи",
+        "лечение",
+        "заболеван",
+    ),
+    "generic_public_health": (
+        "public health",
+        "population health",
+        "epidemiology",
+        "общественн здравоохран",
+        "эпидеми",
+    ),
+    "generic_cognition": (
+        "cognitive performance",
+        "cognitive function",
+        "attention and memory",
+        "memory outcomes",
+        "attention outcomes",
+        "когнитивн функц",
+        "когнитивн результат",
+        "памят",
+        "внимани",
+    ),
+    "generic_food_or_product": (
+        "food science",
+        "food technology",
+        "food processing",
+        "food extraction",
+        "ultrasound-assisted extraction",
+        "phenolic compound",
+        "antiradical",
+        "food industry",
+        "agricultural",
+        "poultry",
+        "chicken",
+        "broiler",
+        "egg",
+        "eggshell",
+        "embryo",
+        "in ovo",
+        "bee bread",
+        "company launch",
+        "пищев технолог",
+        "экстракц",
+        "фенольн соединен",
+        "пищев промышлен",
+        "новый продукт",
+    ),
+}
+
+DIRECT_RESCUE_MARKERS = (
+    "athlete",
+    "athletic",
+    "sport performance",
+    "sports performance",
+    "exercise performance",
+    "resistance training",
+    "strength training",
+    "hypertrophy",
+    "bodybuilding",
+    "bodybuilder",
+    "physique athlete",
+    "training load",
+    "workout",
+    "sarcopenic obesity",
+    "muscle preservation",
+    "fat loss",
+    "contest preparation",
+    "спортсмен",
+    "спортивн результат",
+    "силов трен",
+    "гипертроф",
+    "бодибилд",
+    "тренировочн нагрузк",
+    "саркопеническ ожирен",
+    "сохранен мышц",
+    "снижен жира",
+)
+
+WEIGHT_MANAGEMENT_CONTEXT = (
+    "body composition",
+    "weight management",
+    "weight loss",
+    "fat loss",
+    "obesity treatment",
+    "appetite",
+    "sarcopenic obesity",
+    "muscle preservation",
+    "состав тел",
+    "контроль веса",
+    "снижен веса",
+    "снижен жира",
+    "аппетит",
+    "саркопеническ ожирен",
+    "сохранен мышц",
+)
+
+SUPPLEMENT_CONTEXT = (*WEIGHT_MANAGEMENT_CONTEXT,
+    "athlete",
+    "sport",
+    "exercise",
+    "training",
+    "performance",
+    "recovery",
+    "bodybuilding",
+    "physique",
+    "muscle",
+    "strength",
+    "dietary supplement",
+    "supplement safety",
+    "supplement efficacy",
+    "athletic",
+    "спортсмен",
+    "трениров",
+    "результат",
+    "восстанов",
+    "бодибилд",
+    "мышц",
+    "силов",
+    "бад",
+    "безопасност добавк",
+    "эффективност добавк",
+)
+
+NUTRITION_CONTEXT = (*WEIGHT_MANAGEMENT_CONTEXT,
+    "athlete",
+    "sport",
+    "exercise",
+    "training",
+    "performance",
+    "recovery",
+    "healthy lifestyle",
+    "спортсмен",
+    "трениров",
+    "результат",
+    "восстанов",
+    "здоров образ жизни",
+)
+
+PEPTIDE_CONTEXT = (*WEIGHT_MANAGEMENT_CONTEXT,
+    "performance",
+    "athlete",
+    "bodybuilding",
+    "physique",
+    "спортсмен",
+    "бодибилд",
+)
+
+HEALTHY_LIFESTYLE_CONTEXT = (
+    "physical activity",
+    "exercise",
+    "training",
+    "athlete",
+    "recovery",
+    "sleep",
+    "sedentary",
+    "habit",
+    "физическ актив",
+    "трениров",
+    "спортсмен",
+    "восстанов",
+    "сон",
+    "малоподвиж",
+    "привыч",
+)
+
 
 
 class DiscoveryError(RuntimeError):
@@ -209,6 +464,7 @@ class SourceDefinition:
     authoritative: bool
     allowed_redirect_hosts: tuple[str, ...]
     allowed_item_hosts: tuple[str, ...]
+    adapter: str | None = None
 
 
 @dataclass(frozen=True)
@@ -264,57 +520,65 @@ def _clean_text(value: object, *, maximum: int) -> str:
 
 
 def _evaluate_relevance(candidate: ParsedCandidate) -> dict[str, Any]:
-    text = " ".join((candidate.title, candidate.summary, candidate.content[:MAX_CONTENT_CHARS])).casefold()
+    subject = f"{candidate.title} {candidate.summary}".casefold()
+    normalized = f"{subject} {candidate.content[:MAX_CONTENT_CHARS]}".casefold()
     topics = tuple(
         topic
-        for topic, markers in RELEVANCE_MARKERS.items()
-        if any(marker in text for marker in markers)
+        for topic in OWNER_EDITORIAL_TOPICS
+        if any(marker in normalized for marker in RELEVANCE_MARKERS[topic])
+        and any(marker in subject for marker in RELEVANCE_MARKERS[topic])
     )
-    sports_context = any(
-        topic in topics
-        for topic in (
-            "strength_hypertrophy",
-            "bodybuilding",
-            "sports_nutrition",
-            "dietary_supplements",
-            "training",
-            "mobility_recovery_sleep",
-        )
+    direct_context = any(marker in subject for marker in DIRECT_RESCUE_MARKERS)
+
+    rejection = next(
+        (
+            code
+            for code, markers in GENERIC_REJECTION_MARKERS.items()
+            if any(marker in subject for marker in markers)
+        ),
+        None,
     )
-    sports_context = sports_context or any(
-        marker in text
-        for marker in (
-            "sport",
-            "athlete",
-            "athletic",
-            "для спорта",
-            "спортсмен",
-            "muscle",
-            "мышц",
-        )
-    )
-    if "sports_bodybuilding_pharmacology" in topics and not sports_context:
-        return {
-            "allowed": False,
-            "reason_code": "topic_rejected:generic_clinical_medicine",
-            "strength": "none",
-            "topics": [],
-            "version": RELEVANCE_VERSION,
-        }
+    if rejection and not direct_context:
+        topics = ()
+        reason_code = f"topic_rejected:{rejection}"
+    else:
+        reason_code = ""
+
+    if "peptides" in topics and not any(marker in subject for marker in PEPTIDE_CONTEXT):
+        topics = tuple(topic for topic in topics if topic != "peptides")
+    if "nutrition" in topics and not any(marker in subject for marker in NUTRITION_CONTEXT):
+        topics = tuple(topic for topic in topics if topic != "nutrition")
+    if "dietary_supplements" in topics and not any(
+        marker in subject for marker in SUPPLEMENT_CONTEXT
+    ):
+        topics = tuple(topic for topic in topics if topic != "dietary_supplements")
+    if "healthy_lifestyle" in topics and not any(
+        marker in subject for marker in HEALTHY_LIFESTYLE_CONTEXT
+    ):
+        topics = tuple(topic for topic in topics if topic != "healthy_lifestyle")
+    if "sports_nutrition" in topics and any(
+        marker in subject for marker in ("extraction", "phenolic", "antiradical", "bee bread")
+    ):
+        topics = tuple(topic for topic in topics if topic != "sports_nutrition")
+
     if not topics:
+        if not reason_code:
+            reason_code = "topic_rejected:no_relevant_training_domain"
         return {
             "allowed": False,
-            "reason_code": "topic_rejected:no_relevant_training_domain",
+            "reason_code": reason_code,
             "strength": "none",
             "topics": [],
             "version": RELEVANCE_VERSION,
         }
+
     strong = {
-        "strength_hypertrophy",
+        "fitness_training",
         "bodybuilding",
         "sports_nutrition",
         "dietary_supplements",
         "sports_bodybuilding_pharmacology",
+        "peptides",
     }
     return {
         "allowed": True,
@@ -826,6 +1090,267 @@ def _http_get(
     raise last_error or DiscoveryError("source_network_error")
 
 
+def _source_status_error(status: int) -> None:
+    if status == 429:
+        raise DiscoveryError("source_rate_limited")
+    if status >= 500:
+        raise DiscoveryError("source_upstream_error")
+    if status >= 400:
+        raise DiscoveryError(f"source_http_{status}")
+    if status < 200 or status >= 300:
+        raise DiscoveryError("source_http_invalid")
+
+
+def _parse_pubmed_search_ids(body: bytes) -> tuple[str, ...]:
+    try:
+        payload = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DiscoveryError("source_malformed_feed") from exc
+    result = payload.get("esearchresult") if isinstance(payload, dict) else None
+    ids = result.get("idlist") if isinstance(result, dict) else None
+    if not isinstance(ids, list):
+        raise DiscoveryError("source_malformed_feed")
+    normalized = tuple(
+        value
+        for value in ids
+        if isinstance(value, str) and re.fullmatch(r"[1-9][0-9]{0,15}", value)
+    )
+    if len(normalized) != len(ids):
+        raise DiscoveryError("source_malformed_feed")
+    return normalized
+
+
+def _xml_text(element: ET.Element | None) -> str:
+    if element is None:
+        return ""
+    return " ".join("".join(element.itertext()).split())
+
+
+_MONTHS = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+
+
+def _pubmed_date(article: ET.Element) -> str | None:
+    date = article.find("./MedlineCitation/Article/ArticleDate")
+    if date is None:
+        date = article.find("./MedlineCitation/Article/Journal/JournalIssue/PubDate")
+    if date is None:
+        return None
+    year_text = (date.findtext("Year") or "").strip()
+    month_text = (date.findtext("Month") or "").strip()
+    day_text = (date.findtext("Day") or "").strip()
+    if not year_text:
+        medline = (date.findtext("MedlineDate") or "").strip()
+        match = re.search(r"\b(19|20)\d{2}\b", medline)
+        year_text = match.group(0) if match else ""
+    if not re.fullmatch(r"(19|20)\d{2}", year_text):
+        return None
+    month = 1
+    if month_text:
+        if month_text.isdigit():
+            month = max(1, min(12, int(month_text)))
+        else:
+            month = _MONTHS.get(month_text.casefold(), 1)
+    day = int(day_text) if day_text.isdigit() else 1
+    day = max(1, min(28, day))
+    return f"{int(year_text):04d}-{month:02d}-{day:02d}"
+
+
+def _pubmed_updated_date(article: ET.Element) -> str | None:
+    date = article.find("./MedlineCitation/DateRevised")
+    if date is None:
+        return None
+    year = (date.findtext("Year") or "").strip()
+    month = (date.findtext("Month") or "").strip()
+    day = (date.findtext("Day") or "").strip()
+    if not (year.isdigit() and month.isdigit() and day.isdigit()):
+        return None
+    return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+
+
+def _strip_known_pubmed_doctype(body: bytes) -> bytes:
+    lowered = body.lower()
+    if b"<!entity" in lowered or b"<![doctype" in lowered:
+        raise DiscoveryError("source_unsafe_xml")
+    if b"<!doctype" not in lowered:
+        return body
+    match = re.search(
+        rb'<!DOCTYPE\s+PubmedArticleSet\s+PUBLIC\s+'
+        rb'"-//NLM//DTD PubMedArticle,[^"]+//EN"\s+'
+        rb'"https://dtd\.nlm\.nih\.gov/ncbi/pubmed/out/pubmed_[0-9]+\.dtd"\s*>',
+        body[:2048],
+        re.IGNORECASE,
+    )
+    if match is None:
+        raise DiscoveryError("source_unsafe_xml")
+    return body[: match.start()] + body[match.end() :]
+
+
+def _parse_pubmed_efetch(body: bytes, publisher: str) -> tuple[ParsedCandidate, ...]:
+    sanitized = _strip_known_pubmed_doctype(body)
+    try:
+        root = ET.fromstring(sanitized)
+    except ET.ParseError as exc:
+        raise DiscoveryError("source_malformed_feed") from exc
+    candidates: list[ParsedCandidate] = []
+    for article in root.findall(".//PubmedArticle")[:MAX_ITEMS_PER_SOURCE]:
+        pmid = _xml_text(article.find("./MedlineCitation/PMID"))
+        if not re.fullmatch(r"[1-9][0-9]{0,15}", pmid):
+            continue
+        title = _xml_text(article.find("./MedlineCitation/Article/ArticleTitle"))
+        abstract_parts: list[str] = []
+        for node in article.findall("./MedlineCitation/Article/Abstract/AbstractText"):
+            text = _xml_text(node)
+            if not text:
+                continue
+            label = (node.attrib.get("Label") or "").strip()
+            abstract_parts.append(f"{label}: {text}" if label else text)
+        abstract = " ".join(abstract_parts)
+        authors: list[str] = []
+        for author in article.findall("./MedlineCitation/Article/AuthorList/Author")[:4]:
+            collective = _xml_text(author.find("CollectiveName"))
+            if collective:
+                authors.append(collective)
+                continue
+            last = _xml_text(author.find("LastName"))
+            initials = _xml_text(author.find("Initials"))
+            name = " ".join(part for part in (last, initials) if part)
+            if name:
+                authors.append(name)
+        doi = next(
+            (
+                _xml_text(node)
+                for node in article.findall("./PubmedData/ArticleIdList/ArticleId")
+                if (node.attrib.get("IdType") or "").casefold() == "doi" and _xml_text(node)
+            ),
+            None,
+        )
+        if doi is None:
+            doi = next(
+                (
+                    _xml_text(node)
+                    for node in article.findall("./MedlineCitation/Article/ELocationID")
+                    if (node.attrib.get("EIdType") or "").casefold() == "doi" and _xml_text(node)
+                ),
+                None,
+            )
+        doi = _doi(doi)
+        canonical = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+        candidate = _candidate_from_values(
+            external_id=pmid,
+            link=canonical,
+            title=title,
+            summary=abstract,
+            content=abstract or title,
+            base_url=canonical,
+            publisher=_xml_text(article.find("./MedlineCitation/Article/Journal/Title")) or publisher,
+            author="; ".join(authors),
+            published_at=_pubmed_date(article),
+            updated_at=_pubmed_updated_date(article),
+            primary_url=f"https://doi.org/{doi}" if doi else None,
+            doi=doi,
+        )
+        if candidate is not None:
+            candidates.append(candidate)
+    return tuple(candidates)
+
+
+def _fetch_pubmed_eutils(
+    source: SourceDefinition,
+    *,
+    mode: str,
+    timeout_seconds: float,
+    max_bytes: int,
+    max_items: int,
+) -> FetchResult:
+    source_url = _canonical_url(source.url)
+    parsed = urlsplit(source_url)
+    source_host = (parsed.hostname or "").casefold().rstrip(".")
+    allowed_hosts = frozenset(
+        {source_host, *source.allowed_redirect_hosts}
+        if mode == EXTERNAL_MODE
+        else {source_host, *source.allowed_redirect_hosts, *LOCAL_HOSTS}
+    )
+    status, headers, search_body = _http_get(
+        source_url,
+        mode=mode,
+        allowed_hosts=allowed_hosts,
+        accept="application/json",
+        timeout_seconds=timeout_seconds,
+        max_bytes=max_bytes,
+    )
+    _source_status_error(status)
+    if _media_type(headers.get("content-type")) != "application/json":
+        raise DiscoveryError("source_invalid_mime")
+    ids = _parse_pubmed_search_ids(search_body)[: min(max_items, PUBMED_EUTILS_MAX_ITEMS)]
+    if not ids:
+        return FetchResult(
+            status="fetched",
+            items=(),
+            body_hash=hashlib.sha256(search_body).hexdigest(),
+        )
+
+    search_query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    efetch_query = {
+        "db": "pubmed",
+        "id": ",".join(ids),
+        "retmode": "xml",
+        "tool": search_query.get("tool", "your-fitness-coach"),
+        "email": search_query.get("email", "news@your-fitness-coach.ru"),
+    }
+    efetch_url = urlunsplit(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            urljoin(parsed.path, "efetch.fcgi"),
+            urlencode(efetch_query),
+            "",
+        )
+    )
+    status, fetch_headers, fetch_body = _http_get(
+        efetch_url,
+        mode=mode,
+        allowed_hosts=allowed_hosts,
+        accept="application/xml, text/xml",
+        timeout_seconds=timeout_seconds,
+        max_bytes=max_bytes,
+    )
+    _source_status_error(status)
+    if _media_type(fetch_headers.get("content-type")) not in {"application/xml", "text/xml"}:
+        raise DiscoveryError("source_invalid_mime")
+    parsed_items = _parse_pubmed_efetch(fetch_body, source.name)
+    selected = tuple(item for item in parsed_items if item.external_id in set(ids))[:max_items]
+    return FetchResult(
+        status="fetched",
+        items=selected,
+        body_hash=hashlib.sha256(search_body + b"\n" + fetch_body).hexdigest(),
+    )
+
+
 def fetch_source(
     source: SourceDefinition,
     *,
@@ -835,6 +1360,15 @@ def fetch_source(
     max_items: int,
     state_entry: Mapping[str, Any] | None,
 ) -> FetchResult:
+    if source.adapter == "pubmed_eutils":
+        return _fetch_pubmed_eutils(
+            source,
+            mode=mode,
+            timeout_seconds=timeout_seconds,
+            max_bytes=max_bytes,
+            max_items=max_items,
+        )
+
     source_url = _canonical_url(source.url)
     source_host = (urlsplit(source_url).hostname or "").casefold().rstrip(".")
     allowed_hosts = frozenset(
@@ -905,6 +1439,7 @@ def _validate_source_definition(raw: object) -> SourceDefinition:
     name = raw.get("name")
     source_type = raw.get("type")
     fetch_kind = raw.get("fetch_kind")
+    adapter = raw.get("adapter")
     language = raw.get("language")
     topics = raw.get("topics")
     if (
@@ -913,6 +1448,8 @@ def _validate_source_definition(raw: object) -> SourceDefinition:
         or not isinstance(source_type, str)
         or not 1 <= len(source_type) <= 64
         or fetch_kind not in FETCH_KINDS
+        or adapter not in {None, "pubmed_eutils"}
+        or (adapter == "pubmed_eutils" and fetch_kind != "json_feed")
         or not isinstance(language, str)
         or not re.fullmatch(r"[a-z]{2,8}(?:-[A-Z]{2})?", language)
         or not isinstance(raw.get("enabled"), bool)
@@ -934,6 +1471,7 @@ def _validate_source_definition(raw: object) -> SourceDefinition:
         name=name.strip(),
         source_type=source_type,
         fetch_kind=fetch_kind,
+        adapter=adapter,
         url=url,
         language=language,
         enabled=bool(raw["enabled"]),
@@ -1171,6 +1709,18 @@ def _candidate_content_hash(candidate: ParsedCandidate) -> str:
 def _event_date(candidate: ParsedCandidate) -> str:
     value = candidate.published_at or candidate.updated_at
     return value.date().isoformat() if value else ""
+
+
+def _should_reconsider_relevance(existing: Mapping[str, Any] | None) -> bool:
+    if not existing:
+        return False
+    relevance = existing.get("relevance", {})
+    return bool(
+        existing.get("status") == "rejected"
+        and existing.get("error_code") == "relevance_gate_rejected"
+        and isinstance(relevance, Mapping)
+        and relevance.get("version") != RELEVANCE_VERSION
+    )
 
 
 def _candidate_key(source_id: str, candidate: ParsedCandidate) -> str:
@@ -1418,9 +1968,11 @@ def run_once(
                 )
                 key = _candidate_key(source.source_id, normalized_candidate)
                 existing = state["candidates"].get(key)
-                if existing is not None or key + ".json" in {
-                    path.name for path in outbox_dir.glob("*.json")
-                }:
+                relevance_backfill = _should_reconsider_relevance(existing)
+                if (
+                    (existing is not None and not relevance_backfill)
+                    or key + ".json" in {path.name for path in outbox_dir.glob("*.json")}
+                ):
                     duplicates += 1
                     continue
                 relevance = _evaluate_relevance(normalized_candidate)

@@ -8,10 +8,17 @@
     "language": "en",
     "enabled": true,
     "fetch_interval_minutes": 360,
-    "topics": ["nutrition", "food_products", "sports_nutrition"],
+    "topics": [
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["international"],
+    "jurisdiction": [
+      "international"
+    ],
     "health_claim_limitations": "Research metadata is evidence for the studied question only; design, limitations and conflicts require review.",
     "trust_notes": "Научный журнал. Тип статьи, дизайн, ограничения и conflicts требуют редакционной проверки.",
     "licensing_notes": "Хранить только metadata и короткий audit excerpt; не копировать полный текст или изображения.",
@@ -27,10 +34,16 @@
     "language": "en",
     "enabled": true,
     "fetch_interval_minutes": 360,
-    "topics": ["fitness", "exercise", "training", "cardio_endurance", "sports_medicine_injuries"],
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "healthy_lifestyle"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["international"],
+    "jurisdiction": [
+      "international"
+    ],
     "health_claim_limitations": "Research metadata is evidence for the studied question only; do not turn it into individualized medical or training advice.",
     "trust_notes": "Научный журнал. Материал должен иметь прямую связь с тренировками, восстановлением или спортивной медициной.",
     "licensing_notes": "Хранить только metadata и короткий audit excerpt; не копировать полный текст или изображения.",
@@ -38,23 +51,112 @@
     "allowed_item_hosts": []
   },
   {
-    "id": "pubmed-fitness-health",
-    "name": "PubMed fitness and health research",
+    "id": "frontiers-physiology",
+    "name": "Frontiers in Physiology",
     "type": "primary_research",
     "fetch_kind": "rss",
-    "url": "https://pubmed.ncbi.nlm.nih.gov/rss/search/1/?term=%28%22Resistance%20Training%22%5BTitle%2FAbstract%5D%20OR%20%22Muscle%20Hypertrophy%22%5BTitle%2FAbstract%5D%20OR%20%22Bodybuilding%22%5BTitle%2FAbstract%5D%20OR%20%22Sports%20Nutritional%20Sciences%22%5Bmajr%5D%20OR%20%22Dietary%20Supplements%22%5Bmajr%5D%20OR%20%22Anabolic%20Agents%22%5Bmajr%5D%20OR%20%22Sports%20Medicine%22%5Bmajr%5D%29",
+    "url": "https://www.frontiersin.org/journals/physiology/rss",
     "language": "en",
     "enabled": true,
     "fetch_interval_minutes": 360,
-    "topics": ["strength_hypertrophy", "bodybuilding", "sports_nutrition", "dietary_supplements", "sports_bodybuilding_pharmacology", "sports_medicine_injuries"],
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "healthy_lifestyle"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["international"],
-    "trust_notes": "Discovery/index feed only. PubMed record page and primary source, study design and limitations must be checked before editorial use.",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Research metadata is evidence for the studied question only; require direct training, performance, body-composition or recovery relevance.",
+    "trust_notes": "Scientific journal. The strict per-item gate must reject unrelated physiology and clinical material before provider generation.",
+    "licensing_notes": "Store citation metadata and a short audit excerpt only; do not copy full text or publisher images.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "frontiers-endocrinology",
+    "name": "Frontiers in Endocrinology",
+    "type": "primary_research",
+    "fetch_kind": "rss",
+    "url": "https://www.frontiersin.org/journals/endocrinology/rss",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "peptides",
+      "sports_bodybuilding_pharmacology",
+      "nutrition",
+      "healthy_lifestyle"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Clinical endocrinology is not sufficient for eligibility; require direct body-composition, weight-management, performance or sports relevance.",
+    "trust_notes": "Scientific journal. Generic disease/treatment items must fail the deterministic relevance gate.",
+    "licensing_notes": "Store citation metadata and a short audit excerpt only; do not copy full text or publisher images.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "frontiers-pharmacology",
+    "name": "Frontiers in Pharmacology",
+    "type": "primary_research",
+    "fetch_kind": "rss",
+    "url": "https://www.frontiersin.org/journals/pharmacology/rss",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "sports_bodybuilding_pharmacology",
+      "peptides",
+      "dietary_supplements"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Generic drug/clinical pharmacology is excluded. Sports/bodybuilding pharmacology and peptide material remains manual-review-only and non-prescriptive.",
+    "trust_notes": "Scientific journal. Only direct performance, physique, body-composition or target-audience supplement relevance may pass.",
+    "licensing_notes": "Store citation metadata and a short audit excerpt only; do not copy full text or publisher images.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "pubmed-fitness-health",
+    "name": "PubMed fitness and health research",
+    "type": "primary_research",
+    "fetch_kind": "json_feed",
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=10&sort=pub+date&tool=your-fitness-coach&email=news%40your-fitness-coach.ru&term=%28%22Resistance+Training%22%5BTitle%2FAbstract%5D+OR+%22Muscle+Hypertrophy%22%5BTitle%2FAbstract%5D+OR+%22Bodybuilding%22%5BTitle%2FAbstract%5D+OR+%22Sports+Nutritional+Sciences%22%5Bmajr%5D+OR+%22Dietary+Supplements%22%5Bmajr%5D+OR+%22Anabolic+Agents%22%5Bmajr%5D+OR+%22Sports+Medicine%22%5Bmajr%5D%29",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "dietary_supplements",
+      "sports_bodybuilding_pharmacology",
+      "peptides"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Programmatic PubMed discovery via NCBI E-utilities (ESearch + batched EFetch), not the browser RSS endpoint. Primary source, study design and limitations still require editorial verification.",
     "licensing_notes": "Keep citation metadata and a short paraphrase only; do not copy abstracts or full text beyond permitted use.",
     "health_claim_limitations": "Index metadata or abstract alone does not establish effectiveness, safety or clinical applicability; verify the primary source, study design, limitations and applicability before any health claim.",
     "allowed_redirect_hosts": [],
-    "allowed_item_hosts": ["pubmed.ncbi.nlm.nih.gov"]
+    "allowed_item_hosts": [
+      "pubmed.ncbi.nlm.nih.gov",
+      "doi.org"
+    ],
+    "adapter": "pubmed_eutils"
   },
   {
     "id": "cochrane-systematic-reviews",
@@ -65,15 +167,24 @@
     "language": "en",
     "enabled": false,
     "fetch_interval_minutes": 720,
-    "topics": ["medicine", "health", "nutrition", "exercise", "sports_medicine_injuries"],
+    "topics": [
+      "fitness_training",
+      "nutrition",
+      "healthy_lifestyle"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["international"],
+    "jurisdiction": [
+      "international"
+    ],
     "trust_notes": "Systematic-review publisher; review scope, certainty and applicability require editorial reading.",
     "licensing_notes": "Store citation metadata and short paraphrase; respect publisher access and copyright terms.",
     "health_claim_limitations": "Certainty of evidence and review limitations must be stated where material.",
     "allowed_redirect_hosts": [],
-    "allowed_item_hosts": ["cochranelibrary.com", "www.cochranelibrary.com"]
+    "allowed_item_hosts": [
+      "cochranelibrary.com",
+      "www.cochranelibrary.com"
+    ]
   },
   {
     "id": "nih-ods-supplements",
@@ -84,15 +195,23 @@
     "language": "en",
     "enabled": false,
     "fetch_interval_minutes": 720,
-    "topics": ["nutrition", "sports_nutrition", "dietary_supplements", "public_health"],
+    "topics": [
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["US"],
+    "jurisdiction": [
+      "US"
+    ],
     "trust_notes": "Official US government reference for dietary-supplement fact sheets and notices; jurisdiction is not universal.",
     "licensing_notes": "Use public metadata and concise attribution; retain links to the official page.",
     "health_claim_limitations": "US regulatory and health information must not be presented as universal classification or advice in another market.",
     "allowed_redirect_hosts": [],
-    "allowed_item_hosts": ["ods.od.nih.gov"]
+    "allowed_item_hosts": [
+      "ods.od.nih.gov"
+    ]
   },
   {
     "id": "fda-food-supplement-safety",
@@ -103,15 +222,23 @@
     "language": "en",
     "enabled": false,
     "fetch_interval_minutes": 720,
-    "topics": ["public_health", "food_products", "dietary_supplements", "sports_nutrition"],
+    "topics": [
+      "dietary_supplements",
+      "sports_nutrition"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["US"],
+    "jurisdiction": [
+      "US"
+    ],
     "trust_notes": "Official US regulatory source for notices and enforcement context.",
     "licensing_notes": "Link and paraphrase public notices; do not copy page text or media wholesale.",
     "health_claim_limitations": "Regulatory status is market-specific and is not proof of product efficacy.",
     "allowed_redirect_hosts": [],
-    "allowed_item_hosts": ["fda.gov", "www.fda.gov"]
+    "allowed_item_hosts": [
+      "fda.gov",
+      "www.fda.gov"
+    ]
   },
   {
     "id": "who-health-news",
@@ -122,15 +249,23 @@
     "language": "en",
     "enabled": false,
     "fetch_interval_minutes": 720,
-    "topics": ["health", "public_health", "medicine", "healthy_lifestyle"],
+    "topics": [
+      "healthy_lifestyle",
+      "nutrition"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["international"],
+    "jurisdiction": [
+      "international"
+    ],
     "trust_notes": "International public-health source; statements remain context- and jurisdiction-sensitive.",
     "licensing_notes": "Use link, attribution and concise paraphrase under applicable terms.",
     "health_claim_limitations": "Public-health guidance is not individualized medical advice.",
     "allowed_redirect_hosts": [],
-    "allowed_item_hosts": ["who.int", "www.who.int"]
+    "allowed_item_hosts": [
+      "who.int",
+      "www.who.int"
+    ]
   },
   {
     "id": "efsa-food-safety",
@@ -141,15 +276,23 @@
     "language": "en",
     "enabled": false,
     "fetch_interval_minutes": 720,
-    "topics": ["food_products", "nutrition", "dietary_supplements", "public_health"],
+    "topics": [
+      "nutrition",
+      "dietary_supplements"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["EU"],
+    "jurisdiction": [
+      "EU"
+    ],
     "trust_notes": "Official EU food-risk assessment source; conclusions and market rules are jurisdiction-specific.",
     "licensing_notes": "Retain the official link and concise attribution; do not republish full assessments.",
     "health_claim_limitations": "EU risk assessment or authorization does not automatically apply to other jurisdictions.",
     "allowed_redirect_hosts": [],
-    "allowed_item_hosts": ["efsa.europa.eu", "www.efsa.europa.eu"]
+    "allowed_item_hosts": [
+      "efsa.europa.eu",
+      "www.efsa.europa.eu"
+    ]
   },
   {
     "id": "examine-supplement-research",
@@ -160,15 +303,25 @@
     "language": "en",
     "enabled": false,
     "fetch_interval_minutes": 720,
-    "topics": ["nutrition", "sports_nutrition", "dietary_supplements", "fitness"],
+    "topics": [
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements",
+      "fitness_training"
+    ],
     "authoritative": false,
     "freshness_policy": "current_month",
-    "jurisdiction": ["international"],
+    "jurisdiction": [
+      "international"
+    ],
     "trust_notes": "Secondary discovery source only; every effectiveness or safety claim must resolve to an authoritative primary source.",
     "licensing_notes": "Use metadata for discovery and link to the secondary page; do not copy summaries.",
     "health_claim_limitations": "Secondary interpretation is not sufficient as sole evidence for health or performance claims.",
     "allowed_redirect_hosts": [],
-    "allowed_item_hosts": ["examine.com", "www.examine.com"]
+    "allowed_item_hosts": [
+      "examine.com",
+      "www.examine.com"
+    ]
   },
   {
     "id": "rospotrebnadzor-public-health",
@@ -179,14 +332,22 @@
     "language": "ru",
     "enabled": false,
     "fetch_interval_minutes": 720,
-    "topics": ["public_health", "health", "food_products", "dietary_supplements"],
+    "topics": [
+      "healthy_lifestyle",
+      "dietary_supplements"
+    ],
     "authoritative": true,
     "freshness_policy": "current_month",
-    "jurisdiction": ["RU"],
+    "jurisdiction": [
+      "RU"
+    ],
     "trust_notes": "Official Russian public-health and consumer-protection source; verify the exact notice and date.",
     "licensing_notes": "Use official link and concise attribution; do not copy full notices or images.",
     "health_claim_limitations": "Russian regulatory information is jurisdiction-specific and does not establish efficacy.",
     "allowed_redirect_hosts": [],
-    "allowed_item_hosts": ["rospotrebnadzor.ru", "www.rospotrebnadzor.ru"]
+    "allowed_item_hosts": [
+      "rospotrebnadzor.ru",
+      "www.rospotrebnadzor.ru"
+    ]
   }
 ]

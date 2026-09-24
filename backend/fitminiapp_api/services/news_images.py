@@ -155,12 +155,17 @@ def _rubric(draft: NewsDraftRevision) -> str:
             if value:
                 return value[:48]
     return {
-        "fitness": "Фитнес и тренировки",
-        "nutrition": "Питание и спортпит",
-        "medicine_pharmacology": "Медицина и фармакология",
-        "peptides": "Пептиды",
+        "fitness_training": "Фитнес и тренировки",
         "bodybuilding": "Бодибилдинг",
+        "sports_bodybuilding_pharmacology": "Спортивная фармакология",
+        "peptides": "Пептиды",
+        "nutrition": "Питание",
+        "sports_nutrition": "Спортивное питание",
+        "dietary_supplements": "БАДы и добавки",
+        "healthy_lifestyle": "ЗОЖ и восстановление",
         # Historical topics remain readable for already-created immutable revisions.
+        "fitness": "Фитнес и тренировки",
+        "medicine_pharmacology": "Медицина и фармакология",
         "strength": "Силовые тренировки",
         "cardio_recovery": "Кардио и восстановление",
         "research": "Исследования",

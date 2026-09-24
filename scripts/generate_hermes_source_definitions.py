@@ -22,29 +22,14 @@ SOURCE_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{1,63}$")
 HOST_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
 FETCH_KINDS = frozenset({"rss", "json_feed", "html_metadata"})
 SUPPORTED_TOPICS = (
-    "sports_nutrition",
-    "dietary_supplements",
-    "sports_bodybuilding_pharmacology",
-    "strength_hypertrophy",
-    "medicine",
-    "health",
-    "fitness",
-    "exercise",
-    "training",
-    "cardio_endurance",
-    "sports_medicine_injuries",
+    "fitness_training",
     "bodybuilding",
+    "sports_bodybuilding_pharmacology",
     "peptides",
     "nutrition",
-    "food_products",
-    "public_health",
+    "sports_nutrition",
+    "dietary_supplements",
     "healthy_lifestyle",
-    "fitness_technology",
-    "research",
-    "guideline",
-    "regulation",
-    "product",
-    "safety",
 )
 
 
@@ -126,6 +111,9 @@ def _validate_source(raw: object) -> dict[str, Any]:
     fetch_kind = raw["fetch_kind"]
     if fetch_kind not in FETCH_KINDS:
         raise RegistryError("source_fetch_kind_invalid")
+    adapter = raw.get("adapter")
+    if adapter is not None and (adapter != "pubmed_eutils" or fetch_kind != "json_feed"):
+        raise RegistryError("source_adapter_invalid")
     language = raw["language"]
     if not isinstance(language, str) or not re.fullmatch(r"[a-z]{2,8}(?:-[A-Z]{2})?", language):
         raise RegistryError("source_language_invalid")
@@ -160,6 +148,8 @@ def _validate_source(raw: object) -> dict[str, Any]:
         "allowed_redirect_hosts": allowed_redirect_hosts,
         "allowed_item_hosts": allowed_item_hosts,
     }
+    if adapter is not None:
+        result["adapter"] = adapter
     for key in (
         "fetch_interval_minutes",
         "freshness_policy",

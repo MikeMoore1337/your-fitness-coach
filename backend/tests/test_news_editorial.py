@@ -260,18 +260,24 @@ def test_default_source_allowlist_adds_missing_sources_without_overwriting_opera
     assert {item.id for item in definitions} == {
         "frontiers-nutrition",
         "frontiers-sports-active-living",
+        "frontiers-physiology",
+        "frontiers-endocrinology",
+        "frontiers-pharmacology",
         "pubmed-fitness-health",
     }
-    assert all(item.enabled and item.fetch_kind == "rss" for item in definitions)
+    assert all(item.enabled for item in definitions)
     pubmed = next(item for item in definitions if item.id == "pubmed-fitness-health")
+    assert pubmed.enabled is True
+    assert pubmed.fetch_kind == "json_feed"
+    assert pubmed.adapter == "pubmed_eutils"
     assert pubmed.authoritative is True
     assert pubmed.health_claim_limitations.startswith("Index metadata or abstract alone")
 
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 3
-        db.delete(db.get(NewsSource, "pubmed-fitness-health"))
+        assert db.query(NewsSource).count() == 6
+        db.delete(db.get(NewsSource, "frontiers-physiology"))
         source = db.get(NewsSource, "frontiers-nutrition")
         assert source is not None
         source.enabled = False
@@ -281,10 +287,11 @@ def test_default_source_allowlist_adds_missing_sources_without_overwriting_opera
 
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 3
-        pubmed = db.get(NewsSource, "pubmed-fitness-health")
-        assert pubmed is not None
-        assert pubmed.enabled is True
+        assert db.query(NewsSource).count() == 6
+        restored = db.get(NewsSource, "frontiers-physiology")
+        assert restored is not None
+        assert restored.enabled is True
+        assert db.get(NewsSource, "pubmed-fitness-health") is not None
         source = db.get(NewsSource, "frontiers-nutrition")
         assert source is not None
         assert source.enabled is False
@@ -585,7 +592,7 @@ def test_ingestion_accepts_safe_research_in_expanded_channel_topics() -> None:
         )
         cluster = db.query(NewsCluster).one()
         assert counts["candidate"] == 1
-        assert cluster.topic in {"medicine_pharmacology", "peptides", "bodybuilding"}
+        assert cluster.topic == "sports_bodybuilding_pharmacology"
         assert "priority:new_research" in cluster.score_reasons
         assert "priority:practical" in cluster.score_reasons
         assert "priority:tools_products" in cluster.score_reasons
