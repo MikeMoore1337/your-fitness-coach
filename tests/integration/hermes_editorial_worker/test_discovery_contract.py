@@ -14,11 +14,14 @@ import pytest
 WORKSPACE = Path(__file__).resolve().parents[3]
 DISCOVERY_ROOT = WORKSPACE / "deploy" / "hermes-discovery"
 SYSTEMD_ROOT = DISCOVERY_ROOT / "systemd"
+sys.path.insert(0, str(WORKSPACE / "backend"))
 sys.path.insert(0, str(DISCOVERY_ROOT))
 
 import discovery_runner  # noqa: E402
 import hermes_health  # noqa: E402
 import hermes_worker_drain  # noqa: E402
+
+from fitminiapp_api.services import news_taxonomy  # noqa: E402
 
 GENERATOR_SPEC = importlib.util.spec_from_file_location(
     "generate_hermes_source_definitions",
@@ -308,6 +311,191 @@ def test_worker_drain_accepts_content_addressed_images(
     assert hermes_worker_drain._worker_image() == value
 
 
+def test_pubmed_eutils_batch_is_bounded_below_global_source_limit() -> None:
+    assert discovery_runner.PUBMED_EUTILS_MAX_ITEMS == 10
+    assert discovery_runner.PUBMED_EUTILS_MAX_ITEMS < discovery_runner.MAX_ITEMS_PER_SOURCE
+
+
+def test_pubmed_eutils_parser_preserves_abstract_doi_and_dates() -> None:
+    search = b'{"esearchresult":{"idlist":["42776010","42765482"]}}'
+    assert discovery_runner._parse_pubmed_search_ids(search) == ("42776010", "42765482")
+
+    payload = b"""<?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2025//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_250101.dtd">
+    <PubmedArticleSet>
+      <PubmedArticle>
+        <MedlineCitation>
+          <PMID>42776010</PMID>
+          <DateRevised><Year>2026</Year><Month>09</Month><Day>24</Day></DateRevised>
+          <Article>
+            <ArticleTitle>Resistance training and hypertrophy in athletes</ArticleTitle>
+            <Abstract>
+              <AbstractText Label="BACKGROUND">Background text.</AbstractText>
+              <AbstractText Label="RESULTS">Results text.</AbstractText>
+            </Abstract>
+            <AuthorList>
+              <Author><LastName>Smith</LastName><Initials>AB</Initials></Author>
+            </AuthorList>
+            <Journal>
+              <JournalIssue><PubDate><Year>2026</Year><Month>Sep</Month><Day>23</Day></PubDate></JournalIssue>
+              <Title>Journal of Strength</Title>
+            </Journal>
+          </Article>
+        </MedlineCitation>
+        <PubmedData>
+          <ArticleIdList>
+            <ArticleId IdType="pubmed">42776010</ArticleId>
+            <ArticleId IdType="doi">10.1000/example.2026.1</ArticleId>
+          </ArticleIdList>
+        </PubmedData>
+      </PubmedArticle>
+    </PubmedArticleSet>"""
+
+    candidates = discovery_runner._parse_pubmed_efetch(payload, "PubMed")
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.external_id == "42776010"
+    assert candidate.canonical_url == "https://pubmed.ncbi.nlm.nih.gov/42776010/"
+    assert candidate.primary_url == "https://doi.org/10.1000/example.2026.1"
+    assert candidate.doi == "10.1000/example.2026.1"
+    assert candidate.title == "Resistance training and hypertrophy in athletes"
+    assert "BACKGROUND: Background text." in candidate.summary
+    assert "RESULTS: Results text." in candidate.summary
+    assert candidate.author == "Smith AB"
+    assert candidate.publisher == "Journal of Strength"
+    assert candidate.published_at is not None
+    assert candidate.published_at.isoformat() == "2026-09-23T00:00:00"
+    assert candidate.updated_at is not None
+    assert candidate.updated_at.isoformat() == "2026-09-24T00:00:00"
+
+
+def test_pubmed_eutils_rejects_unknown_dtd_or_entities() -> None:
+    with pytest.raises(discovery_runner.DiscoveryError, match="source_unsafe_xml"):
+        discovery_runner._parse_pubmed_efetch(
+            b'<!DOCTYPE PubmedArticleSet SYSTEM "https://evil.example/x.dtd"><PubmedArticleSet/>',
+            "PubMed",
+        )
+    with pytest.raises(discovery_runner.DiscoveryError, match="source_unsafe_xml"):
+        discovery_runner._parse_pubmed_efetch(
+            b'<!DOCTYPE PubmedArticleSet [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>'
+            b"<PubmedArticleSet/>",
+            "PubMed",
+        )
+
+
+def test_pubmed_eutils_rejects_malformed_search_payload() -> None:
+    with pytest.raises(discovery_runner.DiscoveryError, match="source_malformed_feed"):
+        discovery_runner._parse_pubmed_search_ids(b'{"esearchresult":{"idlist":["bad"]}}')
+
+
+def test_discovery_and_yfc_share_the_same_owner_taxonomy_contract() -> None:
+    assert discovery_runner.OWNER_EDITORIAL_TOPICS == news_taxonomy.OWNER_EDITORIAL_TOPICS
+    assert tuple(GENERATOR_MODULE.SUPPORTED_TOPICS) == news_taxonomy.OWNER_EDITORIAL_TOPICS
+
+
+@pytest.mark.parametrize(
+    ("title", "summary"),
+    [
+        (
+            "Resistance training and muscle hypertrophy in trained adults",
+            "Strength outcomes improved after a resistance-training program.",
+        ),
+        (
+            "Semaglutide and body composition during weight management",
+            "The study measured fat loss and muscle preservation.",
+        ),
+        (
+            "Multi-objective ultrasound extraction from bee bread",
+            "Phenolic recovery and amino acid concentration were optimized.",
+        ),
+        (
+            "Diagnostic nutrition screening in knee osteoarthritis",
+            "Patients with low muscle mass were evaluated in a clinic.",
+        ),
+        (
+            "Omega-3 dietary supplement safety and efficacy",
+            "A systematic review evaluated dietary supplement outcomes.",
+        ),
+        (
+            "Sleep quality and recovery in resistance-trained athletes",
+            "Sleep duration was associated with training recovery.",
+        ),
+        (
+            "Исследование связало силовые тренировки с восстановлением",
+            "Авторы изучили силовые тренировки и восстановление у взрослых.",
+        ),
+        (
+            "Cardio interval study measured endurance outcome",
+            "A controlled cardio interval study reported endurance outcomes.",
+        ),
+        (
+            "Mobility exercise study reported flexibility outcome",
+            "A controlled mobility exercise study reported flexibility outcomes.",
+        ),
+    ],
+)
+def test_discovery_relevance_matches_yfc_relevance(title: str, summary: str) -> None:
+    candidate = discovery_runner.ParsedCandidate(
+        external_id="parity",
+        canonical_url="https://source.example/article",
+        title=title,
+        summary=summary,
+        content=summary,
+    )
+    discovery = discovery_runner._evaluate_relevance(candidate)
+    yfc = news_taxonomy.evaluate_editorial_relevance(title, summary, summary)
+
+    assert discovery["allowed"] is yfc.allowed
+    assert discovery["reason_code"] == yfc.reason_code
+    assert tuple(discovery["topics"]) == yfc.topics
+
+
+def test_only_old_relevance_rejections_are_reconsidered() -> None:
+    old_rejection = {
+        "status": "rejected",
+        "error_code": "relevance_gate_rejected",
+        "relevance": {"version": "hermes-relevance-v1"},
+    }
+    current_rejection = {
+        "status": "rejected",
+        "error_code": "relevance_gate_rejected",
+        "relevance": {"version": discovery_runner.RELEVANCE_VERSION},
+    }
+    accepted_old = {
+        "status": "accepted",
+        "relevance": {"version": "hermes-relevance-v1"},
+    }
+
+    assert discovery_runner._should_reconsider_relevance(old_rejection) is True
+    assert discovery_runner._should_reconsider_relevance(current_rejection) is False
+    assert discovery_runner._should_reconsider_relevance(accepted_old) is False
+
+
+def test_production_registry_uses_six_working_research_sources() -> None:
+    registry = WORKSPACE / "backend" / "fitminiapp_api" / "resources" / "news_sources.json"
+    rendered = GENERATOR_MODULE.render_registry(registry)
+    enabled = {source["id"]: source for source in rendered["sources"] if source["enabled"]}
+
+    assert set(enabled) == {
+        "frontiers-nutrition",
+        "frontiers-sports-active-living",
+        "frontiers-physiology",
+        "frontiers-endocrinology",
+        "frontiers-pharmacology",
+        "pubmed-fitness-health",
+    }
+    frontiers = [source for source in enabled.values() if source["id"].startswith("frontiers-")]
+    assert len(frontiers) == 5
+    assert all(source["fetch_kind"] == "rss" for source in frontiers)
+    assert all(
+        source["url"].startswith("https://www.frontiersin.org/journals/") for source in frontiers
+    )
+    pubmed = enabled["pubmed-fitness-health"]
+    assert pubmed["fetch_kind"] == "json_feed"
+    assert pubmed["adapter"] == "pubmed_eutils"
+    assert pubmed["url"].startswith("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?")
+
+
 def test_canonical_registry_is_lf_only() -> None:
     registry = WORKSPACE / "backend" / "fitminiapp_api" / "resources" / "news_sources.json"
 
@@ -363,16 +551,17 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert document["schema_version"] == discovery_runner.SCHEMA_VERSION
     assert document["source_registry_sha256"] == hashlib.sha256(registry.read_bytes()).hexdigest()
     assert document["definitions_version"].endswith(document["source_registry_sha256"])
-    assert len(document["sources"]) == 10
-    assert len({source["id"] for source in document["sources"]}) == 10
+    assert len(document["sources"]) == 13
+    assert len({source["id"] for source in document["sources"]}) == 13
     pubmed = next(
         source for source in document["sources"] if source["id"] == "pubmed-fitness-health"
     )
     query = unquote(parse_qs(pubmed["url"].split("?", 1)[1])["term"][0])
     assert pubmed["enabled"] is True
     assert pubmed["authoritative"] is True
-    assert pubmed["fetch_kind"] == "rss"
-    assert pubmed["allowed_item_hosts"] == ["pubmed.ncbi.nlm.nih.gov"]
+    assert pubmed["fetch_kind"] == "json_feed"
+    assert pubmed["adapter"] == "pubmed_eutils"
+    assert set(pubmed["allowed_item_hosts"]) == {"pubmed.ncbi.nlm.nih.gov", "doi.org"}
     assert '"Resistance Training"[Title/Abstract]' in query
     assert '"Muscle Hypertrophy"[Title/Abstract]' in query
     assert '"Bodybuilding"[Title/Abstract]' in query
@@ -383,31 +572,12 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert '"Exercise"[majr]' not in query
     assert '"Physical Fitness"[majr]' not in query
     assert "fitness+OR+exercise+OR+nutrition" not in pubmed["url"]
-    assert pubmed["trust_notes"].startswith("Discovery/index feed only")
-    assert "primary source" in pubmed["trust_notes"]
-    assert "study design" in pubmed["trust_notes"]
-    assert "limitations" in pubmed["trust_notes"]
+    assert pubmed["trust_notes"].startswith("Programmatic PubMed discovery via NCBI E-utilities")
+    assert "ESearch" in pubmed["trust_notes"]
+    assert "EFetch" in pubmed["trust_notes"]
     assert "abstract alone" in pubmed["health_claim_limitations"]
     assert "health claim" in pubmed["health_claim_limitations"]
-    assert {
-        "sports_nutrition",
-        "dietary_supplements",
-        "sports_bodybuilding_pharmacology",
-        "medicine",
-        "health",
-        "fitness",
-        "training",
-        "bodybuilding",
-        "peptides",
-        "nutrition",
-        "food_products",
-        "fitness_technology",
-        "research",
-        "guideline",
-        "regulation",
-        "product",
-        "safety",
-    }.issubset(set(document["supported_topics"]))
+    assert tuple(document["supported_topics"]) == news_taxonomy.OWNER_EDITORIAL_TOPICS
 
 
 def test_generated_definitions_load_without_live_fetch(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -436,7 +606,7 @@ def test_generated_definitions_load_without_live_fetch(monkeypatch: pytest.Monke
     )
 
     assert loaded_document["definitions_version"] == document["definitions_version"]
-    assert len(sources) == 10
+    assert len(sources) == 13
     assert sources[0].source_id == "frontiers-nutrition"
     loaded_pubmed = next(
         source for source in loaded_document["sources"] if source["id"] == "pubmed-fitness-health"

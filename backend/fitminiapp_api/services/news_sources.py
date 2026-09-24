@@ -55,6 +55,7 @@ class NewsSourceDefinition:
     jurisdiction: tuple[str, ...] = ()
     allowed_redirect_hosts: tuple[str, ...] = ()
     allowed_item_hosts: tuple[str, ...] = ()
+    adapter: str | None = None
 
 
 def _bounded_text(value: object, *, field: str, maximum: int, required: bool = False) -> str:
@@ -96,6 +97,15 @@ def parse_source_definition(raw: object) -> NewsSourceDefinition:
     fetch_kind = _bounded_text(raw.get("fetch_kind"), field="fetch_kind", maximum=24, required=True)
     if fetch_kind not in FETCH_KINDS:
         raise ValueError("unsupported fetch_kind")
+    adapter_raw = raw.get("adapter")
+    if adapter_raw is None:
+        adapter = None
+    else:
+        adapter = _bounded_text(adapter_raw, field="adapter", maximum=64, required=True)
+        if adapter != "pubmed_eutils":
+            raise ValueError("unsupported adapter")
+        if fetch_kind != "json_feed":
+            raise ValueError("pubmed_eutils adapter requires json_feed fetch_kind")
     language = _bounded_text(
         raw.get("language", "en"), field="language", maximum=8, required=True
     ).lower()
@@ -151,6 +161,7 @@ def parse_source_definition(raw: object) -> NewsSourceDefinition:
         name=_bounded_text(raw.get("name"), field="name", maximum=160, required=True),
         source_type=cast(NewsSourceType, source_type),
         fetch_kind=cast(NewsFetchKind, fetch_kind),
+        adapter=adapter,
         url=_source_url(raw.get("url")),
         language=language,
         enabled=enabled,
@@ -211,6 +222,8 @@ def apply_source_allowlist(
             "allowed_redirect_hosts": list(definition.allowed_redirect_hosts),
             "allowed_item_hosts": list(definition.allowed_item_hosts),
         }
+        if definition.adapter:
+            fetch_options["adapter"] = definition.adapter
         if (
             definition.topics
             or definition.authoritative
