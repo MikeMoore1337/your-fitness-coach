@@ -445,6 +445,47 @@ def test_unresolved_repair_fails_closed_before_hmac_intake(monkeypatch) -> None:
     assert calls == 2
 
 
+def test_worker_source_hash_uses_yfc_url_canonicalization() -> None:
+    source = valid_job().source.model_copy(
+        update={
+            "canonical_url": (
+                "HTTPS://PUBMED.NCBI.NLM.NIH.GOV.:443/42765482/?utm_source=feed&ref=legacy&b=2&a=1"
+            )
+        }
+    )
+
+    assert (
+        editorial_worker._canonicalize_source_url(source.canonical_url)
+        == "https://pubmed.ncbi.nlm.nih.gov/42765482?a=1&b=2"
+    )
+
+    normalized = source.model_copy(
+        update={"canonical_url": "https://pubmed.ncbi.nlm.nih.gov/42765482?a=1&b=2"}
+    )
+    assert editorial_worker._canonical_source_hash(
+        source
+    ) == editorial_worker._canonical_source_hash(normalized)
+
+
+def test_pubmed_trailing_slash_hash_matches_yfc_contract() -> None:
+    source = valid_job().source.model_copy(
+        update={"canonical_url": "https://pubmed.ncbi.nlm.nih.gov/42765482/"}
+    )
+    expected_document = json.dumps(
+        {
+            "title": source.title,
+            "summary": source.summary,
+            "url": "https://pubmed.ncbi.nlm.nih.gov/42765482",
+            "published_at": source.published_at.isoformat() if source.published_at else None,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    expected = editorial_worker.hashlib.sha256(expected_document.encode("utf-8")).hexdigest()
+
+    assert editorial_worker._canonical_source_hash(source) == expected
+
+
 def test_intake_payload_binds_source_evidence_and_new_revision_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
