@@ -68,9 +68,10 @@ test('hides trainer handoff section when the client has no assigned trainer', as
   await expect(page.getByText('Нет доступного текущего тренера', { exact: true })).toHaveCount(0);
 });
 
-test('full report keeps a mobile-first preview and creates a valid light print document', async ({
+test('full report keeps a mobile-first preview and print layout', async ({
   page,
-}) => {
+  browserName,
+}, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
   await installPlatformApi(page, { browserSession: true });
   await installReportApi(page);
@@ -98,10 +99,10 @@ test('full report keeps a mobile-first preview and creates a valid light print d
   ).toHaveCount(1);
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-67/desktop-1280-dark-preview.png',
+    path: testInfo.outputPath('desktop-1280-dark-preview.png'),
   });
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-67/desktop-1280-dark-full.png',
+    path: testInfo.outputPath('desktop-1280-dark-full.png'),
     fullPage: true,
   });
 
@@ -112,10 +113,10 @@ test('full report keeps a mobile-first preview and creates a valid light print d
   expect((await printButton.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator('.progress-report-macros-heading')).toHaveCSS('white-space', 'nowrap');
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-67/mobile-web-360-dark-preview.png',
+    path: testInfo.outputPath('mobile-web-360-dark-preview.png'),
   });
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-67/mobile-web-360-dark-full.png',
+    path: testInfo.outputPath('mobile-web-360-dark-full.png'),
     fullPage: true,
   });
   await page.locator('.progress-report-macros-heading').scrollIntoViewIfNeeded();
@@ -140,17 +141,22 @@ test('full report keeps a mobile-first preview and creates a valid light print d
     'solid',
   );
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-  await page.locator('.data-viz-chart').first().screenshot({
-    path: '../.artifacts/screenshots/task-69b/print-grayscale-chart-and-table.png',
-  });
-  const pdf = await page.pdf({
-    path: '../.artifacts/pdf/task-113A-round-2/progress-report-2026-07-26_2026-08-24.pdf',
-    format: 'A4',
-    printBackground: true,
-    preferCSSPageSize: true,
-  });
-  expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
-  expect(pdf.length).toBeGreaterThan(10_000);
+  await page
+    .locator('.data-viz-chart')
+    .first()
+    .screenshot({
+      path: testInfo.outputPath('print-grayscale-chart-and-table.png'),
+    });
+  if (browserName === 'chromium') {
+    const pdf = await page.pdf({
+      path: testInfo.outputPath('progress-report.pdf'),
+      format: 'A4',
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    expect(pdf.length).toBeGreaterThan(10_000);
+  }
 });
 
 for (const state of ['partial', 'empty'] as const) {

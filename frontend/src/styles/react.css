@@ -4743,6 +4743,7 @@ button.today-text-link {
 .active-workout-rest {
   position: fixed;
   z-index: 30;
+  pointer-events: none;
   right: max(12px, env(safe-area-inset-right, 0px));
   bottom: max(88px, calc(env(safe-area-inset-bottom, 0px) + 76px));
   left: max(12px, env(safe-area-inset-left, 0px));
@@ -4806,6 +4807,7 @@ button.today-text-link {
 .active-workout-rest__actions {
   display: flex;
   gap: 6px;
+  pointer-events: auto;
 }
 .active-workout-rest__actions button {
   min-height: 44px;

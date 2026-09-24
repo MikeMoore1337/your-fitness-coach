@@ -143,19 +143,21 @@ for (const theme of ['light', 'dark'] as const) {
       await settle(page);
       await page.screenshot({ path: testInfo.outputPath(`nutrition-${width}-${theme}.png`) });
 
-      const session = await page.context().newCDPSession(page);
-      await session.send('Emulation.setEmulatedMedia', {
-        features: [
-          { name: 'prefers-color-scheme', value: theme },
-          { name: 'prefers-reduced-transparency', value: 'reduce' },
-        ],
-      });
-      await expect(nav).toHaveCSS('backdrop-filter', 'none');
-      await expect(nav).toHaveCSS(
-        'background-color',
-        theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
-      );
-      await session.detach();
+      if (testInfo.project.name === 'chromium') {
+        const session = await page.context().newCDPSession(page);
+        await session.send('Emulation.setEmulatedMedia', {
+          features: [
+            { name: 'prefers-color-scheme', value: theme },
+            { name: 'prefers-reduced-transparency', value: 'reduce' },
+          ],
+        });
+        await expect(nav).toHaveCSS('backdrop-filter', 'none');
+        await expect(nav).toHaveCSS(
+          'background-color',
+          theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
+        );
+        await session.detach();
+      }
       await page.emulateMedia({ forcedColors: 'active' });
       await expect(nav).toHaveCSS('backdrop-filter', 'none');
       expect(errors).toEqual([]);

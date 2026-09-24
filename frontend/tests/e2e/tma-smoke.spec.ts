@@ -275,7 +275,10 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
   await expect(tmaPage.locator('#appBottomNav')).toBeHidden();
   await duration.fill('35');
-  await tmaCardio.getByText('Дистанция, пульс и заметка').click();
+  const optionalDetails = tmaCardio.locator('.cardio-form__optional');
+  const optionalSummary = tmaCardio.locator('.cardio-form__optional > summary');
+  await optionalSummary.click();
+  await expect(optionalDetails).toHaveAttribute('open', '');
   await tmaCardio.getByLabel('Дистанция, км').fill('5.2');
   await tmaCardio.getByLabel('Средний пульс, уд/мин').fill('142');
   await tmaCardio.getByLabel('Зона пульса').selectOption('3');
@@ -2122,7 +2125,17 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   await tma.setTheme('dark');
   await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   const tmaSearch = tmaPage.getByRole('searchbox', { name: 'Найти продукт' });
+  const localSearchResponse = tmaPage.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname === '/api/v1/nutrition/foods/search' &&
+      url.searchParams.get('q') === 'овсянка' &&
+      url.searchParams.get('include_external') !== 'true'
+    );
+  });
   await tmaSearch.fill('овсянка');
+  await localSearchResponse;
   const tmaClearSearch = tmaPage.getByRole('button', {
     name: 'Очистить поиск',
     exact: true,
@@ -2132,7 +2145,7 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   await expect(tmaSearch).toHaveValue('');
   await expect(tmaSearch).toBeFocused();
   await tmaSearch.fill('овсянка');
-  await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();
+  await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
   await tmaPage.screenshot({ path: testInfo.outputPath('tma-nutrition-search-390x844-dark.png') });
   await tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
   await tmaPage.getByRole('button', { name: 'Добавить в дневник' }).click();

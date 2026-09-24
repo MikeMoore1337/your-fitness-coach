@@ -1339,7 +1339,7 @@ test('demo exposes deterministic loading and error states without leaving the bo
   await expect(loadingPage.locator('[data-demo-state="loading"]')).toBeVisible();
   await expect(loadingPage.getByText('Готовим демо-кабинет…')).toBeVisible();
   await captureEvidence(loadingPage, 'loading-390x844-light.png');
-  expect(pendingSessionRoute).not.toBeNull();
+  await expect.poll(() => pendingSessionRoute).not.toBeNull();
   await pendingSessionRoute!.abort();
   await expect(loadingPage.locator('[data-demo-state="error"]')).toBeVisible();
   await captureEvidence(loadingPage, 'error-aborted-390x844-light.png');
