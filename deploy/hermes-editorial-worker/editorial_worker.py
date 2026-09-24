@@ -186,7 +186,7 @@ class RelevanceMetadata(BaseModel):
     reason_code: str = Field(pattern=r"^[a-z0-9_.:-]{1,96}$")
     strength: str = Field(pattern=r"^(strong|moderate)$")
     topics: list[str] = Field(min_length=1, max_length=8)
-    version: str = Field(pattern=r"^hermes-relevance-v1$")
+    version: str = Field(pattern=r"^hermes-relevance-v(?:1|2)$")
 
 
 class EditorialJob(BaseModel):

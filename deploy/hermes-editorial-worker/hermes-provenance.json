@@ -21,7 +21,7 @@
     "promptVersion": "task403-editorial-worker-v1",
     "skillVersion": "yfc-hermes-editorial-v1",
     "sourceBehaviorPatches": {
-      "relevanceGate": "hermes-relevance-v1 required before provider",
+      "relevanceGate": "hermes-relevance-v1 or hermes-relevance-v2 required before provider",
       "richCaptionTarget": "850-1000 UTF-16 characters when evidence supports it"
     },
     "provider": "OpenAI-compatible HTTP, local-only before Gate A",
