@@ -5,15 +5,37 @@ from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 NEWS_REVIEW_TIMEZONE = ZoneInfo("Europe/Moscow")
-NEWS_REVIEW_BATCH_SIZE = 10
+NEWS_REVIEW_SLOT_LIMIT = 20
+NEWS_REVIEW_WAVE_SIZE = 10
+NEWS_REVIEW_WAVE_PAUSE_SECONDS = 10.0
+# Backward-compatible alias. The old "batch" value is now the full slot cap.
+NEWS_REVIEW_BATCH_SIZE = NEWS_REVIEW_SLOT_LIMIT
 NEWS_REVIEW_SLOT_WINDOW = timedelta(minutes=15)
 NEWS_REVIEW_SLOT_STARTS = (time(hour=8), time(hour=13), time(hour=18))
 
 
-def news_review_batch_size() -> int:
+def news_review_slot_limit() -> int:
     from fitminiapp_api.core.config import settings
 
     return settings.news_review_batch_size
+
+
+def news_review_batch_size() -> int:
+    """Backward-compatible alias for the per-slot owner-review cap."""
+
+    return news_review_slot_limit()
+
+
+def news_review_wave_size() -> int:
+    from fitminiapp_api.core.config import settings
+
+    return min(settings.news_review_wave_size, news_review_slot_limit())
+
+
+def news_review_wave_pause_seconds() -> float:
+    from fitminiapp_api.core.config import settings
+
+    return settings.news_review_wave_pause_seconds
 
 
 @dataclass(frozen=True)

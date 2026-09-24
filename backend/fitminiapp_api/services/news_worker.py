@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -42,7 +43,9 @@ from fitminiapp_api.services.news_publication import (
 )
 from fitminiapp_api.services.news_review_schedule import (
     NewsReviewSlot,
-    news_review_batch_size,
+    news_review_slot_limit,
+    news_review_wave_pause_seconds,
+    news_review_wave_size,
 )
 from fitminiapp_api.services.notifications import safe_delivery_error
 from fitminiapp_api.services.telegram_transport import (
@@ -73,6 +76,10 @@ class NewsCycleStats:
     drafts_skipped_daily_limit: int = 0
     llm_failures: int = 0
     telegram_delivery_failures: int = 0
+    review_awaiting_review: int = 0
+    review_selected: int = 0
+    review_delivered: int = 0
+    review_backlog: int = 0
 
     def log_fields(self) -> dict[str, int]:
         return {
@@ -90,6 +97,10 @@ class NewsCycleStats:
             "drafts_skipped_daily_limit": self.drafts_skipped_daily_limit,
             "llm_failures": self.llm_failures,
             "telegram_delivery_failures": self.telegram_delivery_failures,
+            "review_awaiting_review": self.review_awaiting_review,
+            "review_selected": self.review_selected,
+            "review_delivered": self.review_delivered,
+            "review_backlog": self.review_backlog,
         }
 
 
@@ -260,7 +271,7 @@ def _claim_deliveries(
             NewsReviewDelivery.next_attempt_at <= now,
         )
         effective_draft_limit = draft_limit
-        configured_batch_size = news_review_batch_size()
+        configured_slot_limit = news_review_slot_limit()
         sent_count = 0
         if review_slot is not None:
             slot_start_utc = review_slot.local_start.astimezone(UTC).replace(tzinfo=None)
@@ -275,11 +286,14 @@ def _claim_deliveries(
             )
             eligible = eligible.filter(~NewsReviewDelivery.draft_id.in_(sent_drafts_in_slot))
             sent_count = sent_drafts_in_slot.count()
-            remaining_batch_size = max(0, configured_batch_size - sent_count)
-            if effective_draft_limit is not None:
-                effective_draft_limit = min(effective_draft_limit, remaining_batch_size)
+            remaining_slot_capacity = max(0, configured_slot_limit - sent_count)
+            if effective_draft_limit is None:
+                effective_draft_limit = remaining_slot_capacity
+            else:
+                effective_draft_limit = min(effective_draft_limit, remaining_slot_capacity)
         if effective_draft_limit is None:
-            effective_draft_limit = min(MAX_DELIVERIES_PER_CYCLE, configured_batch_size)
+            effective_draft_limit = configured_slot_limit
+        effective_draft_limit = min(MAX_DELIVERIES_PER_CYCLE, effective_draft_limit)
         candidate_rows = (
             eligible.order_by(NewsReviewDelivery.next_attempt_at.asc(), NewsReviewDelivery.id.asc())
             .limit(200)
@@ -309,7 +323,7 @@ def _claim_deliveries(
             "news_review_queue_ranked",
             extra={
                 "pipeline_stage": "owner_delivery",
-                "configured_batch_size": configured_batch_size,
+                "configured_batch_size": configured_slot_limit,
                 "sent_in_slot_count": sent_count,
                 "ready_candidate_count": len(candidates),
                 "selected_count": len(selected_drafts),
@@ -317,13 +331,31 @@ def _claim_deliveries(
                 "ranking_components": [components for _, (_, components) in selected_drafts[:8]],
             },
         )
-        result = []
+        rows_by_draft: dict[str, list[NewsReviewDelivery]] = {}
         for row in rows:
-            row.status = "processing"
-            row.processing_started_at = now
-            row.attempt_count += 1
-            result.append(row.id)
+            rows_by_draft.setdefault(row.draft_id, []).append(row)
+        result = []
+        for draft_id in draft_ids:
+            for row in rows_by_draft.get(draft_id, []):
+                row.status = "processing"
+                row.processing_started_at = now
+                row.attempt_count += 1
+                result.append(row.id)
         return result
+
+
+def _review_queue_snapshot() -> tuple[int, int]:
+    with get_session_context() as db:
+        awaiting_review = (
+            db.query(NewsCluster).filter(NewsCluster.status == "awaiting_review").count()
+        )
+        backlog = (
+            db.query(NewsReviewDelivery.draft_id)
+            .filter(NewsReviewDelivery.status.in_({"queued", "processing"}))
+            .distinct()
+            .count()
+        )
+    return awaiting_review, backlog
 
 
 def _mark_review_delivery_blocked(
@@ -406,11 +438,34 @@ async def deliver_review_queue(
                 .distinct()
                 .all()
             }
-    for delivery_id in _claim_deliveries(
+    claimed_delivery_ids = _claim_deliveries(
         draft_limit=None,
         review_slot=review_slot,
         channel_ready=channel_ready,
-    ):
+    )
+    with get_session_context() as db:
+        draft_by_delivery_id = {
+            row.id: row.draft_id
+            for row in db.query(NewsReviewDelivery)
+            .filter(NewsReviewDelivery.id.in_(claimed_delivery_ids))
+            .all()
+        }
+    claimed_draft_ids: list[str] = []
+    seen_claimed_drafts: set[str] = set()
+    for delivery_id in claimed_delivery_ids:
+        draft_id = draft_by_delivery_id.get(delivery_id)
+        if draft_id is not None and draft_id not in seen_claimed_drafts:
+            claimed_draft_ids.append(draft_id)
+            seen_claimed_drafts.add(draft_id)
+    if cycle_stats is not None:
+        cycle_stats.review_selected = len(claimed_draft_ids)
+
+    wave_size = news_review_wave_size()
+    wave_pause_seconds = news_review_wave_pause_seconds()
+    wave_starts = set(claimed_draft_ids[wave_size::wave_size])
+    paused_wave_starts: set[str] = set()
+
+    for delivery_id in claimed_delivery_ids:
         with get_session_context() as db:
             delivery = db.get(NewsReviewDelivery, delivery_id)
             if delivery is None or delivery.status != "processing":
@@ -447,6 +502,13 @@ async def deliver_review_queue(
             image_revision = cluster.current_image_revision
             attempt_count = delivery.attempt_count
             queue_age = max(0, round((utcnow() - delivery.created_at).total_seconds()))
+        if (
+            draft_resource_id in wave_starts
+            and draft_resource_id not in paused_wave_starts
+            and wave_pause_seconds > 0
+        ):
+            await asyncio.sleep(wave_pause_seconds)
+            paused_wave_starts.add(draft_resource_id)
         if delivery_blockers:
             _mark_review_delivery_blocked(
                 delivery_id,
@@ -460,7 +522,7 @@ async def deliver_review_queue(
         if (
             review_slot is not None
             and draft_resource_id not in sent_draft_ids
-            and len(sent_draft_ids) >= news_review_batch_size()
+            and len(sent_draft_ids) >= news_review_slot_limit()
         ):
             _release_claimed_delivery(delivery_id)
             continue
@@ -548,6 +610,12 @@ async def deliver_review_queue(
                 "queue_age_seconds": queue_age,
             },
         )
+    if cycle_stats is not None:
+        cycle_stats.review_delivered = delivered
+        (
+            cycle_stats.review_awaiting_review,
+            cycle_stats.review_backlog,
+        ) = _review_queue_snapshot()
     return delivered
 
 
@@ -705,7 +773,7 @@ async def run_news_pipeline_once(
                 review_slot=review_slot,
             )
 
-    if any((delivered, published, cycle_stats.telegram_delivery_failures)):
+    if any((review_delivery_due, delivered, published, cycle_stats.telegram_delivery_failures)):
         logger.info(
             "news_pipeline_cycle_completed",
             extra={

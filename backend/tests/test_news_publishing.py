@@ -1360,7 +1360,7 @@ def test_news_pipeline_uses_explicit_telegram_transport(
     assert captured.get("proxy") == expected_proxy
 
 
-def test_scheduled_review_delivery_sends_at_most_ten_distinct_drafts(monkeypatch) -> None:
+def test_scheduled_review_delivery_sends_twenty_in_two_waves(monkeypatch) -> None:
     definitions = parse_source_allowlist(
         [
             {
@@ -1384,6 +1384,21 @@ def test_scheduled_review_delivery_sends_at_most_ten_distinct_drafts(monkeypatch
         "Cardio interval study measured endurance outcome",
         "Mobility exercise study reported flexibility outcome",
         "Creatine supplement trial measured performance outcome",
+        "Hypertrophy volume study measured muscle growth",
+        "Powerlifting periodization trial measured strength outcome",
+        "Weightlifting velocity study measured training performance",
+        "Omega-3 supplement review measured exercise recovery",
+        "Electrolyte trial measured endurance performance",
+        "GLP-1 study measured body composition during weight management",
+        "Semaglutide study measured fat loss and muscle preservation",
+        "Bodybuilding contest preparation study measured physique outcomes",
+        "Anabolic steroid review assessed bodybuilding performance risks",
+        "Physical activity study measured sedentary behavior change",
+        "Pre-workout caffeine trial measured exercise performance",
+        "Protein intake study measured muscle preservation during fat loss",
+        "Sports injury prevention study measured athlete outcomes",
+        "Aerobic training study measured endurance performance",
+        "Training load study measured athlete recovery outcomes",
     )
     with get_session_context() as db:
         apply_source_allowlist(db, definitions)
@@ -1417,7 +1432,6 @@ def test_scheduled_review_delivery_sends_at_most_ten_distinct_drafts(monkeypatch
                 **draft.evidence_metadata,
                 "submitted_by": "hermes_narrow_intake",
             }
-            draft.warnings = ["unsupported_number"] if index == 0 else []
             asyncio.run(create_image_revision(db, cluster, draft, client=None))
         assert enqueue_review_deliveries(db, {7001}) == len(titles)
 
@@ -1426,10 +1440,19 @@ def test_scheduled_review_delivery_sends_at_most_ten_distinct_drafts(monkeypatch
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "7001")
+    monkeypatch.setattr(settings, "news_review_batch_size", 20)
+    monkeypatch.setattr(settings, "news_review_wave_size", 10)
+    monkeypatch.setattr(settings, "news_review_wave_pause_seconds", 2.5)
     slot = current_news_review_slot(datetime(2026, 9, 8, 5, 5, 0, tzinfo=UTC))
     assert slot is not None
     preview_calls: list[int] = []
     control_calls: list[int] = []
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(news_worker.asyncio, "sleep", fake_sleep)
 
     async def send_preview(_client, chat_id, *_args, **_kwargs):
         preview_calls.append(chat_id)
@@ -1439,30 +1462,38 @@ def test_scheduled_review_delivery_sends_at_most_ten_distinct_drafts(monkeypatch
         control_calls.append(chat_id)
         return 800 + len(control_calls)
 
-    async def deliver() -> int:
+    stats = NewsCycleStats()
+
+    async def deliver(*, cycle_stats: NewsCycleStats | None = None) -> int:
         async with httpx.AsyncClient() as client:
             return await deliver_review_queue(
                 client,
                 send_control,
                 send_preview,
                 channel_ready=True,
+                cycle_stats=cycle_stats,
                 review_slot=slot,
             )
 
-    assert asyncio.run(deliver()) == 5
-    assert len(preview_calls) == 5
-    assert len(control_calls) == 5
+    assert asyncio.run(deliver(cycle_stats=stats)) == 20
+    assert len(preview_calls) == 20
+    assert len(control_calls) == 20
+    assert sleep_calls == [2.5]
+    assert stats.review_selected == 20
+    assert stats.review_delivered == 20
+    assert stats.review_awaiting_review == 21
+    assert stats.review_backlog == 1
     with get_session_context() as db:
         statuses = [
             row.status for row in db.query(NewsReviewDelivery).order_by(NewsReviewDelivery.id)
         ]
-        assert statuses.count("sent") == 5
-        assert statuses.count("queued") == 1
+        assert statuses.count("sent") == 20
         assert statuses.count("queued") == 1
 
     assert asyncio.run(deliver()) == 0
-    assert len(preview_calls) == 5
-    assert len(control_calls) == 5
+    assert len(preview_calls) == 20
+    assert len(control_calls) == 20
+    assert sleep_calls == [2.5]
     with get_session_context() as db:
         assert (
             db.query(NewsReviewDelivery).filter(NewsReviewDelivery.status == "queued").count() == 1
