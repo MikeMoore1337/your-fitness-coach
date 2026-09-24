@@ -51,7 +51,13 @@
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
-  gap: var(--v2-space-2);
+}
+
+.coach-operations__header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .coach-programs-search {

@@ -515,7 +515,7 @@ export function ProgramBuilder({
               ? 'Первая тренировка уже запланирована на сегодня. Она начнётся только после вашего действия.'
               : 'Откройте «Сегодня» в дату первой тренировки, чтобы начать её.'}
           </p>
-          <div className="program-builder-success__actions">
+          <div className="program-builder-success__actions app-action-group">
             <AppLink className="button-link" to="/app?section=today">
               {creationSuccess.canStartToday ? 'Перейти к тренировке' : 'Открыть «Сегодня»'}
             </AppLink>

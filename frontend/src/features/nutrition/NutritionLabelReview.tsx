@@ -722,7 +722,7 @@ export function NutritionLabelReview({
         </p>
       )}
 
-      <div className="nutrition-editor__actions nutrition-label-review__actions">
+      <div className="nutrition-editor__actions app-action-group nutrition-label-review__actions">
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting
             ? 'Сохраняем…'

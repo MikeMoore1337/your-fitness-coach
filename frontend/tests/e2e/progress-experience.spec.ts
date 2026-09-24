@@ -1622,3 +1622,72 @@ test('progress period controls drive one exact URL and API range through history
   await expect(page).toHaveURL(/progress_period=custom/);
   await expect(progressOverview(page)).toBeVisible();
 });
+
+test('progress header aligns help and report without clipping the period selector', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
+  await mockProgress(page);
+  await page.goto('/app?section=progress&progress_period=days_30');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+
+  for (const theme of ['light', 'dark'] as const) {
+    if (theme === 'dark') {
+      await page.evaluate(() => {
+        localStorage.setItem('app-theme', 'dark');
+        window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+      });
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+
+    for (const width of [768, 1280, 1440, 390]) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+      const help = page.locator('.progress-hero__help').getByText('Что это?', { exact: true });
+      const report = page.getByRole('link', { name: 'Скачать отчёт' });
+      const period = page.locator('.progress-hero__period');
+      const tabs = period.getByRole('tablist', { name: 'Период прогресса' });
+
+      await expect(help).toBeVisible();
+      await expect(report).toBeVisible();
+      await expect(tabs.getByRole('tab')).toHaveCount(4);
+      await expect(page.locator('.progress-hero')).toHaveCSS('border-bottom-width', '0px');
+      const selectorGeometry = await tabs.evaluate((element) => ({
+        radius: getComputedStyle(element).borderTopLeftRadius,
+        overflow: getComputedStyle(element.parentElement!).overflow,
+      }));
+      expect(selectorGeometry.radius).not.toBe('0px');
+      expect(selectorGeometry.overflow).toBe('visible');
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+
+      if (width >= 1280) {
+        const [helpBox, reportBox, periodBox] = await Promise.all([
+          help.boundingBox(),
+          report.boundingBox(),
+          period.boundingBox(),
+        ]);
+        expect(helpBox?.width ?? Infinity).toBeLessThanOrEqual(140);
+        expect(helpBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+        expect(periodBox).not.toBeNull();
+        expect(helpBox!.x + helpBox!.width).toBeLessThan(periodBox!.x);
+        const collapsed = [helpBox, reportBox];
+        expect(collapsed[0]).not.toBeNull();
+        expect(collapsed[1]).not.toBeNull();
+        expect(Math.abs(collapsed[0]!.y - collapsed[1]!.y)).toBeLessThanOrEqual(1);
+        expect(reportBox!.x).toBeGreaterThanOrEqual(periodBox!.x);
+        const periodBeforeExpand = await period.boundingBox();
+
+        await help.click();
+        await expect(page.getByText(/Сначала смотрите на период и полноту данных/)).toBeVisible();
+        const expanded = await Promise.all([help.boundingBox(), report.boundingBox()]);
+        expect(Math.abs(expanded[0]!.y - collapsed[0]!.y)).toBeLessThanOrEqual(1);
+        expect(Math.abs(expanded[1]!.y - collapsed[1]!.y)).toBeLessThanOrEqual(1);
+        expect(await period.boundingBox()).toEqual(periodBeforeExpand);
+        await help.click();
+        await expect(page.getByText(/Сначала смотрите на период и полноту данных/)).toBeHidden();
+      }
+    }
+  }
+});

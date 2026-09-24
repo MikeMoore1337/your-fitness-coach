@@ -948,7 +948,7 @@ function RestTimer({
         </strong>
       </div>
       <span className="active-workout-rest__next">Дальше: {nextLabel}</span>
-      <div className="active-workout-rest__actions">
+      <div className="active-workout-rest__actions app-action-group">
         <button
           {...glassProps('clear', true)}
           type="button"
@@ -1310,7 +1310,7 @@ export function TodayWorkout({
                     )}
                     {exercise.notes && <p className="exercise-note">{exercise.notes}</p>}
                   </div>
-                  <div className="active-workout-exercise__head-actions">
+                  <div className="active-workout-exercise__head-actions app-action-group">
                     {(!isCurrentExercise || isPersistedComplete) && (
                       <button
                         type="button"

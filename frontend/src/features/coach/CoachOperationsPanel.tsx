@@ -937,7 +937,7 @@ export function CoachOperationsPanel({
                   : 'Остатки пакетов и ручной учёт оплат клиентов.'}
           </p>
         </div>
-        <div className="coach-operations__header-actions">
+        <div className="coach-operations__header-actions app-action-group">
           {(surface === 'overview' || surface === 'schedule') && (
             <Button onClick={openNewSession} type="button">
               Новая встреча

@@ -158,7 +158,7 @@ export function WorkoutCompletionSummary({
         <span className="eyebrow">Следующий шаг</span>
         <h3 id="workout-next-title">План продолжается</h3>
         <p>{nextWorkoutText(summary?.next_workout ?? null)}</p>
-        <div className="workout-completion__actions">
+        <div className="workout-completion__actions app-action-group">
           {onReturnToday ? (
             <Button type="button" onClick={onReturnToday}>
               Вернуться в Сегодня

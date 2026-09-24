@@ -43,7 +43,7 @@ export function CoachToday({
           <h1 id="coach-today-title">Что требует действия?</h1>
           <p>Короткий список фактов и следующий шаг. Подробности открываются внутри клиента.</p>
         </div>
-        <div className="coach-today__hero-actions">
+        <div className="coach-today__hero-actions app-action-group">
           <button type="button" onClick={() => onNavigate('clients')}>
             Открыть клиентов
             <Icon name="arrow-right" size={16} />

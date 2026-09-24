@@ -565,7 +565,7 @@ export function NaturalFoodInput({
           {(preview.error as Error).message}
         </p>
       )}
-      <div className="nutrition-editor__actions">
+      <div className="nutrition-editor__actions app-action-group">
         <Button
           type="button"
           disabled={demoSafeMode || preview.isPending || commit.isPending || !draft.text.trim()}

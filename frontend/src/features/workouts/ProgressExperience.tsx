@@ -1235,14 +1235,8 @@ export function ProgressExperience({
         <div className="progress-hero__copy">
           <span className="eyebrow">Факты за период</span>
           <h1>Прогресс</h1>
-          <ContextualHelp articlePath="/knowledge/progress/how-to-read-progress">
-            <p>
-              Сначала смотрите на период и полноту данных. Одна точка не образует тренд, а
-              пропущенная запись не равна нулевому результату.
-            </p>
-          </ContextualHelp>
         </div>
-        <div className="progress-hero__actions">
+        <div className="progress-hero__period">
           <ProgressPeriodControls
             key={selectionKey}
             onApplyCustom={applyCustom}
@@ -1251,6 +1245,16 @@ export function ProgressExperience({
             timeZone={resolvedTimeZone}
             today={today}
           />
+        </div>
+        <div className="progress-hero__help">
+          <ContextualHelp articlePath="/knowledge/progress/how-to-read-progress">
+            <p>
+              Сначала смотрите на период и полноту данных. Одна точка не образует тренд, а
+              пропущенная запись не равна нулевому результату.
+            </p>
+          </ContextualHelp>
+        </div>
+        <div className="progress-hero__download">
           {canExport ? (
             <AppLink className="button-link secondary-link" to={progressReportPath(selection)}>
               <Icon name="print" size={16} /> Скачать отчёт

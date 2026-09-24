@@ -410,7 +410,7 @@ function RecipeEditor({
           {formError || 'Не удалось сохранить рецепт. Проверьте продукты и попробуйте снова.'}
         </p>
       )}
-      <div className="nutrition-editor__actions">
+      <div className="nutrition-editor__actions app-action-group">
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Сохраняем…' : recipe ? 'Сохранить рецепт' : 'Создать рецепт'}
         </Button>
@@ -504,7 +504,7 @@ export function RecipeBrowser({ onSelect }: { onSelect: (recipe: Recipe) => void
                     {numberLabel(recipe.nutrients_per_100g.carbs_g_per_100g, 1)}
                   </span>
                 </div>
-                <div className="nutrition-recipe__actions">
+                <div className="nutrition-recipe__actions app-action-group">
                   <button
                     type="button"
                     disabled={!editable || remove.isPending}

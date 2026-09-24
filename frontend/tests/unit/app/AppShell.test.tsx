@@ -249,6 +249,7 @@ describe('AppShell', () => {
 
   it('показывает admin entry только аккаунту с соответствующей capability', () => {
     user.is_root = true;
+    user.is_coach = true;
     navigation.path = '/admin';
     render(<AppShell>Содержимое</AppShell>);
 
@@ -256,6 +257,9 @@ describe('AppShell', () => {
       'aria-current',
       'page',
     );
+    expect(screen.getByRole('link', { name: 'Тренер' })).toHaveAttribute('href', '/coach');
+    expect(user.is_root).toBe(true);
+    expect(user.is_coach).toBe(true);
   });
 
   it('открывает и закрывает mobile-меню сразу при reduced motion', () => {

@@ -1311,7 +1311,7 @@ export default function CoachPage({
           <h1>{tab === 'today' ? 'Сегодня' : 'Кабинет тренера'}</h1>
           <p>Сначала действие, затем детали клиента — без потери глубины YFC.</p>
         </div>
-        <div className="coach-os-header__actions">
+        <div className="coach-os-header__actions app-action-group">
           <Button
             className="coach-os-header__invite"
             disabled={inviteCreating || !capabilities.canManageCoach}

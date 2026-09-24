@@ -3349,7 +3349,6 @@ details:not([open]) > :not(summary) {
 .program-builder-success__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
 }
 .program-builder-success__actions > * {
   min-height: 44px;
@@ -3449,6 +3448,8 @@ details:not([open]) > :not(summary) {
 }
 .exercise-media-asset--missing {
   padding: 5px;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
 }
 .exercise-catalog__more {
   width: 100%;
@@ -3945,7 +3946,6 @@ button.today-text-link {
 .today-secondary-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 22px;
   padding-block: 2px 8px;
 }
 .today-secondary-actions a {
@@ -4185,7 +4185,6 @@ button.today-text-link {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
 }
 .active-workout-exercise__toggle {
   min-height: 44px;
@@ -4628,7 +4627,6 @@ button.today-text-link {
 .workout-completion__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
   padding-top: 6px;
 }
 .workout-completion__actions > * {
@@ -4806,7 +4804,6 @@ button.today-text-link {
 }
 .active-workout-rest__actions {
   display: flex;
-  gap: 6px;
   pointer-events: auto;
 }
 .active-workout-rest__actions button {
@@ -8129,7 +8126,6 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 .nutrition-editor__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
 }
 .nutrition-label-scanner,
 .nutrition-label-review {

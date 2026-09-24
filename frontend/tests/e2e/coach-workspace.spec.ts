@@ -1802,3 +1802,24 @@ test('Coach Programs keeps responsive geometry content-driven', async ({ page })
 
   console.log(`COACH_PROGRAMS_GEOMETRY ${JSON.stringify(measurements)}`);
 });
+
+test('desktop package actions keep the shared horizontal gap', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockCoachWorkspace(page, { operations: 'seeded' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Пакеты и оплаты' }).click();
+  await expect(page.getByRole('heading', { name: 'Пакеты и оплаты', exact: true })).toBeVisible();
+
+  const group = page.locator('.coach-operations__header-actions');
+  const [newPackage, recordPayment] = await Promise.all([
+    page.getByRole('button', { name: 'Новый пакет', exact: true }).boundingBox(),
+    page.getByRole('button', { name: 'Учесть оплату', exact: true }).boundingBox(),
+  ]);
+  expect(newPackage).not.toBeNull();
+  expect(recordPayment).not.toBeNull();
+  expect(await group.evaluate((element) => getComputedStyle(element).gap)).toBe('8px');
+  expect(Math.abs(newPackage!.y - recordPayment!.y)).toBeLessThanOrEqual(1);
+  expect(recordPayment!.x - (newPackage!.x + newPackage!.width)).toBeGreaterThanOrEqual(8);
+});

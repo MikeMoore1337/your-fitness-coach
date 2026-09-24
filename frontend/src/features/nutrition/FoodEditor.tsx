@@ -315,7 +315,7 @@ export function FoodEditor({
               </li>
             ))}
           </ul>
-          <div className="nutrition-editor__actions">
+          <div className="nutrition-editor__actions app-action-group">
             <Button type="button" onClick={() => applyPhotoPrefill(pendingPhotoPrefill, true)}>
               Заменить распознанным
             </Button>
@@ -481,7 +481,7 @@ export function FoodEditor({
           {saveError(mutation.error)}
         </p>
       )}
-      <div className="nutrition-editor__actions">
+      <div className="nutrition-editor__actions app-action-group">
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Сохраняем…' : food ? 'Сохранить изменения' : 'Создать продукт'}
         </Button>

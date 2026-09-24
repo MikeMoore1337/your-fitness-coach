@@ -449,7 +449,7 @@ function TemplateEditor({
           {formError || 'Не удалось сохранить шаблон. Проверьте элементы и попробуйте снова.'}
         </p>
       )}
-      <div className="nutrition-editor__actions">
+      <div className="nutrition-editor__actions app-action-group">
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Сохраняем…' : 'Сохранить шаблон'}
         </Button>
@@ -615,7 +615,7 @@ export function MealTemplateBrowser({
         </p>
       )}
       {!demoSafeMode && (
-        <div className="nutrition-template-browser__actions">
+        <div className="nutrition-template-browser__actions app-action-group">
           <Button type="button" variant="secondary" onClick={() => startNew()}>
             <Icon name="plus" size={16} /> Новый шаблон
           </Button>
@@ -751,7 +751,7 @@ export function MealTemplateBrowser({
           )}
         </div>
       )}
-      <div className="nutrition-editor__actions">
+      <div className="nutrition-editor__actions app-action-group">
         <Button
           type="button"
           variant="ghost"
