@@ -19,7 +19,7 @@ from fitminiapp_api.services.exercise_domain import (
     canonical_muscle_identifier,
     sync_catalog_exercise_domain_metadata,
 )
-from fitminiapp_api.services.news_sources import bootstrap_default_news_sources
+from fitminiapp_api.services.news_sources import reconcile_default_news_sources
 from fitminiapp_api.services.prescription_semantics import ensure_plan
 from fitminiapp_api.services.program_seed_data import (
     EXERCISE_CATALOG,
@@ -379,7 +379,7 @@ def seed_demo_data(db: Session, include_demo_users: bool = True) -> None:
     _delete_legacy_templates(db)
     _seed_strength_templates(db)
     if settings.news_ingestion_enabled:
-        bootstrap_default_news_sources(db)
+        reconcile_default_news_sources(db)
     db.commit()
 
 
