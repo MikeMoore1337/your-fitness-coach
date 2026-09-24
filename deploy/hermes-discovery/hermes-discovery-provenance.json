@@ -33,7 +33,7 @@
     "sourceFetch": "explicit versioned source definitions only"
   },
   "sourceBehaviorPatches": {
-    "relevanceGate": "hermes-relevance-v1 before outbox/provider",
+    "relevanceGate": "hermes-relevance-v2 before outbox/provider",
     "health": "hermes-pipeline-health-v1 with bounded alerts"
   },
   "license": "PSF-2.0 Python runtime plus Alpine package licenses recorded during build"

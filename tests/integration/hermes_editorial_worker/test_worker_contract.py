@@ -12,8 +12,11 @@ from pydantic import ValidationError
 
 WORKSPACE = Path(__file__).resolve().parents[3]
 WORKER_ROOT = WORKSPACE / "deploy" / "hermes-editorial-worker"
+DISCOVERY_ROOT = WORKSPACE / "deploy" / "hermes-discovery"
 sys.path.insert(0, str(WORKER_ROOT))
+sys.path.insert(0, str(DISCOVERY_ROOT))
 
+import discovery_runner  # noqa: E402
 import editorial_worker  # noqa: E402
 
 
@@ -119,6 +122,49 @@ def valid_job() -> editorial_worker.EditorialJob:
             },
         }
     )
+
+
+def test_worker_accepts_real_discovery_v2_job_document() -> None:
+    candidate = discovery_runner.ParsedCandidate(
+        external_id="cross-component-v2",
+        canonical_url="https://example.com/research",
+        title="Resistance training and muscle hypertrophy in trained adults",
+        summary="Strength outcomes improved after a resistance-training program.",
+        content="The source reports resistance-training outcomes and study limitations.",
+        publisher="Example Journal",
+        published_at=editorial_worker.datetime(2026, 9, 24),
+    )
+    relevance = discovery_runner._evaluate_relevance(candidate)
+    assert relevance["allowed"] is True
+    assert relevance["version"] == "hermes-relevance-v2"
+
+    document = discovery_runner._job_document(
+        "journal-one",
+        candidate,
+        "a" * 64,
+        relevance,
+    )
+    job = editorial_worker.EditorialJob.model_validate(document)
+
+    assert job.schema_version == discovery_runner.JOB_SCHEMA_VERSION
+    assert job.relevance.version == "hermes-relevance-v2"
+    assert job.relevance.topics == ["fitness_training"]
+
+
+def test_worker_keeps_v1_compatibility_and_rejects_unknown_relevance_versions() -> None:
+    v1 = valid_job()
+    assert v1.relevance.version == "hermes-relevance-v1"
+
+    with pytest.raises(ValidationError):
+        editorial_worker.EditorialJob.model_validate(
+            {
+                **v1.model_dump(mode="json"),
+                "relevance": {
+                    **v1.relevance.model_dump(),
+                    "version": "hermes-relevance-v3",
+                },
+            }
+        )
 
 
 def _provider_request_with_capture(
