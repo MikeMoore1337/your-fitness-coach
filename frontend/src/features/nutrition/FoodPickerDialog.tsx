@@ -937,19 +937,19 @@ export function FoodPickerDialog({
                 </>
               )
             )}
-            {addEntry.error && (
-              <div className="nutrition-inline-error" role="alert">
-                <span>{(addEntry.error as Error).message}</span>
-                <button
-                  type="button"
-                  disabled={addEntry.isPending}
-                  onClick={() => addEntry.mutate({ closeAfter: true })}
-                >
-                  Повторить
-                </button>
-              </div>
-            )}
             <div className="nutrition-picker__submit">
+              {addEntry.error && (
+                <div className="nutrition-inline-error" role="alert">
+                  <span>{(addEntry.error as Error).message}</span>
+                  <button
+                    type="button"
+                    disabled={addEntry.isPending}
+                    onClick={() => addEntry.mutate({ closeAfter: true })}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              )}
               <Button fullWidth disabled={addEntry.isPending} type="submit">
                 {addEntry.isPending ? 'Добавляем…' : 'Добавить в дневник'}
               </Button>
@@ -1039,19 +1039,19 @@ export function FoodPickerDialog({
                 </Field>
               ))}
             </fieldset>
-            {addEntry.error && (
-              <div className="nutrition-inline-error" role="alert">
-                <span>{(addEntry.error as Error).message}</span>
-                <button
-                  type="button"
-                  disabled={addEntry.isPending}
-                  onClick={() => addEntry.mutate({ closeAfter: true })}
-                >
-                  Повторить
-                </button>
-              </div>
-            )}
             <div className="nutrition-picker__submit">
+              {addEntry.error && (
+                <div className="nutrition-inline-error" role="alert">
+                  <span>{(addEntry.error as Error).message}</span>
+                  <button
+                    type="button"
+                    disabled={addEntry.isPending}
+                    onClick={() => addEntry.mutate({ closeAfter: true })}
+                  >
+                    Повторить
+                  </button>
+                </div>
+              )}
               <Button fullWidth disabled={addEntry.isPending} type="submit">
                 {addEntry.isPending ? 'Сохраняем…' : 'Сохранить Quick Add'}
               </Button>

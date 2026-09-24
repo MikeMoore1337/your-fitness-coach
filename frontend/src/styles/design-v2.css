@@ -4507,6 +4507,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     scroll-padding-bottom: var(--yfc-mobile-dock-clearance);
   }
 
+  html:has(.app-shell--design-v2 #appBottomNav):has(.app-section--progress) {
+    scroll-padding-bottom: calc(var(--yfc-mobile-action-clearance) + 48px);
+  }
+
   .app-shell--design-v2 #appContent :where(button, a, input, select, textarea, summary) {
     scroll-margin-bottom: var(--yfc-mobile-dock-clearance);
   }

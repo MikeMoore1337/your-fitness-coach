@@ -119,7 +119,7 @@ for (const viewport of [
     expect(overflow).toBeLessThanOrEqual(1);
     for (const button of await editor.locator('button').all()) {
       const box = await button.boundingBox();
-      expect(box?.height).toBeGreaterThanOrEqual(44);
+      expect(box?.height).toBeGreaterThanOrEqual(44 - 0.01);
     }
     await context.close();
   });

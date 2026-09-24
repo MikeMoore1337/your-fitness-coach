@@ -347,7 +347,7 @@ export async function newMobilePage(
   const context = await browser.newContext({
     viewport: MOBILE_CONTEXTS[viewport],
     hasTouch: true,
-    isMobile: true,
+    ...(browser.browserType().name() === 'firefox' ? {} : { isMobile: true }),
     reducedMotion: 'reduce',
   });
   return { context, page: await context.newPage() };

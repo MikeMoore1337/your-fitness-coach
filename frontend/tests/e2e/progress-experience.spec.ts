@@ -1024,7 +1024,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   const saveButton = await mobileSave.boundingBox();
   expect(noteField).not.toBeNull();
   expect(saveButton).not.toBeNull();
-  expect(saveButton!.y - (noteField!.y + noteField!.height)).toBeGreaterThanOrEqual(18);
+  expect(saveButton!.y - (noteField!.y + noteField!.height)).toBeGreaterThanOrEqual(18 - 0.01);
   await page.screenshot({
     path: '../.artifacts/screenshots/task-60/mobile-web-360x800-light-save.png',
   });

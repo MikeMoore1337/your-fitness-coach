@@ -1323,6 +1323,7 @@ test('demo exposes deterministic loading and error states without leaving the bo
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
+    serviceWorkers: 'block',
   });
   const loadingPage = await loadingContext.newPage();
   await installDemoTransport(loadingPage);
@@ -1348,6 +1349,7 @@ test('demo exposes deterministic loading and error states without leaving the bo
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
+    serviceWorkers: 'block',
   });
   const errorPage = await errorContext.newPage();
   await installDemoTransport(errorPage);

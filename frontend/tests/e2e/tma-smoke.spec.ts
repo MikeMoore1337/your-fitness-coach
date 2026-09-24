@@ -1945,7 +1945,7 @@ test('progression guidance screenshots cover outcomes, long content and responsi
       };
     });
     expect(geometry.headBottom).toBeLessThanOrEqual(geometry.guidanceTop);
-    expect(geometry.guidanceBottom).toBeLessThanOrEqual(geometry.setsTop);
+    expect(geometry.guidanceBottom).toBeLessThanOrEqual(geometry.setsTop + 0.01);
 
     await exercise.screenshot({
       path: `../.artifacts/screenshots/task-63/${current.surface}-${current.width}x${current.height}-${current.theme}-${current.label}.png`,

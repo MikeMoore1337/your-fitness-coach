@@ -219,6 +219,7 @@ export function AppShell({
   const { path, search } = useNavigation();
   const analyticsSection = analyticsSectionForLocation(path, section);
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreOpenRef = useRef(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const morePresence = useMotionPresence({
     closingAnimationName: 'app-more-backdrop-out',
@@ -303,9 +304,9 @@ export function AppShell({
       to_section: destinationSection,
     });
   };
-
   const closeMore = useCallback(
     (restoreFocus = false) => {
+      moreOpenRef.current = false;
       setMoreOpen(false);
       hideMorePresence();
       if (restoreFocus) moreTriggerRef.current?.focus();
@@ -314,9 +315,13 @@ export function AppShell({
   );
   const openMore = (trigger?: HTMLElement) => {
     if (trigger) moreTriggerRef.current = trigger;
+    moreOpenRef.current = true;
     setMoreOpen(true);
     morePresence.show();
   };
+  useEffect(() => {
+    moreOpenRef.current = moreOpen;
+  }, [moreOpen]);
   const openQuickAdd = () => {
     if (moreOpen) closeMore();
     setQuickAddOpen(true);
@@ -360,22 +365,20 @@ export function AppShell({
   }, [moreOpen]);
 
   useEffect(() => {
-    if (!moreOpen) return;
     const closeOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || !moreOpenRef.current) return;
       event.preventDefault();
       closeMore(true);
     };
     document.addEventListener('keydown', closeOnEscape);
     return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [closeMore, moreOpen]);
+  }, [closeMore]);
 
   useEffect(() => {
     if (demo) return;
     const closeAtDesktopBreakpoint = () => {
-      if (mobileNavigationMatches() || !moreOpen) return;
-      setMoreOpen(false);
-      hideMorePresence();
+      if (mobileNavigationMatches() || !moreOpenRef.current) return;
+      closeMore();
       window.requestAnimationFrame(() => {
         const accountLink = document.getElementById('appAccountProfileLink');
         const railBrand = document.querySelector<HTMLElement>(
@@ -386,7 +389,7 @@ export function AppShell({
     };
     window.addEventListener('resize', closeAtDesktopBreakpoint);
     return () => window.removeEventListener('resize', closeAtDesktopBreakpoint);
-  }, [demo, hideMorePresence, moreOpen]);
+  }, [closeMore, demo]);
 
   if (!demo && !auth) {
     throw new Error('AppShell must be used inside AuthProvider unless demo config is provided');
