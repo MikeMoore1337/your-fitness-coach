@@ -10063,7 +10063,7 @@ export interface components {
              * Change Kind
              * @enum {string}
              */
-            change_kind: "assigned" | "program_archived" | "plan_updated" | "block_created" | "block_updated" | "block_status_changed" | "exercise_replaced" | "prescription_updated";
+            change_kind: "assigned" | "program_archived" | "plan_updated" | "block_created" | "block_updated" | "block_status_changed";
             /** Reason */
             reason?: string | null;
             /** Changed Fields */

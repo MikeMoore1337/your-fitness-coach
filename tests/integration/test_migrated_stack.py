@@ -266,3 +266,111 @@ def test_migrated_postgres_account_deletion_removes_owner_nutrition_graph() -> N
             assert db.get(FoodDiaryCopyOperation, copy_operation_id) is None
             assert db.get(NutritionTarget, target_id) is None
             assert db.get(EnergyCalibration, calibration_id) is None
+
+
+def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
+    database_url = os.environ.get("DATABASE_URL", "")
+    assert database_url.startswith("postgresql+psycopg://"), (
+        "the migration compatibility test must run against PostgreSQL"
+    )
+
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect, text
+    from sqlalchemy.engine import make_url
+
+    from alembic import command
+
+    root = Path(__file__).resolve().parents[2]
+    database = make_url(database_url)
+    assert database.database == "fitminiapp_test", "migration test database must be isolated"
+    schema_name = f"task393_{os.getpid()}_{os.urandom(4).hex()}"
+    maintenance_engine = create_engine(database_url)
+    with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        version = conn.execute(text("SELECT current_setting('server_version_num')")).scalar_one()
+        assert str(version).startswith("16"), "the migration test requires PostgreSQL 16"
+        conn.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name}"})
+    schema_database_url = schema_url.render_as_string(hide_password=False)
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "database_url", schema_database_url)
+    alembic_config = Config(str(root / "backend" / "alembic.ini"))
+    alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    try:
+        command.upgrade(alembic_config, "0092_coach_crm_core")
+        schema_engine = create_engine(schema_database_url)
+        try:
+            with schema_engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO program_templates "
+                        "(slug, title, goal, level, split_type, default_duration_weeks, is_public) "
+                        "VALUES (:slug, :title, 'strength', 'beginner', 'full_body', 1, :is_public)"
+                    ),
+                    [
+                        {
+                            "slug": "stronglifts-5x5",
+                            "title": "StrongLifts",
+                            "is_public": True,
+                        },
+                        {
+                            "slug": "legacy-yfc-template",
+                            "title": "Legacy YFC template",
+                            "is_public": True,
+                        },
+                        {
+                            "slug": "private-custom-template",
+                            "title": "Private custom template",
+                            "is_public": False,
+                        },
+                    ],
+                )
+        finally:
+            schema_engine.dispose()
+
+        command.upgrade(alembic_config, "head")
+        schema_engine = create_engine(schema_database_url)
+        try:
+            inspector = inspect(schema_engine)
+            provenance_columns = {
+                column["name"]: column for column in inspector.get_columns("program_templates")
+            }
+            assert provenance_columns["provenance_type"]["nullable"] is True
+            assert provenance_columns["provenance"]["nullable"] is True
+            assert provenance_columns["program_metadata"]["nullable"] is True
+
+            source_foreign_keys = {
+                column
+                for foreign_key in inspector.get_foreign_keys("user_workout_exercises")
+                for column in foreign_key["constrained_columns"]
+            }
+            assert "source_template_exercise_id" not in source_foreign_keys
+            assert "source_weekly_prescription_id" not in source_foreign_keys
+
+            with schema_engine.connect() as connection:
+                provenance = dict(
+                    connection.execute(
+                        text("SELECT slug, provenance_type FROM program_templates")
+                    ).all()
+                )
+                revision_check = connection.execute(
+                    text(
+                        "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                        "WHERE conrelid = 'program_revisions'::regclass "
+                        "AND conname = 'ck_program_revisions_change_kind'"
+                    )
+                ).scalar_one()
+            assert provenance == {
+                "stronglifts-5x5": "SOURCE_ADAPTATION",
+                "legacy-yfc-template": "YFC_GENERIC",
+                "private-custom-template": "CUSTOM",
+            }
+            assert "exercise_replaced" not in revision_check
+            assert "prescription_updated" not in revision_check
+        finally:
+            schema_engine.dispose()
+    finally:
+        with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
+        maintenance_engine.dispose()

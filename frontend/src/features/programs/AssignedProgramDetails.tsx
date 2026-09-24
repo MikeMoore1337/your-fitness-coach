@@ -37,9 +37,17 @@ const changeLabels: Record<ProgramRevision['change_kind'], string> = {
   block_created: 'Добавлен тренировочный блок',
   block_updated: 'Тренировочный блок изменён',
   block_status_changed: 'Изменён статус тренировочного блока',
-  exercise_replaced: 'Упражнение заменено',
-  prescription_updated: 'Предписание упражнения изменено',
 };
+
+function revisionChangeLabel(revision: ProgramRevision): string {
+  if (revision.change_kind === 'plan_updated') {
+    if (revision.changed_fields.operation === 'exercise_replaced') return 'Упражнение заменено';
+    if (revision.changed_fields.operation === 'prescription_updated') {
+      return 'Предписание упражнения изменено';
+    }
+  }
+  return changeLabels[revision.change_kind];
+}
 
 const actorLabels: Record<ProgramRevision['actor_role'], string> = {
   self: 'Вы',
@@ -576,7 +584,7 @@ export function AssignedProgramDetails({
                       >
                         <summary>
                           <span className="program-revision-timeline__copy">
-                            <strong>{changeLabels[revision.change_kind]}</strong>
+                            <strong>{revisionChangeLabel(revision)}</strong>
                             <small>
                               {actorLabels[revision.actor_role]} ·{' '}
                               {formatRevisionMoment(revision.created_at)}

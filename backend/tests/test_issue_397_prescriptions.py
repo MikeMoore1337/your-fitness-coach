@@ -10,8 +10,8 @@ from pydantic import ValidationError
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_msk
 from fitminiapp_api.db.session import get_session_context
-from fitminiapp_api.models.program import UserWorkout, UserWorkoutExercise
-from fitminiapp_api.schemas.program import ExercisePrescriptionPlan
+from fitminiapp_api.models.program import UserProgram, UserWorkout, UserWorkoutExercise
+from fitminiapp_api.schemas.program import ExercisePrescriptionPlan, ProgramTemplateDayCreate
 from fitminiapp_api.services.program_imports import PROGRAM_IMPORT_COLUMNS
 
 
@@ -211,6 +211,165 @@ def test_unsupported_execution_fields_are_rejected_instead_of_flattened() -> Non
 
     with pytest.raises(ValidationError):
         ExercisePrescriptionPlan.model_validate(plan)
+
+
+def test_advanced_group_rejects_incompatible_set_roles() -> None:
+    plan = next(plan for name, plan in _method_plans() if name == "drop_chain")
+    plan["segments"][1]["role"] = "mini_set"
+
+    with pytest.raises(ValidationError):
+        ExercisePrescriptionPlan.model_validate(plan)
+
+
+def test_program_day_rejects_inconsistent_group_order() -> None:
+    with pytest.raises(ValidationError):
+        ProgramTemplateDayCreate.model_validate(
+            {
+                "title": "Invalid group",
+                "exercises": [
+                    {"exercise_id": 1, "group_id": 4, "group_kind": "circuit", "group_order": 1},
+                    {"exercise_id": 2, "group_id": 4, "group_kind": "circuit", "group_order": 1},
+                ],
+            }
+        )
+
+
+def test_prescription_edit_uses_0092_revision_kind_and_keeps_advanced_plan(client) -> None:
+    headers = _auth(client, 397006)
+    exercises = _strength_exercises(client, headers)
+    updated_plan = _top_backoff_plan()
+    updated_plan["segments"][0]["effort_target"] = {"kind": "rir", "value": 2}
+    created = client.post(
+        "/api/v1/programs/templates",
+        headers=headers,
+        json={
+            "title": "Revision check compatibility",
+            "goal": "strength",
+            "level": "intermediate",
+            "mode": "self",
+            "assign_after_create": True,
+            "start_date": today_msk().isoformat(),
+            "days": [
+                {
+                    "title": "A",
+                    "exercises": [
+                        {
+                            "exercise_id": exercises[0]["id"],
+                            "prescribed_sets": 3,
+                            "prescribed_reps": "5-8",
+                            "rest_seconds": 180,
+                            "prescription": _top_backoff_plan(),
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    assert created.status_code == 200, created.text
+    program_id = created.json()["assigned_program_id"]
+
+    changed = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "day_number": 1,
+            "exercise_id": exercises[0]["id"],
+            "prescription": updated_plan,
+            "reason": "Изменить усилие в верхнем подходе",
+        },
+    )
+    assert changed.status_code == 200, changed.text
+
+    history = client.get(f"/api/v1/programs/assigned/{program_id}/revisions", headers=headers)
+    assert history.status_code == 200, history.text
+    latest = history.json()[0]
+    assert latest["change_kind"] == "plan_updated"
+    assert latest["changed_fields"]["operation"] == "prescription_updated"
+    assert all(row["change_kind"] != "prescription_updated" for row in history.json())
+
+    with get_session_context() as db:
+        workout = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id)
+            .order_by(UserWorkout.scheduled_date.asc())
+            .first()
+        )
+        assert workout is not None
+        exercise = workout.exercises[0]
+        assert exercise.prescription["segments"][0]["role"] == "top"
+        assert exercise.prescription["segments"][0]["effort_target"]["value"] == 2
+        assert [item.planned_role for item in exercise.sets] == ["top", "backoff", "backoff"]
+
+
+def test_assigned_program_update_rejects_inconsistent_group_kind(client) -> None:
+    headers = _auth(client, 397007)
+    exercises = _strength_exercises(client, headers)
+    created = client.post(
+        "/api/v1/programs/templates",
+        headers=headers,
+        json={
+            "title": "Group consistency",
+            "goal": "strength",
+            "level": "intermediate",
+            "mode": "self",
+            "assign_after_create": True,
+            "start_date": today_msk().isoformat(),
+            "days": [
+                {
+                    "title": "Circuit",
+                    "exercises": [
+                        {
+                            "exercise_id": exercises[0]["id"],
+                            "prescribed_sets": 2,
+                            "prescribed_reps": "8",
+                            "group_id": 10,
+                            "group_kind": "circuit",
+                            "group_order": 1,
+                        },
+                        {
+                            "exercise_id": exercises[1]["id"],
+                            "prescribed_sets": 2,
+                            "prescribed_reps": "8",
+                            "group_id": 10,
+                            "group_kind": "circuit",
+                            "group_order": 2,
+                        },
+                    ],
+                }
+            ],
+        },
+    )
+    assert created.status_code == 200, created.text
+    program_id = created.json()["assigned_program_id"]
+
+    changed = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "day_number": 1,
+            "exercise_id": exercises[0]["id"],
+            "prescribed_sets": 2,
+            "prescribed_reps": "8",
+            "group_id": 10,
+            "group_kind": "superset",
+            "group_order": 1,
+        },
+    )
+    assert changed.status_code == 422
+    assert changed.json()["detail"] == "Exercise group kind and order must be consistent"
+
+    with get_session_context() as db:
+        program = db.get(UserProgram, program_id)
+        assert program is not None
+        assert program.current_revision_number == 1
+        workout = db.query(UserWorkout).filter(UserWorkout.user_program_id == program_id).first()
+        assert workout is not None
+        first_exercise = next(
+            item for item in workout.exercises if item.exercise_id == exercises[0]["id"]
+        )
+        assert first_exercise.group_kind == "circuit"
 
 
 def test_structured_assignment_keeps_ordered_roles_legacy_fields_and_export(client) -> None:
@@ -427,7 +586,8 @@ def test_scope_b_replaces_only_future_rows_and_records_lineage(client) -> None:
     history = client.get(f"/api/v1/programs/assigned/{program_id}/revisions", headers=headers)
     assert history.status_code == 200, history.text
     latest = history.json()[0]
-    assert latest["change_kind"] == "exercise_replaced"
+    assert latest["change_kind"] == "plan_updated"
+    assert latest["changed_fields"]["operation"] == "exercise_replaced"
     lineage = latest["changed_fields"]["lineage"]
     assert len(lineage) == 2
     assert {item["scope"] for item in lineage} == {"assigned_program"}

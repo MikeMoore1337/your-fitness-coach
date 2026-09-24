@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import {
   AppLink,
   coachTabFromSearch,
@@ -304,11 +304,14 @@ export function AppShell({
     });
   };
 
-  const closeMore = (restoreFocus = false) => {
-    setMoreOpen(false);
-    morePresence.hide();
-    if (restoreFocus) moreTriggerRef.current?.focus();
-  };
+  const closeMore = useCallback(
+    (restoreFocus = false) => {
+      setMoreOpen(false);
+      hideMorePresence();
+      if (restoreFocus) moreTriggerRef.current?.focus();
+    },
+    [hideMorePresence],
+  );
   const openMore = (trigger?: HTMLElement) => {
     if (trigger) moreTriggerRef.current = trigger;
     setMoreOpen(true);
@@ -357,6 +360,17 @@ export function AppShell({
   }, [moreOpen]);
 
   useEffect(() => {
+    if (!moreOpen) return;
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      closeMore(true);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [closeMore, moreOpen]);
+
+  useEffect(() => {
     if (demo) return;
     const closeAtDesktopBreakpoint = () => {
       if (mobileNavigationMatches() || !moreOpen) return;
@@ -379,11 +393,6 @@ export function AppShell({
   }
 
   const handleMoreKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closeMore(true);
-      return;
-    }
     if (event.key !== 'Tab') return;
     const focusable = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),

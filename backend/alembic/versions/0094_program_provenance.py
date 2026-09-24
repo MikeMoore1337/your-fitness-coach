@@ -1,4 +1,4 @@
-"""Add additive provenance and product metadata to program templates."""
+"""Add nullable provenance and product metadata to program templates."""
 
 from collections.abc import Sequence
 
@@ -11,38 +11,25 @@ down_revision: str | None = "0093_advanced_prescriptions"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-
-_PROVENANCE_CHECK = (
-    "provenance_type IN ('YFC_GENERIC', 'SOURCE_ADAPTATION', 'CUSTOM')"
+online_rollout_phase = "expand"
+online_rollout_notes = (
+    "Adds three nullable scalar provenance/metadata columns using direct ADD COLUMN operations. "
+    "No rows are scanned or backfilled, no table is rewritten, and no constraint, index, or "
+    "default is added. Each addition takes only the brief PostgreSQL catalog lock and no "
+    "row-data work. The previous application revision ignores these nullable columns."
 )
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("program_templates") as batch_op:
-        batch_op.add_column(
-            sa.Column(
-                "provenance_type",
-                sa.String(length=24),
-                nullable=False,
-                server_default="CUSTOM",
-            )
-        )
-        batch_op.add_column(sa.Column("provenance", sa.JSON(), nullable=True))
-        batch_op.add_column(sa.Column("program_metadata", sa.JSON(), nullable=True))
-        batch_op.create_check_constraint(
-            "ck_program_templates_provenance_type",
-            _PROVENANCE_CHECK,
-        )
-        batch_op.create_index(
-            "ix_program_templates_provenance_type",
-            ["provenance_type"],
-        )
+    op.add_column(
+        "program_templates",
+        sa.Column("provenance_type", sa.String(length=24), nullable=True),
+    )
+    op.add_column("program_templates", sa.Column("provenance", sa.JSON(), nullable=True))
+    op.add_column("program_templates", sa.Column("program_metadata", sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("program_templates") as batch_op:
-        batch_op.drop_index("ix_program_templates_provenance_type")
-        batch_op.drop_constraint("ck_program_templates_provenance_type", type_="check")
-        batch_op.drop_column("program_metadata")
-        batch_op.drop_column("provenance")
-        batch_op.drop_column("provenance_type")
+    op.drop_column("program_templates", "program_metadata")
+    op.drop_column("program_templates", "provenance")
+    op.drop_column("program_templates", "provenance_type")

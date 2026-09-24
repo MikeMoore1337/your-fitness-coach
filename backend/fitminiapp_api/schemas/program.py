@@ -238,19 +238,102 @@ class ExercisePrescriptionPlan(BaseModel):
         positions = [segment.position for segment in self.segments]
         if positions != list(range(1, len(positions) + 1)):
             raise ValueError("prescription segment positions must be contiguous and ordered")
-        group_ids = {group.group_id for group in self.groups}
+        groups = {group.group_id: group for group in self.groups}
+        group_ids = set(groups)
         if len(group_ids) != len(self.groups):
             raise ValueError("prescription group ids must be unique")
-        for segment in self.segments:
+        members: dict[int, list[PrescriptionSegment]] = {group_id: [] for group_id in group_ids}
+        for index, segment in enumerate(self.segments):
             if self.metric_type == "strength":
                 if segment.rep_target is None or segment.duration_target is not None:
                     raise ValueError("strength segments require rep targets only")
             elif segment.duration_target is None or segment.rep_target is not None:
                 raise ValueError("cardio segments require duration targets only")
+            prior_roles = {item.role for item in self.segments[:index]}
+            if segment.role == "backoff" and "top" not in prior_roles:
+                raise ValueError("back-off segments require an earlier top segment")
+            if segment.load_target.kind == "relative_to_top" and "top" not in prior_roles:
+                raise ValueError("relative-to-top loads require an earlier top segment")
+            if segment.load_target.kind == "relative_to_previous" and index == 0:
+                raise ValueError("relative-to-previous loads require an earlier segment")
             if segment.group_id is not None and segment.group_id not in group_ids:
                 raise ValueError("segment references an unknown prescription group")
             if segment.group_id is not None and segment.group_position is None:
                 raise ValueError("grouped segments require group_position")
+            if segment.role in {"drop", "mini_set", "cluster_member", "activation"}:
+                if segment.group_id is None:
+                    raise ValueError("advanced segment roles require their structured group")
+                group_kind = groups[segment.group_id].kind
+                expected_kinds = {
+                    "drop": {"drop_chain"},
+                    "mini_set": {"rest_pause", "myo_reps"},
+                    "cluster_member": {"cluster"},
+                    "activation": {"myo_reps"},
+                }
+                if group_kind not in expected_kinds[segment.role]:
+                    raise ValueError("advanced segment role does not match its group kind")
+            if segment.group_id is None and (
+                segment.group_position is not None or segment.round_number is not None
+            ):
+                raise ValueError("group position and round require a group")
+            if segment.group_id is not None:
+                members[segment.group_id].append(segment)
+
+        for group_id, group_segments in members.items():
+            if not group_segments:
+                raise ValueError("prescription groups must contain segments")
+            group = groups[group_id]
+            if group.kind == "circuit":
+                rounds = sorted({segment.round_number or 0 for segment in group_segments})
+                if (
+                    group.rounds is None
+                    or rounds != list(range(1, group.rounds + 1))
+                    or any(segment.round_number is None for segment in group_segments)
+                    or any(segment.role != "working" for segment in group_segments)
+                ):
+                    raise ValueError(
+                        "circuit groups require working segments in every declared round"
+                    )
+                for round_number in rounds:
+                    round_positions = sorted(
+                        segment.group_position or 0
+                        for segment in group_segments
+                        if segment.round_number == round_number
+                    )
+                    if round_positions != list(range(1, len(round_positions) + 1)):
+                        raise ValueError(
+                            "circuit group positions must be contiguous within each round"
+                        )
+                continue
+
+            if group.rounds is not None or any(
+                segment.round_number is not None for segment in group_segments
+            ):
+                raise ValueError("rounds are only valid for circuit groups")
+            group_positions = sorted(segment.group_position or 0 for segment in group_segments)
+            if group_positions != list(range(1, len(group_positions) + 1)):
+                raise ValueError("prescription group positions must be contiguous and unique")
+            roles = [segment.role for segment in group_segments]
+            if group.kind == "drop_chain" and (
+                len(roles) < 2 or roles != ["working", *("drop" for _ in roles[1:])]
+            ):
+                raise ValueError("drop-chain groups require one working segment followed by drops")
+            if group.kind == "rest_pause" and (
+                len(roles) < 2 or roles != ["working", *("mini_set" for _ in roles[1:])]
+            ):
+                raise ValueError(
+                    "rest-pause groups require one working segment followed by mini-sets"
+                )
+            if group.kind == "myo_reps" and (
+                len(roles) < 2 or roles != ["activation", *("mini_set" for _ in roles[1:])]
+            ):
+                raise ValueError("myo-rep groups require one activation followed by mini-sets")
+            if group.kind == "cluster" and (
+                len(roles) < 2 or roles != ["working", *("cluster_member" for _ in roles[1:])]
+            ):
+                raise ValueError(
+                    "cluster groups require one working segment followed by cluster members"
+                )
         return self
 
 
@@ -277,6 +360,16 @@ class ProgramTemplateExerciseCreate(BaseModel):
             value is None for value in group_values
         ):
             raise ValueError("group_id, group_kind and group_order must be provided together")
+        if (
+            self.group_id is not None
+            and self.superset_group is not None
+            and (
+                self.group_id != self.superset_group
+                or self.group_kind != "superset"
+                or self.group_order != self.superset_order
+            )
+        ):
+            raise ValueError("superset fields must match the structured superset group")
         return self
 
 
@@ -287,11 +380,29 @@ class ProgramTemplateDayCreate(BaseModel):
     @model_validator(mode="after")
     def validate_supersets(self):
         groups: dict[int, list[int]] = {}
+        structured_groups: dict[int, tuple[str, list[int]]] = {}
         for exercise in self.exercises:
             if exercise.superset_group is not None and exercise.superset_order is not None:
                 groups.setdefault(exercise.superset_group, []).append(exercise.superset_order)
+            if exercise.group_id is not None:
+                current = structured_groups.get(exercise.group_id)
+                if current is None:
+                    structured_groups[exercise.group_id] = (
+                        exercise.group_kind or "",
+                        [exercise.group_order or 0],
+                    )
+                else:
+                    group_kind, orders = current
+                    if group_kind != exercise.group_kind:
+                        raise ValueError("all exercises in a group must use the same group kind")
+                    orders.append(exercise.group_order or 0)
         if any(sorted(orders) != [1, 2] for orders in groups.values()):
             raise ValueError("each superset must contain exactly two exercises ordered 1 and 2")
+        for group_kind, orders in structured_groups.values():
+            if sorted(orders) != list(range(1, len(orders) + 1)):
+                raise ValueError("exercise group orders must be contiguous and unique")
+            if group_kind == "superset" and sorted(orders) != [1, 2]:
+                raise ValueError("each structured superset must contain exactly two exercises")
         return self
 
 
@@ -497,8 +608,6 @@ ProgramRevisionChangeKind = Literal[
     "block_created",
     "block_updated",
     "block_status_changed",
-    "exercise_replaced",
-    "prescription_updated",
 ]
 TrainingBlockStatus = Literal["planned", "active", "completed", "archived"]
 
@@ -615,6 +724,16 @@ class CoachProgramExerciseCreate(BaseModel):
             value is None for value in group_values
         ):
             raise ValueError("group_id, group_kind and group_order must be provided together")
+        if (
+            self.group_id is not None
+            and self.superset_group is not None
+            and (
+                self.group_id != self.superset_group
+                or self.group_kind != "superset"
+                or self.group_order != self.superset_order
+            )
+        ):
+            raise ValueError("superset fields must match the structured superset group")
         return self
 
 

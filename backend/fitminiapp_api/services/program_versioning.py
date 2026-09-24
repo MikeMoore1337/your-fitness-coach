@@ -43,6 +43,47 @@ BLOCK_STATUS_TRANSITIONS = {
 }
 
 
+def _validate_workout_group_assignments(
+    exercises: list[UserWorkoutExercise],
+    *,
+    target: UserWorkoutExercise | None,
+    candidate: tuple[int | None, str | None, int | None],
+) -> None:
+    groups: dict[int, tuple[str, list[int]]] = {}
+
+    def add(group_id: int | None, group_kind: str | None, group_order: int | None) -> None:
+        if group_id is None and group_kind is None and group_order is None:
+            return
+        if group_id is None or group_kind is None or group_order is None:
+            raise ProgramError("Exercise group fields must be provided together")
+        existing = groups.get(group_id)
+        if existing is None:
+            groups[group_id] = (group_kind, [group_order])
+            return
+        existing_kind, orders = existing
+        if existing_kind != group_kind or group_order in orders:
+            raise ProgramError("Exercise group kind and order must be consistent")
+        orders.append(group_order)
+
+    for exercise in exercises:
+        if exercise is target:
+            continue
+        group_id = exercise.group_id if exercise.group_id is not None else exercise.superset_group
+        group_kind = exercise.group_kind or ("superset" if exercise.superset_group else None)
+        group_order = (
+            exercise.group_order if exercise.group_order is not None else exercise.superset_order
+        )
+        add(group_id, group_kind, group_order)
+    add(*candidate)
+
+    for group_kind, orders in groups.values():
+        ordered = sorted(orders)
+        if ordered != list(range(1, len(ordered) + 1)):
+            raise ProgramError("Exercise group orders must be contiguous and unique")
+        if group_kind == "superset" and ordered != [1, 2]:
+            raise ProgramError("A superset must contain exactly two ordered exercises")
+
+
 def _actor_role(program: UserProgram, actor: User | None) -> str:
     if actor is None:
         return "system"
@@ -548,6 +589,38 @@ def upsert_future_program_exercise(
         )
         if payload.target_template_exercise_id is not None and workout_exercise is None:
             continue
+        preserve_existing_group = (
+            workout_exercise is not None
+            and payload.target_template_exercise_id is not None
+            and payload.group_id is None
+            and payload.group_kind is None
+            and payload.group_order is None
+            and payload.superset_group is None
+            and payload.superset_order is None
+        )
+        candidate_group = (
+            (
+                workout_exercise.group_id
+                if workout_exercise.group_id is not None
+                else workout_exercise.superset_group,
+                workout_exercise.group_kind
+                or ("superset" if workout_exercise.superset_group else None),
+                workout_exercise.group_order
+                if workout_exercise.group_order is not None
+                else workout_exercise.superset_order,
+            )
+            if preserve_existing_group and workout_exercise is not None
+            else (
+                payload.group_id if payload.group_id is not None else payload.superset_group,
+                payload.group_kind or ("superset" if payload.superset_group else None),
+                payload.group_order if payload.group_order is not None else payload.superset_order,
+            )
+        )
+        _validate_workout_group_assignments(
+            workout.exercises,
+            target=workout_exercise,
+            candidate=candidate_group,
+        )
         if payload.superset_group is not None:
             conflict = next(
                 (
@@ -584,14 +657,6 @@ def upsert_future_program_exercise(
             db.flush()
         else:
             original_exercise_id = workout_exercise.exercise_id
-            preserve_existing_group = (
-                payload.target_template_exercise_id is not None
-                and payload.group_id is None
-                and payload.group_kind is None
-                and payload.group_order is None
-                and payload.superset_group is None
-                and payload.superset_order is None
-            )
             superset_group = (
                 workout_exercise.superset_group
                 if preserve_existing_group
@@ -679,18 +744,14 @@ def upsert_future_program_exercise(
         db,
         program,
         actor=actor,
-        change_kind=(
-            "exercise_replaced"
-            if payload.target_template_exercise_id is not None
-            else "prescription_updated"
-            if payload.prescription is not None
-            else "plan_updated"
-        ),
+        change_kind="plan_updated",
         reason=payload.reason,
         changed_fields={
             "operation": (
                 "exercise_replaced"
                 if payload.target_template_exercise_id is not None
+                else "prescription_updated"
+                if payload.prescription is not None
                 else "exercise_upserted"
             ),
             "day_number": selected_day,

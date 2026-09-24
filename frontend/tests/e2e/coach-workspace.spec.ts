@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+test.use({ serviceWorkers: 'block' });
+
 const captureAudit = Boolean(
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
     ?.CAPTURE_COACH_AUDIT,
@@ -289,7 +291,7 @@ async function mockCoachWorkspace(
       revisions: [],
     },
   ];
-  const operationDate = new Date().toISOString().slice(0, 10);
+  const operationDate = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   const seededSession = {
     id: 601,
     client_id: 11,
@@ -441,6 +443,8 @@ async function mockCoachWorkspace(
         json: {
           diary_date: url.searchParams.get('diary_date') ?? '2026-08-30',
           timezone: 'Europe/Moscow',
+          status: 'unlogged',
+          status_is_explicit: false,
           meals: [],
           totals: {
             energy_kcal: '0',

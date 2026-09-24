@@ -38,10 +38,6 @@ class ProgramTemplate(Base):
             "default_duration_weeks >= 1 AND default_duration_weeks <= 24",
             name="ck_program_templates_default_duration_weeks",
         ),
-        CheckConstraint(
-            "provenance_type IN ('YFC_GENERIC', 'SOURCE_ADAPTATION', 'CUSTOM')",
-            name="ck_program_templates_provenance_type",
-        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -62,9 +58,7 @@ class ProgramTemplate(Base):
     default_duration_weeks: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
-    provenance_type: Mapped[str] = mapped_column(
-        String(24), nullable=False, default="CUSTOM", server_default="CUSTOM", index=True
-    )
+    provenance_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
     provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     program_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
@@ -137,13 +131,6 @@ class ProgramTemplateExercise(Base):
             "(superset_group IS NOT NULL AND superset_order IS NOT NULL AND "
             "superset_group >= 1 AND superset_order IN (1, 2))",
             name="ck_program_template_exercises_superset",
-        ),
-        CheckConstraint(
-            "(group_id IS NULL AND group_kind IS NULL AND group_order IS NULL) OR "
-            "(group_id IS NOT NULL AND group_kind IN "
-            "('sequence', 'superset', 'rest_pause', 'myo_reps', 'cluster', 'drop_chain', 'circuit') "
-            "AND group_order IS NOT NULL AND group_order >= 1)",
-            name="ck_program_template_exercises_group",
         ),
     )
 
@@ -305,8 +292,7 @@ class ProgramRevision(Base):
         CheckConstraint(
             "change_kind IN "
             "('assigned', 'program_archived', 'plan_updated', 'block_created', "
-            "'block_updated', 'block_status_changed', 'exercise_replaced', "
-            "'prescription_updated')",
+            "'block_updated', 'block_status_changed')",
             name="ck_program_revisions_change_kind",
         ),
     )
@@ -521,28 +507,13 @@ class UserWorkoutExercise(Base):
             "superset_group >= 1 AND superset_order IN (1, 2))",
             name="ck_user_workout_exercises_superset",
         ),
-        CheckConstraint(
-            "(group_id IS NULL AND group_kind IS NULL AND group_order IS NULL) OR "
-            "(group_id IS NOT NULL AND group_kind IN "
-            "('sequence', 'superset', 'rest_pause', 'myo_reps', 'cluster', 'drop_chain', 'circuit') "
-            "AND group_order IS NOT NULL AND group_order >= 1)",
-            name="ck_user_workout_exercises_group",
-        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     workout_id: Mapped[int] = mapped_column(ForeignKey("user_workouts.id"), index=True)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
-    source_template_exercise_id: Mapped[int | None] = mapped_column(
-        ForeignKey("program_template_exercises.id", ondelete="SET NULL"),
-        index=True,
-        nullable=True,
-    )
-    source_weekly_prescription_id: Mapped[int | None] = mapped_column(
-        ForeignKey("program_template_exercise_weeks.id", ondelete="SET NULL"),
-        index=True,
-        nullable=True,
-    )
+    source_template_exercise_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_weekly_prescription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metric_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
     prescribed_sets: Mapped[int] = mapped_column(Integer)
