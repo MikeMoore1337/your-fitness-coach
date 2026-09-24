@@ -253,7 +253,9 @@ test('catalog keeps blocked media explicit and reduced motion uses the poster', 
   const rows = page.locator('.exercise-catalog-item');
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(0).locator('img[data-media-mode="static-poster"]')).toHaveCount(1);
-  await expect(rows.nth(1)).toContainText('Изображение пока недоступно');
+  const missingMedia = rows.nth(1).getByRole('img');
+  await expect(missingMedia).toHaveText('Нет фото');
+  await expect(missingMedia).toHaveAccessibleName(/Изображение пока недоступно/);
   await rows.nth(1).scrollIntoViewIfNeeded();
   await page.screenshot({
     path: '../.artifacts/tasks/390/evidence/screenshots/catalog-mobile-mixed-and-blocked-390x844.png',

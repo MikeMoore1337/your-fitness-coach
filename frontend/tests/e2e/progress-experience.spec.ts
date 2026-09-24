@@ -1118,13 +1118,13 @@ test('nutrition report preserves truthful period context, daily drill-down and r
       name: 'Навигация по точкам графика',
     });
     await expect(pointNavigation).toBeVisible();
-    expect(
-      (
-        await pointNavigation
-          .getByRole('button', { name: 'Предыдущая точка графика' })
-          .boundingBox()
-      )?.height,
-    ).toBeGreaterThanOrEqual(44);
+    const previousPointButton = pointNavigation.getByRole('button', {
+      name: 'Предыдущая точка графика',
+    });
+    await expect(previousPointButton).toBeVisible();
+    await expect
+      .poll(async () => (await previousPointButton.boundingBox())?.height ?? 0)
+      .toBeGreaterThanOrEqual(44);
   }
   await expect(page).toHaveURL(/progress_period=days_90/);
   await expect(report.getByText(/Заполнено \d+ из 90 дней/)).toBeVisible();
@@ -1652,12 +1652,18 @@ test('progress header aligns help and report without clipping the period selecto
       await expect(report).toBeVisible();
       await expect(tabs.getByRole('tab')).toHaveCount(4);
       await expect(page.locator('.progress-hero')).toHaveCSS('border-bottom-width', '0px');
-      const selectorGeometry = await tabs.evaluate((element) => ({
-        radius: getComputedStyle(element).borderTopLeftRadius,
-        overflow: getComputedStyle(element.parentElement!).overflow,
-      }));
+      const selectorGeometry = await tabs.evaluate((element) => {
+        const tabStyle = getComputedStyle(element);
+        const wrapperStyle = getComputedStyle(element.parentElement!);
+        return {
+          radius: tabStyle.borderTopLeftRadius,
+          overflowX: wrapperStyle.overflowX,
+          overflowY: wrapperStyle.overflowY,
+        };
+      });
       expect(selectorGeometry.radius).not.toBe('0px');
-      expect(selectorGeometry.overflow).toBe('visible');
+      expect(selectorGeometry.overflowX).toBe('auto');
+      expect(selectorGeometry.overflowY).toBe('hidden');
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true);
