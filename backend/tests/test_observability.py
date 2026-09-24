@@ -206,6 +206,10 @@ def test_news_cycle_summary_preserves_required_bounded_counters() -> None:
         "drafts_skipped_daily_limit": 1,
         "llm_failures": 1,
         "telegram_delivery_failures": 0,
+        "review_awaiting_review": 23,
+        "review_selected": 20,
+        "review_delivered": 19,
+        "review_backlog": 4,
     }
     for key, value in fields.items():
         setattr(record, key, value)

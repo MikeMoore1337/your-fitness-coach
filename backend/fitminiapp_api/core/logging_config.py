@@ -162,6 +162,10 @@ STRUCTURED_FIELDS = (
     "drafts_skipped_daily_limit",
     "llm_failures",
     "telegram_delivery_failures",
+    "review_awaiting_review",
+    "review_selected",
+    "review_delivered",
+    "review_backlog",
 )
 INTEGER_FIELDS = {
     "status_code",
@@ -206,6 +210,10 @@ INTEGER_FIELDS = {
     "drafts_skipped_daily_limit",
     "llm_failures",
     "telegram_delivery_failures",
+    "review_awaiting_review",
+    "review_selected",
+    "review_delivered",
+    "review_backlog",
 }
 FLOAT_FIELDS = {"duration_ms", "sql_duration_ms", "latency_ms"}
 CODE_FIELDS = {
