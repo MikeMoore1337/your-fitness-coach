@@ -264,8 +264,16 @@ def apply_source_allowlist(
     return created, updated
 
 
+def reconcile_default_news_sources(db: Session) -> tuple[int, int]:
+    """Reconcile registry-owned sources while preserving runtime fetch state and custom rows."""
+    definitions = load_source_allowlist(include_disabled=True)
+    if not any(item.enabled for item in definitions):
+        raise ValueError("default source allowlist must contain an enabled source")
+    return apply_source_allowlist(db, definitions, disable_missing=False)
+
+
 def bootstrap_default_news_sources(db: Session) -> int:
-    """Add missing enabled canonical sources without changing operator-managed rows."""
+    """Add missing enabled canonical sources without changing existing rows."""
     definitions = load_source_allowlist()
     if not any(item.enabled for item in definitions):
         raise ValueError("default source allowlist must contain an enabled source")
