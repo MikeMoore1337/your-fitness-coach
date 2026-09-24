@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import html
 import ipaddress
 import json
 import logging
@@ -21,7 +22,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -81,6 +82,16 @@ EXTERNAL_GPT_OSS_SOFT_BUDGETS = (
 )
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "host.docker.internal"})
 FALSE_VALUES = frozenset({"0", "false", "no", "off"})
+TRACKING_PARAMS = frozenset(
+    {
+        "fbclid",
+        "gclid",
+        "mc_cid",
+        "mc_eid",
+        "ref",
+        "ref_src",
+    }
+)
 SAFE_PREFLIGHT_BLOCKERS = frozenset(
     {"unsupported_number", "telegram_photo_caption_too_long"}
 )
@@ -433,12 +444,42 @@ def _load_job(path_value: str) -> EditorialJob:
     return job
 
 
+def _canonicalize_source_url(value: str) -> str:
+    parsed = urlsplit(html.unescape(value).strip())
+    hostname = (parsed.hostname or "").lower().rstrip(".")
+    port = parsed.port
+    if port and not (
+        (parsed.scheme.casefold() == "https" and port == 443)
+        or (parsed.scheme.casefold() == "http" and port == 80)
+    ):
+        netloc = f"{hostname}:{port}"
+    else:
+        netloc = hostname
+    query = [
+        (key, item_value)
+        for key, item_value in parse_qsl(parsed.query, keep_blank_values=True)
+        if not key.lower().startswith("utm_") and key.lower() not in TRACKING_PARAMS
+    ]
+    normalized_path = parsed.path or "/"
+    if normalized_path != "/":
+        normalized_path = normalized_path.rstrip("/")
+    return urlunsplit(
+        (
+            parsed.scheme.lower(),
+            netloc,
+            normalized_path,
+            urlencode(sorted(query)),
+            "",
+        )
+    )
+
+
 def _canonical_source_hash(source: SourcePacket) -> str:
     canonical = json.dumps(
         {
             "title": source.title,
             "summary": source.summary,
-            "url": source.canonical_url,
+            "url": _canonicalize_source_url(source.canonical_url),
             "published_at": source.published_at.isoformat() if source.published_at else None,
         },
         ensure_ascii=False,
