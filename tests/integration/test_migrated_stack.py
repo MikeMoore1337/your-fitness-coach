@@ -290,7 +290,7 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
         assert str(version).startswith("16"), "the migration test requires PostgreSQL 16"
         conn.execute(text(f'CREATE SCHEMA "{schema_name}"'))
 
-    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name}"})
+    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name},public"})
     schema_database_url = schema_url.render_as_string(hide_password=False)
     from fitminiapp_api.core.config import settings
 
