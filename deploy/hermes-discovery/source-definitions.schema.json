@@ -14,11 +14,23 @@
     "sources"
   ],
   "properties": {
-    "schema_version": {"const": "hermes-source-definitions-v1"},
-    "generator": {"const": "task403-yfc-source-registry-renderer-v1"},
-    "source_registry": {"const": "backend/fitminiapp_api/resources/news_sources.json"},
-    "source_registry_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "definitions_version": {"type": "string", "pattern": "^yfc-news-sources:[0-9a-f]{64}$"},
+    "schema_version": {
+      "const": "hermes-source-definitions-v1"
+    },
+    "generator": {
+      "const": "task403-yfc-source-registry-renderer-v1"
+    },
+    "source_registry": {
+      "const": "backend/fitminiapp_api/resources/news_sources.json"
+    },
+    "source_registry_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "definitions_version": {
+      "type": "string",
+      "pattern": "^yfc-news-sources:[0-9a-f]{64}$"
+    },
     "supported_topics": {
       "type": "array",
       "uniqueItems": true,
@@ -69,39 +81,102 @@
           "allowed_item_hosts"
         ],
         "properties": {
-          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$"},
-          "name": {"type": "string", "minLength": 1, "maxLength": 160},
-          "type": {"type": "string", "minLength": 1, "maxLength": 64},
-          "fetch_kind": {"enum": ["rss", "json_feed", "html_metadata"]},
-          "url": {"type": "string", "pattern": "^https://[^\\s]+$"},
-          "language": {"type": "string", "pattern": "^[a-z]{2,8}(?:-[A-Z]{2})?$"},
-          "enabled": {"type": "boolean"},
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "fetch_kind": {
+            "enum": [
+              "rss",
+              "json_feed",
+              "html_metadata"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https://[^\\s]+$"
+          },
+          "language": {
+            "type": "string",
+            "pattern": "^[a-z]{2,8}(?:-[A-Z]{2})?$"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
           "topics": {
             "type": "array",
             "minItems": 1,
             "maxItems": 20,
             "uniqueItems": true,
-            "items": {"type": "string", "pattern": "^[a-z0-9_]{2,64}$"}
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]{2,64}$"
+            }
           },
-          "authoritative": {"type": "boolean"},
+          "authoritative": {
+            "type": "boolean"
+          },
           "allowed_redirect_hosts": {
             "type": "array",
             "maxItems": 12,
             "uniqueItems": true,
-            "items": {"type": "string", "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"}
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+            }
           },
           "allowed_item_hosts": {
             "type": "array",
             "maxItems": 12,
             "uniqueItems": true,
-            "items": {"type": "string", "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"}
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+            }
           },
-          "fetch_interval_minutes": {"type": "integer", "minimum": 1, "maximum": 10080},
-          "freshness_policy": {"type": "string", "maxLength": 64},
-          "jurisdiction": {"type": "array", "items": {"type": "string", "maxLength": 32}},
-          "trust_notes": {"type": "string", "maxLength": 2000},
-          "licensing_notes": {"type": "string", "maxLength": 2000},
-          "health_claim_limitations": {"type": "string", "maxLength": 2000}
+          "fetch_interval_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10080
+          },
+          "freshness_policy": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "jurisdiction": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          "trust_notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "licensing_notes": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "health_claim_limitations": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "adapter": {
+            "enum": [
+              "pubmed_eutils"
+            ]
+          }
         }
       }
     }

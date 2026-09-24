@@ -13,7 +13,18 @@ from typing import Literal
 TAXONOMY_VERSION = "news-taxonomy-v1"
 RISK_POLICY_VERSION = "news-risk-v1"
 VOICE_PROFILE_VERSION = "yfc-news-voice-v1"
-RELEVANCE_VERSION = "news-relevance-v1"
+RELEVANCE_VERSION = "news-relevance-v2"
+
+OWNER_EDITORIAL_TOPICS = (
+    "fitness_training",
+    "bodybuilding",
+    "sports_bodybuilding_pharmacology",
+    "peptides",
+    "nutrition",
+    "sports_nutrition",
+    "dietary_supplements",
+    "healthy_lifestyle",
+)
 
 EDITORIAL_TOPICS = (
     "sports_bodybuilding_pharmacology",
@@ -427,29 +438,94 @@ def _contains_any(text: str, markers: tuple[str, ...]) -> bool:
 
 
 _RELEVANCE_MARKERS: dict[str, tuple[str, ...]] = {
-    "strength_hypertrophy": (
+    "fitness_training": (
         "strength training",
         "resistance training",
+        "resistance exercise",
         "hypertrophy",
         "muscle growth",
-        "muscle mass",
-        "muscle",
-        "muscle hypertrophy",
         "powerlifting",
         "weightlifting",
+        "training load",
+        "training volume",
+        "periodization",
+        "workout program",
+        "interval training",
+        "cardio interval",
+        "cardio training",
+        "cardiovascular exercise",
+        "endurance training",
+        "endurance exercise",
+        "endurance performance",
+        "aerobic training",
+        "mobility exercise",
+        "flexibility training",
+        "stretching exercise",
+        "athletic performance",
+        "sports performance",
+        "sports injury",
+        "injury prevention",
+        "sports rehabilitation",
+        "силов",
         "силов трен",
         "гипертроф",
         "рост мышц",
-        "мышечн масс",
         "пауэрлифт",
+        "тренировочн нагрузк",
+        "объем трениров",
+        "периодизац",
+        "программ трениров",
+        "спортивн травм",
+        "реабилитац спортсмен",
     ),
     "bodybuilding": (
         "bodybuilding",
         "bodybuilder",
         "physique competition",
         "physique athlete",
+        "contest preparation",
+        "contest prep",
         "бодибилд",
         "соревновательн подготовк",
+    ),
+    "sports_bodybuilding_pharmacology": TOPIC_MARKERS["sports_bodybuilding_pharmacology"],
+    "peptides": (
+        "peptide",
+        "glp-1",
+        "glp 1",
+        "semaglutide",
+        "tirzepatide",
+        "retatrutide",
+        "пептид",
+        "гпп-1",
+        "семаглутид",
+        "тирзепатид",
+        "ретатрутид",
+    ),
+    "nutrition": (
+        "sports nutrition",
+        "nutrition",
+        "dietary pattern",
+        "diet quality",
+        "energy intake",
+        "calorie intake",
+        "energy balance",
+        "body composition",
+        "weight management",
+        "weight loss",
+        "fat loss",
+        "muscle preservation",
+        "sarcopenic obesity",
+        "appetite",
+        "питани",
+        "рацион",
+        "энергетическ баланс",
+        "состав тел",
+        "снижен веса",
+        "снижен жира",
+        "контроль веса",
+        "аппетит",
+        "саркопеническ ожирен",
     ),
     "sports_nutrition": (
         "sports nutrition",
@@ -459,7 +535,6 @@ _RELEVANCE_MARKERS: dict[str, tuple[str, ...]] = {
         "dietary protein",
         "protein intake",
         "creatine",
-        "amino acid",
         "bcaa",
         "eaa",
         "carbohydrate gel",
@@ -469,7 +544,6 @@ _RELEVANCE_MARKERS: dict[str, tuple[str, ...]] = {
         "спортивн питани",
         "протеин",
         "креатин",
-        "аминокислот",
         "электролит",
         "изотоник",
         "предтренировоч",
@@ -478,57 +552,68 @@ _RELEVANCE_MARKERS: dict[str, tuple[str, ...]] = {
         "dietary supplement",
         "supplement use",
         "supplementation",
+        "supplement safety",
+        "supplement efficacy",
         "omega-3",
         "omega 3",
         "probiotic",
         "prebiotic",
+        "vitamin d supplement",
+        "mineral supplement",
         "бад",
         "пищев добавк",
-        "добавк для спортсмен",
+        "безопасност добавк",
+        "эффективност добавк",
+        "омега-3",
+        "пробиотик",
+        "пребиотик",
     ),
-    "sports_bodybuilding_pharmacology": TOPIC_MARKERS["sports_bodybuilding_pharmacology"],
-    "training": (
-        "training load",
-        "training volume",
-        "periodization",
-        "workout program",
-        "interval training",
-        "endurance training",
-        "endurance performance",
-        "cardio interval",
-        "resistance exercise",
-        "тренировочн нагрузк",
-        "объем трениров",
-        "периодизац",
-        "программ трениров",
-    ),
-    "mobility_recovery_sleep": (
-        "recovery",
+    "healthy_lifestyle": (
+        "physical activity",
+        "sleep quality",
         "sleep duration",
         "sleep and recovery",
-        "sleep quality",
-        "mobility training",
-        "flexibility training",
-        "восстановлени",
+        "exercise recovery",
+        "training recovery",
+        "healthy lifestyle",
+        "behavior change",
+        "habit formation",
+        "sedentary behavior",
+        "физическ актив",
         "качество сна",
-        "мобильност",
-        "mobility exercise",
-        "гибкост",
+        "продолжительност сна",
+        "восстановлени после трениров",
+        "здоров образ жизни",
+        "изменен привыч",
+        "малоподвижн",
     ),
 }
 
 _GENERIC_REJECTION_MARKERS = {
     "generic_clinical_medicine": (
         "clinical",
+        "clinic",
+        "clinical treatment",
+        "clinical care",
         "patient",
-        "disease",
+        "patients",
         "hospital",
-        "medicine",
-        "medical",
-        "клиническ",
+        "diagnostic",
+        "diagnosis",
+        "disease treatment",
+        "therapy",
+        "treatment-naïve",
+        "treatment-naive",
+        "treatment naive",
+        "osteoarthritis",
+        "oncology",
+        "cancer",
+        "клиническ лечен",
         "пациент",
+        "диагност",
+        "терапи",
+        "лечение",
         "заболеван",
-        "медицин",
     ),
     "generic_public_health": (
         "public health",
@@ -537,33 +622,176 @@ _GENERIC_REJECTION_MARKERS = {
         "общественн здравоохран",
         "эпидеми",
     ),
+    "generic_cognition": (
+        "cognitive performance",
+        "cognitive function",
+        "attention and memory",
+        "memory outcomes",
+        "attention outcomes",
+        "когнитивн функц",
+        "когнитивн результат",
+        "памят",
+        "внимани",
+    ),
     "generic_food_or_product": (
         "food science",
-        "food product",
         "food technology",
-        "пищев технолог",
+        "food processing",
+        "food extraction",
+        "ultrasound-assisted extraction",
+        "phenolic compound",
+        "antiradical",
         "food industry",
+        "agricultural",
+        "poultry",
+        "chicken",
+        "broiler",
+        "egg",
+        "eggshell",
+        "embryo",
+        "in ovo",
+        "bee bread",
         "company launch",
+        "пищев технолог",
+        "экстракц",
+        "фенольн соединен",
+        "пищев промышлен",
         "новый продукт",
     ),
-    "generic_fitness": ("fitness", "physical activity", "здоровый образ жизни", "фитнес"),
 }
 
-_WEAK_RELEVANCE_MARKERS = {
-    "strength_hypertrophy": {"muscle"},
-    "mobility_recovery_sleep": {"recovery"},
-}
+_DIRECT_RESCUE_MARKERS = (
+    "athlete",
+    "athletic",
+    "sport performance",
+    "sports performance",
+    "exercise performance",
+    "resistance training",
+    "strength training",
+    "hypertrophy",
+    "bodybuilding",
+    "bodybuilder",
+    "physique athlete",
+    "training load",
+    "workout",
+    "sarcopenic obesity",
+    "muscle preservation",
+    "fat loss",
+    "contest preparation",
+    "спортсмен",
+    "спортивн результат",
+    "силов трен",
+    "гипертроф",
+    "бодибилд",
+    "тренировочн нагрузк",
+    "саркопеническ ожирен",
+    "сохранен мышц",
+    "снижен жира",
+)
+
+_WEIGHT_MANAGEMENT_CONTEXT = (
+    "body composition",
+    "weight management",
+    "weight loss",
+    "fat loss",
+    "obesity treatment",
+    "appetite",
+    "sarcopenic obesity",
+    "muscle preservation",
+    "состав тел",
+    "контроль веса",
+    "снижен веса",
+    "снижен жира",
+    "аппетит",
+    "саркопеническ ожирен",
+    "сохранен мышц",
+)
+
+_SUPPLEMENT_CONTEXT = (
+    *_WEIGHT_MANAGEMENT_CONTEXT,
+    "athlete",
+    "sport",
+    "exercise",
+    "training",
+    "performance",
+    "recovery",
+    "bodybuilding",
+    "physique",
+    "muscle",
+    "strength",
+    "dietary supplement",
+    "supplement safety",
+    "supplement efficacy",
+    "athletic",
+    "спортсмен",
+    "трениров",
+    "результат",
+    "восстанов",
+    "бодибилд",
+    "мышц",
+    "силов",
+    "бад",
+    "безопасност добавк",
+    "эффективност добавк",
+)
+
+_NUTRITION_CONTEXT = (
+    *_WEIGHT_MANAGEMENT_CONTEXT,
+    "athlete",
+    "sport",
+    "exercise",
+    "training",
+    "performance",
+    "recovery",
+    "healthy lifestyle",
+    "спортсмен",
+    "трениров",
+    "результат",
+    "восстанов",
+    "здоров образ жизни",
+)
+
+_PEPTIDE_CONTEXT = (
+    *_WEIGHT_MANAGEMENT_CONTEXT,
+    "performance",
+    "athlete",
+    "bodybuilding",
+    "physique",
+    "спортсмен",
+    "бодибилд",
+)
+
+_HEALTHY_LIFESTYLE_CONTEXT = (
+    "physical activity",
+    "exercise",
+    "training",
+    "athlete",
+    "recovery",
+    "sleep",
+    "sedentary",
+    "habit",
+    "физическ актив",
+    "трениров",
+    "спортсмен",
+    "восстанов",
+    "сон",
+    "малоподвиж",
+    "привыч",
+)
 
 
-def _has_strong_subject_marker(topic: str, subject: str) -> bool:
-    weak = _WEAK_RELEVANCE_MARKERS.get(topic, set())
-    return _contains_any(
-        subject,
-        tuple(
-            marker.casefold()
-            for marker in _RELEVANCE_MARKERS[topic]
-            if marker.casefold() not in weak
-        ),
+def _matched_relevance_topics(subject: str, normalized: str) -> tuple[str, ...]:
+    return tuple(
+        topic
+        for topic in OWNER_EDITORIAL_TOPICS
+        if _contains_any(
+            normalized,
+            tuple(marker.casefold() for marker in _RELEVANCE_MARKERS[topic]),
+        )
+        and _contains_any(
+            subject,
+            tuple(marker.casefold() for marker in _RELEVANCE_MARKERS[topic]),
+        )
     )
 
 
@@ -572,74 +800,81 @@ def evaluate_editorial_relevance(
     summary: str = "",
     content: str = "",
 ) -> EditorialRelevance:
-    """Allow only bounded, deterministic training-domain candidates for Hermes editorial work."""
+    """Allow only direct, owner-relevant fitness/bodybuilding candidates."""
 
     subject = f"{title} {summary}".casefold()
     normalized = f"{subject} {content[:32_000]}".casefold()
-    subject_matched = tuple(
-        topic
-        for topic, markers in _RELEVANCE_MARKERS.items()
-        if _contains_any(subject, tuple(marker.casefold() for marker in markers))
+    matched = _matched_relevance_topics(subject, normalized)
+    direct_context = _contains_any(
+        subject,
+        tuple(marker.casefold() for marker in _DIRECT_RESCUE_MARKERS),
     )
-    matched = tuple(
-        topic
-        for topic, markers in _RELEVANCE_MARKERS.items()
-        if _contains_any(normalized, tuple(marker.casefold() for marker in markers))
+
+    rejection = next(
+        (
+            code
+            for code, markers in _GENERIC_REJECTION_MARKERS.items()
+            if _contains_any(subject, tuple(marker.casefold() for marker in markers))
+        ),
+        None,
     )
-    sports_context = any(
-        topic in subject_matched
-        for topic in (
-            "strength_hypertrophy",
-            "bodybuilding",
-            "sports_nutrition",
-            "dietary_supplements",
-            "training",
-            "mobility_recovery_sleep",
-        )
-    )
-    sports_context = sports_context or any(
-        marker in subject
-        for marker in (
-            "sport",
-            "athlete",
-            "athletic",
-            "для спорта",
-            "спортсмен",
-            "muscle",
-            "мышц",
-        )
-    )
+    if rejection and not direct_context:
+        return EditorialRelevance(False, f"topic_rejected:{rejection}", "none", ())
+
     if not matched:
-        reason = next(
-            (
-                f"topic_rejected:{code}"
-                for code, markers in _GENERIC_REJECTION_MARKERS.items()
-                if _contains_any(normalized, tuple(marker.casefold() for marker in markers))
-            ),
-            "topic_rejected:no_relevant_training_domain",
-        )
-        return EditorialRelevance(False, reason, "none", ())
-    if "sports_bodybuilding_pharmacology" in matched and not sports_context:
         return EditorialRelevance(
             False,
-            "topic_rejected:generic_clinical_medicine",
+            "topic_rejected:no_relevant_training_domain",
             "none",
             (),
         )
-    subject_topics = tuple(topic for topic in matched if _has_strong_subject_marker(topic, subject))
-    if not subject_topics:
+
+    if "peptides" in matched and not _contains_any(
+        subject,
+        tuple(marker.casefold() for marker in _PEPTIDE_CONTEXT),
+    ):
+        matched = tuple(topic for topic in matched if topic != "peptides")
+
+    if "nutrition" in matched and not _contains_any(
+        subject,
+        tuple(marker.casefold() for marker in _NUTRITION_CONTEXT),
+    ):
+        matched = tuple(topic for topic in matched if topic != "nutrition")
+
+    if "dietary_supplements" in matched and not _contains_any(
+        subject,
+        tuple(marker.casefold() for marker in _SUPPLEMENT_CONTEXT),
+    ):
+        matched = tuple(topic for topic in matched if topic != "dietary_supplements")
+
+    if "healthy_lifestyle" in matched and not _contains_any(
+        subject,
+        tuple(marker.casefold() for marker in _HEALTHY_LIFESTYLE_CONTEXT),
+    ):
+        matched = tuple(topic for topic in matched if topic != "healthy_lifestyle")
+
+    # Generic amino-acid/extraction or incidental "recovery" wording must not create
+    # sports-nutrition/training eligibility on its own.
+    if "sports_nutrition" in matched and any(
+        marker in subject for marker in ("extraction", "phenolic", "antiradical", "bee bread")
+    ):
+        matched = tuple(topic for topic in matched if topic != "sports_nutrition")
+
+    if not matched:
         return EditorialRelevance(
             False,
             "topic_rejected:weak_or_context_only",
             "none",
             (),
         )
+
     strong_topics = {
-        "strength_hypertrophy",
+        "fitness_training",
         "bodybuilding",
+        "sports_bodybuilding_pharmacology",
+        "peptides",
         "sports_nutrition",
         "dietary_supplements",
-        "sports_bodybuilding_pharmacology",
     }
     strength = "strong" if any(topic in strong_topics for topic in matched) else "moderate"
     return EditorialRelevance(

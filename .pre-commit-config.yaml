@@ -41,6 +41,13 @@ repos:
         pass_filenames: false
         files: ^(backend/fitminiapp_api|scripts/run_mypy\.py|pyproject\.toml)
 
+      - id: hermes-host-python
+        name: Hermes host Python 3.12 compatibility
+        entry: python3 scripts/check_hermes_host_python.py
+        language: system
+        pass_filenames: false
+        files: ^(deploy/hermes-discovery/.*\.py|scripts/(hermes_colocation|generate_hermes_source_definitions|check_hermes_host_python)\.py)$
+
       - id: skill-safety
         name: deterministic external skill safety
         entry: python scripts/skill_safety.py scan-all
