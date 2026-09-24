@@ -253,11 +253,11 @@ def test_source_allowlist_is_explicit_validated_and_operator_managed() -> None:
         parse_source_allowlist([_definition(), _definition()])
 
 
-def test_default_source_allowlist_adds_missing_sources_without_overwriting_operator_state(
+def test_default_source_registry_reconciles_canonical_rows_and_preserves_runtime_state(
     monkeypatch,
 ) -> None:
-    definitions = load_source_allowlist()
-    assert {item.id for item in definitions} == {
+    enabled_definitions = load_source_allowlist()
+    assert {item.id for item in enabled_definitions} == {
         "frontiers-nutrition",
         "frontiers-sports-active-living",
         "frontiers-physiology",
@@ -265,39 +265,110 @@ def test_default_source_allowlist_adds_missing_sources_without_overwriting_opera
         "frontiers-pharmacology",
         "pubmed-fitness-health",
     }
-    assert all(item.enabled for item in definitions)
-    pubmed = next(item for item in definitions if item.id == "pubmed-fitness-health")
+    all_definitions = load_source_allowlist(include_disabled=True)
+    assert len(all_definitions) == 13
+    pubmed = next(item for item in all_definitions if item.id == "pubmed-fitness-health")
     assert pubmed.enabled is True
     assert pubmed.fetch_kind == "json_feed"
     assert pubmed.adapter == "pubmed_eutils"
-    assert pubmed.authoritative is True
-    assert pubmed.health_claim_limitations.startswith("Index metadata or abstract alone")
+    assert set(pubmed.allowed_item_hosts) == {"pubmed.ncbi.nlm.nih.gov", "doi.org"}
+    disabled = next(item for item in all_definitions if not item.enabled)
 
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
+    operator_definition = parse_source_allowlist(
+        [
+            {
+                **_definition(source_id="operator-source"),
+                "trust_notes": "Operator-owned source",
+            }
+        ]
+    )
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 6
+        assert db.query(NewsSource).count() == 13
+        apply_source_allowlist(db, operator_definition)
+
         db.delete(db.get(NewsSource, "frontiers-physiology"))
+
         source = db.get(NewsSource, "frontiers-nutrition")
         assert source is not None
         source.enabled = False
+        source.feed_url = "https://stale.example/feed"
         source.fetch_interval_minutes = 720
-        source.trust_notes = "Operator-managed trust note"
-        source.fetch_options = {"operator": "preserve"}
+        source.trust_notes = "Stale canonical metadata"
+        source.fetch_options = {"operator": "stale"}
+        source.etag = '"runtime-etag"'
+        source.last_modified = "Wed, 23 Sep 2026 10:00:00 GMT"
+        source.last_success_at = datetime(2026, 9, 23, 10, 0)
+        source.last_error_code = "temporary_runtime_error"
+        source.last_error_at = datetime(2026, 9, 23, 11, 0)
+        source.consecutive_error_count = 4
+        source.next_fetch_at = datetime(2026, 9, 24, 12, 0)
+
+        pubmed_row = db.get(NewsSource, "pubmed-fitness-health")
+        assert pubmed_row is not None
+        pubmed_row.fetch_kind = "rss"
+        pubmed_row.feed_url = "https://pubmed.ncbi.nlm.nih.gov/rss/search/legacy/"
+        pubmed_row.fetch_options = {
+            "allowed_redirect_hosts": [],
+            "allowed_item_hosts": ["pubmed.ncbi.nlm.nih.gov"],
+            "topics": ["medicine", "health", "exercise"],
+        }
+        pubmed_row.last_error_code = "unexpected_content_type"
+        pubmed_row.consecutive_error_count = 7
+
+        disabled_row = db.get(NewsSource, disabled.id)
+        assert disabled_row is not None
+        disabled_row.enabled = True
 
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 6
+
+        assert db.query(NewsSource).count() == 14
         restored = db.get(NewsSource, "frontiers-physiology")
         assert restored is not None
         assert restored.enabled is True
-        assert db.get(NewsSource, "pubmed-fitness-health") is not None
+
         source = db.get(NewsSource, "frontiers-nutrition")
+        expected = next(item for item in all_definitions if item.id == "frontiers-nutrition")
         assert source is not None
-        assert source.enabled is False
-        assert source.fetch_interval_minutes == 720
-        assert source.trust_notes == "Operator-managed trust note"
-        assert source.fetch_options == {"operator": "preserve"}
+        assert source.enabled is expected.enabled
+        assert source.feed_url == expected.url
+        assert source.fetch_interval_minutes == expected.fetch_interval_minutes
+        assert source.trust_notes == expected.trust_notes
+        assert source.fetch_options["topics"] == list(expected.topics)
+        assert source.etag == '"runtime-etag"'
+        assert source.last_modified == "Wed, 23 Sep 2026 10:00:00 GMT"
+        assert source.last_success_at == datetime(2026, 9, 23, 10, 0)
+        assert source.last_error_code == "temporary_runtime_error"
+        assert source.last_error_at == datetime(2026, 9, 23, 11, 0)
+        assert source.consecutive_error_count == 4
+        assert source.next_fetch_at == datetime(2026, 9, 24, 12, 0)
+
+        pubmed_row = db.get(NewsSource, "pubmed-fitness-health")
+        assert pubmed_row is not None
+        assert pubmed_row.fetch_kind == "json_feed"
+        assert pubmed_row.feed_url == pubmed.url
+        assert pubmed_row.fetch_options["adapter"] == "pubmed_eutils"
+        assert set(pubmed_row.fetch_options["allowed_item_hosts"]) == {
+            "pubmed.ncbi.nlm.nih.gov",
+            "doi.org",
+        }
+        assert pubmed_row.last_error_code == "unexpected_content_type"
+        assert pubmed_row.consecutive_error_count == 7
+
+        disabled_row = db.get(NewsSource, disabled.id)
+        assert disabled_row is not None
+        assert disabled_row.enabled is False
+
+        operator_row = db.get(NewsSource, "operator-source")
+        assert operator_row is not None
+        assert operator_row.trust_notes == "Operator-owned source"
+        assert operator_row.feed_url == "https://operator-source.example/feed"
+
+    with get_session_context() as db:
+        seed_demo_data(db)
+        assert db.query(NewsSource).count() == 14
 
 
 def test_news_activation_requires_owner_ids_and_confirmed_channel() -> None:
