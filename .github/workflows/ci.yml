@@ -85,8 +85,19 @@ jobs:
           SCHEDULE_CRON: ${{ github.event.schedule || '' }}
         run: |
           set -Eeuo pipefail
-          if [ "$EVENT_NAME" = schedule ] || [ "$EVENT_NAME" = workflow_dispatch ]; then
-            test "$TARGET_REF" = refs/heads/master
+          if [ "$EVENT_NAME" = schedule ]; then
+            if [ "$TARGET_REF" != refs/heads/master ]; then
+              echo "Scheduled CI is restricted to refs/heads/master" >&2
+              exit 1
+            fi
+          elif [ "$EVENT_NAME" = workflow_dispatch ]; then
+            case "$TARGET_REF" in
+              refs/heads/master|refs/heads/task/*) ;;
+              *)
+                echo "Manual CI is restricted to refs/heads/master and refs/heads/task/*" >&2
+                exit 1
+                ;;
+            esac
           fi
           if [ "$EVENT_NAME" = pull_request ]; then
             python scripts/ci_contract.py route \

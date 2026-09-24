@@ -15,7 +15,9 @@ suite нет.
 | Daily | 17 2 * * * | каждый день 05:17 | daily-regression |
 | Weekly | 43 3 * * 0 | воскресенье 06:43 | weekly-exhaustive |
 
-workflow_dispatch запускается только на master и принимает run_kind: daily или weekly.
+Расписание запускается только на `master`. Ручной `workflow_dispatch` принимает
+`run_kind: daily` или `weekly` на `master` и ветках `task/*`; прочие refs завершаются с
+ошибкой.
 Неизвестный cron не классифицируется и завершается ошибкой. Выбор профиля и периода отчёта
 находится в scripts/scheduled_regression.py, а соответствие профилей CI-группам — в
 scripts/ci_contract.py.
