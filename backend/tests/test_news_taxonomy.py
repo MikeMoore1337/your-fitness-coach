@@ -1,3 +1,5 @@
+import pytest
+
 from fitminiapp_api.services.news_sources import parse_source_definition
 from fitminiapp_api.services.news_taxonomy import (
     EDITORIAL_TOPICS,
@@ -150,6 +152,32 @@ def test_relevance_rejects_animal_or_food_supplementation_without_fitness_contex
 
     assert animal.allowed is False
     assert animal.reason_code == "topic_rejected:generic_food_or_product"
+
+
+@pytest.mark.parametrize(
+    ("title", "summary"),
+    [
+        (
+            "Исследование связало силовые тренировки с восстановлением",
+            "Авторы изучили силовые тренировки и восстановление у взрослых.",
+        ),
+        (
+            "Cardio interval study measured endurance outcome",
+            "A controlled cardio interval study reported endurance outcomes.",
+        ),
+        (
+            "Mobility exercise study reported flexibility outcome",
+            "A controlled mobility exercise study reported flexibility outcomes.",
+        ),
+    ],
+)
+def test_relevance_accepts_explicit_training_phrases_found_by_full_suite(
+    title: str, summary: str
+) -> None:
+    relevance = evaluate_editorial_relevance(title, summary)
+
+    assert relevance.allowed is True
+    assert "fitness_training" in relevance.topics
 
 
 def test_relevance_covers_all_missing_agreed_domains() -> None:

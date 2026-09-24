@@ -420,6 +420,18 @@ def test_discovery_and_yfc_share_the_same_owner_taxonomy_contract() -> None:
             "Sleep quality and recovery in resistance-trained athletes",
             "Sleep duration was associated with training recovery.",
         ),
+        (
+            "Исследование связало силовые тренировки с восстановлением",
+            "Авторы изучили силовые тренировки и восстановление у взрослых.",
+        ),
+        (
+            "Cardio interval study measured endurance outcome",
+            "A controlled cardio interval study reported endurance outcomes.",
+        ),
+        (
+            "Mobility exercise study reported flexibility outcome",
+            "A controlled mobility exercise study reported flexibility outcomes.",
+        ),
     ],
 )
 def test_discovery_relevance_matches_yfc_relevance(title: str, summary: str) -> None:
