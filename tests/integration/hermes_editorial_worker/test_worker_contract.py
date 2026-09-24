@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Thread
 from typing import ClassVar
 
+import httpx
 import pytest
 from pydantic import ValidationError
 
@@ -767,6 +768,80 @@ def test_provider_http_statuses_have_bounded_safe_classification(
         "provider_error_code": "invalid_parameter",
         "provider_error_param": "reasoning_format",
     }
+
+
+def test_provider_429_retry_after_is_safe_and_bounded() -> None:
+    response = httpx.Response(429, headers={"retry-after": "12.5"})
+
+    assert editorial_worker._provider_retry_after_seconds(response) == 12.5
+    error = editorial_worker._provider_http_error(response)
+    assert error.code == "provider_rate_limited"
+    assert error.safe_details["retry_after_seconds"] == 12.5
+    assert error.as_payload()["retry_after_seconds"] == 12.5
+
+    capped = httpx.Response(429, headers={"retry-after": "600"})
+    assert (
+        editorial_worker._provider_retry_after_seconds(capped)
+        == editorial_worker.MAX_PROVIDER_RETRY_AFTER_SECONDS
+    )
+
+
+@pytest.mark.parametrize("value", ["", "later", "-1", "nan", "inf"])
+def test_provider_429_invalid_retry_after_falls_back(value: str) -> None:
+    response = httpx.Response(429, headers={"retry-after": value})
+
+    assert editorial_worker._provider_retry_after_seconds(response) is None
+
+
+def test_provider_rate_limit_retry_uses_server_delay(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HERMES_PROVIDER_MODE", editorial_worker.LOCAL_MOCK_MODE)
+    monkeypatch.setenv("HERMES_PROVIDER_BASE_URL", "http://127.0.0.1:9/v1")
+    monkeypatch.setenv("HERMES_PROVIDER_API_KEY", "test-only-key")
+    monkeypatch.setenv("HERMES_PROVIDER_MODEL", "mock-editorial-v1")
+    monkeypatch.setenv("HERMES_PROVIDER_MAX_ATTEMPTS", "2")
+    monkeypatch.setenv("HERMES_PROVIDER_RETRY_BACKOFF_SECONDS", "0.5")
+
+    calls = 0
+    sleeps: list[float] = []
+    proposal = editorial_worker.DraftProposal(
+        headline="Заголовок",
+        summary="Проверяемый текст.",
+        why_it_matters="Редакторская проверка.",
+    )
+
+    def request_once(*_args: object, **_kwargs: object) -> editorial_worker.DraftProposal:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise editorial_worker.WorkerError(
+                "provider_rate_limited",
+                safe_details={"retry_after_seconds": 14.0},
+            )
+        return proposal
+
+    monkeypatch.setattr(editorial_worker, "_provider_request_once", request_once)
+    monkeypatch.setattr(editorial_worker.time, "sleep", sleeps.append)
+
+    result = editorial_worker._provider_request_bounded(valid_job().source)
+
+    assert result.proposal == proposal
+    assert result.attempts == 2
+    assert calls == 2
+    assert sleeps == [14.0]
+
+
+def test_provider_retry_delay_uses_configured_fallback_and_cap() -> None:
+    missing = editorial_worker.WorkerError("provider_rate_limited")
+    assert editorial_worker._provider_retry_delay(missing, 0.5) == 0.5
+
+    huge = editorial_worker.WorkerError(
+        "provider_rate_limited",
+        safe_details={"retry_after_seconds": 600.0},
+    )
+    assert (
+        editorial_worker._provider_retry_delay(huge, 0.5)
+        == editorial_worker.MAX_PROVIDER_RETRY_AFTER_SECONDS
+    )
 
 
 def test_provider_error_diagnostics_drop_body_message_and_unsafe_values() -> None:

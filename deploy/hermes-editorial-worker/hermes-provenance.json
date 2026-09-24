@@ -22,7 +22,8 @@
     "skillVersion": "yfc-hermes-editorial-v1",
     "sourceBehaviorPatches": {
       "relevanceGate": "hermes-relevance-v1 or hermes-relevance-v2 required before provider",
-      "richCaptionTarget": "850-1000 UTF-16 characters when evidence supports it"
+      "richCaptionTarget": "850-1000 UTF-16 characters when evidence supports it",
+      "providerRateLimit": "429 retry-after honored with a 60 second maximum; provider attempts remain bounded"
     },
     "provider": "OpenAI-compatible HTTP, local-only before Gate A",
     "publishCapability": false,
