@@ -182,7 +182,10 @@ class Settings(BaseSettings):
     news_defer_hours: int = Field(default=24, ge=1, le=168)
     news_max_regenerations: int = Field(default=3, ge=0, le=10)
     news_draft_max_chars: int = Field(default=2600, ge=800, le=3200)
-    news_review_batch_size: int = Field(default=10, ge=1, le=20)
+    # Legacy env name retained for compatibility; this value is the per-slot owner-review cap.
+    news_review_batch_size: int = Field(default=20, ge=1, le=20)
+    news_review_wave_size: int = Field(default=10, ge=1, le=20)
+    news_review_wave_pause_seconds: float = Field(default=10.0, ge=0, le=60)
     news_draft_profile: Literal["standard", "extended"] = "standard"
     news_auto_publish_low_risk: bool = False
     hermes_intake_enabled: bool = False
