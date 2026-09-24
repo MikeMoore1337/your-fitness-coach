@@ -3,6 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 
+test.use({ serviceWorkers: 'block' });
+
 type AppDestination = 'Сегодня' | 'План' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
 const TASK_293_EVIDENCE_DIR = process.env.TASK_293_EVIDENCE_DIR;
 const STAGE4_THUMBNAIL_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';

@@ -349,6 +349,12 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
             assert "source_weekly_prescription_id" not in source_foreign_keys
 
             with schema_engine.connect() as connection:
+                migration_context = connection.execute(
+                    text(
+                        "SELECT current_schema(), current_setting('search_path'), "
+                        "(SELECT version_num FROM alembic_version)"
+                    )
+                ).one()
                 provenance = dict(
                     connection.execute(
                         text("SELECT slug, provenance_type FROM program_templates")
@@ -361,11 +367,13 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
                         "AND conname = 'ck_program_revisions_change_kind'"
                     )
                 ).scalar_one()
+            assert migration_context[0] == schema_name, migration_context
+            assert migration_context[2] == "0095_program_provenance_backfill", migration_context
             assert provenance == {
                 "stronglifts-5x5": "SOURCE_ADAPTATION",
                 "legacy-yfc-template": "YFC_GENERIC",
                 "private-custom-template": "CUSTOM",
-            }
+            }, f"migration_context={migration_context!r}; provenance={provenance!r}"
             assert "exercise_replaced" not in revision_check
             assert "prescription_updated" not in revision_check
         finally:
