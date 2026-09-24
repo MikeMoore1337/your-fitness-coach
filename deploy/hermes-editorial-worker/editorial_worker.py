@@ -13,6 +13,7 @@ import hmac
 import ipaddress
 import json
 import logging
+import math
 import os
 import re
 import sys
@@ -44,6 +45,7 @@ EXTERNAL_YFC_HOST_ALLOWLIST = frozenset({"app.your-fitness-coach.ru"})
 YFC_INTAKE_PATH = "/api/v1/hermes/editorial/intake"
 DEFAULT_PROVIDER_MAX_ATTEMPTS = 2
 DEFAULT_PROVIDER_RETRY_BACKOFF_SECONDS = 0.25
+MAX_PROVIDER_RETRY_AFTER_SECONDS = 60.0
 RETRYABLE_PROVIDER_ERRORS = frozenset(
     {"provider_timeout", "provider_unavailable", "provider_rate_limited", "provider_server_error"}
 )
@@ -101,6 +103,11 @@ class WorkerError(RuntimeError):
             value = self.safe_details.get(field_name)
             if isinstance(value, str) and SAFE_PROVIDER_ERROR_VALUE_PATTERN.fullmatch(value):
                 payload[field_name] = value
+        retry_after = self.safe_details.get("retry_after_seconds")
+        if isinstance(retry_after, (int, float)) and not isinstance(retry_after, bool):
+            value = float(retry_after)
+            if math.isfinite(value) and 0 <= value <= MAX_PROVIDER_RETRY_AFTER_SECONDS:
+                payload["retry_after_seconds"] = value
         blockers = self.safe_details.get("preflight_blockers")
         if isinstance(blockers, (list, tuple)):
             safe_blockers = [
@@ -875,8 +882,37 @@ def _safe_provider_error_value(value: object) -> str | None:
     return normalized
 
 
+def _provider_retry_after_seconds(response: httpx.Response) -> float | None:
+    if response.status_code != 429:
+        return None
+    raw = response.headers.get("retry-after")
+    if raw is None:
+        return None
+    try:
+        value = float(raw.strip())
+    except ValueError:
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return min(value, MAX_PROVIDER_RETRY_AFTER_SECONDS)
+
+
+def _provider_retry_delay(error: WorkerError, configured_backoff: float) -> float:
+    delay = configured_backoff
+    if error.code == "provider_rate_limited":
+        retry_after = error.safe_details.get("retry_after_seconds")
+        if isinstance(retry_after, (int, float)) and not isinstance(retry_after, bool):
+            value = float(retry_after)
+            if math.isfinite(value) and value >= 0:
+                delay = max(delay, min(value, MAX_PROVIDER_RETRY_AFTER_SECONDS))
+    return min(delay, MAX_PROVIDER_RETRY_AFTER_SECONDS)
+
+
 def _provider_http_error(response: httpx.Response) -> WorkerError:
     safe_details: dict[str, object] = {"http_status": response.status_code}
+    retry_after = _provider_retry_after_seconds(response)
+    if retry_after is not None:
+        safe_details["retry_after_seconds"] = retry_after
     try:
         raw = _read_bounded_response(response, MAX_PROVIDER_RESPONSE_BYTES)
     except WorkerError:
@@ -1009,8 +1045,9 @@ def _provider_request_bounded(
         except WorkerError as exc:
             if exc.code not in RETRYABLE_PROVIDER_ERRORS or attempt + 1 >= max_attempts:
                 raise
-            if retry_backoff:
-                time.sleep(retry_backoff)
+            retry_delay = _provider_retry_delay(exc, retry_backoff)
+            if retry_delay:
+                time.sleep(retry_delay)
             continue
         warnings = _preflight_warnings(proposal, source)
         if not warnings:
