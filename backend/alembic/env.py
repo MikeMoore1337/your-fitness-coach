@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool, text
+from sqlalchemy.engine import Connection
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.base import Base
@@ -38,12 +39,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
+    def run(connection: Connection) -> None:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             if connection.dialect.name == "postgresql":
@@ -53,6 +49,19 @@ def run_migrations_online() -> None:
                     {"lock_id": MIGRATION_ADVISORY_LOCK_ID},
                 )
             context.run_migrations()
+
+    supplied_connection = config.attributes.get("connection")
+    if supplied_connection is not None:
+        run(supplied_connection)
+        return
+
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    with connectable.connect() as connection:
+        run(connection)
 
 
 if context.is_offline_mode():

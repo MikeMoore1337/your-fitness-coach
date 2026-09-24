@@ -268,7 +268,7 @@ def test_migrated_postgres_account_deletion_removes_owner_nutrition_graph() -> N
             assert db.get(EnergyCalibration, calibration_id) is None
 
 
-def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
+def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
     database_url = os.environ.get("DATABASE_URL", "")
     assert database_url.startswith("postgresql+psycopg://"), (
         "the migration compatibility test must run against PostgreSQL"
@@ -292,16 +292,17 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
 
     schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name},public"})
     schema_database_url = schema_url.render_as_string(hide_password=False)
-    from fitminiapp_api.core.config import settings
-
-    monkeypatch.setattr(settings, "database_url", schema_database_url)
     alembic_config = Config(str(root / "backend" / "alembic.ini"))
     alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    schema_engine = create_engine(schema_database_url)
     try:
-        command.upgrade(alembic_config, "0092_coach_crm_core")
-        schema_engine = create_engine(schema_database_url)
-        try:
-            with schema_engine.begin() as connection:
+        with schema_engine.connect() as connection:
+            connection.execute(text(f'SET search_path TO "{schema_name}", public'))
+            connection.commit()
+            alembic_config.attributes["connection"] = connection
+
+            command.upgrade(alembic_config, "0092_coach_crm_core")
+            with connection.begin():
                 connection.execute(
                     text(
                         "INSERT INTO program_templates "
@@ -326,13 +327,9 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
                         },
                     ],
                 )
-        finally:
-            schema_engine.dispose()
 
-        command.upgrade(alembic_config, "head")
-        schema_engine = create_engine(schema_database_url)
-        try:
-            inspector = inspect(schema_engine)
+            command.upgrade(alembic_config, "head")
+            inspector = inspect(connection)
             provenance_columns = {
                 column["name"]: column for column in inspector.get_columns("program_templates")
             }
@@ -348,46 +345,45 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
             assert "source_template_exercise_id" not in source_foreign_keys
             assert "source_weekly_prescription_id" not in source_foreign_keys
 
-            with schema_engine.connect() as connection:
-                migration_context = connection.execute(
-                    text(
-                        "SELECT current_schema(), current_setting('search_path'), "
-                        "(SELECT version_num FROM alembic_version)"
-                    )
-                ).one()
-                template_schema = connection.execute(
-                    text(
-                        "SELECT n.nspname FROM pg_class AS c "
-                        "JOIN pg_namespace AS n ON n.oid = c.relnamespace "
-                        "WHERE c.oid = 'program_templates'::regclass"
-                    )
-                ).scalar_one()
-                template_count = connection.execute(
-                    text("SELECT count(*) FROM program_templates")
-                ).scalar_one()
-                backfill_batch = (
-                    connection.execute(
-                        text(
-                            "SELECT id FROM program_templates WHERE provenance_type IS NULL "
-                            "ORDER BY CASE WHEN owner_user_id IS NULL AND created_by_user_id IS NULL "
-                            "AND is_public = TRUE THEN 0 ELSE 1 END, id LIMIT 10"
-                        )
-                    )
-                    .scalars()
-                    .all()
+            migration_context = connection.execute(
+                text(
+                    "SELECT current_schema(), current_setting('search_path'), "
+                    "(SELECT version_num FROM alembic_version)"
                 )
-                provenance = dict(
-                    connection.execute(
-                        text("SELECT slug, provenance_type FROM program_templates")
-                    ).all()
+            ).one()
+            template_schema = connection.execute(
+                text(
+                    "SELECT n.nspname FROM pg_class AS c "
+                    "JOIN pg_namespace AS n ON n.oid = c.relnamespace "
+                    "WHERE c.oid = 'program_templates'::regclass"
                 )
-                revision_check = connection.execute(
+            ).scalar_one()
+            template_count = connection.execute(
+                text("SELECT count(*) FROM program_templates")
+            ).scalar_one()
+            backfill_batch = (
+                connection.execute(
                     text(
-                        "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
-                        "WHERE conrelid = 'program_revisions'::regclass "
-                        "AND conname = 'ck_program_revisions_change_kind'"
+                        "SELECT id FROM program_templates WHERE provenance_type IS NULL "
+                        "ORDER BY CASE WHEN owner_user_id IS NULL AND created_by_user_id IS NULL "
+                        "AND is_public = TRUE THEN 0 ELSE 1 END, id LIMIT 10"
                     )
-                ).scalar_one()
+                )
+                .scalars()
+                .all()
+            )
+            provenance = dict(
+                connection.execute(
+                    text("SELECT slug, provenance_type FROM program_templates")
+                ).all()
+            )
+            revision_check = connection.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                    "WHERE conrelid = 'program_revisions'::regclass "
+                    "AND conname = 'ck_program_revisions_change_kind'"
+                )
+            ).scalar_one()
             assert migration_context[0] == schema_name, migration_context
             assert migration_context[2] == "0095_program_provenance_backfill", migration_context
             assert template_schema == schema_name, template_schema
@@ -402,9 +398,8 @@ def test_program_schema_upgrades_from_0092_on_postgres16(monkeypatch) -> None:
             )
             assert "exercise_replaced" not in revision_check
             assert "prescription_updated" not in revision_check
-        finally:
-            schema_engine.dispose()
     finally:
+        schema_engine.dispose()
         with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
             conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
         maintenance_engine.dispose()
