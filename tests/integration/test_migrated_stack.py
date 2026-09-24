@@ -290,16 +290,17 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
         assert str(version).startswith("16"), "the migration test requires PostgreSQL 16"
         conn.execute(text(f'CREATE SCHEMA "{schema_name}"'))
 
-    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name},public"})
+    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name}"})
     schema_database_url = schema_url.render_as_string(hide_password=False)
     alembic_config = Config(str(root / "backend" / "alembic.ini"))
     alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
     schema_engine = create_engine(schema_database_url)
     try:
         with schema_engine.connect() as connection:
-            connection.execute(text(f'SET search_path TO "{schema_name}", public'))
+            connection.execute(text(f'SET search_path TO "{schema_name}"'))
             connection.commit()
             alembic_config.attributes["connection"] = connection
+            alembic_config.attributes["version_table_schema"] = schema_name
 
             command.upgrade(alembic_config, "0092_coach_crm_core")
             with connection.begin():
@@ -385,6 +386,7 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
                 )
             ).scalar_one()
             assert migration_context[0] == schema_name, migration_context
+            assert migration_context[1] == schema_name, migration_context
             assert migration_context[2] == "0095_program_provenance_backfill", migration_context
             assert template_schema == schema_name, template_schema
             assert provenance == {

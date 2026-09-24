@@ -40,7 +40,11 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     def run(connection: Connection) -> None:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            version_table_schema=config.attributes.get("version_table_schema"),
+        )
         with context.begin_transaction():
             if connection.dialect.name == "postgresql":
                 # Serialize automatic and manual migrations during container startup.
