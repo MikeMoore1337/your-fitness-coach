@@ -18,8 +18,10 @@ from fitminiapp_api.models.nutrition_label import (
     NutritionLabelDraft,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.nutrition_label.contracts import NUTRIENT_FIELDS
 from fitminiapp_api.nutrition_label.image import ImageIngressError, normalize_uploaded_image
 from fitminiapp_api.nutrition_label.parser import build_draft_from_ocr
+from fitminiapp_api.nutrition_label.vision import VISION_MAX_RESPONSE_BYTES
 from fitminiapp_api.schemas.nutrition_label import NutritionLabelConfirmRequest
 from fitminiapp_api.services import nutrition_label as nutrition_label_service
 from fitminiapp_api.services.accounts import delete_user_cascade
@@ -94,6 +96,69 @@ class _FixedTextOcr:
     def extract_text(self, image_bytes: bytes) -> str:
         assert image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
         return self.text
+
+
+class _FakeVisionAdapter:
+    provider_class = "test_provider"
+    model_class = "test_model"
+    prompt_version = "test-prompt-v1"
+
+    def __init__(self, response: bytes = b"{}", error: Exception | None = None) -> None:
+        self.response = response
+        self.error = error
+        self.calls: list[tuple[bytes, float, int]] = []
+
+    def recognize(
+        self,
+        normalized_png: bytes,
+        *,
+        timeout_seconds: float,
+        max_response_bytes: int,
+    ) -> bytes:
+        self.calls.append((normalized_png, timeout_seconds, max_response_bytes))
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+
+def _direct_label_draft(
+    client,
+    *,
+    monkeypatch: pytest.MonkeyPatch,
+    telegram_user_id: int,
+    text: str,
+    idempotency_key: str,
+    vision_adapter: _FakeVisionAdapter | None = None,
+):
+    _auth(client, telegram_user_id)
+    user_id = _user_id(telegram_user_id)
+    _enable_scan(monkeypatch, user_id)
+    with get_session_context() as db:
+        user = db.query(User).filter(User.id == user_id).one()
+        return nutrition_label_service.create_label_draft(
+            db,
+            user,
+            image_bytes=_label_image(),
+            content_type="image/png",
+            idempotency_key=idempotency_key,
+            ocr_engine=_FixedTextOcr(text),
+            vision_adapter=vision_adapter,
+        )
+
+
+def _vision_proposal_bytes(text: str) -> bytes:
+    canonical = build_draft_from_ocr(text)
+    source_facts = canonical.source_facts.model_copy(
+        update={
+            field_name: [
+                cell.model_copy(update={"column_ref": "main"})
+                for cell in getattr(canonical.source_facts, field_name)
+            ]
+            for field_name in NUTRIENT_FIELDS
+            if getattr(canonical.source_facts, field_name) is not None
+        }
+    )
+    return canonical.model_copy(update={"source_facts": source_facts}).model_dump_json().encode()
 
 
 def _confirm_payload(*, visibility: str = "private", barcode: str | None = None) -> dict:
@@ -482,6 +547,145 @@ def test_partial_nutrition_ocr_creates_review_draft_instead_of_retake(client, mo
     assert body["nutrition"]["source_basis"] == "per_100_g"
     assert body["nutrition"]["normalized_facts"]["protein_g"]["value"] == "10"
     assert "missing_required_fact" in body["warnings"]
+
+
+def test_complete_local_assessment_never_invokes_vision(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    adapter = _FakeVisionAdapter()
+
+    draft = _direct_label_draft(
+        client,
+        monkeypatch=monkeypatch,
+        telegram_user_id=128_190,
+        text=_label_text(),
+        idempotency_key="local-review-vision-0",
+        vision_adapter=adapter,
+    )
+
+    assert adapter.calls == []
+    assert draft.requires_user_review is True
+    with get_session_context() as db:
+        user_id = _user_id(128_190)
+        assert db.query(Food).filter_by(owner_user_id=user_id).count() == 0
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user_id).count() == 0
+
+
+def test_retake_assessment_never_invokes_vision_or_creates_a_draft(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    adapter = _FakeVisionAdapter()
+
+    with pytest.raises(nutrition_label_service.NutritionLabelError, match="retake_required"):
+        _direct_label_draft(
+            client,
+            monkeypatch=monkeypatch,
+            telegram_user_id=128_191,
+            text="blurry package text",
+            idempotency_key="retake-vision-0001",
+            vision_adapter=adapter,
+        )
+
+    assert adapter.calls == []
+    with get_session_context() as db:
+        user_id = _user_id(128_191)
+        assert db.query(NutritionLabelDraft).filter_by(user_id=user_id).count() == 0
+
+
+def test_disabled_vision_candidate_remains_an_editable_local_draft(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", False)
+    adapter = _FakeVisionAdapter()
+
+    draft = _direct_label_draft(
+        client,
+        monkeypatch=monkeypatch,
+        telegram_user_id=128_192,
+        text="Per 100 g\nProtein 10 g",
+        idempotency_key="vision-disabled-0001",
+        vision_adapter=adapter,
+    )
+
+    assert adapter.calls == []
+    assert draft.requires_user_review is True
+    assert draft.nutrition.normalized_facts.protein_g is not None
+    with get_session_context() as db:
+        user_id = _user_id(128_192)
+        assert db.query(NutritionLabelDraft).filter_by(user_id=user_id).count() == 1
+
+
+def test_valid_vision_proposal_only_creates_a_review_draft(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    proposal = _vision_proposal_bytes(_label_text())
+    adapter = _FakeVisionAdapter(proposal)
+
+    draft = _direct_label_draft(
+        client,
+        monkeypatch=monkeypatch,
+        telegram_user_id=128_193,
+        text="Per 100 g\nProtein 10 g",
+        idempotency_key="vision-success-0001",
+        vision_adapter=adapter,
+    )
+
+    assert len(adapter.calls) == 1
+    normalized_png, timeout_seconds, max_response_bytes = adapter.calls[0]
+    assert normalized_png.startswith(b"\x89PNG\r\n\x1a\n")
+    assert timeout_seconds == 8
+    assert max_response_bytes == VISION_MAX_RESPONSE_BYTES
+    assert draft.nutrition.metadata.provider == "test_provider"
+    assert draft.requires_user_review is True
+    with get_session_context() as db:
+        user_id = _user_id(128_193)
+        assert db.query(NutritionLabelDraft).filter_by(user_id=user_id).count() == 1
+        assert db.query(Food).filter_by(owner_user_id=user_id).count() == 0
+        assert db.query(FoodDiaryEntry).filter_by(user_id=user_id).count() == 0
+        assert db.query(NutritionCatalogContribution).count() == 0
+
+
+@pytest.mark.parametrize(
+    "error",
+    [TimeoutError("PRIVATE PROVIDER DETAIL"), OSError("PRIVATE PROVIDER DETAIL")],
+    ids=["timeout", "unavailable"],
+)
+def test_vision_failure_returns_the_local_manual_review_draft_without_raw_error(
+    client,
+    monkeypatch,
+    caplog,
+    error: Exception,
+) -> None:
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    adapter = _FakeVisionAdapter(error=error)
+
+    with caplog.at_level("INFO", logger="app"):
+        draft = _direct_label_draft(
+            client,
+            monkeypatch=monkeypatch,
+            telegram_user_id=128_194,
+            text="Per 100 g\nProtein 10 g",
+            idempotency_key="vision-failure-001",
+            vision_adapter=adapter,
+        )
+
+    assert len(adapter.calls) == 1
+    assert draft.nutrition.metadata.provider == "local_tesseract"
+    assert draft.requires_user_review is True
+    assert "PRIVATE PROVIDER DETAIL" not in caplog.text
+
+
+def test_malformed_vision_json_falls_back_to_local_review(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    adapter = _FakeVisionAdapter(b'{"schema_version":')
+
+    draft = _direct_label_draft(
+        client,
+        monkeypatch=monkeypatch,
+        telegram_user_id=128_195,
+        text="Per 100 g\nProtein 10 g",
+        idempotency_key="vision-invalid-0001",
+        vision_adapter=adapter,
+    )
+
+    assert len(adapter.calls) == 1
+    assert draft.nutrition.metadata.provider == "local_tesseract"
+    assert draft.requires_user_review is True
 
 
 def test_empty_ocr_remains_retake_required_without_creating_draft(client, monkeypatch) -> None:

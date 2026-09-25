@@ -234,3 +234,27 @@ Production остаётся на SHA `586ae2b463c085804031fe9a67780f0d33729405` 
 том же снимке отсутствует в доступных материалах задачи; до повторного deploy и успешной проверки
 владельцем вместе с подтверждёнными порогами задержки/ресурсов публичное включение остаётся
 **NO-GO**.
+
+## Addendum Task 283 — deterministic routing and fallback boundary (2026-09-25)
+
+The implementation adds deterministic `local_review`, `vision_candidate`, `retake_required`, and
+`manual_review` assessment on top of the existing local OCR/parser. Strict proposal validation
+rejects unknown schema fields, duplicate JSON keys, non-finite values, fabricated identity,
+invalid evidence/basis/conversion, mixed source columns, unsafe ranges, and inconsistent energy. An
+accepted proposal still creates only an editable review draft.
+
+| Verification | Result | Limit |
+|---|---|---|
+| Task 283 assessment tests | `23 PASS` | Deterministic synthetic parser/schema inputs only |
+| Nutrition backend, OCR quality, RapidOCR and Vision targeted suite | `110 PASS, 1 SKIP` | Final run after column-consistency validation; includes integration fallback and no-write coverage |
+| Frontend Nutrition scanner/review unit tests | `11 PASS` | Existing UI state; no frontend code changed |
+| Nutrition Label Playwright | `4 PASS` | Web 360/390/430 and TMA 390 dark; stubbed product API, not provider or production evidence |
+| Frontend typecheck, ESLint, production build | `PASS` | Existing frontend source is unchanged |
+| Ruff, Ruff format, mypy | `PASS` | Changed Python modules |
+| Provider requests, candidate precision, recovery rate, cost, provider latency/quota | `NOT RUN / NOT MEASURED` | No provider/model/account was approved; no credential or request was used |
+| Real-photo / production Vision evidence | `NOT RUN` | Owner/provider/privacy/legal gate remains open |
+
+The route configuration stays `NUTRITION_LABEL_VISION_ENABLED=false`. Tests used a deterministic
+fake adapter only. Complete local-review and retake cases make zero adapter calls; disabled,
+unavailable, timed-out and invalid-response cases preserve the local draft or existing retake path.
+No production Vision fallback or recognition-quality claim is completed by this addendum.

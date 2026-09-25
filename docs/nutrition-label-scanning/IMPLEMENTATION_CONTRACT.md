@@ -1,5 +1,22 @@
 # Task 128C: backend-контракт сканирования этикетки и rollout
 
+## Addendum Task 283: deterministic Vision routing
+
+После локального OCR и до сохранения draft service строит детерминированный assessment:
+`local_review`, `vision_candidate`, `retake_required` или `manual_review`. Assessment не
+добавляет публичное поле confidence и не меняет API/таблицы. Полный локальный результат и
+обязательный retake не вызывают внешний adapter. Vision-кандидат может передать только
+нормализованный PNG; image, OCR text, user identity, Telegram context и история пользователя в
+adapter не передаются.
+
+`NUTRITION_LABEL_VISION_ENABLED=false` — fail-closed default; timeout ограничен 8 секундами,
+ответ — 64 KiB. На дату этой реализации production adapter/provider отсутствует и обычный API
+его не получает. Неуспех или выключенный route сохраняет локальный editable draft и требует
+ручной проверки. Любой принятый proposal проходит существующую строгую canonical/domain
+валидацию и остаётся `requires_user_review=true`; факты из разных `column_ref` не смешиваются;
+автоматические food/catalog/diary writes не разрешены. Этот code seam не является provider
+approval или разрешением на передачу фотографий.
+
 Этот документ фиксирует production foundation Task 128B и mobile/TMA integration Task 128C.
 Значение `false` в коде и `.env.example` остаётся fail-closed sample default. После обязательной
 production validation владелец может включить feature для всех авторизованных пользователей.

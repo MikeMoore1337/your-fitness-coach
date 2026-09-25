@@ -119,6 +119,8 @@ class Settings(BaseSettings):
     # it no longer limits access when the feature is enabled.
     nutrition_label_scan_enabled: bool = False
     nutrition_label_scan_kill_switch: bool = False
+    nutrition_label_vision_enabled: bool = False
+    nutrition_label_vision_timeout_seconds: float = Field(default=8, ge=1, le=8)
     nutrition_label_scan_internal_user_ids: str = ""
     nutrition_label_scan_ocr_engine: Literal["rapidocr", "tesseract"] = "rapidocr"
     nutrition_label_scan_ocr_languages: str = "rus+eng"
