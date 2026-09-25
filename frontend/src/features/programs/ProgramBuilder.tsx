@@ -13,6 +13,7 @@ import { AppLink } from '../../shared/navigation/router';
 import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
 import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
+import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
 import { normalizeExerciseSearchText, rankExercisesForSearch } from '../exercises/exerciseSearch';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
 import { DateInput } from '../../shared/ui/PickerInput';
@@ -163,6 +164,13 @@ function ExercisePicker({
                     key={exercise.id}
                     onClick={() => chooseExercise(exercise)}
                   >
+                    <ExerciseMediaAsset
+                      animationUrl={exercise.media_animation_url}
+                      alt={`${exercise.title}: изображение упражнения`}
+                      className="exercise-picker__option-thumb"
+                      thumbnailUrl={exercise.media_thumbnail_url}
+                      variant="thumbnail"
+                    />
                     <span className="exercise-picker__option-copy">
                       <strong>{exercise.title}</strong>
                       <span className="exercise-picker__meta">
@@ -507,7 +515,7 @@ export function ProgramBuilder({
               ? 'Первая тренировка уже запланирована на сегодня. Она начнётся только после вашего действия.'
               : 'Откройте «Сегодня» в дату первой тренировки, чтобы начать её.'}
           </p>
-          <div className="program-builder-success__actions">
+          <div className="program-builder-success__actions app-action-group">
             <AppLink className="button-link" to="/app?section=today">
               {creationSuccess.canStartToday ? 'Перейти к тренировке' : 'Открыть «Сегодня»'}
             </AppLink>

@@ -177,6 +177,7 @@ test('active workout переживает offline edit, refresh и reconnect б�
   workoutMissing = true;
   await page.reload();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page.getByRole('button', { name: /Открыть упражнение|1 из 1 сохранено/ }).click();
   await expect(
     page.getByRole('spinbutton', { name: 'Повторы, Жим штанги лежа, подход 1' }),
   ).toHaveValue('8');

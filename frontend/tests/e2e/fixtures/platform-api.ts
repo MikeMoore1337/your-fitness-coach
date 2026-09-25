@@ -2055,6 +2055,20 @@ export async function installPlatformApi(
     if (path.endsWith('/nutrition/foods/recent') || path.endsWith('/nutrition/foods/favorites')) {
       return route.fulfill({ json: { items: [oatmeal], total: 1, limit: 12, offset: 0 } });
     }
+    if (path.endsWith('/nutrition/foods/search') && request.method() === 'GET') {
+      const includeExternal = url.searchParams.get('include_external') === 'true';
+      const items = !includeExternal && url.searchParams.get('q') === 'овсянка' ? [oatmeal] : [];
+      return route.fulfill({
+        json: {
+          items,
+          external_items: [],
+          total: items.length,
+          limit: Number(url.searchParams.get('limit')) || 20,
+          offset: Number(url.searchParams.get('offset')) || 0,
+          provider_status: includeExternal ? 'available' : 'not_requested',
+        },
+      });
+    }
     if (path.endsWith('/nutrition/foods/barcode/3017620422003')) {
       return route.fulfill({
         json: {

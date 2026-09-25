@@ -99,6 +99,11 @@ export function ExerciseGuideDialog({
 
               {guide?.media.length ? (
                 <ExerciseGuideMedia items={guide.media} onExpandedChange={setMediaExpanded} />
+              ) : guide ? (
+                <section className="exercise-guide-media-empty" aria-label="Изображение упражнения">
+                  <strong>Изображение пока недоступно</strong>
+                  <p>Для этого упражнения нет проверенного визуального материала.</p>
+                </section>
               ) : null}
 
               {guide ? (

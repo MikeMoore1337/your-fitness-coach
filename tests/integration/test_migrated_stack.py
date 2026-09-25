@@ -266,3 +266,142 @@ def test_migrated_postgres_account_deletion_removes_owner_nutrition_graph() -> N
             assert db.get(FoodDiaryCopyOperation, copy_operation_id) is None
             assert db.get(NutritionTarget, target_id) is None
             assert db.get(EnergyCalibration, calibration_id) is None
+
+
+def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
+    database_url = os.environ.get("DATABASE_URL", "")
+    assert database_url.startswith("postgresql+psycopg://"), (
+        "the migration compatibility test must run against PostgreSQL"
+    )
+
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect, text
+    from sqlalchemy.engine import make_url
+
+    from alembic import command
+
+    root = Path(__file__).resolve().parents[2]
+    database = make_url(database_url)
+    assert database.database == "fitminiapp_test", "migration test database must be isolated"
+    schema_name = f"task393_{os.getpid()}_{os.urandom(4).hex()}"
+    maintenance_engine = create_engine(database_url)
+    with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        version = conn.execute(text("SELECT current_setting('server_version_num')")).scalar_one()
+        assert str(version).startswith("16"), "the migration test requires PostgreSQL 16"
+        conn.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name},public"})
+    schema_database_url = schema_url.render_as_string(hide_password=False)
+    alembic_config = Config(str(root / "backend" / "alembic.ini"))
+    alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    schema_engine = create_engine(schema_database_url)
+    try:
+        with schema_engine.connect() as connection:
+            connection.execute(text(f'SET search_path TO "{schema_name}", public'))
+            connection.commit()
+            alembic_config.attributes["connection"] = connection
+            alembic_config.attributes["version_table_schema"] = schema_name
+
+            command.upgrade(alembic_config, "0092_coach_crm_core")
+            with connection.begin():
+                connection.execute(
+                    text(
+                        "INSERT INTO program_templates "
+                        "(slug, title, goal, level, split_type, default_duration_weeks, is_public) "
+                        "VALUES (:slug, :title, 'strength', 'beginner', 'full_body', 1, :is_public)"
+                    ),
+                    [
+                        {
+                            "slug": "stronglifts-5x5",
+                            "title": "StrongLifts",
+                            "is_public": True,
+                        },
+                        {
+                            "slug": "legacy-yfc-template",
+                            "title": "Legacy YFC template",
+                            "is_public": True,
+                        },
+                        {
+                            "slug": "private-custom-template",
+                            "title": "Private custom template",
+                            "is_public": False,
+                        },
+                    ],
+                )
+
+            command.upgrade(alembic_config, "head")
+            inspector = inspect(connection)
+            provenance_columns = {
+                column["name"]: column for column in inspector.get_columns("program_templates")
+            }
+            assert provenance_columns["provenance_type"]["nullable"] is True
+            assert provenance_columns["provenance"]["nullable"] is True
+            assert provenance_columns["program_metadata"]["nullable"] is True
+
+            source_foreign_keys = {
+                column
+                for foreign_key in inspector.get_foreign_keys("user_workout_exercises")
+                for column in foreign_key["constrained_columns"]
+            }
+            assert "source_template_exercise_id" not in source_foreign_keys
+            assert "source_weekly_prescription_id" not in source_foreign_keys
+
+            migration_context = connection.execute(
+                text(
+                    "SELECT current_schema(), current_setting('search_path'), "
+                    "(SELECT version_num FROM alembic_version)"
+                )
+            ).one()
+            template_schema = connection.execute(
+                text(
+                    "SELECT n.nspname FROM pg_class AS c "
+                    "JOIN pg_namespace AS n ON n.oid = c.relnamespace "
+                    "WHERE c.oid = 'program_templates'::regclass"
+                )
+            ).scalar_one()
+            template_count = connection.execute(
+                text("SELECT count(*) FROM program_templates")
+            ).scalar_one()
+            backfill_batch = (
+                connection.execute(
+                    text(
+                        "SELECT id FROM program_templates WHERE provenance_type IS NULL "
+                        "ORDER BY CASE WHEN owner_user_id IS NULL AND created_by_user_id IS NULL "
+                        "AND is_public = TRUE THEN 0 ELSE 1 END, id LIMIT 10"
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            provenance = dict(
+                connection.execute(
+                    text("SELECT slug, provenance_type FROM program_templates")
+                ).all()
+            )
+            revision_check = connection.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                    "WHERE conrelid = 'program_revisions'::regclass "
+                    "AND conname = 'ck_program_revisions_change_kind'"
+                )
+            ).scalar_one()
+            assert migration_context[0] == schema_name, migration_context
+            assert migration_context[1].split(",")[0].strip('"') == schema_name, migration_context
+            assert migration_context[2] == "0095_program_provenance_backfill", migration_context
+            assert template_schema == schema_name, template_schema
+            assert provenance == {
+                "stronglifts-5x5": "SOURCE_ADAPTATION",
+                "legacy-yfc-template": "YFC_GENERIC",
+                "private-custom-template": "CUSTOM",
+            }, (
+                f"migration_context={migration_context!r}; template_schema={template_schema!r}; "
+                f"template_count={template_count}; backfill_batch={backfill_batch!r}; "
+                f"provenance={provenance!r}"
+            )
+            assert "exercise_replaced" not in revision_check
+            assert "prescription_updated" not in revision_check
+    finally:
+        schema_engine.dispose()
+        with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
+        maintenance_engine.dispose()

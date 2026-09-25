@@ -99,15 +99,16 @@ export function useModalA11y<T extends HTMLElement>(
         panelRef.current.focus();
         return;
       }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
+      const activeIndex = focusable.indexOf(document.activeElement as HTMLElement);
+      const nextIndex = event.shiftKey
+        ? activeIndex <= 0
+          ? focusable.length - 1
+          : activeIndex - 1
+        : activeIndex < 0 || activeIndex === focusable.length - 1
+          ? 0
+          : activeIndex + 1;
+      event.preventDefault();
+      focusable[nextIndex]?.focus();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => {

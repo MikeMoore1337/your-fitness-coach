@@ -27,10 +27,10 @@ from fitminiapp_api.services.exercise_catalog import (
     _load_visible_exercise_rows,
 )
 from fitminiapp_api.services.notifications import queue_notification
+from fitminiapp_api.services.prescription_semantics import ensure_plan
 from fitminiapp_api.services.program_common import ProgramError
 from fitminiapp_api.services.workout_metrics import (
     exercise_metric_type,
-    normalize_exercise_prescription,
     workout_exercise_metric_type,
 )
 
@@ -41,6 +41,47 @@ BLOCK_STATUS_TRANSITIONS = {
     "completed": set(),
     "archived": set(),
 }
+
+
+def _validate_workout_group_assignments(
+    exercises: list[UserWorkoutExercise],
+    *,
+    target: UserWorkoutExercise | None,
+    candidate: tuple[int | None, str | None, int | None],
+) -> None:
+    groups: dict[int, tuple[str, list[int]]] = {}
+
+    def add(group_id: int | None, group_kind: str | None, group_order: int | None) -> None:
+        if group_id is None and group_kind is None and group_order is None:
+            return
+        if group_id is None or group_kind is None or group_order is None:
+            raise ProgramError("Exercise group fields must be provided together")
+        existing = groups.get(group_id)
+        if existing is None:
+            groups[group_id] = (group_kind, [group_order])
+            return
+        existing_kind, orders = existing
+        if existing_kind != group_kind or group_order in orders:
+            raise ProgramError("Exercise group kind and order must be consistent")
+        orders.append(group_order)
+
+    for exercise in exercises:
+        if exercise is target:
+            continue
+        group_id = exercise.group_id if exercise.group_id is not None else exercise.superset_group
+        group_kind = exercise.group_kind or ("superset" if exercise.superset_group else None)
+        group_order = (
+            exercise.group_order if exercise.group_order is not None else exercise.superset_order
+        )
+        add(group_id, group_kind, group_order)
+    add(*candidate)
+
+    for group_kind, orders in groups.values():
+        ordered = sorted(orders)
+        if ordered != list(range(1, len(ordered) + 1)):
+            raise ProgramError("Exercise group orders must be contiguous and unique")
+        if group_kind == "superset" and ordered != [1, 2]:
+            raise ProgramError("A superset must contain exactly two ordered exercises")
 
 
 def _actor_role(program: UserProgram, actor: User | None) -> str:
@@ -125,7 +166,7 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
     )
     workouts = (
         db.query(UserWorkout)
-        .options(selectinload(UserWorkout.exercises))
+        .options(selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets))
         .filter(UserWorkout.user_program_id == program.id)
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
@@ -166,6 +207,25 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
                         "notes": exercise.notes,
                         "superset_group": exercise.superset_group,
                         "superset_order": exercise.superset_order,
+                        "source_template_exercise_id": exercise.source_template_exercise_id,
+                        "source_weekly_prescription_id": exercise.source_weekly_prescription_id,
+                        "group_id": exercise.group_id,
+                        "group_kind": exercise.group_kind,
+                        "group_order": exercise.group_order,
+                        "prescription": exercise.prescription,
+                        "sets": [
+                            {
+                                "set_number": item.set_number,
+                                "set_kind": item.set_kind,
+                                "planned_role": item.planned_role,
+                                "planned_group_id": item.planned_group_id,
+                                "planned_group_kind": item.planned_group_kind,
+                                "planned_position": item.planned_position,
+                                "planned_round": item.planned_round,
+                                "is_completed": item.is_completed,
+                            }
+                            for item in sorted(exercise.sets, key=lambda row: row.set_number)
+                        ],
                     }
                     for exercise in sorted(
                         workout.exercises, key=lambda row: (row.sort_order, row.id)
@@ -474,13 +534,16 @@ def upsert_future_program_exercise(
     exercise = visible_by_effective_id.get(payload.exercise_id)
     if exercise is None:
         raise ProgramError("Exercise is not available for program owner")
-    prescription = normalize_exercise_prescription(
-        exercise,
+    plan, projection = ensure_plan(
+        payload.prescription,
+        metric_type=exercise_metric_type(exercise),
         prescribed_sets=payload.prescribed_sets,
         prescribed_reps=payload.prescribed_reps,
         prescribed_duration_minutes=payload.prescribed_duration_minutes,
         rest_seconds=payload.rest_seconds,
     )
+    if exercise_metric_type(exercise) == "strength" and projection.rest_seconds < 15:
+        raise ProgramError("Strength rest must be at least 15 seconds")
 
     future_workouts = (
         db.query(UserWorkout)
@@ -495,20 +558,68 @@ def upsert_future_program_exercise(
     )
     available_days = sorted({workout.day_number for workout in future_workouts})
     selected_day = payload.day_number
-    if selected_day is None:
+    if payload.target_template_exercise_id is None and selected_day is None:
         if len(available_days) != 1:
             raise ProgramError("Choose a program day for the exercise")
         selected_day = available_days[0]
-    planned_workouts = [
-        workout for workout in future_workouts if workout.day_number == selected_day
-    ]
+    planned_workouts = (
+        [workout for workout in future_workouts if workout.day_number == selected_day]
+        if selected_day is not None
+        else future_workouts
+    )
     if not planned_workouts:
         raise ProgramError("No future planned workouts for the selected day")
 
+    replacement_lineage: list[dict[str, object]] = []
     for workout in planned_workouts:
         workout_exercise = next(
-            (row for row in workout.exercises if row.exercise_id == payload.exercise_id),
+            (
+                row
+                for row in workout.exercises
+                if (
+                    payload.target_template_exercise_id is not None
+                    and row.source_template_exercise_id == payload.target_template_exercise_id
+                )
+                or (
+                    payload.target_template_exercise_id is None
+                    and row.exercise_id == payload.exercise_id
+                )
+            ),
             None,
+        )
+        if payload.target_template_exercise_id is not None and workout_exercise is None:
+            continue
+        preserve_existing_group = (
+            workout_exercise is not None
+            and payload.target_template_exercise_id is not None
+            and payload.group_id is None
+            and payload.group_kind is None
+            and payload.group_order is None
+            and payload.superset_group is None
+            and payload.superset_order is None
+        )
+        candidate_group = (
+            (
+                workout_exercise.group_id
+                if workout_exercise.group_id is not None
+                else workout_exercise.superset_group,
+                workout_exercise.group_kind
+                or ("superset" if workout_exercise.superset_group else None),
+                workout_exercise.group_order
+                if workout_exercise.group_order is not None
+                else workout_exercise.superset_order,
+            )
+            if preserve_existing_group and workout_exercise is not None
+            else (
+                payload.group_id if payload.group_id is not None else payload.superset_group,
+                payload.group_kind or ("superset" if payload.superset_group else None),
+                payload.group_order if payload.group_order is not None else payload.superset_order,
+            )
+        )
+        _validate_workout_group_assignments(
+            workout.exercises,
+            target=workout_exercise,
+            candidate=candidate_group,
         )
         if payload.superset_group is not None:
             conflict = next(
@@ -529,30 +640,81 @@ def upsert_future_program_exercise(
                 exercise_id=payload.exercise_id,
                 metric_type=exercise_metric_type(exercise),
                 sort_order=max((row.sort_order for row in workout.exercises), default=0) + 1,
-                prescribed_sets=prescription.prescribed_sets,
-                prescribed_reps=prescription.prescribed_reps,
-                prescribed_duration_minutes=prescription.prescribed_duration_minutes,
-                rest_seconds=prescription.rest_seconds,
+                prescribed_sets=projection.prescribed_sets,
+                prescribed_reps=projection.prescribed_reps,
+                prescribed_duration_minutes=projection.prescribed_duration_minutes,
+                rest_seconds=projection.rest_seconds,
                 notes=payload.notes,
                 superset_group=payload.superset_group,
                 superset_order=payload.superset_order,
+                source_template_exercise_id=payload.target_template_exercise_id,
+                group_id=payload.group_id or payload.superset_group,
+                group_kind=payload.group_kind or ("superset" if payload.superset_group else None),
+                group_order=payload.group_order or payload.superset_order,
+                prescription=plan.model_dump(mode="json"),
             )
             db.add(workout_exercise)
             db.flush()
         else:
+            original_exercise_id = workout_exercise.exercise_id
+            superset_group = (
+                workout_exercise.superset_group
+                if preserve_existing_group
+                else payload.superset_group
+            )
+            superset_order = (
+                workout_exercise.superset_order
+                if preserve_existing_group
+                else payload.superset_order
+            )
+            group_id = (
+                workout_exercise.group_id
+                if preserve_existing_group
+                else payload.group_id or payload.superset_group
+            )
+            group_kind = (
+                workout_exercise.group_kind
+                if preserve_existing_group
+                else payload.group_kind or ("superset" if payload.superset_group else None)
+            )
+            group_order = (
+                workout_exercise.group_order
+                if preserve_existing_group
+                else payload.group_order or payload.superset_order
+            )
             workout_exercise.metric_type = exercise_metric_type(exercise)
-            workout_exercise.prescribed_sets = prescription.prescribed_sets
-            workout_exercise.prescribed_reps = prescription.prescribed_reps
-            workout_exercise.prescribed_duration_minutes = prescription.prescribed_duration_minutes
-            workout_exercise.rest_seconds = prescription.rest_seconds
+            workout_exercise.exercise_id = payload.exercise_id
+            workout_exercise.prescribed_sets = projection.prescribed_sets
+            workout_exercise.prescribed_reps = projection.prescribed_reps
+            workout_exercise.prescribed_duration_minutes = projection.prescribed_duration_minutes
+            workout_exercise.rest_seconds = projection.rest_seconds
             workout_exercise.notes = payload.notes
-            workout_exercise.superset_group = payload.superset_group
-            workout_exercise.superset_order = payload.superset_order
+            workout_exercise.superset_group = superset_group
+            workout_exercise.superset_order = superset_order
+            workout_exercise.group_id = group_id
+            workout_exercise.group_kind = group_kind
+            workout_exercise.group_order = group_order
+            workout_exercise.prescription = plan.model_dump(mode="json")
             db.query(UserWorkoutSet).filter(
                 UserWorkoutSet.workout_exercise_id == workout_exercise.id
             ).delete(synchronize_session=False)
+            if payload.target_template_exercise_id is not None:
+                replacement_lineage.append(
+                    {
+                        "workout_id": workout.id,
+                        "workout_exercise_id": workout_exercise.id,
+                        "from_exercise_id": original_exercise_id,
+                        "to_exercise_id": payload.exercise_id,
+                        "scope": "assigned_program",
+                        "compatibility": "compatible_with_load_reset",
+                        "load_reset_required": True,
+                    }
+                )
 
-        for set_number in range(1, prescription.prescribed_sets + 1):
+        group_kinds = {
+            group["group_id"]: group["kind"] for group in plan.model_dump(mode="json")["groups"]
+        }
+        for set_number, segment in enumerate(plan.model_dump(mode="json")["segments"], start=1):
             db.add(
                 UserWorkoutSet(
                     workout_exercise_id=workout_exercise.id,
@@ -562,8 +724,21 @@ def upsert_future_program_exercise(
                     set_kind="working",
                     reached_failure=None,
                     is_completed=False,
+                    planned_role=segment["role"],
+                    planned_group_id=segment.get("group_id"),
+                    planned_group_kind=group_kinds.get(segment.get("group_id")),
+                    planned_position=segment["position"],
+                    planned_round=segment.get("round_number"),
                 )
             )
+
+    workouts_updated = (
+        len(replacement_lineage)
+        if payload.target_template_exercise_id is not None
+        else len(planned_workouts)
+    )
+    if payload.target_template_exercise_id is not None and not replacement_lineage:
+        raise ProgramError("Target template exercise is not present in future planned workouts")
 
     revision = record_program_revision(
         db,
@@ -572,10 +747,24 @@ def upsert_future_program_exercise(
         change_kind="plan_updated",
         reason=payload.reason,
         changed_fields={
-            "operation": "exercise_upserted",
+            "operation": (
+                "exercise_replaced"
+                if payload.target_template_exercise_id is not None
+                else "prescription_updated"
+                if payload.prescription is not None
+                else "exercise_upserted"
+            ),
             "day_number": selected_day,
             "exercise_id": payload.exercise_id,
-            "workouts_updated": len(planned_workouts),
+            "workouts_updated": workouts_updated,
+            **(
+                {
+                    "target_template_exercise_id": payload.target_template_exercise_id,
+                    "lineage": replacement_lineage,
+                }
+                if payload.target_template_exercise_id is not None
+                else {}
+            ),
         },
     )
     record_audit_event(
@@ -588,7 +777,7 @@ def upsert_future_program_exercise(
         details={
             "day_number": selected_day,
             "exercise_id": payload.exercise_id,
-            "workouts_updated": len(planned_workouts),
+            "workouts_updated": workouts_updated,
             "revision_number": revision.revision_number,
         },
     )
@@ -602,4 +791,4 @@ def upsert_future_program_exercise(
             action_url="/app?section=programs",
         )
     db.commit()
-    return len(planned_workouts), revision.revision_number
+    return workouts_updated, revision.revision_number

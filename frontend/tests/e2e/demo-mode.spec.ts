@@ -1305,7 +1305,10 @@ test('trainer demo follows the connected Today-to-Today route', async ({ page })
   await captureTask293Evidence(page, `${TASK_293_VARIANT}-trainer-demo-operations.png`);
 
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Задачи клиентов', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: /Задачи клиентов/ }).click();
+  await expect(page.locator('#coach-tasks-title')).toBeVisible();
+  await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
+  await expect(page.locator('#coach-tasks-title')).toBeFocused();
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
   await expect(page).toHaveURL(/section=trainer.*demo_step=return/);
   await expect(page.getByRole('heading', { name: 'Сегодня', level: 1 })).toBeVisible();
@@ -1320,6 +1323,7 @@ test('demo exposes deterministic loading and error states without leaving the bo
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
+    serviceWorkers: 'block',
   });
   const loadingPage = await loadingContext.newPage();
   await installDemoTransport(loadingPage);
@@ -1335,7 +1339,7 @@ test('demo exposes deterministic loading and error states without leaving the bo
   await expect(loadingPage.locator('[data-demo-state="loading"]')).toBeVisible();
   await expect(loadingPage.getByText('Готовим демо-кабинет…')).toBeVisible();
   await captureEvidence(loadingPage, 'loading-390x844-light.png');
-  expect(pendingSessionRoute).not.toBeNull();
+  await expect.poll(() => pendingSessionRoute).not.toBeNull();
   await pendingSessionRoute!.abort();
   await expect(loadingPage.locator('[data-demo-state="error"]')).toBeVisible();
   await captureEvidence(loadingPage, 'error-aborted-390x844-light.png');
@@ -1345,6 +1349,7 @@ test('demo exposes deterministic loading and error states without leaving the bo
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
+    serviceWorkers: 'block',
   });
   const errorPage = await errorContext.newPage();
   await installDemoTransport(errorPage);

@@ -206,7 +206,7 @@ export function CopyDiaryDialog({
               </button>
             </div>
           )}
-          <div className="nutrition-editor__actions">
+          <div className="nutrition-editor__actions app-action-group">
             <Button type="submit" disabled={mutation.isPending || !targetDate}>
               {mutation.isPending ? 'Копируем…' : scopeLabel}
             </Button>

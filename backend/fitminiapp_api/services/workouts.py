@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import desc, or_
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
@@ -25,13 +25,55 @@ class WorkoutValidationError(ValueError):
 def counts_toward_working_volume(workout_set: UserWorkoutSet) -> bool:
     """Legacy null kinds retain their historical working-volume behavior."""
 
+    if workout_set.set_kind == "warmup":
+        return False
+    if workout_set.planned_role in {"warmup", "activation"}:
+        return False
     return workout_set.set_kind in {None, "working", "drop"}
+
+
+def is_pr_record_set(workout_set: UserWorkoutSet) -> bool:
+    return counts_toward_working_volume(workout_set) and workout_set.planned_role not in {
+        "drop",
+        "mini_set",
+        "cluster_member",
+    }
+
+
+def set_analytics_bucket(workout_set: UserWorkoutSet) -> str:
+    if workout_set.planned_role in {"drop", "mini_set", "cluster_member"}:
+        return "intensifier"
+    if workout_set.planned_role in {"warmup", "activation"}:
+        return "preparation"
+    return "working"
 
 
 def working_volume_set_filter():
     return or_(
-        UserWorkoutSet.set_kind.is_(None),
-        UserWorkoutSet.set_kind.in_(("working", "drop")),
+        and_(
+            UserWorkoutSet.planned_role.is_(None),
+            or_(
+                UserWorkoutSet.set_kind.is_(None),
+                UserWorkoutSet.set_kind.in_(("working", "drop")),
+            ),
+        ),
+        and_(
+            UserWorkoutSet.planned_role.notin_(("warmup", "activation")),
+            or_(
+                UserWorkoutSet.set_kind.is_(None),
+                UserWorkoutSet.set_kind.in_(("working", "drop")),
+            ),
+        ),
+    )
+
+
+def pr_record_set_filter():
+    return and_(
+        working_volume_set_filter(),
+        or_(
+            UserWorkoutSet.planned_role.is_(None),
+            UserWorkoutSet.planned_role.notin_(("drop", "mini_set", "cluster_member")),
+        ),
     )
 
 

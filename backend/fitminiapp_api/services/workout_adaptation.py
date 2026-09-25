@@ -19,7 +19,16 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.workout import WorkoutAdaptationRequest
-from fitminiapp_api.services.exercise_catalog import get_visible_exercise_display_map
+from fitminiapp_api.services.exercise_catalog import (
+    _source_exercise_slug,
+    get_visible_exercise_display_map,
+)
+from fitminiapp_api.services.exercise_catalog_metadata import exercise_catalog_metadata
+from fitminiapp_api.services.prescription_semantics import compatible_for_substitution
+from fitminiapp_api.services.workout_metrics import (
+    exercise_metric_type,
+    workout_exercise_metric_type,
+)
 
 RULESET_VERSION = "workout-adaptation-v1"
 ACTIVE_SECONDS_PER_SET = 45
@@ -38,6 +47,8 @@ class WorkoutAdaptationError(ValueError):
 class AlternativeCandidate:
     exercise: Exercise
     equipment_ids: tuple[str, ...]
+    score: int
+    reason_keys: tuple[str, ...]
 
 
 def _effective_exercise_id(exercise: Exercise) -> int:
@@ -133,6 +144,7 @@ def _exercise_payload(
         "rest_seconds": item.rest_seconds,
         "sort_order": item.sort_order,
         "superset_group": item.superset_group,
+        "prescription": item.prescription,
         "priority": priority,
     }
 
@@ -204,6 +216,7 @@ def _alternative_candidates(
     *,
     visible: dict[int, Exercise] | None = None,
     pairs: list[ExerciseAlternative] | None = None,
+    allow_catalog_fallback: bool = False,
 ) -> list[AlternativeCandidate]:
     from fitminiapp_api.services.training_preferences import avoided_exercise_ids
 
@@ -221,22 +234,67 @@ def _alternative_candidates(
             )
             .all()
         )
-    candidate_ids = {
+    curated_ids = {
         pair.alternative_exercise_id if pair.exercise_id == target_id else pair.exercise_id
         for pair in pairs
         if target_id in {pair.exercise_id, pair.alternative_exercise_id}
     }
+    candidate_ids = set(visible) if allow_catalog_fallback else curated_ids
+    target_metric = workout_exercise_metric_type(target)
+    target_metadata = exercise_catalog_metadata(_source_exercise_slug(target.exercise))
+    target_muscles = _primary_muscle_ids(target.exercise)
     candidates = []
     for candidate_id in candidate_ids:
         exercise = visible.get(candidate_id)
         if exercise is None or _effective_exercise_id(exercise) in avoided_ids:
             continue
+        if exercise_metric_type(exercise) != target_metric:
+            continue
         equipment_ids = _equipment_ids(exercise)
-        if equipment_ids and set(equipment_ids).issubset(available_equipment_ids):
-            candidates.append(AlternativeCandidate(exercise=exercise, equipment_ids=equipment_ids))
+        if equipment_ids and not set(equipment_ids).issubset(available_equipment_ids):
+            continue
+        if _effective_exercise_id(exercise) == target_id:
+            continue
+        metadata = exercise_catalog_metadata(_source_exercise_slug(exercise))
+        reason_keys: list[str] = []
+        score = 0
+        if _effective_exercise_id(exercise) in curated_ids:
+            score += 100
+            reason_keys.append("curated_pair")
+        if (
+            target_metadata
+            and metadata
+            and metadata["movement_pattern"] == target_metadata["movement_pattern"]
+        ):
+            score += 50
+            reason_keys.append("movement_pattern")
+        if target_muscles & _primary_muscle_ids(exercise):
+            score += 30
+            reason_keys.append("primary_muscle")
+        if target_metadata and metadata:
+            if set(target_metadata["machine_variant_tags"]) & set(metadata["machine_variant_tags"]):
+                score += 5
+                reason_keys.append("machine_variant")
+            if set(target_metadata["execution_variant_tags"]) & set(
+                metadata["execution_variant_tags"]
+            ):
+                score += 5
+                reason_keys.append("execution_variant")
+        candidates.append(
+            AlternativeCandidate(
+                exercise=exercise,
+                equipment_ids=equipment_ids,
+                score=score,
+                reason_keys=tuple(reason_keys),
+            )
+        )
     return sorted(
         candidates,
-        key=lambda item: (item.exercise.title.casefold(), _effective_exercise_id(item.exercise)),
+        key=lambda item: (
+            -item.score,
+            item.exercise.title.casefold(),
+            _effective_exercise_id(item.exercise),
+        ),
     )
 
 
@@ -255,12 +313,15 @@ def list_compatible_alternatives(
             "exercise_id": candidate.exercise.id,
             "title": candidate.exercise.title,
             "equipment_ids": list(candidate.equipment_ids),
+            "score": candidate.score,
+            "reason_keys": list(candidate.reason_keys),
         }
         for candidate in _alternative_candidates(
             db,
             current_user,
             target,
             available_equipment_ids,
+            allow_catalog_fallback=True,
         )
         if _effective_exercise_id(candidate.exercise) not in used_ids
     ]
@@ -277,7 +338,24 @@ def _replacement_change(
         "from_title": target.exercise.title,
         "to_exercise_id": candidate.exercise.id,
         "to_title": candidate.exercise.title,
+        "transfer": "compatible_with_load_reset",
+        "load_reset_required": True,
+        "reason_keys": list(candidate.reason_keys),
     }
+
+
+def _ensure_replacement_unstarted(workout: UserWorkout, target: UserWorkoutExercise) -> None:
+    if workout.status != "planned":
+        raise WorkoutAdaptationError("Заменить упражнение можно только до начала тренировки")
+    if any(
+        item.is_completed
+        or item.actual_reps is not None
+        or item.actual_weight is not None
+        or item.duration_minutes is not None
+        or item.distance_km is not None
+        for item in target.sets
+    ):
+        raise WorkoutAdaptationError("Заменить упражнение можно только до записи подходов")
 
 
 def _time_budget_changes(
@@ -355,6 +433,7 @@ def _replacement_changes(
     used_ids = {_effective_exercise_id(item.exercise) for item in workout.exercises}
     changes = []
     for target in sorted(targets, key=lambda item: (item.sort_order, item.id)):
+        _ensure_replacement_unstarted(workout, target)
         candidates = [
             candidate
             for candidate in _alternative_candidates(
@@ -364,6 +443,7 @@ def _replacement_changes(
                 available,
                 visible=visible,
                 pairs=pairs,
+                allow_catalog_fallback=payload.reason == "replace_exercise",
             )
             if _effective_exercise_id(candidate.exercise) not in used_ids
         ]
@@ -389,7 +469,17 @@ def _replacement_changes(
                     f"Для упражнения «{target.exercise.title}» нет проверенной замены "
                     "под выбранное оборудование"
                 )
-        changes.append(_replacement_change(target, candidate))
+        compatible, reason_keys = compatible_for_substitution(
+            target.prescription,
+            target.prescription,
+            source_metric=workout_exercise_metric_type(target),
+            target_metric=exercise_metric_type(candidate.exercise),
+        )
+        if not compatible:
+            raise WorkoutAdaptationError("Выбранная замена несовместима с предписанием")
+        change = _replacement_change(target, candidate)
+        change["reason_keys"] = list(dict.fromkeys([*change["reason_keys"], *reason_keys]))
+        changes.append(change)
         used_ids.add(_effective_exercise_id(candidate.exercise))
     return changes
 
@@ -532,6 +622,7 @@ def apply_adaptation(
             db.delete(target)
         else:
             target.exercise_id = change["to_exercise_id"]
+            target.metric_type = workout_exercise_metric_type(target)
 
     adaptation = WorkoutAdaptation(
         workout_id=workout.id,

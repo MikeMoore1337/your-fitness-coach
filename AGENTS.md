@@ -36,6 +36,18 @@ current state.
 Do not load unrelated tasks, roles, skills or historical documents merely because
 they exist.
 
+For any task that changes visible authenticated UI, read these sources before implementation:
+
+1. `codex-backlog/ACTIVE_DESIGN_SOURCE.md`;
+2. `.agents/references/DESIGN_GUARDRAILS.md`;
+3. `docs/design/YFC_PRODUCT_UI_CONTRACT.md`.
+
+Ordinary UI/product work is **EVOLVE**: preserve and extend the current production UI, reuse
+existing primitives/tokens, and keep the smallest task-local change. Never infer **RETHINK** or
+redesign permission from words such as "improve", "modernize", "app-like", "Stage", "v3" or
+"polish", nor from an external visual reference. RETHINK requires an explicit owner-approved
+redesign/exploration task with bounded scope and a selected direction before rollout.
+
 # Workspace hygiene
 
 - Put caches, temporary files, test artifacts, logs, screenshots, traces, coverage and

@@ -73,6 +73,7 @@ TASK_STATE_VERSION = 2
 STATE_DIRECTORY_NAME = "codex-task-sessions-v1"
 ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
+TASK_INTEGRATION_BRANCHES = {"feature/app-experience-v3": "393"}
 DEPENDABOT_LOGIN = "dependabot[bot]"
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
 UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
@@ -227,6 +228,11 @@ def _task_commit_ids(message: str) -> set[str]:
     }
 
 
+def _is_origin_master_integration_merge(message: str) -> bool:
+    headline = message.splitlines()[0] if message else ""
+    return headline.startswith("Merge remote-tracking branch 'origin/master' into task/")
+
+
 def declared_task_dependency_ids(messages: Sequence[str]) -> set[str]:
     result: set[str] = set()
     for message in messages:
@@ -261,6 +267,8 @@ def validate_task_commit_messages(
     allowed = {expected, *allowed_dependencies}
     task_ids: set[str] = set()
     for message in messages:
+        if _is_origin_master_integration_merge(message):
+            continue
         ids = _task_commit_ids(message)
         task_ids.update(ids)
         if len(ids) != 1 or not ids <= allowed:
@@ -919,7 +927,12 @@ def validate_task_pull_request(
             f"Task pull request base must be {expected_base_branch}, found {base.get('ref')}"
         )
     branch = str(head.get("ref", ""))
-    task_id = task_id_from_branch(branch)
+    try:
+        task_id = task_id_from_branch(branch)
+    except TaskSessionError:
+        task_id = TASK_INTEGRATION_BRANCHES.get(branch, "")
+        if not task_id:
+            raise
     if base.get("sha") != expected_base_sha:
         raise TaskSessionError(
             f"Task PR is stale: base {base.get('sha')} != current {expected_base_sha}"
@@ -3064,7 +3077,8 @@ class TaskController:
                     raise TaskSessionError(
                         f"Task {expected} branch no longer descends from its leased base {old_base}"
                     )
-                self.repository.git("rebase", current_base, cwd=worktree)
+                if not self.repository.is_ancestor(current_base, head_before):
+                    self.repository.git("rebase", current_base, cwd=worktree)
             head_after = self.repository.head(cwd=worktree)
         except TaskSessionError as error:
             self._mark_delivery_refresh_failure(expected, str(error))

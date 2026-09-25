@@ -162,6 +162,21 @@ def test_migrations_use_the_selected_python_interpreter() -> None:
     assert commands[1].argv[:3] == ("python", "-m", "alembic")
 
 
+def test_cross_browser_group_migrates_database_for_ready_backend() -> None:
+    spec = ci_contract.COMMAND_GROUPS["frontend-cross-browser"]
+    assert spec.commands[0].argv == ("python", "-m", "alembic", "upgrade", "head")
+    assert {"python", "alembic", "DATABASE_URL"} <= set(spec.prerequisites)
+
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    job = workflow.split("  frontend-cross-browser:\n", maxsplit=1)[1].split(
+        "  python-tests:\n", maxsplit=1
+    )[0]
+    assert "postgres:" in job
+    assert 'PW_API_SERVER: "true"' in job
+    assert "timeout-minutes: 60" in job
+
+
 def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
@@ -647,7 +662,11 @@ def test_workflow_routes_scope_cancels_only_pull_request_runs() -> None:
     assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in workflow
     assert "schedule:" in workflow
     assert "workflow_dispatch:" in workflow
-    assert 'test "$TARGET_REF" = refs/heads/master' in workflow
+    assert 'if [ "$EVENT_NAME" = schedule ]; then' in workflow
+    assert '[ "$TARGET_REF" != refs/heads/master ]' in workflow
+    assert 'elif [ "$EVENT_NAME" = workflow_dispatch ]; then' in workflow
+    assert "refs/heads/master|refs/heads/task/*" in workflow
+    assert "Manual CI is restricted to refs/heads/master and refs/heads/task/*" in workflow
     assert "group: production" in deploy
     assert "cancel-in-progress: false" in deploy
 

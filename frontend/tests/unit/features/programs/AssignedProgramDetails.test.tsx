@@ -140,6 +140,31 @@ describe('AssignedProgramDetails', () => {
     expect(workoutLink).toHaveAttribute('href', expect.stringContaining('program_revision%3D2'));
   });
 
+  it.each([
+    ['prescription_updated', 'Предписание упражнения изменено'],
+    ['exercise_replaced', 'Упражнение заменено'],
+  ] as const)('derives the %s label from structured revision data', async (operation, label) => {
+    const currentBlock = block();
+    apiMock.mockImplementation(async (path: string) => {
+      if (path.endsWith('/blocks')) return [currentBlock];
+      if (path.endsWith('/revisions')) {
+        const history = revisions(currentBlock);
+        history[0] = {
+          ...history[0]!,
+          change_kind: 'plan_updated',
+          changed_fields: { operation },
+        };
+        return history;
+      }
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+
+    renderDetails();
+
+    fireEvent.click((await screen.findByText('Все этапы и изменения')).closest('summary')!);
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+
   it('keeps empty blocks distinct from empty revision history', async () => {
     apiMock.mockResolvedValue([]);
 

@@ -89,7 +89,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=profile');
       await page.getByRole('link', { name: 'Личные данные', exact: true }).click();
       const avatarButton = page.getByRole('button', { name: 'Изменить аватар' });
-      await avatarButton.click();
+      await avatarButton.press('Enter');
       const avatar = page.getByRole('dialog', { name: 'Аватар', exact: true });
       await expectReadableGlass(avatar.locator('.avatar-editor__header'));
       await expectNoHorizontalOverflow(page);
@@ -100,10 +100,10 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(avatarButton).toBeFocused();
 
       await page.goto('/app?section=nutrition');
-      await page
+      const addFoodButton = page
         .getByRole('region', { name: 'Завтрак', exact: true })
-        .getByRole('button', { name: /Добавить/ })
-        .click();
+        .getByRole('button', { name: /Добавить/ });
+      await addFoodButton.press('Enter');
       const picker = page.locator('.nutrition-picker__panel');
       await expectReadableGlass(picker.locator('.nutrition-picker__header'));
       await expectNoHorizontalOverflow(page);
@@ -129,23 +129,25 @@ for (const theme of ['light', 'dark'] as const) {
         await guide.evaluate((element) => element.closest('.app-shell--design-v2') === null),
       ).toBe(true);
       await page.screenshot({ path: testInfo.outputPath(`exercise-${theme}-${width}.png`) });
-      const session = await page.context().newCDPSession(page);
-      await session.send('Emulation.setEmulatedMedia', {
-        features: [
-          { name: 'prefers-color-scheme', value: theme },
-          { name: 'prefers-reduced-transparency', value: 'reduce' },
-        ],
-      });
-      await expect(guide).toHaveCSS(
-        'background-color',
-        theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
-      );
+      if (testInfo.project.name === 'chromium') {
+        const session = await page.context().newCDPSession(page);
+        await session.send('Emulation.setEmulatedMedia', {
+          features: [
+            { name: 'prefers-color-scheme', value: theme },
+            { name: 'prefers-reduced-transparency', value: 'reduce' },
+          ],
+        });
+        await expect(guide).toHaveCSS(
+          'background-color',
+          theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
+        );
+      }
       await page.emulateMedia({ forcedColors: 'active' });
-      expect(
-        await guide.evaluate((element) =>
-          getComputedStyle(element).backgroundColor.startsWith('rgb('),
-        ),
-      ).toBe(true);
+      await expect
+        .poll(() =>
+          guide.evaluate((element) => getComputedStyle(element).backgroundColor.startsWith('rgb(')),
+        )
+        .toBe(true);
       await page.keyboard.press('Escape');
       await expect(guide).toBeHidden();
       expect(errors).toEqual([]);

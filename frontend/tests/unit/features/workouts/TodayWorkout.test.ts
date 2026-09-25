@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Workout } from '../../../../src/shared/api/types';
 import {
   formatSetResult,
+  formatPlannedGroupKind,
+  formatPlannedSetRole,
   formatWorkoutDuration,
   resolvePreviousSetValues,
   shouldCollapseCompletedExercise,
@@ -49,6 +51,21 @@ describe('formatSetResult', () => {
     expect(formatSetResult(8, null)).toBe('8 повт.');
     expect(formatSetResult(null, 40)).toBe('40 кг');
     expect(formatSetResult(null, null)).toBeNull();
+  });
+});
+
+describe('structured workout labels', () => {
+  it('keeps accepted planned roles readable without flattening them into set kind', () => {
+    expect(formatPlannedSetRole('top')).toBe('Топ-сет');
+    expect(formatPlannedSetRole('backoff')).toBe('Бэкофф');
+    expect(formatPlannedSetRole('mini_set')).toBe('Мини-сет');
+    expect(formatPlannedSetRole(null)).toBeNull();
+  });
+
+  it('shows an accepted advanced group only when the API provides one', () => {
+    expect(formatPlannedGroupKind('rest_pause')).toBe('Rest-pause');
+    expect(formatPlannedGroupKind('drop_chain')).toBe('Дроп-сет');
+    expect(formatPlannedGroupKind(undefined)).toBeNull();
   });
 });
 

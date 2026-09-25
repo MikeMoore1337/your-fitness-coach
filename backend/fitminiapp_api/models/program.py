@@ -58,6 +58,9 @@ class ProgramTemplate(Base):
     default_duration_weeks: Mapped[int] = mapped_column(
         Integer, nullable=True, default=1, server_default="1"
     )
+    provenance_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    provenance: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    program_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     @property
     def effective_duration_weeks(self) -> int:
@@ -142,6 +145,10 @@ class ProgramTemplateExercise(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     superset_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    group_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     day: Mapped[ProgramTemplateDay] = relationship("ProgramTemplateDay", back_populates="exercises")
     exercise: Mapped[Exercise] = relationship("Exercise")
@@ -189,6 +196,7 @@ class ProgramTemplateExerciseWeekPrescription(Base):
     prescribed_reps: Mapped[str] = mapped_column(String(32))
     prescribed_duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rest_seconds: Mapped[int] = mapped_column(Integer, default=90)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     template_exercise: Mapped[ProgramTemplateExercise] = relationship(
         "ProgramTemplateExercise", back_populates="weekly_prescriptions"
@@ -504,6 +512,8 @@ class UserWorkoutExercise(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     workout_id: Mapped[int] = mapped_column(ForeignKey("user_workouts.id"), index=True)
     exercise_id: Mapped[int] = mapped_column(ForeignKey("exercises.id"), index=True)
+    source_template_exercise_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_weekly_prescription_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     metric_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=1)
     prescribed_sets: Mapped[int] = mapped_column(Integer)
@@ -513,6 +523,10 @@ class UserWorkoutExercise(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     superset_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
     superset_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    group_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prescription: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     workout: Mapped[UserWorkout] = relationship("UserWorkout", back_populates="exercises")
     exercise: Mapped[Exercise] = relationship("Exercise")
@@ -557,6 +571,11 @@ class UserWorkoutSet(Base):
     rir: Mapped[str | None] = mapped_column(String(2), nullable=True)
     set_kind: Mapped[str | None] = mapped_column(String(16), nullable=True, default="working")
     reached_failure: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    planned_role: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    planned_group_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    planned_group_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    planned_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    planned_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 

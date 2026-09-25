@@ -20,6 +20,7 @@ from fitminiapp_api.schemas.program import (
     ProgramTemplateCreate,
     ProgramTemplateCreateResponse,
     ProgramTemplateResponse,
+    TemplateExerciseReplacementRequest,
     TrainingBlockCreate,
     TrainingBlockMutationResponse,
     TrainingBlockResponse,
@@ -42,6 +43,7 @@ from fitminiapp_api.services.exercise_domain import (
     exercise_equipment_payload,
     exercise_muscle_payload,
 )
+from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.program_common import ProgramError, assignment_error_status
 from fitminiapp_api.services.program_recommendation import recommend_program_templates
@@ -63,6 +65,7 @@ from fitminiapp_api.services.programs import (
     list_clients,
     list_hidden_example_templates,
     list_user_templates,
+    replace_template_exercise_for_user,
     restore_example_template_for_user,
     update_template_for_user,
 )
@@ -103,6 +106,7 @@ def _serialize_exercise(
     equipment = exercise_equipment_payload(exercise)
     source_slug = _source_exercise_slug(exercise)
     redirected_slug = CANONICAL_EXERCISE_REDIRECTS.get(source_slug)
+    media_preview = get_guide_media_preview(redirected_slug or source_slug)
     catalog_metadata = exercise_catalog_metadata(redirected_slug or source_slug)
     canonical_slug = redirected_slug
     if exercise.source_exercise_id is not None:
@@ -137,6 +141,11 @@ def _serialize_exercise(
         "created_by_user_id": exercise.created_by_user_id,
         "source_exercise_id": exercise.source_exercise_id,
         "has_guide": guide is not None,
+        "media_state": media_preview["state"],
+        "media_thumbnail_url": media_preview["thumbnail_url"],
+        # The catalog/picker only needs posters. Keep animated media on the
+        # detail response and workout payloads to avoid inflating the list.
+        "media_animation_url": media_preview["animation_url"] if include_guide else None,
         "guide": guide if include_guide else None,
     }
 
@@ -431,6 +440,36 @@ def edit_template(
             raise HTTPException(status_code=403, detail=detail)
         raise HTTPException(status_code=400, detail=detail)
 
+    return build_template_response(template, db, current_user)
+
+
+@router.post(
+    "/templates/{template_id}/exercises/{template_exercise_id}/replace",
+    response_model=ProgramTemplateResponse,
+)
+def replace_template_exercise(
+    template_id: int,
+    template_exercise_id: int,
+    payload: TemplateExerciseReplacementRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        template = replace_template_exercise_for_user(
+            db,
+            current_user,
+            template_id,
+            template_exercise_id,
+            payload.replacement_exercise_id,
+            payload.reason,
+        )
+    except ProgramError as exc:
+        detail = str(exc)
+        if detail in {"Template not found", "Template exercise not found"}:
+            raise HTTPException(status_code=404, detail=detail) from exc
+        if detail == "No permission to edit template":
+            raise HTTPException(status_code=403, detail=detail) from exc
+        raise HTTPException(status_code=422, detail=detail) from exc
     return build_template_response(template, db, current_user)
 
 

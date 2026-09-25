@@ -764,7 +764,7 @@ export function NutritionLabelScanner({
           <strong>Загружаем черновик…</strong>
           <span>Если срок действия истёк, можно начать новое сканирование.</span>
         </div>
-        <div className="nutrition-editor__actions nutrition-label-scanner__actions">
+        <div className="nutrition-editor__actions app-action-group nutrition-label-scanner__actions">
           <Button type="button" variant="secondary" onClick={handleManualFallback}>
             Продолжить вручную
           </Button>
@@ -905,7 +905,7 @@ export function NutritionLabelScanner({
           )}
         </div>
       )}
-      <div className="nutrition-editor__actions nutrition-label-scanner__actions">
+      <div className="nutrition-editor__actions app-action-group nutrition-label-scanner__actions">
         <Button
           type="button"
           variant="secondary"

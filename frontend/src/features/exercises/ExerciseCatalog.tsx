@@ -14,6 +14,7 @@ import {
 } from '../../shared/ui/common';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideDialog } from './ExerciseGuideDialog';
+import { ExerciseMediaAsset } from './ExerciseMediaAsset';
 import { rankExercisesForSearch } from './exerciseSearch';
 
 const difficultyLabels: Record<Exercise['difficulty_level'], string> = {
@@ -432,6 +433,13 @@ export function ExerciseCatalog({
                     type="button"
                     onClick={() => setGuide(exercise)}
                   >
+                    <ExerciseMediaAsset
+                      animationUrl={exercise.media_animation_url}
+                      alt={`${exercise.title}: изображение упражнения`}
+                      className="exercise-catalog-item__thumb"
+                      thumbnailUrl={exercise.media_thumbnail_url}
+                      variant="thumbnail"
+                    />
                     <span className="exercise-catalog-item__copy">
                       <strong>{exercise.title}</strong>
                       <span>

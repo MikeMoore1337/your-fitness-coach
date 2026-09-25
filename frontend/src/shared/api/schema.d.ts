@@ -1143,6 +1143,23 @@ export interface paths {
         patch: operations["edit_template_api_v1_programs_templates__template_id__patch"];
         trace?: never;
     };
+    "/api/v1/programs/templates/{template_id}/exercises/{template_exercise_id}/replace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace Template Exercise */
+        post: operations["replace_template_exercise_api_v1_programs_templates__template_id__exercises__template_exercise_id__replace_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/templates/{template_id}/assign-to-me": {
         parameters: {
             query?: never;
@@ -6404,6 +6421,15 @@ export interface components {
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
+            /** Target Template Exercise Id */
+            target_template_exercise_id?: number | null;
             /** Reason */
             reason?: string | null;
         };
@@ -7353,7 +7379,7 @@ export interface components {
             /** Aliases */
             aliases?: string[];
             /** Movement Pattern */
-            movement_pattern?: ("arm_curl" | "calf" | "cardio_row" | "chest_fly" | "chest_press" | "cycling" | "glute" | "grip" | "hinge" | "leg_isolation" | "lunge" | "pullover" | "row" | "running" | "shoulder_press" | "squat" | "triceps" | "vertical_pull" | "wrist") | null;
+            movement_pattern?: ("anti_extension" | "anti_rotation" | "arm_curl" | "calf" | "cardio_row" | "carry" | "chest_fly" | "chest_press" | "conditioning" | "cycling" | "glute" | "grip" | "hinge" | "leg_isolation" | "lunge" | "pullover" | "row" | "running" | "olympic_lift" | "shoulder_raise" | "shoulder_press" | "shoulder_rotation" | "squat" | "trunk_flexion" | "trunk_rotation" | "triceps" | "vertical_pull" | "wrist") | null;
             /** Machine Variant Tags */
             machine_variant_tags?: ("selectorized" | "plate_loaded" | "lever" | "independent" | "converging" | "diverging" | "smith")[];
             /** Execution Variant Tags */
@@ -7390,6 +7416,12 @@ export interface components {
              * @default false
              */
             has_guide: boolean;
+            /** Media State */
+            media_state?: ("approved_animated" | "blocked") | null;
+            /** Media Thumbnail Url */
+            media_thumbnail_url?: string | null;
+            /** Media Animation Url */
+            media_animation_url?: string | null;
             guide?: components["schemas"]["ExerciseGuide"] | null;
         };
         /** ExerciseGuide */
@@ -7436,9 +7468,9 @@ export interface components {
         ExerciseGuideMedia: {
             /**
              * Type
-             * @constant
+             * @enum {string}
              */
-            type: "image";
+            type: "image" | "animation";
             /** Url */
             url: string;
             /** Poster */
@@ -7502,6 +7534,24 @@ export interface components {
             role: string;
             /** Function */
             function: string;
+        };
+        /** ExercisePrescriptionPlan */
+        ExercisePrescriptionPlan: {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /** Segments */
+            segments: components["schemas"]["PrescriptionSegment"][];
+            /** Groups */
+            groups?: components["schemas"]["PrescriptionGroup"][];
         };
         /** ExerciseProgressItem */
         ExerciseProgressItem: {
@@ -8674,6 +8724,16 @@ export interface components {
              * @default 1
              */
             version: number;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /** Planned Group Id */
+            planned_group_id?: number | null;
+            /** Planned Group Kind */
+            planned_group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Planned Position */
+            planned_position?: number | null;
+            /** Planned Round */
+            planned_round?: number | null;
         };
         /** MessageResponse */
         MessageResponse: {
@@ -9561,6 +9621,108 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** PrescriptionDurationTarget */
+        PrescriptionDurationTarget: {
+            /**
+             * Kind
+             * @default exact
+             * @enum {string}
+             */
+            kind: "exact" | "range";
+            /** Value Minutes */
+            value_minutes?: number | null;
+            /** Min Minutes */
+            min_minutes?: number | null;
+            /** Max Minutes */
+            max_minutes?: number | null;
+        };
+        /** PrescriptionEffortTarget */
+        PrescriptionEffortTarget: {
+            /**
+             * Kind
+             * @default none
+             * @enum {string}
+             */
+            kind: "none" | "rir" | "rpe" | "failure";
+            /** Value */
+            value?: number | "4+" | null;
+        };
+        /** PrescriptionGroup */
+        PrescriptionGroup: {
+            /** Group Id */
+            group_id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit";
+            /**
+             * Intra Group Rest Seconds
+             * @default 0
+             */
+            intra_group_rest_seconds: number;
+            /**
+             * Rest After Group Seconds
+             * @default 90
+             */
+            rest_after_group_seconds: number;
+            /** Rounds */
+            rounds?: number | null;
+            /** Exercise Slot */
+            exercise_slot?: number | null;
+        };
+        /** PrescriptionLoadTarget */
+        PrescriptionLoadTarget: {
+            /**
+             * Kind
+             * @default user_selected
+             * @enum {string}
+             */
+            kind: "user_selected" | "absolute" | "percent_1rm" | "percent_training_max" | "relative_to_top" | "relative_to_previous";
+            /** Value */
+            value?: number | null;
+        };
+        /** PrescriptionRepTarget */
+        PrescriptionRepTarget: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "exact" | "range" | "amrap";
+            /** Value */
+            value?: number | null;
+            /** Min Reps */
+            min_reps?: number | null;
+            /** Max Reps */
+            max_reps?: number | null;
+            /** Cap Reps */
+            cap_reps?: number | null;
+        };
+        /** PrescriptionSegment */
+        PrescriptionSegment: {
+            /** Position */
+            position: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member";
+            rep_target?: components["schemas"]["PrescriptionRepTarget"] | null;
+            duration_target?: components["schemas"]["PrescriptionDurationTarget"] | null;
+            load_target?: components["schemas"]["PrescriptionLoadTarget"];
+            effort_target?: components["schemas"]["PrescriptionEffortTarget"];
+            /**
+             * Rest After Seconds
+             * @default 90
+             */
+            rest_after_seconds: number;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Position */
+            group_position?: number | null;
+            /** Round Number */
+            round_number?: number | null;
+        };
         /** ProgramAssignmentResponse */
         ProgramAssignmentResponse: {
             /** User Program Id */
@@ -9780,6 +9942,7 @@ export interface components {
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
             /** Resolved Exercise Id */
             resolved_exercise_id?: number | null;
             /** Resolved Exercise Title */
@@ -9934,7 +10097,7 @@ export interface components {
              * Goal
              * @enum {string}
              */
-            goal: "muscle_gain" | "fat_loss" | "maintenance" | "recomposition";
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
             /**
              * Level
              * @enum {string}
@@ -10023,6 +10186,13 @@ export interface components {
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
         };
         /** ProgramTemplateExerciseResponse */
         ProgramTemplateExerciseResponse: {
@@ -10051,6 +10221,13 @@ export interface components {
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
             /**
              * Has Guide
              * @default false
@@ -10073,6 +10250,7 @@ export interface components {
             prescribed_duration_minutes?: number | null;
             /** Rest Seconds */
             rest_seconds: number;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
         };
         /** ProgramTemplateResponse */
         ProgramTemplateResponse: {
@@ -10140,6 +10318,20 @@ export interface components {
              * @default 1
              */
             default_duration_weeks: number;
+            /**
+             * Provenance Type
+             * @default CUSTOM
+             * @enum {string}
+             */
+            provenance_type: "YFC_GENERIC" | "SOURCE_ADAPTATION" | "CUSTOM";
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            } | null;
+            /** Program Metadata */
+            program_metadata?: {
+                [key: string]: unknown;
+            } | null;
             /** Days */
             days: components["schemas"]["ProgramTemplateDayResponse"][];
         };
@@ -11040,6 +11232,13 @@ export interface components {
             /** Expires In Seconds */
             expires_in_seconds: number;
         };
+        /** TemplateExerciseReplacementRequest */
+        TemplateExerciseReplacementRequest: {
+            /** Replacement Exercise Id */
+            replacement_exercise_id: number;
+            /** Reason */
+            reason?: string | null;
+        };
         /** TokenPairResponse */
         TokenPairResponse: {
             /** Access Token */
@@ -11188,6 +11387,8 @@ export interface components {
             set_kind?: ("warmup" | "working" | "drop") | null;
             /** Reached Failure */
             reached_failure?: boolean | null;
+        } & {
+            [key: string]: unknown;
         };
         /** TrainingBlockCreate */
         TrainingBlockCreate: {
@@ -12021,6 +12222,15 @@ export interface components {
             to_exercise_id?: number | null;
             /** To Title */
             to_title?: string | null;
+            /** Transfer */
+            transfer?: ("compatible_with_load_reset" | "blocked") | null;
+            /**
+             * Load Reset Required
+             * @default false
+             */
+            load_reset_required: boolean;
+            /** Reason Keys */
+            reason_keys?: string[];
         };
         /** WorkoutAdaptationExercise */
         WorkoutAdaptationExercise: {
@@ -12042,6 +12252,7 @@ export interface components {
             sort_order: number;
             /** Superset Group */
             superset_group?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
             /**
              * Priority
              * @enum {string}
@@ -12126,6 +12337,10 @@ export interface components {
             title: string;
             /** Equipment Ids */
             equipment_ids: string[];
+            /** Score */
+            score?: number | null;
+            /** Reason Keys */
+            reason_keys?: string[];
         };
         /** WorkoutCommentCreate */
         WorkoutCommentCreate: {
@@ -12293,11 +12508,28 @@ export interface components {
             superset_group?: number | null;
             /** Superset Order */
             superset_order?: number | null;
+            prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Source Template Exercise Id */
+            source_template_exercise_id?: number | null;
+            /** Source Weekly Prescription Id */
+            source_weekly_prescription_id?: number | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
             /**
              * Has Guide
              * @default false
              */
             has_guide: boolean;
+            /** Media State */
+            media_state?: ("approved_animated" | "blocked") | null;
+            /** Media Thumbnail Url */
+            media_thumbnail_url?: string | null;
+            /** Media Animation Url */
+            media_animation_url?: string | null;
             progression_guidance?: components["schemas"]["ProgressionGuidance"] | null;
             /** Sets */
             sets: components["schemas"]["LoggedSetItem"][];
@@ -12496,6 +12728,16 @@ export interface components {
             is_completed: boolean;
             /** Version */
             version: number;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /** Planned Group Id */
+            planned_group_id?: number | null;
+            /** Planned Group Kind */
+            planned_group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Planned Position */
+            planned_position?: number | null;
+            /** Planned Round */
+            planned_round?: number | null;
         };
         /** WorkoutTimelineExercise */
         WorkoutTimelineExercise: {
@@ -12561,6 +12803,8 @@ export interface components {
             reached_failure?: boolean | null;
             /** Is Completed */
             is_completed: boolean;
+        } & {
+            [key: string]: unknown;
         };
         /** WorkoutTodayResponse */
         WorkoutTodayResponse: {
@@ -14954,6 +15198,42 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProgramTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_template_exercise_api_v1_programs_templates__template_id__exercises__template_exercise_id__replace_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+                template_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateExerciseReplacementRequest"];
             };
         };
         responses: {

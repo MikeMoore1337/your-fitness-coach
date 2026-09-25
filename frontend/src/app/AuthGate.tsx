@@ -76,5 +76,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   if (user) return <>{children}</>;
   if (isTelegramLaunch(window.location)) return <TelegramAuthRecovery />;
 
-  return <Redirect to={loginPathForNext(window.location.pathname)} />;
+  const requestedPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return <Redirect to={loginPathForNext(requestedPath)} />;
 }

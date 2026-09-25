@@ -59,7 +59,7 @@ export function useMotionPresence({
   const onAnimationEnd = useCallback(
     (event: AnimationEvent<HTMLElement>) => {
       if (event.animationName === openingAnimationName) {
-        setPhase('open');
+        setPhase((current) => (current === 'opening' ? 'open' : current));
       }
       if (event.animationName === closingAnimationName) finishClosing();
     },

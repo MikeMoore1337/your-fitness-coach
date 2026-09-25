@@ -487,6 +487,9 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
         "split_type": template.split_type,
         "is_public": template.is_public,
         "default_duration_weeks": template.effective_duration_weeks,
+        "provenance_type": template.provenance_type or "CUSTOM",
+        "provenance": template.provenance,
+        "program_metadata": template.program_metadata,
         "created_at": template.created_at,
         "days": [
             {
@@ -507,6 +510,10 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
                             "notes",
                             "superset_group",
                             "superset_order",
+                            "group_id",
+                            "group_kind",
+                            "group_order",
+                            "prescription",
                         ),
                     )
                     | {
@@ -523,6 +530,7 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
                                     "prescribed_reps",
                                     "prescribed_duration_minutes",
                                     "rest_seconds",
+                                    "prescription",
                                 ),
                             )
                             for prescription in exercise.weekly_prescriptions
@@ -637,6 +645,12 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
                                 "notes",
                                 "superset_group",
                                 "superset_order",
+                                "source_template_exercise_id",
+                                "source_weekly_prescription_id",
+                                "group_id",
+                                "group_kind",
+                                "group_order",
+                                "prescription",
                             ),
                         ),
                         "title": exercise.exercise.title if exercise.exercise else None,
@@ -661,6 +675,11 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
                                     "rir",
                                     "set_kind",
                                     "reached_failure",
+                                    "planned_role",
+                                    "planned_group_id",
+                                    "planned_group_kind",
+                                    "planned_position",
+                                    "planned_round",
                                     "is_completed",
                                     "version",
                                 ),

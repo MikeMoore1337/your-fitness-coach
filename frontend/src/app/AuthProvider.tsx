@@ -20,20 +20,20 @@ import type { PublicConfig, User } from '../shared/api/types';
 import { LIVE_DATA_REFETCH_INTERVAL_MS } from '../shared/sync';
 import type { TelegramWebApp } from '../shared/telegram/types';
 import { useQueryClient } from '@tanstack/react-query';
-import { loadCurrentActiveWorkoutSnapshot } from '../features/workouts/activeWorkoutQueue';
 import {
   AUTHENTICATED_USER_ID_STORAGE_KEY,
   clearSensitiveUserScopedStorage,
 } from '../shared/userScopedStorage';
 import { syncFirstTouchAttribution } from '../shared/analytics/attribution';
-import { trackProductLoginCompletedIfStarted } from '../shared/analytics/productEvents';
 import { YFC_PLATFORM_ACTIVATED_EVENT } from '../shared/telegram/layout';
 import { revokeWebPushSubscription } from '../shared/notifications/webPush';
 
-function offlineWorkoutUser(): User | null {
+async function offlineWorkoutUser(): Promise<User | null> {
   if (!getAccessToken()) return null;
   const userId = Number(sessionStorage.getItem(AUTHENTICATED_USER_ID_STORAGE_KEY));
   if (!Number.isInteger(userId) || userId <= 0) return null;
+  const { loadCurrentActiveWorkoutSnapshot } =
+    await import('../features/workouts/activeWorkoutQueue');
   if (!loadCurrentActiveWorkoutSnapshot(userId)) return null;
   return {
     id: userId,
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return current;
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 0) {
-        const cached = offlineWorkoutUser();
+        const cached = await offlineWorkoutUser();
         if (cached) {
           userIdRef.current = cached.id;
           setUser(cached);
@@ -164,7 +164,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userId = user?.id;
   useEffect(() => {
     if (!userId) return;
-    trackProductLoginCompletedIfStarted();
+    void import('../shared/analytics/productEvents').then(
+      ({ trackProductLoginCompletedIfStarted }) => {
+        trackProductLoginCompletedIfStarted();
+      },
+    );
     void syncFirstTouchAttribution(userId);
   }, [userId]);
 
@@ -357,7 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (reason) {
         if (!cancelled) {
           const cached =
-            reason instanceof ApiError && reason.status === 0 ? offlineWorkoutUser() : null;
+            reason instanceof ApiError && reason.status === 0 ? await offlineWorkoutUser() : null;
           if (cached) {
             setUser(cached);
             setError(null);

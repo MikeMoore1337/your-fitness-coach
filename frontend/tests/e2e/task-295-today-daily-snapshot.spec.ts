@@ -19,6 +19,7 @@ const EVIDENCE_DIR = resolve(
 async function openApp(page: Page, section: string): Promise<void> {
   await page.goto(`/app?section=${section}`);
   await expect(page.locator('.app-shell')).toBeVisible();
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
 }
 
 async function capture(page: Page, filename: string): Promise<void> {

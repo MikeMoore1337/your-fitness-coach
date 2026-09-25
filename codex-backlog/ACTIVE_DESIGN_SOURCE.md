@@ -17,6 +17,26 @@ CURRENT_PILOT_TASK = 75C_COMPLETED_AND_ARCHIVED
 
 Baseline нужен для consistency обычных feature/fix tasks. Он не является вечной эстетической догмой.
 
+## App Experience v3 и approved trainer baseline
+
+App Experience v3 — это production evolution, а не permission на RETHINK. Текущий production YFC
+UI остаётся visual source of truth. Rejected Stage 0 prototype не является design source и не
+должен копироваться в authenticated product.
+
+После owner approval действуют следующие bounded interaction references:
+
+- #387: trainer-first entry, явный workspace switch `Для себя / Клиенты`, trainer context с
+  mobile dock/desktop sidebar и без duplicate global navigation;
+- #388: navigation-first trainer IA — короткий `Сегодня`, `Ещё` hub и focused destinations;
+  mobile primary card CTA full-width, secondary navigation имеет явную affordance, stacked actions
+  используют token-based gap;
+- client `Профиль` / `Прогресс` и trainer #388 — references для interaction intent, не literal
+  templates для копирования.
+
+Durable production rules находятся в `docs/design/YFC_PRODUCT_UI_CONTRACT.md`. Обычные tasks
+работают в EVOLVE; RETHINK требует отдельной owner-approved redesign/exploration task, bounded
+scope и owner selection направления до rollout.
+
 27.08.2026 владелец одобрил результат Rethink-аудита `75A`, выбрал
 `START_RETHINK_EXPLORATION`, затем завершил selection gate `75B` решением
 `SELECT_DIRECTION_PULSE`. Это решение не активирует отдельную новую дизайн-систему и не разрешает

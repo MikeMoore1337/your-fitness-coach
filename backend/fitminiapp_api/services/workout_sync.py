@@ -26,6 +26,11 @@ def serialize_workout_set(set_row: UserWorkoutSet) -> dict:
         "rir": set_row.rir,
         "set_kind": set_row.set_kind,
         "reached_failure": set_row.reached_failure,
+        "planned_role": set_row.planned_role,
+        "planned_group_id": set_row.planned_group_id,
+        "planned_group_kind": set_row.planned_group_kind,
+        "planned_position": set_row.planned_position,
+        "planned_round": set_row.planned_round,
         "is_completed": set_row.is_completed,
         "version": set_row.version,
     }

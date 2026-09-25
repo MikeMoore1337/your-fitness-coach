@@ -484,8 +484,8 @@ test('returning and legacy required users keep requested core routes without red
   await page.getByRole('button', { name: 'Выйти из аккаунта' }).click();
   await expect(page).toHaveURL(/\/login\?next=%2Fapp/);
   await page.getByRole('button', { name: 'Клиент' }).click();
-  await expect(page).toHaveURL('/app');
-  await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
+  await expect(page).toHaveURL('/app?section=nutrition');
+  await expect(page.getByRole('heading', { level: 1, name: 'Питание' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
 });
 

@@ -13,10 +13,14 @@ import { getApiRuntime, useRuntime } from '../runtime/runtime';
 interface NavigationContextValue {
   path: string;
   search: string;
-  navigate(to: string, replace?: boolean): void;
+  navigate(to: string, replace?: boolean, historyState?: unknown): void;
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
+export type CoachTab = 'today' | 'clients' | 'programs' | 'tools';
+
+const COACH_TABS = new Set<CoachTab>(['today', 'clients', 'programs', 'tools']);
+export const PERSONAL_WORKSPACE_RETURN_STATE = 'yfcPersonalWorkspaceReturn';
 const DEMO_SCENARIOS = new Set(['self_training', 'nutrition', 'trainer']);
 const DEMO_CABINET_SECTIONS = new Set([
   'today',
@@ -34,6 +38,45 @@ const PROGRESS_DETAIL_VIEWS = new Set([
   'wellbeing',
   'history',
 ]);
+
+export function coachTabFromSearch(search: string): CoachTab {
+  const params = new URLSearchParams(search);
+  const requestedTab = params.get('tab');
+  const clientId = params.get('client_id');
+  if (params.getAll('tab').length > 1) return 'today';
+  if (clientId !== null) {
+    const parsedClientId = Number(clientId);
+    const validClientId =
+      /^\d+$/.test(clientId) && Number.isSafeInteger(parsedClientId) && parsedClientId > 0;
+    if (!validClientId) return 'today';
+    return !requestedTab || requestedTab === 'clients' ? 'clients' : 'today';
+  }
+  return requestedTab && COACH_TABS.has(requestedTab as CoachTab)
+    ? (requestedTab as CoachTab)
+    : 'today';
+}
+
+export function coachPathForTab(tab: CoachTab): string {
+  return tab === 'today' ? '/coach' : `/coach?tab=${tab}`;
+}
+
+export function safeTrainerReturnPath(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value, window.location.origin);
+    if (parsed.origin !== window.location.origin || parsed.pathname !== '/coach' || parsed.hash) {
+      return null;
+    }
+    const keys = Array.from(parsed.searchParams.keys());
+    if (keys.length > 1 || keys.some((key) => key !== 'tab')) return null;
+    const requestedTab = parsed.searchParams.get('tab');
+    if (!requestedTab) return '/coach';
+    if (!COACH_TABS.has(requestedTab as CoachTab) || requestedTab === 'today') return null;
+    return coachPathForTab(requestedTab as CoachTab);
+  } catch {
+    return null;
+  }
+}
 
 function resolveNavigationPath(to: string): string {
   const runtime = getApiRuntime();
@@ -167,10 +210,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  const navigate = useCallback((to: string, replace = false) => {
+  const navigate = useCallback((to: string, replace = false, historyState?: unknown) => {
     const destination = resolveNavigationPath(to);
-    if (replace) window.history.replaceState({}, '', destination);
-    else window.history.pushState({}, '', destination);
+    const nextHistoryState = historyState === undefined ? {} : historyState;
+    if (replace) window.history.replaceState(nextHistoryState, '', destination);
+    else window.history.pushState(nextHistoryState, '', destination);
     setLocation({ path: window.location.pathname, search: window.location.search });
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
@@ -196,7 +240,9 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     }
     const goBack = () => {
       const returnPath = focusedReturn ?? publicReturn ?? demoHandoffReturn;
-      navigate(returnPath ?? '/app', Boolean(returnPath));
+      const historyState =
+        location.path === '/coach' ? { [PERSONAL_WORKSPACE_RETURN_STATE]: true } : undefined;
+      navigate(returnPath ?? '/app', Boolean(returnPath), historyState);
     };
     return registerTelegramBackButton(telegram, goBack, 'route');
   }, [navigate, location.path, location.search]);

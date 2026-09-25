@@ -324,11 +324,14 @@ def _public_exercise_media_markup(exercise: dict[str, object]) -> str:
                 )
                 srcset.append(f"{html.escape(source_url, quote=True)} {source_width}w")
         srcset_attribute = f' srcset="{", ".join(srcset)}"' if srcset else ""
-        figures.append(
-            f'<figure class="exercise-guide-image"><img src="{html.escape(url, quote=True)}"'
-            f'{srcset_attribute} sizes="(max-width: 620px) calc(100vw - 48px), '
+        media_markup = (
+            f'<img src="{html.escape(url, quote=True)}"{srcset_attribute} '
+            'sizes="(max-width: 620px) calc(100vw - 48px), '
             f'(max-width: 1040px) 44vw, 470px" alt="{html.escape(alt, quote=True)}" '
             f'width="{width}" height="{height}" loading="lazy" decoding="async" />'
+        )
+        figures.append(
+            f'<figure class="exercise-guide-image">{media_markup}'
             f"<figcaption>{html.escape(phase)}</figcaption></figure>"
         )
     if not figures:

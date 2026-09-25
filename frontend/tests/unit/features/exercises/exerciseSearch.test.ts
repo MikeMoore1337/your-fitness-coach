@@ -51,6 +51,43 @@ const exercises = lowerBodyExercises.map(
     }) satisfies Exercise,
 );
 
+const baseExercise = exercises[0]!;
+
+const approvedCanonicalExercises = [
+  {
+    ...baseExercise,
+    id: 14001,
+    slug: 'floor-press',
+    title: 'Жим с пола',
+    aliases: ['floor press', 'barbell floor press'],
+    movement_pattern: 'chest_press',
+  },
+  {
+    ...baseExercise,
+    id: 14002,
+    slug: 'assisted-pull-ups',
+    title: 'Подтягивания с противовесом',
+    aliases: ['подтягивания в гравитроне', 'assisted pull up'],
+    movement_pattern: 'vertical_pull',
+  },
+  {
+    ...baseExercise,
+    id: 14003,
+    slug: 'trap-bar-deadlift',
+    title: 'Тяга с трэп-грифом',
+    aliases: ['тяга трэп-гриф', 'hex bar deadlift'],
+    movement_pattern: 'hinge',
+  },
+  {
+    ...baseExercise,
+    id: 14004,
+    slug: 'machine-seated-crunch',
+    title: 'Скручивания в тренажёре сидя',
+    aliases: ['machine crunch', 'пресс в тренажере сидя'],
+    movement_pattern: 'trunk_flexion',
+  },
+] satisfies Exercise[];
+
 describe('lower-body exercise aliases', () => {
   it.each([
     ['pendulum squat', 'pendulum-squat'],
@@ -159,5 +196,16 @@ describe('Task 120D hardened exercise search', () => {
     expect(rankExercisesForSearch(remaining, 'гребля').map((item) => item.slug)).toEqual([
       'rowing-machine',
     ]);
+  });
+});
+
+describe('Issue 395 canonical exercise search', () => {
+  it.each([
+    ['floor press', 'floor-press'],
+    ['подтягивания в гравитроне', 'assisted-pull-ups'],
+    ['трэп гриф', 'trap-bar-deadlift'],
+    ['machine crunch', 'machine-seated-crunch'],
+  ])('keeps %s attached to one approved canonical', (query, expectedSlug) => {
+    expect(rankExercisesForSearch(approvedCanonicalExercises, query)[0]?.slug).toBe(expectedSlug);
   });
 });

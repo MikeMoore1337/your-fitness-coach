@@ -159,6 +159,18 @@ CURATED_ALTERNATIVE_SLUG_PAIRS = (
     ("outdoor-walk", "treadmill-walk"),
     ("outdoor-cycling", "stationary-bike"),
     ("stationary-bike", "recumbent-bike"),
+    ("floor-press", "bench-press"),
+    ("push-press", "overhead-press"),
+    ("assisted-pull-ups", "pull-up"),
+    ("decline-crunch", "crunch"),
+    ("overhead-squat", "front-squat"),
+    ("trap-bar-deadlift", "deadlift"),
+    ("safety-bar-squat", "squat"),
+    ("negative-pull-ups", "pull-up"),
+    ("assisted-dips", "machine-dip"),
+    ("machine-seated-crunch", "cable-crunch"),
+    ("db-squat", "goblet-squat"),
+    ("hang-power-clean", "kettlebell-clean"),
 )
 
 DEFAULT_SAFETY_NOTES = [
@@ -333,6 +345,7 @@ def _sync_guide_metadata(db: Session, exercise: Exercise, *, has_guide: bool) ->
             db.delete(existing)
         return
 
+    from fitminiapp_api.services.exercise_catalog_metadata import MEDIA_STATE_BY_SLUG
     from fitminiapp_api.services.exercise_guides import (
         SOURCE_LICENSE,
         SOURCE_NAME,
@@ -343,12 +356,19 @@ def _sync_guide_metadata(db: Session, exercise: Exercise, *, has_guide: bool) ->
 
     slug = _base_slug(exercise)
     generated = slug in YFC_SINGLE_IMAGE_SLUGS or slug in YFC_ORIGINAL_VECTOR_SLUGS
+    content_only = slug in MEDIA_STATE_BY_SLUG
     values = {
         "safety_notes": list(DEFAULT_SAFETY_NOTES),
-        "source_name": "Your Fitness Coach" if generated else SOURCE_NAME,
-        "source_url": "/" if generated else SOURCE_URL,
-        "source_license": "Иллюстрация создана для приложения" if generated else SOURCE_LICENSE,
-        "source_license_url": None if generated else SOURCE_LICENSE_URL,
+        "source_name": "Your Fitness Coach" if generated or content_only else SOURCE_NAME,
+        "source_url": "/" if generated or content_only else SOURCE_URL,
+        "source_license": (
+            "Техника написана для приложения"
+            if content_only
+            else "Иллюстрация создана для приложения"
+            if generated
+            else SOURCE_LICENSE
+        ),
+        "source_license_url": None if generated or content_only else SOURCE_LICENSE_URL,
         "media_reference": f"exercise-guides:{slug}",
     }
     if existing is None:

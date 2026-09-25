@@ -1117,6 +1117,25 @@ def test_task_commit_messages_allow_only_declared_hard_dependencies() -> None:
         )
 
 
+def test_task_commit_messages_allow_origin_master_integration_merge() -> None:
+    task_session.validate_task_commit_messages(
+        "393",
+        [
+            "Merge remote-tracking branch 'origin/master' into task/393-app-experience-v3-final-hardening",
+            "fix: [Task 393] preserve trace",
+        ],
+    )
+
+    with pytest.raises(task_session.TaskSessionError, match="must contain exactly"):
+        task_session.validate_task_commit_messages(
+            "393",
+            [
+                "Merge branch 'other' into task/393-app-experience-v3-final-hardening",
+                "fix: [Task 393] preserve trace",
+            ],
+        )
+
+
 def test_task_pr_accepts_dependency_provenance_declared_in_task_commit() -> None:
     base_sha = "a" * 40
     head_sha = "b" * 40
@@ -1136,6 +1155,38 @@ def test_task_pr_accepts_dependency_provenance_declared_in_task_commit() -> None
             dependency_ids=None,
         )
         == "135"
+    )
+
+
+def test_task_pr_accepts_task_393_integration_branch_and_completed_stages() -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _task_pr(393, "393", base_sha, head_sha)
+    pull_request["head"]["ref"] = "feature/app-experience-v3"
+    pull_request["commits"] = 2
+    commits = [
+        {"commit": {"message": "[Task 391] Make active workout media full width on mobile"}},
+        {
+            "commit": {
+                "message": (
+                    "[Task 393] Integrate approved stages\n\n"
+                    "Depends-on: [Task 386], [Task 387], [Task 388], [Task 389], "
+                    "[Task 390], [Task 391], [Task 392], [Task 395], [Task 396], "
+                    "[Task 397], [Task 400]"
+                )
+            }
+        },
+    ]
+
+    assert (
+        task_session.validate_task_pull_request(
+            pull_request,
+            commits,
+            [_success_check(head_sha)],
+            expected_base_sha=base_sha,
+            dependency_ids=None,
+        )
+        == "393"
     )
 
 
@@ -2036,6 +2087,44 @@ def test_refresh_updates_stale_task_base_and_rebuilds_exact_delivery_anchor(
     validated = controller.validate_delivery("234")
     assert validated["lifecycle_state"] == "delivery-gate"
     assert validated["delivery_anchor"]["head_sha"] == new_head
+
+
+def test_refresh_preserves_published_master_integration_merge(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, _ = _prepare_started(
+        repository, "244B", concurrency="independent-write"
+    )
+    task_head = _commit_task(worktree, "244B")
+
+    (root / "master-refresh.txt").write_text("M1\n", encoding="utf-8")
+    _git(root, "add", "master-refresh.txt")
+    _git(root, "commit", "-m", "chore: advance master for delivery refresh")
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+    _git(worktree, "fetch", "origin", "master")
+    _git(
+        worktree,
+        "merge",
+        "--no-ff",
+        "origin/master",
+        "-m",
+        f"Merge remote-tracking branch 'origin/master' into {branch}",
+    )
+    integrated_head = git_repository.head(cwd=worktree)
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = git_repository.ref("origin/master")
+
+    controller.mark_ready("244B", head_sha=integrated_head, quality_verdict="PASS")
+    controller.acquire_delivery("244B", offline=True)
+    refreshed = controller.refresh_for_delivery("244B", offline=True)
+
+    assert task_head != integrated_head
+    assert refreshed["delivery_head_sha"] == integrated_head
+    assert git_repository.head(cwd=worktree) == integrated_head
+    assert len(_git(worktree, "rev-list", "--parents", "-n", "1", "HEAD").split()) == 3
+    assert controller.validate_delivery("244B", offline=True)["lifecycle_state"] == "delivery-gate"
 
 
 def test_refresh_delivery_waits_for_active_production_before_touching_task_branch(

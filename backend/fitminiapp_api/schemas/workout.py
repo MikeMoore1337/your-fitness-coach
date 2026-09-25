@@ -1,10 +1,15 @@
 from datetime import date, datetime, time
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.data_quality import TrainingDataSufficiency
-from fitminiapp_api.schemas.program import EquipmentIdentifier
+from fitminiapp_api.schemas.program import (
+    EquipmentIdentifier,
+    ExercisePrescriptionPlan,
+    PrescriptionGroupKind,
+    PrescriptionRole,
+)
 
 RirValue = Literal["0", "1", "2", "3", "4+"]
 SetKind = Literal["warmup", "working", "drop"]
@@ -71,6 +76,7 @@ class WorkoutAdaptationExercise(BaseModel):
     rest_seconds: int
     sort_order: int
     superset_group: int | None = None
+    prescription: ExercisePrescriptionPlan | None = None
     priority: Literal["core", "priority", "accessory"]
 
 
@@ -81,6 +87,9 @@ class WorkoutAdaptationChange(BaseModel):
     from_title: str
     to_exercise_id: int | None = None
     to_title: str | None = None
+    transfer: Literal["compatible_with_load_reset", "blocked"] | None = None
+    load_reset_required: bool = False
+    reason_keys: list[str] = Field(default_factory=list)
 
 
 class WorkoutAdaptationPreviewResponse(BaseModel):
@@ -103,6 +112,8 @@ class WorkoutAlternativeItem(BaseModel):
     exercise_id: int
     title: str
     equipment_ids: list[str]
+    score: int | None = None
+    reason_keys: list[str] = Field(default_factory=list)
 
 
 class WorkoutSetCreate(BaseModel):
@@ -151,6 +162,11 @@ class LoggedSetItem(BaseModel):
     reached_failure: bool | None = None
     is_completed: bool = True
     version: int = Field(default=1, ge=1)
+    planned_role: PrescriptionRole | None = None
+    planned_group_id: int | None = None
+    planned_group_kind: PrescriptionGroupKind | None = None
+    planned_position: int | None = None
+    planned_round: int | None = None
 
 
 class ProgressionSessionEvidence(BaseModel):
@@ -203,7 +219,16 @@ class WorkoutExerciseItem(BaseModel):
     notes: str | None = None
     superset_group: int | None = None
     superset_order: int | None = None
+    prescription: ExercisePrescriptionPlan | None = None
+    source_template_exercise_id: int | None = None
+    source_weekly_prescription_id: int | None = None
+    group_id: int | None = None
+    group_kind: PrescriptionGroupKind | None = None
+    group_order: int | None = None
     has_guide: bool = False
+    media_state: Literal["approved_animated", "blocked"] | None = None
+    media_thumbnail_url: str | None = None
+    media_animation_url: str | None = None
     progression_guidance: ProgressionGuidance | None = None
     sets: list[LoggedSetItem]
 
@@ -288,6 +313,11 @@ class WorkoutStatusResponse(BaseModel):
     reached_failure: bool | None = None
     is_completed: bool
     version: int = Field(ge=1)
+    planned_role: PrescriptionRole | None = None
+    planned_group_id: int | None = None
+    planned_group_kind: PrescriptionGroupKind | None = None
+    planned_position: int | None = None
+    planned_round: int | None = None
 
 
 class WorkoutScheduleItem(BaseModel):
@@ -403,6 +433,8 @@ class WorkoutProgressResponse(BaseModel):
 
 
 class TrainingAnalyticsSet(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     set_number: int
     reps: int | None = None
     external_load_kg: float | None = None
@@ -480,6 +512,8 @@ class TrainingAnalyticsResponse(BaseModel):
 
 
 class WorkoutTimelineSet(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     set_number: int
     actual_reps: int | None = None
     actual_weight: float | None = None

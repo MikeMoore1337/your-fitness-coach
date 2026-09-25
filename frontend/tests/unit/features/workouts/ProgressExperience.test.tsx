@@ -347,6 +347,16 @@ describe('ProgressExperience', () => {
       'href',
       '/app/report?period=days_30',
     );
+    const helpControl = screen.getByText('Что это?', { exact: true });
+    const helpDisclosure = helpControl.closest('details');
+    expect(helpDisclosure).not.toBeNull();
+    fireEvent.click(helpControl);
+    expect(helpDisclosure).toHaveAttribute('open');
+    expect(
+      within(helpDisclosure as HTMLDetailsElement).getByText(/Сначала смотрите на период/),
+    ).toBeVisible();
+    fireEvent.click(helpControl);
+    expect(helpDisclosure).not.toHaveAttribute('open');
     expect(screen.getByRole('img', { name: /Вес: 2 янв. — 69,4 кг/ })).toBeVisible();
 
     fireEvent.click(

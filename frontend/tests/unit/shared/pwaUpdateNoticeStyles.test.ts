@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('PWA update notice styles', () => {
   it('keeps the mobile update action content-sized', () => {
-    const css = readFileSync('src/styles/react.css', 'utf8');
+    const css = readFileSync('src/styles/react.css', 'utf8').replace(/\r\n/g, '\n');
 
     expect(css).toContain(`
   .pwa-update-notice button {

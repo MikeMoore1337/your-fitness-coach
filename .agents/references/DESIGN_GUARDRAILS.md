@@ -15,6 +15,18 @@
 
 ## Current baseline vs redesign
 
+Before changing visible authenticated UI, read:
+
+1. `codex-backlog/ACTIVE_DESIGN_SOURCE.md`;
+2. this file;
+3. `docs/design/YFC_PRODUCT_UI_CONTRACT.md`.
+
+Ordinary product work is **EVOLVE**. Words such as "improve", "modernize", "app-like", "Stage",
+"v3" and "polish", App Experience naming, or an external reference do not imply **RETHINK** and
+do not authorize a parallel visual system. **RETHINK** requires a separate owner-approved
+redesign/exploration task, explicit bounded scope and owner selection of the direction before
+rollout.
+
 ### Ordinary feature/fix task
 
 Если task не является redesign/exploration:

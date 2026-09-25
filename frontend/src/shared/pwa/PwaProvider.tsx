@@ -26,12 +26,53 @@ import {
   type BeforeInstallPromptEvent,
   type PwaInstallState,
 } from './pwaRuntime';
-import {
-  PRODUCT_EVENT_NAME,
-  productEventSurface,
-  trackProductEvent,
-  type PwaServiceWorkerErrorCategory,
+import type {
+  ProductEventTrackOptions,
+  ProductSurface,
+  PwaServiceWorkerErrorCategory,
 } from '../analytics/productEvents';
+
+const PRODUCT_EVENT_NAME = 'yfc:product-event';
+type PwaProductEvent =
+  | {
+      name: 'pwa_service_worker_error';
+      surface: ProductSurface;
+      category: PwaServiceWorkerErrorCategory;
+    }
+  | {
+      name:
+        | 'pwa_install_option_shown'
+        | 'pwa_install_option_dismissed'
+        | 'pwa_install_option_accepted'
+        | 'pwa_standalone_launched'
+        | 'pwa_update_applied'
+        | 'pwa_update_available';
+      surface: ProductSurface;
+    };
+type PwaProductEventWithoutSurface =
+  | {
+      name: 'pwa_service_worker_error';
+      category: PwaServiceWorkerErrorCategory;
+    }
+  | {
+      name: Exclude<PwaProductEvent['name'], 'pwa_service_worker_error'>;
+    };
+
+let productEventsModule: Promise<typeof import('../analytics/productEvents')> | undefined;
+
+function loadProductEvents(): Promise<typeof import('../analytics/productEvents')> {
+  productEventsModule ??= import('../analytics/productEvents');
+  return productEventsModule;
+}
+
+function trackPwaEvent(
+  event: PwaProductEventWithoutSurface,
+  options?: ProductEventTrackOptions,
+): void {
+  void loadProductEvents().then(({ productEventSurface, trackProductEvent }) => {
+    trackProductEvent({ ...event, surface: productEventSurface() }, options);
+  });
+}
 
 interface PwaContextValue {
   enabled: boolean;
@@ -128,9 +169,8 @@ export function PwaProvider({ children }: { children: ReactNode }) {
 
   const trackServiceWorkerError = useCallback((category: unknown) => {
     if (!isPwaServiceWorkerErrorCategory(category)) return;
-    trackProductEvent({
+    trackPwaEvent({
       name: 'pwa_service_worker_error',
-      surface: productEventSurface(),
       category,
     });
   }, []);
@@ -157,7 +197,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
   const markInstallOptionShown = useCallback(() => {
     if (installShownRef.current) return;
     installShownRef.current = true;
-    trackProductEvent({ name: 'pwa_install_option_shown', surface: productEventSurface() });
+    trackPwaEvent({ name: 'pwa_install_option_shown' });
   }, []);
 
   const markInstallDismissed = useCallback(() => {
@@ -165,7 +205,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
       ...current,
       dismissedUntil: Date.now() + PWA_INSTALL_DISMISSAL_MS,
     }));
-    trackProductEvent({ name: 'pwa_install_option_dismissed', surface: productEventSurface() });
+    trackPwaEvent({ name: 'pwa_install_option_dismissed' });
   }, []);
 
   const markInstallAccepted = useCallback(() => {
@@ -176,7 +216,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
       qualified: false,
       dismissedUntil: 0,
     }));
-    trackProductEvent({ name: 'pwa_install_option_accepted', surface: productEventSurface() });
+    trackPwaEvent({ name: 'pwa_install_option_accepted' });
   }, []);
 
   const install = useCallback(async () => {
@@ -228,13 +268,12 @@ export function PwaProvider({ children }: { children: ReactNode }) {
       try {
         if (sessionStorage.getItem(PWA_STANDALONE_SESSION_KEY) !== '1') {
           sessionStorage.setItem(PWA_STANDALONE_SESSION_KEY, '1');
-          trackProductEvent({ name: 'pwa_standalone_launched', surface: productEventSurface() });
+          trackPwaEvent({ name: 'pwa_standalone_launched' });
         }
       } catch {
-        trackProductEvent(
+        trackPwaEvent(
           {
             name: 'pwa_standalone_launched',
-            surface: productEventSurface(),
           },
           { dedupe: 'session' },
         );
@@ -296,7 +335,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
     const onControllerChange = () => {
       if (!applyingUpdateRef.current) return;
       applyingUpdateRef.current = false;
-      trackProductEvent({ name: 'pwa_update_applied', surface: productEventSurface() });
+      trackPwaEvent({ name: 'pwa_update_applied' });
       window.location.reload();
     };
     const markWaiting = (worker: ServiceWorker | null) => {
@@ -309,7 +348,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
         setUpdateBlockedByWorkout(workoutIsActive);
         if (!updateNoticeTrackedRef.current) {
           updateNoticeTrackedRef.current = true;
-          trackProductEvent({ name: 'pwa_update_available', surface: productEventSurface() });
+          trackPwaEvent({ name: 'pwa_update_available' });
         }
       } else {
         worker.postMessage({ type: 'YFC_PWA_SKIP_WAITING' });

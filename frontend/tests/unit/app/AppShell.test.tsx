@@ -75,6 +75,12 @@ vi.mock('../../../src/shared/pwa/PwaProvider', () => ({
 
 vi.mock('../../../src/shared/navigation/router', () => ({
   useNavigation: () => navigation,
+  coachTabFromSearch: (search: string) => new URLSearchParams(search).get('tab') ?? 'today',
+  safeTrainerReturnPath: (value: string | null | undefined) => {
+    if (!value) return null;
+    const parsed = new URL(value, 'http://localhost');
+    return `${parsed.pathname}${parsed.search}`;
+  },
   AppLink: ({ to, className, children, ...props }: React.ComponentProps<'a'> & { to: string }) => (
     <a href={to} className={className} {...props}>
       {children}
@@ -102,21 +108,18 @@ describe('AppShell', () => {
     render(<AppShell>Содержимое</AppShell>);
 
     expect(screen.getByRole('navigation', { name: 'Основная навигация' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Сегодня' })).toHaveAttribute('href', '/coach');
+    expect(screen.getByRole('link', { name: 'Клиенты' })).toHaveAttribute(
       'href',
-      '/app?section=today',
-    );
-    expect(screen.getByRole('link', { name: 'План' })).toHaveAttribute(
-      'href',
-      '/app?section=programs',
+      '/coach?tab=clients',
     );
     expect(
       Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
         (link) => link.textContent,
       ),
-    ).toEqual(['Сегодня', 'План', 'Питание', 'Прогресс']);
+    ).toEqual(['Сегодня', 'Клиенты', 'Программы', 'Ещё']);
     expect(screen.queryByRole('button', { name: 'Ещё' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Тренер' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('link', { name: 'Тренер' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Админ-панель' })).not.toBeInTheDocument();
     expect(screen.getByText('Ресурсы')).toBeInTheDocument();
     expect(screen.getByText('Михаил')).toBeInTheDocument();
@@ -124,6 +127,37 @@ describe('AppShell', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Выйти из аккаунта' }));
     expect(logout).toHaveBeenCalledOnce();
+  });
+
+  it('показывает персональный dock и отдельный быстрый switch для trainer-capable аккаунта', () => {
+    navigation.path = '/app';
+    render(<AppShell section="today">Содержимое</AppShell>);
+
+    expect(
+      Array.from(document.querySelectorAll('.app-bottom-nav__primary > a')).map(
+        (link) => link.textContent,
+      ),
+    ).toEqual(['Сегодня', 'План', 'Питание', 'Прогресс']);
+    expect(screen.getByRole('link', { name: 'Для себя' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'В кабинет тренера' })).toHaveAttribute(
+      'href',
+      '/coach',
+    );
+  });
+
+  it('сохраняет безопасный trainer tab при переходе по персональным разделам', () => {
+    navigation.path = '/app';
+    navigation.search = '?section=nutrition&trainer_return=%2Fcoach%3Ftab%3Dprograms';
+    render(<AppShell section="nutrition">Содержимое</AppShell>);
+
+    expect(screen.getByRole('link', { name: 'В кабинет тренера' })).toHaveAttribute(
+      'href',
+      '/coach?tab=programs',
+    );
+    expect(screen.getByRole('link', { name: 'Питание' })).toHaveAttribute(
+      'href',
+      '/app?section=nutrition&trainer_return=%2Fcoach%3Ftab%3Dprograms',
+    );
   });
 
   it('сохраняет active state для каждого прямого core route', () => {
@@ -215,6 +249,7 @@ describe('AppShell', () => {
 
   it('показывает admin entry только аккаунту с соответствующей capability', () => {
     user.is_root = true;
+    user.is_coach = true;
     navigation.path = '/admin';
     render(<AppShell>Содержимое</AppShell>);
 
@@ -222,6 +257,9 @@ describe('AppShell', () => {
       'aria-current',
       'page',
     );
+    expect(screen.getByRole('link', { name: 'Тренер' })).toHaveAttribute('href', '/coach');
+    expect(user.is_root).toBe(true);
+    expect(user.is_coach).toBe(true);
   });
 
   it('открывает и закрывает mobile-меню сразу при reduced motion', () => {

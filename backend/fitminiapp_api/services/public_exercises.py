@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from functools import lru_cache
 
-from fitminiapp_api.services.exercise_guide_media import get_guide_media
+from fitminiapp_api.services.exercise_guide_media import get_guide_media, resolve_guide_source
 from fitminiapp_api.services.exercise_guides import (
     DEFAULT_SAFETY_NOTES,
     PROFILES,
@@ -90,6 +90,13 @@ def public_exercises() -> tuple[dict[str, object], ...]:
             raise RuntimeError(f"Published exercise {slug!r} is missing canonical domain data")
         title, primary_muscle, equipment = catalog_item
         profile = PROFILES[profile_name]
+        source_name, source_url, source_license, source_license_url = resolve_guide_source(
+            slug,
+            source_name=SOURCE_NAME,
+            source_url=SOURCE_URL,
+            source_license=SOURCE_LICENSE,
+            source_license_url=SOURCE_LICENSE_URL,
+        )
         record: dict[str, object] = {
             "slug": slug,
             "title": title,
@@ -104,15 +111,15 @@ def public_exercises() -> tuple[dict[str, object], ...]:
             "media": get_guide_media(
                 slug,
                 exercise_title=title,
-                source_name=SOURCE_NAME,
-                source_url=SOURCE_URL,
-                source_license=SOURCE_LICENSE,
-                source_license_url=SOURCE_LICENSE_URL,
+                source_name=source_name,
+                source_url=source_url,
+                source_license=source_license,
+                source_license_url=source_license_url,
             ),
-            "source_name": SOURCE_NAME,
-            "source_url": SOURCE_URL,
-            "source_license": SOURCE_LICENSE,
-            "source_license_url": SOURCE_LICENSE_URL,
+            "source_name": source_name,
+            "source_url": source_url,
+            "source_license": source_license,
+            "source_license_url": source_license_url,
         }
         validate_public_exercise_quality(record)
         records.append(record)

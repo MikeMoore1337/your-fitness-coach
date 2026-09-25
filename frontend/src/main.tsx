@@ -1,7 +1,7 @@
 import { StrictMode, lazy, Suspense, useEffect, useLayoutEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from './app/AuthProvider';
+import { AuthProvider, useAuth } from './app/AuthProvider';
 import { AuthGate } from './app/AuthGate';
 import { OnboardingGate } from './app/OnboardingGate';
 import { ErrorBoundary } from './app/ErrorBoundary';
@@ -11,19 +11,19 @@ import { OnlineStatus } from './shared/ui/OnlineStatus';
 import { LoadingState } from './shared/ui/common';
 import { isTelegramLaunch } from './shared/telegram/launch';
 import { applyPlatformTheme, useTelegram } from './shared/telegram/useTelegram';
-import { NavigationProvider, Redirect, useNavigation } from './shared/navigation/router';
+import {
+  NavigationProvider,
+  PERSONAL_WORKSPACE_RETURN_STATE,
+  Redirect,
+  useNavigation,
+} from './shared/navigation/router';
+import { hasExplicitAppDestination } from './shared/auth/redirects';
 import {
   isPublicKnowledgePath,
   publicKnowledgePathFromLegacyRoute,
 } from './shared/navigation/knowledgeRoutes';
-import { applyRouteMetadata } from './shared/seo/metadata';
 import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
-import {
-  initializeYandexMetrica,
-  setYandexPrivateContentMask,
-  trackYandexPageView,
-} from './shared/analytics/yandexMetrica';
 import { captureFirstTouchAttribution } from './shared/analytics/attribution';
 import './styles/legacy.css';
 import './styles/fonts.css';
@@ -40,6 +40,28 @@ const publicContentRoots = new Set([
   '/knowledge',
   '/exercises',
 ]);
+
+function applyPrivateRouteMetadata(path: string): void {
+  void import('./shared/seo/metadata').then(({ applyRouteMetadata }) => {
+    if (window.location.pathname === path) applyRouteMetadata(path);
+  });
+}
+
+function initializeYandexMetrica(): void {
+  void import('./shared/analytics/yandexMetrica').then(({ initializeYandexMetrica }) => {
+    initializeYandexMetrica();
+  });
+}
+
+function trackYandexPageView(path: string, title?: string): void {
+  void import('./shared/analytics/yandexMetrica').then(({ trackYandexPageView }) => {
+    trackYandexPageView(path, title);
+  });
+}
+
+function setYandexPrivateContentMask(masked: boolean): void {
+  document.getElementById('root')?.classList.toggle('ym-hide-content', masked);
+}
 
 function isArticleRoute(path: string): boolean {
   return path === '/articles' || path.startsWith('/articles/');
@@ -95,12 +117,31 @@ function AuthenticatedRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AuthenticatedAppRoute() {
+  const { user } = useAuth();
+  const { search } = useNavigation();
+  const isIntentionalPersonalReturn =
+    window.history.state?.[PERSONAL_WORKSPACE_RETURN_STATE] === true;
+  if (
+    user?.is_coach &&
+    !isIntentionalPersonalReturn &&
+    !hasExplicitAppDestination(search, window.location.hash)
+  ) {
+    return <Redirect to="/coach" />;
+  }
+  return (
+    <OnboardingGate>
+      <MiniAppPage />
+    </OnboardingGate>
+  );
+}
+
 function AppRoutes() {
   const { path } = useNavigation();
   const legacyKnowledgePath = publicKnowledgePathFromLegacyRoute(path);
   useEffect(() => {
     if (path !== '/' && !isPublicContentRoute(path) && !isArticleRoute(path)) {
-      applyRouteMetadata(path);
+      applyPrivateRouteMetadata(path);
     }
   }, [path]);
   if (path === '/') return <LandingPage />;
@@ -149,9 +190,7 @@ function AppRoutes() {
   if (path === '/app')
     return (
       <AuthenticatedRoute>
-        <OnboardingGate>
-          <MiniAppPage />
-        </OnboardingGate>
+        <AuthenticatedAppRoute />
       </AuthenticatedRoute>
     );
   if (path === '/app/report')

@@ -3,8 +3,12 @@ import { expect, test, type Page } from '@playwright/test';
 import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 
+test.use({ serviceWorkers: 'block' });
+
 type AppDestination = 'Сегодня' | 'План' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
 const TASK_293_EVIDENCE_DIR = process.env.TASK_293_EVIDENCE_DIR;
+const STAGE4_THUMBNAIL_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
+const STAGE4_ANIMATION_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
 
 async function captureTask293Evidence(page: Page, fileName: string): Promise<void> {
   if (!TASK_293_EVIDENCE_DIR) return;
@@ -812,6 +816,9 @@ async function mockApi(
           is_custom: false,
           is_personalized: false,
           has_guide: true,
+          media_state: 'approved_animated',
+          media_thumbnail_url: STAGE4_THUMBNAIL_URL,
+          media_animation_url: STAGE4_ANIMATION_URL,
           guide: {
             technique_steps: ['Зафиксируйте корпус', 'Выполните движение под контролем'],
             breathing: 'Выдох в фазе усилия, вдох при возврате.',
@@ -931,6 +938,9 @@ async function mockApi(
             is_custom: false,
             is_personalized: false,
             has_guide: true,
+            media_state: 'approved_animated',
+            media_thumbnail_url: STAGE4_THUMBNAIL_URL,
+            media_animation_url: STAGE4_ANIMATION_URL,
             guide: null,
           },
         ],
@@ -1756,7 +1766,7 @@ test('desktop sidebar keeps trainer workspaces reachable at a short viewport', a
   await expect(
     page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }),
   ).not.toBeVisible();
-  await expect(page.getByRole('link', { name: 'Тренер', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Сегодня', exact: true })).toBeVisible();
   expect(await navigation.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
     true,
   );
@@ -2399,7 +2409,7 @@ test('пользователь напрямую включает режим тр
   });
   expect(repeatedActivation).toMatchObject({ activated_now: false, is_active: true });
   const modeSwitch = page.getByRole('navigation', { name: 'Режим работы' });
-  await expect(modeSwitch.getByRole('link', { name: 'Для себя' })).toHaveAttribute(
+  await expect(modeSwitch.getByRole('link', { name: 'Для себя' }).first()).toHaveAttribute(
     'aria-current',
     'page',
   );
@@ -2432,16 +2442,19 @@ test('пользователь напрямую включает режим тр
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await openAppDestination(page, 'Профиль');
   await openCard(page, 'Тренер и приглашения');
-  await modeSwitch.getByRole('link', { name: 'Клиенты' }).click();
+  await modeSwitch.getByRole('link', { name: 'В кабинет тренера', exact: true }).first().click();
   await page
-    .getByRole('navigation', { name: 'Разделы тренера' })
-    .getByRole('button', { name: 'Клиенты', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Клиенты', exact: true }).first()).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .locator('.app-bottom-nav__primary')
+      .getByRole('link', { name: 'Клиенты', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Добавьте первого клиента' })).toBeVisible();
   const modeCopyPadding = await page
     .locator('.trainer-mode-context__copy')
@@ -2489,10 +2502,10 @@ test('активные клиенты блокируют отключение р
   await mockApi(page, { coachClientName: longClientName, withCoachClient: true });
   await page.goto('/app');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await page
-    .locator('#appMorePanel')
-    .getByRole('link', { name: 'Кабинет тренера', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
     .click();
   await page.getByText(longClientName, { exact: true }).first().click();
   const clientContext = page.locator('.trainer-mode-context__copy small');
@@ -2876,6 +2889,18 @@ test('клиент собирает и переупорядочивает лич
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockApi(page);
+  await page.route(`**${STAGE4_THUMBNAIL_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg',
+      contentType: 'image/jpeg',
+    }),
+  );
+  await page.route(`**${STAGE4_ANIMATION_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif',
+      contentType: 'image/gif',
+    }),
+  );
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'План');
@@ -2914,6 +2939,13 @@ test('клиент собирает и переупорядочивает лич
   await closeGuide.click();
   await expect(exercisePicker).toHaveValue('Тяга');
   await exercisePicker.focus();
+  await expect(
+    builder.locator('.exercise-picker__option img[data-media-mode="static-poster"]'),
+  ).toHaveCount(1);
+  await page.screenshot({
+    path: '../.artifacts/tasks/390/evidence/screenshots/program-builder-mobile-390x844-picker.png',
+    fullPage: true,
+  });
   await builder.getByRole('option', { name: /Тяга блока/ }).click();
   await expect(exercisePicker).toHaveValue('Тяга блока');
   await expect(builder.getByText('1 тренировка · 1 упр.', { exact: true })).toBeVisible();
@@ -3051,6 +3083,11 @@ test('поля даты остаются внутри анкеты клиент�
   await mockApi(page, { withCoachClient: true });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
+    .click();
   await page.getByRole('button', { name: /Тестовый клиент/ }).click();
   await page.getByText('Профиль клиента', { exact: true }).click();
 
@@ -3092,14 +3129,17 @@ test('тренер открывает кабинет', async ({ page }) => {
   await page.getByRole('button', { name: 'Тренер' }).click();
   await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
   await page
-    .getByRole('navigation', { name: 'Разделы тренера' })
-    .getByRole('button', { name: 'Клиенты', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Клиенты', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'Кабинет тренера' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Тренер', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Основная навигация' })
+      .locator('.app-bottom-nav__primary')
+      .getByRole('link', { name: 'Клиенты', exact: true }),
+  ).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: 'Админ-панель' })).toHaveCount(0);
   await expect(page.getByText('Клиентов пока нет')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Добавьте первого клиента' })).toBeVisible();
@@ -3113,8 +3153,9 @@ test('тренер быстро переходит между программо
   await page.getByRole('button', { name: 'Тренер' }).click();
 
   await page
-    .getByRole('navigation', { name: 'Разделы тренера' })
-    .getByRole('button', { name: 'Программы', exact: true })
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .locator('.app-bottom-nav__primary')
+    .getByRole('link', { name: 'Программы', exact: true })
     .click();
   await openCard(page, 'Программы клиентов');
   await expect(page.getByText('План клиента на четыре недели')).toBeVisible();

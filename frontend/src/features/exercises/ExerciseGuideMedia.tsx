@@ -3,6 +3,7 @@ import type { ExerciseGuide } from '../../shared/api/types';
 import { ChevronIcon, CloseIcon } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
+import { usePrefersReducedMotion } from './ExerciseMediaAsset';
 
 type GuideMediaItem = ExerciseGuide['media'][number];
 
@@ -26,6 +27,7 @@ export function ExerciseGuideMedia({
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
+  const reducedMotion = usePrefersReducedMotion();
   const close = () => {
     setExpandedIndex(null);
     onExpandedChange?.(false);
@@ -67,6 +69,8 @@ export function ExerciseGuideMedia({
       <div className="exercise-guide-images" aria-label="Положения упражнения">
         {items.map((item, index) => {
           const failed = failedUrls.has(item.url);
+          const showPoster = reducedMotion && item.type === 'animation';
+          const displayUrl = showPoster ? item.poster : item.url;
           return (
             <figure className="exercise-guide-image" key={item.asset_id ?? item.url}>
               {failed ? (
@@ -90,14 +94,17 @@ export function ExerciseGuideMedia({
                   }}
                 >
                   <img
-                    src={item.url}
-                    srcSet={responsiveSources(item)}
+                    src={displayUrl}
+                    srcSet={
+                      showPoster || item.type === 'animation' ? undefined : responsiveSources(item)
+                    }
                     sizes={cardSizes}
                     alt={item.alt}
                     width={item.width}
                     height={item.height}
                     loading="lazy"
                     decoding="async"
+                    data-media-mode={showPoster ? 'static-poster' : item.type}
                     onError={() => markFailed(item.url)}
                   />
                   <span className="exercise-guide-image__zoom" aria-hidden="true">
@@ -145,13 +152,24 @@ export function ExerciseGuideMedia({
           )}
           <figure>
             <img
-              src={activeItem.sources.at(-1)?.url ?? activeItem.url}
-              srcSet={responsiveSources(activeItem)}
+              src={
+                reducedMotion
+                  ? activeItem.poster
+                  : activeItem.type === 'animation'
+                    ? activeItem.url
+                    : (activeItem.sources.at(-1)?.url ?? activeItem.url)
+              }
+              srcSet={
+                reducedMotion || activeItem.type === 'animation'
+                  ? undefined
+                  : responsiveSources(activeItem)
+              }
               sizes={lightboxSizes}
               alt={activeItem.alt}
               width={activeItem.width}
               height={activeItem.height}
               decoding="async"
+              data-media-mode={reducedMotion ? 'static-poster' : activeItem.type}
               onError={() => markFailed(activeItem.url)}
             />
             <figcaption>{activeItem.phase}</figcaption>

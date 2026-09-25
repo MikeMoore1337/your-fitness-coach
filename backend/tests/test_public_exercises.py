@@ -55,8 +55,9 @@ def test_bench_press_public_record_uses_existing_media_provenance():
     assert exercise["slug"] == "bench-press"
     media = exercise["media"]
     assert isinstance(media, list)
-    assert len(media) == 2
-    assert all(item["source_name"] == "free-exercise-db" for item in media)
+    assert len(media) == 1
+    assert media[0]["source_name"] == "Gym visual"
+    assert media[0]["source_license"] == "Owner-purchased GymVisual license"
 
 
 def test_full_body_public_program_reuses_canonical_three_day_seed():

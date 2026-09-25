@@ -1,9 +1,12 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  coachPathForTab,
+  coachTabFromSearch,
   demoReturnPathFromLogin,
   focusedContextReturn,
   NavigationProvider,
+  safeTrainerReturnPath,
 } from '../../../../src/shared/navigation/router';
 
 describe('NavigationProvider Telegram BackButton', () => {
@@ -138,5 +141,22 @@ describe('NavigationProvider Telegram BackButton', () => {
       demoReturnPathFromLogin('?from=demo&scenario=self_training&cabinet=1&section=profile'),
     ).toBe('/demo?cabinet=1&scenario=self_training&section=profile');
     expect(demoReturnPathFromLogin('?from=demo&scenario=https://evil.example')).toBeNull();
+  });
+
+  it('использует текущие trainer tabs и отклоняет stale return context', () => {
+    expect(coachTabFromSearch('')).toBe('today');
+    expect(coachTabFromSearch('?tab=clients')).toBe('clients');
+    expect(coachTabFromSearch('?tab=tools')).toBe('tools');
+    expect(coachTabFromSearch('?tab=unknown')).toBe('today');
+    expect(coachTabFromSearch('?client_id=42')).toBe('clients');
+    expect(coachTabFromSearch('?client_id=bad')).toBe('today');
+    expect(coachTabFromSearch('?client_id=9007199254740992')).toBe('today');
+    expect(coachTabFromSearch('?tab=clients&tab=programs')).toBe('today');
+    expect(coachPathForTab('programs')).toBe('/coach?tab=programs');
+    expect(safeTrainerReturnPath('/coach?tab=clients')).toBe('/coach?tab=clients');
+    expect(safeTrainerReturnPath('/coach?tab=unknown')).toBeNull();
+    expect(safeTrainerReturnPath('/coach?client_id=42')).toBeNull();
+    expect(safeTrainerReturnPath('/coach?tab=clients&tab=programs')).toBeNull();
+    expect(safeTrainerReturnPath('https://evil.example/coach?tab=clients')).toBeNull();
   });
 });

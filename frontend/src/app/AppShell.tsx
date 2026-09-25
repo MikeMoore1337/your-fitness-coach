@@ -1,5 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { AppLink, useNavigation } from '../shared/navigation/router';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  AppLink,
+  coachTabFromSearch,
+  safeTrainerReturnPath,
+  useNavigation,
+} from '../shared/navigation/router';
 import { AppThemeToggle } from '../shared/ui/AppThemeToggle';
 import { glassProps } from '../shared/ui/Glass';
 import { BrandLockup } from '../shared/ui/BrandLogo';
@@ -21,6 +26,7 @@ import {
   type QuickAddAction,
 } from './QuickAddSheet';
 import { AiCoachWorkspaceProvider } from '../features/ai/AiCoachWorkspace';
+import { TrainerModeSwitch } from '../features/trainer/TrainerModeSwitch';
 import {
   productEventSurface,
   trackProductEvent,
@@ -39,6 +45,33 @@ const APP_DESTINATIONS: ReadonlyArray<{
   { section: 'nutrition', label: 'Питание', icon: 'nutrition' },
   { section: 'progress', label: 'Прогресс', icon: 'progress' },
 ];
+
+const TRAINER_DESTINATIONS: ReadonlyArray<{
+  key: string;
+  label: string;
+  icon: AppNavigationIconName;
+  to: string;
+}> = [
+  { key: 'today', label: 'Сегодня', icon: 'today', to: '/coach' },
+  { key: 'clients', label: 'Клиенты', icon: 'coach', to: '/coach?tab=clients' },
+  { key: 'programs', label: 'Программы', icon: 'plan', to: '/coach?tab=programs' },
+  { key: 'tools', label: 'Ещё', icon: 'more', to: '/coach?tab=tools' },
+];
+
+function personalDestinationWithTrainerReturn(to: string, search: string): string {
+  const returnTo = safeTrainerReturnPath(new URLSearchParams(search).get('trainer_return'));
+  if (!returnTo) return to;
+  try {
+    const destination = new URL(to, window.location.origin);
+    if (destination.origin !== window.location.origin || destination.pathname !== '/app') {
+      return to;
+    }
+    destination.searchParams.set('trainer_return', returnTo);
+    return `${destination.pathname}${destination.search}${destination.hash}`;
+  } catch {
+    return to;
+  }
+}
 
 export interface DemoAppShellConfig {
   activeSection: string;
@@ -183,9 +216,10 @@ export function AppShell({
   const auth = useOptionalAuth();
   const user = auth?.user ?? null;
   const logout = auth?.logout;
-  const { path } = useNavigation();
+  const { path, search } = useNavigation();
   const analyticsSection = analyticsSectionForLocation(path, section);
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreOpenRef = useRef(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const morePresence = useMotionPresence({
     closingAnimationName: 'app-more-backdrop-out',
@@ -204,9 +238,16 @@ export function AppShell({
   const secondaryActive = section === 'catalog' || section === 'profile';
   const isMiniApp = Boolean(window.Telegram?.WebApp?.initData);
   const mobileNavigation = useMobileNavigation();
-  const shellDestinations = demo?.destinations ?? APP_DESTINATIONS;
+  const trainerWorkspace = Boolean(!demo && user?.is_coach && path === '/coach');
+  const personalWorkspace = Boolean(!demo && user?.is_coach && path === '/app' && section);
+  const trainerReturnTo = personalWorkspace
+    ? safeTrainerReturnPath(new URLSearchParams(search).get('trainer_return'))
+    : null;
+  const shellDestinations =
+    demo?.destinations ?? (trainerWorkspace ? TRAINER_DESTINATIONS : APP_DESTINATIONS);
   const quickAddLinks = demo?.quickAddLinks ?? DEFAULT_QUICK_ADD_ACTIONS;
   const brandTo = demo?.brandTo ?? '/app?section=today';
+  const resolvedBrandTo = demo ? brandTo : personalDestinationWithTrainerReturn(brandTo, search);
   const shellVisible = Boolean(user || demo);
   const quickAddVisible = shellVisible && (Boolean(demo) || section !== undefined);
   const morePresent = moreOpen || morePresence.present;
@@ -235,7 +276,7 @@ export function AppShell({
       to: '/coach',
       icon: 'coach' as const,
       desktopGroup: 'workspaces' as const,
-      visible: Boolean(user?.is_coach),
+      visible: Boolean(user?.is_coach) && !trainerWorkspace,
     },
     {
       key: 'admin',
@@ -263,17 +304,24 @@ export function AppShell({
       to_section: destinationSection,
     });
   };
-
-  const closeMore = (restoreFocus = false) => {
-    setMoreOpen(false);
-    morePresence.hide();
-    if (restoreFocus) moreTriggerRef.current?.focus();
-  };
+  const closeMore = useCallback(
+    (restoreFocus = false) => {
+      moreOpenRef.current = false;
+      setMoreOpen(false);
+      hideMorePresence();
+      if (restoreFocus) moreTriggerRef.current?.focus();
+    },
+    [hideMorePresence],
+  );
   const openMore = (trigger?: HTMLElement) => {
     if (trigger) moreTriggerRef.current = trigger;
+    moreOpenRef.current = true;
     setMoreOpen(true);
     morePresence.show();
   };
+  useEffect(() => {
+    moreOpenRef.current = moreOpen;
+  }, [moreOpen]);
   const openQuickAdd = () => {
     if (moreOpen) closeMore();
     setQuickAddOpen(true);
@@ -317,11 +365,20 @@ export function AppShell({
   }, [moreOpen]);
 
   useEffect(() => {
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape' || !moreOpenRef.current) return;
+      event.preventDefault();
+      closeMore(true);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [closeMore]);
+
+  useEffect(() => {
     if (demo) return;
     const closeAtDesktopBreakpoint = () => {
-      if (mobileNavigationMatches() || !moreOpen) return;
-      setMoreOpen(false);
-      hideMorePresence();
+      if (mobileNavigationMatches() || !moreOpenRef.current) return;
+      closeMore();
       window.requestAnimationFrame(() => {
         const accountLink = document.getElementById('appAccountProfileLink');
         const railBrand = document.querySelector<HTMLElement>(
@@ -332,18 +389,13 @@ export function AppShell({
     };
     window.addEventListener('resize', closeAtDesktopBreakpoint);
     return () => window.removeEventListener('resize', closeAtDesktopBreakpoint);
-  }, [demo, hideMorePresence, moreOpen]);
+  }, [closeMore, demo]);
 
   if (!demo && !auth) {
     throw new Error('AppShell must be used inside AuthProvider unless demo config is provided');
   }
 
   const handleMoreKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closeMore(true);
-      return;
-    }
     if (event.key !== 'Tab') return;
     const focusable = Array.from(
       event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
@@ -367,7 +419,7 @@ export function AppShell({
           <header className="app-mobile-header">
             <AppLink
               className="app-mobile-header__brand"
-              to={brandTo}
+              to={resolvedBrandTo}
               aria-label="Your Fitness Coach — сегодня"
             >
               <BrandLockup markClassName="app-mobile-header__brand-mark" />
@@ -400,6 +452,9 @@ export function AppShell({
           />
         )}
         <main id="appContent" className={`container app-shell__content${narrow ? ' narrow' : ''}`}>
+          {personalWorkspace && (
+            <TrainerModeSwitch mode="personal" returnTo={trainerReturnTo ?? undefined} />
+          )}
           {children}
         </main>
         {shellVisible && (
@@ -412,7 +467,7 @@ export function AppShell({
             >
               <AppLink
                 className="app-bottom-nav__brand"
-                to={brandTo}
+                to={resolvedBrandTo}
                 aria-label={demo ? 'Your Fitness Coach — демо' : 'Your Fitness Coach — сегодня'}
               >
                 <BrandLockup markClassName="app-bottom-nav__brand-mark" />
@@ -422,7 +477,10 @@ export function AppShell({
                 <div className="app-bottom-nav__profile-slot">
                   <AppLink
                     id="appAccountProfileLink"
-                    to={demo?.accountTo ?? '/app?section=profile'}
+                    to={
+                      demo?.accountTo ??
+                      personalDestinationWithTrainerReturn('/app?section=profile', search)
+                    }
                     className={`app-desktop-account-entry${
                       (
                         demo
@@ -464,11 +522,16 @@ export function AppShell({
                 {shellDestinations.map((destination) => {
                   const destinationKey =
                     'section' in destination ? destination.section : destination.key;
-                  const destinationTo =
+                  const rawDestinationTo =
                     'to' in destination ? destination.to : `/app?section=${destination.section}`;
+                  const destinationTo = demo
+                    ? rawDestinationTo
+                    : personalDestinationWithTrainerReturn(rawDestinationTo, search);
                   const active = demo
                     ? demo.activeSection === destinationKey
-                    : path === '/app' && section === destinationKey;
+                    : trainerWorkspace
+                      ? path === '/coach' && coachTabFromSearch(search) === destinationKey
+                      : path === '/app' && section === destinationKey;
                   return (
                     <AppLink
                       key={destinationKey}
@@ -531,11 +594,15 @@ export function AppShell({
                           return (
                             <AppLink
                               key={destination.key}
-                              to={destination.to}
+                              to={personalDestinationWithTrainerReturn(destination.to, search)}
                               className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
                               {...(active ? glassProps('clear', true) : {})}
                               aria-current={active ? 'page' : undefined}
-                              onClick={() => trackSectionNavigation(destination.to)}
+                              onClick={() =>
+                                trackSectionNavigation(
+                                  personalDestinationWithTrainerReturn(destination.to, search),
+                                )
+                              }
                             >
                               <AppNavigationIcon name={destination.icon} />
                               <span className="app-bottom-nav__label">
@@ -694,11 +761,13 @@ export function AppShell({
                         return (
                           <AppLink
                             key={destination.key}
-                            to={destination.to}
+                            to={personalDestinationWithTrainerReturn(destination.to, search)}
                             className="app-more-panel__item"
                             aria-current={active ? 'page' : undefined}
                             onClick={() => {
-                              trackSectionNavigation(destination.to);
+                              trackSectionNavigation(
+                                personalDestinationWithTrainerReturn(destination.to, search),
+                              );
                               setMoreOpen(false);
                               hideMorePresence();
                             }}

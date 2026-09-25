@@ -260,7 +260,8 @@ function CardioSessionForm({
       noValidate
       onFocusCapture={(event) => {
         const focused = event.target;
-        if (!(focused instanceof HTMLElement)) return;
+        if (!(focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement))
+          return;
         requestAnimationFrame(() => {
           focused.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         });

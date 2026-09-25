@@ -4,6 +4,10 @@
  * semantic contract without creating a parallel component tree.
  */
 
+.app-action-group {
+  gap: var(--v2-space-2);
+}
+
 body:has(.app-shell--design-v2) {
   background: var(--v2-canvas);
 }
@@ -645,12 +649,6 @@ body:has(.app-shell--design-v2) {
   overflow-wrap: anywhere;
 }
 
-.progress-hero__actions {
-  display: grid;
-  justify-items: end;
-  gap: 8px;
-}
-
 @media (max-width: 899px) {
   .progress-report-page {
     padding: 18px 16px calc(28px + var(--yfc-content-safe-bottom));
@@ -730,11 +728,6 @@ body:has(.app-shell--design-v2) {
   .progress-report-exercises dl,
   .progress-report-checkin dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .progress-hero__actions {
-    width: 100%;
-    justify-items: stretch;
   }
 }
 
@@ -3505,15 +3498,56 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 .app-section--progress .progress-experience--bento .progress-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 620px);
+  grid-template-areas:
+    'copy period'
+    'help download';
   align-items: start;
+  column-gap: var(--v2-space-5);
+  row-gap: var(--v2-space-2);
   padding-block: var(--v2-space-2) 0;
 }
 
-.app-section--progress .progress-experience--bento .progress-hero__actions {
-  display: grid;
-  justify-items: stretch;
-  gap: var(--v2-space-3);
-  min-width: min(100%, 620px);
+.app-section--progress .progress-hero__copy {
+  grid-area: copy;
+}
+
+.app-section--progress .progress-hero__period,
+.app-section--progress .progress-hero__help,
+.app-section--progress .progress-hero__download {
+  min-width: 0;
+}
+
+.app-section--progress .progress-hero__period {
+  grid-area: period;
+}
+
+.app-section--progress .progress-hero__help {
+  grid-area: help;
+  min-width: 0;
+}
+
+.app-section--progress .progress-hero__download {
+  grid-area: download;
+  justify-self: start;
+  min-width: 0;
+}
+
+.app-section--progress .progress-hero__help .contextual-help {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+}
+
+.app-section--progress .progress-hero__help .contextual-help > summary {
+  width: fit-content;
+  max-width: 100%;
+  justify-content: flex-start;
+}
+
+.app-section--progress .progress-hero__help .contextual-help > summary > span {
+  flex: 0 0 28px;
 }
 
 .app-section--progress .progress-period-controls {
@@ -3854,13 +3888,13 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
 @media (max-width: 1100px) {
   .app-section--progress .progress-experience--bento .progress-hero {
-    flex-direction: column;
-    gap: var(--v2-space-3);
-  }
-
-  .app-section--progress .progress-experience--bento .progress-hero__actions {
-    width: 100%;
-    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'copy'
+      'period'
+      'help'
+      'download';
+    row-gap: var(--v2-space-3);
   }
 
   .app-section--progress .progress-bento__grid {
@@ -3879,16 +3913,6 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 @media (max-width: 767px) {
-  .app-section--progress .progress-experience--bento .progress-hero {
-    flex-direction: column;
-    gap: var(--v2-space-3);
-  }
-
-  .app-section--progress .progress-experience--bento .progress-hero__actions {
-    width: 100%;
-    min-width: 0;
-  }
-
   .app-section--progress .progress-period-controls__meta {
     justify-content: flex-start;
   }
@@ -4505,6 +4529,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   html:has(.app-shell--design-v2 #appBottomNav) {
     scroll-padding-bottom: var(--yfc-mobile-dock-clearance);
+  }
+
+  html:has(.app-shell--design-v2 #appBottomNav):has(.app-section--progress) {
+    scroll-padding-bottom: calc(var(--yfc-mobile-action-clearance) + 48px);
   }
 
   .app-shell--design-v2 #appContent :where(button, a, input, select, textarea, summary) {
@@ -6468,10 +6496,8 @@ button.notification-row__main:focus-visible {
 }
 
 .app-section--progress .progress-hero {
-  align-items: end;
-  padding: 0 0 var(--v2-space-4);
+  padding: 0;
   border: 0;
-  border-bottom: 1px solid var(--v2-border);
   border-radius: 0;
   background: transparent;
 }
@@ -6583,6 +6609,7 @@ button.notification-row__main:focus-visible {
 .app-section--progress .ui-tabs {
   border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
+  background-clip: padding-box;
 }
 
 .app-section--progress .ui-tab[aria-selected='true'] {

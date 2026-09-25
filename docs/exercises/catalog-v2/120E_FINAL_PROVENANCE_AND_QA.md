@@ -98,8 +98,9 @@ assets создавались и проверялись в одной agent sess
 
 - `python scripts/build_exercise_human_visual_assets.py --source-dir <review-artifacts>`:
   108 exact derivatives, оба set digests совпали.
-- `python scripts/build_exercise_guide_media_manifest.py --check`: 343 logical
-  assets / 415 physical derivatives, 176 exercises — pass.
+- `python scripts/validate_exercise_catalog.py`: active schema-3 manifest,
+  334 Gym visual assets / 206 canonical exercises, 167 approved animated and
+  39 blocked entries — pass.
 - `pytest backend/tests/test_exercise_domain.py`: `10 passed`.
 - Frontend component tests `ExerciseGuideMedia` + `ExerciseGuideDialog`: `4 passed`.
 - Frontend `typecheck`, ESLint и production build: pass.

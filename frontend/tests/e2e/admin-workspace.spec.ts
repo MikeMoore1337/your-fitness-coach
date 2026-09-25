@@ -102,7 +102,7 @@ const detail = {
   audit_history: audit,
 };
 
-async function mockAdminApi(page: Page, { root = true } = {}) {
+async function mockAdminApi(page: Page, { root = true, coach = false } = {}) {
   await page.addInitScript(() => {
     sessionStorage.setItem('fit_access_token', 'root-e2e-token');
   });
@@ -119,7 +119,9 @@ async function mockAdminApi(page: Page, { root = true } = {}) {
       return route.fulfill({ status: 401, json: { detail: 'No refresh cookie' } });
     }
     if (path.endsWith('/me')) {
-      return route.fulfill({ json: { ...rootUser, is_root: root, is_admin: root } });
+      return route.fulfill({
+        json: { ...rootUser, is_coach: coach, is_root: root, is_admin: root },
+      });
     }
     if (path.endsWith('/admin/users') && request.method() === 'GET') {
       return route.fulfill({ json: url.searchParams.get('q') ? [searchRow] : [] });
@@ -288,6 +290,36 @@ test('non-root web account receives a controlled permission state', async ({ pag
     path: '../.artifacts/screenshots/task-71/390-light-permission-denied.png',
     fullPage: true,
   });
+});
+
+test('Root and Trainer remain separate explicit workspaces for a dual-capability account', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockAdminApi(page, { coach: true });
+  await page.goto('/admin');
+
+  await expect(
+    page.getByRole('heading', { name: 'Операции поддержки и безопасности' }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Админ-панель' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  const trainerWorkspace = page.getByRole('link', { name: 'Тренер' });
+  await expect(trainerWorkspace).toHaveAttribute('href', '/coach');
+  await trainerWorkspace.click();
+  await expect(page).toHaveURL('/coach');
+
+  const adminWorkspace = page.getByRole('link', { name: 'Админ-панель' });
+  await expect(adminWorkspace).toBeVisible();
+  await adminWorkspace.click();
+  await expect(page).toHaveURL('/admin');
+  await expect(
+    page.getByRole('heading', { name: 'Операции поддержки и безопасности' }),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Админ-панель' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Тренер' })).toBeVisible();
 });
 
 for (const viewport of [
