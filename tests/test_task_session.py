@@ -1158,6 +1158,38 @@ def test_task_pr_accepts_dependency_provenance_declared_in_task_commit() -> None
     )
 
 
+def test_task_pr_accepts_task_393_integration_branch_and_completed_stages() -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _task_pr(393, "393", base_sha, head_sha)
+    pull_request["head"]["ref"] = "feature/app-experience-v3"
+    pull_request["commits"] = 2
+    commits = [
+        {"commit": {"message": "[Task 391] Make active workout media full width on mobile"}},
+        {
+            "commit": {
+                "message": (
+                    "[Task 393] Integrate approved stages\n\n"
+                    "Depends-on: [Task 386], [Task 387], [Task 388], [Task 389], "
+                    "[Task 390], [Task 391], [Task 392], [Task 395], [Task 396], "
+                    "[Task 397], [Task 400]"
+                )
+            }
+        },
+    ]
+
+    assert (
+        task_session.validate_task_pull_request(
+            pull_request,
+            commits,
+            [_success_check(head_sha)],
+            expected_base_sha=base_sha,
+            dependency_ids=None,
+        )
+        == "393"
+    )
+
+
 @pytest.mark.parametrize(
     "branch", ["feature/127-x", "task/127", "task/127-Bad-Slug", "task/127_bad", "task/A127-test"]
 )

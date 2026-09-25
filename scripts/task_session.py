@@ -73,6 +73,7 @@ TASK_STATE_VERSION = 2
 STATE_DIRECTORY_NAME = "codex-task-sessions-v1"
 ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
+TASK_INTEGRATION_BRANCHES = {"feature/app-experience-v3": "393"}
 DEPENDABOT_LOGIN = "dependabot[bot]"
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
 UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
@@ -926,7 +927,12 @@ def validate_task_pull_request(
             f"Task pull request base must be {expected_base_branch}, found {base.get('ref')}"
         )
     branch = str(head.get("ref", ""))
-    task_id = task_id_from_branch(branch)
+    try:
+        task_id = task_id_from_branch(branch)
+    except TaskSessionError:
+        task_id = TASK_INTEGRATION_BRANCHES.get(branch, "")
+        if not task_id:
+            raise
     if base.get("sha") != expected_base_sha:
         raise TaskSessionError(
             f"Task PR is stale: base {base.get('sha')} != current {expected_base_sha}"
