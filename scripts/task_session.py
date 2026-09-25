@@ -4609,8 +4609,18 @@ class TaskController:
                 if path
             )
             check = _verified_required_check(github.check_runs(head_sha), head_sha)
+            merge_subject = re.match(
+                r"^Merge pull request #(?P<pr_number>\d+) from \S+$",
+                subject,
+            )
+            standard_merge_pr = (
+                merge_subject is not None
+                and int(merge_subject.group("pr_number")) == pr_number
+                and len(parents) >= 2
+            )
             controller_match = CONTROLLER_COMMIT_RE.match(subject)
-            if controller_match:
+            controller_from_merge = standard_merge_pr and title.startswith("[Controller]")
+            if controller_match or controller_from_merge:
                 if (
                     CONTROLLER_BRANCH_RE.fullmatch(branch) is None
                     or not title.startswith("[Controller]")
@@ -4690,21 +4700,12 @@ class TaskController:
                 if task_match is not None:
                     task_id = normalize_task_id(task_match.group("task_id"))
                 else:
-                    merge_subject = re.match(
-                        r"^Merge pull request #(?P<pr_number>\d+) from \S+$",
-                        subject,
-                    )
                     title_task_match = re.match(
                         rf"^\[Task (?P<task_id>{TASK_ID_PATTERN})\]",
                         title,
                         re.IGNORECASE,
                     )
-                    if (
-                        merge_subject is None
-                        or int(merge_subject.group("pr_number")) != pr_number
-                        or title_task_match is None
-                        or len(parents) < 2
-                    ):
+                    if not standard_merge_pr or title_task_match is None:
                         raise TaskSessionError(f"Intervening commit {commit_sha} is unclassified")
                     task_id = normalize_task_id(title_task_match.group("task_id"))
                 try:
