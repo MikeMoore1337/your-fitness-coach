@@ -181,6 +181,21 @@ anchor и ordered PR/deployment evidence в task history, переводит lea
 исторический ancestor проверенного master snapshot, а новые commits после snapshot по-прежнему
 должны быть controller-only и затрагивать только allowlist controller paths.
 
+Для уже завершённой task, чей production SHA позже стал ancestor master, существует отдельная
+terminal-only команда `reconcile-subsequent-production <ID> --owner-authorize`. Она требует
+`production-success`, неизменённую clean task branch/worktree без unique commits, пустой delivery
+owner и отсутствие активного production deployment. Команда классифицирует каждый commit между
+исходным deployed SHA и защищённым master, связывает его с точным merged PR/task и успешным
+exact-head `checks`, проверяет release/deployment evidence для каждого product commit и
+подтверждает, что controller PR меняли только разрешённые controller paths, а application deploy
+был skipped. Latest production deployment должен быть успешным и находиться в проверенной цепочке;
+если после него `master` содержит commits, они должны быть только подтверждёнными controller-only
+PRs. Исходные `head_sha`, `merge_sha` и `deployed_sha` task не меняются: отдельно сохраняются
+текущие production SHA и master SHA, ordered commit/PR/task/CI/deployment evidence и owner
+authorization в lease и history. `finish` повторно проверяет сохранённую цепочку, текущий protected
+master и latest production deployment и отказывает при изменении любого из них. Обычный `finish`
+без этой записи продолжает отклонять product drift.
+
 Если canonical checkout ещё не содержит merged controller fix из-за заблокированного refresh,
 запустите этот код из чистого worktree merged controller PR и передайте `--repo` путь к canonical
 checkout с общим Git common dir. Пример для уже проверенной цепочки Task 415:
@@ -234,6 +249,7 @@ python scripts/task_session.py refresh-delivery 135
 python scripts/task_session.py validate-delivery 135
 python scripts/task_session.py reopen-for-review 135 --reason "address review findings"
 python scripts/task_session.py complete-production 135 --pr <number> --merge-sha <sha> --deployed-sha <sha>
+python scripts/task_session.py reconcile-subsequent-production 135 --owner-authorize
 python scripts/task_session.py finish 135
 ```
 
