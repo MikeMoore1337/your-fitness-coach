@@ -53,7 +53,7 @@ dev = [
     "ruff>=0.16.1",
 ]
 scheduled-report = [
-    "allure-pytest==2.16.0",
+    "allure-pytest==2.16.1",
 ]
 
 [tool.uv]
