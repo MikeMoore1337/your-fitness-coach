@@ -275,7 +275,7 @@ export default function LandingPage() {
             <p className="landing-hero__lead">Тренировки, питание и прогресс — в одном месте.</p>
             <div className="landing-hero__actions">
               <a className="landing-button" href={appUrl} onClick={trackAppSelection}>
-                Начать <Icon name="arrow-right" size={20} />
+                Начать со своими данными <Icon name="arrow-right" size={20} />
               </a>
               <a
                 className="landing-button landing-button--secondary"
@@ -289,8 +289,7 @@ export default function LandingPage() {
             </div>
             <div className="landing-hero__platform">
               <p className="landing-hero__platform-note">
-                <Icon name="web-app" size={16} /> Web и Telegram Mini App · один аккаунт и общие
-                данные
+                <Icon name="web-app" size={16} /> Web и Telegram Mini App
               </p>
               <a
                 className="landing-hero__telegram-link"
@@ -598,15 +597,11 @@ export default function LandingPage() {
 
         <section id="contact" className="landing-contact">
           <div>
-            <p className="landing-kicker">Ваш следующий шаг</p>
-            <h2>Начните с одного понятного шага.</h2>
-            <p>
-              Откройте свой профиль или сначала проверьте связный сценарий в демо без регистрации.
-            </p>
+            <h2>Выберите, как начать.</h2>
           </div>
           <div className="landing-contact__actions">
             <a className="landing-button" href={appUrl} onClick={trackAppSelection}>
-              Открыть приложение <Icon name="arrow-right" size={20} />
+              Начать со своими данными <Icon name="arrow-right" size={20} />
             </a>
             <a
               className="landing-button landing-button--secondary landing-button--secondary-on-dark"

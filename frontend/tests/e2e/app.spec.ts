@@ -155,7 +155,9 @@ test('первый экран лендинга объясняет продукт
 
     await expect(page.getByRole('heading', { name: /сила в действии/i })).toBeVisible();
     await expect(
-      page.locator('.landing-hero__actions').getByRole('link', { name: 'Начать', exact: true }),
+      page
+        .locator('.landing-hero__actions')
+        .getByRole('link', { name: 'Начать со своими данными', exact: true }),
     ).toBeVisible();
     await expect(page.locator('.landing-hero__image')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
@@ -199,7 +201,9 @@ test('лендинг остаётся адаптивным на контроль
     expect(pageMetrics.documentWidth).toBeLessThanOrEqual(pageMetrics.viewport);
     expect(pageMetrics.bodyWidth).toBeLessThanOrEqual(pageMetrics.viewport);
     await expect(
-      page.locator('.landing-hero__actions').getByRole('link', { name: 'Начать', exact: true }),
+      page
+        .locator('.landing-hero__actions')
+        .getByRole('link', { name: 'Начать со своими данными', exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: /Включить .* тему/ })).toBeInViewport();
     await expect(page.locator('.landing-continuity__rail')).toBeVisible();
@@ -327,7 +331,9 @@ test('сценарии спортсмена и тренера ведут в ве
     );
     await expect(page.locator('.landing-practice').getByText(/попробуй сам/i)).toBeVisible();
     await expect(
-      page.locator('.landing-contact__actions').getByRole('link', { name: /открыть приложение/i }),
+      page
+        .locator('.landing-contact__actions')
+        .getByRole('link', { name: 'Начать со своими данными', exact: true }),
     ).toHaveAttribute('href', '/app');
     await expect(
       page.locator('.landing-contact').getByRole('link', { name: /попробовать демо/i }),
@@ -1443,7 +1449,7 @@ test('primary CTA лендинга и Войти остаются lime в обе
   await page.goto('/');
   await page.mouse.move(0, 700);
   const primary = page.locator('.landing-hero__actions').getByRole('link', {
-    name: 'Начать',
+    name: 'Начать со своими данными',
     exact: true,
   });
   const login = page.getByRole('link', { name: 'Войти' });

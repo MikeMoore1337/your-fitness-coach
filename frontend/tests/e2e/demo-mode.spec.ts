@@ -1080,12 +1080,18 @@ test('demo uses production today composition and persists one workout set throug
     }
     if (url.pathname.startsWith('/api/v1/workouts/')) directProductionRequests.push(url.pathname);
   });
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
   await installDemoTransport(page);
   if (TASK_278_THEME) {
     await page.emulateMedia({ colorScheme: TASK_278_THEME });
     await page.addInitScript((theme) => localStorage.setItem('app-theme', theme), TASK_278_THEME);
   }
-  await page.goto('/demo?cabinet=1&scenario=self_training&section=today');
+  await page.goto('/');
+  await page
+    .locator('.landing-hero__actions')
+    .getByRole('link', { name: 'Попробовать демо', exact: true })
+    .click();
+  await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=today');
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
   if (TASK_278_THEME) {

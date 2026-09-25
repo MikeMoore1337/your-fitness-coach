@@ -132,10 +132,23 @@ export function createYandexMetricaProvider(
         sendCommand('reachGoal', GROWTH_GOAL_IDS[event.name]);
         return;
       }
-      sendCommand('params', {
+      const params: Record<string, string> = {
         yfc_event: event.name,
         yfc_surface: event.surface,
-      });
+      };
+      switch (event.name) {
+        case 'section_navigation_selected':
+          params.yfc_from_section = event.from_section;
+          params.yfc_to_section = event.to_section;
+          break;
+        case 'next_action_shown':
+        case 'next_action_clicked':
+        case 'next_action_completed':
+          params.yfc_action_kind = event.action_kind;
+          params.yfc_position = event.position;
+          break;
+      }
+      sendCommand('params', params);
     },
   };
 }

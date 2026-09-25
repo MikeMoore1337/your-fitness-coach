@@ -73,7 +73,11 @@ test.describe('motion demonstration', () => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/');
     const scene = page.locator('.strength-scene');
-    await expect(page.getByRole('link', { name: 'Начать', exact: true })).toBeInViewport();
+    await expect(
+      page
+        .locator('.landing-hero__actions')
+        .getByRole('link', { name: 'Начать со своими данными', exact: true }),
+    ).toBeInViewport();
     await expect(scene).toHaveAttribute('data-phase', '0');
     for (const chapter of await page.locator('.landing-chapter').all()) {
       await chapter.scrollIntoViewIfNeeded();

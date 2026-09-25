@@ -113,10 +113,11 @@ describe('LandingPage', () => {
     renderLanding();
 
     expect(screen.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login');
-    expect(screen.getAllByRole('link', { name: 'Открыть приложение' })[0]).toHaveAttribute(
-      'href',
-      '/app',
-    );
+    const ownDataCtas = screen.getAllByRole('link', {
+      name: 'Начать со своими данными',
+    });
+    expect(ownDataCtas).toHaveLength(2);
+    ownDataCtas.forEach((link) => expect(link).toHaveAttribute('href', '/app'));
     expect(screen.getAllByRole('link', { name: 'Попробовать демо' })[0]).toHaveAttribute(
       'href',
       '/demo?cabinet=1&scenario=self_training&section=today',
@@ -195,6 +196,21 @@ describe('LandingPage', () => {
       { placement: 'section', scenario: 'nutrition' },
     ]);
 
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
+  });
+
+  it('keeps both own-data CTAs on the existing landing app-selection event', () => {
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) => {
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    };
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
+    const { container } = renderLanding();
+
+    fireEvent.click(container.querySelector('.landing-hero__actions .landing-button')!);
+    fireEvent.click(container.querySelector('.landing-contact__actions .landing-button')!);
+
+    expect(events.filter((event) => event.name === 'landing_app_selected')).toHaveLength(2);
     window.removeEventListener(PRODUCT_EVENT_NAME, listener);
   });
 
