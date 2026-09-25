@@ -198,6 +198,16 @@ def task_id_from_branch(branch: str) -> str:
     return match.group("task_id").upper()
 
 
+def task_pr_task_id_from_branch(branch: str) -> str:
+    try:
+        return task_id_from_branch(branch)
+    except TaskSessionError:
+        task_id = TASK_INTEGRATION_BRANCHES.get(branch)
+        if task_id is None:
+            raise
+        return task_id
+
+
 def is_dependabot_pull_request(pull_request: Mapping[str, Any]) -> bool:
     user = pull_request.get("user")
     return isinstance(user, Mapping) and user.get("login") == DEPENDABOT_LOGIN
@@ -927,12 +937,7 @@ def validate_task_pull_request(
             f"Task pull request base must be {expected_base_branch}, found {base.get('ref')}"
         )
     branch = str(head.get("ref", ""))
-    try:
-        task_id = task_id_from_branch(branch)
-    except TaskSessionError:
-        task_id = TASK_INTEGRATION_BRANCHES.get(branch, "")
-        if not task_id:
-            raise
+    task_id = task_pr_task_id_from_branch(branch)
     if base.get("sha") != expected_base_sha:
         raise TaskSessionError(
             f"Task PR is stale: base {base.get('sha')} != current {expected_base_sha}"
@@ -1171,10 +1176,6 @@ def verify_master_merge(
             continue
         branch = str(head.get("ref", ""))
         title = str(pull_request.get("title", ""))
-        is_task_merge = TASK_BRANCH_RE.fullmatch(branch) and title.startswith("[Task ")
-        is_controller_merge = CONTROLLER_BRANCH_RE.fullmatch(
-            branch
-        ) is not None and title.startswith("[Controller]")
         base_repo = base.get("repo", {})
         head_repo = head.get("repo", {})
         is_same_repository = (
@@ -1183,6 +1184,16 @@ def verify_master_merge(
             and bool(base_repo.get("full_name"))
             and head_repo.get("full_name") == base_repo.get("full_name")
         )
+        try:
+            task_id = task_pr_task_id_from_branch(branch)
+        except TaskSessionError:
+            task_id = None
+        is_task_merge = (
+            task_id is not None and title.startswith(f"[Task {task_id}]") and is_same_repository
+        )
+        is_controller_merge = CONTROLLER_BRANCH_RE.fullmatch(
+            branch
+        ) is not None and title.startswith("[Controller]")
         is_dependabot_merge = is_dependabot_pull_request(pull_request) and is_same_repository
         if is_task_merge:
             merge_kind = "task-pr-merge"
@@ -4229,7 +4240,10 @@ class TaskController:
             raise TaskSessionError("Deployed SHA is not an ancestor of current protected master")
 
         exact_anchor = (
-            original["branch"] == branch
+            (
+                original["branch"] == branch
+                or TASK_INTEGRATION_BRANCHES.get(original["branch"]) == expected
+            )
             and original["base_sha"] == base_sha
             and original["head_sha"] == head_sha
         )
@@ -4508,7 +4522,10 @@ class TaskController:
             or lease.get("merge_sha") != deployed_sha
             or lease.get("deployed_sha") != deployed_sha
             or history.get("pr_number") != original.get("pr_number")
-            or original.get("branch") != lease.get("branch")
+            or not (
+                original.get("branch") == lease.get("branch")
+                or TASK_INTEGRATION_BRANCHES.get(str(original.get("branch", ""))) == expected
+            )
             or original.get("base_sha") != base_sha
             or original.get("head_sha") != head_sha
             or not self.repository.is_ancestor(deployed_sha, master_sha)
@@ -4531,7 +4548,7 @@ class TaskController:
                 type(number) is not int
                 or number <= 0
                 or number in numbers
-                or task_id_from_branch(branch) != expected
+                or task_pr_task_id_from_branch(branch) != expected
                 or any(
                     re.fullmatch(r"[0-9a-f]{40}", sha) is None
                     for sha in (item_base, item_head, item_merge)
