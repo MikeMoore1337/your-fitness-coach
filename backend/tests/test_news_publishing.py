@@ -824,10 +824,12 @@ def test_exact_approval_is_idempotent_and_edit_revokes_schedule(monkeypatch) -> 
 
 
 def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -> None:
+    fixed_now = datetime(2026, 9, 25, 10, 5, 0)
     monkeypatch.setattr(settings, "news_publication_enabled", True)
     monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
     monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
     monkeypatch.setattr(settings, "news_daily_publication_limit", 1)
+    monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
     snapshot_ids: list[str] = []
     for index in range(2):
         cluster_id = _source_and_candidate(external_id=f"daily-{index}")
@@ -867,8 +869,19 @@ def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -
         rejected_id = next(value for value in snapshot_ids if value != claimed_id)
         second = db.get(NewsPublicationSnapshot, rejected_id)
         assert second is not None
-        assert second.status == "failed"
-        assert second.last_error_code == "daily_cap_reached"
+        assert second.status == "queued"
+        assert second.last_error_code == "waiting_for_daily_capacity"
+        assert second.next_attempt_at == datetime(2026, 9, 26, 10, 5, 0)
+        second_cluster = db.get(NewsCluster, second.cluster_id)
+        assert second_cluster is not None
+        assert second_cluster.status == "publication_approved"
+        assert second_cluster.delivery_round == 0
+
+        next_day = datetime(2026, 9, 26, 10, 5, 0)
+        monkeypatch.setattr(news_publication, "utcnow", lambda: next_day)
+        assert claim_due_publications(db, limit=5) == [second.id]
+        assert second.status == "processing"
+        assert second.publication_local_date.isoformat() == "2026-09-26"
 
 
 def test_publisher_rejects_tampered_stored_snapshot(monkeypatch) -> None:
