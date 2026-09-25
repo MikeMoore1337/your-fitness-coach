@@ -171,9 +171,12 @@ test('Landing ведёт на canonical Login, а protected route сохраня
 }) => {
   await mockAuthApi(page);
   await page.goto('/');
-  await page.getByRole('link', { name: 'Войти' }).click();
+  await page
+    .locator('.landing-hero__actions')
+    .getByRole('link', { name: 'Начать со своими данными', exact: true })
+    .click();
 
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login\?next=%2Fapp$/);
   await expect(page.locator('#login-title .login-title--desktop')).toBeVisible();
   await expect(page.locator('#login-title')).toContainText('Вернитесь к своему плану.');
 

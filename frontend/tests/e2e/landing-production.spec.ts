@@ -109,6 +109,7 @@ test('landing keeps the approved sports composition across themes and viewports'
       { width: 430, height: 932 },
       { width: 390, height: 844 },
       { width: 360, height: 800 },
+      { width: 320, height: 800 },
     ]) {
       await page.setViewportSize(viewport);
       await openLanding(page, theme);
@@ -118,10 +119,14 @@ test('landing keeps the approved sports composition across themes and viewports'
       await expect(page.locator('.strength-scene img')).toHaveCount(2);
       await expect(page.locator('.strength-scene svg[data-icon="exercise"]')).toHaveCount(2);
       await expect(page.locator('.landing-energy-path')).toHaveCount(0);
-      await expect(page.getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute(
-        'href',
-        '/app',
-      );
+      const ownDataCtas = page.getByRole('link', {
+        name: 'Начать со своими данными',
+        exact: true,
+      });
+      await expect(ownDataCtas).toHaveCount(2);
+      for (const ownDataCta of await ownDataCtas.all()) {
+        await expect(ownDataCta).toHaveAttribute('href', '/app');
+      }
       await expect(
         page.locator('.landing-hero__actions').getByRole('link', { name: 'Попробовать демо' }),
       ).toHaveAttribute('href', '/demo?cabinet=1&scenario=self_training&section=today');
@@ -373,10 +378,12 @@ test('media failures preserve the story and reserve the scene layout', async ({ 
   await openLanding(page, 'light');
   await expect(page.getByText('Фото не загрузилось. Все действия доступны.')).toBeVisible();
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Начать', exact: true })).toHaveAttribute(
-    'href',
-    '/app',
-  );
+  await expect(
+    page.locator('.landing-hero__actions').getByRole('link', {
+      name: 'Начать со своими данными',
+      exact: true,
+    }),
+  ).toHaveAttribute('href', '/app');
   const frame = page.locator('.strength-scene__photo');
   await frame.scrollIntoViewIfNeeded();
   const bounds = await frame.boundingBox();
@@ -610,7 +617,12 @@ test('motion has an immediate reduced-motion final state', async ({ page }) => {
   expect(motionState.phase).toBe('2');
   expect(motionState.animations).toBe(0);
   expect(motionState.clip).toBe('none');
-  await expect(page.getByRole('link', { name: 'Начать', exact: true })).toBeInViewport();
+  await expect(
+    page.locator('.landing-hero__actions').getByRole('link', {
+      name: 'Начать со своими данными',
+      exact: true,
+    }),
+  ).toBeInViewport();
 });
 
 test('captures the owner-review packet when requested', async ({ page, browser }) => {

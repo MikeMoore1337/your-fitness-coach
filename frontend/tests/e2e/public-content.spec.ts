@@ -317,9 +317,10 @@ test('legacy app knowledge URLs hand off to the equivalent Public Web article', 
 
 test('landing emits a privacy-safe acquisition event without changing the desktop result', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
   await page.addInitScript(() => {
     const events: unknown[] = [];
     Object.defineProperty(window, '__productAnalyticsEvents', { value: events, writable: false });
@@ -336,17 +337,17 @@ test('landing emits a privacy-safe acquisition event without changing the deskto
     }),
   ).toBeVisible();
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-73a/analytics/desktop-1440x900-light-landing.png',
+    path: testInfo.outputPath('landing-acquisition-desktop-1440-light.png'),
   });
   await page
     .locator('.landing-contact')
-    .getByRole('link', { name: 'Открыть приложение', exact: true })
+    .getByRole('link', { name: 'Начать со своими данными', exact: true })
     .evaluate((element) => {
       element.addEventListener('click', (event) => event.preventDefault(), { once: true });
     });
   await page
     .locator('.landing-contact')
-    .getByRole('link', { name: 'Открыть приложение', exact: true })
+    .getByRole('link', { name: 'Начать со своими данными', exact: true })
     .click();
 
   const analyticsEvents = await page.evaluate(
