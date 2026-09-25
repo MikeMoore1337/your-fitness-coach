@@ -1117,6 +1117,25 @@ def test_task_commit_messages_allow_only_declared_hard_dependencies() -> None:
         )
 
 
+def test_task_commit_messages_allow_origin_master_integration_merge() -> None:
+    task_session.validate_task_commit_messages(
+        "393",
+        [
+            "Merge remote-tracking branch 'origin/master' into task/393-app-experience-v3-final-hardening",
+            "fix: [Task 393] preserve trace",
+        ],
+    )
+
+    with pytest.raises(task_session.TaskSessionError, match="must contain exactly"):
+        task_session.validate_task_commit_messages(
+            "393",
+            [
+                "Merge branch 'other' into task/393-app-experience-v3-final-hardening",
+                "fix: [Task 393] preserve trace",
+            ],
+        )
+
+
 def test_task_pr_accepts_dependency_provenance_declared_in_task_commit() -> None:
     base_sha = "a" * 40
     head_sha = "b" * 40

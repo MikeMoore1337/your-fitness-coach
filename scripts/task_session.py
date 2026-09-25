@@ -227,6 +227,11 @@ def _task_commit_ids(message: str) -> set[str]:
     }
 
 
+def _is_origin_master_integration_merge(message: str) -> bool:
+    headline = message.splitlines()[0] if message else ""
+    return headline.startswith("Merge remote-tracking branch 'origin/master' into task/")
+
+
 def declared_task_dependency_ids(messages: Sequence[str]) -> set[str]:
     result: set[str] = set()
     for message in messages:
@@ -261,6 +266,8 @@ def validate_task_commit_messages(
     allowed = {expected, *allowed_dependencies}
     task_ids: set[str] = set()
     for message in messages:
+        if _is_origin_master_integration_merge(message):
+            continue
         ids = _task_commit_ids(message)
         task_ids.update(ids)
         if len(ids) != 1 or not ids <= allowed:
