@@ -194,3 +194,30 @@ external food providers unavailable -> previously saved YFC product remains sear
 явного owner/legal disposition. `ACCEPT_RISK` для real-user photos не рекомендуется. Recheck
 требуется при новом provider/model, изменении страны/terms/retention, появлении paid plan,
 несовершеннолетних пользователей, shared user-generated content или новой редакции закона.
+
+## Addendum Task 283 — current provider disposition (2026-09-25)
+
+Task 283 реализует только локальную детерминированную оценку результата OCR, fail-closed route
+config и strict validation boundary. Публичное включение Vision не одобрено; provider adapter,
+учётные данные и внешние запросы отсутствуют. Обязательный review/confirmation и локальный
+editable fallback сохраняются.
+
+По публичным официальным документам на 2026-09-25:
+
+- Groq Qwen3.8-27B поддерживает технический image/OCR use case, но модель помечена `Preview`, а
+  Groq запрещает её production use. Она не может стать production-кандидатом, пока этот статус не
+  изменится и не будет проверен выбранный account/contract.
+- OpenAI GPT-4.1 имеет image input и Structured Outputs, но опубликованный API supported-country
+  list не включает Россию. Для текущего deployment это не допустимый route.
+- Gemini 3.1 Flash-Lite — технически поддерживаемая stable image model, однако опубликованный
+  Gemini API region list не включает Россию; free tier дополнительно запрещён для частных фото из-за
+  условий использования submitted content.
+- Cloudflare Workers AI исключён действующим YFC news-image contract.
+
+Таким образом, на дату проверки нет одобренного production Vision provider. Feature flag остаётся
+`NUTRITION_LABEL_VISION_ENABLED=false`; никаких provider credentials, accounts, paid calls или
+real photos не использовали. Перед будущей активацией владелец должен выбрать допустимый route и
+отдельно подтвердить актуальные provider terms, region/residency, retention, subprocessors, billing
+limits, legal/privacy disposition и quality evaluation. Официальные ссылки и текущие ограничения
+собраны в [provider matrix](PROVIDER_PRIVACY_COST_MATRIX.md). Это decision aid, не юридическое
+заключение.

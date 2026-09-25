@@ -110,7 +110,7 @@ _LABELS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("energy_kcal", ("энергетическ.*ценност", "калори", "energy", "calories", "calorie")),
 )
 
-_WARNING_ORDER = (
+PARSER_WARNING_CODES = (
     "ambiguous_basis",
     "serving_size_required_for_normalization",
     "dv_as_mass",
@@ -124,7 +124,7 @@ _WARNING_ORDER = (
     "energy_sanity_warning",
     "unreadable_field",
 )
-_REQUIRED_FIELDS = ("energy_kcal", "protein_g", "fat_g", "carbohydrate_g")
+REQUIRED_NUTRIENT_FIELDS = ("energy_kcal", "protein_g", "fat_g", "carbohydrate_g")
 _CATASTROPHIC_WARNINGS = {"energy_outlier", "energy_unit_conflict", "energy_sanity_warning"}
 
 
@@ -412,17 +412,36 @@ def _set_read_fact(
         normalized[field_name] = None
 
 
-def _energy_pair_is_consistent(kj_value: Decimal, kcal_value: Decimal) -> bool:
+def energy_pair_is_consistent(kj_value: Decimal, kcal_value: Decimal) -> bool:
     expected_kcal = kj_value / Decimal("4.184")
     tolerance = max(Decimal("5"), expected_kcal * Decimal("0.10"))
     return abs(expected_kcal - kcal_value) <= tolerance
 
 
-def _energy_value_exceeds_outlier_limit(field_name: str, value: Decimal, source_basis: str) -> bool:
+def energy_value_exceeds_outlier_limit(field_name: str, value: Decimal, source_basis: str) -> bool:
     if source_basis not in {"per_100_g", "per_100_ml"}:
         return False
     limit = Decimal("1000") if field_name == "energy_kcal" else Decimal("10000")
     return value > limit
+
+
+def nutrient_value_exceeds_outlier_limit(field_name: str, value: Decimal, basis_ref: str) -> bool:
+    if basis_ref not in {"per_100_g", "per_100_ml"}:
+        return False
+    if field_name in {"energy_kcal", "energy_kj"}:
+        return energy_value_exceeds_outlier_limit(field_name, value, basis_ref)
+    limit = Decimal("100") if NUTRIENT_UNITS[field_name] == "g" else Decimal("100000")
+    return value > limit
+
+
+def macro_energy_is_consistent(
+    kcal_value: Decimal,
+    protein_g: Decimal,
+    fat_g: Decimal,
+    carbohydrate_g: Decimal,
+) -> bool:
+    implied = protein_g * Decimal(4) + fat_g * Decimal(9) + carbohydrate_g * Decimal(4)
+    return abs(implied - kcal_value) <= max(Decimal("20"), kcal_value * Decimal("0.2"))
 
 
 def _recover_unique_energy_pair(line: str, source_basis: str) -> dict[str, list[Decimal]] | None:
@@ -441,9 +460,9 @@ def _recover_unique_energy_pair(line: str, source_basis: str) -> dict[str, list[
     consistent_pairs = [
         (kj_value, kcal_value)
         for kj_value, kcal_value in ((numbers[0], numbers[1]), (numbers[1], numbers[0]))
-        if _energy_pair_is_consistent(kj_value, kcal_value)
-        and not _energy_value_exceeds_outlier_limit("energy_kj", kj_value, source_basis)
-        and not _energy_value_exceeds_outlier_limit("energy_kcal", kcal_value, source_basis)
+        if energy_pair_is_consistent(kj_value, kcal_value)
+        and not energy_value_exceeds_outlier_limit("energy_kj", kj_value, source_basis)
+        and not energy_value_exceeds_outlier_limit("energy_kcal", kcal_value, source_basis)
     ]
     if len(consistent_pairs) != 1:
         return None
@@ -497,7 +516,7 @@ def _apply_energy_safety(
     if (
         kj_value is not None
         and kcal_value is not None
-        and not _energy_pair_is_consistent(kj_value, kcal_value)
+        and not energy_pair_is_consistent(kj_value, kcal_value)
     ):
         _mark_ambiguous(
             "energy_kj",
@@ -535,11 +554,7 @@ def _apply_outlier_safety(
         fact = normalized[field_name]
         if fact is None:
             continue
-        if field_name in {"energy_kcal", "energy_kj"}:
-            is_outlier = _energy_value_exceeds_outlier_limit(field_name, fact.value, source_basis)
-        else:
-            limit = Decimal("100") if fact.unit == "g" else Decimal("100000")
-            is_outlier = fact.value > limit
+        is_outlier = nutrient_value_exceeds_outlier_limit(field_name, fact.value, source_basis)
         if is_outlier:
             _mark_ambiguous(
                 field_name,
@@ -571,9 +586,8 @@ def _apply_macro_energy_consistency(
     carbohydrate = normalized["carbohydrate_g"]
     if energy is None or protein is None or fat is None or carbohydrate is None:
         return
-    implied = protein.value * Decimal(4) + fat.value * Decimal(9) + carbohydrate.value * Decimal(4)
-    if abs(implied - energy.value) > max(Decimal("20"), energy.value * Decimal("0.2")):
-        for field_name in _REQUIRED_FIELDS:
+    if not macro_energy_is_consistent(energy.value, protein.value, fat.value, carbohydrate.value):
+        for field_name in REQUIRED_NUTRIENT_FIELDS:
             _mark_ambiguous(
                 field_name,
                 source_basis=source_basis,
@@ -749,11 +763,14 @@ def build_draft_from_ocr(
         evidence=evidence,
         warnings=warnings,
     )
-    if any(normalized[field_name] is None for field_name in _REQUIRED_FIELDS):
+    if any(normalized[field_name] is None for field_name in REQUIRED_NUTRIENT_FIELDS):
         warnings.append("missing_required_fact")
     warnings = list(dict.fromkeys(warnings))
     warnings.sort(
-        key=lambda value: (_WARNING_ORDER.index(value) if value in _WARNING_ORDER else 99, value)
+        key=lambda value: (
+            PARSER_WARNING_CODES.index(value) if value in PARSER_WARNING_CODES else 99,
+            value,
+        )
     )
     try:
         return CanonicalDraft(
@@ -793,7 +810,7 @@ def score_nutrition_candidate(
 
     required_present = sum(
         getattr(canonical.normalized_facts, field_name) is not None
-        for field_name in _REQUIRED_FIELDS
+        for field_name in REQUIRED_NUTRIENT_FIELDS
     )
     readable_count = sum(
         getattr(canonical.field_evidence, field_name) == "read" for field_name in NUTRIENT_FIELDS
@@ -815,7 +832,7 @@ def score_nutrition_candidate(
     )
     reasons = (
         f"basis={'resolved' if canonical.source_basis != 'ambiguous' else 'ambiguous'}",
-        f"required={required_present}/{len(_REQUIRED_FIELDS)}",
+        f"required={required_present}/{len(REQUIRED_NUTRIENT_FIELDS)}",
         f"read={readable_count}",
         f"energy_pair={energy_pair}",
         f"ambiguous={ambiguous_count}",
@@ -823,7 +840,7 @@ def score_nutrition_candidate(
     rank = (
         -catastrophic,
         int(canonical.source_basis != "ambiguous"),
-        int(required_present == len(_REQUIRED_FIELDS)),
+        int(required_present == len(REQUIRED_NUTRIENT_FIELDS)),
         required_present,
         energy_pair,
         readable_count,

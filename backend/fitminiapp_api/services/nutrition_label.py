@@ -48,6 +48,19 @@ from fitminiapp_api.nutrition_label.parser import (
     build_draft_from_ocr,
     score_nutrition_candidate,
 )
+from fitminiapp_api.nutrition_label.recognition_assessment import (
+    OCR_BUDGET_EXHAUSTED_WARNING,
+    RecognitionOutcome,
+    assess_recognition,
+    has_reviewable_source_signal,
+    usable_read_fact_count,
+)
+from fitminiapp_api.nutrition_label.vision import (
+    VISION_MAX_RESPONSE_BYTES,
+    VisionFallbackAdapter,
+    VisionProposalError,
+    validate_vision_proposal,
+)
 from fitminiapp_api.schemas.food import (
     FoodCatalogContributionOutcome,
     FoodResponse,
@@ -67,7 +80,6 @@ from fitminiapp_api.services.foods import get_food_response
 
 NUTRITION_LABEL_SOURCE_VERSION = "nutrition-label-local-v3"
 NUTRITION_LABEL_PROMPT_VERSION = "ocr-structured-adaptive-v3"
-OCR_BUDGET_EXHAUSTED_WARNING = "ocr_budget_exhausted"
 _STRONG_SUCCESS_BLOCKING_WARNINGS = frozenset(
     {
         "ambiguous_basis",
@@ -255,7 +267,7 @@ def _parse_ocr_candidates(
             raise CanonicalNormalizationError("ocr_candidates_unusable")
         _, _, selected = max(parsed_candidates, key=lambda item: (item[0], -item[1]))
         if budget_exhausted:
-            if not _has_reviewable_source_signal(selected):
+            if not has_reviewable_source_signal(selected):
                 raise LocalOcrError("local_ocr_timeout")
             selected = selected.model_copy(
                 update={
@@ -319,24 +331,6 @@ def _parse_ocr_candidates(
     return select_best(parsed_candidates)
 
 
-def _usable_read_fact_count(canonical: CanonicalDraft) -> int:
-    return sum(
-        getattr(canonical.field_evidence, field_name) == "read" for field_name in NUTRIENT_FIELDS
-    )
-
-
-def _has_reviewable_source_signal(canonical: CanonicalDraft) -> bool:
-    """Return true when OCR found a nutrition row that belongs in manual review.
-
-    A parser/layout ambiguity is recoverable in the existing editable draft flow. An empty OCR
-    result, or text without any recognized nutrient row, remains a fail-closed retake case.
-    """
-
-    return any(
-        getattr(canonical.source_facts, field_name) is not None for field_name in NUTRIENT_FIELDS
-    )
-
-
 def create_label_draft(
     db: Session,
     user: User,
@@ -345,6 +339,7 @@ def create_label_draft(
     content_type: str | None,
     idempotency_key: str,
     ocr_engine: OcrEngine | None = None,
+    vision_adapter: VisionFallbackAdapter | None = None,
 ) -> NutritionLabelDraftResponse:
     started = time.monotonic()
     configured_provider = (
@@ -392,9 +387,78 @@ def create_label_draft(
         logger.info("nutrition_scan_failed", extra={"error_code": str(exc)})
         raise NutritionLabelError(str(exc)) from exc
 
-    if _usable_read_fact_count(canonical) == 0 and not _has_reviewable_source_signal(canonical):
-        logger.info("nutrition_scan_failed", extra={"error_code": "retake_required"})
+    assessment = assess_recognition(canonical)
+    provider_outcome = "not_invoked"
+    provider_class = "none"
+    route_class = assessment.outcome.value
+
+    if assessment.outcome == RecognitionOutcome.RETAKE_REQUIRED:
+        logger.info(
+            "nutrition_scan_failed",
+            extra={
+                "error_code": "retake_required",
+                "assessment_outcome": assessment.outcome.value,
+                "assessment_reason_codes": assessment.reasons,
+            },
+        )
         raise NutritionLabelError("retake_required")
+
+    if assessment.outcome == RecognitionOutcome.VISION_CANDIDATE:
+        if not settings.nutrition_label_vision_enabled:
+            assessment = assessment.with_outcome(
+                RecognitionOutcome.MANUAL_REVIEW, "vision_disabled"
+            )
+            provider_outcome = "disabled"
+        elif vision_adapter is None:
+            assessment = assessment.with_outcome(
+                RecognitionOutcome.MANUAL_REVIEW, "vision_adapter_unavailable"
+            )
+            provider_outcome = "unavailable"
+        elif len(normalized_image.data) > settings.nutrition_label_scan_max_image_bytes:
+            assessment = assessment.with_outcome(
+                RecognitionOutcome.MANUAL_REVIEW, "vision_image_too_large"
+            )
+            provider_outcome = "image_too_large"
+        else:
+            provider_class = "vision_adapter"
+            try:
+                proposal = vision_adapter.recognize(
+                    normalized_image.data,
+                    timeout_seconds=settings.nutrition_label_vision_timeout_seconds,
+                    max_response_bytes=VISION_MAX_RESPONSE_BYTES,
+                )
+                canonical = validate_vision_proposal(
+                    proposal,
+                    provider_class=vision_adapter.provider_class,
+                    model_class=vision_adapter.model_class,
+                    prompt_version=vision_adapter.prompt_version,
+                )
+            except TimeoutError:
+                assessment = assessment.with_outcome(
+                    RecognitionOutcome.MANUAL_REVIEW, "vision_timeout"
+                )
+                provider_outcome = "timeout"
+            except VisionProposalError:
+                assessment = assessment.with_outcome(
+                    RecognitionOutcome.MANUAL_REVIEW, "vision_invalid_response"
+                )
+                provider_outcome = "invalid_response"
+            except OSError:
+                assessment = assessment.with_outcome(
+                    RecognitionOutcome.MANUAL_REVIEW, "vision_provider_unavailable"
+                )
+                provider_outcome = "unavailable"
+            except Exception:
+                assessment = assessment.with_outcome(
+                    RecognitionOutcome.MANUAL_REVIEW, "vision_provider_failed"
+                )
+                provider_outcome = "failed"
+            else:
+                provider_outcome = "succeeded"
+                route_class = "vision_fallback"
+
+    if route_class != "vision_fallback":
+        route_class = assessment.outcome.value
 
     row = NutritionLabelDraft(
         id=str(uuid.uuid4()),
@@ -430,7 +494,12 @@ def create_label_draft(
         extra={
             "outcome": "draft_created",
             "latency_ms": (time.monotonic() - started) * 1000,
-            "items_count": _usable_read_fact_count(canonical),
+            "items_count": usable_read_fact_count(canonical),
+            "assessment_outcome": assessment.outcome.value,
+            "assessment_reason_codes": assessment.reasons,
+            "route_class": route_class,
+            "provider_class": provider_class,
+            "provider_outcome": provider_outcome,
         },
     )
     return _draft_response(row)

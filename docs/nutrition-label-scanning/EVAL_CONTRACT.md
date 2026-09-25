@@ -10,6 +10,27 @@
 ambiguous, unreadable и absent cases имеют разные знаменатели. Ошибка в `salt/sodium`, `%DV`,
 basis или отсутствующем поле важнее красивого среднего по простым строкам.
 
+## Recognition routing evaluation (Task 283)
+
+The deterministic assessment adds four outcomes: `local_review`, `vision_candidate`,
+`retake_required`, and `manual_review`. These describe routing only; they are not a confidence
+score or a recognition-quality claim.
+
+- A complete local draft stays `local_review`, including when it has optional warnings.
+- `vision_candidate` requires incomplete mandatory facts and a bounded parser warning. A generic
+  failure or unknown warning must not trigger external processing.
+- No nutrition signal and no readable fact yields `retake_required`.
+- Provider disabled/unavailable, timeout, invalid or semantically unsafe response yields
+  `manual_review` and preserves the editable local draft.
+- External invocation count must be exactly zero for `local_review` and `retake_required`, and
+  zero for every route while the feature flag is disabled. An approved candidate may make at most
+  one request; retries require a separately approved transport policy.
+- Track outcome/reason-code counts, candidate precision against labeled ground truth, false-local
+  and false-retake cases, provider invocation count, and fallback preservation. Do not infer
+  precision, latency, or cost from deterministic unit cases.
+
+Task 283 does not change the pre-registered quality thresholds below or authorize provider traffic.
+
 ## Hard gates
 
 Любое из условий ниже означает `FAIL` кандидата независимо от среднего score:

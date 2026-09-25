@@ -1,58 +1,36 @@
-# Provider / OCR privacy-cost matrix
+# Nutrition label Vision provider matrix
 
-**Версия:** `nutrition-label-provider-matrix-v1`
-**Дата проверки official sources:** 2026-09-12
+**Версия:** `nutrition-label-provider-matrix-v2`
+**Дата проверки официальных источников:** 2026-09-25
 **Статус:** research only; ни один provider не approved для YFC.
 
-## Как читать матрицу
+## Текущие кандидаты
 
-`free` в pricing page не означает `recurring_free + approved_for_user_photos`. Для YFC отдельны
-три оси: техническая capability, цена/quota и допустимость data-flow. Любое `unknown` блокирует
-production GO до owner/provider/legal decision.
-
-| Кандидат | Image / schema evidence | Cost / quota evidence | Data / region evidence | Current disposition |
+| Кандидат | Image / schema | Цена и лимиты | Данные и регион | Решение для YFC |
 |---|---|---|---|---|
-| **Current YFC Groq route** `openai/gpt-oss-120b` | Current adapter sends text-only chat completion and strict text schema. No image input in YFC contract. | Groq model page lists $0.15 input / $0.60 output per 1M tokens and developer limits; current YFC policy is `free_only`, account billing not re-verified here. | Existing AI decision keeps generic-only, no personal image route. | **Not Vision-capable in current route.** |
-| **Groq Qwen Vision** `qwen/qwen3.6-27b` / `qwen/qwen3.8-27b` | Official Vision page documents image input, OCR-oriented use, JSON mode, 20 MB URL limit, and 5/3 images per request. Structured Outputs page documents strict mode only for supported models; the combination of this Vision model and YFC schema is not live-tested. | Models page lists preview status, Qwen price $0.60/$3.00 and $0.80/$4.00 input/output per 1M tokens. Rate page lists 30 RPM, 1K RPD, 8K TPM, 200K TPD on developer plan. No recurring-free production promise established. | Groq says inference data is not retained by default but reliability/abuse logs can be retained up to 30 days; ZDR is configurable. Customer data location is US GCP buckets. | **Research candidate only; privacy/region/cost/legal gate.** |
-| **OpenAI GPT-4o pinned snapshot** | Official model page documents text+image input, text output including Structured Outputs, and snapshots. Image guide documents PNG/JPEG/WEBP/non-animated GIF, payload and detail limits. | Official model page lists $2.50 input / $10 output per 1M text tokens; image-token cost and account limits must be calculated for the selected snapshot. Free tier is not evidenced. | API data guide says API data is not used for training by default, but default abuse monitoring can retain customer content up to 30 days; ZDR/MAM require approval and image/file inputs have rare exceptions. Residency has its own region/endpoint limitations. | **Paid candidate only; owner/legal and cost approval required.** |
-| **Google Gemini API** | Official image guide documents PNG/JPEG/WEBP/HEIC/HEIF. Structured output is JSON Schema subset; Google explicitly recommends application validation for semantically incorrect but schema-valid outputs. | Pricing page exposes free and paid tiers; current Gemini 3 Flash Preview example lists free text/image input and paid $0.50 input / $3 output per 1M tokens. Free tier is not a safe YFC data policy. | Current terms say unpaid content and responses can be used to improve/develop products and may be read by human reviewers; paid service does not use prompts/responses to improve products but logs them for limited safety/legal purposes and may process transiently in any country. Public available-region list inspected today contains Kazakhstan and Moldova but no Russia entry; account-specific availability is still unknown. | **Rejected as free/private default; paid/legal candidate only after explicit review.** |
-| **PaddleOCR local hybrid** | Official documentation lists Russian and English recognition models and orientation/document pipeline options. It returns OCR/layout data that YFC would still need to parse and validate. | No provider token charge; CPU/GPU, package size, cold start, memory and device/browser feasibility are unmeasured. | Image can remain on the YFC-controlled runtime/device; no third-party upload by default. OSS model/code license and deployment asset review are required before bundling. | **Best privacy direction for a narrow local spike; not quality-approved.** |
-| **Tesseract local hybrid** | Official docs expose language data plus hOCR/TSV outputs; table reconstruction and numeric normalization remain YFC work. | No provider token charge; runtime and language-data footprint unmeasured. | Local processing avoids provider data transfer; package/license and deployment footprint still require review. | **Fallback/reference OCR candidate; not quality-approved.** |
+| **Текущий YFC Groq route** | Существующий YFC adapter обслуживает generic text-only контракт. Он не принимает фотографии; перепрофилировать его под package images нельзя. | Его тариф и лимиты не являются оценкой Vision-запроса. | Текущая generic/free-only политика AI Coach не даёт разрешения на обработку личных фото. | **Не Vision-кандидат в текущей архитектуре.** |
+| **Groq Qwen3.8 27B** `qwen/qwen3.8-27b` | Vision docs описывают image input и OCR; документация Structured Outputs содержит strict JSON Schema режим для поддерживаемых моделей. Совместимость этой preview-модели с YFC schema и семантикой не проверялась. Документация указывает 20 MB для URL-image и фиксированный image input 2048 tokens. | Страница модели указывает `$0.80 / 1M input tokens` и `$4.00 / 1M output tokens`; image input — около `$0.00164` на одну картинку до text/output. Страница помечает модель `Preview` и прямо ограничивает её evaluation use. Developer-plan limits: `30 RPM`, `1K RPD`, `8K TPM`, `200K TPD`; действующие лимиты организации не проверены. | Inference content по умолчанию не сохраняется, но abuse/reliability logs могут содержать данные до 30 дней; ZDR требует account setting. Документация указывает хранение customer data в US GCP buckets. Субпроцессоры перечислены Groq отдельно. | **Не годится для production, пока модель Preview.** Допустим только отдельный синтетический evaluation после owner/provider/privacy approval. |
+| **OpenAI GPT-4.1** | Image input, text output и Structured Outputs поддерживаются. Изображения поддерживают PNG/JPEG/WEBP/non-animated GIF; image token cost зависит от размера/detail. Семантическая точность для YFC не доказана. | Текущая страница модели указывает `$2 / 1M input tokens`, `$8 / 1M output tokens`; API Free tier отсутствует, account limits зависят от tier. Image tokens оплачиваются по правилам vision guide. | API data не используется для обучения без opt-in; стандартный abuse monitoring может хранить customer content до 30 дней. ZDR/MAM требуют одобрения и имеют редкие исключения для image/file input. Текущий supported-countries list не включает Россию. | **Не использовать из неподдерживаемого региона.** Даже при допустимом регионе нужны account-specific privacy, residency, cost/quota и legal approvals. |
+| **Gemini API 3.1 Flash-Lite** | Stable-модель поддерживает image input и structured output; приложение всё равно должно валидировать результат. Поддерживаемые форматы включают PNG/JPEG/WEBP/HEIC/HEIF; inline body ограничен 20 MB, а разрешение влияет на токены/задержку. | Официальная цена: `$0.25 / 1M input tokens`, `$1.50 / 1M output tokens`. Free tier существует; actual project quota зависит от аккаунта и показана в AI Studio. Paid tier требует настроенного billing account. | На free tier input/output может использоваться для улучшения продуктов и просматриваться людьми: личные фото туда отправлять нельзя. Paid tier не использует content для улучшения моделей, но abuse monitoring может хранить его до 55 дней и допускает human review flagged inputs. Документация Developer API перечисляет допустимые регионы, но не Россию. Для data-processing условий нужны актуальные Google Cloud DPA и subprocessor list. | **Free tier запрещён для личных фото; Developer API недоступен из России по опубликованному списку регионов.** Не production route для текущего YFC. |
+| **Cloudflare Workers AI** | — | — | — | **Исключён:** внутренний contract резервирует Workers AI для Telegram/news-image flow. |
 
-## Source links
+## Текущая политика и проверенные факты
 
-- Groq: [Vision](https://console.groq.com/docs/vision), [Structured Outputs](https://console.groq.com/docs/structured-outputs), [Models](https://console.groq.com/docs/models), [Rate Limits](https://console.groq.com/docs/rate-limits), [Your Data](https://console.groq.com/docs/your-data).
-- OpenAI: [Images and vision](https://developers.openai.com/api/docs/guides/images-vision), [Structured model outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [GPT-4o model](https://developers.openai.com/api/docs/models/gpt-4o), [Data controls](https://developers.openai.com/api/docs/guides/your-data).
-- Google: [Image understanding](https://ai.google.dev/gemini-api/docs/image-understanding), [Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output), [Pricing](https://ai.google.dev/gemini-api/docs/pricing), [Additional Terms](https://ai.google.dev/gemini-api/terms), [Available regions](https://ai.google.dev/gemini-api/docs/available-regions).
-- Local OCR: [PaddleOCR multilingual models](https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/algorithm/PP-OCRv5/PP-OCRv5_multi_languages.en.md), [PaddleOCR pipeline](https://www.paddleocr.ai/main/en/version3.x/pipeline_usage/OCR.html), [Tesseract FAQ](https://tesseract-ocr.github.io/tessdoc/FAQ.html).
+- Проверены только официальные публичные документы на указанную дату. Ни один аккаунт, billing state,
+  organization quota, endpoint, secret или provider request не проверялся.
+- В существующем YFC Groq adapter Vision-обработка не реализована. Наличие credentials для другого
+  продукта или route не означает право отправлять туда этикетки.
+- Ни одна модель не выбрана и не подключена. Vision feature имеет sample default
+  `NUTRITION_LABEL_VISION_ENABLED=false`; code contract сам по себе не является разрешением на
+  активацию.
+- Не отправлять real-user/package photos до отдельного решения владельца, актуальной проверки
+  privacy/legal, региона и account-specific data terms. Provider schema validity не подтверждает
+  фактическую точность распознавания.
+- Local OCR и внешний Vision имеют отдельные бюджеты/метрики. Никакие synthetic или local OCR
+  показатели не являются provider quality result.
 
-## Policy decisions for YFC
+## Официальные источники
 
-- Access check for this bounded run: no `GROQ_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` or
-  equivalent Vision credential is available under the current task environment. Current YFC AI
-  Coach policy is disabled/generic-only/free-only; an existing credential scoped to the separate
-  news flow is not eligible for reuse. No provider request was attempted.
-- Local runtime check: Pillow is available for legal synthetic fixture generation, but PaddleOCR,
-  Tesseract, `pytesseract` and checked alternative OCR runtimes are absent. Therefore local image
-  preflight passed, while local extraction quality remains `NOT_RUN` with blocker
-  `LOCAL_OCR_RUNTIME_UNAVAILABLE`.
-- Cloudflare Workers AI остаётся вне этой матрицы: текущий contract резервирует его для Telegram
-  news image generation; это не Vision fallback.
-- Не считать OpenAI-compatible endpoint доказательством image capability: capability проверяется
-  конкретной моделью, pinned snapshot и фактическим request schema.
-- Не считать free tier достаточным: `recurring_free`, billing state, rate limits, spend limits,
-  region, retention/training/analytics and subprocessors должны быть зафиксированы на выбранном
-  аккаунте и дате.
-- До owner/legal approval не передавать ни real-user photos, ни package photos с user-identifying
-  context. Test fixture upload — отдельный explicit gate.
-
-## Exact disposition after the bounded run
-
-No cloud candidate is approved. Owner decision permits implementation of the local-only
-OCR/preprocessing route with deterministic parser/validator, zero external token cost and no
-provider retention/training/analytics/subprocessors. Its exact TTL, package license and
-device-resource budget remain gates before owner-only production validation/public enable.
-
-Any cloud route remains blocked by the combination of missing approved credential, absent
-account-specific region/retention/quota proof and missing corpus quality results. It must not be
-implemented as an automatic paid fallback.
+- Groq: [Vision](https://console.groq.com/docs/vision), [Structured Outputs](https://console.groq.com/docs/structured-outputs), [Models and pricing](https://console.groq.com/docs/models), [Rate limits](https://console.groq.com/docs/rate-limits), [Your data](https://console.groq.com/docs/your-data), [DPA](https://console.groq.com/docs/legal/customer-data-processing-addendum), [Subprocessors](https://trust.groq.com/subprocessors).
+- OpenAI: [GPT-4.1](https://developers.openai.com/api/docs/models/gpt-4.1), [Images and vision](https://developers.openai.com/api/docs/guides/images-vision), [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), [Data controls](https://developers.openai.com/api/docs/guides/your-data), [Supported countries](https://developers.openai.com/api/docs/supported-countries), [Subprocessor list](https://openai.com/policies/sub-processor-list/).
+- Google: [Gemini 3 developer guide and pricing](https://ai.google.dev/gemini-api/docs/gemini-3), [Gemini 3.1 Flash-Lite](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite), [Image understanding](https://ai.google.dev/gemini-api/docs/image-understanding), [Structured outputs](https://ai.google.dev/gemini-api/docs/structured-output), [Rate limits](https://ai.google.dev/gemini-api/docs/rate-limits), [Data use](https://ai.google.dev/gemini-api/docs/your-data), [Terms](https://ai.google.dev/gemini-api/terms), [Available regions](https://ai.google.dev/gemini-api/docs/available-regions), [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum), [Subprocessors](https://cloud.google.com/terms/subprocessors).
