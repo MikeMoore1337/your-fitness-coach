@@ -565,19 +565,22 @@ def enqueue_review_deliveries(db: Session, admin_telegram_user_ids: set[int]) ->
                 reason_code="source_not_current_month",
             )
             continue
+        preview_recorded = (
+            db.query(AuditEvent.id)
+            .filter(
+                AuditEvent.action == "news.preview_created",
+                AuditEvent.resource_type == "news_draft_revision",
+                AuditEvent.resource_id == draft.id,
+            )
+            .first()
+            is not None
+        )
+        if cluster.status == "publication_failed" and preview_recorded:
+            continue
+
         created_for_cluster = 0
         is_preview_upgrade = False
         if cluster.status == "awaiting_review":
-            preview_recorded = (
-                db.query(AuditEvent.id)
-                .filter(
-                    AuditEvent.action == "news.preview_created",
-                    AuditEvent.resource_type == "news_draft_revision",
-                    AuditEvent.resource_id == draft.id,
-                )
-                .first()
-                is not None
-            )
             upgrade_queued = (
                 db.query(AuditEvent.id)
                 .filter(
