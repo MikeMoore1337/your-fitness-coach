@@ -1311,6 +1311,22 @@ def test_controller_pr_rejects_product_paths(
         )
 
 
+def test_controller_pr_accepts_only_the_new_artifact_cleanup_paths() -> None:
+    task_session.validate_controller_pull_request_files(
+        [
+            {"filename": "scripts/artifact_manager.py"},
+            {"filename": "tests/test_artifact_manager.py"},
+        ]
+    )
+    with pytest.raises(task_session.TaskSessionError, match="outside the governance allowlist"):
+        task_session.validate_controller_pull_request_files(
+            [
+                {"filename": "scripts/artifact_manager.py"},
+                {"filename": "scripts/unrelated.py"},
+            ]
+        )
+
+
 def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(
     tmp_path: Path,
 ) -> None:
@@ -3232,8 +3248,16 @@ def test_finish_accepts_verified_squash_merge(
     assert not git_repository.ref_exists(branch)
 
 
+@pytest.mark.parametrize(
+    "drift_paths",
+    [
+        ("AGENTS.md",),
+        ("scripts/artifact_manager.py", "tests/test_artifact_manager.py"),
+    ],
+)
 def test_finish_accepts_controller_only_master_drift_after_deployment(
     repository: tuple[Path, Any],
+    drift_paths: tuple[str, ...],
 ) -> None:
     root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
         repository, "207D"
@@ -3259,8 +3283,11 @@ def test_finish_accepts_controller_only_master_drift_after_deployment(
     remote_worktree = root.parent / f"remote-controller-drift-{uuid.uuid4().hex[:8]}"
     _git(root, "worktree", "add", "--detach", str(remote_worktree), merge_sha)
     try:
-        (remote_worktree / "AGENTS.md").write_text("controller-only drift\n", encoding="utf-8")
-        _git(remote_worktree, "add", "AGENTS.md")
+        for drift_path in drift_paths:
+            changed_file = remote_worktree / Path(drift_path)
+            changed_file.parent.mkdir(parents=True, exist_ok=True)
+            changed_file.write_text("controller-only drift\n", encoding="utf-8")
+        _git(remote_worktree, "add", *drift_paths)
         _git(remote_worktree, "commit", "-m", "[Controller] Advance governance after deployment")
         drift_sha = _git(remote_worktree, "rev-parse", "HEAD")
         _git(remote_worktree, "push", "origin", "HEAD:master")

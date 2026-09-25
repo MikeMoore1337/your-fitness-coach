@@ -9,11 +9,13 @@ controller-managed worktrees or operational data.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import os
 import re
 import stat
+import struct
 import subprocess
 import sys
 from collections import Counter
@@ -79,6 +81,15 @@ TERMINAL_STATES = {"dev-ci-success", "finished", "terminal-success", "success"}
 CONTROLLER_TERMINAL_LEASE_STATES = TERMINAL_STATES | {"production-success"}
 CONTROLLER_STATE_NAME = "codex-task-sessions-v1"
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
+FILE_ATTRIBUTE_DIRECTORY = 0x10
+WINDOWS_LX_SYMLINK_TAG = 0xA000001D
+WINDOWS_LX_SYMLINK_VERSION = 2
+WINDOWS_FSCTL_GET_REPARSE_POINT = 0x000900A8
+WINDOWS_FILE_READ_ATTRIBUTES = 0x80
+WINDOWS_FILE_SHARE_ALL = 0x7
+WINDOWS_OPEN_EXISTING = 3
+WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
+WINDOWS_FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
 
 
 class ArtifactError(RuntimeError):
@@ -194,6 +205,256 @@ def _file_fingerprint(path: Path) -> dict[str, Any]:
         "size_bytes": int(metadata.st_size if kind == "file" else 0),
         "mtime_ns": int(metadata.st_mtime_ns),
     }
+
+
+def _metadata_is_reparse(metadata: os.stat_result) -> bool:
+    return stat.S_ISLNK(metadata.st_mode) or bool(
+        getattr(metadata, "st_file_attributes", 0) & FILE_ATTRIBUTE_REPARSE_POINT
+    )
+
+
+def _decode_lx_symlink_reparse_data(data: bytes) -> str:
+    if len(data) < 12:
+        raise ArtifactSafetyError("LX symlink reparse data is truncated")
+    tag, data_length, _reserved = struct.unpack_from("<IHH", data)
+    if tag != WINDOWS_LX_SYMLINK_TAG:
+        raise ArtifactSafetyError(f"Unsupported reparse tag: 0x{tag:08x}")
+    if data_length != len(data) - 8 or data_length < 4:
+        raise ArtifactSafetyError("LX symlink reparse data length is invalid")
+    version = struct.unpack_from("<I", data, 8)[0]
+    if version != WINDOWS_LX_SYMLINK_VERSION:
+        raise ArtifactSafetyError(f"Unsupported LX symlink version: {version}")
+    target_bytes = data[12:]
+    if not target_bytes or b"\x00" in target_bytes:
+        raise ArtifactSafetyError("LX symlink target is empty or contains NUL")
+    try:
+        return target_bytes.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ArtifactSafetyError("LX symlink target is not valid UTF-8") from error
+
+
+def _read_windows_lx_symlink_reparse_data(path: Path) -> bytes:
+    if os.name != "nt":
+        raise ArtifactSafetyError("Windows reparse data is unavailable on this platform")
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
+    create_file.restype = wintypes.HANDLE
+    device_io_control = kernel32.DeviceIoControl
+    device_io_control.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+        wintypes.LPVOID,
+    ]
+    device_io_control.restype = wintypes.BOOL
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = [wintypes.HANDLE]
+    close_handle.restype = wintypes.BOOL
+
+    handle = create_file(
+        str(path),
+        WINDOWS_FILE_READ_ATTRIBUTES,
+        WINDOWS_FILE_SHARE_ALL,
+        None,
+        WINDOWS_OPEN_EXISTING,
+        WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT | WINDOWS_FILE_FLAG_BACKUP_SEMANTICS,
+        None,
+    )
+    invalid_handle = wintypes.HANDLE(-1).value
+    if handle == invalid_handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        buffer = ctypes.create_string_buffer(16 * 1024)
+        bytes_returned = wintypes.DWORD()
+        succeeded = device_io_control(
+            handle,
+            WINDOWS_FSCTL_GET_REPARSE_POINT,
+            None,
+            0,
+            buffer,
+            len(buffer),
+            ctypes.byref(bytes_returned),
+            None,
+        )
+        if not succeeded:
+            raise ctypes.WinError(ctypes.get_last_error())
+        return buffer.raw[: bytes_returned.value]
+    finally:
+        close_handle(handle)
+
+
+def _read_reparse_target(path: Path) -> str:
+    try:
+        target = os.readlink(path)
+    except (OSError, ValueError) as error:
+        if os.name != "nt":
+            raise ArtifactSafetyError(f"Cannot inspect reparse target: {error}") from error
+        try:
+            target = _decode_lx_symlink_reparse_data(_read_windows_lx_symlink_reparse_data(path))
+        except (OSError, ArtifactError) as reparse_error:
+            raise ArtifactSafetyError(
+                f"Cannot inspect supported reparse target: {reparse_error}"
+            ) from error
+    if os.name == "nt":
+        if target.startswith("\\??\\UNC\\") or target.startswith("\\\\?\\UNC\\"):
+            target = "\\\\" + target[8:]
+        elif target.startswith("\\??\\") or target.startswith("\\\\?\\"):
+            candidate = target[4:]
+            if len(candidate) < 3 or candidate[1:3] != ":\\":
+                raise ArtifactSafetyError("Unsupported Windows reparse target namespace")
+            target = target[4:]
+    if not target or "\x00" in target:
+        raise ArtifactSafetyError("Reparse target is empty or contains NUL")
+    return target
+
+
+def _contained_temporary_target(
+    temporary_root: Path, entry: Path, target_text: str
+) -> tuple[Path, Path, str]:
+    root = Path(os.path.abspath(os.fspath(temporary_root)))
+    entry_path = Path(os.path.abspath(os.fspath(entry)))
+    try:
+        root_metadata = root.lstat()
+    except OSError as error:
+        raise ArtifactSafetyError(f"Cannot inspect task temporary root: {error}") from error
+    if _metadata_is_reparse(root_metadata) or not stat.S_ISDIR(root_metadata.st_mode):
+        raise ArtifactSafetyError("Task temporary root is not a plain directory")
+    try:
+        entry_path.relative_to(root)
+    except ValueError as error:
+        raise ArtifactSafetyError("Reparse entry is outside task temporary") from error
+
+    raw_target = Path(target_text)
+    if raw_target.drive and not raw_target.is_absolute():
+        raise ArtifactSafetyError("Drive-relative reparse target is ambiguous")
+    if raw_target.is_absolute():
+        if os.name == "nt" and not raw_target.drive:
+            raise ArtifactSafetyError("Root-relative Windows reparse target is ambiguous")
+        if ".." in raw_target.parts:
+            raise ArtifactSafetyError("Absolute reparse target contains parent traversal")
+        if os.name == "nt" and any(":" in part for part in raw_target.parts[1:]):
+            raise ArtifactSafetyError("Alternate data stream target is not allowed")
+        target_path = Path(os.path.abspath(os.fspath(raw_target)))
+        try:
+            relative = target_path.relative_to(root)
+        except ValueError as error:
+            raise ArtifactSafetyError("Reparse target escapes task temporary") from error
+    else:
+        stack = list(entry_path.parent.relative_to(root).parts)
+        for part in raw_target.parts:
+            if part in {"", "."}:
+                continue
+            if part == "..":
+                if not stack:
+                    raise ArtifactSafetyError("Relative reparse target escapes task temporary")
+                stack.pop()
+            else:
+                if os.name == "nt" and ":" in part:
+                    raise ArtifactSafetyError("Alternate data stream target is not allowed")
+                stack.append(part)
+        relative = Path(*stack)
+        target_path = root / relative
+
+    if target_path == entry_path:
+        raise ArtifactSafetyError("Reparse entry targets itself")
+    current = root
+    try:
+        target_metadata = current.lstat()
+        if _metadata_is_reparse(target_metadata):
+            raise ArtifactSafetyError("Task temporary root is a reparse point")
+        for index, part in enumerate(relative.parts):
+            current = current / part
+            target_metadata = current.lstat()
+            if _metadata_is_reparse(target_metadata):
+                raise ArtifactSafetyError("Reparse target traverses another reparse point")
+            if index < len(relative.parts) - 1 and not stat.S_ISDIR(target_metadata.st_mode):
+                raise ArtifactSafetyError("Reparse target parent is not a directory")
+    except OSError as error:
+        raise ArtifactSafetyError(f"Cannot inspect reparse target: {error}") from error
+
+    if stat.S_ISDIR(target_metadata.st_mode):
+        target_kind = "directory"
+    elif stat.S_ISREG(target_metadata.st_mode):
+        target_kind = "file"
+    else:
+        raise ArtifactSafetyError("Reparse target is not a regular file or directory")
+    return target_path, relative, target_kind
+
+
+def _temporary_entry_path(temporary_root: Path, relative: Path) -> Path:
+    relative_name = _safe_relative_name(relative)
+    try:
+        root_metadata = temporary_root.lstat()
+    except OSError as error:
+        raise ArtifactSafetyError(f"Cannot inspect task temporary root: {error}") from error
+    if _metadata_is_reparse(root_metadata) or not stat.S_ISDIR(root_metadata.st_mode):
+        raise ArtifactSafetyError("Task temporary root is not a plain directory")
+    parent = (
+        temporary_root
+        if not relative_name.parent.parts
+        else _safe_relative(temporary_root, relative_name.parent)
+    )
+    entry = parent / relative_name.name
+    try:
+        entry.relative_to(temporary_root)
+    except ValueError as error:
+        raise ArtifactSafetyError("Task temporary entry escapes its exact root") from error
+    return entry
+
+
+def _reparse_fingerprint(path: Path, temporary_root: Path) -> dict[str, Any]:
+    try:
+        metadata = path.lstat()
+    except OSError as error:
+        raise ArtifactSafetyError(f"Cannot inspect reparse entry: {error}") from error
+    if not _metadata_is_reparse(metadata):
+        raise ArtifactSafetyError("Task cleanup entry is no longer a reparse point")
+    target_text = _read_reparse_target(path)
+    _target_path, target_relative, target_kind = _contained_temporary_target(
+        temporary_root, path, target_text
+    )
+    attributes = int(getattr(metadata, "st_file_attributes", 0))
+    return {
+        "kind": "reparse",
+        "device": int(metadata.st_dev),
+        "inode": int(metadata.st_ino),
+        "mode": int(metadata.st_mode),
+        "size_bytes": int(metadata.st_size),
+        "mtime_ns": int(metadata.st_mtime_ns),
+        "ctime_ns": int(metadata.st_ctime_ns),
+        "attributes": attributes,
+        "directory_entry": bool(
+            stat.S_ISDIR(metadata.st_mode)
+            or attributes & FILE_ATTRIBUTE_DIRECTORY
+            or target_kind == "directory"
+        ),
+        "target": target_text,
+        "target_relative": target_relative.as_posix(),
+        "target_kind": target_kind,
+        "containment": "task-temporary",
+    }
+
+
+def _remove_reparse_entry(path: Path, fingerprint: Mapping[str, Any]) -> None:
+    if os.name == "nt" and fingerprint["directory_entry"]:
+        os.rmdir(path)
+    else:
+        path.unlink()
 
 
 def _iter_entries(root: Path) -> Iterable[dict[str, Any]]:
@@ -1097,24 +1358,87 @@ class ArtifactManager:
         guard = self._controller_guard(task_id=normalized)
         task_root = self.task_root(normalized)
         temporary_root = _safe_relative(task_root, "temporary")
-        if not temporary_root.exists():
+        try:
+            temporary_metadata = temporary_root.lstat()
+        except FileNotFoundError:
             return self._cleanup_result(normalized, "noop", [], [], [], 0, 0, [])
+        except OSError as error:
+            return self._cleanup_result(
+                normalized,
+                "blocked",
+                [],
+                [],
+                [{"path": "temporary", "reason": f"Cannot inspect task temporary root: {error}"}],
+                0,
+                0,
+                [],
+            )
+        if _metadata_is_reparse(temporary_metadata) or not stat.S_ISDIR(temporary_metadata.st_mode):
+            return self._cleanup_result(
+                normalized,
+                "blocked",
+                [],
+                [],
+                [{"path": "temporary", "reason": "Task temporary root is not a plain directory"}],
+                0,
+                0,
+                [],
+            )
         includes = self._normalize_scope_prefixes(include_prefixes, base="temporary")
         excludes = self._normalize_scope_prefixes(exclude_prefixes, base="temporary")
         candidates: list[dict[str, Any]] = []
+        inventory_paths: list[str] = []
         safety_errors = list(guard)
         for item in _iter_entries(temporary_root):
             if item["kind"] not in {"file", "reparse", "inaccessible"}:
                 continue
-            relative = Path("temporary") / item["relative"]
-            if includes and not any(_path_is_under(relative, prefix) for prefix in includes):
+            relative_to_temporary = Path(item["relative"])
+            if item["kind"] == "inaccessible" and not relative_to_temporary.parts:
+                safety_errors.append(
+                    f"cannot inventory task temporary: {item.get('error', 'inaccessible')}"
+                )
+                continue
+            relative = Path("temporary") / relative_to_temporary
+            selected = any(_path_is_under(relative, prefix) for prefix in includes)
+            if item["kind"] == "inaccessible":
+                selected = selected or any(_path_is_under(prefix, relative) for prefix in includes)
+            if includes and not selected:
                 continue
             if any(_path_is_under(relative, prefix) for prefix in excludes):
                 continue
-            if item["kind"] != "file":
-                safety_errors.append(f"unsafe task artifact path: {relative.as_posix()}")
+            path_text = (Path("tasks") / normalized / relative).as_posix()
+            inventory_paths.append(path_text)
+            if item["kind"] == "inaccessible":
+                safety_errors.append(
+                    f"unsafe task artifact path: {relative.as_posix()} ({item.get('error', 'inaccessible')})"
+                )
                 continue
-            candidates.append(item)
+            try:
+                entry_relative = _safe_relative_name(relative_to_temporary)
+                target = _temporary_entry_path(temporary_root, entry_relative)
+                if target != item["path"]:
+                    raise ArtifactSafetyError("Task cleanup inventory path changed")
+                if item["kind"] == "file":
+                    fingerprint = {
+                        "kind": "file",
+                        "size_bytes": int(item["size_bytes"]),
+                        "mtime_ns": int(item["mtime_ns"]),
+                    }
+                    size_bytes = int(item["size_bytes"])
+                else:
+                    fingerprint = _reparse_fingerprint(target, temporary_root)
+                    size_bytes = 0
+                candidates.append(
+                    {
+                        "path": path_text,
+                        "relative": entry_relative,
+                        "kind": item["kind"],
+                        "fingerprint": fingerprint,
+                        "size_bytes": size_bytes,
+                    }
+                )
+            except (OSError, ArtifactError) as error:
+                safety_errors.append(f"unsafe task artifact path: {relative.as_posix()} ({error})")
         if safety_errors:
             return self._cleanup_result(
                 normalized,
@@ -1124,27 +1448,18 @@ class ArtifactManager:
                 [{"path": "temporary", "reason": issue} for issue in sorted(set(safety_errors))],
                 sum(int(item.get("size_bytes", 0)) for item in candidates),
                 sum(int(item.get("size_bytes", 0)) for item in candidates),
-                [
-                    str(Path("tasks") / normalized / "temporary" / item["relative"]).replace(
-                        "\\", "/"
-                    )
-                    for item in candidates
-                ],
+                inventory_paths,
             )
         plan_entries = [
             {
-                "path": (Path("tasks") / normalized / "temporary" / item["relative"]).as_posix(),
+                "path": item["path"],
                 "category": "temporary",
                 "classification": "temporary",
                 "reason": "exact task-owned temporary data after terminal success",
-                "size_bytes": int(item.get("size_bytes", 0)),
+                "size_bytes": int(item["size_bytes"]),
                 "disposition": "DELETE",
-                "kind": "file",
-                "fingerprint": {
-                    "kind": "file",
-                    "size_bytes": int(item.get("size_bytes", 0)),
-                    "mtime_ns": int(item.get("mtime_ns", 0)),
-                },
+                "kind": item["kind"],
+                "fingerprint": item["fingerprint"],
             }
             for item in candidates
         ]
@@ -1162,22 +1477,39 @@ class ArtifactManager:
             )
         removed: list[str] = []
         errors: list[dict[str, str]] = []
+        removed_reparse_count = 0
         for entry in plan_entries:
             try:
-                target = _safe_relative(self.root, _safe_relative_name(entry["path"]))
-                if not target.exists():
-                    raise ArtifactSafetyError("task cleanup target disappeared after inventory")
-                if _is_reparse(target):
-                    raise ArtifactSafetyError("reparse point")
-                current = _file_fingerprint(target)
-                if current != entry["fingerprint"]:
-                    raise ArtifactSafetyError("task cleanup target changed after inventory")
-                target.unlink()
+                raw_path = _safe_relative_name(entry["path"])
+                expected_prefix = ("tasks", normalized, "temporary")
+                if raw_path.parts[:3] != expected_prefix or len(raw_path.parts) < 4:
+                    raise ArtifactSafetyError("task cleanup plan escaped task temporary")
+                relative = Path(*raw_path.parts[3:])
+                if entry["kind"] == "reparse":
+                    target = _temporary_entry_path(temporary_root, relative)
+                    current = _reparse_fingerprint(target, temporary_root)
+                    if current != entry["fingerprint"]:
+                        raise ArtifactSafetyError(
+                            "task cleanup reparse entry changed after inventory"
+                        )
+                    _remove_reparse_entry(target, current)
+                    removed_reparse_count += 1
+                else:
+                    target = _safe_relative(self.root, raw_path)
+                    if not target.exists():
+                        raise ArtifactSafetyError("task cleanup target disappeared after inventory")
+                    if _is_reparse(target):
+                        raise ArtifactSafetyError("task cleanup target became a reparse point")
+                    current = _file_fingerprint(target)
+                    if current != entry["fingerprint"]:
+                        raise ArtifactSafetyError("task cleanup target changed after inventory")
+                    target.unlink()
                 removed.append(str(entry["path"]))
             except (OSError, ArtifactError) as error:
                 errors.append({"path": str(entry["path"]), "reason": str(error)})
                 break
-        self._remove_empty_task_directories(task_root, includes, excludes)
+        if not errors:
+            self._remove_empty_task_directories(task_root, includes, excludes)
         after = sum(
             int(entry["size_bytes"]) for entry in plan_entries if entry["path"] not in removed
         )
@@ -1190,6 +1522,7 @@ class ArtifactManager:
             before,
             after,
             [str(entry["path"]) for entry in plan_entries if entry["path"] not in removed],
+            removed_reparse_count=removed_reparse_count,
         )
         return result
 
@@ -1203,6 +1536,8 @@ class ArtifactManager:
         before_bytes: int,
         after_bytes: int,
         remaining: Sequence[str],
+        *,
+        removed_reparse_count: int = 0,
     ) -> dict[str, Any]:
         removed_bytes = max(0, before_bytes - after_bytes)
         return {
@@ -1214,6 +1549,7 @@ class ArtifactManager:
             "preserved": list(preserved) + list(remaining),
             "cleanup_errors": [dict(item) for item in errors],
             "removed_count": len(removed),
+            "removed_reparse_count": removed_reparse_count,
             "preserved_count": len(preserved) + len(remaining),
             "removed_bytes": removed_bytes,
             "before_bytes": before_bytes,
@@ -1428,6 +1764,7 @@ def _human_result(payload: Mapping[str, Any]) -> str:
     for key in (
         "status",
         "removed_count",
+        "removed_reparse_count",
         "removed_bytes",
         "before_bytes",
         "after_bytes",

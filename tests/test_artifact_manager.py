@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import struct
+import subprocess
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -27,6 +29,30 @@ def _manager(tmp_path: Path):
     return artifact_manager.ArtifactManager(tmp_path / ".artifacts")
 
 
+def _create_windows_junction_or_skip(link: Path, target: Path) -> None:
+    command = f'mklink /J "{link}" "{target}"'
+    created = subprocess.run(
+        ["cmd.exe", "/d", "/c", command], capture_output=True, text=True, check=False
+    )
+    if created.returncode:
+        ps_path = str(link).replace("'", "''")
+        ps_target = str(target).replace("'", "''")
+        created = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                f"New-Item -ItemType Junction -Path '{ps_path}' -Target '{ps_target}' | Out-Null",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    if created.returncode:
+        pytest.skip(f"junction creation unavailable: {created.stderr or created.stdout}")
+
+
 def test_safe_relative_rejects_traversal_and_reparse_points(tmp_path: Path) -> None:
     manager = _manager(tmp_path)
     manager.ensure_layout("133")
@@ -36,10 +62,13 @@ def test_safe_relative_rejects_traversal_and_reparse_points(tmp_path: Path) -> N
     outside = tmp_path / "outside"
     outside.mkdir()
     link = manager.root / "runtime" / "link"
-    try:
-        link.symlink_to(outside, target_is_directory=True)
-    except (OSError, NotImplementedError) as error:
-        pytest.skip(f"symlink creation unavailable: {error}")
+    if os.name == "nt":
+        _create_windows_junction_or_skip(link, outside)
+    else:
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except (OSError, NotImplementedError) as error:
+            pytest.skip(f"symlink creation unavailable: {error}")
     with pytest.raises(artifact_manager.ArtifactSafetyError, match="Reparse point"):
         artifact_manager._safe_relative(manager.root, "runtime/link/file.txt")
 
@@ -275,13 +304,32 @@ def test_ensure_layout_refuses_canonical_reparse_point(tmp_path: Path) -> None:
     outside = tmp_path / "outside"
     outside.mkdir()
     link = manager.root / "runtime"
-    try:
-        link.symlink_to(outside, target_is_directory=True)
-    except (OSError, NotImplementedError) as error:
-        pytest.skip(f"symlink creation unavailable: {error}")
+    if os.name == "nt":
+        _create_windows_junction_or_skip(link, outside)
+    else:
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except (OSError, NotImplementedError) as error:
+            pytest.skip(f"symlink creation unavailable: {error}")
 
     with pytest.raises(artifact_manager.ArtifactSafetyError, match="Reparse point"):
         manager.ensure_layout()
+
+
+def test_artifact_manager_refuses_reparse_artifact_root(tmp_path: Path) -> None:
+    root = tmp_path / ".artifacts"
+    target = tmp_path / "outside-root"
+    target.mkdir()
+    if os.name == "nt":
+        _create_windows_junction_or_skip(root, target)
+    else:
+        try:
+            root.symlink_to(target, target_is_directory=True)
+        except (OSError, NotImplementedError) as error:
+            pytest.skip(f"symlink creation unavailable: {error}")
+
+    with pytest.raises(artifact_manager.ArtifactSafetyError, match="Artifact root"):
+        artifact_manager.ArtifactManager(root)
 
 
 def test_manifest_validation_rejects_unregistered_durable_artifact(tmp_path: Path) -> None:
@@ -368,6 +416,329 @@ def test_cleanup_task_stops_on_target_drift(
     assert drift["status"] == "partial-failure"
     assert drift["cleanup_errors"]
     assert target.exists()
+
+
+def _create_symlink_or_simulate(
+    link: Path,
+    target_text: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[bool, list[str]]:
+    try:
+        link.symlink_to(target_text)
+        return True, [target_text]
+    except OSError, NotImplementedError:
+        link.write_text("simulated reparse entry\n", encoding="utf-8")
+        target_ref = [target_text]
+        original_iter_entries = artifact_manager._iter_entries
+
+        def iter_entries(root: Path):
+            for item in original_iter_entries(root):
+                if item["path"] == link:
+                    yield {**item, "kind": "reparse"}
+                else:
+                    yield item
+
+        def reparse_fingerprint(path: Path, temporary_root: Path) -> dict[str, object]:
+            if path != link:
+                raise artifact_manager.ArtifactSafetyError("unexpected fake reparse path")
+            metadata = path.lstat()
+            _target, relative, target_kind = artifact_manager._contained_temporary_target(
+                temporary_root, path, target_ref[0]
+            )
+            return {
+                "kind": "reparse",
+                "device": int(metadata.st_dev),
+                "inode": int(metadata.st_ino),
+                "mode": int(metadata.st_mode),
+                "size_bytes": int(metadata.st_size),
+                "mtime_ns": int(metadata.st_mtime_ns),
+                "ctime_ns": int(metadata.st_ctime_ns),
+                "attributes": artifact_manager.FILE_ATTRIBUTE_REPARSE_POINT,
+                "directory_entry": False,
+                "target": target_ref[0],
+                "target_relative": relative.as_posix(),
+                "target_kind": target_kind,
+                "containment": "task-temporary",
+            }
+
+        monkeypatch.setattr(artifact_manager, "_iter_entries", iter_entries)
+        monkeypatch.setattr(artifact_manager, "_reparse_fingerprint", reparse_fingerprint)
+        return False, target_ref
+
+
+def test_cleanup_task_removes_only_contained_relative_symlink_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("133")
+    temporary = manager.root / "tasks" / "133" / "temporary"
+    target = temporary / "target" / "payload.txt"
+    target.parent.mkdir()
+    target.write_text("keep target contents\n", encoding="utf-8")
+    link = temporary / "links" / "payload-link"
+    link.parent.mkdir()
+    _native_symlink, _target_ref = _create_symlink_or_simulate(
+        link,
+        os.path.relpath(target, link.parent),
+        monkeypatch,
+    )
+    ordinary = temporary / "ordinary.txt"
+    ordinary.write_text("remove ordinary file\n", encoding="utf-8")
+
+    result = manager.cleanup_task(
+        "133", terminal_state="finished", exclude_prefixes=("temporary/target",)
+    )
+
+    assert result["status"] == "completed"
+    assert result["removed_count"] == 2
+    assert result["removed_reparse_count"] == 1
+    assert not os.path.lexists(link)
+    assert not ordinary.exists()
+    assert target.read_text(encoding="utf-8") == "keep target contents\n"
+    second = manager.cleanup_task(
+        "133", terminal_state="finished", exclude_prefixes=("temporary/target",)
+    )
+    assert second["status"] == "completed"
+    assert second["removed_count"] == 0
+    assert second["removed_reparse_count"] == 0
+
+
+@pytest.mark.parametrize("target_area", ["outside", "other-task", "runtime", "evidence", "source"])
+def test_cleanup_task_blocks_reparse_targets_outside_exact_temporary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target_area: str
+) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("133")
+    temporary = manager.root / "tasks" / "133" / "temporary"
+    target_roots = {
+        "outside": tmp_path / "outside",
+        "other-task": manager.root / "tasks" / "134" / "temporary",
+        "runtime": manager.root / "runtime" / "cache",
+        "evidence": manager.root / "tasks" / "133" / "evidence",
+        "source": tmp_path / "backend",
+    }
+    target = target_roots[target_area] / "target.txt"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("must not be reached\n", encoding="utf-8")
+    link = temporary / "z-link"
+    _create_symlink_or_simulate(link, str(target), monkeypatch)
+    ordinary = temporary / "a-ordinary.txt"
+    ordinary.write_text("blocked with unsafe link\n", encoding="utf-8")
+
+    result = manager.cleanup_task("133", terminal_state="finished")
+
+    assert result["status"] == "blocked"
+    assert result["cleanup_errors"]
+    assert os.path.lexists(link)
+    assert ordinary.exists()
+    assert target.read_text(encoding="utf-8") == "must not be reached\n"
+
+
+@pytest.mark.parametrize("target_text", ["", "../../outside", "../../../runtime/cache"])
+def test_contained_temporary_target_rejects_ambiguous_or_escaping_target(
+    tmp_path: Path, target_text: str
+) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("133")
+    temporary = manager.root / "tasks" / "133" / "temporary"
+    with pytest.raises(artifact_manager.ArtifactSafetyError):
+        artifact_manager._contained_temporary_target(
+            temporary, temporary / "nested" / "candidate", target_text
+        )
+
+
+def test_contained_temporary_target_accepts_relative_target_in_same_tree(
+    tmp_path: Path,
+) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("133")
+    temporary = manager.root / "tasks" / "133" / "temporary"
+    target = temporary / "target" / "payload.txt"
+    target.parent.mkdir()
+    target.write_text("preserved\n", encoding="utf-8")
+
+    resolved, relative, kind = artifact_manager._contained_temporary_target(
+        temporary, temporary / "links" / "payload-link", "../target/payload.txt"
+    )
+
+    assert resolved == target
+    assert relative == Path("target") / "payload.txt"
+    assert kind == "file"
+
+
+def test_cleanup_task_blocks_unreadable_reparse_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("133")
+    temporary = manager.root / "tasks" / "133" / "temporary"
+    target = temporary / "target.txt"
+    target.write_text("preserved\n", encoding="utf-8")
+    link = temporary / "z-link"
+    native_symlink, _target_ref = _create_symlink_or_simulate(link, "target.txt", monkeypatch)
+    later_file = temporary / "a-later.txt"
+    later_file.write_text("preserved after inventory refusal\n", encoding="utf-8")
+    if native_symlink:
+
+        def unreadable(_path: Path) -> str:
+            raise artifact_manager.ArtifactSafetyError("target cannot be inspected")
+
+        monkeypatch.setattr(artifact_manager, "_read_reparse_target", unreadable)
+    else:
+
+        def unreadable(_path: Path, _root: Path) -> dict[str, object]:
+            raise artifact_manager.ArtifactSafetyError("target cannot be inspected")
+
+        monkeypatch.setattr(artifact_manager, "_reparse_fingerprint", unreadable)
+
+    result = manager.cleanup_task("133", terminal_state="finished")
+
+    assert result["status"] == "blocked"
+    assert result["cleanup_errors"]
+    assert os.path.lexists(link)
+    assert later_file.exists()
+    assert target.read_text(encoding="utf-8") == "preserved\n"
+
+
+def test_cleanup_task_blocks_inaccessible_parent_of_selected_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("133")
+    temporary = manager.root / "tasks" / "133" / "temporary"
+    monkeypatch.setattr(
+        artifact_manager,
+        "_iter_entries",
+        lambda _root: iter(
+            [
+                {
+                    "path": temporary / "worker",
+                    "relative": Path("worker"),
+                    "kind": "inaccessible",
+                    "error": "access denied",
+                }
+            ]
+        ),
+    )
+
+    result = manager.cleanup_task(
+        "133",
+        terminal_state="finished",
+        include_prefixes=("temporary/worker/generated",),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["cleanup_errors"]
+
+
+def test_lx_symlink_reparse_parser_checks_version_and_target() -> None:
+    target = b"../target/file.txt"
+    data = (
+        struct.pack(
+            "<IHHI",
+            artifact_manager.WINDOWS_LX_SYMLINK_TAG,
+            len(target) + 4,
+            0,
+            artifact_manager.WINDOWS_LX_SYMLINK_VERSION,
+        )
+        + target
+    )
+
+    assert artifact_manager._decode_lx_symlink_reparse_data(data) == target.decode()
+    with pytest.raises(artifact_manager.ArtifactSafetyError, match="version"):
+        artifact_manager._decode_lx_symlink_reparse_data(data[:8] + struct.pack("<I", 1) + target)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows directory junction behavior")
+def test_cleanup_task_removes_contained_junction_entry_only(tmp_path: Path) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("133")
+    temporary = manager.root / "tasks" / "133" / "temporary"
+    target = temporary / "junction-target"
+    target.mkdir()
+    payload = target / "keep.txt"
+    payload.write_text("keep through junction removal\n", encoding="utf-8")
+    junction = temporary / "z-junction"
+    _create_windows_junction_or_skip(junction, target)
+
+    with pytest.raises(artifact_manager.ArtifactSafetyError):
+        artifact_manager._contained_temporary_target(
+            temporary, temporary / "candidate", "z-junction/keep.txt"
+        )
+    with pytest.raises(artifact_manager.ArtifactSafetyError, match="Reparse point"):
+        artifact_manager._safe_relative(
+            manager.root, Path("tasks/133/temporary/z-junction/keep.txt")
+        )
+
+    result = manager.cleanup_task(
+        "133", terminal_state="finished", exclude_prefixes=("temporary/junction-target",)
+    )
+
+    assert result["status"] == "completed"
+    assert result["removed_reparse_count"] == 1
+    assert not junction.exists()
+    assert payload.read_text(encoding="utf-8") == "keep through junction removal\n"
+
+
+@pytest.mark.parametrize("replacement", ["different-target", "regular-file"])
+def test_cleanup_task_stops_when_reparse_entry_changes_after_inventory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replacement: str
+) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("133")
+    temporary = manager.root / "tasks" / "133" / "temporary"
+    original_target = temporary / "target-a.txt"
+    changed_target = temporary / "target-b.txt"
+    original_target.write_text("target a\n", encoding="utf-8")
+    changed_target.write_text("target b\n", encoding="utf-8")
+    link = temporary / "z-link"
+    native_symlink, target_ref = _create_symlink_or_simulate(link, "target-a.txt", monkeypatch)
+    later_file = temporary / "a-later.txt"
+    later_file.write_text("must remain after failure\n", encoding="utf-8")
+    calls = 0
+    if native_symlink:
+        read_target = artifact_manager._read_reparse_target
+
+        def change_entry(path: Path) -> str:
+            nonlocal calls
+            calls += 1
+            if path == link and calls == 2:
+                path.unlink()
+                if replacement == "regular-file":
+                    path.write_text("replacement\n", encoding="utf-8")
+                else:
+                    path.symlink_to(Path("target-b.txt"))
+            return read_target(path)
+
+        monkeypatch.setattr(artifact_manager, "_read_reparse_target", change_entry)
+    else:
+        reparse_fingerprint = artifact_manager._reparse_fingerprint
+
+        def change_fake_entry(path: Path, temporary_root: Path) -> dict[str, object]:
+            nonlocal calls
+            calls += 1
+            if path == link and calls == 2:
+                if replacement == "regular-file":
+                    path.write_text("replacement\n", encoding="utf-8")
+                    raise artifact_manager.ArtifactSafetyError(
+                        "Task cleanup entry is no longer a reparse point"
+                    )
+                target_ref[0] = "target-b.txt"
+                path.write_text("changed simulated reparse entry\n", encoding="utf-8")
+            return reparse_fingerprint(path, temporary_root)
+
+        monkeypatch.setattr(artifact_manager, "_reparse_fingerprint", change_fake_entry)
+
+    result = manager.cleanup_task("133", terminal_state="finished")
+
+    assert result["status"] == "partial-failure"
+    assert result["cleanup_errors"]
+    assert later_file.exists()
+    assert changed_target.read_text(encoding="utf-8") == "target b\n"
+    if replacement == "regular-file":
+        assert link.read_text(encoding="utf-8") == "replacement\n"
+    elif native_symlink:
+        assert link.is_symlink()
 
 
 def test_runtime_cleanup_applies_the_saved_exact_plan(tmp_path: Path) -> None:
