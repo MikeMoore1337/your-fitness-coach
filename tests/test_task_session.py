@@ -335,6 +335,8 @@ def _prepare_superseding_production_reconciliation(
     task_id: str = "415",
     superseding_count: int = 2,
     post_deploy_drift: bool = True,
+    original_pr_branch: str | None = None,
+    superseding_pr_branch: str | None = None,
 ) -> tuple[Path, Any, Any, Path, str, list[int], str]:
     root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
         repository, task_id
@@ -350,6 +352,8 @@ def _prepare_superseding_production_reconciliation(
     assert isinstance(github, FakeGitHub)
     original_pr = 423
     original = _task_pr(original_pr, task_id, base_sha, head_sha, merge_sha=original_merge_sha)
+    if original_pr_branch is not None:
+        original["head"]["ref"] = original_pr_branch
     original["state"] = "closed"
     original["merged_at"] = "2026-09-22T13:34:24Z"
     github.pulls[original_pr] = original
@@ -388,7 +392,9 @@ def _prepare_superseding_production_reconciliation(
             merge_sha=superseding_merge,
         )
         pull_request["state"] = "closed"
-        pull_request["head"]["ref"] = f"task/{task_id}-superseding-{index + 1}"
+        pull_request["head"]["ref"] = superseding_pr_branch or (
+            f"task/{task_id}-superseding-{index + 1}"
+        )
         pull_request["merged_at"] = f"2026-09-22T20:{20 + index * 33:02}:29Z"
         github.pulls[number] = pull_request
         github.commits[number] = [_task_commit(task_id)]
@@ -2967,6 +2973,80 @@ def test_verify_master_merge_accepts_only_one_task_pr_for_current_master() -> No
     result = task_session.verify_master_merge(object(), github, sha=merge_sha)
     assert result["kind"] == "task-pr-merge"
     assert result["pull_request"]["number"] == 205
+
+
+def test_verify_master_merge_accepts_task_393_integration_pr() -> None:
+    base_sha = "a" * 40
+    merge_sha = "c" * 40
+    integration_pr = _task_pr(472, "393", base_sha, "b" * 40, merge_sha=merge_sha)
+    integration_pr["head"]["ref"] = "feature/app-experience-v3"
+    github = FakeGitHub(merge_sha)
+    github.associated_pulls = [integration_pr]
+
+    result = task_session.verify_master_merge(object(), github, sha=merge_sha)
+
+    assert result["kind"] == "task-pr-merge"
+    assert result["pull_request"]["number"] == 472
+
+
+@pytest.mark.parametrize(
+    ("title", "head_repository"),
+    [
+        ("[Task 392] Unrelated delivery", "owner/repository"),
+        ("[Task 393] App Experience v3", "fork/repository"),
+    ],
+)
+def test_verify_master_merge_rejects_misattributed_task_393_integration_pr(
+    title: str, head_repository: str
+) -> None:
+    base_sha = "a" * 40
+    merge_sha = "c" * 40
+    integration_pr = _task_pr(472, "393", base_sha, "b" * 40, merge_sha=merge_sha)
+    integration_pr["head"]["ref"] = "feature/app-experience-v3"
+    integration_pr["title"] = title
+    integration_pr["head"]["repo"]["full_name"] = head_repository
+    github = FakeGitHub(merge_sha)
+    github.associated_pulls = [integration_pr]
+
+    with pytest.raises(
+        task_session.TaskSessionError,
+        match="not exactly one merged task or controller PR",
+    ):
+        task_session.verify_master_merge(object(), github, sha=merge_sha)
+
+
+def test_reconcile_and_finish_accept_task_393_integration_branch_anchor(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository, controller, worktree, branch, superseding_prs, deployed_sha = (
+        _prepare_superseding_production_reconciliation(
+            repository,
+            task_id="393",
+            superseding_count=1,
+            post_deploy_drift=False,
+            original_pr_branch="feature/app-experience-v3",
+            superseding_pr_branch="feature/app-experience-v3",
+        )
+    )
+
+    history = controller.reconcile_production_success(
+        "393",
+        original_pr_number=423,
+        superseding_pr_numbers=superseding_prs,
+        deployed_sha=deployed_sha,
+        production_run_id=35783412553,
+        owner_authorize=True,
+    )
+
+    assert history["superseding_production_reconciliation"]["anchor_classification"] == (
+        "exact_delivery_anchor"
+    )
+    assert history["superseding_production_reconciliation"]["original_delivery"]["branch"] == (
+        "feature/app-experience-v3"
+    )
+    assert controller.finish("393")["cleanup_performed"] is True
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
 
 
 def test_verify_master_merge_accepts_one_controller_maintenance_pr() -> None:
