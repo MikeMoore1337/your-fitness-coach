@@ -651,6 +651,12 @@ def _publication_lock(db: Session, row: NewsPublicationSnapshot) -> None:
         db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_value})
 
 
+def _next_local_day_same_time(now: datetime, timezone: ZoneInfo) -> datetime:
+    local_now = now.replace(tzinfo=UTC).astimezone(timezone)
+    next_local = local_now + timedelta(days=1)
+    return next_local.astimezone(UTC).replace(tzinfo=None)
+
+
 def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
     now = utcnow()
     stale_before = now - PROCESSING_TTL
@@ -789,6 +795,11 @@ def claim_due_publications(db: Session, *, limit: int = 5) -> list[str]:
                 .count()
             )
             if occupied >= settings.news_daily_publication_limit:
+                if row.publication_mode == "immediate":
+                    row.status = "queued"
+                    row.next_attempt_at = _next_local_day_same_time(now, publication_timezone)
+                    row.last_error_code = "waiting_for_daily_capacity"
+                    continue
                 row.status = "failed"
                 row.last_error_code = "daily_cap_reached"
                 if cluster is not None:
