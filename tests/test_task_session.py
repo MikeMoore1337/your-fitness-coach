@@ -102,7 +102,11 @@ class FakeGitHub:
         self.ruleset_payload: list[dict[str, Any]] = []
         self.successful_deployments: set[tuple[str, str]] = set()
         self.associated_pulls: list[dict[str, Any]] = []
+        self.associated_pulls_by_commit: dict[str, list[dict[str, Any]]] = {}
         self.runs: dict[int, dict[str, Any]] = {}
+        self.workflow_runs_by_sha: dict[str, list[dict[str, Any]]] = {}
+        self.workflow_jobs_by_run: dict[int, list[dict[str, Any]]] = {}
+        self.current_production_deployment: dict[str, Any] | None = None
 
     def api(self, endpoint: str) -> Any:
         if endpoint.startswith("commits/") and endpoint.endswith("/pulls"):
@@ -123,6 +127,9 @@ class FakeGitHub:
     def pull_request_files(self, number: int) -> list[dict[str, Any]]:
         return self.files.get(number, [{"filename": "README.md"}])
 
+    def pull_requests_for_commit(self, sha: str) -> list[dict[str, Any]]:
+        return self.associated_pulls_by_commit.get(sha, [])
+
     def check_runs(self, sha: str) -> list[dict[str, Any]]:
         return self.checks.get(sha, [])
 
@@ -133,6 +140,17 @@ class FakeGitHub:
 
     def has_successful_deployment(self, sha: str, environment: str) -> bool:
         return (sha, environment) in self.successful_deployments
+
+    def workflow_runs(self, workflow: str, sha: str) -> list[dict[str, Any]]:
+        assert workflow == "deploy.yml"
+        return self.workflow_runs_by_sha.get(sha, [])
+
+    def workflow_jobs(self, run_id: int) -> list[dict[str, Any]]:
+        return self.workflow_jobs_by_run.get(run_id, [])
+
+    def latest_deployment_status(self, environment: str) -> dict[str, Any] | None:
+        assert environment == "production"
+        return self.current_production_deployment
 
     def active_workflow_runs(self) -> list[dict[str, Any]]:
         return self.active_runs
@@ -216,6 +234,391 @@ def _prepare_started(
     _git(worktree, "commit", "-m", f"feat: [Task {task_id}] synthetic change")
     head_sha = _git(worktree, "rev-parse", "HEAD")
     return root, git_repository, controller, worktree, branch, base_sha + ":" + head_sha
+
+
+def _prepare_subsequent_production_reconciliation(
+    repository: tuple[Path, Any],
+    later_changes: list[tuple[str, str, str, bool]],
+) -> tuple[Path, Any, Any, Path, str, str, list[dict[str, Any]]]:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "415"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready("415", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _git(root, "merge", "--no-ff", branch, "-m", "Merge task 415")
+    original_sha = _git(root, "rev-parse", "HEAD")
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = original_sha
+    original_run_id = 9000
+    github.workflow_runs_by_sha[original_sha] = [
+        {
+            "id": original_run_id,
+            "name": "Release production",
+            "head_sha": original_sha,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": f"https://example.invalid/runs/{original_run_id}",
+        }
+    ]
+    github.successful_deployments.add((original_sha, "production"))
+    github.current_production_deployment = {
+        "deployment_id": 8000,
+        "sha": original_sha,
+        "environment": "production",
+        "state": "success",
+        "updated_at": "2026-09-24T00:00:00Z",
+        "log_url": "https://example.invalid/deployments/8000",
+    }
+
+    lease_path = controller.store.task_lease_path("415")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease.update(
+        {
+            "lifecycle_state": "production-success",
+            "merge_sha": original_sha,
+            "deployed_sha": original_sha,
+        }
+    )
+    history = {
+        "version": task_session.TASK_STATE_VERSION,
+        "task_id": "415",
+        "state": "production-success",
+        "head_sha": head_sha,
+        "base_sha": base_sha,
+        "merge_sha": original_sha,
+        "deployed_sha": original_sha,
+        "pr_number": 415,
+        "completed_at": "2026-09-24T00:00:00Z",
+        "closeout_required": True,
+    }
+    task_session.StateStore.replace_json(lease_path, lease)
+    history_path = controller.store.history / "task-415.json"
+    task_session.StateStore.replace_json(history_path, history)
+
+    records: list[dict[str, Any]] = []
+    previous_sha = original_sha
+    for index, (classification, task_id, filename, deploy) in enumerate(later_changes, start=1):
+        path = root / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"change {index}\n", encoding="utf-8")
+        _git(root, "add", filename)
+        number = 600 + index
+        if classification == "controller":
+            subject = f"[Controller] Synthetic controller change {index}"
+            branch_name = f"codex/controller-synthetic-{index}"
+            title = f"[Controller] Synthetic controller change {index}"
+        else:
+            subject = f"[Task {task_id}] Synthetic product change {index}"
+            branch_name = f"task/{task_id}-synthetic-{index}"
+            title = f"[Task {task_id}] Synthetic product change {index}"
+        _git(root, "commit", "-m", subject)
+        commit_sha = _git(root, "rev-parse", "HEAD")
+        head_sha_for_pr = commit_sha
+        pr = {
+            "number": number,
+            "title": title,
+            "state": "closed",
+            "merged_at": f"2026-09-24T0{index}:00:00Z",
+            "merge_commit_sha": commit_sha,
+            "commits": 1,
+            "changed_files": 1,
+            "base": {
+                "ref": "master",
+                "sha": previous_sha,
+                "repo": {"full_name": "owner/repository"},
+            },
+            "head": {
+                "ref": branch_name,
+                "sha": head_sha_for_pr,
+                "repo": {"full_name": "owner/repository"},
+            },
+        }
+        github.pulls[number] = pr
+        github.associated_pulls_by_commit[commit_sha] = [pr]
+        github.commits[number] = [{"sha": commit_sha, "commit": {"message": subject}}]
+        github.files[number] = [{"filename": filename}]
+        github.checks[head_sha_for_pr] = [_success_check(head_sha_for_pr)]
+        release_run_id = 9100 + index
+        if classification == "controller":
+            github.workflow_runs_by_sha[commit_sha] = [
+                {
+                    "id": release_run_id,
+                    "name": "Release production",
+                    "head_sha": commit_sha,
+                    "status": "completed",
+                    "conclusion": "success",
+                    "html_url": f"https://example.invalid/runs/{release_run_id}",
+                }
+            ]
+            github.workflow_jobs_by_run[release_run_id] = [
+                {"name": "Authorize exact merged master revision", "conclusion": "success"},
+                {"name": "Deploy immutable tested bundle", "conclusion": "skipped"},
+            ]
+        elif deploy:
+            github.workflow_runs_by_sha[commit_sha] = [
+                {
+                    "id": release_run_id,
+                    "name": "Release production",
+                    "head_sha": commit_sha,
+                    "status": "completed",
+                    "conclusion": "success",
+                    "html_url": f"https://example.invalid/runs/{release_run_id}",
+                }
+            ]
+            github.successful_deployments.add((commit_sha, "production"))
+            github.current_production_deployment = {
+                "deployment_id": 8000 + index,
+                "sha": commit_sha,
+                "environment": "production",
+                "state": "success",
+                "updated_at": f"2026-09-24T0{index}:30:00Z",
+                "log_url": f"https://example.invalid/deployments/{8000 + index}",
+            }
+        records.append(
+            {
+                "classification": classification,
+                "task_id": task_id,
+                "commit_sha": commit_sha,
+                "pr_number": number,
+                "head_sha": head_sha_for_pr,
+                "release_run_id": release_run_id,
+            }
+        )
+        previous_sha = commit_sha
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+    github.master_sha = previous_sha
+    return root, git_repository, controller, worktree, branch, original_sha, records
+
+
+def test_reconcile_subsequent_production_accepts_controller_only_master_advance(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, original_sha, records = _prepare_subsequent_production_reconciliation(
+        repository,
+        [("controller", "", "scripts/task_session.py", False)],
+    )
+
+    reconciliation = controller.reconcile_subsequent_production("415", owner_authorize=True)
+
+    assert reconciliation["current_master_sha"] == records[-1]["commit_sha"]
+    assert reconciliation["current_production"]["deployed_sha"] == original_sha
+    assert reconciliation["intervening_commits"][0]["classification"] == "controller"
+    assert (
+        reconciliation["intervening_commits"][0]["release"]["application_deploy_job"] == "skipped"
+    )
+
+
+def test_reconcile_subsequent_production_preserves_original_and_records_product_deployment(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, original_sha, records = _prepare_subsequent_production_reconciliation(
+        repository,
+        [("product", "475", "backend/fitminiapp_api/services/news_editorial.py", True)],
+    )
+
+    reconciliation = controller.reconcile_subsequent_production("415", owner_authorize=True)
+    history = controller.store.read_json(controller.store.history / "task-415.json")
+    lease = controller.store.read_json(controller.store.task_lease_path("415"))
+
+    assert history["deployed_sha"] == original_sha
+    assert history["merge_sha"] == original_sha
+    assert lease["deployed_sha"] == original_sha
+    assert reconciliation["original_deployed_sha"] == original_sha
+    assert reconciliation["current_production"]["deployed_sha"] == records[0]["commit_sha"]
+    assert (
+        history["subsequent_production_reconciliation"]
+        == lease["subsequent_production_reconciliation"]
+    )
+
+
+def test_reconcile_subsequent_production_preserves_ordered_product_deployments(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, records = _prepare_subsequent_production_reconciliation(
+        repository,
+        [
+            ("controller", "", "scripts/task_session.py", False),
+            ("product", "475", "backend/news_one.py", True),
+            ("product", "477", "backend/news_two.py", True),
+        ],
+    )
+
+    reconciliation = controller.reconcile_subsequent_production("415", owner_authorize=True)
+    chain = reconciliation["intervening_commits"]
+
+    assert [item["classification"] for item in chain] == ["controller", "product", "product"]
+    assert [item["pr_number"] for item in chain] == [601, 602, 603]
+    assert [item["task_id"] for item in chain if item["classification"] == "product"] == [
+        "475",
+        "477",
+    ]
+    assert [
+        item["release"]["deployed_sha"] for item in chain if item["classification"] == "product"
+    ] == [
+        records[1]["commit_sha"],
+        records[2]["commit_sha"],
+    ]
+
+
+def test_reconcile_subsequent_production_records_a_later_deployment_that_supersedes_a_product_sha(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, records = _prepare_subsequent_production_reconciliation(
+        repository,
+        [
+            ("product", "475", "backend/news_one.py", False),
+            ("product", "477", "backend/news_two.py", True),
+        ],
+    )
+
+    reconciliation = controller.reconcile_subsequent_production("415", owner_authorize=True)
+    first, second = reconciliation["intervening_commits"]
+
+    assert first["release"]["result"] == "superseded"
+    assert first["release"]["superseded_by_sha"] == records[1]["commit_sha"]
+    assert second["release"]["result"] == "deployed"
+    assert reconciliation["current_production"]["deployed_sha"] == records[1]["commit_sha"]
+
+
+def test_reconcile_subsequent_production_allows_only_controller_tail_and_finish_revalidates(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, worktree, branch, original_sha, records = (
+        _prepare_subsequent_production_reconciliation(
+            repository,
+            [
+                ("controller", "", "scripts/task_session.py", False),
+                ("product", "475", "backend/news_one.py", True),
+                ("product", "477", "backend/news_two.py", True),
+                ("controller", "", "docs/task-branch-integration.md", False),
+            ],
+        )
+    )
+
+    reconciliation = controller.reconcile_subsequent_production("415", owner_authorize=True)
+    assert reconciliation["original_deployed_sha"] == original_sha
+    assert reconciliation["current_production"]["deployed_sha"] == records[2]["commit_sha"]
+    assert reconciliation["current_master_sha"] == records[3]["commit_sha"]
+    assert (
+        reconciliation["current_production"]["deployed_sha"] != reconciliation["current_master_sha"]
+    )
+
+    result = controller.finish("415")
+
+    assert result["cleanup_performed"] is True
+    assert not worktree.exists()
+    assert branch not in controller.repository.git("branch", "--list", branch).splitlines()
+    history = controller.store.read_json(controller.store.history / "task-415.json")
+    assert history["state"] == "finished"
+    assert history["deployed_sha"] == original_sha
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("unverified_product", "after the latest production deployment"),
+        ("failed_checks", "required check 'checks' is not successful"),
+        ("unknown_commit", "unique merged pull request"),
+        ("active_deployment", "active deployment"),
+        ("dirty_worktree", "unchanged clean task worktree"),
+        ("unique_task_commit", "unique task commits"),
+    ],
+)
+def test_reconcile_subsequent_production_fails_closed(
+    repository: tuple[Path, Any], mutation: str, message: str, monkeypatch: Any
+) -> None:
+    root, git_repository, controller, worktree, _branch, _, records = (
+        _prepare_subsequent_production_reconciliation(
+            repository,
+            [("product", "475", "backend/news_one.py", True)],
+        )
+    )
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    if mutation == "unverified_product":
+        extra = root / "backend" / "news_unreleased.py"
+        extra.write_text("unreleased\n", encoding="utf-8")
+        _git(root, "add", "backend/news_unreleased.py")
+        _git(root, "commit", "-m", "[Task 477] Unreleased product change")
+        _git(root, "push", "origin", "master")
+        _git(root, "fetch", "origin", "master")
+        github.master_sha = _git(root, "rev-parse", "HEAD")
+        new_sha = github.master_sha
+        pr_number = 699
+        pr = {
+            "number": pr_number,
+            "title": "[Task 477] Unreleased product change",
+            "state": "closed",
+            "merged_at": "2026-09-24T08:00:00Z",
+            "merge_commit_sha": new_sha,
+            "commits": 1,
+            "changed_files": 1,
+            "base": {
+                "ref": "master",
+                "sha": records[-1]["commit_sha"],
+                "repo": {"full_name": "owner/repository"},
+            },
+            "head": {
+                "ref": "task/477-unreleased",
+                "sha": new_sha,
+                "repo": {"full_name": "owner/repository"},
+            },
+        }
+        github.pulls[pr_number] = pr
+        github.associated_pulls_by_commit[new_sha] = [pr]
+        github.commits[pr_number] = [
+            {"sha": new_sha, "commit": {"message": "[Task 477] Unreleased product change"}}
+        ]
+        github.files[pr_number] = [{"filename": "backend/news_unreleased.py"}]
+        github.checks[new_sha] = [_success_check(new_sha)]
+    elif mutation == "failed_checks":
+        github.checks[records[0]["head_sha"]] = [
+            {
+                "name": "checks",
+                "head_sha": records[0]["head_sha"],
+                "status": "completed",
+                "conclusion": "FAILURE",
+            }
+        ]
+    elif mutation == "unknown_commit":
+        path = root / "misc.py"
+        path.write_text("unknown\n", encoding="utf-8")
+        _git(root, "add", "misc.py")
+        _git(root, "commit", "-m", "Refactor without task provenance")
+        _git(root, "push", "origin", "master")
+        _git(root, "fetch", "origin", "master")
+        github.master_sha = _git(root, "rev-parse", "HEAD")
+    elif mutation == "active_deployment":
+        github.active_runs = [{"name": "Release production", "status": "in_progress"}]
+    elif mutation == "dirty_worktree":
+        (worktree / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+    elif mutation == "unique_task_commit":
+        monkeypatch.setattr(git_repository, "unique_commits", lambda _branch: ["a" * 40])
+
+    with pytest.raises(task_session.TaskSessionError, match=message):
+        controller.reconcile_subsequent_production("415", owner_authorize=True)
+
+
+def test_reconcile_subsequent_production_requires_explicit_owner_authorization(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, _ = _prepare_subsequent_production_reconciliation(
+        repository,
+        [("product", "475", "backend/news_one.py", True)],
+    )
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit owner authorization"):
+        controller.reconcile_subsequent_production("415", owner_authorize=False)
+
+    history = controller.store.read_json(controller.store.history / "task-415.json")
+    lease = controller.store.read_json(controller.store.task_lease_path("415"))
+    assert "subsequent_production_reconciliation" not in history
+    assert "subsequent_production_reconciliation" not in lease
 
 
 def test_superseded_archived_task_is_not_a_completed_dependency(
