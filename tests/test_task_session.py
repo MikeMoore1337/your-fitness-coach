@@ -2089,6 +2089,44 @@ def test_refresh_updates_stale_task_base_and_rebuilds_exact_delivery_anchor(
     assert validated["delivery_anchor"]["head_sha"] == new_head
 
 
+def test_refresh_preserves_published_master_integration_merge(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, _ = _prepare_started(
+        repository, "244B", concurrency="independent-write"
+    )
+    task_head = _commit_task(worktree, "244B")
+
+    (root / "master-refresh.txt").write_text("M1\n", encoding="utf-8")
+    _git(root, "add", "master-refresh.txt")
+    _git(root, "commit", "-m", "chore: advance master for delivery refresh")
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+    _git(worktree, "fetch", "origin", "master")
+    _git(
+        worktree,
+        "merge",
+        "--no-ff",
+        "origin/master",
+        "-m",
+        f"Merge remote-tracking branch 'origin/master' into {branch}",
+    )
+    integrated_head = git_repository.head(cwd=worktree)
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = git_repository.ref("origin/master")
+
+    controller.mark_ready("244B", head_sha=integrated_head, quality_verdict="PASS")
+    controller.acquire_delivery("244B", offline=True)
+    refreshed = controller.refresh_for_delivery("244B", offline=True)
+
+    assert task_head != integrated_head
+    assert refreshed["delivery_head_sha"] == integrated_head
+    assert git_repository.head(cwd=worktree) == integrated_head
+    assert len(_git(worktree, "rev-list", "--parents", "-n", "1", "HEAD").split()) == 3
+    assert controller.validate_delivery("244B", offline=True)["lifecycle_state"] == "delivery-gate"
+
+
 def test_refresh_delivery_waits_for_active_production_before_touching_task_branch(
     repository: tuple[Path, Any],
 ) -> None:

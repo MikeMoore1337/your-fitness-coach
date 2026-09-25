@@ -3077,7 +3077,8 @@ class TaskController:
                     raise TaskSessionError(
                         f"Task {expected} branch no longer descends from its leased base {old_base}"
                     )
-                self.repository.git("rebase", current_base, cwd=worktree)
+                if not self.repository.is_ancestor(current_base, head_before):
+                    self.repository.git("rebase", current_base, cwd=worktree)
             head_after = self.repository.head(cwd=worktree)
         except TaskSessionError as error:
             self._mark_delivery_refresh_failure(expected, str(error))
