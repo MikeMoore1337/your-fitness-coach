@@ -21,6 +21,7 @@ from fitminiapp_api.models.news import (
     NewsSource,
     NewsStateTransition,
 )
+from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.news_drafts import (
     DraftGenerationError,
     NewsEvidencePacket,
@@ -1021,6 +1022,63 @@ def test_owner_only_moderation_is_revision_bound_idempotent_and_never_publishes(
 
     paths = client.get("/openapi.json").json()["paths"]
     assert not any("publish" in path or "channel" in path for path in paths if "/news/" in path)
+
+
+def test_publication_failed_does_not_requeue_an_already_shown_draft() -> None:
+    _create_source()
+    cluster_id = _candidate_cluster()
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        draft = asyncio.run(create_draft_revision(db, cluster))
+        assert enqueue_review_deliveries(db, {7001}) == 1
+        delivery = db.query(NewsReviewDelivery).filter_by(draft_id=draft.id).one()
+        delivery.status = "sent"
+        delivery.sent_at = utcnow()
+        record_audit_event(
+            db,
+            action="news.preview_created",
+            resource_type="news_draft_revision",
+            resource_id=draft.id,
+            details={"preview_message_id": 101},
+        )
+        cluster.status = "publication_failed"
+        cluster.delivery_round += 1
+        draft_id = draft.id
+
+    with get_session_context() as db:
+        assert enqueue_review_deliveries(db, {7001}) == 0
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        assert cluster.status == "publication_failed"
+        deliveries = (
+            db.query(NewsReviewDelivery)
+            .filter_by(draft_id=draft_id)
+            .order_by(NewsReviewDelivery.delivery_round)
+            .all()
+        )
+        assert [(row.status, row.delivery_round) for row in deliveries] == [("sent", 0)]
+
+
+def test_publication_failed_unshown_draft_can_still_enter_review() -> None:
+    _create_source()
+    cluster_id = _candidate_cluster()
+    with get_session_context() as db:
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        draft = asyncio.run(create_draft_revision(db, cluster))
+        cluster.status = "publication_failed"
+        cluster.delivery_round = 1
+        draft_id = draft.id
+
+    with get_session_context() as db:
+        assert enqueue_review_deliveries(db, {7001}) == 1
+        cluster = db.get(NewsCluster, cluster_id)
+        assert cluster is not None
+        assert cluster.status == "awaiting_review"
+        delivery = db.query(NewsReviewDelivery).filter_by(draft_id=draft_id).one()
+        assert delivery.status == "queued"
+        assert delivery.delivery_round == 1
 
 
 def test_defer_requeues_same_revision_by_new_delivery_round(monkeypatch) -> None:
