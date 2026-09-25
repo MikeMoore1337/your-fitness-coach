@@ -834,9 +834,7 @@ def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -
     monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
     snapshot_ids: list[str] = []
     for index in range(2):
-        cluster_id = _source_and_candidate(
-            external_id=f"daily-{index}", published_at=fixed_now
-        )
+        cluster_id = _source_and_candidate(external_id=f"daily-{index}", published_at=fixed_now)
         draft_id, _ = _draft(cluster_id)
         with get_session_context() as db:
             cluster = db.get(NewsCluster, cluster_id)
