@@ -4687,9 +4687,26 @@ class TaskController:
                 task_match = re.match(
                     rf"^\[Task (?P<task_id>{TASK_ID_PATTERN})\]", subject, re.IGNORECASE
                 )
-                if task_match is None:
-                    raise TaskSessionError(f"Intervening commit {commit_sha} is unclassified")
-                task_id = normalize_task_id(task_match.group("task_id"))
+                if task_match is not None:
+                    task_id = normalize_task_id(task_match.group("task_id"))
+                else:
+                    merge_subject = re.match(
+                        r"^Merge pull request #(?P<pr_number>\d+) from \S+$",
+                        subject,
+                    )
+                    title_task_match = re.match(
+                        rf"^\[Task (?P<task_id>{TASK_ID_PATTERN})\]",
+                        title,
+                        re.IGNORECASE,
+                    )
+                    if (
+                        merge_subject is None
+                        or int(merge_subject.group("pr_number")) != pr_number
+                        or title_task_match is None
+                        or len(parents) < 2
+                    ):
+                        raise TaskSessionError(f"Intervening commit {commit_sha} is unclassified")
+                    task_id = normalize_task_id(title_task_match.group("task_id"))
                 try:
                     branch_task_id = task_pr_task_id_from_branch(branch)
                 except TaskSessionError as error:

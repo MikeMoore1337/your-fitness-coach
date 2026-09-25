@@ -302,10 +302,6 @@ def _prepare_subsequent_production_reconciliation(
     records: list[dict[str, Any]] = []
     previous_sha = original_sha
     for index, (classification, task_id, filename, deploy) in enumerate(later_changes, start=1):
-        path = root / filename
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"change {index}\n", encoding="utf-8")
-        _git(root, "add", filename)
         number = 600 + index
         if classification == "controller":
             subject = f"[Controller] Synthetic controller change {index}"
@@ -315,9 +311,27 @@ def _prepare_subsequent_production_reconciliation(
             subject = f"[Task {task_id}] Synthetic product change {index}"
             branch_name = f"task/{task_id}-synthetic-{index}"
             title = f"[Task {task_id}] Synthetic product change {index}"
+        if classification == "product_merge":
+            _git(root, "switch", "-c", branch_name)
+        path = root / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"change {index}\n", encoding="utf-8")
+        _git(root, "add", filename)
         _git(root, "commit", "-m", subject)
-        commit_sha = _git(root, "rev-parse", "HEAD")
-        head_sha_for_pr = commit_sha
+        head_sha_for_pr = _git(root, "rev-parse", "HEAD")
+        if classification == "product_merge":
+            _git(root, "switch", "master")
+            _git(
+                root,
+                "merge",
+                "--no-ff",
+                branch_name,
+                "-m",
+                f"Merge pull request #{number} from owner/{branch_name}",
+            )
+            commit_sha = _git(root, "rev-parse", "HEAD")
+        else:
+            commit_sha = head_sha_for_pr
         pr = {
             "number": number,
             "title": title,
@@ -339,7 +353,7 @@ def _prepare_subsequent_production_reconciliation(
         }
         github.pulls[number] = pr
         github.associated_pulls_by_commit[commit_sha] = [pr]
-        github.commits[number] = [{"sha": commit_sha, "commit": {"message": subject}}]
+        github.commits[number] = [{"sha": head_sha_for_pr, "commit": {"message": subject}}]
         github.files[number] = [{"filename": filename}]
         github.checks[head_sha_for_pr] = [_success_check(head_sha_for_pr)]
         release_run_id = 9100 + index
@@ -380,7 +394,9 @@ def _prepare_subsequent_production_reconciliation(
             }
         records.append(
             {
-                "classification": classification,
+                "classification": "product"
+                if classification == "product_merge"
+                else classification,
                 "task_id": task_id,
                 "commit_sha": commit_sha,
                 "pr_number": number,
@@ -434,6 +450,31 @@ def test_reconcile_subsequent_production_preserves_original_and_records_product_
         history["subsequent_production_reconciliation"]
         == lease["subsequent_production_reconciliation"]
     )
+
+
+def test_reconcile_subsequent_production_accepts_standard_github_merge_commit(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, records = _prepare_subsequent_production_reconciliation(
+        repository,
+        [
+            (
+                "product_merge",
+                "480",
+                "backend/tests/test_news_publishing.py",
+                True,
+            )
+        ],
+    )
+
+    reconciliation = controller.reconcile_subsequent_production("415", owner_authorize=True)
+    record = reconciliation["intervening_commits"][0]
+
+    assert record["classification"] == "product"
+    assert record["task_id"] == "480"
+    assert record["pr_number"] == 601
+    assert record["subject"].startswith("Merge pull request #601 from ")
+    assert reconciliation["current_production"]["deployed_sha"] == records[0]["commit_sha"]
 
 
 def test_reconcile_subsequent_production_preserves_ordered_product_deployments(
