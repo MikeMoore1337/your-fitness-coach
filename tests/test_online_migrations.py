@@ -342,12 +342,12 @@ def test_online_constraint_swap_accepts_bounded_not_valid_check_replacement(
         "def upgrade():\n"
         "    bind = op.get_bind()\n"
         '    if bind.dialect.name == "postgresql":\n'
-        '        op.execute("SET LOCAL lock_timeout = \'3s\'")\n'
-        '        op.execute("SET LOCAL statement_timeout = \'30s\'")\n'
+        "        op.execute(\"SET LOCAL lock_timeout = '3s'\")\n"
+        "        op.execute(\"SET LOCAL statement_timeout = '30s'\")\n"
         '        op.execute("ALTER TABLE foods DROP CONSTRAINT IF EXISTS '
-        'ck_foods_active_catalog_trust, ADD CONSTRAINT '
-        'ck_foods_active_catalog_trust CHECK (food_type = \'user\' OR '
-        'catalog_quality = \'community_unverified\') NOT VALID")\n'
+        "ck_foods_active_catalog_trust, ADD CONSTRAINT "
+        "ck_foods_active_catalog_trust CHECK (food_type = 'user' OR "
+        "catalog_quality = 'community_unverified') NOT VALID\")\n"
         '        op.execute("ALTER TABLE foods VALIDATE CONSTRAINT '
         'ck_foods_active_catalog_trust")\n',
     )
@@ -369,11 +369,11 @@ def test_online_constraint_swap_rejects_unbounded_validating_replacement(
         "def upgrade():\n"
         "    bind = op.get_bind()\n"
         '    if bind.dialect.name == "postgresql":\n'
-        '        op.execute("SET LOCAL lock_timeout = \'3s\'")\n'
-        '        op.execute("SET LOCAL statement_timeout = \'30s\'")\n'
+        "        op.execute(\"SET LOCAL lock_timeout = '3s'\")\n"
+        "        op.execute(\"SET LOCAL statement_timeout = '30s'\")\n"
         '        op.execute("ALTER TABLE foods DROP CONSTRAINT IF EXISTS '
-        'ck_foods_active_catalog_trust, ADD CONSTRAINT '
-        'ck_foods_active_catalog_trust CHECK (food_type = \'user\')")\n'
+        "ck_foods_active_catalog_trust, ADD CONSTRAINT "
+        "ck_foods_active_catalog_trust CHECK (food_type = 'user')\")\n"
         '        op.execute("ALTER TABLE foods VALIDATE CONSTRAINT '
         'ck_foods_active_catalog_trust")\n',
     )
