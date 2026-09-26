@@ -504,10 +504,10 @@ def validate_added_migration(path: Path) -> None:
         table_name = _assignment(tree, "online_rollout_constraint_table")
         constraint_name = _assignment(tree, "online_rollout_constraint_name")
         lock_timeout_seconds = _assignment(tree, "online_rollout_lock_timeout_seconds")
-        statement_timeout_seconds = _assignment(
-            tree, "online_rollout_statement_timeout_seconds"
-        )
-        if not isinstance(table_name, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table_name):
+        statement_timeout_seconds = _assignment(tree, "online_rollout_statement_timeout_seconds")
+        if not isinstance(table_name, str) or not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", table_name
+        ):
             raise OnlineMigrationError(
                 f"{path} constraint_swap must declare a static table identifier"
             )
