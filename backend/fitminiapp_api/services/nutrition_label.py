@@ -375,14 +375,31 @@ def create_label_draft(
             max_bytes=settings.nutrition_label_scan_max_image_bytes,
             max_pixels=settings.nutrition_label_scan_max_pixels,
         )
-        engine = ocr_engine or _build_ocr_engine()
-        canonical = _parse_ocr_candidates(engine, normalized_image.data)
     except ImageIngressError as exc:
         logger.info("nutrition_scan_failed", extra={"error_code": exc.code})
         raise NutritionLabelError(exc.code) from exc
+
+    vision_rescue_available = (
+        settings.nutrition_label_vision_enabled
+        and not settings.nutrition_label_vision_kill_switch
+        and vision_adapter is not None
+    )
+    forced_vision_reason: str | None = None
+    engine = ocr_engine or _build_ocr_engine()
+    try:
+        canonical = _parse_ocr_candidates(engine, normalized_image.data)
     except LocalOcrError as exc:
-        logger.info("nutrition_scan_failed", extra={"error_code": exc.code})
-        raise NutritionLabelError(exc.code, status_code=503) from exc
+        if exc.code == "local_ocr_timeout" and vision_rescue_available:
+            canonical = build_draft_from_ocr(
+                "",
+                provider=engine.name,
+                model=engine.version,
+                prompt_version=NUTRITION_LABEL_PROMPT_VERSION,
+            )
+            forced_vision_reason = "vision_rescue_local_ocr_timeout"
+        else:
+            logger.info("nutrition_scan_failed", extra={"error_code": exc.code})
+            raise NutritionLabelError(exc.code, status_code=503) from exc
     except CanonicalNormalizationError as exc:
         logger.info("nutrition_scan_failed", extra={"error_code": str(exc)})
         raise NutritionLabelError(str(exc)) from exc
@@ -391,12 +408,12 @@ def create_label_draft(
     provider_outcome = "not_invoked"
     provider_class = "none"
 
-    vision_rescue_available = (
-        settings.nutrition_label_vision_enabled
-        and not settings.nutrition_label_vision_kill_switch
-        and vision_adapter is not None
-    )
-    if assessment.outcome == RecognitionOutcome.RETAKE_REQUIRED and vision_rescue_available:
+    if forced_vision_reason is not None:
+        assessment = assessment.with_outcome(
+            RecognitionOutcome.VISION_CANDIDATE,
+            forced_vision_reason,
+        )
+    elif assessment.outcome == RecognitionOutcome.RETAKE_REQUIRED and vision_rescue_available:
         assessment = assessment.with_outcome(
             RecognitionOutcome.VISION_CANDIDATE,
             "vision_rescue_no_local_signal",
