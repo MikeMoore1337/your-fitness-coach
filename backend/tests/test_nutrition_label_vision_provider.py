@@ -189,15 +189,26 @@ def test_vision_settings_fail_closed_until_zdr_is_verified() -> None:
             groq_api_key="test-key",
         )
 
+    with pytest.raises(ValidationError, match="ALLOW_PREVIEW"):
+        Settings(
+            **base,
+            nutrition_label_vision_enabled=True,
+            nutrition_label_vision_provider="groq",
+            nutrition_label_vision_data_policy="zdr_verified",
+            groq_api_key="test-key",
+        )
+
     configured = Settings(
         **base,
         nutrition_label_vision_enabled=True,
         nutrition_label_vision_provider="groq",
         nutrition_label_vision_data_policy="zdr_verified",
+        nutrition_label_vision_allow_preview=True,
         nutrition_label_vision_proxy_url="socks5://host.docker.internal:1081",
         groq_api_key="test-key",
     )
     assert configured.nutrition_label_vision_model == "qwen/qwen3.8-27b"
+    assert configured.nutrition_label_vision_allow_preview is True
     assert configured.nutrition_label_vision_proxy_url == "socks5://host.docker.internal:1081"
 
     with pytest.raises(ValidationError, match="NUTRITION_LABEL_VISION_PROXY_URL"):
@@ -213,7 +224,7 @@ def test_vision_settings_fail_closed_until_zdr_is_verified() -> None:
         "bot_internal_token": "b" * 40,
         "enable_dev_auth": False,
     }
-    with pytest.raises(ValidationError, match="Preview"):
+    with pytest.raises(ValidationError, match="ALLOW_PREVIEW"):
         Settings(
             **prod,
             nutrition_label_vision_enabled=True,
@@ -221,6 +232,17 @@ def test_vision_settings_fail_closed_until_zdr_is_verified() -> None:
             nutrition_label_vision_data_policy="zdr_verified",
             groq_api_key="test-key",
         )
+
+    production_configured = Settings(
+        **prod,
+        nutrition_label_vision_enabled=True,
+        nutrition_label_vision_provider="groq",
+        nutrition_label_vision_data_policy="zdr_verified",
+        nutrition_label_vision_allow_preview=True,
+        nutrition_label_vision_proxy_url="socks5://host.docker.internal:1081",
+        groq_api_key="test-key",
+    )
+    assert production_configured.nutrition_label_vision_allow_preview is True
 
 
 def test_vision_adapter_factory_is_disabled_without_verified_policy(monkeypatch) -> None:
