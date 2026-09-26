@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NutritionLabelScanner } from '../../../../src/features/nutrition/NutritionLabelScanner';
 import { NUTRITION_LABEL_FIELDS } from '../../../../src/features/nutrition/NutritionLabelReview';
+import { ApiError } from '../../../../src/shared/api/client';
 import type { NutritionLabelDraft } from '../../../../src/shared/api/types';
 import { nutritionLabelDraftStorageKey } from '../../../../src/shared/userScopedStorage';
 
@@ -263,6 +264,30 @@ describe('NutritionLabelScanner', () => {
       'Выберите фото в формате JPEG, PNG или WebP.',
     );
     expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('shows retake guidance for a backend retake response instead of a timeout message', async () => {
+    apiMock.mockRejectedValue(
+      new ApiError('Bad Request', 400, {
+        detail: {
+          code: 'retake_required',
+          message: 'Нужен более чёткий снимок этикетки',
+        },
+      }),
+    );
+
+    render(<NutritionLabelScanner userId={10} onCancel={vi.fn()} />);
+    const file = new File(['camera-or-gallery-image'], 'label.png', { type: 'image/png' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files: [file] },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Распознать' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Нужен более чёткий снимок этикетки крупным планом.',
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Сервер не ответил вовремя');
   });
 
   it('keeps the gallery picker separate from the explicit camera flow', () => {

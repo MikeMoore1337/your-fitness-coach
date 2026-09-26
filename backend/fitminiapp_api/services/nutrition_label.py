@@ -390,6 +390,18 @@ def create_label_draft(
     assessment = assess_recognition(canonical)
     provider_outcome = "not_invoked"
     provider_class = "none"
+
+    vision_rescue_available = (
+        settings.nutrition_label_vision_enabled
+        and not settings.nutrition_label_vision_kill_switch
+        and vision_adapter is not None
+    )
+    if assessment.outcome == RecognitionOutcome.RETAKE_REQUIRED and vision_rescue_available:
+        assessment = assessment.with_outcome(
+            RecognitionOutcome.VISION_CANDIDATE,
+            "vision_rescue_no_local_signal",
+        )
+
     route_class = assessment.outcome.value
 
     if assessment.outcome == RecognitionOutcome.RETAKE_REQUIRED:

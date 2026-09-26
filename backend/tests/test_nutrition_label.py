@@ -571,23 +571,51 @@ def test_complete_local_assessment_never_invokes_vision(client, monkeypatch) -> 
         assert db.query(FoodDiaryEntry).filter_by(user_id=user_id).count() == 0
 
 
-def test_retake_assessment_never_invokes_vision_or_creates_a_draft(client, monkeypatch) -> None:
+def test_active_vision_rescues_valid_scan_when_local_parser_has_no_nutrition_signal(
+    client, monkeypatch
+) -> None:
     monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
-    adapter = _FakeVisionAdapter()
+    monkeypatch.setattr(settings, "nutrition_label_vision_kill_switch", False)
+    adapter = _FakeVisionAdapter(_vision_proposal_bytes(_label_text()))
+
+    draft = _direct_label_draft(
+        client,
+        monkeypatch=monkeypatch,
+        telegram_user_id=128_191,
+        text="blurry package text",
+        idempotency_key="retake-vision-rescue-0001",
+        vision_adapter=adapter,
+    )
+
+    assert len(adapter.calls) == 1
+    assert draft.requires_user_review is True
+    assert draft.nutrition.metadata.provider == "test_provider"
+    assert draft.nutrition.normalized_facts.protein_g is not None
+    with get_session_context() as db:
+        user_id = _user_id(128_191)
+        assert db.query(NutritionLabelDraft).filter_by(user_id=user_id).count() == 1
+
+
+def test_no_signal_scan_still_requires_retake_when_vision_kill_switch_is_active(
+    client, monkeypatch
+) -> None:
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    monkeypatch.setattr(settings, "nutrition_label_vision_kill_switch", True)
+    adapter = _FakeVisionAdapter(_vision_proposal_bytes(_label_text()))
 
     with pytest.raises(nutrition_label_service.NutritionLabelError, match="retake_required"):
         _direct_label_draft(
             client,
             monkeypatch=monkeypatch,
-            telegram_user_id=128_191,
+            telegram_user_id=128_201,
             text="blurry package text",
-            idempotency_key="retake-vision-0001",
+            idempotency_key="retake-vision-killed-0001",
             vision_adapter=adapter,
         )
 
     assert adapter.calls == []
     with get_session_context() as db:
-        user_id = _user_id(128_191)
+        user_id = _user_id(128_201)
         assert db.query(NutritionLabelDraft).filter_by(user_id=user_id).count() == 0
 
 
