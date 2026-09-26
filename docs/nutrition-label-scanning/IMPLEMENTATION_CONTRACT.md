@@ -17,11 +17,17 @@ evaluation-capable fallback: normalised PNG передаётся как inline i
 `NUTRITION_LABEL_VISION_PROXY_URL`, `trust_env=false`, `store=false`, no tools и no user id.
 
 Активация fail-closed: нужны provider=`groq`, data policy=`zdr_verified`, выключенный Vision
-kill switch и валидный credential. Дополнительно `APP_ENV=prod` запрещает активировать текущую
-модель, пока Groq классифицирует `qwen/qwen3.8-27b` как Preview. То есть даже подтверждённый ZDR
-не превращает Preview-модель в production route. Неуспех или выключенный route сохраняет
-локальный editable draft и требует ручной проверки. Любой принятый proposal остаётся
-`requires_user_review=true`; автоматические food/catalog/diary writes не разрешены.
+kill switch, валидный credential и отдельный `NUTRITION_LABEL_VISION_PROXY_URL` при blocked direct
+egress. Пока выбран `qwen/qwen3.8-27b` со статусом Preview, дополнительно обязателен явный
+`NUTRITION_LABEL_VISION_ALLOW_PREVIEW=true`. По умолчанию он false. Это операторское принятие
+ограниченного reliability-рискa, а не автоматическое следствие `APP_ENV=prod`.
+
+Сам код не может подтвердить ZDR: Groq публикует его как настройку Console/Data Controls, а не
+readable API state. Поэтому `zdr_verified` устанавливается только после проверки точной
+Organization. Preview-модель также должна быть явно разрешена администратором Organization в
+Groq Settings/Limits. Неуспех или выключенный route сохраняет локальный editable draft и требует
+ручной проверки. Любой принятый proposal остаётся `requires_user_review=true`; автоматические
+food/catalog/diary writes не разрешены.
 
 Этот документ фиксирует production foundation Task 128B и mobile/TMA integration Task 128C.
 Значение `false` в коде и `.env.example` остаётся fail-closed sample default. После обязательной
