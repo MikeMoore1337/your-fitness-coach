@@ -214,9 +214,11 @@ editable fallback сохраняются.
   условий использования submitted content.
 - Cloudflare Workers AI исключён действующим YFC news-image contract.
 
-Таким образом, на дату проверки нет одобренного production Vision provider. Feature flag остаётся
-`NUTRITION_LABEL_VISION_ENABLED=false`; никаких provider credentials, accounts, paid calls или
-real photos не использовали. Перед будущей активацией владелец должен выбрать допустимый route и
+После закрытия production egress blocker #491 выбран bounded candidate:
+Groq `qwen/qwen3.8-27b` с Vision + strict JSON Schema. Adapter реализован local-first fallback,
+но production transmission остаётся NO-GO до подтверждения account-level Zero Data Retention.
+Feature flag остаётся `NUTRITION_LABEL_VISION_ENABLED=false`; real-user photos в provider не
+отправлялись. Перед будущей активацией владелец должен выбрать допустимый route и
 отдельно подтвердить актуальные provider terms, region/residency, retention, subprocessors, billing
 limits, legal/privacy disposition и quality evaluation. Официальные ссылки и текущие ограничения
 собраны в [provider matrix](PROVIDER_PRIVACY_COST_MATRIX.md). Это decision aid, не юридическое
