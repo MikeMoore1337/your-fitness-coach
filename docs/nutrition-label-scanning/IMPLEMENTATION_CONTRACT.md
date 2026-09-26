@@ -94,8 +94,10 @@ Pinned Python dependencies и Debian packages остаются частью об
   ограничен отдельным body limit.
 - Pillow делает `verify`, проверяет decompression-bomb bounds, применяет EXIF orientation и
   пересохраняет только RGB PNG без EXIF/ICC/user metadata.
-- Изображение передаётся только локальному OCR subprocess. Raw image, raw OCR и внешние
-  provider payload не сохраняются в БД и не попадают в обычные логи.
+- Изображение всегда сначала обрабатывается локально. Только deterministic `vision_candidate`
+  может передать нормализованный PNG внешнему adapter при явной включённой ZDR policy.
+  Raw upload, raw OCR, provider response и user identity не сохраняются в БД и не попадают в
+  обычные логи.
 - Draft имеет короткий TTL (по умолчанию 15 минут) и scope по владельцу. После expiry новый scan
   требует нового idempotency key.
 
@@ -192,7 +194,8 @@ Local YFC catalog checked first. Exact local barcode lookup завершаетс
 `NUTRITION_LABEL_SCAN_KILL_SWITCH=false`. Маркер Task 128I хранится в persistent
 `.artifacts/operations/deployments`; последующие deploy сохраняют текущие значения host `.env`,
 включая аварийное включение kill switch. Это rollout action, а не новая credential или provider
-настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны.
+настройка. Local OCR остаётся primary. Groq Vision fallback имеет отдельный rollout gate и не включается
+скриптом public scan rollout; без подтверждённого ZDR остаётся выключенным.
 
 ## Runtime OCR
 
