@@ -798,9 +798,7 @@ def _provider_context() -> tuple[ContextRef, ...]:
 
 def test_groq_adapter_sends_docs_compatible_strict_request_without_tools(monkeypatch) -> None:
     _enable_provider(monkeypatch)
-    monkeypatch.setattr(
-        settings, "ai_coach_proxy_url", "socks5://host.docker.internal:1081"
-    )
+    monkeypatch.setattr(settings, "ai_coach_proxy_url", "socks5://host.docker.internal:1081")
     captured: dict[str, object] = {}
     raw_response = {
         "model": "openai/gpt-oss-120b",
