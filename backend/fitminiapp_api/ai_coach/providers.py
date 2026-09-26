@@ -397,6 +397,16 @@ def _parse_plain_text_response(response: Any, *, started: float) -> ProviderText
     )
 
 
+
+def _provider_http_client() -> httpx.Client:
+    return httpx.Client(
+        timeout=httpx.Timeout(settings.ai_coach_timeout_seconds),
+        follow_redirects=False,
+        trust_env=False,
+        proxy=settings.ai_coach_proxy_url.strip() or None,
+    )
+
+
 class GroqDirectAdapter:
     """Small OpenAI-compatible adapter with no tools and no provider types upstream."""
 
@@ -436,10 +446,7 @@ class GroqDirectAdapter:
         }
         started = time.monotonic()
         try:
-            with httpx.Client(
-                timeout=httpx.Timeout(settings.ai_coach_timeout_seconds),
-                follow_redirects=False,
-            ) as client:
+            with _provider_http_client() as client:
                 response = client.post(settings.ai_coach_endpoint, headers=headers, json=payload)
         except httpx.TimeoutException as exc:
             raise NormalizedProviderError(
@@ -550,10 +557,7 @@ class GroqDirectAdapter:
         }
         started = time.monotonic()
         try:
-            with httpx.Client(
-                timeout=httpx.Timeout(settings.ai_coach_timeout_seconds),
-                follow_redirects=False,
-            ) as client:
+            with _provider_http_client() as client:
                 response = client.post(settings.ai_coach_endpoint, headers=headers, json=payload)
         except httpx.TimeoutException as exc:
             raise NormalizedProviderError(
