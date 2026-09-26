@@ -9,7 +9,6 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from fitminiapp_api.core.config import settings
-
 from fitminiapp_api.nutrition_label.contracts import (
     CANONICAL_DRAFT_SCHEMA_VERSION,
     NUTRIENT_FIELDS,
