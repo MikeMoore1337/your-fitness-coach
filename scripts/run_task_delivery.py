@@ -18,6 +18,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -1274,25 +1275,46 @@ def _start(
     offline: bool,
     dependency_ids: Sequence[str] | None = None,
     queue_mode: bool = False,
+    resume_control_issue: int | None = None,
+    resume_reason: str | None = None,
 ) -> dict[str, Any]:
     deadline = time.monotonic() + max_wait_minutes * 60
-    command = [
-        sys.executable,
-        str(CONTROLLER_PATH),
-        "--repo",
-        str(REPOSITORY_ROOT),
-        "start",
-        task_id,
-        "--owner-launch",
-        "--session-label",
-        session_label,
-    ]
-    for dependency_id in dependency_ids or ():
-        command.extend(("--dependency-id", str(dependency_id)))
-    if offline:
-        command.append("--offline")
-    if queue_mode:
-        command.append("--queue-mode")
+    if resume_control_issue is not None:
+        if offline or queue_mode or dependency_ids is not None or not resume_reason:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: pre-implementation resume requires online direct-task mode"
+            )
+        command = [
+            sys.executable,
+            str(CONTROLLER_PATH),
+            "--repo",
+            str(REPOSITORY_ROOT),
+            "resume-preimplementation",
+            task_id,
+            "--control-issue",
+            str(resume_control_issue),
+            "--reason",
+            resume_reason,
+            "--owner-authorize",
+        ]
+    else:
+        command = [
+            sys.executable,
+            str(CONTROLLER_PATH),
+            "--repo",
+            str(REPOSITORY_ROOT),
+            "start",
+            task_id,
+            "--owner-launch",
+            "--session-label",
+            session_label,
+        ]
+        for dependency_id in dependency_ids or ():
+            command.extend(("--dependency-id", str(dependency_id)))
+        if offline:
+            command.append("--offline")
+        if queue_mode:
+            command.append("--queue-mode")
 
     while True:
         completed = _run(command, check=False)
@@ -1308,6 +1330,23 @@ def _start(
             raise DeliveryError(f"Timed out waiting for coordination state lock: {detail}")
         _event("WAITING_FOR_IMPLEMENTATION_STATE", task_id=task_id, retry_in_seconds=poll_seconds)
         time.sleep(poll_seconds)
+
+
+def _controller_payload(*arguments: str) -> dict[str, Any]:
+    completed = _run(
+        [sys.executable, str(CONTROLLER_PATH), "--repo", str(REPOSITORY_ROOT), *arguments],
+        check=False,
+    )
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip() or "unknown controller error"
+        raise DeliveryError(detail)
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise DeliveryError("Controller returned invalid task-session JSON") from error
+    if not isinstance(payload, dict):
+        raise DeliveryError("Controller returned invalid task-session JSON")
+    return payload
 
 
 def _worker_prompt(
@@ -1661,6 +1700,40 @@ def _write_worker_state(path: Path, process: Any, process_group_id: int | None) 
         raise DeliveryError(f"HUMAN_REQUIRED: cannot persist Codex worker state {path}") from error
 
 
+def _write_worker_command_started(path: Path, process: Any) -> None:
+    state = _read_worker_state(path)
+    process_id = getattr(process, "pid", None)
+    if isinstance(process_id, bool) or not isinstance(process_id, int) or process_id < 1:
+        raise DeliveryError("HUMAN_REQUIRED: guarded Codex command has invalid PID")
+    process_instance = _queue_owner_process_instance(process_id)
+    if process_instance is None:
+        raise DeliveryError("HUMAN_REQUIRED: cannot identify the guarded Codex command")
+    if state.get("command_process") is not None:
+        raise DeliveryError("HUMAN_REQUIRED: worker state already records a Codex command")
+    state["command_process"] = {
+        "pid": process_id,
+        "process_instance": process_instance,
+    }
+    state["command_started_at"] = datetime.now(UTC).isoformat(timespec="microseconds")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(state, handle, ensure_ascii=True, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot persist guarded Codex command start {path}"
+        ) from error
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _read_worker_state(path: Path) -> dict[str, Any]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -1694,6 +1767,20 @@ def _read_worker_state(path: Path) -> dict[str, Any]:
     ):
         raise DeliveryError(f"HUMAN_REQUIRED: Codex worker state has invalid PID; inspect {path}")
     raw["process_instance"] = _queue_claim_process_instance(process_instance, path)
+    command_process = raw.get("command_process")
+    if command_process is not None:
+        if not isinstance(command_process, dict):
+            raise DeliveryError(f"HUMAN_REQUIRED: Codex command state is invalid; inspect {path}")
+        command_pid = command_process.get("pid")
+        if isinstance(command_pid, bool) or not isinstance(command_pid, int) or command_pid < 1:
+            raise DeliveryError(f"HUMAN_REQUIRED: Codex command PID is invalid; inspect {path}")
+        command_process["process_instance"] = _queue_claim_process_instance(
+            command_process.get("process_instance"), path
+        )
+        if not isinstance(raw.get("command_started_at"), str) or not raw["command_started_at"]:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Codex command start time is invalid; inspect {path}"
+            )
     return raw
 
 
@@ -1987,6 +2074,8 @@ def _run_worker_bootstrap(
                     process_group_id = worker_process.pid
             if worker_state_path is not None and os.name != "nt":
                 _write_worker_state(worker_state_path, worker_process, process_group_id)
+            if worker_state_path is not None:
+                _write_worker_command_started(worker_state_path, worker_process)
 
         if guard is not None:
             stream = getattr(worker_process, "stdout", None)
@@ -2011,11 +2100,15 @@ def _run_worker_bootstrap(
                 daemon=True,
             ).start()
     except OSError as error:
-        if process_group_id is not None:
+        if worker_process is not None and worker_process.poll() is None:
+            terminate_worker()
+        elif process_group_id is not None:
             _kill_posix_worker_group(process_group_id)
         raise DeliveryError("HUMAN_REQUIRED: cannot start Codex worker") from error
     except DeliveryError:
-        if process_group_id is not None:
+        if worker_process is not None and worker_process.poll() is None:
+            terminate_worker()
+        elif process_group_id is not None:
             _kill_posix_worker_group(process_group_id)
         raise
 
@@ -2406,6 +2499,9 @@ def _launch_worker(
     issue_contract: Mapping[str, Any] | None = None,
     agent_flow: Mapping[str, Any] | None = None,
     worker_state_path: Path | None = None,
+    on_launch_claim: Callable[[], str] | None = None,
+    on_command_started: Callable[[Path], None] | None = None,
+    on_precommand_failure: Callable[[Path, str, str], None] | None = None,
 ) -> int:
     codex = shutil.which("codex")
     if codex is None:
@@ -2485,12 +2581,72 @@ def _launch_worker(
             launch_kwargs["start_new_session"] = True
             if sys.platform == "linux":
                 launch_kwargs["preexec_fn"] = _linux_worker_preexec(os.getpid())
-        completed = subprocess.run(
-            supervisor_command,
-            **launch_kwargs,
-        )
+        if on_command_started is None:
+            completed = subprocess.run(
+                supervisor_command,
+                **launch_kwargs,
+            )
+            worker_exit = completed.returncode
+        else:
+            if on_launch_claim is None or on_precommand_failure is None:
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: resumed worker has incomplete launch callbacks"
+                )
+            launch_id = on_launch_claim()
+            if not launch_id:
+                raise DeliveryError("HUMAN_REQUIRED: resumed worker launch claim has no identity")
+            try:
+                process = subprocess.Popen(
+                    supervisor_command,
+                    **{key: value for key, value in launch_kwargs.items() if key not in {"check"}},
+                )
+            except (OSError, ValueError, subprocess.SubprocessError) as error:
+                on_precommand_failure(
+                    worker_state_path,
+                    launch_id,
+                    "guarded worker supervisor could not be started",
+                )
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: guarded worker supervisor did not start; no Codex worker was launched"
+                ) from error
+            command_started = False
+            try:
+                while process.poll() is None:
+                    if not command_started and worker_state_path.is_file():
+                        state = _read_worker_state(worker_state_path)
+                        if state.get("command_process") is not None:
+                            on_command_started(worker_state_path)
+                            command_started = True
+                    if process.poll() is None:
+                        time.sleep(WORKER_SUPERVISOR_POLL_SECONDS)
+                if not command_started and worker_state_path.is_file():
+                    state = _read_worker_state(worker_state_path)
+                    if state.get("command_process") is not None:
+                        on_command_started(worker_state_path)
+                        command_started = True
+                worker_exit = int(process.returncode)
+                if not command_started:
+                    if worker_state_path.exists():
+                        _reconcile_worker_state(worker_state_path)
+                        raise DeliveryError(
+                            "HUMAN_REQUIRED: guarded bootstrap exited without an actual Codex start marker; "
+                            "worker state requires reconciliation"
+                        )
+                    on_precommand_failure(
+                        worker_state_path,
+                        launch_id,
+                        f"guarded worker supervisor exited with code {worker_exit} before durable worker state",
+                    )
+                    raise DeliveryError(
+                        "HUMAN_REQUIRED: guarded bootstrap exited before durable worker state; "
+                        "no Codex worker started, so the supported resume can be retried"
+                    )
+            except BaseException:
+                if process.poll() is None:
+                    _terminate_supervised_worker(process)
+                raise
     _reconcile_worker_state(worker_state_path)
-    return completed.returncode
+    return worker_exit
 
 
 def _worker_exit_blocker(worker_exit: int, artifacts: Path) -> str:
@@ -2579,7 +2735,10 @@ def _deliver_one(
     state_issue: int | None = None,
     issue_contract: Mapping[str, Any] | None = None,
     queue_claim: _ContinuousQueueClaim | None = None,
+    resume_reason: str | None = None,
 ) -> dict[str, Any]:
+    if resume_reason is not None and control_issue is None:
+        raise DeliveryError("HUMAN_REQUIRED: pre-implementation resume requires --control-issue")
     started = _start(
         task_id,
         session_label=session_label,
@@ -2592,9 +2751,12 @@ def _deliver_one(
             else None
         ),
         queue_mode=issue_contract is not None,
+        resume_control_issue=control_issue if resume_reason is not None else None,
+        resume_reason=resume_reason,
     )
     status_issue = state_issue or control_issue
-    if status_issue is not None:
+    resumed_worker = resume_reason is not None
+    if status_issue is not None and not resumed_worker:
         _post_control_state(
             status_issue,
             control_state_payload(
@@ -2630,6 +2792,60 @@ def _deliver_one(
         worktree=started["lease"]["worktree"],
         artifacts=str(artifacts),
     )
+
+    def claim_resumed_worker() -> str:
+        result = _controller_payload("claim-preimplementation-worker-launch", task_id)
+        event = result.get("preimplementation_resume")
+        launch_id = event.get("launch_id") if isinstance(event, Mapping) else None
+        if (
+            not isinstance(event, Mapping)
+            or event.get("state") != "launching"
+            or not isinstance(launch_id, str)
+        ):
+            raise DeliveryError(
+                "HUMAN_REQUIRED: controller did not claim the resumed worker launch"
+            )
+        return launch_id
+
+    def release_resumed_worker(path: Path, launch_id: str, reason: str) -> None:
+        result = _controller_payload(
+            "release-preimplementation-worker-launch",
+            task_id,
+            "--launch-id",
+            launch_id,
+            "--worker-state-path",
+            str(path),
+            "--reason",
+            reason,
+        )
+        event = result.get("preimplementation_resume")
+        if not isinstance(event, Mapping) or event.get("state") != "prepared":
+            raise DeliveryError(
+                "HUMAN_REQUIRED: controller did not reconcile the pre-worker failure"
+            )
+
+    def record_resumed_worker(path: Path) -> None:
+        result = _controller_payload(
+            "record-preimplementation-worker-started",
+            task_id,
+            "--worker-state-path",
+            str(path),
+        )
+        event = result.get("preimplementation_resume")
+        if not isinstance(event, Mapping) or event.get("state") != "worker-started":
+            raise DeliveryError("HUMAN_REQUIRED: controller did not record the guarded Codex start")
+        if status_issue is None:
+            raise DeliveryError("HUMAN_REQUIRED: resumed worker has no control Issue")
+        _post_control_state(
+            status_issue,
+            control_state_payload(
+                task_id=task_id,
+                state="in_progress",
+                issue_number=status_issue,
+                branch=started["lease"]["branch"],
+            ),
+        )
+
     worker_exit = _launch_worker(
         task_id,
         started,
@@ -2637,6 +2853,9 @@ def _deliver_one(
         issue_contract=issue_contract,
         agent_flow=agent_flow,
         worker_state_path=worker_state_path,
+        on_launch_claim=claim_resumed_worker if resumed_worker else None,
+        on_command_started=record_resumed_worker if resumed_worker else None,
+        on_precommand_failure=release_resumed_worker if resumed_worker else None,
     )
     history = _history(task_id)
     budget_report: dict[str, int] | None = None
@@ -2928,6 +3147,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-wait-minutes", type=int, default=1440)
     parser.add_argument("--continue-queue", action="store_true")
     parser.add_argument("--control-issue", type=int)
+    parser.add_argument("--resume-preimplementation", action="store_true")
+    parser.add_argument("--resume-reason")
     parser.add_argument("--max-tasks", type=int, default=4)
     parser.add_argument("--offline", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--worker-supervisor", action="store_true", help=argparse.SUPPRESS)
@@ -2965,6 +3186,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.continue_queue:
             if args.task_id is not None:
                 raise DeliveryError("continuous queue mode does not accept a task ID")
+            if args.resume_preimplementation or args.resume_reason is not None:
+                raise DeliveryError("continuous queue mode does not support task resume")
             if args.control_issue is None:
                 raise DeliveryError("continuous queue mode requires --control-issue")
             if args.offline:
@@ -2977,6 +3200,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         if args.task_id is None:
             raise DeliveryError("a task ID is required unless --continue-queue is selected")
+        if args.resume_preimplementation and (
+            args.control_issue is None or not args.resume_reason or args.offline
+        ):
+            raise DeliveryError(
+                "pre-implementation resume requires --control-issue, --resume-reason and online mode"
+            )
+        if not args.resume_preimplementation and args.resume_reason is not None:
+            raise DeliveryError("--resume-reason requires --resume-preimplementation")
         task_id = _normalize_task_id(args.task_id)
         session_label = args.session_label or f"delivery-task-{task_id.lower()}"
         _deliver_one(
@@ -2987,6 +3218,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             offline=args.offline,
             control_issue=args.control_issue,
             state_issue=args.control_issue,
+            resume_reason=args.resume_reason if args.resume_preimplementation else None,
         )
         return 0
     except (DeliveryError, IssueWorkflowError, OSError) as error:
