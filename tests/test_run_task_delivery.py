@@ -109,6 +109,29 @@ def test_worker_launch_passes_active_delivery_artifacts_to_child(
         assert callable(observed["kwargs"]["preexec_fn"])
 
 
+@pytest.mark.parametrize(
+    ("platform", "expected_executable"),
+    (("nt", "base-python.exe"), ("posix", "venv-python")),
+)
+def test_worker_bootstrap_uses_process_identity_stable_interpreter(
+    monkeypatch: pytest.MonkeyPatch,
+    platform: str,
+    expected_executable: str,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", platform)
+    monkeypatch.setattr(delivery.sys, "executable", "venv-python")
+    monkeypatch.setattr(delivery.sys, "_base_executable", "base-python.exe", raising=False)
+
+    command = delivery._worker_bootstrap_command(
+        ["codex", "--version"],
+        parent_pid=42,
+        parent_identity={"kind": "windows", "creation_time_100ns": "123"},
+        worker_state_path=None,
+    )
+
+    assert command[0] == expected_executable
+
+
 def test_worker_launch_sets_ponytail_mode_from_agent_flow(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -357,7 +380,7 @@ def test_worker_supervisor_uses_windows_job_for_process_tree_termination(
     assert process.stdin.writes == [b"\n"]
     assert process.stdin.closed is True
     assert observed["command"][:3] == [
-        sys.executable,
+        getattr(sys, "_base_executable", sys.executable),
         str(delivery.SCRIPT_PATH),
         "--worker-bootstrap",
     ]

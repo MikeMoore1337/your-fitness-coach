@@ -1740,8 +1740,11 @@ def _worker_bootstrap_command(
     parent_identity: Mapping[str, str] | None,
     worker_state_path: Path | None,
 ) -> list[str]:
+    bootstrap_executable = (
+        getattr(sys, "_base_executable", sys.executable) if os.name == "nt" else sys.executable
+    )
     bootstrap = [
-        sys.executable,
+        bootstrap_executable,
         str(SCRIPT_PATH),
         "--worker-bootstrap",
         "--parent-pid",
