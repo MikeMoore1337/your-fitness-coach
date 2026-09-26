@@ -1718,20 +1718,20 @@ def _write_worker_command_started(path: Path, process: Any) -> None:
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
     )
-    temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
             json.dump(state, handle, ensure_ascii=True, sort_keys=True)
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
+        os.replace(temporary_name, path)
     except OSError as error:
         raise DeliveryError(
             f"HUMAN_REQUIRED: cannot persist guarded Codex command start {path}"
         ) from error
     finally:
-        temporary.unlink(missing_ok=True)
+        with suppress(FileNotFoundError):
+            os.unlink(temporary_name)
 
 
 def _read_worker_state(path: Path) -> dict[str, Any]:
