@@ -68,8 +68,10 @@ identity и process-group ID, пока parent-loss signal остаётся за�
 поэтому новый launcher не reclaim-ит очередь до reconciliation.
 На Windows guard сначала ждёт release от supervisor. Supervisor сначала помещает этот ещё
 не запустивший Codex bootstrap в Job Object с `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, записывает его
-stable identity в worker state, затем отправляет release. Bootstrap проверяет эту запись и identity
-supervisor до запуска Codex; Codex и его дочерние процессы наследуют Job Object без assignment gap.
+stable identity в worker state, затем отправляет release. Bootstrap запускается через base Python
+executable, чтобы PID в worker state совпадал с PID bootstrap: Windows venv launcher может создать
+дочерний процесс с другим PID. Bootstrap проверяет эту запись и identity supervisor до
+запуска Codex; Codex и его дочерние процессы наследуют Job Object без assignment gap.
 Claim атомарно обновляет `queue_phase`, `task_id`, `task_issue` и `worker_state` перед запуском
 каждой задачи и очищает их только после полного `_deliver_one`. Если owner провалился, пока claim
 содержит активную задачу, recovery сначала читает durable controller history и останавливается
