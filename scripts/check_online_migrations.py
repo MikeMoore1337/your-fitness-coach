@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 
 MIGRATION_ROOT = Path("backend/alembic/versions")
-ALLOWED_PHASES = {"expand", "backfill"}
+ALLOWED_PHASES = {"expand", "backfill", "constraint_swap"}
 DESTRUCTIVE_CALLS = {
     "alter_column",
     "drop_column",
@@ -279,6 +279,20 @@ def _is_in_non_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.
     return False
 
 
+def _is_in_postgresql_branch(call: ast.Call, links: dict[ast.AST, tuple[ast.AST, str]]) -> bool:
+    current: ast.AST = call
+    while current in links:
+        parent, field_name = links[current]
+        if (
+            isinstance(parent, ast.If)
+            and field_name == "body"
+            and _is_postgresql_dialect_check(parent.test)
+        ):
+            return True
+        current = parent
+    return False
+
+
 def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object) -> None:
     links = _parent_links(upgrade)
     created_tables = {
@@ -309,6 +323,8 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 )
             elif phase == "backfill":
                 allowed = owner == "op" and function.attr == "execute"
+            elif phase == "constraint_swap":
+                allowed = owner == "op" and function.attr in {"execute", "get_bind"}
         if _is_autocommit_block_call(call):
             allowed = True
         if not allowed:
@@ -340,6 +356,51 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                     "a new empty table in the same migration or a PostgreSQL-concurrent "
                     "index in an autocommit block"
                 )
+
+
+def _validate_constraint_swap_sql(
+    path: Path,
+    statements: list[str],
+    *,
+    table_name: str,
+    constraint_name: str,
+    lock_timeout_seconds: int,
+    statement_timeout_seconds: int,
+) -> None:
+    expected_lock = f"SET LOCAL lock_timeout = '{lock_timeout_seconds}s'"
+    expected_statement = f"SET LOCAL statement_timeout = '{statement_timeout_seconds}s'"
+    expected_validate = f"ALTER TABLE {table_name} VALIDATE CONSTRAINT {constraint_name}"
+    if len(statements) != 4:
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must contain exactly four static op.execute statements"
+        )
+    if statements[0].strip() != expected_lock:
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must set the declared LOCAL lock_timeout first"
+        )
+    if statements[1].strip() != expected_statement:
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must set the declared LOCAL statement_timeout second"
+        )
+
+    swap = re.sub(r"\s+", " ", statements[2]).strip()
+    prefix = (
+        f"ALTER TABLE {table_name} DROP CONSTRAINT IF EXISTS {constraint_name}, "
+        f"ADD CONSTRAINT {constraint_name} CHECK ("
+    )
+    if (
+        not swap.startswith(prefix)
+        or not swap.endswith(") NOT VALID")
+        or ";" in swap
+        or re.search(r"\b(REFERENCES|UNIQUE|PRIMARY KEY|FOREIGN KEY)\b", swap, re.IGNORECASE)
+    ):
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must replace only the declared CHECK constraint using NOT VALID"
+        )
+    if statements[3].strip() != expected_validate:
+        raise OnlineMigrationError(
+            f"{path} constraint_swap must validate the declared constraint after replacement"
+        )
 
 
 def _validate_nullable_add_column(path: Path, call: ast.Call) -> None:
@@ -438,6 +499,47 @@ def validate_added_migration(path: Path) -> None:
                 f"{path} backfill must declare online_rollout_idempotent = True"
             )
 
+    constraint_swap_config: tuple[str, str, int, int] | None = None
+    if phase == "constraint_swap":
+        table_name = _assignment(tree, "online_rollout_constraint_table")
+        constraint_name = _assignment(tree, "online_rollout_constraint_name")
+        lock_timeout_seconds = _assignment(tree, "online_rollout_lock_timeout_seconds")
+        statement_timeout_seconds = _assignment(tree, "online_rollout_statement_timeout_seconds")
+        if not isinstance(table_name, str) or not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", table_name
+        ):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap must declare a static table identifier"
+            )
+        if not isinstance(constraint_name, str) or not re.fullmatch(
+            r"[A-Za-z_][A-Za-z0-9_]*", constraint_name
+        ):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap must declare a static constraint identifier"
+            )
+        if (
+            not isinstance(lock_timeout_seconds, int)
+            or isinstance(lock_timeout_seconds, bool)
+            or not 1 <= lock_timeout_seconds <= 5
+        ):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap lock timeout must be between 1 and 5 seconds"
+            )
+        if (
+            not isinstance(statement_timeout_seconds, int)
+            or isinstance(statement_timeout_seconds, bool)
+            or not 1 <= statement_timeout_seconds <= 60
+        ):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap statement timeout must be between 1 and 60 seconds"
+            )
+        constraint_swap_config = (
+            table_name,
+            constraint_name,
+            lock_timeout_seconds,
+            statement_timeout_seconds,
+        )
+
     destructive = sorted(
         {
             node.func.attr
@@ -453,6 +555,7 @@ def validate_added_migration(path: Path) -> None:
             + ", ".join(destructive)
         )
 
+    links = _parent_links(upgrade)
     for node in ast.walk(upgrade):
         if (
             not isinstance(node, ast.Call)
@@ -466,7 +569,11 @@ def validate_added_migration(path: Path) -> None:
             and node.func.value.id == "op"
         ):
             raise OnlineMigrationError(
-                f"{path} uses SQL execution outside the verified op.execute backfill contract"
+                f"{path} uses SQL execution outside the verified op.execute online contract"
+            )
+        if phase == "constraint_swap" and not _is_in_postgresql_branch(node, links):
+            raise OnlineMigrationError(
+                f"{path} constraint_swap SQL must be gated to the PostgreSQL branch"
             )
 
     forbidden = sorted(
@@ -500,7 +607,12 @@ def validate_added_migration(path: Path) -> None:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for online backfill"
             )
+        elif phase == "constraint_swap" and operation not in {"execute", "get_bind"}:
+            raise OnlineMigrationError(
+                f"{path} uses op.{operation}, which is not allowlisted for online constraint_swap"
+            )
 
+    execute_statements: list[str] = []
     for node in _op_calls(upgrade):
         if (
             isinstance(node, ast.Call)
@@ -515,7 +627,11 @@ def validate_added_migration(path: Path) -> None:
                 raise OnlineMigrationError(
                     f"{path} uses dynamic op.execute; online safety cannot be verified"
                 )
-            sql = re.sub(r"\s+", " ", node.args[0].value).strip().upper()
+            raw_sql = node.args[0].value
+            if phase == "constraint_swap":
+                execute_statements.append(raw_sql)
+                continue
+            sql = re.sub(r"\s+", " ", raw_sql).strip().upper()
             if re.search(r"\b(DROP|ALTER|TRUNCATE|DELETE)\b", sql):
                 raise OnlineMigrationError(
                     f"{path} contains destructive SQL forbidden during an online rollout"
@@ -528,6 +644,17 @@ def validate_added_migration(path: Path) -> None:
                 raise OnlineMigrationError(
                     f"{path} backfill SQL must be one bounded UPDATE with an explicit WHERE"
                 )
+
+    if phase == "constraint_swap":
+        assert constraint_swap_config is not None
+        _validate_constraint_swap_sql(
+            path,
+            execute_statements,
+            table_name=constraint_swap_config[0],
+            constraint_name=constraint_swap_config[1],
+            lock_timeout_seconds=constraint_swap_config[2],
+            statement_timeout_seconds=constraint_swap_config[3],
+        )
 
     if phase == "backfill" and not any(
         isinstance(node, ast.Call)

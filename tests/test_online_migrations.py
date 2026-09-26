@@ -326,3 +326,57 @@ def test_online_expand_rejects_two_argument_foreign_key_column(tmp_path: Path) -
 
     with pytest.raises(OnlineMigrationError, match="allowlisted static SQLAlchemy scalar type"):
         validate_added_migration(path)
+
+
+def test_online_constraint_swap_accepts_bounded_not_valid_check_replacement(
+    tmp_path: Path,
+) -> None:
+    path = _migration(
+        tmp_path / "0096_constraint_swap.py",
+        'online_rollout_phase = "constraint_swap"\n'
+        'online_rollout_notes = "bounded CHECK replacement"\n'
+        'online_rollout_constraint_table = "foods"\n'
+        'online_rollout_constraint_name = "ck_foods_active_catalog_trust"\n'
+        "online_rollout_lock_timeout_seconds = 3\n"
+        "online_rollout_statement_timeout_seconds = 30\n\n"
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        '    if bind.dialect.name == "postgresql":\n'
+        "        op.execute(\"SET LOCAL lock_timeout = '3s'\")\n"
+        "        op.execute(\"SET LOCAL statement_timeout = '30s'\")\n"
+        '        op.execute("ALTER TABLE foods DROP CONSTRAINT IF EXISTS '
+        "ck_foods_active_catalog_trust, ADD CONSTRAINT "
+        "ck_foods_active_catalog_trust CHECK (food_type = 'user' OR "
+        "catalog_quality = 'community_unverified') NOT VALID\")\n"
+        '        op.execute("ALTER TABLE foods VALIDATE CONSTRAINT '
+        'ck_foods_active_catalog_trust")\n',
+    )
+
+    validate_added_migration(path)
+
+
+def test_online_constraint_swap_rejects_unbounded_validating_replacement(
+    tmp_path: Path,
+) -> None:
+    path = _migration(
+        tmp_path / "0096_constraint_swap.py",
+        'online_rollout_phase = "constraint_swap"\n'
+        'online_rollout_notes = "unsafe CHECK replacement"\n'
+        'online_rollout_constraint_table = "foods"\n'
+        'online_rollout_constraint_name = "ck_foods_active_catalog_trust"\n'
+        "online_rollout_lock_timeout_seconds = 3\n"
+        "online_rollout_statement_timeout_seconds = 30\n\n"
+        "def upgrade():\n"
+        "    bind = op.get_bind()\n"
+        '    if bind.dialect.name == "postgresql":\n'
+        "        op.execute(\"SET LOCAL lock_timeout = '3s'\")\n"
+        "        op.execute(\"SET LOCAL statement_timeout = '30s'\")\n"
+        '        op.execute("ALTER TABLE foods DROP CONSTRAINT IF EXISTS '
+        "ck_foods_active_catalog_trust, ADD CONSTRAINT "
+        "ck_foods_active_catalog_trust CHECK (food_type = 'user')\")\n"
+        '        op.execute("ALTER TABLE foods VALIDATE CONSTRAINT '
+        'ck_foods_active_catalog_trust")\n',
+    )
+
+    with pytest.raises(OnlineMigrationError, match="NOT VALID"):
+        validate_added_migration(path)
