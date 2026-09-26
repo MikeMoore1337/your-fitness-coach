@@ -12,6 +12,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from scripts.issue_workflow import (
+    control_state_payload,
+    render_control_state_comment,
+    render_task_contract,
+)
 
 
 def _load_module():
@@ -107,6 +112,8 @@ class FakeGitHub:
         self.workflow_runs_by_sha: dict[str, list[dict[str, Any]]] = {}
         self.workflow_jobs_by_run: dict[int, list[dict[str, Any]]] = {}
         self.current_production_deployment: dict[str, Any] | None = None
+        self.issues: dict[int, dict[str, Any]] = {}
+        self.issue_comment_map: dict[int, list[dict[str, Any]]] = {}
 
     def api(self, endpoint: str) -> Any:
         if endpoint.startswith("commits/") and endpoint.endswith("/pulls"):
@@ -137,6 +144,17 @@ class FakeGitHub:
         if branch != "master":
             raise AssertionError(f"Unexpected branch lookup: {branch}")
         return self.master_sha
+
+    def issue_comments(self, number: int) -> list[dict[str, Any]]:
+        return self.issue_comment_map[number]
+
+    def task_issues(self, task_id: str) -> list[dict[str, Any]]:
+        prefix = f"[Task {task_id}]".casefold()
+        return [
+            issue
+            for issue in self.issues.values()
+            if str(issue.get("title", "")).casefold().startswith(prefix)
+        ]
 
     def has_successful_deployment(self, sha: str, environment: str) -> bool:
         return (sha, environment) in self.successful_deployments
@@ -234,6 +252,431 @@ def _prepare_started(
     _git(worktree, "commit", "-m", f"feat: [Task {task_id}] synthetic change")
     head_sha = _git(worktree, "rev-parse", "HEAD")
     return root, git_repository, controller, worktree, branch, base_sha + ":" + head_sha
+
+
+def _prepare_preimplementation_resume(
+    repository: tuple[Path, Any],
+    task_id: str = "241",
+    *,
+    dependencies: tuple[str, ...] = (),
+) -> tuple[Path, Any, Any, Path, str, str, FakeGitHub]:
+    root, git_repository = repository
+    slug = "resume-me"
+    _write_task(root, task_id, slug, dependencies=", ".join(dependencies))
+    github = FakeGitHub(git_repository.ref("origin/master"))
+    controller = task_session.TaskController(git_repository, github=github)
+    started = controller.start(
+        task_id, owner_launch=True, session_label="resume-test", offline=True
+    )
+    lease = started["lease"]
+    branch = str(lease["branch"])
+    issue_number = int(task_id.rstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+    github.issues[issue_number] = {
+        "number": issue_number,
+        "title": f"[Task {task_id}] Synthetic resume fixture",
+        "state": "open",
+        "user": {"login": "owner"},
+        "body": render_task_contract(
+            {
+                "version": 1,
+                "task_id": task_id,
+                "scope": "Synthetic pre-implementation recovery",
+                "acceptance": ["resume safely"],
+                "dependencies": list(dependencies),
+                "owner_gate": "explicit-launch",
+                "risk_lane": "GREEN",
+                "source_spec": f"codex-backlog/tasks/{task_id}-{slug}.md",
+                "issue_state": "in_progress",
+            }
+        ),
+    }
+    blocker = (
+        "Task worker stopped before implementation: guarded bootstrap exited before "
+        "creating worker-state.json."
+    )
+    github.issue_comment_map[issue_number] = [
+        {
+            "id": 1,
+            "created_at": "2026-09-26T12:00:00Z",
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id=task_id,
+                    state="human_required",
+                    issue_number=issue_number,
+                    branch=branch,
+                    blocker=blocker,
+                )
+            ),
+        }
+    ]
+    return (
+        root,
+        git_repository,
+        controller,
+        Path(lease["worktree"]),
+        branch,
+        str(lease["base_origin_master_sha"]),
+        github,
+    )
+
+
+def test_task_session_exposes_supported_preimplementation_resume_command() -> None:
+    args = task_session._parser().parse_args(
+        [
+            "resume-preimplementation",
+            "241",
+            "--control-issue",
+            "241",
+            "--reason",
+            "owner-authorized retry after resolved bootstrap failure",
+            "--owner-authorize",
+        ]
+    )
+
+    assert args.command == "resume-preimplementation"
+    assert args.control_issue == 241
+    assert args.owner_authorize is True
+
+
+def test_resume_preimplementation_fast_forwards_and_preserves_attempt_audit(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, original_base, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    (root / "controller-fix.txt").write_text("resolved controller blocker\n", encoding="utf-8")
+    _git(root, "add", "controller-fix.txt")
+    _git(root, "commit", "-m", "[Controller] Resolve the worker bootstrap blocker")
+    _git(root, "push", "origin", "master")
+    git_repository.fetch_origin_master(cwd=root)
+    current_master = git_repository.ref("origin/master")
+    github.master_sha = current_master
+
+    resumed = controller.resume_preimplementation(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized retry after merged bootstrap fix",
+        owner_authorize=True,
+    )
+
+    event = resumed["preimplementation_resume"]
+    assert resumed["lease"]["original_base_origin_master_sha"] == original_base
+    assert resumed["lease"]["base_origin_master_sha"] == current_master
+    assert resumed["lease"]["lifecycle_state"] == "implementation"
+    assert git_repository.head(cwd=worktree) == current_master
+    assert git_repository.ref(branch) == current_master
+    assert event["state"] == "prepared"
+    assert event["original_base_sha"] == original_base
+    assert event["previous_head_sha"] == original_base
+    assert event["base_sha"] == current_master
+    assert event["head_sha"] == current_master
+    assert event["reason"] == "owner-authorized retry after merged bootstrap fix"
+    assert "worker-state.json" in event["previous_control_state"]["blocker"]
+    assert event["registered_at"] == resumed["lease"]["created_at"]
+    repeated = controller.resume_preimplementation(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized retry after merged bootstrap fix",
+        owner_authorize=True,
+    )
+    assert repeated["mutation_performed"] is False
+    assert repeated["preimplementation_resume"] == event
+    claimed = controller.claim_preimplementation_worker_launch("241")
+    assert claimed["preimplementation_resume"]["state"] == "launching"
+    first_launch_id = claimed["preimplementation_resume"]["launch_id"]
+    prestart_path = (
+        root
+        / ".artifacts"
+        / "tasks"
+        / "241"
+        / "temporary"
+        / "delivery"
+        / "first-attempt"
+        / "worker-state.json"
+    )
+    released = controller.release_preimplementation_worker_launch(
+        "241",
+        launch_id=first_launch_id,
+        worker_state_path=prestart_path,
+        reason="guarded worker supervisor exited before durable state",
+    )
+    assert released["preimplementation_resume"]["state"] == "prepared"
+    assert released["preimplementation_resume"]["launch_attempts"][0]["state"] == (
+        "no-worker-started"
+    )
+    claimed = controller.claim_preimplementation_worker_launch("241")
+    assert claimed["preimplementation_resume"]["launch_attempts"][1]["state"] == "launching"
+
+    worker_state_path = (
+        root
+        / ".artifacts"
+        / "tasks"
+        / "241"
+        / "temporary"
+        / "delivery"
+        / "test-delivery"
+        / "worker-state.json"
+    )
+    worker_state_path.parent.mkdir(parents=True)
+    worker_state_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "pid": 101,
+                "process_group_id": None,
+                "process_instance": {"kind": "test", "instance": "supervisor"},
+                "started_at": "2026-09-27T00:00:00Z",
+                "command_process": {
+                    "pid": 102,
+                    "process_instance": {"kind": "test", "instance": "codex"},
+                },
+                "command_started_at": "2026-09-27T00:00:01Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    recorded = controller.record_preimplementation_worker_started(
+        "241", worker_state_path=worker_state_path
+    )
+    assert recorded["preimplementation_resume"]["state"] == "worker-started"
+    assert recorded["preimplementation_resume"]["worker_pid"] == 102
+    assert recorded["preimplementation_resume"]["launch_attempts"][1]["state"] == ("worker-started")
+    worker_state_path.unlink()
+    with pytest.raises(task_session.TaskSessionError, match="unreconciled or already-used"):
+        controller.resume_preimplementation(
+            "241",
+            control_issue_number=241,
+            reason="repeat request",
+            owner_authorize=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("dirty", "worktree is dirty"),
+        ("unique_commit", "unique commits"),
+        ("worker_state", "unreconciled worker state"),
+        ("git_operation", "active Git operation"),
+        ("open_pr", "open pull request"),
+        ("remote_branch", "remote ref"),
+        ("queue_claim", "continuous queue claim"),
+        ("branch_mismatch", "does not uniquely match"),
+        ("superseded", "implementation state"),
+        ("missing_worktree", "does not uniquely match"),
+        ("divergent", "fast-forward"),
+        ("duplicate_lease", "ambiguous task lease"),
+        ("dependency_changed", "dependency contract changed"),
+        ("unresolved_dependency", "incomplete dependencies"),
+    ],
+)
+def test_resume_preimplementation_refuses_unsafe_state_without_mutation(
+    repository: tuple[Path, Any], mutation: str, message: str
+) -> None:
+    root, git_repository, controller, worktree, branch, base_sha, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    lease_path = controller.store.task_lease_path("241")
+    lease_before = controller.store.read_json(lease_path)
+    head_before = git_repository.head(cwd=worktree)
+    if mutation == "dirty":
+        (worktree / "untracked.txt").write_text("keep\n", encoding="utf-8")
+    elif mutation == "unique_commit":
+        (worktree / "unique.txt").write_text("keep\n", encoding="utf-8")
+        _git(worktree, "add", "unique.txt")
+        _git(worktree, "commit", "-m", "feat: [Task 241] unique commit")
+    elif mutation == "worker_state":
+        path = (
+            root / ".artifacts" / "tasks" / "241" / "temporary" / "delivery" / "worker-state.json"
+        )
+        path.parent.mkdir(parents=True)
+        path.write_text("{}\n", encoding="utf-8")
+    elif mutation == "git_operation":
+        marker = git_repository.git_dir(worktree) / "MERGE_HEAD"
+        marker.write_text("a" * 40, encoding="utf-8")
+    elif mutation == "open_pr":
+        github.open_prs = [{"head": {"ref": branch}}]
+    elif mutation == "remote_branch":
+        _git(root, "push", "origin", branch)
+    elif mutation == "queue_claim":
+        claim_path = controller.store.root / "continuous-queue.lock"
+        claim_path.write_text(
+            json.dumps({"queue_phase": "task_running", "task_id": "241"}),
+            encoding="utf-8",
+        )
+    elif mutation == "branch_mismatch":
+        lease = dict(lease_before)
+        lease["branch"] = "task/241-other"
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif mutation == "superseded":
+        lease = dict(lease_before)
+        lease["lifecycle_state"] = "superseded"
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif mutation == "missing_worktree":
+        lease = dict(lease_before)
+        lease["worktree"] = str(root / ".artifacts" / "worktrees" / "missing")
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif mutation == "divergent":
+        git_repository.is_ancestor = lambda _ancestor, _descendant: False
+    elif mutation == "duplicate_lease":
+        task_session.StateStore.replace_json(
+            controller.store.leases / "duplicate.json", dict(lease_before)
+        )
+    elif mutation == "unresolved_dependency":
+        task_path = Path(lease_before["canonical_task_path"])
+        task_path.write_text(
+            task_path.read_text(encoding="utf-8").replace(
+                "dependencies: \n", "dependencies: 999\n"
+            ),
+            encoding="utf-8",
+        )
+        lease_before["dependency_ids"] = ["999"]
+        task_session.StateStore.replace_json(lease_path, lease_before)
+        issue_number = 241
+        github.issues[issue_number]["body"] = render_task_contract(
+            {
+                "version": 1,
+                "task_id": "241",
+                "scope": "Synthetic pre-implementation recovery",
+                "acceptance": ["resume safely"],
+                "dependencies": ["999"],
+                "owner_gate": "explicit-launch",
+                "risk_lane": "GREEN",
+                "source_spec": "codex-backlog/tasks/241-resume-me.md",
+                "issue_state": "in_progress",
+            }
+        )
+    elif mutation == "dependency_changed":
+        task_path = Path(lease_before["canonical_task_path"])
+        task_path.write_text(
+            task_path.read_text(encoding="utf-8").replace(
+                "dependencies: \n", "dependencies: 999\n"
+            ),
+            encoding="utf-8",
+        )
+        github.issues[241]["body"] = render_task_contract(
+            {
+                "version": 1,
+                "task_id": "241",
+                "scope": "Synthetic pre-implementation recovery",
+                "acceptance": ["resume safely"],
+                "dependencies": ["999"],
+                "owner_gate": "explicit-launch",
+                "risk_lane": "GREEN",
+                "source_spec": "codex-backlog/tasks/241-resume-me.md",
+                "issue_state": "in_progress",
+            }
+        )
+
+    head_before = git_repository.head(cwd=worktree)
+    with pytest.raises(task_session.TaskSessionError, match=message):
+        controller.resume_preimplementation(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized retry",
+            owner_authorize=True,
+        )
+
+    if mutation not in {"branch_mismatch", "superseded", "missing_worktree", "duplicate_lease"}:
+        assert git_repository.head(cwd=worktree) == head_before
+        assert controller.store.read_json(lease_path) == lease_before
+    assert base_sha == lease_before["base_origin_master_sha"]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("not_authorized", "owner authorization"),
+        ("wrong_state", "human_required"),
+        ("wrong_branch", "control state branch"),
+        ("wrong_blocker", "pre-implementation failure"),
+        ("closed_issue", "open control Issue"),
+        ("wrong_author", "repository owner"),
+        ("wrong_task_contract", "machine-readable contract"),
+        ("external_gate", "separate human or external gate"),
+    ],
+)
+def test_resume_preimplementation_requires_matching_owner_control_state(
+    repository: tuple[Path, Any], mutation: str, message: str
+) -> None:
+    _, _, controller, _, branch, _, github = _prepare_preimplementation_resume(repository)
+    if mutation == "wrong_state":
+        github.issue_comment_map[241] = [
+            {
+                "id": 2,
+                "created_at": "2026-09-26T13:00:00Z",
+                "user": {"login": "owner"},
+                "body": render_control_state_comment(
+                    control_state_payload(
+                        task_id="241",
+                        state="queued",
+                        issue_number=241,
+                        branch=branch,
+                    )
+                ),
+            }
+        ]
+    elif mutation == "wrong_branch":
+        payload = control_state_payload(
+            task_id="241",
+            state="human_required",
+            issue_number=241,
+            branch="task/241-wrong",
+            blocker="worker stopped before implementation",
+        )
+        github.issue_comment_map[241] = [
+            {
+                "id": 2,
+                "created_at": "2026-09-26T13:00:00Z",
+                "user": {"login": "owner"},
+                "body": render_control_state_comment(payload),
+            }
+        ]
+    elif mutation == "wrong_blocker":
+        payload = control_state_payload(
+            task_id="241",
+            state="human_required",
+            issue_number=241,
+            branch=branch,
+            blocker="domain owner decision required",
+        )
+        github.issue_comment_map[241] = [
+            {
+                "id": 2,
+                "created_at": "2026-09-26T13:00:00Z",
+                "user": {"login": "owner"},
+                "body": render_control_state_comment(payload),
+            }
+        ]
+    elif mutation == "closed_issue":
+        github.issues[241]["state"] = "closed"
+    elif mutation == "wrong_author":
+        github.issues[241]["user"]["login"] = "intruder"
+    elif mutation in {"wrong_task_contract", "external_gate"}:
+        github.issues[241]["body"] = render_task_contract(
+            {
+                "version": 1,
+                "task_id": "242" if mutation == "wrong_task_contract" else "241",
+                "scope": "Synthetic pre-implementation recovery",
+                "acceptance": ["resume safely"],
+                "dependencies": [],
+                "owner_gate": (
+                    "external_authorization" if mutation == "external_gate" else "explicit-launch"
+                ),
+                "risk_lane": "RED" if mutation == "external_gate" else "GREEN",
+                "source_spec": "codex-backlog/tasks/241-resume-me.md",
+                "issue_state": "in_progress",
+            }
+        )
+
+    with pytest.raises(task_session.TaskSessionError, match=message):
+        controller.resume_preimplementation(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized retry",
+            owner_authorize=mutation != "not_authorized",
+        )
 
 
 def _prepare_subsequent_production_reconciliation(

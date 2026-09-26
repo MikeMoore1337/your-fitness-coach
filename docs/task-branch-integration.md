@@ -232,6 +232,23 @@ human/legal/external/destructive/task-specific gate. Следующая product 
 batch существующих Issue-backed GREEN tasks; лимиты и точные правила описаны в
 [`docs/issue-driven-continuous-workflow.md`](issue-driven-continuous-workflow.md).
 
+Если Windows launcher остановился до запуска worker, но task осталась в активном
+`implementation` lease, используйте поддерживаемое восстановление только для подтверждённого
+pre-implementation blocker:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_task_delivery.py 504 `
+    --control-issue 504 --resume-preimplementation `
+    --resume-reason "resume after verified pre-implementation controller failure"
+```
+
+Укажите ID существующей task и её owner-authored control Issue. Команда повторно проверяет Issue,
+contract/dependencies, owner gate, lease, branch/worktree и актуальный `master`; task branch может
+измениться только fast-forward. Resume отказывает при worker state, PR, unique commit, изменённой
+зависимости, очередном claim или любом неоднозначном состоянии. Issue переводится в `in_progress`
+только после записи durable identity фактически запущенной Codex-команды. Повторный запуск
+разрешён только когда supervisor не стартовал и worker state ещё не создан.
+
 Низкоуровневые команды:
 
 ```powershell

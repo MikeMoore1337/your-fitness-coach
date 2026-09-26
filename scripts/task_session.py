@@ -27,10 +27,24 @@ from uuid import uuid4
 
 try:
     from scripts.artifact_manager import ArtifactError, ArtifactManager
-    from scripts.issue_workflow import DEFAULT_QUEUE_BUDGET, IssueWorkflowError
+    from scripts.issue_workflow import (
+        DEFAULT_QUEUE_BUDGET,
+        IssueWorkflowError,
+        latest_control_state,
+        normalize_github_login,
+        parse_task_contract,
+        task_risk_lane,
+    )
 except ModuleNotFoundError:
     from artifact_manager import ArtifactError, ArtifactManager
-    from issue_workflow import DEFAULT_QUEUE_BUDGET, IssueWorkflowError
+    from issue_workflow import (
+        DEFAULT_QUEUE_BUDGET,
+        IssueWorkflowError,
+        latest_control_state,
+        normalize_github_login,
+        parse_task_contract,
+        task_risk_lane,
+    )
 
 TASK_ID_PATTERN = r"[0-9]+[A-Z]?"
 TASK_ID_RE = re.compile(rf"^{TASK_ID_PATTERN}$", re.IGNORECASE)
@@ -429,6 +443,16 @@ class GitRepository:
 
     def ref_exists(self, name: str) -> bool:
         return self.git("rev-parse", "--verify", "--quiet", name, check=False) != ""
+
+    def remote_branch_exists(self, branch: str, *, cwd: Path | None = None) -> bool:
+        result = _run(
+            ["git", "ls-remote", "--heads", "origin", f"refs/heads/{branch}"],
+            cwd=cwd or self.current_worktree,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise TaskSessionError("Cannot verify the task branch on origin")
+        return bool(result.stdout.strip())
 
     def fetch_origin_master(self, *, cwd: Path | None = None, prune: bool = True) -> None:
         args = ["fetch"]
@@ -886,6 +910,39 @@ class GitHubClient:
 
     def open_pull_requests(self) -> list[dict[str, Any]]:
         return list(self.api("pulls?state=open&per_page=100"))
+
+    def task_issues(self, task_id: str) -> list[dict[str, Any]]:
+        issues: list[dict[str, Any]] = []
+        page = 1
+        pattern = re.compile(rf"^\[Task\s+{re.escape(task_id)}\]", re.IGNORECASE)
+        while True:
+            payload = self.api(f"issues?state=all&per_page=100&page={page}")
+            if not isinstance(payload, list):
+                raise TaskSessionError("GitHub task Issue inventory is not a list")
+            batch = [
+                dict(item)
+                for item in payload
+                if isinstance(item, Mapping)
+                and not item.get("pull_request")
+                and pattern.match(str(item.get("title", "")))
+            ]
+            issues.extend(batch)
+            if len(payload) < 100:
+                return issues
+            page += 1
+
+    def issue_comments(self, number: int) -> list[dict[str, Any]]:
+        comments: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            payload = self.api(f"issues/{number}/comments?per_page=100&page={page}")
+            if not isinstance(payload, list):
+                raise TaskSessionError(f"GitHub Issue #{number} comments are not a list")
+            batch = [dict(item) for item in payload if isinstance(item, Mapping)]
+            comments.extend(batch)
+            if len(payload) < 100:
+                return comments
+            page += 1
 
     def pull_request(self, number: int) -> dict[str, Any]:
         return dict(self.api(f"pulls/{number}"))
@@ -2732,6 +2789,613 @@ class TaskController:
             ),
         }
 
+    def _preimplementation_issue_state(
+        self,
+        task_id: str,
+        issue_number: int,
+        branch: str,
+        document: TaskDocument,
+        lease: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        github = self._github()
+        owner = normalize_github_login(github.repo_slug.split("/", maxsplit=1)[0])
+        if not owner:
+            raise TaskSessionError("Cannot establish the repository owner for resume authorization")
+        matching_issues = [
+            item
+            for item in github.task_issues(task_id)
+            if normalize_github_login(
+                str((item.get("user") or {}).get("login", ""))
+                if isinstance(item.get("user"), Mapping)
+                else ""
+            )
+            == owner
+        ]
+        if len(matching_issues) != 1:
+            raise TaskSessionError(
+                f"Task {task_id} must have exactly one task Issue authored by the repository owner"
+            )
+        issue = matching_issues[0]
+        if issue.get("number") != issue_number or str(issue.get("state", "")).lower() != "open":
+            raise TaskSessionError("Resume requires the matching open control Issue")
+        try:
+            contract = parse_task_contract(str(issue.get("body", "")))
+        except IssueWorkflowError as error:
+            raise TaskSessionError(
+                f"Task {task_id} Issue contract is malformed: {error}"
+            ) from error
+        if contract is None or contract.get("task_id") != task_id:
+            raise TaskSessionError("Task Issue has no matching machine-readable contract")
+        expected_source = document.path.resolve().relative_to(self._canonical_root()).as_posix()
+        if contract.get("source_spec") != expected_source:
+            raise TaskSessionError("Task Issue source does not match the registered task document")
+        try:
+            issue_dependencies = _resolved_dependency_ids(
+                contract.get("dependencies"), document.dependencies
+            )
+        except TaskSessionError as error:
+            raise TaskSessionError(f"Task Issue dependency contract is invalid: {error}") from error
+        document_dependencies = tuple(
+            dict.fromkeys(normalize_task_id(item) for item in document.dependencies)
+        )
+        lease_dependencies = lease.get("dependency_ids")
+        if (
+            issue_dependencies != document_dependencies
+            or not isinstance(lease_dependencies, list)
+            or tuple(lease_dependencies) != document_dependencies
+        ):
+            raise TaskSessionError("Task dependency contract changed since the lease was created")
+        if task_risk_lane(str(contract.get("owner_gate", ""))) == "RED":
+            raise TaskSessionError(
+                "Task Issue owner gate requires a separate human or external gate"
+            )
+        missing_dependencies = sorted(set(issue_dependencies) - self._completed_dependency_ids())
+        if missing_dependencies:
+            raise TaskSessionError(
+                "Task has incomplete dependencies: " + ", ".join(missing_dependencies)
+            )
+        try:
+            state = latest_control_state(
+                github.issue_comments(issue_number),
+                task_id=task_id,
+                authorized_logins=(owner,),
+            )
+        except IssueWorkflowError as error:
+            raise TaskSessionError(f"Task control state is malformed: {error}") from error
+        if state is None or state.get("state") != "human_required":
+            raise TaskSessionError(
+                "Resume requires the latest owner-authorized human_required state"
+            )
+        blocker = state.get("blocker")
+        blocker_text = blocker.lower() if isinstance(blocker, str) else ""
+        if state.get("issue_number") != issue_number:
+            raise TaskSessionError(
+                "Latest control state Issue identity does not match the task Issue"
+            )
+        if state.get("branch") != branch:
+            raise TaskSessionError("Latest control state branch does not match the task lease")
+        if (
+            state.get("pr_number") is not None
+            or state.get("head_sha") is not None
+            or "before implementation" not in blocker_text
+            or not any(
+                token in blocker_text for token in ("bootstrap", "worker-state", "worker state")
+            )
+        ):
+            raise TaskSessionError(
+                "Latest control state is not a matching pre-implementation failure"
+            )
+        return state
+
+    def _preimplementation_worker_state_paths(self, task_id: str) -> list[Path]:
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / task_id / "temporary" / "delivery"
+        )
+        return sorted(delivery_root.rglob("worker-state.json")) if delivery_root.is_dir() else []
+
+    def _preimplementation_queue_claim(self, task_id: str) -> None:
+        claim_path = self.store.root / "continuous-queue.lock"
+        if not claim_path.exists():
+            return
+        try:
+            claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise TaskSessionError("Continuous queue claim is unreadable or malformed") from error
+        if not isinstance(claim, Mapping):
+            raise TaskSessionError("Continuous queue claim is malformed")
+        phase = claim.get("queue_phase")
+        raw_task_id = claim.get("task_id")
+        if phase not in {"idle", "task_running"}:
+            raise TaskSessionError("Continuous queue claim has an unknown phase")
+        if (phase == "idle") != (raw_task_id is None):
+            raise TaskSessionError("Continuous queue claim task state is inconsistent")
+        if raw_task_id is not None:
+            try:
+                claimed_task_id = normalize_task_id(str(raw_task_id))
+            except TaskSessionError as error:
+                raise TaskSessionError(
+                    "Continuous queue claim has an invalid task identity"
+                ) from error
+            if phase != "idle" and claimed_task_id == task_id:
+                raise TaskSessionError("Task has an active continuous queue claim")
+
+    def _validate_preimplementation_worktree(
+        self,
+        task_id: str,
+        lease: Mapping[str, Any],
+        *,
+        prepared_event: Mapping[str, Any] | None = None,
+    ) -> tuple[Path, str, str]:
+        branch = lease.get("branch")
+        if not isinstance(branch, str):
+            raise TaskSessionError("Task lease has no registered branch")
+        try:
+            if task_id_from_branch(branch) != task_id:
+                raise TaskSessionError("Task branch does not match the registered task identity")
+        except TaskSessionError as error:
+            raise TaskSessionError(
+                "Task branch does not match the registered task identity"
+            ) from error
+        worktree_value = lease.get("worktree")
+        if not isinstance(worktree_value, str) or not worktree_value:
+            raise TaskSessionError("Task lease has no registered worktree")
+        worktree = Path(worktree_value).resolve()
+        try:
+            worktree.relative_to((self._canonical_root() / ".artifacts" / "worktrees").resolve())
+        except ValueError as error:
+            raise TaskSessionError(
+                "Registered task worktree is outside the managed worktree root"
+            ) from error
+        worktrees = self.repository.worktrees()
+        matches = [item for item in worktrees if item.path == worktree]
+        branch_matches = [item for item in worktrees if item.branch == branch]
+        if len(matches) != 1 or len(branch_matches) != 1 or matches[0].branch != branch:
+            raise TaskSessionError("Registered worktree does not uniquely match the task branch")
+        local_branches = [
+            str(item["branch"])
+            for item in self.repository.local_branches()
+            if isinstance(item.get("branch"), str)
+            and str(item["branch"]).startswith(f"task/{task_id}-")
+        ]
+        if local_branches != [branch]:
+            raise TaskSessionError("Task has duplicate or ambiguous local task branches")
+        if self.repository.current_branch(cwd=worktree) != branch:
+            raise TaskSessionError("Registered task worktree is on a different branch")
+        issues = self.repository.operation_issues(worktree)
+        if issues:
+            raise TaskSessionError(
+                "Task worktree has an active Git operation: " + ", ".join(issues)
+            )
+        dirty = self.repository.status(worktree, include_ignored=True)
+        if dirty:
+            raise TaskSessionError("Task worktree is dirty: " + ", ".join(dirty[:5]))
+        head = self.repository.head(cwd=worktree)
+        branch_head = self.repository.ref(f"refs/heads/{branch}")
+        base = str(lease.get("base_origin_master_sha", ""))
+        original_base = str(lease.get("original_base_origin_master_sha", ""))
+        valid_original_anchor = base == original_base or bool(
+            isinstance(prepared_event, Mapping)
+            and prepared_event.get("state") == "prepared"
+            and prepared_event.get("original_base_sha") == original_base
+            and prepared_event.get("head_sha") == base
+        )
+        if (
+            re.fullmatch(r"[0-9a-f]{40}", base) is None
+            or re.fullmatch(r"[0-9a-f]{40}", original_base) is None
+            or head != branch_head
+            or head != base
+            or not valid_original_anchor
+            or self.repository.unique_commits(branch, base=base)
+        ):
+            raise TaskSessionError(
+                "Task branch has unique commits or no longer matches its original base"
+            )
+        remote_branch = f"refs/remotes/origin/{branch}"
+        if self.repository.ref_exists(remote_branch) or self.repository.remote_branch_exists(
+            branch, cwd=self._canonical_root()
+        ):
+            raise TaskSessionError(
+                "Task branch already has a remote ref that requires reconciliation"
+            )
+        return worktree, branch, head
+
+    def resume_preimplementation(
+        self,
+        task_id: str,
+        *,
+        control_issue_number: int,
+        reason: str,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError("Resume requires explicit owner authorization")
+        if (
+            isinstance(control_issue_number, bool)
+            or not isinstance(control_issue_number, int)
+            or control_issue_number < 1
+        ):
+            raise TaskSessionError("Resume requires a valid control Issue number")
+        if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 1024:
+            raise TaskSessionError("Resume reason must be a bounded non-empty string")
+        if self.github is None:
+            raise TaskSessionError("Pre-implementation resume requires online GitHub state")
+        self.store.initialize()
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            leases = self.store.all_leases()
+            matching_leases = []
+            for item in leases:
+                raw_task_id = item.get("task_id")
+                if not isinstance(raw_task_id, str) or not TASK_ID_RE.fullmatch(raw_task_id):
+                    raise TaskSessionError(
+                        "Controller contains a lease with an invalid task identity"
+                    )
+                if raw_task_id.upper() == expected:
+                    matching_leases.append(item)
+            lease = self.store.read_json(lease_path)
+            if len(matching_leases) != 1 or matching_leases[0] != lease:
+                raise TaskSessionError(f"Task {expected} has an ambiguous task lease")
+            if not isinstance(lease, dict):
+                raise TaskSessionError(f"Task {expected} has no valid active lease")
+            if (
+                lease.get("mode") != "write"
+                or lease.get("owner_launch") is not True
+                or lease.get("queue_mode") is True
+                or self._lease_state(lease) != "implementation"
+            ):
+                raise TaskSessionError(
+                    f"Task {expected} is not in a compatible active implementation state"
+                )
+            document = find_task_document(self._canonical_root(), expected)
+            if (
+                not document.executable
+                or "blocked" in document.status.lower()
+                or "заблок" in document.status.lower()
+                or Path(str(lease.get("canonical_task_path", ""))).resolve()
+                != document.path.resolve()
+            ):
+                raise TaskSessionError("Registered task document does not match the active lease")
+            if (
+                self._validated_lease_concurrency_class(lease) != document.concurrency_class
+                or lease.get("integration_policy") != document.integration_policy
+                or lease.get("target_base_branch") != TARGET_BASE_BRANCH
+            ):
+                raise TaskSessionError("Task metadata is incompatible with the active lease")
+            branch = str(lease.get("branch", ""))
+            event = lease.get("preimplementation_resume")
+            if event is not None and (
+                not isinstance(event, Mapping)
+                or event.get("state") != "prepared"
+                or event.get("control_issue_number") != control_issue_number
+                or event.get("reason") != reason.strip()
+            ):
+                raise TaskSessionError(
+                    "Task has an unreconciled or already-used pre-implementation resume"
+                )
+            prepared_event = event if isinstance(event, Mapping) else None
+            _, branch, old_head = self._validate_preimplementation_worktree(
+                expected, lease, prepared_event=prepared_event
+            )
+            control_state = self._preimplementation_issue_state(
+                expected, control_issue_number, branch, document, lease
+            )
+            self._preimplementation_queue_claim(expected)
+            worker_states = self._preimplementation_worker_state_paths(expected)
+            if worker_states:
+                raise TaskSessionError(
+                    "Task has unreconciled worker state: "
+                    + ", ".join(str(item) for item in worker_states)
+                )
+            open_prs = [
+                item
+                for item in self._github().open_pull_requests()
+                if isinstance(item.get("head"), Mapping)
+                if str(item["head"].get("ref", "")) == branch
+            ]
+            if open_prs:
+                raise TaskSessionError("Task branch already has an open pull request")
+            current_origin = self.repository.ref("origin/master")
+            if event is not None and current_origin != lease.get("base_origin_master_sha"):
+                raise TaskSessionError("origin/master moved after the resume was prepared")
+            if event is None:
+                self.repository.fetch_origin_master(cwd=self._canonical_root(), prune=False)
+                current_origin = self.repository.ref("origin/master")
+            live_master = self._github().branch_head(TARGET_BASE_BRANCH)
+            if current_origin != live_master:
+                raise TaskSessionError(
+                    "origin/master is not synchronized with live protected master"
+                )
+            canonical_head = self.repository.head(cwd=self._canonical_root())
+            canonical_changes = self._canonical_worktree_status()
+            if (
+                self.repository.current_branch(cwd=self._canonical_root()) != TARGET_BASE_BRANCH
+                or self.repository.operation_issues(self._canonical_root())
+                or canonical_changes
+                or not self.repository.is_ancestor(canonical_head, current_origin)
+            ):
+                detail = ", ".join(canonical_changes[:5])
+                raise TaskSessionError(
+                    "Canonical master is not clean and in a safe fast-forward relationship"
+                    + (f": {detail}" if detail else "")
+                )
+            if not self.repository.is_ancestor(old_head, current_origin):
+                raise TaskSessionError("Task branch cannot be refreshed by fast-forward")
+            if event is not None:
+                return {
+                    "task_id": expected,
+                    "lease": dict(lease),
+                    "preimplementation_resume": dict(event),
+                    "control_state": control_state,
+                    "mutation_performed": False,
+                }
+            timestamp = utc_now()
+            resume_event = {
+                "version": 1,
+                "state": "refreshing",
+                "owner_authorized": True,
+                "control_issue_number": control_issue_number,
+                "previous_control_state": control_state,
+                "registered_at": lease.get("created_at"),
+                "original_base_sha": lease.get("original_base_origin_master_sha"),
+                "previous_base_sha": lease.get("base_origin_master_sha"),
+                "previous_head_sha": old_head,
+                "base_sha": current_origin,
+                "reason": reason.strip(),
+                "prepared_at": timestamp,
+            }
+            lease["preimplementation_resume"] = resume_event
+            lease["updated_at"] = timestamp
+            StateStore.replace_json(lease_path, lease)
+            try:
+                self.repository.fast_forward_current(current_origin, cwd=Path(lease["worktree"]))
+            except TaskSessionError as error:
+                resume_event["state"] = "refresh-failed"
+                resume_event["failure"] = str(error)[:1024]
+                lease["updated_at"] = utc_now()
+                StateStore.replace_json(lease_path, lease)
+                raise TaskSessionError(
+                    "Task branch refresh failed; the recorded attempt requires reconciliation"
+                ) from error
+            if (
+                self.repository.head(cwd=Path(lease["worktree"])) != current_origin
+                or self.repository.ref(f"refs/heads/{branch}") != current_origin
+                or self.repository.ref("origin/master") != current_origin
+                or self._github().branch_head(TARGET_BASE_BRANCH) != current_origin
+            ):
+                resume_event["state"] = "refresh-failed"
+                resume_event["failure"] = "protected master changed during branch refresh"
+                lease["updated_at"] = utc_now()
+                StateStore.replace_json(lease_path, lease)
+                raise TaskSessionError("Protected master changed during branch refresh")
+            resume_event["state"] = "prepared"
+            resume_event["head_sha"] = current_origin
+            lease["base_origin_master_sha"] = current_origin
+            lease["updated_at"] = utc_now()
+            StateStore.replace_json(lease_path, lease)
+            return {
+                "task_id": expected,
+                "lease": lease,
+                "preimplementation_resume": resume_event,
+                "control_state": control_state,
+                "mutation_performed": True,
+            }
+
+    def claim_preimplementation_worker_launch(self, task_id: str) -> dict[str, Any]:
+        expected = normalize_task_id(task_id)
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            lease = self.store.read_json(lease_path)
+            if not isinstance(lease, dict) or lease.get("task_id") != expected:
+                raise TaskSessionError(f"No active task lease exists for Task {expected}")
+            resume_event = lease.get("preimplementation_resume")
+            if (
+                self._lease_state(lease) != "implementation"
+                or not isinstance(resume_event, dict)
+                or resume_event.get("state") != "prepared"
+            ):
+                raise TaskSessionError("Task has no unclaimed prepared resume")
+            worktree, branch, head = self._validate_preimplementation_worktree(
+                expected, lease, prepared_event=resume_event
+            )
+            if head != resume_event.get("head_sha"):
+                raise TaskSessionError("Prepared task branch changed before worker launch")
+            control_issue = resume_event.get("control_issue_number")
+            if isinstance(control_issue, bool) or not isinstance(control_issue, int):
+                raise TaskSessionError("Prepared resume has an invalid control Issue identity")
+            document = find_task_document(self._canonical_root(), expected)
+            self._preimplementation_issue_state(
+                expected,
+                control_issue,
+                branch,
+                document,
+                lease,
+            )
+            self._preimplementation_queue_claim(expected)
+            worker_states = self._preimplementation_worker_state_paths(expected)
+            if worker_states:
+                raise TaskSessionError("Task has unreconciled worker state")
+            if any(
+                isinstance(item.get("head"), Mapping) and str(item["head"].get("ref", "")) == branch
+                for item in self._github().open_pull_requests()
+            ):
+                raise TaskSessionError("Task branch already has an open pull request")
+            attempts = resume_event.get("launch_attempts", [])
+            if not isinstance(attempts, list) or "launch_id" in resume_event:
+                raise TaskSessionError("Prepared resume has unreconciled launch-attempt state")
+            launch_id = uuid4().hex
+            claimed_at = utc_now()
+            attempts.append(
+                {"launch_id": launch_id, "state": "launching", "claimed_at": claimed_at}
+            )
+            resume_event["launch_attempts"] = attempts
+            resume_event.update(
+                {
+                    "state": "launching",
+                    "launch_id": launch_id,
+                    "launch_claimed_at": claimed_at,
+                    "worktree": str(worktree),
+                }
+            )
+            lease["updated_at"] = utc_now()
+            StateStore.replace_json(lease_path, lease)
+            return {"task_id": expected, "preimplementation_resume": resume_event}
+
+    def release_preimplementation_worker_launch(
+        self,
+        task_id: str,
+        *,
+        launch_id: str,
+        worker_state_path: Path,
+        reason: str,
+    ) -> dict[str, Any]:
+        expected = normalize_task_id(task_id)
+        path = worker_state_path.resolve()
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / expected / "temporary" / "delivery"
+        ).resolve()
+        try:
+            path.relative_to(delivery_root)
+        except ValueError as error:
+            raise TaskSessionError(
+                "Worker state path is outside the task delivery artifacts"
+            ) from error
+        if path.exists():
+            raise TaskSessionError("Worker state exists; launch requires reconciliation")
+        if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 1024:
+            raise TaskSessionError("Pre-worker failure reason must be a bounded non-empty string")
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            lease = self.store.read_json(lease_path)
+            resume_event = (
+                lease.get("preimplementation_resume") if isinstance(lease, Mapping) else None
+            )
+            if (
+                not isinstance(lease, dict)
+                or lease.get("task_id") != expected
+                or not isinstance(resume_event, dict)
+                or resume_event.get("state") != "launching"
+                or resume_event.get("launch_id") != launch_id
+            ):
+                raise TaskSessionError("Task has no matching pre-implementation launch claim")
+            attempts = resume_event.get("launch_attempts")
+            if (
+                not isinstance(attempts, list)
+                or not attempts
+                or not isinstance(attempts[-1], dict)
+                or attempts[-1].get("launch_id") != launch_id
+                or attempts[-1].get("state") != "launching"
+            ):
+                raise TaskSessionError("Task launch-attempt audit is malformed")
+            released_at = utc_now()
+            attempts[-1].update(
+                {
+                    "state": "no-worker-started",
+                    "finished_at": released_at,
+                    "reason": reason.strip(),
+                    "worker_state_path": str(path),
+                }
+            )
+            resume_event.pop("launch_id")
+            resume_event.pop("launch_claimed_at", None)
+            resume_event["state"] = "prepared"
+            resume_event["last_prestart_failure"] = {
+                "recorded_at": released_at,
+                "reason": reason.strip(),
+            }
+            lease["updated_at"] = released_at
+            StateStore.replace_json(lease_path, lease)
+            return {"task_id": expected, "preimplementation_resume": resume_event}
+
+    def record_preimplementation_worker_started(
+        self, task_id: str, *, worker_state_path: Path
+    ) -> dict[str, Any]:
+        expected = normalize_task_id(task_id)
+        path = worker_state_path.resolve()
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / expected / "temporary" / "delivery"
+        ).resolve()
+        try:
+            path.relative_to(delivery_root)
+        except ValueError as error:
+            raise TaskSessionError(
+                "Worker state path is outside the task delivery artifacts"
+            ) from error
+        raw = self.store.read_json(path)
+        command_process = raw.get("command_process") if isinstance(raw, Mapping) else None
+        if (
+            not isinstance(raw, Mapping)
+            or raw.get("version") != 1
+            or not isinstance(command_process, Mapping)
+        ):
+            raise TaskSessionError("Durable worker state has no actual command-start marker")
+        worker_pid = command_process.get("pid")
+        process_instance = command_process.get("process_instance")
+        command_started_at = raw.get("command_started_at")
+        if (
+            isinstance(worker_pid, bool)
+            or not isinstance(worker_pid, int)
+            or worker_pid < 1
+            or not isinstance(process_instance, Mapping)
+            or not isinstance(process_instance.get("kind"), str)
+            or not process_instance.get("kind")
+            or any(
+                not isinstance(key, str) or not isinstance(value, str)
+                for key, value in process_instance.items()
+            )
+            or not isinstance(command_started_at, str)
+            or not command_started_at
+        ):
+            raise TaskSessionError("Durable worker command-start marker is malformed")
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            lease = self.store.read_json(lease_path)
+            resume_event = (
+                lease.get("preimplementation_resume") if isinstance(lease, Mapping) else None
+            )
+            if (
+                not isinstance(lease, dict)
+                or lease.get("task_id") != expected
+                or self._lease_state(lease) != "implementation"
+                or not isinstance(resume_event, dict)
+                or resume_event.get("state") != "launching"
+            ):
+                raise TaskSessionError("Task has no claimed pre-implementation worker launch")
+            launch_id = resume_event.get("launch_id")
+            attempts = resume_event.get("launch_attempts")
+            if (
+                not isinstance(launch_id, str)
+                or not isinstance(attempts, list)
+                or not attempts
+                or not isinstance(attempts[-1], dict)
+                or attempts[-1].get("launch_id") != launch_id
+                or attempts[-1].get("state") != "launching"
+            ):
+                raise TaskSessionError("Task launch-attempt audit is malformed")
+            started_at = utc_now()
+            attempts[-1].update(
+                {
+                    "state": "worker-started",
+                    "worker_started_at": started_at,
+                    "worker_pid": worker_pid,
+                    "worker_process_instance": dict(process_instance),
+                    "worker_state_path": str(path),
+                }
+            )
+            resume_event.update(
+                {
+                    "state": "worker-started",
+                    "worker_started_at": started_at,
+                    "command_started_at": command_started_at,
+                    "worker_pid": worker_pid,
+                    "worker_process_instance": dict(process_instance),
+                    "worker_state_path": str(path),
+                }
+            )
+            lease["updated_at"] = utc_now()
+            StateStore.replace_json(lease_path, lease)
+            return {"task_id": expected, "preimplementation_resume": resume_event}
+
     def record_queue_cycle(
         self,
         task_id: str,
@@ -3965,6 +4629,8 @@ class TaskController:
                 history["queue_budget"] = current["queue_budget"]
             if "delivery_priority_override" in current:
                 history["delivery_priority_override"] = current["delivery_priority_override"]
+            if isinstance(current.get("preimplementation_resume"), Mapping):
+                history["preimplementation_resume"] = current["preimplementation_resume"]
             latest_history = self.store.read_json(history_path)
             if latest_history != prior_history:
                 raise TaskSessionError(
@@ -5594,6 +6260,21 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument("--dependency-id", action="append")
     start.add_argument("--offline", action="store_true")
     start.add_argument("--queue-mode", action="store_true")
+    resume = subparsers.add_parser("resume-preimplementation")
+    resume.add_argument("task_id")
+    resume.add_argument("--control-issue", type=int, required=True)
+    resume.add_argument("--reason", required=True)
+    resume.add_argument("--owner-authorize", action="store_true")
+    claim_worker = subparsers.add_parser("claim-preimplementation-worker-launch")
+    claim_worker.add_argument("task_id")
+    release_worker = subparsers.add_parser("release-preimplementation-worker-launch")
+    release_worker.add_argument("task_id")
+    release_worker.add_argument("--launch-id", required=True)
+    release_worker.add_argument("--worker-state-path", type=Path, required=True)
+    release_worker.add_argument("--reason", required=True)
+    record_worker = subparsers.add_parser("record-preimplementation-worker-started")
+    record_worker.add_argument("task_id")
+    record_worker.add_argument("--worker-state-path", type=Path, required=True)
     adopt = subparsers.add_parser("adopt-current")
     adopt.add_argument("task_id")
     adopt.add_argument("--owner-launch", action="store_true")
@@ -5703,6 +6384,37 @@ def main(argv: Sequence[str] | None = None) -> int:
                     dependency_ids=args.dependency_id,
                     offline=args.offline,
                     queue_mode=args.queue_mode,
+                )
+            )
+            return 0
+        if args.command == "resume-preimplementation":
+            _print(
+                controller.resume_preimplementation(
+                    args.task_id,
+                    control_issue_number=args.control_issue,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            )
+            return 0
+        if args.command == "claim-preimplementation-worker-launch":
+            _print(controller.claim_preimplementation_worker_launch(args.task_id))
+            return 0
+        if args.command == "release-preimplementation-worker-launch":
+            _print(
+                controller.release_preimplementation_worker_launch(
+                    args.task_id,
+                    launch_id=args.launch_id,
+                    worker_state_path=args.worker_state_path,
+                    reason=args.reason,
+                )
+            )
+            return 0
+        if args.command == "record-preimplementation-worker-started":
+            _print(
+                controller.record_preimplementation_worker_started(
+                    args.task_id,
+                    worker_state_path=args.worker_state_path,
                 )
             )
             return 0

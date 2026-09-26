@@ -45,6 +45,188 @@ def _claim_process_instance(*, boot_id: str = "a" * 32, start_ticks: str = "1") 
     return {"kind": "linux-proc", "boot_id": boot_id, "start_ticks": start_ticks}
 
 
+@pytest.mark.parametrize(
+    ("exit_after_polls", "expected_events"),
+    (
+        (
+            1,
+            ["launch-claimed", "supervisor-started", "codex-started", "reconciled"],
+        ),
+        (
+            3,
+            ["launch-claimed", "supervisor-started", "codex-started", "polled", "reconciled"],
+        ),
+    ),
+)
+def test_resumed_worker_claims_before_supervisor_and_records_only_after_codex_start(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    exit_after_polls: int,
+    expected_events: list[str],
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    worker_state_path = artifacts / "worker-state.json"
+    events: list[str] = []
+
+    class _Process:
+        pid = 501
+        returncode: int | None = None
+
+        def __init__(self) -> None:
+            self.poll_count = 0
+
+        def poll(self) -> int | None:
+            self.poll_count += 1
+            if self.poll_count >= exit_after_polls:
+                self.returncode = 0
+            return self.returncode
+
+    process = _Process()
+
+    def fake_popen(command: list[str], **kwargs: Any) -> _Process:
+        assert "--worker-supervisor" in command
+        assert "codex.exe" in command
+        assert "--check" not in kwargs
+        events.append("supervisor-started")
+        identity = _claim_process_instance()
+        worker_state_path.write_text(
+            json.dumps(
+                {
+                    "version": delivery.WORKER_STATE_VERSION,
+                    "pid": 502,
+                    "process_group_id": None,
+                    "process_instance": identity,
+                    "started_at": "2026-09-27T00:00:00+00:00",
+                    "command_process": {"pid": 503, "process_instance": identity},
+                    "command_started_at": "2026-09-27T00:00:01+00:00",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return process
+
+    monkeypatch.setattr(delivery.shutil, "which", lambda name: "codex.exe")
+    monkeypatch.setattr(
+        delivery,
+        "_current_process_instance_identity",
+        lambda: _claim_process_instance(start_ticks="10"),
+    )
+    monkeypatch.setattr(delivery.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(
+        delivery, "_reconcile_worker_state", lambda path: events.append("reconciled")
+    )
+    monkeypatch.setattr(delivery.time, "sleep", lambda seconds: events.append("polled"))
+
+    result = delivery._launch_worker(
+        "504",
+        {
+            "lease": {
+                "worktree": str(tmp_path),
+                "canonical_task_path": "codex-backlog/tasks/504-task.md",
+            }
+        },
+        artifacts,
+        worker_state_path=worker_state_path,
+        on_launch_claim=lambda: events.append("launch-claimed") or "test-launch-id",
+        on_command_started=lambda path: events.append(
+            "codex-started" if path == worker_state_path else "wrong-state-path"
+        ),
+        on_precommand_failure=lambda *_args: pytest.fail(
+            "pre-command failure callback must not run after a Codex start marker"
+        ),
+    )
+
+    assert result == 0
+    assert events == expected_events
+
+
+def test_resumed_worker_releases_claim_when_supervisor_process_never_starts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    worker_state_path = artifacts / "worker-state.json"
+    events: list[str] = []
+    monkeypatch.setattr(delivery.shutil, "which", lambda name: "codex.exe")
+    monkeypatch.setattr(
+        delivery,
+        "_current_process_instance_identity",
+        lambda: _claim_process_instance(start_ticks="10"),
+    )
+
+    def failed_popen(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError("synthetic supervisor startup failure")
+
+    monkeypatch.setattr(delivery.subprocess, "Popen", failed_popen)
+
+    with pytest.raises(delivery.DeliveryError, match="no Codex worker was launched"):
+        delivery._launch_worker(
+            "504",
+            {
+                "lease": {
+                    "worktree": str(tmp_path),
+                    "canonical_task_path": "codex-backlog/tasks/504-task.md",
+                }
+            },
+            artifacts,
+            worker_state_path=worker_state_path,
+            on_launch_claim=lambda: "test-launch-id",
+            on_command_started=lambda _path: pytest.fail("Codex must not start"),
+            on_precommand_failure=lambda path, launch_id, reason: events.append(
+                "released"
+                if path == worker_state_path
+                and launch_id == "test-launch-id"
+                and "could not be started" in reason
+                and not path.exists()
+                else "invalid-release"
+            ),
+        )
+
+    assert events == ["released"]
+
+
+def test_resume_launcher_uses_owner_authorized_controller_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = delivery._parser().parse_args(
+        [
+            "504",
+            "--control-issue",
+            "504",
+            "--resume-preimplementation",
+            "--resume-reason",
+            "owner-authorized controller retry",
+        ]
+    )
+    observed: dict[str, Any] = {}
+
+    def fake_run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["command"] = command
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"lease": {"branch": "task/504-test"}}), stderr=""
+        )
+
+    monkeypatch.setattr(delivery, "_run", fake_run)
+    started = delivery._start(
+        args.task_id,
+        session_label="test",
+        poll_seconds=10,
+        max_wait_minutes=1,
+        offline=args.offline,
+        resume_control_issue=args.control_issue,
+        resume_reason=args.resume_reason,
+    )
+
+    command = observed["command"]
+    assert started["lease"]["branch"] == "task/504-test"
+    assert command[command.index("resume-preimplementation") + 1] == "504"
+    assert "--owner-authorize" in command
+    assert "--control-issue" in command
+    assert "--reason" in command
+    assert "start" not in command
+
+
 def test_run_scopes_git_safety_to_exact_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -441,7 +623,10 @@ def test_windows_bootstrap_runs_command_when_supervisor_identity_matches(
 
     assert result == 0
     assert starts == [["codex", "--version"]]
-    assert json.loads(state_path.read_text(encoding="utf-8"))["pid"] == delivery.os.getpid()
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert state["pid"] == delivery.os.getpid()
+    assert state["command_process"]["pid"] == process.pid
+    assert state["command_started_at"]
 
 
 def test_windows_worker_parent_fails_closed_when_supervisor_is_dead(
@@ -614,6 +799,8 @@ def test_posix_worker_bootstrap_persists_worker_group_identity(
     assert state["pid"] == process.pid
     assert state["process_group_id"] == 1700
     assert state["process_instance"] == _claim_process_instance()
+    assert state["command_process"]["pid"] == process.pid
+    assert state["command_started_at"]
 
 
 def test_posix_worker_bootstrap_publishes_identity_before_unblocking_parent_loss(
