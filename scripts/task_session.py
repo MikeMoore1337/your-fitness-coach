@@ -77,6 +77,11 @@ ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
 TASK_INTEGRATION_BRANCHES = {"feature/app-experience-v3": "393"}
 DEPENDABOT_LOGIN = "dependabot[bot]"
+RENOVATE_LOGIN = "renovate[bot]"
+TRUSTED_DEPENDENCY_BOT_BRANCH_PREFIXES = {
+    DEPENDABOT_LOGIN: "dependabot/",
+    RENOVATE_LOGIN: "renovate/",
+}
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
 UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
 STATE_LOCK_STALE_SECONDS = 300
@@ -210,9 +215,31 @@ def task_pr_task_id_from_branch(branch: str) -> str:
         return task_id
 
 
-def is_dependabot_pull_request(pull_request: Mapping[str, Any]) -> bool:
+def trusted_dependency_bot_login(pull_request: Mapping[str, Any]) -> str | None:
     user = pull_request.get("user")
-    return isinstance(user, Mapping) and user.get("login") == DEPENDABOT_LOGIN
+    if not isinstance(user, Mapping):
+        return None
+    login = user.get("login")
+    if not isinstance(login, str):
+        return None
+    branch_prefix = TRUSTED_DEPENDENCY_BOT_BRANCH_PREFIXES.get(login)
+    if branch_prefix is None:
+        return None
+    head = pull_request.get("head")
+    if not isinstance(head, Mapping):
+        return None
+    branch = head.get("ref")
+    if not isinstance(branch, str) or not branch.startswith(branch_prefix):
+        return None
+    return login
+
+
+def is_dependabot_pull_request(pull_request: Mapping[str, Any]) -> bool:
+    return trusted_dependency_bot_login(pull_request) == DEPENDABOT_LOGIN
+
+
+def is_renovate_pull_request(pull_request: Mapping[str, Any]) -> bool:
+    return trusted_dependency_bot_login(pull_request) == RENOVATE_LOGIN
 
 
 def normalize_concurrency_class(value: str) -> str:
@@ -1183,19 +1210,22 @@ def validate_pr_event(
         raise TaskSessionError(
             f"Unsupported pull request base: {pull_request.get('base', {}).get('ref')}"
         )
-    if is_dependabot_pull_request(pull_request):
+    dependency_bot_login = trusted_dependency_bot_login(pull_request)
+    if dependency_bot_login is not None:
         base = pull_request.get("base", {})
         head = pull_request.get("head", {})
         base_repo = base.get("repo", {}).get("full_name")
         head_repo = head.get("repo", {}).get("full_name")
+        bot_name = "Dependabot" if dependency_bot_login == DEPENDABOT_LOGIN else "Renovate"
         if not base_repo or not head_repo or head_repo != base_repo:
             raise TaskSessionError(
-                "Dependabot pull request must originate from the same repository"
+                f"{bot_name} pull request must originate from the same repository"
             )
         head_sha = str(head.get("sha", ""))
         if not head_sha:
-            raise TaskSessionError("Dependabot pull request head SHA is missing")
-        return {"kind": "dependabot-pr", "head_sha": head_sha}
+            raise TaskSessionError(f"{bot_name} pull request head SHA is missing")
+        kind = "dependabot-pr" if dependency_bot_login == DEPENDABOT_LOGIN else "renovate-pr"
+        return {"kind": kind, "head_sha": head_sha}
     event_base_sha = str(pull_request.get("base", {}).get("sha", ""))
     current_master_sha = github.branch_head(TARGET_BASE_BRANCH)
     if event_base_sha != current_master_sha:
@@ -1272,13 +1302,18 @@ def verify_master_merge(
         is_controller_merge = CONTROLLER_BRANCH_RE.fullmatch(
             branch
         ) is not None and title.startswith("[Controller]")
-        is_dependabot_merge = is_dependabot_pull_request(pull_request) and is_same_repository
+        dependency_bot_login = trusted_dependency_bot_login(pull_request)
+        is_dependency_bot_merge = dependency_bot_login is not None and is_same_repository
         if is_task_merge:
             merge_kind = "task-pr-merge"
         elif is_controller_merge and is_same_repository:
             merge_kind = "controller-pr-merge"
-        elif is_dependabot_merge:
-            merge_kind = "dependabot-pr-merge"
+        elif is_dependency_bot_merge:
+            merge_kind = (
+                "dependabot-pr-merge"
+                if dependency_bot_login == DEPENDABOT_LOGIN
+                else "renovate-pr-merge"
+            )
         else:
             continue
         matches.append(
