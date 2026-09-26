@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from fitminiapp_api.core.config import Settings, settings
 from fitminiapp_api.nutrition_label import vision
@@ -245,10 +245,19 @@ def test_vision_settings_fail_closed_until_zdr_is_verified() -> None:
     assert production_configured.nutrition_label_vision_allow_preview is True
 
 
-def test_vision_adapter_factory_is_disabled_without_verified_policy(monkeypatch) -> None:
+def test_vision_adapter_factory_requires_verified_policy_and_preview_opt_in(monkeypatch) -> None:
     monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
     monkeypatch.setattr(settings, "nutrition_label_vision_kill_switch", False)
     monkeypatch.setattr(settings, "nutrition_label_vision_provider", "groq")
     monkeypatch.setattr(settings, "nutrition_label_vision_data_policy", "disabled")
+    monkeypatch.setattr(settings, "nutrition_label_vision_allow_preview", False)
+    monkeypatch.setattr(settings, "groq_api_key", SecretStr("test-key"))
 
     assert vision.build_vision_fallback_adapter() is None
+
+    monkeypatch.setattr(settings, "nutrition_label_vision_data_policy", "zdr_verified")
+    assert vision.build_vision_fallback_adapter() is None
+
+    monkeypatch.setattr(settings, "nutrition_label_vision_allow_preview", True)
+    adapter = vision.build_vision_fallback_adapter()
+    assert isinstance(adapter, vision.GroqNutritionLabelVisionAdapter)
