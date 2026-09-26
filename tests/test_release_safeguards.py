@@ -124,6 +124,7 @@ def test_renovate_dependency_policy_is_fail_closed() -> None:
     ):
         assert not legacy.exists()
 
+
 def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() -> None:
     sources = _sources()
     deploy = sources["deploy"]
