@@ -397,7 +397,6 @@ def _parse_plain_text_response(response: Any, *, started: float) -> ProviderText
     )
 
 
-
 def _provider_http_client() -> httpx.Client:
     return httpx.Client(
         timeout=httpx.Timeout(settings.ai_coach_timeout_seconds),
