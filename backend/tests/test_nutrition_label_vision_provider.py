@@ -206,6 +206,18 @@ def test_vision_settings_fail_closed_until_zdr_is_verified() -> None:
             nutrition_label_vision_proxy_url="socks5://user:secret@proxy.example:1080",
         )
 
+    with pytest.raises(ValidationError, match="Preview"):
+        Settings(
+            **base,
+            app_env="prod",
+            secret_key="p" * 40,
+            bot_internal_token="b" * 40,
+            nutrition_label_vision_enabled=True,
+            nutrition_label_vision_provider="groq",
+            nutrition_label_vision_data_policy="zdr_verified",
+            groq_api_key="test-key",
+        )
+
 
 def test_vision_adapter_factory_is_disabled_without_verified_policy(monkeypatch) -> None:
     monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
