@@ -118,6 +118,8 @@ class FakeGitHub:
     def api(self, endpoint: str) -> Any:
         if endpoint.startswith("commits/") and endpoint.endswith("/pulls"):
             return self.associated_pulls
+        if endpoint.startswith("issues/") and endpoint.count("/") == 1:
+            return self.issues[int(endpoint.rsplit("/", maxsplit=1)[1])]
         if endpoint.startswith("actions/runs/"):
             return self.runs[int(endpoint.rsplit("/", maxsplit=1)[1])]
         raise AssertionError(f"Unexpected fake GitHub API endpoint: {endpoint}")
@@ -147,14 +149,6 @@ class FakeGitHub:
 
     def issue_comments(self, number: int) -> list[dict[str, Any]]:
         return self.issue_comment_map[number]
-
-    def task_issues(self, task_id: str) -> list[dict[str, Any]]:
-        prefix = f"[Task {task_id}]".casefold()
-        return [
-            issue
-            for issue in self.issues.values()
-            if str(issue.get("title", "")).casefold().startswith(prefix)
-        ]
 
     def has_successful_deployment(self, sha: str, environment: str) -> bool:
         return (sha, environment) in self.successful_deployments
@@ -273,7 +267,7 @@ def _prepare_preimplementation_resume(
     issue_number = int(task_id.rstrip("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
     github.issues[issue_number] = {
         "number": issue_number,
-        "title": f"[Task {task_id}] Synthetic resume fixture",
+        "title": f"[Product v4 / Stage 0] Synthetic task {task_id} resume fixture",
         "state": "open",
         "user": {"login": "owner"},
         "body": render_task_contract(
@@ -592,6 +586,7 @@ def test_resume_preimplementation_refuses_unsafe_state_without_mutation(
         ("wrong_branch", "control state branch"),
         ("wrong_blocker", "pre-implementation failure"),
         ("closed_issue", "open control Issue"),
+        ("pull_request", "not a pull request"),
         ("wrong_author", "repository owner"),
         ("wrong_task_contract", "machine-readable contract"),
         ("external_gate", "separate human or external gate"),
@@ -651,6 +646,8 @@ def test_resume_preimplementation_requires_matching_owner_control_state(
         ]
     elif mutation == "closed_issue":
         github.issues[241]["state"] = "closed"
+    elif mutation == "pull_request":
+        github.issues[241]["pull_request"] = {}
     elif mutation == "wrong_author":
         github.issues[241]["user"]["login"] = "intruder"
     elif mutation in {"wrong_task_contract", "external_gate"}:
