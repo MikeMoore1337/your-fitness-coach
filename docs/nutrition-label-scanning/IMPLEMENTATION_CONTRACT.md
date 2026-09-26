@@ -10,12 +10,18 @@
 adapter не передаются.
 
 `NUTRITION_LABEL_VISION_ENABLED=false` — fail-closed default; timeout ограничен 8 секундами,
-ответ — 64 KiB. На дату этой реализации production adapter/provider отсутствует и обычный API
-его не получает. Неуспех или выключенный route сохраняет локальный editable draft и требует
-ручной проверки. Любой принятый proposal проходит существующую строгую canonical/domain
-валидацию и остаётся `requires_user_review=true`; факты из разных `column_ref` не смешиваются;
-автоматические food/catalog/diary writes не разрешены. Этот code seam не является provider
-approval или разрешением на передачу фотографий.
+ответ — 64 KiB. Task 283 добавляет отдельный Groq adapter для `qwen/qwen3.8-27b` только как
+evaluation-capable fallback: normalised PNG передаётся как inline image исключительно для
+`vision_candidate`, strict JSON Schema ограничивает ответ узким extraction DTO, а canonical draft
+строится детерминированно внутри YFC. Adapter использует отдельный
+`NUTRITION_LABEL_VISION_PROXY_URL`, `trust_env=false`, `store=false`, no tools и no user id.
+
+Активация fail-closed: нужны provider=`groq`, data policy=`zdr_verified`, выключенный Vision
+kill switch и валидный credential. Дополнительно `APP_ENV=prod` запрещает активировать текущую
+модель, пока Groq классифицирует `qwen/qwen3.8-27b` как Preview. То есть даже подтверждённый ZDR
+не превращает Preview-модель в production route. Неуспех или выключенный route сохраняет
+локальный editable draft и требует ручной проверки. Любой принятый proposal остаётся
+`requires_user_review=true`; автоматические food/catalog/diary writes не разрешены.
 
 Этот документ фиксирует production foundation Task 128B и mobile/TMA integration Task 128C.
 Значение `false` в коде и `.env.example` остаётся fail-closed sample default. После обязательной
