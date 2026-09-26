@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from scripts.configure_production_nutrition_label_vision import (
     PRODUCTION_NUTRITION_VISION_FLAGS,
     configure_production_nutrition_label_vision,
