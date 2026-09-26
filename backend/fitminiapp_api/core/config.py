@@ -113,10 +113,10 @@ class Settings(BaseSettings):
     usda_fdc_api_key: SecretStr = SecretStr("")
     food_provider_timeout_seconds: float = Field(default=4, ge=1, le=15)
 
-    # Task 128C keeps recognition local-only. These settings do not configure
-    # a cloud Vision provider or an external fallback route. The internal user
-    # list remains accepted for backwards-compatible configuration parsing, but
-    # it no longer limits access when the feature is enabled.
+    # Nutrition label recognition remains local-first. Task 283 adds a separately gated
+    # Groq Vision fallback for deterministic vision_candidate cases only. The internal
+    # user list remains accepted for backwards-compatible configuration parsing, but
+    # it no longer limits access when the scan feature is enabled.
     nutrition_label_scan_enabled: bool = False
     nutrition_label_scan_kill_switch: bool = False
     nutrition_label_vision_enabled: bool = False
