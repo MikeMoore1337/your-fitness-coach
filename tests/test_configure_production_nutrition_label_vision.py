@@ -70,7 +70,9 @@ def test_enables_vision_idempotently_and_preserves_secrets(tmp_path: Path) -> No
     assert "NUTRITION_LABEL_VISION_PROXY_URL=socks5://host.docker.internal:1081\n" in first
     for key, value in PRODUCTION_NUTRITION_VISION_FLAGS.items():
         assert first.count(f"{key}={value}\n") == 1
-    assert int(PRODUCTION_NUTRITION_VISION_FLAGS["NUTRITION_LABEL_VISION_MAX_OUTPUT_TOKENS"]) <= 1000
+    assert (
+        int(PRODUCTION_NUTRITION_VISION_FLAGS["NUTRITION_LABEL_VISION_MAX_OUTPUT_TOKENS"]) <= 1000
+    )
 
 
 @pytest.mark.parametrize("value", ["", "change-me", "replace-me", "your_api_key"])
