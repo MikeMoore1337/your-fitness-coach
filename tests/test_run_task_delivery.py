@@ -303,22 +303,43 @@ def test_worker_supervisor_returns_codex_exit_code_when_parent_stays_alive(
 
 
 def test_worker_supervisor_uses_windows_job_for_process_tree_termination(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(delivery.os, "name", "nt")
     process = _FakeSupervisedWorker()
     job = _FakeWindowsWorkerJob(process)
+    state_path = tmp_path / "worker-state.json"
     observed: dict[str, Any] = {}
+    monkeypatch.setattr(
+        delivery,
+        "_current_process_instance_identity",
+        lambda: {"kind": "windows", "creation_time_100ns": "111"},
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_queue_owner_process_instance",
+        lambda pid: {"kind": "windows", "creation_time_100ns": str(pid)},
+    )
+    release_worker = delivery._release_windows_worker
+
+    def release_after_durable_state(worker: _FakeSupervisedWorker) -> None:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        assert state["pid"] == worker.pid
+        observed["released_after_state"] = True
+        release_worker(worker)
 
     def fake_popen(command: list[str], **kwargs: Any) -> _FakeSupervisedWorker:
         observed["command"] = command
         observed["kwargs"] = kwargs
         return process
 
+    monkeypatch.setattr(delivery, "_release_windows_worker", release_after_durable_state)
+
     result = delivery._run_worker_supervisor(
         ["codex", "exec"],
         parent_pid=42,
         parent_identity={"kind": "windows", "creation_time_100ns": "123"},
+        worker_state_path=state_path,
         popen=fake_popen,
         owner_probe=lambda pid, identity: False,
         sleeper=lambda seconds: pytest.fail("parent loss must terminate without polling sleep"),
@@ -328,6 +349,11 @@ def test_worker_supervisor_uses_windows_job_for_process_tree_termination(
     assert result == delivery.WORKER_PARENT_LOST_EXIT_CODE
     assert job.closed is True
     assert process.terminated is False
+    assert observed["released_after_state"] is True
+    assert json.loads(state_path.read_text(encoding="utf-8"))["process_instance"] == {
+        "kind": "windows",
+        "creation_time_100ns": str(process.pid),
+    }
     assert process.stdin.writes == [b"\n"]
     assert process.stdin.closed is True
     assert observed["command"][:3] == [
@@ -338,6 +364,135 @@ def test_worker_supervisor_uses_windows_job_for_process_tree_termination(
     assert observed["kwargs"]["creationflags"] == getattr(
         delivery.subprocess, "CREATE_NEW_PROCESS_GROUP", 0
     )
+
+
+def test_windows_worker_parent_accepts_mismatched_immediate_parent_with_matching_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "nt")
+    monkeypatch.setattr(delivery.os, "getppid", lambda: 99)
+    identity = {"kind": "windows", "creation_time_100ns": "123"}
+    monkeypatch.setattr(delivery, "_queue_owner_process_instance", lambda pid: identity)
+
+    assert delivery._worker_parent_is_alive(42, identity) is True
+
+
+def test_windows_bootstrap_runs_command_when_supervisor_identity_matches(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "nt")
+    monkeypatch.setattr(delivery.os, "getppid", lambda: 99)
+    monkeypatch.setattr(delivery, "_wait_for_windows_worker_release", lambda: None)
+    supervisor_identity = {"kind": "windows", "creation_time_100ns": "123"}
+    bootstrap_identity = {"kind": "windows", "creation_time_100ns": "456"}
+    monkeypatch.setattr(
+        delivery,
+        "_queue_owner_process_instance",
+        lambda pid: supervisor_identity if pid == 42 else bootstrap_identity,
+    )
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", lambda: bootstrap_identity)
+    state_path = tmp_path / "worker-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "version": delivery.WORKER_STATE_VERSION,
+                "pid": delivery.os.getpid(),
+                "process_group_id": None,
+                "process_instance": bootstrap_identity,
+                "started_at": "2026-09-26T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    process = _FakeSupervisedWorker(exit_after_polls=0)
+    starts: list[list[str]] = []
+
+    result = delivery._run_worker_bootstrap(
+        ["codex", "--version"],
+        parent_pid=42,
+        parent_identity=supervisor_identity,
+        worker_state_path=state_path,
+        popen=lambda command, **kwargs: starts.append(command) or process,
+        sleeper=lambda seconds: pytest.fail("already exited harmless command must not sleep"),
+    )
+
+    assert result == 0
+    assert starts == [["codex", "--version"]]
+    assert json.loads(state_path.read_text(encoding="utf-8"))["pid"] == delivery.os.getpid()
+
+
+def test_windows_worker_parent_fails_closed_when_supervisor_is_dead(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "nt")
+    monkeypatch.setattr(delivery.os, "getppid", lambda: 99)
+    monkeypatch.setattr(delivery, "_queue_owner_process_instance", lambda pid: None)
+
+    assert (
+        delivery._worker_parent_is_alive(42, {"kind": "windows", "creation_time_100ns": "123"})
+        is False
+    )
+
+
+def test_windows_worker_parent_fails_closed_when_supervisor_pid_was_reused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "nt")
+    monkeypatch.setattr(delivery.os, "getppid", lambda: 99)
+    monkeypatch.setattr(
+        delivery,
+        "_queue_owner_process_instance",
+        lambda pid: {"kind": "windows", "creation_time_100ns": "456"},
+    )
+
+    assert (
+        delivery._worker_parent_is_alive(42, {"kind": "windows", "creation_time_100ns": "123"})
+        is False
+    )
+
+
+@pytest.mark.parametrize("identity_json", [None, "{", "{}"])
+def test_windows_worker_bootstrap_rejects_missing_or_malformed_parent_identity(
+    monkeypatch: pytest.MonkeyPatch, identity_json: str | None
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "nt")
+
+    with pytest.raises(delivery.DeliveryError, match="supervisor process identity"):
+        delivery._worker_bootstrap_from_args(
+            parent_pid=42,
+            parent_identity_json=identity_json,
+            command=["codex", "--version"],
+            worker_state_path_value="C:/artifacts/worker-state.json",
+        )
+
+
+def test_windows_worker_bootstrap_does_not_start_command_without_durable_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "nt")
+    monkeypatch.setattr(delivery, "_wait_for_windows_worker_release", lambda: None)
+    starts: list[list[str]] = []
+
+    with pytest.raises(delivery.DeliveryError, match="worker state is missing"):
+        delivery._run_worker_bootstrap(
+            ["codex", "--version"],
+            parent_pid=42,
+            parent_identity={"kind": "windows", "creation_time_100ns": "123"},
+            worker_state_path=tmp_path / "worker-state.json",
+            popen=lambda command, **kwargs: starts.append(command),
+        )
+
+    assert starts == []
+
+
+def test_posix_worker_parent_keeps_direct_parent_semantics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(delivery.os, "name", "posix")
+    monkeypatch.setattr(delivery.os, "getppid", lambda: 42)
+
+    assert delivery._worker_parent_is_alive(42) is True
+    assert delivery._worker_parent_is_alive(43) is False
 
 
 def test_linux_worker_supervisor_binds_codex_to_supervisor_lifetime(

@@ -60,13 +60,16 @@ identity и запускает worker через bounded bootstrap guard. На P
 `PR_SET_PDEATHSIG` до `exec`, а после старта переключается на обработчик, который уничтожает
 worker group, поэтому SIGKILL/OOM supervisor не оставляет Codex descendants работать дальше.
 На macOS тот же guard использует bounded parent-polling и тот же group kill.
-Worker state с PID, process-instance identity и process-group ID записывается атомарно до
-начала дальнейшей работы. При ошибке supervisor launcher сверяет и при необходимости
-завершает эту группу; active queue claim сохраняется при любом abnormal worker exit, поэтому
-новый launcher не reclaim-ит очередь до reconciliation.
+Worker state записывается атомарно до release supervision: на POSIX это PID Codex, process-instance
+identity и process-group ID, пока parent-loss signal остаётся заблокирован; на Windows supervisor
+сохраняет PID и process-instance identity gated bootstrap process до release. Bootstrap сверяет эту
+запись и stable identity supervisor до запуска Codex. При ошибке launcher сверяет и при
+необходимости завершает worker; active queue claim сохраняется при любом abnormal worker exit,
+поэтому новый launcher не reclaim-ит очередь до reconciliation.
 На Windows guard сначала ждёт release от supervisor. Supervisor сначала помещает этот ещё
-не запустивший Codex guard в Job Object с `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, затем отправляет
-release; Codex и его дочерние процессы наследуют Job Object без assignment gap.
+не запустивший Codex bootstrap в Job Object с `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, записывает его
+stable identity в worker state, затем отправляет release. Bootstrap проверяет эту запись и identity
+supervisor до запуска Codex; Codex и его дочерние процессы наследуют Job Object без assignment gap.
 Claim атомарно обновляет `queue_phase`, `task_id`, `task_issue` и `worker_state` перед запуском
 каждой задачи и очищает их только после полного `_deliver_one`. Если owner провалился, пока claim
 содержит активную задачу, recovery сначала читает durable controller history и останавливается

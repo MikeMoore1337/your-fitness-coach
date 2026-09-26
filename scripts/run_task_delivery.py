@@ -1734,7 +1734,11 @@ def _reconcile_worker_state(path: Path) -> None:
 
 
 def _worker_bootstrap_command(
-    command: Sequence[str], *, parent_pid: int, worker_state_path: Path | None
+    command: Sequence[str],
+    *,
+    parent_pid: int,
+    parent_identity: Mapping[str, str] | None,
+    worker_state_path: Path | None,
 ) -> list[str]:
     bootstrap = [
         sys.executable,
@@ -1743,13 +1747,31 @@ def _worker_bootstrap_command(
         "--parent-pid",
         str(parent_pid),
     ]
+    if parent_identity is not None:
+        bootstrap.extend(
+            (
+                "--parent-identity",
+                json.dumps(dict(parent_identity), ensure_ascii=True, sort_keys=True),
+            )
+        )
     if worker_state_path is not None:
         bootstrap.extend(("--worker-state-path", str(worker_state_path)))
     bootstrap.extend(("--worker-command", *command))
     return bootstrap
 
 
-def _worker_parent_is_alive(parent_pid: int) -> bool:
+def _worker_parent_is_alive(
+    parent_pid: int,
+    parent_identity: Mapping[str, str] | None = None,
+) -> bool:
+    if os.name == "nt":
+        if parent_identity is None:
+            return False
+        try:
+            expected = _queue_claim_process_instance(parent_identity, Path("worker-supervisor"))
+        except DeliveryError:
+            return False
+        return expected.get("kind") == "windows" and _queue_owner_is_alive(parent_pid, expected)
     return os.getppid() == parent_pid
 
 
@@ -1868,9 +1890,10 @@ def _run_worker_bootstrap(
     command: Sequence[str],
     *,
     parent_pid: int,
+    parent_identity: Mapping[str, str] | None = None,
     worker_state_path: Path | None,
     popen: Callable[..., Any] = subprocess.Popen,
-    parent_probe: Callable[[int], bool] = _worker_parent_is_alive,
+    parent_probe: Callable[[int], bool] | None = None,
     sleeper: Callable[[float], None] = time.sleep,
     guard: WorkerEventGuard | None = None,
     guard_report_path: Path | None = None,
@@ -1878,7 +1901,27 @@ def _run_worker_bootstrap(
     if parent_pid < 1 or not command:
         raise DeliveryError("HUMAN_REQUIRED: worker bootstrap received invalid process metadata")
     if os.name == "nt":
+        if parent_identity is None or parent_identity.get("kind") != "windows":
+            raise DeliveryError(
+                "HUMAN_REQUIRED: Windows worker bootstrap supervisor process identity is missing"
+            )
+        if worker_state_path is None:
+            raise DeliveryError("HUMAN_REQUIRED: Windows worker bootstrap state path is missing")
         _wait_for_windows_worker_release()
+        state = _read_worker_state(worker_state_path)
+        if (
+            state["pid"] != os.getpid()
+            or state["process_instance"] != _current_process_instance_identity()
+            or state.get("process_group_id") is not None
+        ):
+            raise DeliveryError(
+                "HUMAN_REQUIRED: Windows worker state does not identify the released bootstrap"
+            )
+
+    if parent_probe is None:
+
+        def parent_probe(pid: int) -> bool:
+            return _worker_parent_is_alive(pid, parent_identity)
 
     worker_process: Any | None = None
     process_group_id: int | None = None
@@ -1939,7 +1982,7 @@ def _run_worker_bootstrap(
                     process_group_id = os.getpgid(worker_process.pid)
                 except ProcessLookupError:
                     process_group_id = worker_process.pid
-            if worker_state_path is not None:
+            if worker_state_path is not None and os.name != "nt":
                 _write_worker_state(worker_state_path, worker_process, process_group_id)
 
         if guard is not None:
@@ -2008,7 +2051,12 @@ def _run_worker_bootstrap(
 
             running = worker_process.poll() is None
             if running:
-                if not parent_probe(parent_pid):
+                try:
+                    parent_alive = parent_probe(parent_pid)
+                except DeliveryError:
+                    terminate_worker()
+                    raise
+                if not parent_alive:
                     terminate_worker()
                     _event("WORKER_BOOTSTRAP_ABORTED_PARENT_LOST", parent_pid=parent_pid)
                     return WORKER_PARENT_LOST_EXIT_CODE
@@ -2199,9 +2247,13 @@ def _run_worker_supervisor(
 ) -> int:
     if parent_pid < 1 or not command:
         raise DeliveryError("HUMAN_REQUIRED: worker supervisor received invalid process metadata")
+    if os.name == "nt" and worker_state_path is None:
+        raise DeliveryError("HUMAN_REQUIRED: Windows worker supervisor state path is missing")
+    bootstrap_parent_identity = _current_process_instance_identity() if os.name == "nt" else None
     worker_command = _worker_bootstrap_command(
         command,
         parent_pid=os.getpid(),
+        parent_identity=bootstrap_parent_identity,
         worker_state_path=worker_state_path,
     )
     launch_kwargs: dict[str, Any] = {
@@ -2225,6 +2277,11 @@ def _run_worker_supervisor(
             windows_job = (job_factory or _create_windows_worker_job)(process)
             if windows_job is None:
                 raise DeliveryError("HUMAN_REQUIRED: Windows Codex worker job was not installed")
+            if worker_state_path is None:
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: Windows worker supervisor state path is missing"
+                )
+            _write_worker_state(worker_state_path, process, None)
             _release_windows_worker(process)
         except DeliveryError:
             _terminate_supervised_worker(process, windows_job=windows_job)
@@ -2292,16 +2349,46 @@ def _worker_state_path_from_arg(value: str | None) -> Path | None:
 def _worker_bootstrap_from_args(
     *,
     parent_pid: int | None,
+    parent_identity_json: str | None,
     command: Sequence[str] | None,
     worker_state_path_value: str | None,
 ) -> int:
     if parent_pid is None or not command:
         raise DeliveryError("HUMAN_REQUIRED: worker bootstrap arguments are incomplete")
+    parent_identity: dict[str, str] | None = None
+    if os.name == "nt":
+        if not parent_identity_json:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: worker bootstrap supervisor process identity is missing"
+            )
+        if len(parent_identity_json) > 1024:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: worker bootstrap supervisor process identity is too large"
+            )
+        try:
+            identity_value = json.loads(parent_identity_json)
+        except json.JSONDecodeError as error:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: worker bootstrap supervisor process identity is malformed"
+            ) from error
+        try:
+            parent_identity = _queue_claim_process_instance(
+                identity_value, Path("worker-bootstrap-supervisor")
+            )
+        except DeliveryError as error:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: worker bootstrap supervisor process identity is invalid"
+            ) from error
+        if parent_identity.get("kind") != "windows":
+            raise DeliveryError(
+                "HUMAN_REQUIRED: worker bootstrap supervisor process identity is invalid"
+            )
     worker_state_path = _worker_state_path_from_arg(worker_state_path_value)
     guard, guard_report_path = _worker_guard_from_environment()
     return _run_worker_bootstrap(
         command,
         parent_pid=parent_pid,
+        parent_identity=parent_identity,
         worker_state_path=worker_state_path,
         guard=guard,
         guard_report_path=guard_report_path,
@@ -2855,6 +2942,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.worker_bootstrap:
             return _worker_bootstrap_from_args(
                 parent_pid=args.parent_pid,
+                parent_identity_json=args.parent_identity,
                 command=args.worker_command,
                 worker_state_path_value=args.worker_state_path,
             )
