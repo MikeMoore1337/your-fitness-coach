@@ -124,6 +124,7 @@ class Settings(BaseSettings):
     nutrition_label_vision_provider: Literal["disabled", "groq"] = "disabled"
     nutrition_label_vision_endpoint: str = "https://api.groq.com/openai/v1/chat/completions"
     nutrition_label_vision_model: Literal["qwen/qwen3.8-27b"] = "qwen/qwen3.8-27b"
+    nutrition_label_vision_allow_preview: bool = False
     nutrition_label_vision_proxy_url: str = ""
     nutrition_label_vision_data_policy: Literal["disabled", "zdr_verified"] = "disabled"
     nutrition_label_vision_timeout_seconds: float = Field(default=8, ge=1, le=8)
@@ -367,10 +368,13 @@ class Settings(BaseSettings):
                     "NUTRITION_LABEL_VISION_DATA_POLICY must be zdr_verified before Vision "
                     "is enabled"
                 )
-            if self.app_env == "prod":
+            if (
+                self.nutrition_label_vision_model == "qwen/qwen3.8-27b"
+                and not self.nutrition_label_vision_allow_preview
+            ):
                 raise ValueError(
-                    "Nutrition Label Vision cannot be enabled in prod while the selected "
-                    "Groq Vision model is Preview"
+                    "NUTRITION_LABEL_VISION_ALLOW_PREVIEW must be true for the selected "
+                    "Groq Preview Vision model"
                 )
             parsed_endpoint = urlparse(self.nutrition_label_vision_endpoint)
             if (
