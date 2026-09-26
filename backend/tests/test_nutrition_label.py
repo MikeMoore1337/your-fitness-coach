@@ -21,6 +21,7 @@ from fitminiapp_api.models.nutrition_label import (
 from fitminiapp_api.models.user import User
 from fitminiapp_api.nutrition_label.contracts import NUTRIENT_FIELDS
 from fitminiapp_api.nutrition_label.image import ImageIngressError, normalize_uploaded_image
+from fitminiapp_api.nutrition_label.ocr import LocalOcrError
 from fitminiapp_api.nutrition_label.parser import build_draft_from_ocr
 from fitminiapp_api.nutrition_label.vision import VISION_MAX_RESPONSE_BYTES
 from fitminiapp_api.schemas.nutrition_label import NutritionLabelConfirmRequest
@@ -97,6 +98,15 @@ class _FixedTextOcr:
     def extract_text(self, image_bytes: bytes) -> str:
         assert image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
         return self.text
+
+
+class _TimeoutOcr:
+    name = "local_rapidocr"
+    version = "synthetic-timeout-v1"
+
+    def extract_text(self, image_bytes: bytes) -> str:
+        assert image_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+        raise LocalOcrError("local_ocr_timeout")
 
 
 class _FakeVisionAdapter:
@@ -569,6 +579,53 @@ def test_complete_local_assessment_never_invokes_vision(client, monkeypatch) -> 
         user_id = _user_id(128_190)
         assert db.query(Food).filter_by(owner_user_id=user_id).count() == 0
         assert db.query(FoodDiaryEntry).filter_by(user_id=user_id).count() == 0
+
+
+def test_active_vision_rescues_local_ocr_timeout(client, monkeypatch) -> None:
+    telegram_user_id = 128_202
+    _auth(client, telegram_user_id)
+    user_id = _user_id(telegram_user_id)
+    _enable_scan(monkeypatch, user_id)
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    monkeypatch.setattr(settings, "nutrition_label_vision_kill_switch", False)
+    adapter = _FakeVisionAdapter(_vision_proposal_bytes(_label_text()))
+
+    with get_session_context() as db:
+        user = db.query(User).filter(User.id == user_id).one()
+        draft = nutrition_label_service.create_label_draft(
+            db,
+            user,
+            image_bytes=_label_image(),
+            content_type="image/png",
+            idempotency_key="ocr-timeout-vision-rescue-0001",
+            ocr_engine=_TimeoutOcr(),
+            vision_adapter=adapter,
+        )
+
+    assert len(adapter.calls) == 1
+    assert draft.requires_user_review is True
+    assert draft.nutrition.metadata.provider == "test_provider"
+    assert draft.nutrition.normalized_facts.protein_g is not None
+
+
+def test_local_ocr_timeout_stays_503_when_vision_unavailable(client, monkeypatch) -> None:
+    telegram_user_id = 128_203
+    _auth(client, telegram_user_id)
+    user_id = _user_id(telegram_user_id)
+    _enable_scan(monkeypatch, user_id)
+
+    with get_session_context() as db:
+        user = db.query(User).filter(User.id == user_id).one()
+        with pytest.raises(nutrition_label_service.NutritionLabelError, match="local_ocr_timeout"):
+            nutrition_label_service.create_label_draft(
+                db,
+                user,
+                image_bytes=_label_image(),
+                content_type="image/png",
+                idempotency_key="ocr-timeout-no-vision-0001",
+                ocr_engine=_TimeoutOcr(),
+                vision_adapter=None,
+            )
 
 
 def test_active_vision_rescues_valid_scan_when_local_parser_has_no_nutrition_signal(
