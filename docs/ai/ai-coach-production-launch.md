@@ -23,6 +23,12 @@ provider и policy. Старые переменные остаются толь�
 и без provider tools. Legacy structured JSON остаётся только на старых report endpoints. Новая
 архитектура или новый платный сервис не добавляются.
 
+Для production origin, где прямой Groq egress недоступен, адаптер поддерживает отдельный
+server-only `AI_COACH_PROXY_URL`. Это явный AI Coach contract: он не читает
+`TELEGRAM_OAUTH_PROXY_URL`/`TELEGRAM_BOT_PROXY_URL`, запрещает credentials/query/fragment в URL,
+отключает ambient proxy inheritance через `trust_env=False` и сохраняет end-to-end TLS к
+`api.groq.com`. Пустое значение сохраняет прямой route.
+
 ## Production environment
 
 Источник `GROQ_API_KEY` — существующий persistent host `.env`. GitHub Actions передаёт этот файл в
@@ -43,6 +49,7 @@ Production policy после нормализации:
 | `AI_COACH_ENABLED` | `true` |
 | `AI_COACH_KILL_SWITCH` | `false` |
 | `AI_COACH_PROVIDER` | `groq` |
+| `AI_COACH_PROXY_URL` | operator-managed; empty for direct egress, explicit credential-free HTTP(S)/SOCKS5 URL when required |
 | `AI_COACH_MODEL` | `openai/gpt-oss-120b` |
 | `AI_COACH_COST_POLICY` | `free_only` |
 | `AI_COACH_COST_CLASS` | `free` |
@@ -56,7 +63,7 @@ Production policy после нормализации:
 | `AI_COACH_QUOTA_WINDOW_SECONDS` | `86400` |
 | `AI_COACH_PER_USER_REQUEST_LIMIT` | `20` |
 
-`AI_COACH_GLOBAL_REQUEST_LIMIT`, timeout и cooldown сохраняются из текущего host `.env`; helper
+`AI_COACH_PROXY_URL`, `AI_COACH_GLOBAL_REQUEST_LIMIT`, timeout и cooldown сохраняются из текущего host `.env`; helper
 не меняет global protective limit. В рамках Task 276 helper идемпотентно закрепляет
 `AI_COACH_QUOTA_WINDOW_SECONDS=86400` и `AI_COACH_PER_USER_REQUEST_LIMIT=20` вместе с
 остальными перечисленными AI Coach flags. При отсутствии допустимого ключа deploy останавливается

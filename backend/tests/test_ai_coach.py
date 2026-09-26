@@ -798,6 +798,7 @@ def _provider_context() -> tuple[ContextRef, ...]:
 
 def test_groq_adapter_sends_docs_compatible_strict_request_without_tools(monkeypatch) -> None:
     _enable_provider(monkeypatch)
+    monkeypatch.setattr(settings, "ai_coach_proxy_url", "socks5://host.docker.internal:1081")
     captured: dict[str, object] = {}
     raw_response = {
         "model": "openai/gpt-oss-120b",
@@ -861,6 +862,11 @@ def test_groq_adapter_sends_docs_compatible_strict_request_without_tools(monkeyp
         "Authorization": "Bearer test-groq-key",
         "Content-Type": "application/json",
     }
+    client_kwargs = captured["client_kwargs"]
+    assert isinstance(client_kwargs, dict)
+    assert client_kwargs["proxy"] == "socks5://host.docker.internal:1081"
+    assert client_kwargs["trust_env"] is False
+    assert client_kwargs["follow_redirects"] is False
     payload = captured["json"]
     assert isinstance(payload, dict)
     assert "max_tokens" not in payload
@@ -1450,6 +1456,15 @@ def test_ai_coach_settings_require_explicit_free_generic_policy_when_enabled() -
         ai_coach_data_policy="verified_generic_only",
     )
     assert configured.ai_coach_model == "openai/gpt-oss-120b"
+    assert configured.ai_coach_proxy_url == ""
+
+    proxied = Settings(**base, ai_coach_proxy_url="socks5://host.docker.internal:1081")
+    assert proxied.ai_coach_proxy_url == "socks5://host.docker.internal:1081"
+
+    with pytest.raises(ValueError, match="AI_COACH_PROXY_URL"):
+        Settings(**base, ai_coach_proxy_url="socks5://user:secret@proxy.example:1080")
+    with pytest.raises(ValueError, match="AI_COACH_PROXY_URL"):
+        Settings(**base, ai_coach_proxy_url="https://proxy.example/path?token=secret")
 
     with pytest.raises(ValueError, match="GROQ_API_KEY"):
         Settings(**base, ai_coach_enabled=True, ai_coach_provider="groq")

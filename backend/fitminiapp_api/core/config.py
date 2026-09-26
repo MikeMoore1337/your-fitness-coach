@@ -208,6 +208,7 @@ class Settings(BaseSettings):
     ai_coach_provider: Literal["disabled", "groq"] = "disabled"
     groq_api_key: SecretStr = SecretStr("")
     ai_coach_endpoint: str = "https://api.groq.com/openai/v1/chat/completions"
+    ai_coach_proxy_url: str = ""
     ai_coach_model: Literal["openai/gpt-oss-120b"] = "openai/gpt-oss-120b"
     ai_coach_cost_policy: Literal["free_only"] = "free_only"
     ai_coach_cost_class: Literal["free", "developer", "paid", "promo", "trial", "unknown"] = (
@@ -504,6 +505,34 @@ class Settings(BaseSettings):
                 "AI_COACH_ENDPOINT must be the credential-free Groq HTTPS chat completions URL"
             )
         return self
+
+    @field_validator("ai_coach_proxy_url")
+    @classmethod
+    def validate_ai_coach_proxy_url(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            return ""
+        try:
+            parsed = urlparse(normalized)
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError(
+                "AI_COACH_PROXY_URL must be an absolute credential-free HTTP(S) or SOCKS5 URL"
+            ) from exc
+        if (
+            parsed.scheme not in {"http", "https", "socks5", "socks5h"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+            or (port is not None and not 1 <= port <= 65535)
+        ):
+            raise ValueError(
+                "AI_COACH_PROXY_URL must be an absolute credential-free HTTP(S) or SOCKS5 URL"
+            )
+        return normalized
 
     @field_validator("weekly_digest_consent_version")
     @classmethod
