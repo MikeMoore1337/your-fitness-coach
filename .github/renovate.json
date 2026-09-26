@@ -1,0 +1,218 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "timezone": "Europe/Moscow",
+  "branchPrefix": "renovate/",
+  "labels": [
+    "dependencies"
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rebaseWhen": "behind-base-branch",
+  "rangeStrategy": "bump",
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "platformAutomerge": false,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "constraints": {
+    "python": "3.14"
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "dependencies",
+      "security"
+    ],
+    "automerge": false,
+    "prConcurrentLimit": 2
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 7am on monday"
+    ],
+    "automerge": true,
+    "automergeType": "pr"
+  },
+  "packageRules": [
+    {
+      "description": "Never automerge major dependency upgrades",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "Automerge non-major dependency updates only after required checks pass",
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Python and uv updates run on Monday",
+      "matchManagers": [
+        "pep621"
+      ],
+      "schedule": [
+        "before 7am on monday"
+      ],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Frontend npm updates run on Tuesday",
+      "matchManagers": [
+        "npm"
+      ],
+      "schedule": [
+        "before 7am on tuesday"
+      ],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Docker updates run on Wednesday",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "schedule": [
+        "before 7am on wednesday"
+      ],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "GitHub Actions updates run on Thursday",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "schedule": [
+        "before 7am on thursday"
+      ],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Keep React runtime and type packages together for non-major updates",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "frontend React runtime"
+    },
+    {
+      "description": "Keep TypeScript tooling together for non-major updates",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "typescript",
+        "typescript-eslint",
+        "@typescript-eslint/**",
+        "@types/node"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "frontend TypeScript tooling"
+    },
+    {
+      "description": "Keep Vite and Vitest together for non-major updates",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "vite",
+        "vitest",
+        "@vitejs/plugin-react"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "frontend Vite tooling"
+    },
+    {
+      "description": "Keep Testing Library packages together for non-major updates",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "@testing-library/**",
+        "jsdom"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "frontend test tooling"
+    },
+    {
+      "description": "Keep ESLint and formatting tooling together for non-major updates",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "eslint",
+        "@eslint/js",
+        "eslint-plugin-react-hooks",
+        "eslint-plugin-react-refresh",
+        "globals",
+        "prettier"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "frontend lint tooling"
+    },
+    {
+      "description": "Keep Python QA tooling together for non-major updates",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchPackageNames": [
+        "pytest",
+        "pytest-xdist",
+        "mypy",
+        "ruff",
+        "pre-commit",
+        "allure-pytest"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "python QA tooling"
+    },
+    {
+      "description": "Keep GitHub Actions non-major updates together",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}
