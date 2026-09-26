@@ -404,10 +404,16 @@ def create_label_draft(
         raise NutritionLabelError("retake_required")
 
     if assessment.outcome == RecognitionOutcome.VISION_CANDIDATE:
-        if not settings.nutrition_label_vision_enabled:
-            assessment = assessment.with_outcome(
-                RecognitionOutcome.MANUAL_REVIEW, "vision_disabled"
+        if (
+            not settings.nutrition_label_vision_enabled
+            or settings.nutrition_label_vision_kill_switch
+        ):
+            reason = (
+                "vision_kill_switch"
+                if settings.nutrition_label_vision_kill_switch
+                else "vision_disabled"
             )
+            assessment = assessment.with_outcome(RecognitionOutcome.MANUAL_REVIEW, reason)
             provider_outcome = "disabled"
         elif vision_adapter is None:
             assessment = assessment.with_outcome(
@@ -420,7 +426,7 @@ def create_label_draft(
             )
             provider_outcome = "image_too_large"
         else:
-            provider_class = "vision_adapter"
+            provider_class = vision_adapter.provider_class
             try:
                 proposal = vision_adapter.recognize(
                     normalized_image.data,

@@ -2,7 +2,8 @@
 
 **Версия:** `nutrition-label-provider-matrix-v2`
 **Дата проверки официальных источников:** 2026-09-25
-**Статус:** research only; ни один provider не approved для YFC.
+**Статус:** Groq Qwen 3.8 выбран как bounded evaluation implementation candidate. Production
+activation запрещена, пока модель имеет статус Preview; отдельно остаётся account-level ZDR gate.
 
 ## Текущие кандидаты
 
@@ -18,11 +19,11 @@
 
 - Проверены только официальные публичные документы на указанную дату. Ни один аккаунт, billing state,
   organization quota, endpoint, secret или provider request не проверялся.
-- В существующем YFC Groq adapter Vision-обработка не реализована. Наличие credentials для другого
-  продукта или route не означает право отправлять туда этикетки.
-- Ни одна модель не выбрана и не подключена. Vision feature имеет sample default
-  `NUTRITION_LABEL_VISION_ENABLED=false`; code contract сам по себе не является разрешением на
-  активацию.
+- Task 283 реализует отдельный Groq Vision adapter для `qwen/qwen3.8-27b`, но он не переиспользует
+  AI Coach route неявно: provider policy, proxy, kill switch и data-policy gate отдельные.
+- `NUTRITION_LABEL_VISION_ENABLED=false` остаётся default. Даже при существующем
+  `GROQ_API_KEY` activation fail-closed без `NUTRITION_LABEL_VISION_DATA_POLICY=zdr_verified`.
+  Code contract сам по себе не является разрешением на активацию.
 - Не отправлять real-user/package photos до отдельного решения владельца, актуальной проверки
   privacy/legal, региона и account-specific data terms. Provider schema validity не подтверждает
   фактическую точность распознавания.

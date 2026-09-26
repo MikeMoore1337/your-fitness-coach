@@ -10,12 +10,18 @@
 adapter не передаются.
 
 `NUTRITION_LABEL_VISION_ENABLED=false` — fail-closed default; timeout ограничен 8 секундами,
-ответ — 64 KiB. На дату этой реализации production adapter/provider отсутствует и обычный API
-его не получает. Неуспех или выключенный route сохраняет локальный editable draft и требует
-ручной проверки. Любой принятый proposal проходит существующую строгую canonical/domain
-валидацию и остаётся `requires_user_review=true`; факты из разных `column_ref` не смешиваются;
-автоматические food/catalog/diary writes не разрешены. Этот code seam не является provider
-approval или разрешением на передачу фотографий.
+ответ — 64 KiB. Task 283 добавляет отдельный Groq adapter для `qwen/qwen3.8-27b` только как
+evaluation-capable fallback: normalised PNG передаётся как inline image исключительно для
+`vision_candidate`, strict JSON Schema ограничивает ответ узким extraction DTO, а canonical draft
+строится детерминированно внутри YFC. Adapter использует отдельный
+`NUTRITION_LABEL_VISION_PROXY_URL`, `trust_env=false`, `store=false`, no tools и no user id.
+
+Активация fail-closed: нужны provider=`groq`, data policy=`zdr_verified`, выключенный Vision
+kill switch и валидный credential. Дополнительно `APP_ENV=prod` запрещает активировать текущую
+модель, пока Groq классифицирует `qwen/qwen3.8-27b` как Preview. То есть даже подтверждённый ZDR
+не превращает Preview-модель в production route. Неуспех или выключенный route сохраняет
+локальный editable draft и требует ручной проверки. Любой принятый proposal остаётся
+`requires_user_review=true`; автоматические food/catalog/diary writes не разрешены.
 
 Этот документ фиксирует production foundation Task 128B и mobile/TMA integration Task 128C.
 Значение `false` в коде и `.env.example` остаётся fail-closed sample default. После обязательной
@@ -94,8 +100,10 @@ Pinned Python dependencies и Debian packages остаются частью об
   ограничен отдельным body limit.
 - Pillow делает `verify`, проверяет decompression-bomb bounds, применяет EXIF orientation и
   пересохраняет только RGB PNG без EXIF/ICC/user metadata.
-- Изображение передаётся только локальному OCR subprocess. Raw image, raw OCR и внешние
-  provider payload не сохраняются в БД и не попадают в обычные логи.
+- Изображение всегда сначала обрабатывается локально. Только deterministic `vision_candidate`
+  может передать нормализованный PNG внешнему adapter при явной включённой ZDR policy.
+  Raw upload, raw OCR, provider response и user identity не сохраняются в БД и не попадают в
+  обычные логи.
 - Draft имеет короткий TTL (по умолчанию 15 минут) и scope по владельцу. После expiry новый scan
   требует нового idempotency key.
 
@@ -192,7 +200,8 @@ Local YFC catalog checked first. Exact local barcode lookup завершаетс
 `NUTRITION_LABEL_SCAN_KILL_SWITCH=false`. Маркер Task 128I хранится в persistent
 `.artifacts/operations/deployments`; последующие deploy сохраняют текущие значения host `.env`,
 включая аварийное включение kill switch. Это rollout action, а не новая credential или provider
-настройка. Cloud Vision, paid Vision, local LLM и credentials для них не нужны.
+настройка. Local OCR остаётся primary. Groq Vision fallback имеет отдельный rollout gate и не включается
+скриптом public scan rollout; без подтверждённого ZDR остаётся выключенным.
 
 ## Runtime OCR
 

@@ -9,6 +9,7 @@ from threading import Event, Lock
 import pytest
 from PIL import Image
 
+from fitminiapp_api.api.v1 import nutrition as nutrition_api
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import SessionLocal, engine, get_session_context
 from fitminiapp_api.models.food import Food
@@ -609,6 +610,52 @@ def test_disabled_vision_candidate_remains_an_editable_local_draft(client, monke
     with get_session_context() as db:
         user_id = _user_id(128_192)
         assert db.query(NutritionLabelDraft).filter_by(user_id=user_id).count() == 1
+
+
+def test_api_wires_gated_vision_adapter_for_candidate(client, monkeypatch) -> None:
+    telegram_user_id = 128_198
+    headers = _auth(client, telegram_user_id)
+    _enable_scan(monkeypatch, _user_id(telegram_user_id))
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    monkeypatch.setattr(settings, "nutrition_label_vision_kill_switch", False)
+    monkeypatch.setattr(
+        nutrition_label_service,
+        "_build_ocr_engine",
+        lambda: _FixedTextOcr("Per 100 g\nProtein 10 g"),
+    )
+    adapter = _FakeVisionAdapter(_vision_proposal_bytes(_label_text()))
+    monkeypatch.setattr(nutrition_api, "build_vision_fallback_adapter", lambda: adapter)
+
+    response = client.post(
+        "/api/v1/nutrition/label-scans",
+        headers={**headers, "Idempotency-Key": "api-vision-wiring-283"},
+        files={"image": ("label.png", _label_image(), "image/png")},
+    )
+
+    assert response.status_code == 201, response.text
+    assert len(adapter.calls) == 1
+    body = response.json()
+    assert body["requires_user_review"] is True
+    assert body["nutrition"]["source_basis"] == "per_100_g"
+
+
+def test_vision_kill_switch_never_invokes_adapter(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "nutrition_label_vision_enabled", True)
+    monkeypatch.setattr(settings, "nutrition_label_vision_kill_switch", True)
+    adapter = _FakeVisionAdapter(_vision_proposal_bytes(_label_text()))
+
+    draft = _direct_label_draft(
+        client,
+        monkeypatch=monkeypatch,
+        telegram_user_id=128_199,
+        text="Per 100 g\nProtein 10 g",
+        idempotency_key="vision-kill-switch-283",
+        vision_adapter=adapter,
+    )
+
+    assert adapter.calls == []
+    assert draft.requires_user_review is True
+    assert draft.nutrition.normalized_facts.protein_g is not None
 
 
 def test_valid_vision_proposal_only_creates_a_review_draft(client, monkeypatch) -> None:

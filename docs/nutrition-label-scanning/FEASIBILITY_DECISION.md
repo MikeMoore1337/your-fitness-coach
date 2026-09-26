@@ -214,10 +214,28 @@ editable fallback сохраняются.
   условий использования submitted content.
 - Cloudflare Workers AI исключён действующим YFC news-image contract.
 
-Таким образом, на дату проверки нет одобренного production Vision provider. Feature flag остаётся
-`NUTRITION_LABEL_VISION_ENABLED=false`; никаких provider credentials, accounts, paid calls или
-real photos не использовали. Перед будущей активацией владелец должен выбрать допустимый route и
+После закрытия production egress blocker #491 выбран bounded candidate:
+Groq `qwen/qwen3.8-27b` с Vision + strict JSON Schema. Adapter реализован local-first fallback,
+но production transmission остаётся NO-GO до подтверждения account-level Zero Data Retention.
+Feature flag остаётся `NUTRITION_LABEL_VISION_ENABLED=false`; real-user photos в provider не
+отправлялись. Перед будущей активацией владелец должен выбрать допустимый route и
 отдельно подтвердить актуальные provider terms, region/residency, retention, subprocessors, billing
 limits, legal/privacy disposition и quality evaluation. Официальные ссылки и текущие ограничения
 собраны в [provider matrix](PROVIDER_PRIVACY_COST_MATRIX.md). Это decision aid, не юридическое
 заключение.
+
+
+## Addendum Task 283 — Groq evaluation adapter (2026-09-26)
+
+После закрытия production egress blocker #491 реализован provider-specific evaluation adapter для
+Groq `qwen/qwen3.8-27b`. Он не меняет local-first решение: RapidOCR остаётся primary, внешний
+вызов возможен только для deterministic `vision_candidate`, а accepted result всё равно требует
+ручного подтверждения.
+
+На текущую дату Groq относит `qwen/qwen3.8-27b` к Preview models и прямо указывает, что Preview
+предназначены для evaluation, а не production. Поэтому runtime configuration запрещает включить
+этот Vision route при `APP_ENV=prod`. Отдельно activation требует account-level подтверждения
+Zero Data Retention и явного `NUTRITION_LABEL_VISION_DATA_POLICY=zdr_verified`.
+
+Итог: implementation/evaluation path — GO; production enable — NO-GO до stable Vision model +
+подтверждённого ZDR + pre-registered quality evaluation.

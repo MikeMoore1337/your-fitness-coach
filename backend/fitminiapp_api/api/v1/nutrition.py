@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from fitminiapp_api.api.dependencies.auth import require_nutrition_label_scan, require_user
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.user import User
+from fitminiapp_api.nutrition_label.vision import build_vision_fallback_adapter
 from fitminiapp_api.schemas.food import (
     FoodBarcodeLookupResponse,
     FoodListResponse,
@@ -271,6 +272,7 @@ def recognize_nutrition_label(
             image_bytes=image_bytes,
             content_type=image.content_type,
             idempotency_key=idempotency_key,
+            vision_adapter=build_vision_fallback_adapter(),
         )
     except NutritionLabelError as exc:
         _raise_nutrition_label_http_error(exc)

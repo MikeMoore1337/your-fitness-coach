@@ -258,3 +258,24 @@ The route configuration stays `NUTRITION_LABEL_VISION_ENABLED=false`. Tests used
 fake adapter only. Complete local-review and retake cases make zero adapter calls; disabled,
 unavailable, timed-out and invalid-response cases preserve the local draft or existing retake path.
 No production Vision fallback or recognition-quality claim is completed by this addendum.
+
+
+## Addendum Task 283 — Groq Vision adapter implementation (2026-09-26)
+
+Owner-independent provider integration is implemented for Groq `qwen/qwen3.8-27b`. The route is
+still fail-closed in production. Only deterministic `vision_candidate` cases may invoke it; complete
+local OCR and retake paths remain external-call-free. The adapter sends one normalized PNG as an
+inline image, uses no user identifier/tools/history, disables ambient proxy inheritance, requests
+strict JSON Schema output, then rebuilds the canonical draft deterministically inside YFC.
+
+Provider activation requires all of:
+`NUTRITION_LABEL_VISION_ENABLED=true`,
+`NUTRITION_LABEL_VISION_KILL_SWITCH=false`,
+`NUTRITION_LABEL_VISION_PROVIDER=groq`, and
+`NUTRITION_LABEL_VISION_DATA_POLICY=zdr_verified`.
+The last value is an operator assertion after Groq Data Controls were verified for the exact
+organization/account; code does not infer it from the API key.
+
+No real-user/package image has been sent as part of this implementation. Provider quality,
+candidate recovery, correction time, cost and real-photo accuracy therefore remain NOT MEASURED
+until the owner/privacy gate is satisfied and the pre-registered evaluation can run.
