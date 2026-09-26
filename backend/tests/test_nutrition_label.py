@@ -1125,7 +1125,7 @@ def test_local_fuzzy_search_ranks_verified_catalog_above_community_candidate() -
     assert [item.brand for item in response.items] == ["Verified", "Community"]
 
 
-def test_shared_confirmation_allows_missing_gtin_with_exact_catalog_identity(
+def test_shared_confirmation_normalizes_blank_gtin_with_exact_catalog_identity(
     client, monkeypatch
 ) -> None:
     telegram_user_id = 128_106
@@ -1141,7 +1141,7 @@ def test_shared_confirmation_allows_missing_gtin_with_exact_catalog_identity(
     response = client.post(
         f"/api/v1/nutrition/label-scans/{draft['draft_id']}/confirm",
         headers=headers,
-        json=_confirm_payload(visibility="share_to_yfc_catalog", barcode=None),
+        json=_confirm_payload(visibility="share_to_yfc_catalog", barcode=""),
     )
 
     assert response.status_code == 201, response.text

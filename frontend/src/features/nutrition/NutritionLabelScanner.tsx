@@ -704,7 +704,7 @@ export function NutritionLabelScanner({
         `/api/v1/nutrition/label-scans/${encodeURIComponent(draft.draft_id)}/confirm`,
         {
           method: 'POST',
-          body: { revision: draft.revision, ...values },
+          body: { revision: draft.revision, ...values, barcode: values.barcode || null },
           timeoutMs: 15_000,
         },
       );

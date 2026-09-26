@@ -85,6 +85,8 @@ class NutritionLabelConfirmRequest(StrictModel):
     @field_validator("barcode")
     @classmethod
     def validate_barcode(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
         return validate_gtin(value)
 
     @model_validator(mode="after")
