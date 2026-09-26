@@ -128,7 +128,7 @@ class Settings(BaseSettings):
     nutrition_label_vision_proxy_url: str = ""
     nutrition_label_vision_data_policy: Literal["disabled", "zdr_verified"] = "disabled"
     nutrition_label_vision_timeout_seconds: float = Field(default=8, ge=1, le=8)
-    nutrition_label_vision_max_output_tokens: int = Field(default=1536, ge=512, le=4096)
+    nutrition_label_vision_max_output_tokens: int = Field(default=900, ge=512, le=4096)
     nutrition_label_scan_internal_user_ids: str = ""
     nutrition_label_scan_ocr_engine: Literal["rapidocr", "tesseract"] = "rapidocr"
     nutrition_label_scan_ocr_languages: str = "rus+eng"
