@@ -291,6 +291,10 @@ def build_vision_fallback_adapter() -> VisionFallbackAdapter | None:
         or settings.nutrition_label_vision_kill_switch
         or settings.nutrition_label_vision_provider != "groq"
         or settings.nutrition_label_vision_data_policy != "zdr_verified"
+        or (
+            settings.nutrition_label_vision_model == "qwen/qwen3.8-27b"
+            and not settings.nutrition_label_vision_allow_preview
+        )
     ):
         return None
     api_key = settings.groq_api_key.get_secret_value().strip()
