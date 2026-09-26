@@ -1,3 +1,4 @@
+import json
 import tomllib
 from pathlib import Path
 
@@ -16,7 +17,7 @@ def _sources() -> dict[str, str]:
         "deploy": (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8"),
         "controller": (root / "scripts" / "task_session.py").read_text(encoding="utf-8"),
         "launcher": (root / "scripts" / "run_task_delivery.py").read_text(encoding="utf-8"),
-        "dependabot": (root / ".github" / "dependabot.yml").read_text(encoding="utf-8"),
+        "renovate": (root / ".github" / "renovate.json").read_text(encoding="utf-8"),
     }
 
 
@@ -30,7 +31,7 @@ def test_ci_runs_full_regression_on_task_pr_and_only_provenance_on_master_push()
     assert "review-contract:" not in ci
     assert "pull_request_review:" not in ci
     assert "merge-provenance:" in ci
-    assert "Validate task provenance or trusted Dependabot identity" in ci
+    assert "Validate task provenance or trusted dependency bot identity" in ci
     assert "TASK_PROVENANCE_RESULT: ${{ needs.task-provenance.result }}" in ci
     assert "python scripts/ci_contract.py run-group" in ci
     assert "frontend-checks" in ci
@@ -58,33 +59,49 @@ def test_python_script_ci_jobs_pin_supported_python_runtime() -> None:
         assert setup_python["with"]["python-version"] == "3.14"
 
 
-def test_dependabot_allows_only_patch_minor_version_updates() -> None:
+def test_renovate_dependency_policy_is_fail_closed() -> None:
     sources = _sources()
-    config = yaml.safe_load(sources["dependabot"])
+    config = json.loads(sources["renovate"])
 
-    assert config["version"] == 2
-    updates = config["updates"]
-    assert len(updates) == 5
-    expected_update_types = {
-        "version-update:semver-minor",
-        "version-update:semver-patch",
-    }
+    assert config["$schema"] == "https://docs.renovatebot.com/renovate-schema.json"
+    assert config["branchPrefix"] == "renovate/"
+    assert config["platformAutomerge"] is False
+    assert config["automergeType"] == "pr"
+    assert config["prConcurrentLimit"] <= 5
+    assert config["prHourlyLimit"] <= 2
 
-    for update in updates:
-        assert update["allow"] == [
-            {"dependency-name": "*", "update-types": sorted(expected_update_types)}
-        ]
-        for group in update.get("groups", {}).values():
-            if group.get("applies-to", "version-updates") == "version-updates":
-                assert set(group.get("update-types", ())) <= {"minor", "patch"}
-        assert "ignore" not in update
+    vulnerability_alerts = config["vulnerabilityAlerts"]
+    assert vulnerability_alerts["enabled"] is True
+    assert vulnerability_alerts["automerge"] is False
+    assert vulnerability_alerts["prConcurrentLimit"] <= 2
 
-    python_update = updates[0]
-    assert python_update["package-ecosystem"] == "uv"
-    assert python_update["directory"] == "/"
-    assert "directories" not in python_update
+    lock_maintenance = config["lockFileMaintenance"]
+    assert lock_maintenance["enabled"] is True
+    assert lock_maintenance["automerge"] is True
+    assert lock_maintenance["automergeType"] == "pr"
+
+    rules = config["packageRules"]
+    major_rule = next(rule for rule in rules if rule.get("matchUpdateTypes") == ["major"])
+    assert major_rule["automerge"] is False
+    assert major_rule["dependencyDashboardApproval"] is True
+
+    safe_rule = next(
+        rule
+        for rule in rules
+        if set(rule.get("matchUpdateTypes", ())) == {"minor", "patch", "pin", "digest"}
+    )
+    assert safe_rule["automerge"] is True
+    assert safe_rule["automergeType"] == "pr"
+
+    for rule in rules:
+        if "groupName" in rule:
+            assert "major" not in set(rule.get("matchUpdateTypes", ()))
 
     root = Path(__file__).resolve().parents[1]
+    assert not (root / ".github" / "dependabot.yml").exists()
+    assert (root / ".github" / "renovate.json").is_file()
+    assert (root / "docs" / "dependency-automation.md").is_file()
+
     uv_lock = root / "uv.lock"
     assert uv_lock.is_file()
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))

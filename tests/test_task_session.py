@@ -1732,6 +1732,27 @@ def test_validate_pr_event_accepts_trusted_dependabot_without_task_branch(
     assert result == {"kind": "dependabot-pr", "head_sha": head_sha}
 
 
+def test_validate_pr_event_accepts_trusted_renovate_without_task_branch(
+    tmp_path: Path,
+) -> None:
+    base_sha = "a" * 40
+    live_master_sha = "c" * 40
+    head_sha = "b" * 40
+    pull_request = _task_pr(510, "510", base_sha, head_sha)
+    pull_request["head"]["ref"] = "renovate/python-qa-tooling"
+    pull_request["user"] = {"login": "renovate[bot]", "type": "Bot"}
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
+
+    result = task_session.validate_pr_event(
+        object(),
+        FakeGitHub(live_master_sha),
+        event_path,  # type: ignore[arg-type]
+    )
+
+    assert result == {"kind": "renovate-pr", "head_sha": head_sha}
+
+
 def test_validate_pr_event_accepts_controller_maintenance_branch(
     tmp_path: Path,
 ) -> None:
@@ -1805,6 +1826,23 @@ def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(
     event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
     github = FakeGitHub(base_sha)
     github.commits[178] = [_task_commit("178")]
+
+    with pytest.raises(task_session.TaskSessionError, match="must match"):
+        task_session.validate_pr_event(object(), github, event_path)  # type: ignore[arg-type]
+
+
+def test_validate_pr_event_rejects_spoofed_renovate_branch(
+    tmp_path: Path,
+) -> None:
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    pull_request = _task_pr(510, "510", base_sha, head_sha)
+    pull_request["head"]["ref"] = "renovate/python-qa-tooling"
+    pull_request["user"] = {"login": "ordinary-user", "type": "User"}
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps({"pull_request": pull_request}), encoding="utf-8")
+    github = FakeGitHub(base_sha)
+    github.commits[510] = [_task_commit("510")]
 
     with pytest.raises(task_session.TaskSessionError, match="must match"):
         task_session.validate_pr_event(object(), github, event_path)  # type: ignore[arg-type]
@@ -3560,6 +3598,22 @@ def test_verify_master_merge_accepts_trusted_dependabot_pr() -> None:
 
     assert result["kind"] == "dependabot-pr-merge"
     assert result["pull_request"]["number"] == 178
+
+
+def test_verify_master_merge_accepts_trusted_renovate_pr() -> None:
+    base_sha = "a" * 40
+    merge_sha = "c" * 40
+    renovate_pr = _task_pr(510, "510", base_sha, "b" * 40, merge_sha=merge_sha)
+    renovate_pr["title"] = "chore(deps): update Python QA tooling"
+    renovate_pr["user"] = {"login": "renovate[bot]", "type": "Bot"}
+    renovate_pr["head"]["ref"] = "renovate/python-qa-tooling"
+    github = FakeGitHub(merge_sha)
+    github.associated_pulls = [renovate_pr]
+
+    result = task_session.verify_master_merge(object(), github, sha=merge_sha)
+
+    assert result["kind"] == "renovate-pr-merge"
+    assert result["pull_request"]["number"] == 510
 
 
 def test_verify_master_merge_rejects_dependabot_fork_pr() -> None:

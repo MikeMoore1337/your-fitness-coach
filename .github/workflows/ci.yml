@@ -134,7 +134,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
-      - name: Validate task provenance or trusted Dependabot identity
+      - name: Validate task provenance or trusted dependency bot identity
         env:
           GH_TOKEN: ${{ github.token }}
         run: python scripts/task_session.py validate-pr --event "$GITHUB_EVENT_PATH"
