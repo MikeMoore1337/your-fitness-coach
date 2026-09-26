@@ -120,7 +120,14 @@ class Settings(BaseSettings):
     nutrition_label_scan_enabled: bool = False
     nutrition_label_scan_kill_switch: bool = False
     nutrition_label_vision_enabled: bool = False
+    nutrition_label_vision_kill_switch: bool = False
+    nutrition_label_vision_provider: Literal["disabled", "groq"] = "disabled"
+    nutrition_label_vision_endpoint: str = "https://api.groq.com/openai/v1/chat/completions"
+    nutrition_label_vision_model: Literal["qwen/qwen3.8-27b"] = "qwen/qwen3.8-27b"
+    nutrition_label_vision_proxy_url: str = ""
+    nutrition_label_vision_data_policy: Literal["disabled", "zdr_verified"] = "disabled"
     nutrition_label_vision_timeout_seconds: float = Field(default=8, ge=1, le=8)
+    nutrition_label_vision_max_output_tokens: int = Field(default=1536, ge=512, le=4096)
     nutrition_label_scan_internal_user_ids: str = ""
     nutrition_label_scan_ocr_engine: Literal["rapidocr", "tesseract"] = "rapidocr"
     nutrition_label_scan_ocr_languages: str = "rus+eng"
@@ -319,6 +326,61 @@ class Settings(BaseSettings):
         if not re.fullmatch(r"[a-z]{2,4}(?:\+[a-z]{2,4}){0,2}", languages):
             raise ValueError("NUTRITION_LABEL_SCAN_OCR_LANGUAGES is invalid")
         self.nutrition_label_scan_ocr_languages = languages
+
+        proxy_url = self.nutrition_label_vision_proxy_url.strip()
+        if proxy_url:
+            try:
+                parsed_proxy = urlparse(proxy_url)
+                proxy_port = parsed_proxy.port
+            except ValueError as exc:
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_PROXY_URL must be an absolute credential-free "
+                    "HTTP(S) or SOCKS5 URL"
+                ) from exc
+            if (
+                parsed_proxy.scheme not in {"http", "https", "socks5", "socks5h"}
+                or not parsed_proxy.hostname
+                or parsed_proxy.username
+                or parsed_proxy.password
+                or parsed_proxy.query
+                or parsed_proxy.fragment
+                or parsed_proxy.path not in {"", "/"}
+                or (proxy_port is not None and not 1 <= proxy_port <= 65535)
+            ):
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_PROXY_URL must be an absolute credential-free "
+                    "HTTP(S) or SOCKS5 URL"
+                )
+        self.nutrition_label_vision_proxy_url = proxy_url
+
+        if self.nutrition_label_vision_enabled and not self.nutrition_label_vision_kill_switch:
+            if self.nutrition_label_vision_provider != "groq":
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_PROVIDER must be groq when Vision is enabled"
+                )
+            if not self.groq_api_key.get_secret_value().strip():
+                raise ValueError(
+                    "GROQ_API_KEY must be configured when Nutrition Label Vision is enabled"
+                )
+            if self.nutrition_label_vision_data_policy != "zdr_verified":
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_DATA_POLICY must be zdr_verified before Vision "
+                    "is enabled"
+                )
+            parsed_endpoint = urlparse(self.nutrition_label_vision_endpoint)
+            if (
+                parsed_endpoint.scheme != "https"
+                or parsed_endpoint.hostname != "api.groq.com"
+                or parsed_endpoint.path != "/openai/v1/chat/completions"
+                or parsed_endpoint.username
+                or parsed_endpoint.password
+                or parsed_endpoint.query
+                or parsed_endpoint.fragment
+            ):
+                raise ValueError(
+                    "NUTRITION_LABEL_VISION_ENDPOINT must be the credential-free Groq HTTPS "
+                    "chat completions URL"
+                )
         return self
 
     @model_validator(mode="after")
