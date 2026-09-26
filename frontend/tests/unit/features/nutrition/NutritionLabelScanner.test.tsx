@@ -285,7 +285,7 @@ describe('NutritionLabelScanner', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Распознать' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Нужен более чёткий снимок пищевой таблицы.',
+      'Нужен более чёткий снимок этикетки крупным планом.',
     );
     expect(screen.getByRole('alert')).not.toHaveTextContent('Сервер не ответил вовремя');
   });
