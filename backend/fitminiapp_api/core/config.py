@@ -367,6 +367,11 @@ class Settings(BaseSettings):
                     "NUTRITION_LABEL_VISION_DATA_POLICY must be zdr_verified before Vision "
                     "is enabled"
                 )
+            if self.app_env == "prod":
+                raise ValueError(
+                    "Nutrition Label Vision cannot be enabled in prod while the selected "
+                    "Groq Vision model is Preview"
+                )
             parsed_endpoint = urlparse(self.nutrition_label_vision_endpoint)
             if (
                 parsed_endpoint.scheme != "https"
