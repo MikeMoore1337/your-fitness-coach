@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -123,10 +124,8 @@ def configure_production_nutrition_label_vision(
             temporary.write(content)
             temporary_name = temporary.name
         os.chmod(temporary_name, stat.st_mode)
-        try:
+        with suppress(PermissionError):
             os.chown(temporary_name, stat.st_uid, stat.st_gid)
-        except PermissionError:
-            pass
         os.replace(temporary_name, env_path)
     finally:
         if temporary_name is not None:
