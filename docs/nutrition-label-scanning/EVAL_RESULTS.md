@@ -279,3 +279,21 @@ organization/account; code does not infer it from the API key.
 No real-user/package image has been sent as part of this implementation. Provider quality,
 candidate recovery, correction time, cost and real-photo accuracy therefore remain NOT MEASURED
 until the owner/privacy gate is satisfied and the pre-registered evaluation can run.
+
+
+## Addendum Task 494 — bounded Preview activation (2026-09-26)
+
+A first live synthetic-only provider probe used the deployed Task 283 adapter contract and the
+already approved non-RU SOCKS egress. No user/package photo, identity, OCR text from a user image,
+or model answer was logged.
+
+Result: provider request reached Groq but returned HTTP 403 with
+`permissions_error / model_permission_blocked_org` for `qwen/qwen3.8-27b`. The credential and
+egress are therefore not the blocker; the exact Groq Organization has not enabled this Preview
+model in Organization settings yet.
+
+Task 494 replaces the absolute production ban with an explicit
+`NUTRITION_LABEL_VISION_ALLOW_PREVIEW` opt-in while retaining the independent kill switch,
+dedicated proxy, ZDR assertion and mandatory user review. Live quality metrics remain NOT MEASURED
+until the Organization model permission is enabled. Real-user/package photos remain forbidden
+until ZDR is separately verified in Groq Data Controls.
