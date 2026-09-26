@@ -387,7 +387,7 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
             ).scalar_one()
             assert migration_context[0] == schema_name, migration_context
             assert migration_context[1].split(",")[0].strip('"') == schema_name, migration_context
-            assert migration_context[2] == "0095_program_provenance_backfill", migration_context
+            assert migration_context[2] == "0096_nutrition_catalog_trust", migration_context
             assert template_schema == schema_name, template_schema
             assert provenance == {
                 "stronglifts-5x5": "SOURCE_ADAPTATION",
@@ -470,6 +470,7 @@ def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -
             assert "community_unverified" in corrected_constraint
             assert validated is True
             assert revision == "0096_nutrition_catalog_trust"
+            connection.commit()
 
         with Session(schema_engine) as session:
             food = Food(
@@ -593,4 +594,12 @@ def test_migrated_postgres_shared_package_scan_confirmation(monkeypatch) -> None
         assert body["visibility"] == "share_to_yfc_catalog"
         assert body["catalog_quality"] == "community_unverified"
         assert body["contribution_outcome"] == "created"
-        assert body["food"]["status"] == "active"
+
+        from fitminiapp_api.db.session import get_session_context
+        from fitminiapp_api.models.food import Food
+
+        with get_session_context() as db:
+            stored = db.get(Food, body["food"]["id"])
+            assert stored is not None
+            assert stored.status == "active"
+            assert stored.catalog_quality == "community_unverified"
