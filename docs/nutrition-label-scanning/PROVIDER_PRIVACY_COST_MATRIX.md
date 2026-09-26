@@ -2,8 +2,8 @@
 
 **Версия:** `nutrition-label-provider-matrix-v2`
 **Дата проверки официальных источников:** 2026-09-25
-**Статус:** Groq Qwen 3.8 выбран как bounded implementation candidate; production transmission
-остаётся blocked до account-level ZDR verification и отдельного activation decision.
+**Статус:** Groq Qwen 3.8 выбран как bounded evaluation implementation candidate. Production
+activation запрещена, пока модель имеет статус Preview; отдельно остаётся account-level ZDR gate.
 
 ## Текущие кандидаты
 
