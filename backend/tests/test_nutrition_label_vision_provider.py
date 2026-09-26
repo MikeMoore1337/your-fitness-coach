@@ -211,6 +211,7 @@ def test_vision_settings_fail_closed_until_zdr_is_verified() -> None:
         "app_env": "prod",
         "secret_key": "p" * 40,
         "bot_internal_token": "b" * 40,
+        "enable_dev_auth": False,
     }
     with pytest.raises(ValidationError, match="Preview"):
         Settings(
