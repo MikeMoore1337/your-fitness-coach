@@ -447,6 +447,51 @@ def test_resume_preimplementation_fast_forwards_and_preserves_attempt_audit(
 
 
 @pytest.mark.parametrize(
+    ("risk_lane", "error"),
+    [("YELLOW", None), ("GREEN", "weaker than its owner gate")],
+)
+def test_resume_preimplementation_validates_legacy_owner_task_issue_contract(
+    repository: tuple[Path, Any], risk_lane: str, error: str | None
+) -> None:
+    _, _, controller, _, _, _, github = _prepare_preimplementation_resume(repository)
+    github.issues[241]["body"] = (
+        f"{task_session.TASK_CONTRACT_MARKER}\n"
+        + json.dumps(
+            {
+                "version": 1,
+                "scope": "Product v4 stage 0 synthetic scope",
+                "owner_gate": "domain_contract",
+                "risk_lane": risk_lane,
+                "issue_state": "in_progress",
+            }
+        )
+        + f"\n{task_session.TASK_CONTRACT_MARKER}"
+    )
+
+    if error is not None:
+        with pytest.raises(task_session.TaskSessionError, match=error):
+            controller.resume_preimplementation(
+                "241",
+                control_issue_number=241,
+                reason="owner-authorized retry of the legacy Issue contract",
+                owner_authorize=True,
+            )
+        return
+
+    resumed = controller.resume_preimplementation(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized retry of the legacy Issue contract",
+        owner_authorize=True,
+    )
+
+    assert resumed["preimplementation_resume"]["state"] == "prepared"
+    assert resumed["preimplementation_resume"]["previous_control_state"]["state"] == (
+        "human_required"
+    )
+
+
+@pytest.mark.parametrize(
     ("mutation", "message"),
     [
         ("dirty", "worktree is dirty"),

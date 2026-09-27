@@ -28,7 +28,9 @@ from uuid import uuid4
 try:
     from scripts.artifact_manager import ArtifactError, ArtifactManager
     from scripts.issue_workflow import (
+        CONTROL_STATES,
         DEFAULT_QUEUE_BUDGET,
+        TASK_CONTRACT_MARKER,
         IssueWorkflowError,
         latest_control_state,
         normalize_github_login,
@@ -38,7 +40,9 @@ try:
 except ModuleNotFoundError:
     from artifact_manager import ArtifactError, ArtifactManager
     from issue_workflow import (
+        CONTROL_STATES,
         DEFAULT_QUEUE_BUDGET,
+        TASK_CONTRACT_MARKER,
         IssueWorkflowError,
         latest_control_state,
         normalize_github_login,
@@ -2796,12 +2800,17 @@ class TaskController:
             raise TaskSessionError("Task Issue must be authored by the repository owner")
         if str(issue.get("state", "")).lower() != "open":
             raise TaskSessionError("Resume requires the matching open control Issue")
+        issue_body = str(issue.get("body", ""))
         try:
-            contract = parse_task_contract(str(issue.get("body", "")))
+            contract = parse_task_contract(issue_body)
         except IssueWorkflowError as error:
-            raise TaskSessionError(
-                f"Task {task_id} Issue contract is malformed: {error}"
-            ) from error
+            if str(error) != "Task contract requires scope and source_spec":
+                raise TaskSessionError(
+                    f"Task {task_id} Issue contract is malformed: {error}"
+                ) from error
+            contract = self._legacy_preimplementation_issue_contract(
+                issue_body, task_id=task_id, document=document
+            )
         if contract is None or contract.get("task_id") != task_id:
             raise TaskSessionError("Task Issue has no matching machine-readable contract")
         expected_source = document.path.resolve().relative_to(self._canonical_root()).as_posix()
@@ -2823,7 +2832,8 @@ class TaskController:
             or tuple(lease_dependencies) != document_dependencies
         ):
             raise TaskSessionError("Task dependency contract changed since the lease was created")
-        if task_risk_lane(str(contract.get("owner_gate", ""))) == "RED":
+        owner_gate = str(contract.get("owner_gate", ""))
+        if contract.get("risk_lane") == "RED" or task_risk_lane(owner_gate) == "RED":
             raise TaskSessionError(
                 "Task Issue owner gate requires a separate human or external gate"
             )
@@ -2864,6 +2874,65 @@ class TaskController:
                 "Latest control state is not a matching pre-implementation failure"
             )
         return state
+
+    def _legacy_preimplementation_issue_contract(
+        self,
+        body: str,
+        *,
+        task_id: str,
+        document: TaskDocument,
+    ) -> dict[str, Any]:
+        parts = body.split(TASK_CONTRACT_MARKER)
+        if len(parts) != 3:
+            raise TaskSessionError("Legacy task Issue contract markers are malformed")
+        try:
+            payload = json.loads(parts[1].strip())
+        except json.JSONDecodeError as error:
+            raise TaskSessionError("Legacy task Issue contract JSON is malformed") from error
+        if not isinstance(payload, Mapping) or set(payload) != {
+            "version",
+            "scope",
+            "owner_gate",
+            "risk_lane",
+            "issue_state",
+        }:
+            raise TaskSessionError("Legacy task Issue contract fields are incomplete or unknown")
+        scope = payload.get("scope")
+        owner_gate = payload.get("owner_gate")
+        risk_lane = payload.get("risk_lane")
+        issue_state = payload.get("issue_state")
+        if (
+            payload.get("version") != 1
+            or not isinstance(scope, str)
+            or not scope.strip()
+            or len(scope.strip()) > 8192
+            or not isinstance(owner_gate, str)
+            or not owner_gate.strip()
+            or not isinstance(risk_lane, str)
+            or risk_lane.strip().upper() not in {"GREEN", "YELLOW", "RED"}
+            or not isinstance(issue_state, str)
+            or issue_state.strip().lower() not in CONTROL_STATES
+        ):
+            raise TaskSessionError("Legacy task Issue contract values are invalid")
+        normalized_owner_gate = owner_gate.strip()
+        normalized_risk_lane = risk_lane.strip().upper()
+        risk_rank = {"GREEN": 0, "YELLOW": 1, "RED": 2}
+        if risk_rank[normalized_risk_lane] < risk_rank[task_risk_lane(normalized_owner_gate)]:
+            raise TaskSessionError(
+                "Legacy task Issue contract risk lane is weaker than its owner gate"
+            )
+        expected_source = document.path.resolve().relative_to(self._canonical_root()).as_posix()
+        return {
+            "version": 1,
+            "task_id": task_id,
+            "scope": scope.strip(),
+            "acceptance": [],
+            "dependencies": list(document.dependencies),
+            "owner_gate": normalized_owner_gate,
+            "risk_lane": normalized_risk_lane,
+            "source_spec": expected_source,
+            "issue_state": issue_state.strip().lower(),
+        }
 
     def _preimplementation_worker_state_paths(self, task_id: str) -> list[Path]:
         delivery_root = (
