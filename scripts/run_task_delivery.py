@@ -2533,7 +2533,9 @@ def _launch_worker(
     on_command_started: Callable[[Path], None] | None = None,
     on_precommand_failure: Callable[[Path, str, str], None] | None = None,
 ) -> int:
-    codex = shutil.which("codex")
+    # Windows' npm shim is constrained by cmd.exe's short command-line limit;
+    # use the native executable so the bounded worker prompt reaches Codex intact.
+    codex = shutil.which("codex.exe" if os.name == "nt" else "codex")
     if codex is None:
         raise DeliveryError("Codex CLI is not available in PATH")
     worktree = Path(str(started["lease"]["worktree"]))
@@ -2827,6 +2829,22 @@ def _deliver_one(
                         blocker=(
                             "Task worker stopped before implementation after the verified Codex CLI "
                             "argument conflict; no worker-state remains and the zero-action retry is bounded."
+                        ),
+                    ),
+                )
+            elif valid_guard_retry:
+                # Keep the state machine explicit: blocked -> human_required is the
+                # owner-authorized recovery handoff, then the durable worker marker
+                # below publishes in_progress only after Codex actually starts.
+                _post_control_state(
+                    status_issue,
+                    control_state_payload(
+                        task_id=task_id,
+                        state="human_required",
+                        issue_number=status_issue,
+                        branch=started["lease"]["branch"],
+                        blocker=(
+                            "Owner-authorized bounded guard recovery is launching the preserved task WIP."
                         ),
                     ),
                 )

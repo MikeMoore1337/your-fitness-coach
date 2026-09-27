@@ -256,6 +256,12 @@ contract/dependencies, owner gate, lease, branch/worktree и актуальны�
 `human_required`. Любое другое завершение после старта worker, неполные evidence, live PID, state,
 изменение ветки или повторное использование этого лимита блокируют resume.
 
+Если Windows shim завершился до запуска Codex с точной ошибкой `The command line is too long.`,
+guard recovery также может один раз reconcile-ить только этот zero-action startup failure при
+отсутствующем `worker-state.json`, завершённом процессе и полном evidence. Попытка сохраняется в
+lease как `failed-before-implementation`; произвольный текст, live process, неполные evidence или
+повторный такой failure остаются `HUMAN_REQUIRED`.
+
 Если запущенный worker был остановлен именно лимитом `TOOL_ACTION_BUDGET_EXCEEDED`, владелец может
 один раз разрешить отдельный guard recovery через существующий owner-authored Issue:
 
