@@ -360,6 +360,49 @@ def test_worker_launch_passes_active_delivery_artifacts_to_child(
         assert callable(observed["kwargs"]["preexec_fn"])
 
 
+def test_windows_worker_launch_uses_native_codex_executable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    worktree = tmp_path / "worktree"
+    artifacts = tmp_path / "artifacts"
+    worktree.mkdir()
+    artifacts.mkdir()
+    observed: dict[str, Any] = {}
+
+    monkeypatch.setattr(delivery.os, "name", "nt")
+    monkeypatch.setattr(delivery, "_worker_prompt", lambda *args, **kwargs: "prompt")
+    monkeypatch.setattr(delivery, "_reconcile_worker_state", lambda path: None)
+    monkeypatch.setattr(
+        delivery,
+        "_current_process_instance_identity",
+        lambda: {"kind": "windows", "creation_time_100ns": "1"},
+    )
+
+    def fake_which(name: str) -> str:
+        observed["which"] = name
+        return "C:/Codex/codex.exe"
+
+    def fake_run(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["args"] = args
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(delivery.shutil, "which", fake_which)
+    monkeypatch.setattr(delivery.subprocess, "run", fake_run)
+
+    assert (
+        delivery._launch_worker(
+            "504",
+            {"lease": {"worktree": str(worktree)}},
+            artifacts,
+        )
+        == 0
+    )
+
+    assert observed["which"] == "codex.exe"
+    command_index = observed["args"].index("--worker-command")
+    assert observed["args"][command_index + 1] == "C:/Codex/codex.exe"
+
+
 @pytest.mark.parametrize(
     ("platform", "expected_executable"),
     (("nt", "base-python.exe"), ("posix", "venv-python")),
@@ -2161,7 +2204,11 @@ def test_second_guard_budget_failure_exhausts_one_time_recovery(
             resume_guard_interrupted=True,
         )
 
-    assert [item["state"] for item in status_updates] == ["in_progress", "human_required"]
+    assert [item["state"] for item in status_updates] == [
+        "human_required",
+        "in_progress",
+        "human_required",
+    ]
     assert "no further automatic guard recovery is allowed" in status_updates[-1]["blocker"]
 
 

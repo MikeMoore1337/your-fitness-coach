@@ -692,6 +692,83 @@ def test_guard_interrupted_resume_accepts_prior_base_refresh_anchor(
     assert git_repository.head(cwd=worktree) == current_base
 
 
+def test_guard_interrupted_resume_reconciles_windows_command_line_failure(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_guard_budget_failure(controller, root, github, branch, worktree)
+    kwargs = {
+        "control_issue_number": 241,
+        "reason": "owner-authorized resume after tool-budget interruption",
+        "owner_authorize": True,
+    }
+    controller.resume_guard_interrupted("241", **kwargs)
+    claimed = controller.claim_preimplementation_worker_launch("241")["preimplementation_resume"]
+    attempt_root = (
+        root
+        / ".artifacts"
+        / "tasks"
+        / "241"
+        / "temporary"
+        / "delivery"
+        / "windows-command-line-attempt"
+    )
+    attempt_root.mkdir(parents=True)
+    worker_state_path = attempt_root / "worker-state.json"
+    worker_state_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "pid": 801,
+                "process_group_id": None,
+                "process_instance": {"kind": "test", "instance": "supervisor"},
+                "started_at": "2026-09-27T00:00:00Z",
+                "command_process": {
+                    "pid": 802,
+                    "process_instance": {"kind": "test", "instance": "codex"},
+                },
+                "command_started_at": "2026-09-27T00:00:01Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    controller.record_preimplementation_worker_started("241", worker_state_path=worker_state_path)
+    worker_state_path.unlink()
+    (attempt_root / "events.jsonl").write_text("The command line is too long.\n", encoding="utf-8")
+    (attempt_root / "worker-guard.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "classification": "yfc-worker-guard-report",
+                "blocked": False,
+                "block_reason_code": None,
+                "counters": {
+                    "completed_tool_actions": 0,
+                    "collab_tool_calls": 0,
+                    "spawned_subagents": 0,
+                    "max_observed_concurrent_subagents": 0,
+                    "progress_events": 0,
+                    "malformed_lines": 1,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    resumed = controller.resume_guard_interrupted("241", **kwargs)
+
+    event = resumed["preimplementation_resume"]
+    assert resumed["mutation_performed"] is True
+    assert event["state"] == "prepared"
+    assert event["last_preimplementation_failure"]["kind"] == (
+        "windows_command_line_too_long_before_implementation"
+    )
+    assert event["launch_attempts"][-1]["state"] == "failed-before-implementation"
+    assert event["launch_attempts"][-1]["launch_id"] == claimed["launch_id"]
+    repeated = controller.resume_guard_interrupted("241", **kwargs)
+    assert repeated["mutation_performed"] is False
+
+
 def test_guard_interrupted_resume_is_idempotent_and_claim_requires_checkpoint(
     repository: tuple[Path, Any],
 ) -> None:

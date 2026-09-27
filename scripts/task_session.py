@@ -3119,6 +3119,118 @@ class TaskController:
                 )
         return evidence
 
+    def _preimplementation_windows_command_line_failure_evidence(
+        self, task_id: str, event: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Verify a Windows shim failure before any Codex work could run."""
+
+        failure_kind = "windows_command_line_too_long_before_implementation"
+        attempts = event.get("launch_attempts")
+        if (
+            event.get("state") != "worker-started"
+            or not isinstance(attempts, list)
+            or not attempts
+            or not isinstance(attempts[-1], Mapping)
+            or attempts[-1].get("state") != "worker-started"
+        ):
+            raise TaskSessionError("Windows worker startup failure launch audit is inconsistent")
+        if any(
+            not isinstance(item, Mapping)
+            or item.get("state")
+            not in {"no-worker-started", "failed-before-implementation", "failed-guard-budget"}
+            for item in attempts[:-1]
+        ):
+            raise TaskSessionError("Windows worker startup failure launch audit is ambiguous")
+        if any(
+            isinstance(item, Mapping) and item.get("failure_kind") == failure_kind
+            for item in attempts[:-1]
+        ):
+            raise TaskSessionError("Windows worker startup retry budget was already used")
+
+        attempt = attempts[-1]
+        worker_pid = attempt.get("worker_pid")
+        worker_state_value = attempt.get("worker_state_path")
+        if (
+            isinstance(worker_pid, bool)
+            or not isinstance(worker_pid, int)
+            or worker_pid < 1
+            or event.get("worker_pid") != worker_pid
+            or not isinstance(worker_state_value, str)
+            or not Path(worker_state_value).is_absolute()
+        ):
+            raise TaskSessionError("Windows worker startup failure has malformed worker identity")
+        if self.store._pid_is_alive(worker_pid):
+            raise TaskSessionError("Codex worker process is still live")
+
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / task_id / "temporary" / "delivery"
+        ).resolve()
+        worker_state_path = Path(worker_state_value).resolve()
+        try:
+            worker_state_path.relative_to(delivery_root)
+        except ValueError as error:
+            raise TaskSessionError(
+                "Windows worker state path is outside task delivery artifacts"
+            ) from error
+        if worker_state_path.name != "worker-state.json" or worker_state_path.exists():
+            raise TaskSessionError("Windows worker state has not been fully reconciled")
+        if self._preimplementation_worker_state_paths(task_id):
+            raise TaskSessionError("Task has unreconciled worker state")
+
+        events_path = worker_state_path.with_name("events.jsonl")
+        guard_path = worker_state_path.with_name("worker-guard.json")
+        try:
+            if events_path.stat().st_size > 1024 * 1024 or guard_path.stat().st_size > 64 * 1024:
+                raise TaskSessionError(
+                    "Windows worker startup failure evidence exceeds its size limit"
+                )
+            events = events_path.read_text(encoding="utf-8")
+            guard = json.loads(guard_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise TaskSessionError(
+                "Windows worker startup failure evidence is missing or unreadable"
+            ) from error
+        counters = guard.get("counters") if isinstance(guard, Mapping) else None
+        zero_counters = (
+            "completed_tool_actions",
+            "collab_tool_calls",
+            "spawned_subagents",
+            "max_observed_concurrent_subagents",
+            "progress_events",
+        )
+        if (
+            not isinstance(guard, Mapping)
+            or guard.get("schema_version") != 1
+            or guard.get("classification") != "yfc-worker-guard-report"
+            or guard.get("blocked") is not False
+            or guard.get("block_reason_code") is not None
+            or not isinstance(counters, Mapping)
+            or any(
+                isinstance(counters.get(name), bool)
+                or not isinstance(counters.get(name), int)
+                or counters.get(name) != 0
+                for name in zero_counters
+            )
+            or isinstance(counters.get("malformed_lines"), bool)
+            or not isinstance(counters.get("malformed_lines"), int)
+            or counters.get("malformed_lines", -1) < 0
+            or "the command line is too long." not in events.casefold()
+        ):
+            raise TaskSessionError(
+                "Windows worker startup failure is not a verified zero-action failure"
+            )
+        return {
+            "kind": failure_kind,
+            "worker_pid": worker_pid,
+            "worker_state_path": str(worker_state_path),
+            "events_path": str(events_path.resolve()),
+            "guard_report_path": str(guard_path.resolve()),
+            "completed_tool_actions": 0,
+            "collab_tool_calls": 0,
+            "spawned_subagents": 0,
+            "progress_events": 0,
+        }
+
     def _preimplementation_queue_claim(self, task_id: str) -> None:
         claim_path = self.store.root / "continuous-queue.lock"
         if not claim_path.exists():
@@ -4028,11 +4140,20 @@ class TaskController:
                 raise TaskSessionError("Task has no matching resumable pre-implementation launch")
             existing = event.get("guard_budget_recovery")
             if isinstance(existing, Mapping):
-                if (
-                    event.get("state") != "prepared"
-                    or event.get("guard_budget_recovery_reason") != reason.strip()
-                    or "launch_id" in event
-                ):
+                if event.get("guard_budget_recovery_reason") != reason.strip():
+                    raise TaskSessionError(
+                        "The one-time guard recovery was already launched or reconciled"
+                    )
+                startup_failure_evidence: dict[str, Any] | None = None
+                prepared_event: Mapping[str, Any] = event
+                if event.get("state") == "worker-started":
+                    startup_failure_evidence = (
+                        self._preimplementation_windows_command_line_failure_evidence(
+                            expected, event
+                        )
+                    )
+                    prepared_event = {**event, "state": "prepared"}
+                elif event.get("state") != "prepared" or "launch_id" in event:
                     raise TaskSessionError(
                         "The one-time guard recovery was already launched or reconciled"
                     )
@@ -4048,13 +4169,56 @@ class TaskController:
                     raise TaskSessionError(
                         "Latest task guard blocker no longer matches its checkpoint"
                     )
-                self._validate_preimplementation_worktree(expected, lease, prepared_event=event)
+                self._validate_preimplementation_worktree(
+                    expected, lease, prepared_event=prepared_event
+                )
+                if startup_failure_evidence is not None:
+                    attempts = event.get("launch_attempts")
+                    if not isinstance(attempts, list) or not attempts:
+                        raise TaskSessionError(
+                            "Windows worker startup failure has no launch-attempt audit"
+                        )
+                    attempt = attempts[-1]
+                    if not isinstance(attempt, dict):
+                        raise TaskSessionError(
+                            "Windows worker startup failure launch audit is malformed"
+                        )
+                    timestamp = utc_now()
+                    failure_kind = str(startup_failure_evidence["kind"])
+                    launch_id = str(attempt["launch_id"])
+                    attempt.update(
+                        {
+                            "state": "failed-before-implementation",
+                            "finished_at": timestamp,
+                            "failure_kind": failure_kind,
+                            "failure_evidence": startup_failure_evidence,
+                        }
+                    )
+                    event["last_preimplementation_failure"] = {
+                        "kind": failure_kind,
+                        "recorded_at": timestamp,
+                        "launch_id": launch_id,
+                        "failure_evidence": startup_failure_evidence,
+                    }
+                    for key in (
+                        "launch_id",
+                        "launch_claimed_at",
+                        "worker_started_at",
+                        "command_started_at",
+                        "worker_pid",
+                        "worker_process_instance",
+                        "worker_state_path",
+                    ):
+                        event.pop(key, None)
+                    event["state"] = "prepared"
+                    lease["updated_at"] = timestamp
+                    StateStore.replace_json(lease_path, lease)
                 return {
                     "task_id": expected,
                     "lease": dict(lease),
                     "preimplementation_resume": dict(event),
                     "control_state": control_state,
-                    "mutation_performed": False,
+                    "mutation_performed": startup_failure_evidence is not None,
                 }
             if event.get("state") != "worker-started":
                 raise TaskSessionError("Task has no guard-interrupted worker to recover")

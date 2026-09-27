@@ -72,6 +72,8 @@ stable identity в worker state, затем отправляет release. Bootst
 executable, чтобы PID в worker state совпадал с PID bootstrap: Windows venv launcher может создать
 дочерний процесс с другим PID. Bootstrap проверяет эту запись и identity supervisor до
 запуска Codex; Codex и его дочерние процессы наследуют Job Object без assignment gap.
+Launcher выбирает native `codex.exe`, а не npm `codex.cmd`: длинный bounded prompt не должен
+проходить через короткий лимит `cmd.exe`.
 Claim атомарно обновляет `queue_phase`, `task_id`, `task_issue` и `worker_state` перед запуском
 каждой задачи и очищает их только после полного `_deliver_one`. Если owner провалился, пока claim
 содержит активную задачу, recovery сначала читает durable controller history и останавливается
