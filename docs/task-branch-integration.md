@@ -256,6 +256,23 @@ contract/dependencies, owner gate, lease, branch/worktree и актуальны�
 `human_required`. Любое другое завершение после старта worker, неполные evidence, live PID, state,
 изменение ветки или повторное использование этого лимита блокируют resume.
 
+Если запущенный worker был остановлен именно лимитом `TOOL_ACTION_BUDGET_EXCEEDED`, владелец может
+один раз разрешить отдельный guard recovery через существующий owner-authored Issue:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_task_delivery.py 504 `
+    --control-issue 504 --resume-guard-interrupted `
+    --resume-reason "owner-authorized one-time guard recovery"
+```
+
+Controller принимает только точный guard blocker, согласованные bounded report/events, завершённый
+worker PID, неизменённый task head без PR/queue claim и WIP, timestamps которого попадают между
+фактическим стартом Codex и остановкой guard. До запуска он записывает весь tracked/untracked WIP
+в отдельный локальный checkpoint ref; task branch и индекс не меняются. Claim сверяет WIP и hashes
+с checkpoint. Worker сначала проверяет унаследованный diff против task acceptance и только затем
+продолжает работу. Повторный guard budget stop переводит Issue в `human_required`; второго
+автоматического recovery нет.
+
 Низкоуровневые команды:
 
 ```powershell
