@@ -789,6 +789,24 @@ def test_guard_interrupted_resume_is_idempotent_and_claim_requires_checkpoint(
         repeated["preimplementation_resume"]["guard_budget_recovery"]
         == (first["preimplementation_resume"]["guard_budget_recovery"])
     )
+    github.issue_comment_map[241].append(
+        {
+            "id": 4,
+            "created_at": task_session.utc_now(),
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="241",
+                    state="human_required",
+                    issue_number=241,
+                    branch=branch,
+                    blocker=task_session.GUARD_RECOVERY_HANDOFF_BLOCKER,
+                )
+            ),
+        }
+    )
+    repeated_after_handoff = controller.resume_guard_interrupted("241", **kwargs)
+    assert repeated_after_handoff["mutation_performed"] is False
     claimed = controller.claim_preimplementation_worker_launch("241")
     assert claimed["preimplementation_resume"]["state"] == "launching"
     with pytest.raises(task_session.TaskSessionError, match="unclaimed prepared resume"):
