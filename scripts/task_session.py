@@ -4094,8 +4094,9 @@ class TaskController:
                 str(lease.get("base_origin_master_sha", "")), current_origin
             ):
                 raise TaskSessionError("Task base is not an ancestor of synchronized origin/master")
+            prepared_event = {**event, "state": "prepared"}
             worktree, branch, head = self._validate_preimplementation_worktree(
-                expected, lease, allow_guard_dirty=True
+                expected, lease, prepared_event=prepared_event, allow_guard_dirty=True
             )
             if (
                 head != event.get("head_sha")

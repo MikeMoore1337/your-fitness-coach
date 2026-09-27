@@ -633,6 +633,43 @@ def test_guard_checkpoint_does_not_execute_git_clean_filters(
     )
 
 
+def test_guard_interrupted_resume_accepts_prior_base_refresh_anchor(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, _, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    _record_guard_budget_failure(controller, root, github, branch, worktree)
+    lease_path = controller.store.task_lease_path("241")
+    lease = controller.store.read_json(lease_path)
+    current_base = str(lease["base_origin_master_sha"])
+    original_base = "a" * 40
+    event = lease["preimplementation_resume"]
+    lease["original_base_origin_master_sha"] = original_base
+    event["original_base_sha"] = original_base
+    event["base_sha"] = current_base
+    event["head_sha"] = current_base
+    event["base_refreshes"] = [
+        {
+            "from_base_sha": original_base,
+            "from_head_sha": original_base,
+            "to_base_sha": current_base,
+        }
+    ]
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    resumed = controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized resume after tool-budget interruption",
+        owner_authorize=True,
+    )
+
+    assert resumed["mutation_performed"] is True
+    assert resumed["preimplementation_resume"]["guard_budget_recovery"]["base_sha"] == current_base
+    assert git_repository.head(cwd=worktree) == current_base
+
+
 def test_guard_interrupted_resume_is_idempotent_and_claim_requires_checkpoint(
     repository: tuple[Path, Any],
 ) -> None:
