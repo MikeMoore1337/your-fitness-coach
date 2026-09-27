@@ -98,6 +98,9 @@ STATE_DIRECTORY_NAME = "codex-task-sessions-v1"
 ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
 MAX_GUARD_BUDGET_RECOVERIES = 1
+GUARD_RECOVERY_HANDOFF_BLOCKER = (
+    "Owner-authorized bounded guard recovery is launching the preserved task WIP."
+)
 MAX_GUARD_EVIDENCE_BYTES = 16 * 1024 * 1024
 TASK_INTEGRATION_BRANCHES = {"feature/app-experience-v3": "393"}
 DEPENDABOT_LOGIN = "dependabot[bot]"
@@ -2894,8 +2897,16 @@ class TaskController:
                 flags=re.IGNORECASE,
             )
         )
+        valid_guard_recovery_handoff = (
+            allow_guard_budget_failure
+            and state.get("state") == "human_required"
+            and blocker == GUARD_RECOVERY_HANDOFF_BLOCKER
+        )
         if not common_failure or not (
-            valid_human_required or valid_cli_failure or valid_guard_failure
+            valid_human_required
+            or valid_cli_failure
+            or valid_guard_failure
+            or valid_guard_recovery_handoff
         ):
             raise TaskSessionError(
                 "Latest control state is not a matching pre-implementation failure"
@@ -3676,9 +3687,11 @@ class TaskController:
             else None
         )
         return bool(
-            match
-            and isinstance(expected, str)
-            and Path(match.group(1)).resolve() == Path(expected).resolve()
+            isinstance(expected, str)
+            and (
+                (match is not None and Path(match.group(1)).resolve() == Path(expected).resolve())
+                or blocker == GUARD_RECOVERY_HANDOFF_BLOCKER
+            )
         )
 
     def _validate_preimplementation_worktree(
