@@ -3637,6 +3637,27 @@ def test_state_lock_reclaims_only_a_stale_dead_owner(
     assert not store.lock_path.exists()
 
 
+@pytest.mark.parametrize(("winerror", "expected"), [(87, False), (5, True)])
+def test_state_pid_is_alive_handles_windows_probe_errors(
+    repository: tuple[Path, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    winerror: int,
+    expected: bool,
+) -> None:
+    _, git_repository = repository
+    store = task_session.StateStore(git_repository.common_dir)
+    error = OSError(winerror, "Windows process probe failed")
+    error.winerror = winerror
+
+    def fail_probe(_pid: int, _signal: int) -> None:
+        raise error
+
+    monkeypatch.setattr(task_session.os, "name", "nt")
+    monkeypatch.setattr(task_session.os, "kill", fail_probe)
+
+    assert store._pid_is_alive(424242) is expected
+
+
 def test_state_lock_refuses_active_owner_and_preserves_lock(
     repository: tuple[Path, Any],
 ) -> None:
