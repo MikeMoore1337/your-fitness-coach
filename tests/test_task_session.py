@@ -812,6 +812,115 @@ def test_guard_interrupted_resume_allows_known_generated_cache(
     assert resumed["mutation_performed"] is True
 
 
+def test_guard_ignored_paths_accepts_canonical_managed_paths(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    frontend = root / "frontend"
+    (frontend / "node_modules" / "some-package").mkdir(parents=True)
+    (frontend / "node_modules" / "some-package" / "file.js").write_text(
+        "generated\n", encoding="utf-8"
+    )
+    (frontend / "openapi.json").write_text("{}\n", encoding="utf-8")
+    (frontend / "dist" / "assets").mkdir(parents=True)
+    (frontend / ".pytest_cache" / "v" / "cache").mkdir(parents=True)
+    excludes = root.parent / "canonical-managed-excludes"
+    excludes.write_text(
+        "frontend/node_modules/\n/frontend/openapi.json\nfrontend/dist/\nfrontend/.pytest_cache/\n",
+        encoding="utf-8",
+    )
+    _git(root, "config", "core.excludesfile", str(excludes))
+
+    assert controller._guard_ignored_paths(root) == []
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("frontend/node_modules/", True),
+        ("FRONTEND\\NODE_MODULES\\some-package\\file.js", True),
+        ("frontend/dist/assets/manifest.js", True),
+        ("frontend/.pytest_cache/v/cache/nodeids", True),
+        ("frontend/openapi.json", True),
+        ("frontend/node_modules-evil/", False),
+        ("frontend/node_modules_backup/", False),
+        ("frontend/openapi.json.bak", False),
+        ("frontend/openapi.json/anything", False),
+        ("frontend/random-secret.txt", False),
+        ("tmp/private-data/", False),
+        ("../frontend/node_modules/file.js", False),
+        ("C:\\repo\\frontend\\node_modules\\file.js", False),
+    ],
+)
+def test_canonical_managed_ignored_path_boundaries(
+    tmp_path: Path,
+    path: str,
+    expected: bool,
+) -> None:
+    (tmp_path / "frontend" / "node_modules" / "some-package").mkdir(parents=True)
+    (tmp_path / "frontend" / "dist").mkdir(parents=True)
+    (tmp_path / "frontend" / ".pytest_cache" / "v" / "cache").mkdir(parents=True)
+    (tmp_path / "frontend" / "openapi.json").write_text("{}\n", encoding="utf-8")
+
+    assert task_session._is_canonical_managed_ignored_path(path, root=tmp_path) is expected
+
+
+def test_canonical_refresh_reuses_managed_ignored_path_semantics(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    frontend = root / "frontend"
+    (frontend / "node_modules" / "some-package").mkdir(parents=True)
+    (frontend / "node_modules" / "some-package" / "file.js").write_text(
+        "generated\n", encoding="utf-8"
+    )
+    (frontend / "openapi.json").write_text("{}\n", encoding="utf-8")
+    excludes = root.parent / "canonical-refresh-excludes"
+    excludes.write_text(
+        "frontend/node_modules/\n/frontend/openapi.json\n",
+        encoding="utf-8",
+    )
+    _git(root, "config", "core.excludesfile", str(excludes))
+
+    assert controller._canonical_worktree_status(root) == []
+
+
+def test_post_start_transport_resume_accepts_canonical_managed_paths(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_post_start_transport_failure(controller, root, github, branch, worktree)
+    frontend = worktree / "frontend"
+    (frontend / "node_modules" / "some-package").mkdir(parents=True)
+    (frontend / "node_modules" / "some-package" / "file.js").write_text(
+        "generated\n", encoding="utf-8"
+    )
+    (frontend / "openapi.json").write_text("{}\n", encoding="utf-8")
+    excludes = root.parent / "canonical-transport-excludes"
+    excludes.write_text(
+        "frontend/node_modules/\n/frontend/openapi.json\n",
+        encoding="utf-8",
+    )
+    _git(worktree, "config", "core.excludesfile", str(excludes))
+
+    resumed = controller.resume_transport_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized one-time post-start transport recovery",
+        owner_authorize=True,
+    )
+
+    assert resumed["mutation_performed"] is True
+
+
 def test_guard_interrupted_resume_accepts_prior_base_refresh_anchor(
     repository: tuple[Path, Any],
 ) -> None:

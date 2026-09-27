@@ -178,6 +178,32 @@ CANONICAL_MANAGED_IGNORED_BASENAMES = frozenset(
 )
 
 
+def _is_canonical_managed_ignored_path(path: str, *, root: Path) -> bool:
+    """Return whether an ignored repository-relative path is controller-managed."""
+    normalized = path.replace("\\", "/").casefold().rstrip("/")
+    if not normalized or normalized.startswith("/") or re.fullmatch(r"[a-z]:.*", normalized):
+        return False
+    parts = normalized.split("/")
+    if any(not part or part in {".", ".."} for part in parts):
+        return False
+
+    if any(part in CANONICAL_MANAGED_IGNORED_BASENAMES for part in parts):
+        return True
+
+    for managed_path in CANONICAL_MANAGED_IGNORED_PATHS:
+        managed = managed_path.casefold().rstrip("/")
+        if normalized == managed:
+            return True
+        if not normalized.startswith(f"{managed}/"):
+            continue
+        try:
+            managed_root = root.joinpath(*managed.split("/"))
+        except OSError, ValueError:
+            return False
+        return managed_root.is_dir()
+    return False
+
+
 class TaskSessionError(RuntimeError):
     """A fail-closed controller refusal with an actionable message."""
 
@@ -1414,21 +1440,15 @@ class TaskController:
         return self.repository.repository_root
 
     def _canonical_worktree_status(self, root: Path | None = None) -> list[str]:
-        status = self.repository.status(root or self._canonical_root(), include_ignored=True)
+        canonical_root = root or self._canonical_root()
+        status = self.repository.status(canonical_root, include_ignored=True)
         unexpected: list[str] = []
         for item in status:
             if not item.startswith("!! "):
                 unexpected.append(item)
                 continue
             ignored_path = item[3:].strip().replace("\\", "/").rstrip("/")
-            path_parts = set(ignored_path.split("/"))
-            if not (
-                any(
-                    ignored_path == managed or ignored_path.startswith(f"{managed}/")
-                    for managed in CANONICAL_MANAGED_IGNORED_PATHS
-                )
-                or bool(path_parts & CANONICAL_MANAGED_IGNORED_BASENAMES)
-            ):
+            if not _is_canonical_managed_ignored_path(ignored_path, root=canonical_root):
                 unexpected.append(item)
         return unexpected
 
@@ -3397,17 +3417,10 @@ class TaskController:
                 raise TaskSessionError("Task worktree status is malformed")
             status, path = record[:2], record[3:]
             if status == "!!":
-                normalized = path.replace("\\", "/").casefold()
-                path_parts = set(normalized.split("/"))
-                if (
-                    normalized != ".artifacts"
-                    and not normalized.startswith(".artifacts/")
-                    and not path_parts & CANONICAL_MANAGED_IGNORED_BASENAMES
-                ):
+                if not _is_canonical_managed_ignored_path(path, root=worktree):
                     ignored.append(path)
-            elif "R" in status or "C" in status:
-                if index < len(records):
-                    index += 1
+            elif ("R" in status or "C" in status) and index < len(records):
+                index += 1
         return ignored
 
     @staticmethod
