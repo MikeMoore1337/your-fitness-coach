@@ -633,6 +633,28 @@ def test_guard_checkpoint_does_not_execute_git_clean_filters(
     )
 
 
+def test_guard_interrupted_resume_allows_known_generated_cache(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_guard_budget_failure(controller, root, github, branch, worktree)
+    cache_path = worktree / "__pycache__" / "generated.cpython-314.pyc"
+    cache_path.parent.mkdir(parents=True)
+    cache_path.write_bytes(b"generated cache")
+    excludes = root.parent / "cache-excludes"
+    excludes.write_text("__pycache__/\n", encoding="utf-8")
+    _git(worktree, "config", "core.excludesfile", str(excludes))
+
+    resumed = controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized resume after tool-budget interruption",
+        owner_authorize=True,
+    )
+
+    assert resumed["mutation_performed"] is True
+
+
 def test_guard_interrupted_resume_accepts_prior_base_refresh_anchor(
     repository: tuple[Path, Any],
 ) -> None:
