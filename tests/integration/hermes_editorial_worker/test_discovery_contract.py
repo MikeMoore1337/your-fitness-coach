@@ -471,7 +471,7 @@ def test_only_old_relevance_rejections_are_reconsidered() -> None:
     assert discovery_runner._should_reconsider_relevance(accepted_old) is False
 
 
-def test_production_registry_uses_six_working_research_sources() -> None:
+def test_production_registry_uses_expanded_working_news_sources() -> None:
     registry = WORKSPACE / "backend" / "fitminiapp_api" / "resources" / "news_sources.json"
     rendered = GENERATOR_MODULE.render_registry(registry)
     enabled = {source["id"]: source for source in rendered["sources"] if source["enabled"]}
@@ -483,17 +483,58 @@ def test_production_registry_uses_six_working_research_sources() -> None:
         "frontiers-endocrinology",
         "frontiers-pharmacology",
         "pubmed-fitness-health",
+        "sciencedaily-fitness",
+        "sciencedaily-nutrition",
+        "sciencedaily-sports-medicine",
+        "medicalxpress-fitness",
+        "medicalxpress-sports-medicine",
+        "acsm-news",
+        "muscle-and-fitness",
+        "bjsm",
+        "bmj-open-sport-exercise-medicine",
+        "mens-health",
     }
+
     frontiers = [source for source in enabled.values() if source["id"].startswith("frontiers-")]
     assert len(frontiers) == 5
     assert all(source["fetch_kind"] == "rss" for source in frontiers)
     assert all(
         source["url"].startswith("https://www.frontiersin.org/journals/") for source in frontiers
     )
+
     pubmed = enabled["pubmed-fitness-health"]
     assert pubmed["fetch_kind"] == "json_feed"
     assert pubmed["adapter"] == "pubmed_eutils"
     assert pubmed["url"].startswith("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?")
+
+    sciencedaily = [
+        source for source in enabled.values() if source["id"].startswith("sciencedaily-")
+    ]
+    assert len(sciencedaily) == 3
+    assert all(source["fetch_kind"] == "rss" for source in sciencedaily)
+    assert all(
+        source["url"].startswith("https://www.sciencedaily.com/rss/") for source in sciencedaily
+    )
+
+    medicalxpress = [
+        source for source in enabled.values() if source["id"].startswith("medicalxpress-")
+    ]
+    assert len(medicalxpress) == 2
+    assert all(source["fetch_kind"] == "rss" for source in medicalxpress)
+    assert all(
+        source["url"].startswith("https://medicalxpress.com/rss-feed/") for source in medicalxpress
+    )
+
+    assert enabled["acsm-news"]["authoritative"] is True
+    assert enabled["bjsm"]["authoritative"] is True
+    assert enabled["bmj-open-sport-exercise-medicine"]["authoritative"] is True
+    stronger_by_science = next(
+        source for source in rendered["sources"] if source["id"] == "stronger-by-science"
+    )
+    assert stronger_by_science["enabled"] is False
+    assert stronger_by_science["authoritative"] is False
+    assert enabled["muscle-and-fitness"]["authoritative"] is False
+    assert enabled["mens-health"]["authoritative"] is False
 
 
 def test_canonical_registry_is_lf_only() -> None:
@@ -551,8 +592,8 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert document["schema_version"] == discovery_runner.SCHEMA_VERSION
     assert document["source_registry_sha256"] == hashlib.sha256(registry.read_bytes()).hexdigest()
     assert document["definitions_version"].endswith(document["source_registry_sha256"])
-    assert len(document["sources"]) == 13
-    assert len({source["id"] for source in document["sources"]}) == 13
+    assert len(document["sources"]) == 24
+    assert len({source["id"] for source in document["sources"]}) == 24
     pubmed = next(
         source for source in document["sources"] if source["id"] == "pubmed-fitness-health"
     )
@@ -606,7 +647,7 @@ def test_generated_definitions_load_without_live_fetch(monkeypatch: pytest.Monke
     )
 
     assert loaded_document["definitions_version"] == document["definitions_version"]
-    assert len(sources) == 13
+    assert len(sources) == 24
     assert sources[0].source_id == "frontiers-nutrition"
     loaded_pubmed = next(
         source for source in loaded_document["sources"] if source["id"] == "pubmed-fitness-health"
