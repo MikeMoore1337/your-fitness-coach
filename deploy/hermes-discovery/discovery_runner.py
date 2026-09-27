@@ -27,7 +27,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from pathlib import Path
@@ -77,6 +77,9 @@ MAX_DEFINITIONS_BYTES = 512 * 1024
 MAX_SOURCES = 50
 MAX_ITEMS_PER_SOURCE = 50
 PUBMED_EUTILS_MAX_ITEMS = 10
+EUROPE_PMC_MAX_ITEMS = 8
+MAX_CANDIDATE_AGE_DAYS = 14
+MAX_CANDIDATE_FUTURE_SKEW_DAYS = 2
 MAX_SOURCE_RESPONSE_BYTES = 512 * 1024
 MAX_TITLE_CHARS = 500
 MAX_SUMMARY_CHARS = 4000
@@ -139,6 +142,15 @@ RELEVANCE_MARKERS = {
         "physique athlete",
         "contest preparation",
         "contest prep",
+        "mr. olympia",
+        "mr olympia",
+        "olympia champion",
+        "olympia results",
+        "olympia prejudging",
+        "classic physique",
+        "men's physique",
+        "mens physique",
+        "ifbb pro",
         "бодибилд",
         "соревновательн подготовк",
     ),
@@ -1287,6 +1299,108 @@ def _parse_pubmed_efetch(body: bytes, publisher: str) -> tuple[ParsedCandidate, 
     return tuple(candidates)
 
 
+def _parse_europe_pmc_search(body: bytes, publisher: str) -> tuple[ParsedCandidate, ...]:
+    try:
+        payload = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DiscoveryError("source_malformed_feed") from exc
+    result_list = payload.get("resultList") if isinstance(payload, dict) else None
+    results = result_list.get("result") if isinstance(result_list, dict) else None
+    if not isinstance(results, list):
+        raise DiscoveryError("source_malformed_feed")
+
+    candidates: list[ParsedCandidate] = []
+    for raw in results[:MAX_ITEMS_PER_SOURCE]:
+        if not isinstance(raw, dict):
+            continue
+        source_code = _clean_text(raw.get("source"), maximum=16).upper()
+        item_id = _clean_text(raw.get("id") or raw.get("pmid") or raw.get("pmcid"), maximum=64)
+        if (
+            not re.fullmatch(r"[A-Z0-9]{2,12}", source_code)
+            or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", item_id)
+        ):
+            continue
+
+        journal_info = raw.get("journalInfo")
+        journal = journal_info.get("journal") if isinstance(journal_info, dict) else None
+        journal_title = journal.get("title") if isinstance(journal, dict) else None
+        doi = _doi(str(raw.get("doi") or ""), str(raw.get("abstractText") or ""))
+        canonical = f"https://europepmc.org/article/{source_code}/{item_id}"
+        candidate = _candidate_from_values(
+            external_id=f"{source_code}:{item_id}",
+            link=canonical,
+            title=raw.get("title"),
+            summary=raw.get("abstractText") or "",
+            content=raw.get("abstractText") or raw.get("title"),
+            base_url=canonical,
+            publisher=journal_title or publisher,
+            author=raw.get("authorString"),
+            published_at=(
+                raw.get("firstPublicationDate")
+                or raw.get("electronicPublicationDate")
+                or (
+                    journal_info.get("printPublicationDate")
+                    if isinstance(journal_info, dict)
+                    else None
+                )
+            ),
+            updated_at=raw.get("firstIndexDate") or raw.get("dateOfRevision"),
+            primary_url=f"https://doi.org/{doi}" if doi else None,
+            doi=doi,
+        )
+        if candidate is not None:
+            candidates.append(candidate)
+    return tuple(candidates)
+
+
+def _fetch_europe_pmc_rest(
+    source: SourceDefinition,
+    *,
+    mode: str,
+    timeout_seconds: float,
+    max_bytes: int,
+    max_items: int,
+) -> FetchResult:
+    source_url = _canonical_url(source.url)
+    parsed = urlsplit(source_url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    base_query = query.get("query", "").strip()
+    if not base_query:
+        raise DiscoveryError("source_definition_invalid")
+    base_query = re.sub(r"\s+sort_date:y\s*$", "", base_query, flags=re.IGNORECASE).strip()
+    today = datetime.now(UTC).date()
+    start = today - timedelta(days=MAX_CANDIDATE_AGE_DAYS)
+    query["query"] = (
+        f"({base_query}) FIRST_PDATE:[{start.isoformat()} TO {today.isoformat()}] sort_date:y"
+    )
+    source_url = urlunsplit(
+        (parsed.scheme, parsed.netloc, parsed.path, urlencode(query), "")
+    )
+    source_host = (urlsplit(source_url).hostname or "").casefold().rstrip(".")
+    allowed_hosts = frozenset(
+        {source_host, *source.allowed_redirect_hosts}
+        if mode == EXTERNAL_MODE
+        else {source_host, *source.allowed_redirect_hosts, *LOCAL_HOSTS}
+    )
+    status, headers, body = _http_get(
+        source_url,
+        mode=mode,
+        allowed_hosts=allowed_hosts,
+        accept="application/json",
+        timeout_seconds=timeout_seconds,
+        max_bytes=max_bytes,
+    )
+    _source_status_error(status)
+    if _media_type(headers.get("content-type")) != "application/json":
+        raise DiscoveryError("source_invalid_mime")
+    parsed_items = _parse_europe_pmc_search(body, source.name)
+    return FetchResult(
+        status="fetched",
+        items=tuple(parsed_items[: min(max_items, EUROPE_PMC_MAX_ITEMS)]),
+        body_hash=hashlib.sha256(body).hexdigest(),
+    )
+
+
 def _fetch_pubmed_eutils(
     source: SourceDefinition,
     *,
@@ -1376,6 +1490,14 @@ def fetch_source(
             max_bytes=max_bytes,
             max_items=max_items,
         )
+    if source.adapter == "europepmc_rest":
+        return _fetch_europe_pmc_rest(
+            source,
+            mode=mode,
+            timeout_seconds=timeout_seconds,
+            max_bytes=max_bytes,
+            max_items=max_items,
+        )
 
     source_url = _canonical_url(source.url)
     source_host = (urlsplit(source_url).hostname or "").casefold().rstrip(".")
@@ -1456,8 +1578,8 @@ def _validate_source_definition(raw: object) -> SourceDefinition:
         or not isinstance(source_type, str)
         or not 1 <= len(source_type) <= 64
         or fetch_kind not in FETCH_KINDS
-        or adapter not in {None, "pubmed_eutils"}
-        or (adapter == "pubmed_eutils" and fetch_kind != "json_feed")
+        or adapter not in {None, "pubmed_eutils", "europepmc_rest"}
+        or (adapter is not None and fetch_kind != "json_feed")
         or not isinstance(language, str)
         or not re.fullmatch(r"[a-z]{2,8}(?:-[A-Z]{2})?", language)
         or not isinstance(raw.get("enabled"), bool)
@@ -1710,6 +1832,15 @@ def _mode() -> str:
     return value
 
 
+def _candidate_is_fresh(candidate: ParsedCandidate, *, now: datetime) -> bool:
+    event_time = candidate.published_at or candidate.updated_at
+    if event_time is None:
+        return True
+    if event_time > now + timedelta(days=MAX_CANDIDATE_FUTURE_SKEW_DAYS):
+        return False
+    return event_time >= now - timedelta(days=MAX_CANDIDATE_AGE_DAYS)
+
+
 def _candidate_content_hash(candidate: ParsedCandidate) -> str:
     return hashlib.sha256(candidate.content.encode("utf-8")).hexdigest()
 
@@ -1916,6 +2047,8 @@ def run_once(
         source_errors: list[dict[str, str]] = []
         fetched_sources = 0
         relevance_rejected = 0
+        freshness_rejected = 0
+        freshness_now = datetime.now(UTC).replace(tzinfo=None)
         for outcome in outcomes:
             source = outcome.source
             source_state = state["sources"].setdefault(source.source_id, {})
@@ -1983,6 +2116,19 @@ def run_once(
                 ):
                     duplicates += 1
                     continue
+                if not _candidate_is_fresh(normalized_candidate, now=freshness_now):
+                    freshness_rejected += 1
+                    state["candidates"][key] = {
+                        "status": "rejected",
+                        "error_code": "freshness_gate_rejected",
+                        "source_id": source.source_id,
+                        "canonical_url": normalized_url,
+                        "content_hash": _candidate_content_hash(normalized_candidate),
+                        "event_date": _event_date(normalized_candidate),
+                        "created_at": state["last_run_at"],
+                    }
+                    continue
+
                 relevance = _evaluate_relevance(normalized_candidate)
                 if not relevance["allowed"]:
                     relevance_rejected += 1
@@ -2042,6 +2188,7 @@ def run_once(
         "source_errors": source_errors,
         "candidates_created": created,
         "duplicates": duplicates,
+        "freshness_rejected": freshness_rejected,
         "relevance_rejected": relevance_rejected,
         "outbox_pending": len(list(outbox_dir.glob("*.json"))),
         "health": health,

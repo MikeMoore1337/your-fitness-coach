@@ -102,10 +102,10 @@ def parse_source_definition(raw: object) -> NewsSourceDefinition:
         adapter = None
     else:
         adapter = _bounded_text(adapter_raw, field="adapter", maximum=64, required=True)
-        if adapter != "pubmed_eutils":
+        if adapter not in {"pubmed_eutils", "europepmc_rest"}:
             raise ValueError("unsupported adapter")
         if fetch_kind != "json_feed":
-            raise ValueError("pubmed_eutils adapter requires json_feed fetch_kind")
+            raise ValueError(f"{adapter} adapter requires json_feed fetch_kind")
     language = _bounded_text(
         raw.get("language", "en"), field="language", maximum=8, required=True
     ).lower()

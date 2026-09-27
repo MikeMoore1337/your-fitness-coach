@@ -265,14 +265,29 @@ def test_default_source_registry_reconciles_canonical_rows_and_preserves_runtime
         "frontiers-endocrinology",
         "frontiers-pharmacology",
         "pubmed-fitness-health",
+        "acsm-news",
+        "jissn-sports-nutrition",
+        "menshealth-fitness",
+        "fitness-volt",
+        "stronger-by-science",
+        "precision-nutrition",
+        "sciencedaily-fitness",
+        "medicalxpress-health",
+        "muscle-and-fitness",
+        "europe-pmc-fitness-research",
     }
     all_definitions = load_source_allowlist(include_disabled=True)
-    assert len(all_definitions) == 13
+    assert len(all_definitions) == 23
     pubmed = next(item for item in all_definitions if item.id == "pubmed-fitness-health")
     assert pubmed.enabled is True
     assert pubmed.fetch_kind == "json_feed"
     assert pubmed.adapter == "pubmed_eutils"
     assert set(pubmed.allowed_item_hosts) == {"pubmed.ncbi.nlm.nih.gov", "doi.org"}
+    europe_pmc = next(item for item in all_definitions if item.id == "europe-pmc-fitness-research")
+    assert europe_pmc.enabled is True
+    assert europe_pmc.fetch_kind == "json_feed"
+    assert europe_pmc.adapter == "europepmc_rest"
+    assert set(europe_pmc.allowed_item_hosts) == {"europepmc.org", "doi.org"}
     disabled = next(item for item in all_definitions if not item.enabled)
 
     monkeypatch.setattr(settings, "news_ingestion_enabled", True)
@@ -286,7 +301,7 @@ def test_default_source_registry_reconciles_canonical_rows_and_preserves_runtime
     )
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 13
+        assert db.query(NewsSource).count() == 23
         apply_source_allowlist(db, operator_definition)
 
         db.delete(db.get(NewsSource, "frontiers-physiology"))
@@ -325,7 +340,7 @@ def test_default_source_registry_reconciles_canonical_rows_and_preserves_runtime
     with get_session_context() as db:
         seed_demo_data(db)
 
-        assert db.query(NewsSource).count() == 14
+        assert db.query(NewsSource).count() == 24
         restored = db.get(NewsSource, "frontiers-physiology")
         assert restored is not None
         assert restored.enabled is True
@@ -369,7 +384,7 @@ def test_default_source_registry_reconciles_canonical_rows_and_preserves_runtime
 
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 14
+        assert db.query(NewsSource).count() == 24
 
 
 def test_news_activation_requires_owner_ids_and_confirmed_channel() -> None:

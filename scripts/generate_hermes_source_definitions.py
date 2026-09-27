@@ -112,7 +112,9 @@ def _validate_source(raw: object) -> dict[str, Any]:
     if fetch_kind not in FETCH_KINDS:
         raise RegistryError("source_fetch_kind_invalid")
     adapter = raw.get("adapter")
-    if adapter is not None and (adapter != "pubmed_eutils" or fetch_kind != "json_feed"):
+    if adapter is not None and (
+        adapter not in {"pubmed_eutils", "europepmc_rest"} or fetch_kind != "json_feed"
+    ):
         raise RegistryError("source_adapter_invalid")
     language = raw["language"]
     if not isinstance(language, str) or not re.fullmatch(r"[a-z]{2,8}(?:-[A-Z]{2})?", language):

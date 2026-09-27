@@ -5,9 +5,10 @@ import importlib.util
 import json
 import os
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from subprocess import CompletedProcess
-from urllib.parse import parse_qs, unquote
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
 
@@ -388,6 +389,157 @@ def test_pubmed_eutils_rejects_malformed_search_payload() -> None:
         discovery_runner._parse_pubmed_search_ids(b'{"esearchresult":{"idlist":["bad"]}}')
 
 
+def test_europe_pmc_batch_is_bounded_by_global_source_limit() -> None:
+    assert discovery_runner.EUROPE_PMC_MAX_ITEMS == 8
+    assert discovery_runner.EUROPE_PMC_MAX_ITEMS <= discovery_runner.MAX_ITEMS_PER_SOURCE
+
+
+def test_europe_pmc_parser_preserves_abstract_doi_and_dates() -> None:
+    payload = json.dumps(
+        {
+            "resultList": {
+                "result": [
+                    {
+                        "id": "42765482",
+                        "source": "MED",
+                        "pmid": "42765482",
+                        "doi": "10.1000/example.2026.2",
+                        "title": "Resistance training combined with creatine supplementation",
+                        "authorString": "Smith AB, Jones CD.",
+                        "firstPublicationDate": "2026-09-21",
+                        "firstIndexDate": "2026-09-24",
+                        "abstractText": "<b>Results:</b> Strength and hypertrophy outcomes improved.",
+                        "journalInfo": {
+                            "journal": {"title": "Journal of Sports Nutrition"},
+                            "printPublicationDate": "2026-09-01",
+                        },
+                    }
+                ]
+            }
+        }
+    ).encode()
+
+    candidates = discovery_runner._parse_europe_pmc_search(payload, "Europe PMC")
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.external_id == "MED:42765482"
+    assert candidate.canonical_url == "https://europepmc.org/article/MED/42765482"
+    assert candidate.primary_url == "https://doi.org/10.1000/example.2026.2"
+    assert candidate.doi == "10.1000/example.2026.2"
+    assert candidate.title == "Resistance training combined with creatine supplementation"
+    assert candidate.summary == "Results: Strength and hypertrophy outcomes improved."
+    assert candidate.author == "Smith AB, Jones CD."
+    assert candidate.publisher == "Journal of Sports Nutrition"
+    assert candidate.published_at is not None
+    assert candidate.published_at.isoformat() == "2026-09-21T00:00:00"
+    assert candidate.updated_at is not None
+    assert candidate.updated_at.isoformat() == "2026-09-24T00:00:00"
+
+
+def test_candidate_freshness_gate_bounds_archive_and_future_dates() -> None:
+    now = datetime(2026, 9, 27, 9, 0, 0)
+
+    def candidate(published_at: datetime | None) -> discovery_runner.ParsedCandidate:
+        return discovery_runner.ParsedCandidate(
+            external_id="freshness",
+            canonical_url="https://source.example/item",
+            title="Resistance training and hypertrophy",
+            summary="Strength training outcome.",
+            content="Strength training outcome.",
+            published_at=published_at,
+        )
+
+    assert discovery_runner._candidate_is_fresh(candidate(None), now=now) is True
+    assert (
+        discovery_runner._candidate_is_fresh(
+            candidate(now - timedelta(days=discovery_runner.MAX_CANDIDATE_AGE_DAYS)),
+            now=now,
+        )
+        is True
+    )
+    assert (
+        discovery_runner._candidate_is_fresh(
+            candidate(now - timedelta(days=discovery_runner.MAX_CANDIDATE_AGE_DAYS, seconds=1)),
+            now=now,
+        )
+        is False
+    )
+    assert (
+        discovery_runner._candidate_is_fresh(
+            candidate(now + timedelta(days=discovery_runner.MAX_CANDIDATE_FUTURE_SKEW_DAYS)),
+            now=now,
+        )
+        is True
+    )
+    assert (
+        discovery_runner._candidate_is_fresh(
+            candidate(
+                now
+                + timedelta(
+                    days=discovery_runner.MAX_CANDIDATE_FUTURE_SKEW_DAYS,
+                    seconds=1,
+                )
+            ),
+            now=now,
+        )
+        is False
+    )
+
+
+def test_europe_pmc_fetch_adds_recent_first_publication_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[str] = []
+    source = discovery_runner.SourceDefinition(
+        source_id="europe-pmc-test",
+        name="Europe PMC",
+        source_type="official_organization",
+        fetch_kind="json_feed",
+        url=(
+            "https://www.ebi.ac.uk/europepmc/webservices/rest/search?"
+            "query=%28%22resistance%20training%22%20OR%20creatine%29%20sort_date:y"
+            "&format=json&resultType=core&pageSize=20"
+        ),
+        language="en",
+        enabled=True,
+        topics=("fitness_training",),
+        authoritative=True,
+        allowed_redirect_hosts=(),
+        allowed_item_hosts=("europepmc.org", "doi.org"),
+        adapter="europepmc_rest",
+    )
+
+    def fake_http_get(url: str, **_kwargs: object) -> tuple[int, dict[str, str], bytes]:
+        captured.append(url)
+        return (
+            200,
+            {"content-type": "application/json"},
+            b'{"resultList":{"result":[]}}',
+        )
+
+    monkeypatch.setattr(discovery_runner, "_http_get", fake_http_get)
+
+    result = discovery_runner._fetch_europe_pmc_rest(
+        source,
+        mode=discovery_runner.EXTERNAL_MODE,
+        timeout_seconds=5,
+        max_bytes=discovery_runner.MAX_SOURCE_RESPONSE_BYTES,
+        max_items=20,
+    )
+
+    assert result.status == "fetched"
+    assert len(captured) == 1
+    query = parse_qs(urlsplit(captured[0]).query)["query"][0]
+    assert "FIRST_PDATE:[" in query
+    assert "sort_date:y" in query
+    assert query.count("sort_date:y") == 1
+
+
+def test_europe_pmc_rejects_malformed_payload() -> None:
+    with pytest.raises(discovery_runner.DiscoveryError, match="source_malformed_feed"):
+        discovery_runner._parse_europe_pmc_search(b'{"resultList":{}}', "Europe PMC")
+
+
 def test_discovery_and_yfc_share_the_same_owner_taxonomy_contract() -> None:
     assert discovery_runner.OWNER_EDITORIAL_TOPICS == news_taxonomy.OWNER_EDITORIAL_TOPICS
     assert tuple(GENERATOR_MODULE.SUPPORTED_TOPICS) == news_taxonomy.OWNER_EDITORIAL_TOPICS
@@ -432,6 +584,14 @@ def test_discovery_and_yfc_share_the_same_owner_taxonomy_contract() -> None:
             "Mobility exercise study reported flexibility outcome",
             "A controlled mobility exercise study reported flexibility outcomes.",
         ),
+        (
+            "2026 Mr. Olympia results crown a new champion",
+            "IFBB Pro bodybuilding competition results from the Olympia stage.",
+        ),
+        (
+            "Classic Physique Olympia prejudging report",
+            "The IFBB Pro classic physique field completed prejudging.",
+        ),
     ],
 )
 def test_discovery_relevance_matches_yfc_relevance(title: str, summary: str) -> None:
@@ -471,7 +631,7 @@ def test_only_old_relevance_rejections_are_reconsidered() -> None:
     assert discovery_runner._should_reconsider_relevance(accepted_old) is False
 
 
-def test_production_registry_uses_six_working_research_sources() -> None:
+def test_production_registry_uses_sixteen_diverse_working_sources() -> None:
     registry = WORKSPACE / "backend" / "fitminiapp_api" / "resources" / "news_sources.json"
     rendered = GENERATOR_MODULE.render_registry(registry)
     enabled = {source["id"]: source for source in rendered["sources"] if source["enabled"]}
@@ -483,6 +643,16 @@ def test_production_registry_uses_six_working_research_sources() -> None:
         "frontiers-endocrinology",
         "frontiers-pharmacology",
         "pubmed-fitness-health",
+        "acsm-news",
+        "jissn-sports-nutrition",
+        "menshealth-fitness",
+        "fitness-volt",
+        "stronger-by-science",
+        "precision-nutrition",
+        "sciencedaily-fitness",
+        "medicalxpress-health",
+        "muscle-and-fitness",
+        "europe-pmc-fitness-research",
     }
     frontiers = [source for source in enabled.values() if source["id"].startswith("frontiers-")]
     assert len(frontiers) == 5
@@ -494,6 +664,13 @@ def test_production_registry_uses_six_working_research_sources() -> None:
     assert pubmed["fetch_kind"] == "json_feed"
     assert pubmed["adapter"] == "pubmed_eutils"
     assert pubmed["url"].startswith("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?")
+    europe_pmc = enabled["europe-pmc-fitness-research"]
+    assert europe_pmc["fetch_kind"] == "json_feed"
+    assert europe_pmc["adapter"] == "europepmc_rest"
+    assert europe_pmc["url"].startswith("https://www.ebi.ac.uk/europepmc/webservices/rest/search?")
+    assert set(europe_pmc["allowed_item_hosts"]) == {"europepmc.org", "doi.org"}
+    rss_ids = set(enabled) - {"pubmed-fitness-health", "europe-pmc-fitness-research"}
+    assert all(enabled[source_id]["fetch_kind"] == "rss" for source_id in rss_ids)
 
 
 def test_canonical_registry_is_lf_only() -> None:
@@ -551,8 +728,8 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert document["schema_version"] == discovery_runner.SCHEMA_VERSION
     assert document["source_registry_sha256"] == hashlib.sha256(registry.read_bytes()).hexdigest()
     assert document["definitions_version"].endswith(document["source_registry_sha256"])
-    assert len(document["sources"]) == 13
-    assert len({source["id"] for source in document["sources"]}) == 13
+    assert len(document["sources"]) == 23
+    assert len({source["id"] for source in document["sources"]}) == 23
     pubmed = next(
         source for source in document["sources"] if source["id"] == "pubmed-fitness-health"
     )
@@ -606,7 +783,7 @@ def test_generated_definitions_load_without_live_fetch(monkeypatch: pytest.Monke
     )
 
     assert loaded_document["definitions_version"] == document["definitions_version"]
-    assert len(sources) == 13
+    assert len(sources) == 23
     assert sources[0].source_id == "frontiers-nutrition"
     loaded_pubmed = next(
         source for source in loaded_document["sources"] if source["id"] == "pubmed-fitness-health"

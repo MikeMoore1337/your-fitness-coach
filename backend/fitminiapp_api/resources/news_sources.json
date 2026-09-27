@@ -349,5 +349,284 @@
       "rospotrebnadzor.ru",
       "www.rospotrebnadzor.ru"
     ]
+  },
+  {
+    "id": "acsm-news",
+    "name": "American College of Sports Medicine News",
+    "type": "official_organization",
+    "fetch_kind": "rss",
+    "url": "https://acsm.org/category/news-release/feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "healthy_lifestyle",
+      "nutrition"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Official ACSM news and consensus context. Keep only items with direct fitness, exercise-science, sports-medicine or nutrition relevance.",
+    "licensing_notes": "Store metadata and a short paraphrase only; retain the canonical ACSM link.",
+    "health_claim_limitations": "Organization news and consensus statements still require scope and applicability review; do not convert them into individualized medical advice.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "jissn-sports-nutrition",
+    "name": "Journal of the International Society of Sports Nutrition",
+    "type": "primary_research",
+    "fetch_kind": "rss",
+    "url": "https://www.tandfonline.com/feed/rss/rssn20",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Peer-reviewed sports-nutrition journal. Study design, sample, conflicts and limitations require editorial verification.",
+    "licensing_notes": "Store citation metadata and a short audit excerpt only; link to the publisher/DOI.",
+    "health_claim_limitations": "A single study does not establish universal efficacy or safety; preserve study design and limitations.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "menshealth-fitness",
+    "name": "Men's Health Fitness",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.menshealth.com/rss/fitness.xml",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 180,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Large fitness publication. Treat as secondary reporting; product/deal/listicle content must fail relevance or editorial quality gates unless there is a substantive evidence-based angle.",
+    "licensing_notes": "Store title, metadata and concise paraphrase only; do not reproduce article text or publisher images.",
+    "health_claim_limitations": "Secondary media is not primary evidence. Verify health, supplement and training claims against cited research before publication.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "stronger-by-science",
+    "name": "Stronger by Science",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.strongerbyscience.com/feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "nutrition",
+      "sports_nutrition",
+      "healthy_lifestyle"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Evidence-focused strength and hypertrophy analysis. Secondary interpretation must remain linked to underlying research.",
+    "licensing_notes": "Store metadata and concise paraphrase only; do not reproduce article text, charts or images.",
+    "health_claim_limitations": "Verify cited studies and avoid turning population-level findings into individualized prescriptions.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "precision-nutrition",
+    "name": "Precision Nutrition",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.precisionnutrition.com/feed",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 720,
+    "topics": [
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle",
+      "peptides"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Evidence-informed nutrition and coaching publication. Use as secondary context, not as primary clinical evidence.",
+    "licensing_notes": "Store metadata and concise paraphrase only; retain the canonical source link.",
+    "health_claim_limitations": "Nutrition and GLP-1 material must be verified against primary/official evidence before health claims.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "sciencedaily-fitness",
+    "name": "ScienceDaily Fitness",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.sciencedaily.com/rss/health_medicine/fitness.xml",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 180,
+    "topics": [
+      "fitness_training",
+      "nutrition",
+      "healthy_lifestyle",
+      "peptides",
+      "dietary_supplements"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Research-news aggregator. Use for discovery only and verify claims in the linked primary study or institution release.",
+    "licensing_notes": "Store metadata and concise paraphrase only; do not reproduce publisher text or images.",
+    "health_claim_limitations": "Headlines may simplify preliminary findings; primary source verification is required.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "medicalxpress-health",
+    "name": "MedicalXpress",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://medicalxpress.com/rss-feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 180,
+    "topics": [
+      "fitness_training",
+      "nutrition",
+      "healthy_lifestyle",
+      "peptides",
+      "sports_bodybuilding_pharmacology",
+      "dietary_supplements"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "High-volume medical and research news. Strict deterministic relevance filtering is required before provider generation.",
+    "licensing_notes": "Store metadata and concise paraphrase only; retain links to MedicalXpress and the underlying research where available.",
+    "health_claim_limitations": "Secondary research reporting is not sufficient evidence for efficacy, safety or clinical guidance.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "muscle-and-fitness",
+    "name": "Muscle & Fitness",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://www.muscleandfitness.com/feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 180,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle",
+      "sports_bodybuilding_pharmacology"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Large strength/bodybuilding publication. Product, celebrity and promotional content must be rejected unless it carries substantive fitness evidence or industry relevance.",
+    "licensing_notes": "Store metadata and concise paraphrase only; do not reproduce article text or images.",
+    "health_claim_limitations": "Training, supplement and pharmacology claims require independent evidence verification.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "fitness-volt",
+    "name": "Fitness Volt",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://fitnessvolt.com/feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 180,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle",
+      "sports_bodybuilding_pharmacology"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Active bodybuilding and strength publication. Competition results and athlete news are useful for the bodybuilding domain; product/promotional claims still require editorial scrutiny.",
+    "licensing_notes": "Store metadata and concise paraphrase only; do not reproduce article text or publisher images.",
+    "health_claim_limitations": "Training, supplement and pharmacology claims are secondary reporting and require independent evidence verification.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": []
+  },
+  {
+    "id": "europe-pmc-fitness-research",
+    "name": "Europe PMC fitness research",
+    "type": "official_organization",
+    "fetch_kind": "json_feed",
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=%28TITLE%3A%22resistance+training%22+OR+TITLE%3A%22strength+training%22+OR+TITLE%3A%22muscle+hypertrophy%22+OR+TITLE%3Abodybuilding+OR+TITLE%3Acreatine+OR+TITLE%3A%22sports+nutrition%22+OR+TITLE%3A%22performance-enhancing+drug%22+OR+TITLE%3A%22performance+enhancing+drug%22+OR+%28TITLE%3A%22anabolic+steroid%22+AND+%28TITLE%3Aathlete+OR+TITLE%3Abodybuilding%29%29+OR+%28%28TITLE%3Asemaglutide+OR+TITLE%3Atirzepatide+OR+TITLE%3Aretatrutide%29+AND+%28TITLE%3A%22body+composition%22+OR+TITLE%3A%22weight+loss%22+OR+TITLE%3Amuscle%29%29%29+sort_date%3Ay&format=json&resultType=core&pageSize=20",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_bodybuilding_pharmacology",
+      "peptides",
+      "nutrition",
+      "sports_nutrition",
+      "dietary_supplements",
+      "healthy_lifestyle"
+    ],
+    "authoritative": true,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "trust_notes": "Programmatic literature discovery through the Europe PMC REST API. Europe PMC is an index/metadata service; verify the primary publication before editorial claims.",
+    "licensing_notes": "Store bibliographic metadata and a short audit excerpt only; abstract/full-text rights remain with their respective sources.",
+    "health_claim_limitations": "Indexed metadata or abstracts do not establish efficacy, safety or clinical applicability; verify study design, limitations and primary publication.",
+    "allowed_redirect_hosts": [],
+    "allowed_item_hosts": [
+      "europepmc.org",
+      "doi.org"
+    ],
+    "adapter": "europepmc_rest"
   }
 ]
