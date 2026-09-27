@@ -911,26 +911,6 @@ class GitHubClient:
     def open_pull_requests(self) -> list[dict[str, Any]]:
         return list(self.api("pulls?state=open&per_page=100"))
 
-    def task_issues(self, task_id: str) -> list[dict[str, Any]]:
-        issues: list[dict[str, Any]] = []
-        page = 1
-        pattern = re.compile(rf"^\[Task\s+{re.escape(task_id)}\]", re.IGNORECASE)
-        while True:
-            payload = self.api(f"issues?state=all&per_page=100&page={page}")
-            if not isinstance(payload, list):
-                raise TaskSessionError("GitHub task Issue inventory is not a list")
-            batch = [
-                dict(item)
-                for item in payload
-                if isinstance(item, Mapping)
-                and not item.get("pull_request")
-                and pattern.match(str(item.get("title", "")))
-            ]
-            issues.extend(batch)
-            if len(payload) < 100:
-                return issues
-            page += 1
-
     def issue_comments(self, number: int) -> list[dict[str, Any]]:
         comments: list[dict[str, Any]] = []
         page = 1
@@ -2801,22 +2781,20 @@ class TaskController:
         owner = normalize_github_login(github.repo_slug.split("/", maxsplit=1)[0])
         if not owner:
             raise TaskSessionError("Cannot establish the repository owner for resume authorization")
-        matching_issues = [
-            item
-            for item in github.task_issues(task_id)
-            if normalize_github_login(
-                str((item.get("user") or {}).get("login", ""))
-                if isinstance(item.get("user"), Mapping)
-                else ""
-            )
-            == owner
-        ]
-        if len(matching_issues) != 1:
+        issue = github.api(f"issues/{issue_number}")
+        if not isinstance(issue, Mapping) or issue.get("number") != issue_number:
+            raise TaskSessionError("Resume requires the matching task Issue")
+        if "pull_request" in issue:
             raise TaskSessionError(
-                f"Task {task_id} must have exactly one task Issue authored by the repository owner"
+                "Resume control reference must be a task Issue, not a pull request"
             )
-        issue = matching_issues[0]
-        if issue.get("number") != issue_number or str(issue.get("state", "")).lower() != "open":
+        author = issue.get("user")
+        if (
+            not isinstance(author, Mapping)
+            or normalize_github_login(str(author.get("login", ""))) != owner
+        ):
+            raise TaskSessionError("Task Issue must be authored by the repository owner")
+        if str(issue.get("state", "")).lower() != "open":
             raise TaskSessionError("Resume requires the matching open control Issue")
         try:
             contract = parse_task_contract(str(issue.get("body", "")))
