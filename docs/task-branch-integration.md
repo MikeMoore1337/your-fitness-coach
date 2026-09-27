@@ -246,8 +246,15 @@ pre-implementation blocker:
 contract/dependencies, owner gate, lease, branch/worktree и актуальный `master`; task branch может
 измениться только fast-forward. Resume отказывает при worker state, PR, unique commit, изменённой
 зависимости, очередном claim или любом неоднозначном состоянии. Issue переводится в `in_progress`
-только после записи durable identity фактически запущенной Codex-команды. Повторный запуск
+только после записи durable identity фактически запущенной Codex-команды. Обычный повторный запуск
 разрешён только когда supervisor не стартовал и worker state ещё не создан.
+Есть одно дополнительное узкое восстановление для уже запущенного Codex CLI, который завершился
+с кодом 2 из-за точной ошибки несовместимых `--approve-for-me` и `--sandbox` аргументов: controller
+сверяет эту строку в `events.jsonl`, проверяет отчёт guard с нулём tool/progress/subagent действий,
+убеждается в отсутствии `worker-state.json` и завершившемся worker PID и сохраняет неудачную попытку
+в lease. Разрешается ровно одно такое восстановление; перед новым claim launcher возвращает Issue в
+`human_required`. Любое другое завершение после старта worker, неполные evidence, live PID, state,
+изменение ветки или повторное использование этого лимита блокируют resume.
 
 Низкоуровневые команды:
 

@@ -315,6 +315,97 @@ def _prepare_preimplementation_resume(
     )
 
 
+def _record_codex_cli_argument_failure(
+    controller: Any,
+    root: Path,
+    github: Any,
+    branch: str,
+    *,
+    reason: str,
+    completed_tool_actions: int = 0,
+    attempt_name: str = "codex-cli-attempt",
+    advance_master: bool = False,
+) -> Path:
+    controller.resume_preimplementation(
+        "241",
+        control_issue_number=241,
+        reason=reason,
+        owner_authorize=True,
+    )
+    controller.claim_preimplementation_worker_launch("241")
+    attempt_root = root / ".artifacts" / "tasks" / "241" / "temporary" / "delivery" / attempt_name
+    attempt_root.mkdir(parents=True)
+    worker_state_path = attempt_root / "worker-state.json"
+    worker_state_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "pid": 701,
+                "process_group_id": None,
+                "process_instance": {"kind": "test", "instance": "supervisor"},
+                "started_at": "2026-09-27T00:00:00Z",
+                "command_process": {
+                    "pid": 702,
+                    "process_instance": {"kind": "test", "instance": "codex"},
+                },
+                "command_started_at": "2026-09-27T00:00:01Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    controller.record_preimplementation_worker_started("241", worker_state_path=worker_state_path)
+    worker_state_path.unlink()
+    (attempt_root / "events.jsonl").write_text(
+        "error: the argument '--approve-for-me' cannot be used with '--sandbox <SANDBOX_MODE>'\n",
+        encoding="utf-8",
+    )
+    (attempt_root / "worker-guard.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "classification": "yfc-worker-guard-report",
+                "blocked": False,
+                "block_reason_code": None,
+                "counters": {
+                    "completed_tool_actions": completed_tool_actions,
+                    "collab_tool_calls": 0,
+                    "spawned_subagents": 0,
+                    "max_observed_concurrent_subagents": 0,
+                    "progress_events": 0,
+                    "malformed_lines": 1,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    github.issue_comment_map[241] = [
+        {
+            "id": 2,
+            "created_at": "2026-09-27T00:01:00Z",
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="241",
+                    state="blocked",
+                    issue_number=241,
+                    branch=branch,
+                    blocker="worker exited with code 2",
+                )
+            ),
+        }
+    ]
+    if advance_master:
+        (root / "controller-fix.txt").write_text(
+            "merged controller remediation\n", encoding="utf-8"
+        )
+        _git(root, "add", "controller-fix.txt")
+        _git(root, "commit", "-m", "[Controller] Merge startup fix")
+        _git(root, "push", "origin", "master")
+        controller.repository.fetch_origin_master(cwd=root, prune=False)
+        github.master_sha = controller.repository.ref("origin/master")
+    return worker_state_path
+
+
 def test_task_session_exposes_supported_preimplementation_resume_command() -> None:
     args = task_session._parser().parse_args(
         [
@@ -444,6 +535,193 @@ def test_resume_preimplementation_fast_forwards_and_preserves_attempt_audit(
             reason="repeat request",
             owner_authorize=True,
         )
+
+
+def test_resume_preimplementation_reconciles_verified_zero_action_cli_failure(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository, controller, worktree, branch, original_base, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    reason = "owner-authorized retry after merged controller CLI fix"
+    worker_state_path = _record_codex_cli_argument_failure(
+        controller, root, github, branch, reason=reason, advance_master=True
+    )
+    monkeypatch.setattr(controller.store, "_pid_is_alive", lambda _pid: False)
+    lease_path = controller.store.task_lease_path("241")
+    before = controller.store.read_json(lease_path)
+
+    resumed = controller.resume_preimplementation(
+        "241",
+        control_issue_number=241,
+        reason=reason,
+        owner_authorize=True,
+    )
+
+    event = resumed["preimplementation_resume"]
+    failed_attempt = event["launch_attempts"][0]
+    current_master = git_repository.ref("origin/master")
+    assert resumed["mutation_performed"] is True
+    assert resumed["control_state"]["state"] == "blocked"
+    assert resumed["lease"]["original_base_origin_master_sha"] == original_base
+    assert before["base_origin_master_sha"] == original_base
+    assert resumed["lease"]["base_origin_master_sha"] == current_master
+    assert git_repository.head(cwd=worktree) == current_master
+    assert event["state"] == "prepared"
+    assert event["base_refreshes"][0]["from_base_sha"] == original_base
+    assert event["base_refreshes"][0]["to_base_sha"] == current_master
+    assert event["registered_at"] == resumed["lease"]["created_at"]
+    assert event["previous_control_state"]["state"] == "human_required"
+    assert "worker-state.json" in event["previous_control_state"]["blocker"]
+    assert failed_attempt["state"] == "failed-before-implementation"
+    assert failed_attempt["worker_exit_code"] == 2
+    assert event["last_preimplementation_failure"]["worker_exit_code"] == 2
+    assert event["last_preimplementation_failure"]["recorded_at"] == failed_attempt["finished_at"]
+    assert failed_attempt["failure_kind"] == "codex_cli_argument_conflict_before_implementation"
+    assert failed_attempt["failure_evidence"]["completed_tool_actions"] == 0
+    assert failed_attempt["failure_evidence"]["worker_state_path"] == str(worker_state_path)
+    assert not worker_state_path.exists()
+
+    repeated = controller.resume_preimplementation(
+        "241",
+        control_issue_number=241,
+        reason=reason,
+        owner_authorize=True,
+    )
+    assert repeated["mutation_performed"] is False
+    assert repeated["preimplementation_resume"] == event
+
+
+@pytest.mark.parametrize(
+    ("completed_tool_actions", "process_alive", "message"),
+    [
+        (1, False, "zero-action"),
+        (0, True, "still live"),
+    ],
+)
+def test_resume_preimplementation_refuses_unproven_cli_failure(
+    repository: tuple[Path, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    completed_tool_actions: int,
+    process_alive: bool,
+    message: str,
+) -> None:
+    root, git_repository, controller, worktree, branch, _, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    reason = "owner-authorized retry after merged controller CLI fix"
+    _record_codex_cli_argument_failure(
+        controller,
+        root,
+        github,
+        branch,
+        reason=reason,
+        completed_tool_actions=completed_tool_actions,
+    )
+    monkeypatch.setattr(controller.store, "_pid_is_alive", lambda _pid: process_alive)
+    lease_path = controller.store.task_lease_path("241")
+    lease_before = controller.store.read_json(lease_path)
+    head_before = git_repository.head(cwd=worktree)
+
+    with pytest.raises(task_session.TaskSessionError, match=message):
+        controller.resume_preimplementation(
+            "241",
+            control_issue_number=241,
+            reason=reason,
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(lease_path) == lease_before
+    assert git_repository.head(cwd=worktree) == head_before
+
+
+def test_resume_preimplementation_allows_only_one_cli_failure_rearm(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, controller, _, branch, _, github = _prepare_preimplementation_resume(repository)
+    reason = "owner-authorized retry after merged controller CLI fix"
+    _record_codex_cli_argument_failure(controller, root, github, branch, reason=reason)
+    monkeypatch.setattr(controller.store, "_pid_is_alive", lambda _pid: False)
+    first_resume = controller.resume_preimplementation(
+        "241",
+        control_issue_number=241,
+        reason=reason,
+        owner_authorize=True,
+    )
+    assert first_resume["preimplementation_resume"]["state"] == "prepared"
+
+    github.issue_comment_map[241] = [
+        {
+            "id": 3,
+            "created_at": "2026-09-27T00:02:00Z",
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="241",
+                    state="human_required",
+                    issue_number=241,
+                    branch=branch,
+                    blocker="Task worker stopped before implementation; inspect worker-state.json.",
+                )
+            ),
+        }
+    ]
+    _record_codex_cli_argument_failure(
+        controller,
+        root,
+        github,
+        branch,
+        reason=reason,
+        attempt_name="second-codex-cli-attempt",
+    )
+    lease_path = controller.store.task_lease_path("241")
+    lease_before = controller.store.read_json(lease_path)
+
+    with pytest.raises(task_session.TaskSessionError, match="retry budget was already used"):
+        controller.resume_preimplementation(
+            "241",
+            control_issue_number=241,
+            reason=reason,
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(lease_path) == lease_before
+
+
+def test_resume_preimplementation_refuses_non_fast_forward_cli_failure_refresh(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository, controller, worktree, branch, _, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    reason = "owner-authorized retry after merged controller CLI fix"
+    _record_codex_cli_argument_failure(
+        controller, root, github, branch, reason=reason, advance_master=True
+    )
+    monkeypatch.setattr(controller.store, "_pid_is_alive", lambda _pid: False)
+    is_ancestor = git_repository.is_ancestor
+    calls = 0
+
+    def reject_task_branch_refresh(ancestor: str, descendant: str) -> bool:
+        nonlocal calls
+        calls += 1
+        return False if calls == 2 else is_ancestor(ancestor, descendant)
+
+    monkeypatch.setattr(git_repository, "is_ancestor", reject_task_branch_refresh)
+    lease_path = controller.store.task_lease_path("241")
+    lease_before = controller.store.read_json(lease_path)
+    head_before = git_repository.head(cwd=worktree)
+
+    with pytest.raises(task_session.TaskSessionError, match="cannot be refreshed by fast-forward"):
+        controller.resume_preimplementation(
+            "241",
+            control_issue_number=241,
+            reason=reason,
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(lease_path) == lease_before
+    assert git_repository.head(cwd=worktree) == head_before
 
 
 @pytest.mark.parametrize(
