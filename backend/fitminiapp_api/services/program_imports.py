@@ -28,15 +28,18 @@ from fitminiapp_api.models.exercise import Exercise
 from fitminiapp_api.models.program import (
     ProgramTemplate,
     ProgramTemplateExerciseWeekPrescription,
+    UserProgram,
 )
 from fitminiapp_api.models.program_import import ProgramImport
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.program import (
     ExercisePrescriptionPlan,
+    ProgramCoachingRule,
     ProgramTemplateCreate,
     ProgramTemplateDayCreate,
     ProgramTemplateExerciseCreate,
 )
+from fitminiapp_api.schemas.program_import import ProgramImportBlock, ProgramImportProvenance
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.exercise_catalog import (
     _effective_exercise_id,
@@ -61,6 +64,10 @@ from fitminiapp_api.services.program_import_ai import (
     ProgramImportAiRowContext,
     ProgramImportAiSourceSpan,
 )
+from fitminiapp_api.services.program_versioning import (
+    apply_imported_template_revision,
+    get_program_for_actor,
+)
 from fitminiapp_api.services.programs import create_template
 from fitminiapp_api.services.workout_metrics import (
     exercise_metric_type,
@@ -69,8 +76,8 @@ from fitminiapp_api.services.workout_metrics import (
 
 logger = logging.getLogger(__name__)
 
-PROGRAM_IMPORT_SCHEMA_VERSION: Final = 2
-PROGRAM_IMPORT_PARSER_VERSION: Final = "program-import-v3"
+PROGRAM_IMPORT_SCHEMA_VERSION: Final = 3
+PROGRAM_IMPORT_PARSER_VERSION: Final = "program-import-v4"
 PROGRAM_IMPORT_CANONICAL_LAYOUT: Final = "canonical-table-v1"
 PROGRAM_IMPORT_MATRIX_LAYOUT: Final = "weekly-matrix-v1"
 PROGRAM_IMPORT_GENERIC_LAYOUT: Final = "generic-table-v1"
@@ -79,6 +86,7 @@ PROGRAM_IMPORT_DOCX_LAYOUT: Final = "docx-document-v1"
 PROGRAM_IMPORT_MARKER: Final = "#yfc_template_version"
 PROGRAM_IMPORT_MARKER_VALUE: Final = "1"
 PROGRAM_IMPORT_MAX_PRESCRIPTION_CHARS: Final = 12_000
+PROGRAM_IMPORT_MAX_RULE_CHARS: Final = 4_000
 PROGRAM_IMPORT_COLUMNS: Final = (
     "program_title",
     "goal",
@@ -97,6 +105,10 @@ PROGRAM_IMPORT_COLUMNS: Final = (
     "superset_group",
     "superset_order",
     "prescription",
+    "block_number",
+    "block_title",
+    "block_is_deload",
+    "coaching_rule",
 )
 PROGRAM_IMPORT_REQUIRED_COLUMNS: Final = frozenset(
     {
@@ -128,6 +140,11 @@ _DOCUMENT_DAY_PATTERN = re.compile(
 _DOCUMENT_WEEK_PATTERN = re.compile(
     r"^(?:[-*•]\s*)?(?:неделя|week)\s*(\d+)\s*(?:[-:–—]\s*(.*))?$", re.IGNORECASE
 )
+_DOCUMENT_BLOCK_PATTERN = re.compile(
+    r"^(?:[-*•]\s*)?(?:(разгруз(?:очный)?\s+)?(?:блок|block))\s*(\d+)"
+    r"\s*(?:[-:–—]\s*(.*))?$",
+    re.IGNORECASE,
+)
 _DOCUMENT_REST_PATTERN = re.compile(
     r"^(?:[-*•]\s*)?(?:отдых|rest)\s*[:：-]?\s*(\d+(?:[.,]\d+)?)\s*"
     r"(сек(?:унд)?|с|seconds?|sec|мин(?:уты|ут)?|м|minutes?|min)?\s*$",
@@ -136,6 +153,14 @@ _DOCUMENT_REST_PATTERN = re.compile(
 _DOCUMENT_LIST_PREFIX_PATTERN = re.compile(r"^(?:[-*•]\s+|\d+[.)]\s+)")
 _PRESCRIPTION_PATTERN = re.compile(
     r"^(?P<sets>\d{1,2})\s*(?:×|x|х|\*)\s*(?P<reps>.+)$", re.IGNORECASE
+)
+_UNSTRUCTURED_COACHING_RULE_PATTERN = re.compile(
+    r"\b(?:RIR|RPE|AMRAP|double progression|linear progression|training max|deload|progression|"
+    r"прогрессия|разгруз(?:ка|очный)|тренировочн(?:ый|ого) максимум)\b|"
+    r"\b(?:add|increase|raise)\s+(?:the\s+)?(?:load|weight)\b|"
+    r"\b(?:add|increase)\s+\d+(?:[.,]\d+)?\s*(?:kg|lb)\b|"
+    r"увелич\w*\s+(?:вес|нагрузк)|добав\w*\s+\d+(?:[.,]\d+)?\s*кг",
+    re.IGNORECASE,
 )
 _SETS_REPS_TEXT_PATTERN = re.compile(
     r"^(?P<sets>\d{1,2})\s*(?:подход(?:а|ов)?|sets?)\s*(?:по|x|×|х)?\s*(?P<reps>.+)$",
@@ -177,6 +202,10 @@ _GENERIC_HEADER_ALIASES: dict[str, frozenset[str]] = {
     "prescription": frozenset(
         {"prescription", "advancedprescription", "structuredprescription", "предписание"}
     ),
+    "block_number": frozenset({"block", "blocknumber", "номерблока"}),
+    "block_title": frozenset({"blocktitle", "названиеблока"}),
+    "block_is_deload": frozenset({"isdeload", "разгрузка", "делоад"}),
+    "coaching_rule": frozenset({"coachingrule", "progressionrule", "правилопрогрессии"}),
 }
 _SOURCE_EXERCISE_ALIASES: dict[str, tuple[str, ...]] = {
     "выпадынаместе": ("Выпады",),
@@ -348,6 +377,11 @@ class _RowDraft(TypedDict, total=False):
     superset_group: int | None
     superset_order: int | None
     prescription: dict | None
+    block_number: int | None
+    block_title: str | None
+    block_is_deload: bool
+    block_metadata_present: bool
+    coaching_rule: dict | None
     manual_exercise_id: int | None
     resolved_exercise_id: int | None
     resolved_exercise_title: str | None
@@ -375,6 +409,14 @@ class _Summary(TypedDict):
     warning_count: int
 
 
+class _ProgramBlock(TypedDict):
+    block_number: int
+    title: str
+    week_start: int
+    week_end: int
+    is_deload: bool
+
+
 class _Draft(TypedDict):
     source_format: str
     schema_version: int
@@ -384,6 +426,9 @@ class _Draft(TypedDict):
     program_title: str | None
     goal: str | None
     level: str | None
+    provenance: dict[str, object]
+    blocks: list[_ProgramBlock]
+    coaching_rules: list[dict[str, object]]
     rows: list[_RowDraft]
     issues: list[_Issue]
     summary: _Summary
@@ -526,7 +571,9 @@ def _validate_table(
             )
         normalized_rows.append((row_number, tuple(row) + ("",) * (width - len(row))))
     large_columns = {
-        index for index, value in enumerate(normalized_header) if value == "prescription"
+        index
+        for index, value in enumerate(normalized_header)
+        if value in {"prescription", "coaching_rule"}
     }
     _validate_text_cells(normalized_rows, large_column_indices=large_columns)
     return _Table(
@@ -586,7 +633,9 @@ def _parse_csv(source: bytes) -> _Table:
             raise ProgramImportError("header_missing", "В CSV отсутствует строка заголовков")
         header = raw_rows[1][1]
         large_columns = {
-            index for index, value in enumerate(header) if _text(value).lower() == "prescription"
+            index
+            for index, value in enumerate(header)
+            if _text(value).lower() in {"prescription", "coaching_rule"}
         }
         return _validate_table(
             marker=raw_rows[0][1],
@@ -1339,6 +1388,9 @@ def _document_metadata(label: str, value: str) -> tuple[str, str] | None:
         "goal": "goal",
         "уровень": "level",
         "level": "level",
+        "coachingrule": "coaching_rule",
+        "progressionrule": "coaching_rule",
+        "правилопрогрессии": "coaching_rule",
     }
     field = field_by_key.get(key)
     if field is None:
@@ -1456,6 +1508,10 @@ def _document_values(
         "prescribed_sets": str(prescribed_sets) if prescribed_sets is not None else "",
         "prescribed_reps": prescribed_reps or "",
         "rest_seconds": str(rest_seconds) if rest_seconds is not None else "",
+        "block_number": metadata.get("block_number", ""),
+        "block_title": metadata.get("block_title", ""),
+        "block_is_deload": metadata.get("block_is_deload", ""),
+        "coaching_rule": metadata.get("coaching_rule", ""),
     }
     if extra:
         values.update(extra)
@@ -1555,6 +1611,10 @@ def _extract_document_rows(
                     rest = _parse_integer_text(cell("rest_seconds"))
                 values_extra = {
                     "notes": cell("notes"),
+                    "block_number": cell("block_number"),
+                    "block_title": cell("block_title"),
+                    "block_is_deload": cell("block_is_deload"),
+                    "coaching_rule": cell("coaching_rule"),
                     "rest_seconds": str(
                         rest
                         if rest is not None
@@ -1598,6 +1658,14 @@ def _extract_document_rows(
         if week_match is not None:
             current_week = int(week_match.group(1))
             saw_explicit_week = True
+            continue
+        block_match = _DOCUMENT_BLOCK_PATTERN.fullmatch(content)
+        if block_match is not None:
+            block_number = int(block_match.group(2))
+            block_title = _optional_text(block_match.group(3)) or f"Блок {block_number}"
+            metadata["block_number"] = str(block_number)
+            metadata["block_title"] = block_title
+            metadata["block_is_deload"] = "true" if block_match.group(1) else "false"
             continue
         metadata_match = re.match(
             r"^(?:[-*•]\s*)?(.+?)\s*[:：-]\s*(.+)$", content, flags=re.IGNORECASE
@@ -1988,6 +2056,24 @@ def _extract_generic_rows(
             ),
             ("notes", values_by_column.get(mapping.get("notes", _GridCell(0, 0, "", "")).column)),
             (
+                "block_number",
+                values_by_column.get(mapping.get("block_number", _GridCell(0, 0, "", "")).column),
+            ),
+            (
+                "block_title",
+                values_by_column.get(mapping.get("block_title", _GridCell(0, 0, "", "")).column),
+            ),
+            (
+                "block_is_deload",
+                values_by_column.get(
+                    mapping.get("block_is_deload", _GridCell(0, 0, "", "")).column
+                ),
+            ),
+            (
+                "coaching_rule",
+                values_by_column.get(mapping.get("coaching_rule", _GridCell(0, 0, "", "")).column),
+            ),
+            (
                 "source_auxiliary",
                 values_by_column.get(
                     mapping.get("source_auxiliary", _GridCell(0, 0, "", "")).column
@@ -2034,6 +2120,22 @@ def _extract_generic_rows(
             or "90",
             "notes": values_by_column.get(
                 mapping.get("notes", _GridCell(0, 0, "", "")).column, _GridCell(0, 0, "", "")
+            ).value,
+            "block_number": values_by_column.get(
+                mapping.get("block_number", _GridCell(0, 0, "", "")).column,
+                _GridCell(0, 0, "", ""),
+            ).value,
+            "block_title": values_by_column.get(
+                mapping.get("block_title", _GridCell(0, 0, "", "")).column,
+                _GridCell(0, 0, "", ""),
+            ).value,
+            "block_is_deload": values_by_column.get(
+                mapping.get("block_is_deload", _GridCell(0, 0, "", "")).column,
+                _GridCell(0, 0, "", ""),
+            ).value,
+            "coaching_rule": values_by_column.get(
+                mapping.get("coaching_rule", _GridCell(0, 0, "", "")).column,
+                _GridCell(0, 0, "", ""),
             ).value,
         }
         extracted.append(
@@ -2507,6 +2609,51 @@ def _parse_structured_prescription(
     return plan.model_dump(mode="json")
 
 
+def _parse_coaching_rule(
+    value: object,
+    *,
+    row_number: int,
+    issues: list[_Issue],
+) -> dict | None:
+    raw = _optional_text(value)
+    if raw is None:
+        return None
+    if len(raw) > PROGRAM_IMPORT_MAX_RULE_CHARS:
+        _append_issue(
+            issues,
+            "coaching_rule_too_large",
+            "blocking",
+            "Структурированное правило слишком большое",
+            row_number=row_number,
+            field="coaching_rule",
+        )
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as exc:
+        _append_issue(
+            issues,
+            "coaching_rule_invalid",
+            "blocking",
+            "Правило прогрессии должно быть корректным JSON-объектом",
+            row_number=row_number,
+            field="coaching_rule",
+        )
+        del exc
+        return None
+    if not isinstance(parsed, dict):
+        _append_issue(
+            issues,
+            "coaching_rule_invalid",
+            "blocking",
+            "Правило прогрессии должно быть JSON-объектом",
+            row_number=row_number,
+            field="coaching_rule",
+        )
+        return None
+    return parsed
+
+
 def _row_from_values(
     *,
     row_number: int,
@@ -2517,6 +2664,26 @@ def _row_from_values(
 ) -> tuple[_RowDraft, list[_Issue]]:
     issues: list[_Issue] = []
     raw_rest_seconds = _optional_text(values.get("rest_seconds"))
+    raw_block_is_deload = (_optional_text(values.get("block_is_deload")) or "false").casefold()
+    block_is_deload_values = {
+        "true": True,
+        "1": True,
+        "да": True,
+        "yes": True,
+        "false": False,
+        "0": False,
+        "нет": False,
+        "no": False,
+    }
+    if raw_block_is_deload not in block_is_deload_values:
+        _append_issue(
+            issues,
+            "block_is_deload_invalid",
+            "blocking",
+            "Признак разгрузочного блока должен быть true или false",
+            row_number=row_number,
+            field="block_is_deload",
+        )
     row: _RowDraft = {
         "row_number": row_number,
         "source_sheet": source_sheet,
@@ -2564,6 +2731,21 @@ def _row_from_values(
         "prescription": _parse_structured_prescription(
             values.get("prescription"), row_number=row_number, issues=issues
         ),
+        "block_number": _parse_integer(
+            values.get("block_number"),
+            row_number=row_number,
+            field="block_number",
+            issues=issues,
+        ),
+        "block_title": _optional_text(values.get("block_title")),
+        "block_is_deload": block_is_deload_values.get(raw_block_is_deload, False),
+        "block_metadata_present": any(
+            _optional_text(values.get(field)) is not None
+            for field in ("block_number", "block_title", "block_is_deload")
+        ),
+        "coaching_rule": _parse_coaching_rule(
+            values.get("coaching_rule"), row_number=row_number, issues=issues
+        ),
         "manual_exercise_id": None,
         "resolved_exercise_id": None,
         "resolved_exercise_title": None,
@@ -2583,6 +2765,7 @@ def _add_domain_range_issues(row: _RowDraft, issues: list[_Issue]) -> None:
     row_number = row["row_number"]
     ranges = (
         ("week_number", 1, 24, "Номер недели должен быть от 1 до 24"),
+        ("block_number", 1, 24, "Номер блока должен быть от 1 до 24"),
         ("day_number", 1, 8, "Номер дня должен быть от 1 до 8"),
         ("exercise_id", 1, 2_147_483_647, "ID упражнения должен быть положительным"),
         ("prescribed_sets", 1, 10, "Количество подходов должно быть от 1 до 10"),
@@ -2628,6 +2811,15 @@ def _add_domain_range_issues(row: _RowDraft, issues: list[_Issue]) -> None:
             "Заметка слишком длинная",
             row_number=row_number,
             field="notes",
+        )
+    if row.get("block_title") and len(str(row["block_title"])) > 128:
+        _append_issue(
+            issues,
+            "value_too_long",
+            "blocking",
+            "Название блока слишком длинное",
+            row_number=row_number,
+            field="block_title",
         )
 
 
@@ -2718,8 +2910,20 @@ def _resolve_row(
             matches = by_key.get(_normalized_match_key(str(row["exercise_slug"])), [])
             unique = {item.exercise_id: item for item in matches}
             if len(unique) == 1:
-                candidate = next(iter(unique.values()))
-                row["match_type"] = "slug"
+                suggested_candidate = next(iter(unique.values()))
+                if suggested_candidate.match_type == "transliteration":
+                    row["candidates"] = [_public_candidate(suggested_candidate)]
+                    _append_issue(
+                        row_issues,
+                        "exercise_suggested",
+                        "blocking",
+                        "Транслитерация нашла возможное упражнение; подтвердите выбор вручную",
+                        row_number=row_number,
+                        field="exercise_slug",
+                    )
+                else:
+                    candidate = suggested_candidate
+                    row["match_type"] = candidate.match_type
             elif len(unique) > 1:
                 row["candidates"] = [
                     _public_candidate(item)
@@ -2757,14 +2961,26 @@ def _resolve_row(
                 if source_alias:
                     row["source_alias_used"] = True
             if len(matches_by_id) == 1:
-                candidate = next(iter(matches_by_id.values()))
-                row["match_type"] = (
-                    "alias" if row.get("source_alias_used") else candidate.match_type
-                )
-                row["name_normalized"] = bool(
-                    row.get("exercise_match_name")
-                    and row.get("exercise_match_name") != row.get("exercise_name")
-                )
+                suggested_candidate = next(iter(matches_by_id.values()))
+                if suggested_candidate.match_type == "transliteration":
+                    row["candidates"] = [_public_candidate(suggested_candidate)]
+                    _append_issue(
+                        row_issues,
+                        "exercise_suggested",
+                        "blocking",
+                        "Транслитерация нашла возможное упражнение; подтвердите выбор вручную",
+                        row_number=row_number,
+                        field="exercise_name",
+                    )
+                else:
+                    candidate = suggested_candidate
+                    row["match_type"] = (
+                        "alias" if row.get("source_alias_used") else candidate.match_type
+                    )
+                    row["name_normalized"] = bool(
+                        row.get("exercise_match_name")
+                        and row.get("exercise_match_name") != row.get("exercise_name")
+                    )
             elif len(matches_by_id) > 1:
                 candidates = sorted(matches_by_id.values(), key=lambda item: item.title)
                 row["candidates"] = [
@@ -2990,7 +3206,9 @@ def _attach_source_coordinates(issue: _Issue, rows: list[_RowDraft]) -> None:
 
 def _row_signature(row: _RowDraft) -> tuple[object, ...]:
     return tuple(
-        row.get(field)
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if isinstance(value := row.get(field), (dict, list))
+        else value
         for field in (
             "week_number",
             "day_number",
@@ -3002,11 +3220,148 @@ def _row_signature(row: _RowDraft) -> tuple[object, ...]:
             "prescribed_reps",
             "prescribed_duration_minutes",
             "rest_seconds",
+            "prescription",
             "notes",
             "superset_group",
             "superset_order",
+            "block_number",
+            "block_title",
+            "block_is_deload",
+            "coaching_rule",
         )
     )
+
+
+def _normalize_coaching_rule(row: _RowDraft, issues: list[_Issue]) -> None:
+    rule_data = row.get("coaching_rule")
+    if rule_data is None:
+        notes = row.get("notes")
+        if isinstance(notes, str) and _UNSTRUCTURED_COACHING_RULE_PATTERN.search(notes):
+            _append_issue(
+                issues,
+                "coaching_rule_unstructured",
+                "blocking",
+                "Правило прогрессии нужно задать в колонке coaching_rule как проверяемый JSON-объект",
+                row_number=row["row_number"],
+                field="coaching_rule",
+            )
+        return
+    if not isinstance(rule_data, dict):
+        return
+    normalized = dict(rule_data)
+    resolved_id = row.get("resolved_exercise_id")
+    if normalized.get("scope", "program") == "exercise":
+        explicit_id = normalized.get("exercise_id")
+        if (
+            isinstance(explicit_id, int)
+            and isinstance(resolved_id, int)
+            and explicit_id != resolved_id
+        ):
+            _append_issue(
+                issues,
+                "coaching_rule_exercise_mismatch",
+                "blocking",
+                "Упражнение в правиле не совпадает с сопоставленным упражнением строки",
+                row_number=row["row_number"],
+                field="coaching_rule",
+            )
+        elif isinstance(resolved_id, int):
+            normalized["exercise_id"] = resolved_id
+    try:
+        rule = ProgramCoachingRule.model_validate(normalized)
+    except TypeError, ValueError:
+        _append_issue(
+            issues,
+            "coaching_rule_invalid",
+            "blocking",
+            "Структурированное правило не соответствует поддерживаемым полям прогрессии",
+            row_number=row["row_number"],
+            field="coaching_rule",
+        )
+        return
+    row["coaching_rule"] = rule.model_dump(mode="json", exclude_none=True)
+
+
+def _import_blocks(
+    rows: list[_RowDraft],
+    *,
+    duration_weeks: int,
+    issues: list[_Issue],
+) -> list[_ProgramBlock]:
+    if not any(row.get("block_metadata_present") for row in rows):
+        return []
+    by_block: dict[int, _ProgramBlock] = {}
+    weeks_by_block: dict[int, set[int]] = {}
+    week_owners: dict[int, int] = {}
+    for row in rows:
+        block_number = row.get("block_number")
+        block_title = _optional_text(row.get("block_title"))
+        week_number = row.get("week_number") or 1
+        if not isinstance(block_number, int) or block_title is None:
+            _append_issue(
+                issues,
+                "block_metadata_incomplete",
+                "blocking",
+                "Для каждого упражнения укажите номер и название блока",
+                row_number=row["row_number"],
+                field="block_number",
+            )
+            continue
+        block = by_block.setdefault(
+            block_number,
+            {
+                "block_number": block_number,
+                "title": block_title,
+                "week_start": week_number,
+                "week_end": week_number,
+                "is_deload": row.get("block_is_deload", False),
+            },
+        )
+        weeks_by_block.setdefault(block_number, set()).add(week_number)
+        block["week_start"] = min(block["week_start"], week_number)
+        block["week_end"] = max(block["week_end"], week_number)
+        if block["title"] != block_title or block["is_deload"] != row.get("block_is_deload", False):
+            _append_issue(
+                issues,
+                "block_metadata_conflict",
+                "blocking",
+                "Название и признак разгрузки должны совпадать во всех строках блока",
+                row_number=row["row_number"],
+                field="block_title",
+            )
+        previous_owner = week_owners.setdefault(week_number, block_number)
+        if previous_owner != block_number:
+            _append_issue(
+                issues,
+                "block_week_conflict",
+                "blocking",
+                "Одна неделя не может входить в несколько блоков",
+                row_number=row["row_number"],
+                field="block_number",
+            )
+    if not by_block:
+        return []
+    if sorted(by_block) != list(range(1, len(by_block) + 1)):
+        _append_issue(issues, "block_sequence", "blocking", "Номера блоков должны идти с 1")
+    if set(week_owners) != set(range(1, duration_weeks + 1)):
+        _append_issue(
+            issues,
+            "block_week_coverage",
+            "blocking",
+            "Блоки должны покрывать каждую неделю программы без пропусков",
+        )
+    result: list[_ProgramBlock] = []
+    for block_number, block in sorted(by_block.items()):
+        weeks = sorted(weeks_by_block[block_number])
+        if weeks != list(range(weeks[0], weeks[-1] + 1)):
+            _append_issue(
+                issues,
+                "block_week_sequence",
+                "blocking",
+                "Недели каждого блока должны идти подряд",
+            )
+        result.append(block)
+    return result
 
 
 def _build_draft(
@@ -3018,6 +3373,7 @@ def _build_draft(
     raw_rows: list[_RowDraft],
     layout_version: str = PROGRAM_IMPORT_CANONICAL_LAYOUT,
     duration_weeks: int = 1,
+    provenance: dict[str, object] | None = None,
     layout_warnings: tuple[tuple[str, str, str], ...] = (),
     ai_metadata: dict[str, object] | None = None,
 ) -> _Draft:
@@ -3056,6 +3412,7 @@ def _build_draft(
                 field="day_title",
             )
         _resolve_row(row, row_issues, by_id=by_id, by_key=by_key)
+        _normalize_coaching_rule(row, row_issues)
         if row.get("metric_type") != "cardio" and (
             row.get("prescribed_sets") is None or not row.get("prescribed_reps")
         ):
@@ -3085,6 +3442,18 @@ def _build_draft(
     level = _metadata_value(
         rows, "level", global_issues, allowed=frozenset({"beginner", "intermediate", "advanced"})
     )
+    try:
+        normalized_provenance = ProgramImportProvenance.model_validate(provenance or {})
+    except ValueError:
+        _append_issue(
+            global_issues,
+            "provenance_invalid",
+            "blocking",
+            "Источник программы содержит недопустимые значения",
+        )
+        normalized_provenance = ProgramImportProvenance()
+    if normalized_provenance.source_name is None and title:
+        normalized_provenance.source_name = title
 
     days: dict[tuple[int, int], list[_RowDraft]] = defaultdict(list)
     seen_signatures: set[tuple[object, ...]] = set()
@@ -3110,6 +3479,7 @@ def _build_draft(
             global_issues, "week_limit", "blocking", "Программа может содержать от 1 до 24 недель"
         )
         duration_weeks = max(1, min(duration_weeks, 24))
+    blocks = _import_blocks(rows, duration_weeks=duration_weeks, issues=global_issues)
     if weeks and weeks != list(range(1, duration_weeks + 1)):
         _append_issue(
             global_issues,
@@ -3226,6 +3596,40 @@ def _build_draft(
             "Часть названий сопоставлена по детерминированным русским алиасам каталога",
         )
 
+    coaching_rules_by_json: dict[str, dict[str, object]] = {}
+    for row in rows:
+        rule = row.get("coaching_rule")
+        if isinstance(rule, dict):
+            rule_json = json.dumps(rule, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            coaching_rules_by_json[rule_json] = rule
+    coaching_rules = [coaching_rules_by_json[key] for key in sorted(coaching_rules_by_json)]
+    if len(coaching_rules) > 500:
+        _append_issue(
+            global_issues,
+            "coaching_rule_limit",
+            "blocking",
+            "Программа может содержать не более 500 правил прогрессии",
+        )
+        coaching_rules = coaching_rules[:500]
+    known_block_numbers = {block["block_number"] for block in blocks}
+    for rule in coaching_rules:
+        if rule.get("scope") == "block" and rule.get("block_number") not in known_block_numbers:
+            _append_issue(
+                global_issues,
+                "coaching_rule_block_missing",
+                "blocking",
+                "Правило ссылается на блок, которого нет в импорте",
+                field="coaching_rule",
+            )
+        if rule.get("scope") == "exercise" and not isinstance(rule.get("exercise_id"), int):
+            _append_issue(
+                global_issues,
+                "coaching_rule_exercise_unresolved",
+                "blocking",
+                "Сначала сопоставьте упражнение для правила прогрессии",
+                field="coaching_rule",
+            )
+
     all_issues = list(global_issues) + [issue for row in rows for issue in row.get("issues", [])]
     for issue in global_issues:
         _attach_source_coordinates(issue, rows)
@@ -3244,6 +3648,9 @@ def _build_draft(
         "program_title": title,
         "goal": goal,
         "level": level,
+        "provenance": normalized_provenance.model_dump(mode="json", exclude_none=True),
+        "blocks": blocks,
+        "coaching_rules": coaching_rules,
         "rows": rows,
         "issues": global_issues,
         "summary": {
@@ -3631,6 +4038,7 @@ def _run_ai_assistance(
         raw_rows=working_rows,
         layout_version=draft["layout_version"],
         duration_weeks=draft["duration_weeks"],
+        provenance=draft["provenance"],
         layout_warnings=warnings,
         ai_metadata=ai_info,
     )
@@ -3838,6 +4246,9 @@ def serialize_import(import_row: ProgramImport) -> dict[str, object]:
         "program_title": draft["program_title"] if draft is not None else None,
         "goal": draft["goal"] if draft is not None else None,
         "level": draft["level"] if draft is not None else None,
+        "provenance": draft.get("provenance", {}) if draft is not None else {},
+        "blocks": draft.get("blocks", []) if draft is not None else [],
+        "coaching_rules": draft.get("coaching_rules", []) if draft is not None else [],
         "rows": row_list if import_row.status == "pending" else [],
         "issues": issues if import_row.status == "pending" else [],
         "summary": summary,
@@ -4011,6 +4422,7 @@ def resolve_program_import(
     title: str | None,
     goal: str | None,
     level: str | None,
+    provenance: dict[str, object] | None,
     row_resolutions: list[tuple[int, int | None]],
 ) -> ProgramImport:
     import_row = get_program_import(db, current_user, import_id, for_update=True)
@@ -4049,6 +4461,7 @@ def resolve_program_import(
         raw_rows=rows,
         layout_version=draft.get("layout_version", PROGRAM_IMPORT_CANONICAL_LAYOUT),
         duration_weeks=draft.get("duration_weeks", 1),
+        provenance=provenance or draft.get("provenance"),
         layout_warnings=tuple(
             (
                 str(issue.get("code", "layout_warning")),
@@ -4245,13 +4658,72 @@ def _create_weekly_prescriptions(
     db.flush()
 
 
+def _template_import_metadata(
+    draft: _Draft,
+    *,
+    source_format: str,
+) -> tuple[str, dict[str, object], dict[str, object]]:
+    provenance_input = ProgramImportProvenance.model_validate(draft.get("provenance", {}))
+    imported_at = now_msk_naive()
+    source_name = (
+        provenance_input.source_name or draft.get("program_title") or "Импортированная программа"
+    )
+    provenance: dict[str, object] = {
+        "source_program_name": source_name,
+        "source_type": "file_upload",
+        "source_format": source_format,
+        "provenance_type": provenance_input.provenance_type,
+        "imported_at": imported_at.isoformat(),
+        "retrieved_date": imported_at.date().isoformat(),
+    }
+    optional_provenance = {
+        "creator": provenance_input.creator,
+        "organization": provenance_input.organization,
+        "canonical_source": provenance_input.source_reference,
+        "source_version": provenance_input.source_version,
+        "source_date": (
+            provenance_input.source_date.isoformat() if provenance_input.source_date else None
+        ),
+        "adaptation_notes": provenance_input.adaptation_notes,
+    }
+    provenance.update(
+        {key: value for key, value in optional_provenance.items() if value is not None}
+    )
+    blocks = [
+        ProgramImportBlock.model_validate(block).model_dump(mode="json")
+        for block in draft.get("blocks", [])
+    ]
+    rules = [
+        ProgramCoachingRule.model_validate(rule).model_dump(mode="json", exclude_none=True)
+        for rule in draft.get("coaching_rules", [])
+    ]
+    program_metadata: dict[str, object] = {
+        "schema_version": 1,
+        "source_type": "file_upload",
+        "source_format": source_format,
+        "imported_at": imported_at.isoformat(),
+        "training_blocks": blocks,
+        "coaching_rules": rules,
+    }
+    return provenance_input.provenance_type, provenance, program_metadata
+
+
 def confirm_program_import(
     db: Session,
     current_user: User,
     import_id: str,
-) -> tuple[ProgramImport, ProgramTemplate]:
+    *,
+    target_program_id: int | None = None,
+    expected_revision_number: int | None = None,
+) -> tuple[ProgramImport, ProgramTemplate, UserProgram | None, int, int | None]:
     import_row = get_program_import(db, current_user, import_id, for_update=True)
     if import_row.status == "confirmed" and import_row.confirmed_template_id is not None:
+        if import_row.confirmed_program_id != target_program_id:
+            raise ProgramImportError(
+                "confirmation_target_conflict",
+                "Подтверждённый импорт нельзя применить к другой программе",
+                409,
+            )
         template = (
             db.query(ProgramTemplate)
             .filter(ProgramTemplate.id == import_row.confirmed_template_id)
@@ -4261,10 +4733,32 @@ def confirm_program_import(
             raise ProgramImportError(
                 "confirmed_template_missing", "Результат подтверждённого импорта недоступен", 409
             )
-        return import_row, template
+        program = (
+            db.query(UserProgram).filter(UserProgram.id == import_row.confirmed_program_id).first()
+            if import_row.confirmed_program_id is not None
+            else None
+        )
+        if program is not None and target_program_id is not None:
+            try:
+                get_program_for_actor(db, current_user, target_program_id)
+            except ProgramError as exc:
+                raise ProgramImportError(
+                    "target_unavailable", "Назначенная программа больше недоступна", 404
+                ) from exc
+        return (
+            import_row,
+            template,
+            program,
+            import_row.confirmed_workouts_updated or 0,
+            import_row.confirmed_revision_number,
+        )
     if import_row.status != "pending":
         raise ProgramImportError(
             "import_not_confirmable", "Этот импорт больше нельзя подтвердить", 409
+        )
+    if (target_program_id is None) != (expected_revision_number is None):
+        raise ProgramImportError(
+            "revision_required", "Для новой ревизии выберите программу и её текущую версию", 422
         )
 
     draft = cast(_Draft, dict(import_row.draft_json))
@@ -4276,6 +4770,7 @@ def confirm_program_import(
         raw_rows=[cast(_RowDraft, dict(row)) for row in draft["rows"]],
         layout_version=draft.get("layout_version", PROGRAM_IMPORT_CANONICAL_LAYOUT),
         duration_weeks=draft.get("duration_weeks", 1),
+        provenance=draft.get("provenance"),
         layout_warnings=tuple(
             (
                 str(issue.get("code", "layout_warning")),
@@ -4298,22 +4793,57 @@ def confirm_program_import(
 
     try:
         payload = _program_payload_from_draft(rebuilt)
+        template_owner = current_user
+        if target_program_id is not None:
+            authorized_program, role = get_program_for_actor(db, current_user, target_program_id)
+            template_owner = db.query(User).filter(User.id == authorized_program.user_id).one()
+            if role == "trainer":
+                payload = payload.model_copy(
+                    update={
+                        "mode": "coach",
+                        "target_telegram_user_id": template_owner.telegram_user_id,
+                    }
+                )
         template = create_template(
             db,
             current_user,
             payload,
-            current_user,
+            template_owner,
             force_private=True,
         )
-        _create_weekly_prescriptions(db, template, rebuilt, current_user)
+        provenance_type, provenance, program_metadata = _template_import_metadata(
+            rebuilt,
+            source_format=_document_format(import_row),
+        )
+        template.provenance_type = provenance_type
+        template.provenance = provenance
+        template.program_metadata = program_metadata
+        _create_weekly_prescriptions(db, template, rebuilt, template_owner)
+        target_program = None
+        workouts_updated = 0
+        revision_number = None
+        if target_program_id is not None and expected_revision_number is not None:
+            target_program, workouts_updated, revision_number = apply_imported_template_revision(
+                db,
+                current_user,
+                target_program_id,
+                template,
+                expected_revision_number=expected_revision_number,
+                import_id=import_row.id,
+            )
         import_row.status = "confirmed"
         import_row.confirmed_template_id = template.id
+        import_row.confirmed_program_id = target_program_id
+        import_row.confirmed_revision_number = revision_number
+        import_row.confirmed_workouts_updated = workouts_updated
         import_row.draft_json = {}
         import_row.updated_at = now_msk_naive()
         record_audit_event(
             db,
             actor_user_id=current_user.id,
-            target_user_id=current_user.id,
+            target_user_id=target_program.user_id
+            if target_program is not None
+            else current_user.id,
             action="program_import.confirmed",
             resource_type="program_import",
             resource_id=import_row.id,
@@ -4323,21 +4853,55 @@ def confirm_program_import(
                 "parser_version": import_row.parser_version,
                 "row_count": import_row.row_count,
                 "template_id": template.id,
-                "assigned": False,
+                "assigned_program_id": target_program_id,
+                "revision_number": revision_number,
+                "workouts_updated": workouts_updated,
             },
         )
         db.commit()
     except ProgramImportError:
         db.rollback()
         raise
-    except (ProgramError, ValueError) as exc:
+    except ProgramError as exc:
         db.rollback()
-        raise ProgramImportError("domain_invalid", str(exc)[:500], 422) from exc
+        if target_program_id is not None:
+            if str(exc) == "Assigned program not found":
+                raise ProgramImportError(
+                    "target_unavailable", "Назначенная программа не найдена", 404
+                ) from exc
+            target_messages = {
+                "Program revision conflict": "Назначенная программа уже изменилась. Обновите список и повторите импорт.",
+                "Assigned program is not editable": "Назначенная программа больше не редактируется.",
+                "Imported duration must match the assigned program": "Длительность импорта должна совпадать с назначенной программой.",
+                "Imported days and weeks must match the assigned program schedule": "Недели и дни импорта должны совпадать с расписанием программы.",
+                "Imported exercise is not available for program owner": "Одно из упражнений недоступно владельцу программы.",
+                "Strength rest must be at least 15 seconds": "Отдых между силовыми подходами должен составлять не менее 15 секунд.",
+            }
+            raise ProgramImportError(
+                "target_conflict",
+                target_messages.get(
+                    str(exc),
+                    "Не удалось применить ревизию. Проверьте доступ к программе и повторите импорт.",
+                ),
+                409,
+            ) from exc
+        raise ProgramImportError(
+            "domain_invalid",
+            "Не удалось проверить структуру программы. Исправьте проблемы в предпросмотре и повторите импорт.",
+            422,
+        ) from exc
+    except ValueError as exc:
+        db.rollback()
+        raise ProgramImportError(
+            "domain_invalid",
+            "Некоторые значения не соответствуют поддерживаемому формату. Проверьте предпросмотр.",
+            422,
+        ) from exc
     except Exception as exc:
         db.rollback()
         logger.exception("program_import_confirm_failed", extra={"import_id": import_id})
         raise ProgramImportError("confirm_failed", "Не удалось подтвердить импорт", 500) from exc
-    return import_row, template
+    return import_row, template, target_program, workouts_updated, revision_number
 
 
 def cancel_program_import(db: Session, current_user: User, import_id: str) -> None:
@@ -4374,7 +4938,7 @@ def _safe_export_value(value: object) -> str:
 def _template_matrix() -> list[list[str]]:
     return [
         [PROGRAM_IMPORT_MARKER, PROGRAM_IMPORT_MARKER_VALUE],
-        list(PROGRAM_IMPORT_COLUMNS[:-1]),
+        list(PROGRAM_IMPORT_COLUMNS),
         [
             "Пример импортируемой программы",
             "maintenance",
@@ -4390,6 +4954,10 @@ def _template_matrix() -> list[list[str]]:
             "strength",
             "",
             "Безопасный пример: проверьте план перед подтверждением",
+            "",
+            "",
+            "",
+            "",
             "",
             "",
         ],

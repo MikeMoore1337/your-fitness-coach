@@ -68,6 +68,9 @@ class ProgramImport(Base):
     confirmed_template_id: Mapped[int | None] = mapped_column(
         ForeignKey("program_templates.id", ondelete="SET NULL"), nullable=True
     )
+    confirmed_program_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confirmed_revision_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confirmed_workouts_updated: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=now_msk_naive, server_default=func.now()
     )

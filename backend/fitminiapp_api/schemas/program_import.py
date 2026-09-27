@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.program import (
     ExercisePrescriptionPlan,
+    ProgramCoachingRule,
     ProgramTargetUserResponse,
     ProgramTemplateResponse,
 )
@@ -45,6 +46,55 @@ class ProgramImportIssue(BaseModel):
     source_cell: str | None = Field(default=None, max_length=32)
 
 
+class ProgramImportProvenance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provenance_type: Literal["CUSTOM", "SOURCE_ADAPTATION"] = "CUSTOM"
+    source_name: str | None = Field(default=None, max_length=128)
+    creator: str | None = Field(default=None, max_length=128)
+    organization: str | None = Field(default=None, max_length=128)
+    source_reference: str | None = Field(default=None, max_length=500)
+    source_version: str | None = Field(default=None, max_length=64)
+    source_date: date | None = None
+    adaptation_notes: str | None = Field(default=None, max_length=1_000)
+
+    @field_validator("source_reference")
+    @classmethod
+    def validate_source_reference(cls, value: str | None) -> str | None:
+        normalized = value.strip() if value else value
+        if (
+            normalized is not None
+            and "://" in normalized
+            and not normalized.casefold().startswith("https://")
+        ):
+            raise ValueError("source references must use HTTPS")
+        return normalized
+
+
+class ProgramImportBlock(BaseModel):
+    block_number: int = Field(ge=1, le=24)
+    title: str = Field(min_length=1, max_length=128)
+    week_start: int = Field(ge=1, le=24)
+    week_end: int = Field(ge=1, le=24)
+    is_deload: bool = False
+
+    @model_validator(mode="after")
+    def validate_weeks(self):
+        if self.week_end < self.week_start:
+            raise ValueError("week_end must not precede week_start")
+        return self
+
+
+class ProgramImportTarget(BaseModel):
+    program_id: int = Field(ge=1)
+    title: str = Field(min_length=1, max_length=128)
+    owner_name: str | None = Field(default=None, max_length=128)
+    duration_weeks: int = Field(ge=1, le=24)
+    current_revision_number: int = Field(ge=0)
+    status: Literal["scheduled", "active"]
+    day_numbers: list[int] = Field(min_length=1, max_length=8)
+
+
 class ProgramImportCandidate(BaseModel):
     exercise_id: int = Field(ge=1)
     title: str = Field(min_length=1, max_length=128)
@@ -67,7 +117,7 @@ class ProgramImportRow(BaseModel):
     row_number: int = Field(ge=3)
     source_sheet: str | None = Field(default=None, max_length=31)
     source_range: str | None = Field(default=None, max_length=64)
-    source_cells: dict[str, str] = Field(default_factory=dict, max_length=18)
+    source_cells: dict[str, str] = Field(default_factory=dict, max_length=24)
     week_number: int | None = Field(default=None, ge=1, le=24)
     day_number: int | None = Field(default=None, ge=1, le=8)
     day_title: str | None = Field(default=None, max_length=128)
@@ -84,6 +134,10 @@ class ProgramImportRow(BaseModel):
     superset_group: int | None = Field(default=None, ge=1)
     superset_order: int | None = Field(default=None, ge=1, le=2)
     prescription: ExercisePrescriptionPlan | None = None
+    block_number: int | None = Field(default=None, ge=1, le=24)
+    block_title: str | None = Field(default=None, max_length=128)
+    block_is_deload: bool = False
+    coaching_rule: ProgramCoachingRule | None = None
     resolved_exercise_id: int | None = Field(default=None, ge=1)
     resolved_exercise_title: str | None = Field(default=None, max_length=128)
     match_status: ImportMatchStatus
@@ -134,6 +188,9 @@ class ProgramImportResponse(BaseModel):
     program_title: str | None = None
     goal: ImportGoal | None = None
     level: ImportLevel | None = None
+    provenance: ProgramImportProvenance = Field(default_factory=ProgramImportProvenance)
+    blocks: list[ProgramImportBlock] = Field(default_factory=list, max_length=24)
+    coaching_rules: list[ProgramCoachingRule] = Field(default_factory=list, max_length=500)
     rows: list[ProgramImportRow]
     issues: list[ProgramImportIssue]
     summary: ProgramImportSummary
@@ -149,12 +206,26 @@ class ProgramImportResolveRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=128)
     goal: ImportGoal | None = None
     level: ImportLevel | None = None
+    provenance: ProgramImportProvenance | None = None
     rows: list[ProgramImportRowResolution] = Field(default_factory=list, max_length=500)
+
+
+class ProgramImportConfirmRequest(BaseModel):
+    target_program_id: int | None = Field(default=None, ge=1)
+    expected_revision_number: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_revision_target(self):
+        if (self.target_program_id is None) != (self.expected_revision_number is None):
+            raise ValueError("target program and expected revision must be provided together")
+        return self
 
 
 class ProgramImportConfirmResponse(BaseModel):
     import_id: str
     template: ProgramTemplateResponse
     assigned_program_id: int | None = None
+    revision_number: int | None = Field(default=None, ge=1)
     workouts_created: int = 0
+    workouts_updated: int = 0
     target_user: ProgramTargetUserResponse

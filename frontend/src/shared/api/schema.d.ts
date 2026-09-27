@@ -1331,6 +1331,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/imports/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Import Targets */
+        get: operations["list_import_targets_api_v1_programs_imports_targets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/imports/{import_id}": {
         parameters: {
             query?: never;
@@ -9742,6 +9759,48 @@ export interface components {
             /** Duration Weeks */
             duration_weeks: number;
         };
+        /**
+         * ProgramCoachingRule
+         * @description Validated, non-executable coaching guidance attached to an imported plan.
+         */
+        ProgramCoachingRule: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "fixed_prescription" | "double_progression" | "linear_load" | "percentage_training_max" | "rir_rpe" | "amrap_success_failure" | "deload";
+            /**
+             * Scope
+             * @default program
+             * @enum {string}
+             */
+            scope: "program" | "block" | "exercise";
+            /** Block Number */
+            block_number?: number | null;
+            /** Exercise Id */
+            exercise_id?: number | null;
+            /** Week Start */
+            week_start?: number | null;
+            /** Week End */
+            week_end?: number | null;
+            rep_target?: components["schemas"]["PrescriptionRepTarget"] | null;
+            load_target?: components["schemas"]["PrescriptionLoadTarget"] | null;
+            effort_target?: components["schemas"]["PrescriptionEffortTarget"] | null;
+            /** Increment Value */
+            increment_value?: number | null;
+            /** Increment Unit */
+            increment_unit?: ("kg" | "lb" | "percent") | null;
+            /** Reset On Failure */
+            reset_on_failure?: boolean | null;
+            /** Amrap Min Reps */
+            amrap_min_reps?: number | null;
+            /** Amrap Failure Action */
+            amrap_failure_action?: ("repeat" | "reduce_load" | "deload" | "manual_review") | null;
+            /** Deload Volume Percent */
+            deload_volume_percent?: number | null;
+            /** Deload Intensity Percent */
+            deload_intensity_percent?: number | null;
+        };
         /** ProgramImportAiInfo */
         ProgramImportAiInfo: {
             /** Contract Version */
@@ -9794,6 +9853,22 @@ export interface components {
              */
             applied: boolean;
         };
+        /** ProgramImportBlock */
+        ProgramImportBlock: {
+            /** Block Number */
+            block_number: number;
+            /** Title */
+            title: string;
+            /** Week Start */
+            week_start: number;
+            /** Week End */
+            week_end: number;
+            /**
+             * Is Deload
+             * @default false
+             */
+            is_deload: boolean;
+        };
         /** ProgramImportCandidate */
         ProgramImportCandidate: {
             /** Exercise Id */
@@ -9813,6 +9888,13 @@ export interface components {
              */
             match_type: "id" | "slug" | "title" | "alias" | "transliteration" | "manual";
         };
+        /** ProgramImportConfirmRequest */
+        ProgramImportConfirmRequest: {
+            /** Target Program Id */
+            target_program_id?: number | null;
+            /** Expected Revision Number */
+            expected_revision_number?: number | null;
+        };
         /** ProgramImportConfirmResponse */
         ProgramImportConfirmResponse: {
             /** Import Id */
@@ -9820,11 +9902,18 @@ export interface components {
             template: components["schemas"]["ProgramTemplateResponse"];
             /** Assigned Program Id */
             assigned_program_id?: number | null;
+            /** Revision Number */
+            revision_number?: number | null;
             /**
              * Workouts Created
              * @default 0
              */
             workouts_created: number;
+            /**
+             * Workouts Updated
+             * @default 0
+             */
+            workouts_updated: number;
             target_user: components["schemas"]["ProgramTargetUserResponse"];
         };
         /** ProgramImportIssue */
@@ -9849,6 +9938,29 @@ export interface components {
             /** Source Cell */
             source_cell?: string | null;
         };
+        /** ProgramImportProvenance */
+        ProgramImportProvenance: {
+            /**
+             * Provenance Type
+             * @default CUSTOM
+             * @enum {string}
+             */
+            provenance_type: "CUSTOM" | "SOURCE_ADAPTATION";
+            /** Source Name */
+            source_name?: string | null;
+            /** Creator */
+            creator?: string | null;
+            /** Organization */
+            organization?: string | null;
+            /** Source Reference */
+            source_reference?: string | null;
+            /** Source Version */
+            source_version?: string | null;
+            /** Source Date */
+            source_date?: string | null;
+            /** Adaptation Notes */
+            adaptation_notes?: string | null;
+        };
         /** ProgramImportResolveRequest */
         ProgramImportResolveRequest: {
             /** Title */
@@ -9857,6 +9969,7 @@ export interface components {
             goal?: ("muscle_gain" | "fat_loss" | "maintenance" | "recomposition") | null;
             /** Level */
             level?: ("beginner" | "intermediate" | "advanced") | null;
+            provenance?: components["schemas"]["ProgramImportProvenance"] | null;
             /** Rows */
             rows?: components["schemas"]["ProgramImportRowResolution"][];
         };
@@ -9893,6 +10006,11 @@ export interface components {
             goal?: ("muscle_gain" | "fat_loss" | "maintenance" | "recomposition") | null;
             /** Level */
             level?: ("beginner" | "intermediate" | "advanced") | null;
+            provenance?: components["schemas"]["ProgramImportProvenance"];
+            /** Blocks */
+            blocks?: components["schemas"]["ProgramImportBlock"][];
+            /** Coaching Rules */
+            coaching_rules?: components["schemas"]["ProgramCoachingRule"][];
             /** Rows */
             rows: components["schemas"]["ProgramImportRow"][];
             /** Issues */
@@ -9943,6 +10061,16 @@ export interface components {
             /** Superset Order */
             superset_order?: number | null;
             prescription?: components["schemas"]["ExercisePrescriptionPlan"] | null;
+            /** Block Number */
+            block_number?: number | null;
+            /** Block Title */
+            block_title?: string | null;
+            /**
+             * Block Is Deload
+             * @default false
+             */
+            block_is_deload: boolean;
+            coaching_rule?: components["schemas"]["ProgramCoachingRule"] | null;
             /** Resolved Exercise Id */
             resolved_exercise_id?: number | null;
             /** Resolved Exercise Title */
@@ -9984,6 +10112,26 @@ export interface components {
             blocking_issue_count: number;
             /** Warning Count */
             warning_count: number;
+        };
+        /** ProgramImportTarget */
+        ProgramImportTarget: {
+            /** Program Id */
+            program_id: number;
+            /** Title */
+            title: string;
+            /** Owner Name */
+            owner_name?: string | null;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active";
+            /** Day Numbers */
+            day_numbers: number[];
         };
         /** ProgramRecommendationCriteria */
         ProgramRecommendationCriteria: {
@@ -15578,6 +15726,26 @@ export interface operations {
             };
         };
     };
+    list_import_targets_api_v1_programs_imports_targets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramImportTarget"][];
+                };
+            };
+        };
+    };
     get_import_preview_api_v1_programs_imports__import_id__get: {
         parameters: {
             query?: never;
@@ -15653,7 +15821,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ProgramImportConfirmRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

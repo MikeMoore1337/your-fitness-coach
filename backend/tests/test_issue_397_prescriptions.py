@@ -676,6 +676,10 @@ def test_structured_import_preserves_ordered_prescription(client) -> None:
         "superset_group": "",
         "superset_order": "",
         "prescription": plan_json,
+        "block_number": "",
+        "block_title": "",
+        "block_is_deload": "",
+        "coaching_rule": "",
     }
     output = io.StringIO(newline="")
     output.write("#yfc_template_version,1\n")

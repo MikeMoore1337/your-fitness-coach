@@ -65,6 +65,7 @@ export type ProgramTemplate = ApiSchemas['ProgramTemplateResponse'];
 export type ProgramTemplateCreate = ApiSchemas['ProgramTemplateCreate'];
 export type ProgramImport = ApiSchemas['ProgramImportResponse'];
 export type ProgramImportConfirmResponse = ApiSchemas['ProgramImportConfirmResponse'];
+export type ProgramImportTarget = ApiSchemas['ProgramImportTarget'];
 export type ProgramImportRow = ApiSchemas['ProgramImportRow'];
 export type ProgramImportCandidate = ApiSchemas['ProgramImportCandidate'];
 export type ProgramRecommendationRequest = ApiSchemas['ProgramRecommendationRequest'];

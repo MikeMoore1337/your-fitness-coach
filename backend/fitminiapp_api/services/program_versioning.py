@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from datetime import date
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
 from fitminiapp_api.models.exercise import Muscle
 from fitminiapp_api.models.program import (
     ProgramRevision,
+    ProgramTemplate,
+    ProgramTemplateDay,
+    ProgramTemplateExercise,
     TrainingBlock,
     TrainingBlockPriorityMuscle,
     UserProgram,
@@ -15,7 +19,7 @@ from fitminiapp_api.models.program import (
     UserWorkoutExercise,
     UserWorkoutSet,
 )
-from fitminiapp_api.models.user import CoachClient, User
+from fitminiapp_api.models.user import CoachClient, User, UserProfile
 from fitminiapp_api.schemas.program import (
     CoachProgramExerciseCreate,
     TrainingBlockCreate,
@@ -124,6 +128,70 @@ def get_program_for_actor(
     raise ProgramError("Assigned program not found")
 
 
+def list_program_import_targets(db: Session, actor: User) -> list[dict[str, object]]:
+    access_filters = [UserProgram.user_id == actor.id]
+    if actor.is_coach:
+        client_ids = [
+            row[0]
+            for row in db.query(CoachClient.client_user_id)
+            .filter(CoachClient.coach_user_id == actor.id, CoachClient.status == "active")
+            .all()
+        ]
+        if client_ids:
+            access_filters.append(
+                and_(
+                    UserProgram.assigned_by_user_id == actor.id,
+                    UserProgram.user_id.in_(client_ids),
+                )
+            )
+    programs = (
+        db.query(UserProgram)
+        .options(joinedload(UserProgram.template))
+        .filter(
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_(MUTABLE_PROGRAM_STATUSES),
+            or_(*access_filters),
+        )
+        .order_by(UserProgram.id.asc())
+        .all()
+    )
+    result: list[dict[str, object]] = []
+    for program in programs:
+        try:
+            get_program_for_actor(db, actor, program.id)
+        except ProgramError:
+            continue
+        owner_name = None
+        if program.user_id != actor.id:
+            profile = db.query(UserProfile).filter(UserProfile.user_id == program.user_id).first()
+            owner_name = (
+                profile.full_name if profile is not None else f"Пользователь {program.user_id}"
+            )
+        day_numbers = sorted(
+            {
+                row[0]
+                for row in db.query(UserWorkout.day_number)
+                .filter(UserWorkout.user_program_id == program.id)
+                .distinct()
+                .all()
+            }
+        )
+        if not day_numbers or len(day_numbers) > 8:
+            continue
+        result.append(
+            {
+                "program_id": program.id,
+                "title": program.template.title if program.template else "Архивная программа",
+                "owner_name": owner_name,
+                "duration_weeks": program.duration_weeks,
+                "current_revision_number": program.current_revision_number,
+                "status": program.status,
+                "day_numbers": day_numbers,
+            }
+        )
+    return result
+
+
 def _serialize_block(block: TrainingBlock) -> dict:
     return {
         "id": block.id,
@@ -179,6 +247,9 @@ def _build_program_snapshot(db: Session, program: UserProgram) -> dict:
             "title": loaded.template.title if loaded.template else "Архивная программа",
             "goal": loaded.template.goal if loaded.template else None,
             "level": loaded.template.level if loaded.template else None,
+            "provenance_type": loaded.template.provenance_type if loaded.template else None,
+            "provenance": loaded.template.provenance if loaded.template else None,
+            "program_metadata": loaded.template.program_metadata if loaded.template else None,
             "start_date": loaded.start_date.isoformat(),
             "duration_weeks": loaded.duration_weeks,
             "schedule_weekdays": list(loaded.schedule_weekdays),
@@ -300,6 +371,195 @@ def _ensure_expected_revision(program: UserProgram, expected_revision_number: in
 def _ensure_program_mutable(program: UserProgram) -> None:
     if not program.is_active or program.status not in MUTABLE_PROGRAM_STATUSES:
         raise ProgramError("Assigned program is not editable")
+
+
+def apply_imported_template_revision(
+    db: Session,
+    actor: User,
+    program_id: int,
+    template: ProgramTemplate,
+    *,
+    expected_revision_number: int,
+    import_id: str,
+) -> tuple[UserProgram, int, int]:
+    program, role = get_program_for_actor(db, actor, program_id, lock=True)
+    _ensure_program_mutable(program)
+    _ensure_expected_revision(program, expected_revision_number)
+    if program.duration_weeks != template.effective_duration_weeks:
+        raise ProgramError("Imported duration must match the assigned program")
+
+    loaded_template = (
+        db.query(ProgramTemplate)
+        .options(
+            selectinload(ProgramTemplate.days)
+            .selectinload(ProgramTemplateDay.exercises)
+            .selectinload(ProgramTemplateExercise.weekly_prescriptions)
+        )
+        .filter(ProgramTemplate.id == template.id)
+        .one()
+    )
+    days_by_number = {day.day_number: day for day in loaded_template.days}
+    expected_pairs = {
+        (week_number, day_number)
+        for week_number in range(1, program.duration_weeks + 1)
+        for day_number in days_by_number
+    }
+    all_workouts = (
+        db.query(UserWorkout)
+        .filter(UserWorkout.user_program_id == program.id)
+        .order_by(UserWorkout.week_number, UserWorkout.day_number)
+        .all()
+    )
+    actual_pairs = {(row.week_number, row.day_number) for row in all_workouts}
+    if actual_pairs != expected_pairs or len(actual_pairs) != len(all_workouts):
+        raise ProgramError("Imported days and weeks must match the assigned program schedule")
+
+    target_user = db.query(User).filter(User.id == program.user_id).one()
+    visible_by_id = {
+        _effective_exercise_id(exercise): exercise
+        for exercise in _load_visible_exercise_rows(db, target_user)
+    }
+    future_workouts = (
+        db.query(UserWorkout)
+        .options(selectinload(UserWorkout.exercises).selectinload(UserWorkoutExercise.sets))
+        .filter(
+            UserWorkout.user_program_id == program.id,
+            UserWorkout.status == "planned",
+            UserWorkout.scheduled_date >= today_for_user(target_user),
+        )
+        .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
+        .all()
+    )
+    for workout in future_workouts:
+        day = days_by_number[workout.day_number]
+        workout.title = day.title
+        for previous in list(workout.exercises):
+            for previous_set in list(previous.sets):
+                db.delete(previous_set)
+            db.delete(previous)
+        db.flush()
+        for template_exercise in sorted(day.exercises, key=lambda item: item.sort_order):
+            weekly = next(
+                (
+                    item
+                    for item in template_exercise.weekly_prescriptions
+                    if item.week_number == workout.week_number
+                ),
+                None,
+            )
+            exercise_id = (
+                weekly.exercise_id if weekly is not None else template_exercise.exercise_id
+            )
+            exercise = visible_by_id.get(exercise_id)
+            if exercise is None:
+                raise ProgramError("Imported exercise is not available for program owner")
+            prescription = weekly or template_exercise
+            plan, projection = ensure_plan(
+                prescription.prescription or template_exercise.prescription,
+                metric_type=exercise_metric_type(exercise),
+                prescribed_sets=prescription.prescribed_sets,
+                prescribed_reps=prescription.prescribed_reps,
+                prescribed_duration_minutes=prescription.prescribed_duration_minutes,
+                rest_seconds=prescription.rest_seconds,
+            )
+            if exercise_metric_type(exercise) == "strength" and projection.rest_seconds < 15:
+                raise ProgramError("Strength rest must be at least 15 seconds")
+            has_structured_plan = template_exercise.prescription is not None or (
+                weekly is not None and weekly.prescription is not None
+            )
+            group_id = (
+                template_exercise.group_id
+                if template_exercise.group_id is not None
+                else template_exercise.superset_group
+            )
+            group_kind = template_exercise.group_kind or (
+                "superset" if template_exercise.superset_group is not None else None
+            )
+            group_order = (
+                template_exercise.group_order
+                if template_exercise.group_order is not None
+                else template_exercise.superset_order
+            )
+            workout_exercise = UserWorkoutExercise(
+                workout_id=workout.id,
+                exercise_id=exercise_id,
+                source_template_exercise_id=template_exercise.id,
+                source_weekly_prescription_id=weekly.id if weekly is not None else None,
+                metric_type=exercise_metric_type(exercise),
+                sort_order=template_exercise.sort_order,
+                prescribed_sets=projection.prescribed_sets,
+                prescribed_reps=projection.prescribed_reps,
+                prescribed_duration_minutes=projection.prescribed_duration_minutes,
+                rest_seconds=projection.rest_seconds,
+                notes=template_exercise.notes,
+                superset_group=template_exercise.superset_group,
+                superset_order=template_exercise.superset_order,
+                group_id=group_id,
+                group_kind=group_kind,
+                group_order=group_order,
+                prescription=plan.model_dump(mode="json") if has_structured_plan else None,
+            )
+            db.add(workout_exercise)
+            groups = {item.group_id: item.kind for item in plan.groups}
+            for set_number, segment in enumerate(plan.segments, start=1):
+                db.add(
+                    UserWorkoutSet(
+                        workout_exercise=workout_exercise,
+                        set_number=set_number,
+                        actual_reps=None,
+                        actual_weight=None,
+                        set_kind="working",
+                        reached_failure=None,
+                        is_completed=False,
+                        planned_role=segment.role if has_structured_plan else None,
+                        planned_group_id=segment.group_id if has_structured_plan else None,
+                        planned_group_kind=(
+                            groups.get(segment.group_id)
+                            if has_structured_plan and segment.group_id is not None
+                            else None
+                        ),
+                        planned_position=segment.position if has_structured_plan else None,
+                        planned_round=segment.round_number if has_structured_plan else None,
+                    )
+                )
+
+    prior_template_id = program.template_id
+    program.template_id = loaded_template.id
+    program.template = loaded_template
+    revision = record_program_revision(
+        db,
+        program,
+        actor=actor,
+        change_kind="plan_updated",
+        reason="Импорт новой ревизии программы",
+        changed_fields={
+            "operation": "program_import_revision",
+            "import_id": import_id,
+            "previous_template_id": prior_template_id,
+            "template_id": loaded_template.id,
+            "workouts_updated": len(future_workouts),
+        },
+    )
+    record_audit_event(
+        db,
+        actor_user_id=actor.id,
+        target_user_id=program.user_id,
+        action="program_import.revision_confirmed",
+        resource_type="user_program",
+        resource_id=program.id,
+        details={"import_id": import_id, "revision_number": revision.revision_number},
+    )
+    if role == "trainer":
+        queue_notification(
+            db,
+            target_user,
+            category="trainer_program_update",
+            title="Программа тренировок изменена",
+            body="Тренер обновил предстоящие тренировки. История изменений сохранена.",
+            action_url="/app?section=programs",
+        )
+    db.flush()
+    return program, len(future_workouts), revision.revision_number
 
 
 def _validate_block_dates(

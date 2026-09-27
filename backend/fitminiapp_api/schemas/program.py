@@ -337,6 +337,88 @@ class ExercisePrescriptionPlan(BaseModel):
         return self
 
 
+class ProgramCoachingRule(BaseModel):
+    """Validated, non-executable coaching guidance attached to an imported plan."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal[
+        "fixed_prescription",
+        "double_progression",
+        "linear_load",
+        "percentage_training_max",
+        "rir_rpe",
+        "amrap_success_failure",
+        "deload",
+    ]
+    scope: Literal["program", "block", "exercise"] = "program"
+    block_number: int | None = Field(default=None, ge=1, le=24)
+    exercise_id: int | None = Field(default=None, ge=1)
+    week_start: int | None = Field(default=None, ge=1, le=24)
+    week_end: int | None = Field(default=None, ge=1, le=24)
+    rep_target: PrescriptionRepTarget | None = None
+    load_target: PrescriptionLoadTarget | None = None
+    effort_target: PrescriptionEffortTarget | None = None
+    increment_value: float | None = Field(default=None, gt=0, le=100_000)
+    increment_unit: Literal["kg", "lb", "percent"] | None = None
+    reset_on_failure: bool | None = None
+    amrap_min_reps: int | None = Field(default=None, ge=1, le=1_000)
+    amrap_failure_action: Literal["repeat", "reduce_load", "deload", "manual_review"] | None = None
+    deload_volume_percent: int | None = Field(default=None, ge=0, le=100)
+    deload_intensity_percent: int | None = Field(default=None, ge=0, le=100)
+
+    @model_validator(mode="after")
+    def validate_rule(self):
+        if (
+            self.week_start is not None
+            and self.week_end is not None
+            and self.week_end < self.week_start
+        ):
+            raise ValueError("week_end must not precede week_start")
+        if self.scope == "program" and (
+            self.block_number is not None or self.exercise_id is not None
+        ):
+            raise ValueError("program rules cannot target a block or exercise")
+        if self.scope == "block" and (self.block_number is None or self.exercise_id is not None):
+            raise ValueError("block rules require only block_number as their target")
+        if self.scope == "exercise" and self.block_number is not None:
+            raise ValueError("exercise rules cannot target a block")
+
+        if self.kind == "fixed_prescription" and self.rep_target is None:
+            raise ValueError("fixed prescription rules require rep_target")
+        if self.kind == "double_progression" and (
+            self.rep_target is None
+            or self.rep_target.kind != "range"
+            or self.increment_value is None
+            or self.increment_unit not in {"kg", "lb"}
+        ):
+            raise ValueError("double progression requires a rep range and load increment")
+        if self.kind == "linear_load" and (
+            self.increment_value is None or self.increment_unit not in {"kg", "lb"}
+        ):
+            raise ValueError("linear load rules require a load increment")
+        if self.kind == "percentage_training_max" and (
+            self.load_target is None or self.load_target.kind != "percent_training_max"
+        ):
+            raise ValueError("percentage rules require a training-max load target")
+        if self.kind == "rir_rpe" and (
+            self.effort_target is None or self.effort_target.kind not in {"rir", "rpe"}
+        ):
+            raise ValueError("effort rules require an RIR or RPE target")
+        if self.kind == "amrap_success_failure" and (
+            self.rep_target is None
+            or self.rep_target.kind != "amrap"
+            or self.amrap_min_reps is None
+            or self.amrap_failure_action is None
+        ):
+            raise ValueError("AMRAP rules require a success threshold and failure action")
+        if self.kind == "deload" and (
+            self.deload_volume_percent is None and self.deload_intensity_percent is None
+        ):
+            raise ValueError("deload rules require volume or intensity metadata")
+        return self
+
+
 class ProgramTemplateExerciseCreate(BaseModel):
     exercise_id: int = Field(ge=1)
     prescribed_sets: int | None = Field(default=None, ge=1, le=10)
