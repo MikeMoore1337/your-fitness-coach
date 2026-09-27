@@ -731,8 +731,8 @@ class StateStore:
             return False
         except PermissionError:
             return True
-        except OSError:
-            return True
+        except OSError as error:
+            return not (os.name == "nt" and getattr(error, "winerror", None) == 87)
         return True
 
     def _reclaim_stale_lock_if_safe(self) -> None:
