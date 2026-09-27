@@ -2780,6 +2780,8 @@ class TaskController:
         branch: str,
         document: TaskDocument,
         lease: Mapping[str, Any],
+        *,
+        allow_cli_preflight_failure: bool = False,
     ) -> dict[str, Any]:
         github = self._github()
         owner = normalize_github_login(github.repo_slug.split("/", maxsplit=1)[0])
@@ -2850,9 +2852,9 @@ class TaskController:
             )
         except IssueWorkflowError as error:
             raise TaskSessionError(f"Task control state is malformed: {error}") from error
-        if state is None or state.get("state") != "human_required":
+        if state is None or state.get("state") not in {"human_required", "blocked"}:
             raise TaskSessionError(
-                "Resume requires the latest owner-authorized human_required state"
+                "Resume requires the latest owner-authorized human_required or verified CLI failure state"
             )
         blocker = state.get("blocker")
         blocker_text = blocker.lower() if isinstance(blocker, str) else ""
@@ -2862,14 +2864,20 @@ class TaskController:
             )
         if state.get("branch") != branch:
             raise TaskSessionError("Latest control state branch does not match the task lease")
-        if (
-            state.get("pr_number") is not None
-            or state.get("head_sha") is not None
-            or "before implementation" not in blocker_text
-            or not any(
+        common_failure = state.get("pr_number") is None and state.get("head_sha") is None
+        valid_human_required = (
+            state.get("state") == "human_required"
+            and "before implementation" in blocker_text
+            and any(
                 token in blocker_text for token in ("bootstrap", "worker-state", "worker state")
             )
-        ):
+        )
+        valid_cli_failure = (
+            allow_cli_preflight_failure
+            and state.get("state") == "blocked"
+            and blocker_text == "worker exited with code 2"
+        )
+        if not common_failure or not (valid_human_required or valid_cli_failure):
             raise TaskSessionError(
                 "Latest control state is not a matching pre-implementation failure"
             )
@@ -2939,6 +2947,158 @@ class TaskController:
             self._canonical_root() / ".artifacts" / "tasks" / task_id / "temporary" / "delivery"
         )
         return sorted(delivery_root.rglob("worker-state.json")) if delivery_root.is_dir() else []
+
+    def _preimplementation_cli_failure_evidence(
+        self, task_id: str, event: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        failure_kind = "codex_cli_argument_conflict_before_implementation"
+        error_text = (
+            "the argument '--approve-for-me' cannot be used with '--sandbox <SANDBOX_MODE>'"
+        )
+        attempts = event.get("launch_attempts")
+        if not isinstance(attempts, list) or not attempts:
+            raise TaskSessionError("Codex CLI startup failure has no launch-attempt audit")
+        reconciled = [
+            item
+            for item in attempts
+            if isinstance(item, Mapping) and item.get("state") == "failed-before-implementation"
+        ]
+        if len(reconciled) > 1:
+            raise TaskSessionError("Codex CLI startup retry budget was already used")
+
+        if event.get("state") == "worker-started":
+            if reconciled:
+                raise TaskSessionError("Codex CLI startup retry budget was already used")
+            attempt = attempts[-1]
+            if not isinstance(attempt, Mapping) or attempt.get("state") != "worker-started":
+                raise TaskSessionError("Codex CLI startup failure launch audit is inconsistent")
+            if any(
+                not isinstance(item, Mapping) or item.get("state") != "no-worker-started"
+                for item in attempts[:-1]
+            ):
+                raise TaskSessionError("Codex CLI startup failure launch audit is ambiguous")
+        elif event.get("state") == "prepared":
+            failure = event.get("last_preimplementation_failure")
+            launch_id = failure.get("launch_id") if isinstance(failure, Mapping) else None
+            attempt = next(
+                (
+                    item
+                    for item in attempts
+                    if isinstance(item, Mapping) and item.get("launch_id") == launch_id
+                ),
+                None,
+            )
+            if (
+                not isinstance(failure, Mapping)
+                or failure.get("kind") != failure_kind
+                or len(reconciled) != 1
+                or not isinstance(attempt, Mapping)
+                or attempt.get("state") != "failed-before-implementation"
+                or attempt.get("failure_kind") != failure_kind
+                or attempt.get("worker_exit_code") != 2
+                or failure.get("worker_exit_code") != 2
+            ):
+                raise TaskSessionError("Codex CLI startup retry audit is invalid")
+        else:
+            raise TaskSessionError("Task has no reconcilable Codex CLI startup failure")
+
+        worker_pid = attempt.get("worker_pid")
+        worker_state_value = attempt.get("worker_state_path")
+        if (
+            isinstance(worker_pid, bool)
+            or not isinstance(worker_pid, int)
+            or worker_pid < 1
+            or not isinstance(worker_state_value, str)
+            or not Path(worker_state_value).is_absolute()
+            or (event.get("state") == "worker-started" and event.get("worker_pid") != worker_pid)
+        ):
+            raise TaskSessionError("Codex CLI startup failure has malformed worker identity")
+        if self.store._pid_is_alive(worker_pid):
+            raise TaskSessionError("Codex worker process is still live")
+
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / task_id / "temporary" / "delivery"
+        ).resolve()
+        worker_state_path = Path(worker_state_value).resolve()
+        try:
+            worker_state_path.relative_to(delivery_root)
+        except ValueError as error:
+            raise TaskSessionError(
+                "Codex worker state path is outside task delivery artifacts"
+            ) from error
+        if worker_state_path.name != "worker-state.json" or worker_state_path.exists():
+            raise TaskSessionError("Codex worker state has not been fully reconciled")
+        if self._preimplementation_worker_state_paths(task_id):
+            raise TaskSessionError("Task has unreconciled worker state")
+
+        events_path = worker_state_path.with_name("events.jsonl")
+        guard_path = worker_state_path.with_name("worker-guard.json")
+        try:
+            if events_path.stat().st_size > 1024 * 1024 or guard_path.stat().st_size > 64 * 1024:
+                raise TaskSessionError("Codex CLI startup failure evidence exceeds its size limit")
+            events = events_path.read_text(encoding="utf-8")
+            guard = json.loads(guard_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise TaskSessionError(
+                "Codex CLI startup failure evidence is missing or unreadable"
+            ) from error
+        counters = guard.get("counters") if isinstance(guard, Mapping) else None
+        zero_counters = (
+            "completed_tool_actions",
+            "collab_tool_calls",
+            "spawned_subagents",
+            "max_observed_concurrent_subagents",
+            "progress_events",
+        )
+        if (
+            not isinstance(guard, Mapping)
+            or guard.get("schema_version") != 1
+            or guard.get("classification") != "yfc-worker-guard-report"
+            or guard.get("blocked") is not False
+            or guard.get("block_reason_code") is not None
+            or not isinstance(counters, Mapping)
+            or any(
+                isinstance(counters.get(name), bool)
+                or not isinstance(counters.get(name), int)
+                or counters.get(name) != 0
+                for name in zero_counters
+            )
+            or isinstance(counters.get("malformed_lines"), bool)
+            or not isinstance(counters.get("malformed_lines"), int)
+            or counters.get("malformed_lines", -1) < 0
+            or error_text not in events
+        ):
+            raise TaskSessionError(
+                "Codex CLI startup failure is not a verified zero-action failure"
+            )
+        evidence = {
+            "kind": failure_kind,
+            "worker_pid": worker_pid,
+            "worker_state_path": str(worker_state_path),
+            "events_path": str(events_path.resolve()),
+            "guard_report_path": str(guard_path.resolve()),
+            "completed_tool_actions": 0,
+            "collab_tool_calls": 0,
+            "spawned_subagents": 0,
+            "progress_events": 0,
+        }
+        if event.get("state") == "prepared":
+            failure = event.get("last_preimplementation_failure")
+            attempt_evidence = attempt.get("failure_evidence")
+            failure_evidence = (
+                failure.get("failure_evidence") if isinstance(failure, Mapping) else None
+            )
+            if (
+                not isinstance(failure, Mapping)
+                or not isinstance(attempt_evidence, Mapping)
+                or not isinstance(failure_evidence, Mapping)
+                or dict(attempt_evidence) != evidence
+                or dict(failure_evidence) != evidence
+            ):
+                raise TaskSessionError(
+                    "Codex CLI startup retry evidence changed after reconciliation"
+                )
+        return evidence
 
     def _preimplementation_queue_claim(self, task_id: str) -> None:
         claim_path = self.store.root / "continuous-queue.lock"
@@ -3111,21 +3271,40 @@ class TaskController:
                 raise TaskSessionError("Task metadata is incompatible with the active lease")
             branch = str(lease.get("branch", ""))
             event = lease.get("preimplementation_resume")
-            if event is not None and (
-                not isinstance(event, Mapping)
-                or event.get("state") != "prepared"
-                or event.get("control_issue_number") != control_issue_number
-                or event.get("reason") != reason.strip()
-            ):
-                raise TaskSessionError(
-                    "Task has an unreconciled or already-used pre-implementation resume"
-                )
+            cli_failure_evidence: dict[str, Any] | None = None
+            if event is not None:
+                if (
+                    not isinstance(event, Mapping)
+                    or event.get("control_issue_number") != control_issue_number
+                    or event.get("reason") != reason.strip()
+                ):
+                    raise TaskSessionError(
+                        "Task has an unreconciled or already-used pre-implementation resume"
+                    )
+                if event.get("state") == "worker-started" or (
+                    event.get("state") == "prepared"
+                    and event.get("last_preimplementation_failure") is not None
+                ):
+                    cli_failure_evidence = self._preimplementation_cli_failure_evidence(
+                        expected, event
+                    )
+                elif event.get("state") != "prepared":
+                    raise TaskSessionError(
+                        "Task has an unreconciled or already-used pre-implementation resume"
+                    )
             prepared_event = event if isinstance(event, Mapping) else None
+            if isinstance(event, Mapping) and event.get("state") == "worker-started":
+                prepared_event = {**event, "state": "prepared"}
             _, branch, old_head = self._validate_preimplementation_worktree(
                 expected, lease, prepared_event=prepared_event
             )
             control_state = self._preimplementation_issue_state(
-                expected, control_issue_number, branch, document, lease
+                expected,
+                control_issue_number,
+                branch,
+                document,
+                lease,
+                allow_cli_preflight_failure=cli_failure_evidence is not None,
             )
             self._preimplementation_queue_claim(expected)
             worker_states = self._preimplementation_worker_state_paths(expected)
@@ -3143,7 +3322,14 @@ class TaskController:
             if open_prs:
                 raise TaskSessionError("Task branch already has an open pull request")
             current_origin = self.repository.ref("origin/master")
-            if event is not None and current_origin != lease.get("base_origin_master_sha"):
+            if event is not None and cli_failure_evidence is not None:
+                self.repository.fetch_origin_master(cwd=self._canonical_root(), prune=False)
+                current_origin = self.repository.ref("origin/master")
+            if (
+                event is not None
+                and current_origin != lease.get("base_origin_master_sha")
+                and cli_failure_evidence is None
+            ):
                 raise TaskSessionError("origin/master moved after the resume was prepared")
             if event is None:
                 self.repository.fetch_origin_master(cwd=self._canonical_root(), prune=False)
@@ -3169,6 +3355,91 @@ class TaskController:
             if not self.repository.is_ancestor(old_head, current_origin):
                 raise TaskSessionError("Task branch cannot be refreshed by fast-forward")
             if event is not None:
+                if cli_failure_evidence is not None and old_head != current_origin:
+                    refreshes = event.get("base_refreshes", [])
+                    if not isinstance(refreshes, list):
+                        raise TaskSessionError("Task resume base-refresh audit is malformed")
+                    timestamp = utc_now()
+                    pending_refresh = {
+                        "from_base_sha": lease.get("base_origin_master_sha"),
+                        "from_head_sha": old_head,
+                        "to_base_sha": current_origin,
+                        "started_at": timestamp,
+                    }
+                    event["state"] = "refreshing"
+                    event["pending_base_refresh"] = pending_refresh
+                    lease["updated_at"] = timestamp
+                    StateStore.replace_json(lease_path, lease)
+                    try:
+                        self.repository.fast_forward_current(
+                            current_origin, cwd=Path(lease["worktree"])
+                        )
+                    except TaskSessionError as error:
+                        event["state"] = "refresh-failed"
+                        event["failure"] = str(error)[:1024]
+                        lease["updated_at"] = utc_now()
+                        StateStore.replace_json(lease_path, lease)
+                        raise TaskSessionError(
+                            "Task branch refresh failed; the recorded attempt requires reconciliation"
+                        ) from error
+                    if (
+                        self.repository.head(cwd=Path(lease["worktree"])) != current_origin
+                        or self.repository.ref(f"refs/heads/{branch}") != current_origin
+                        or self.repository.ref("origin/master") != current_origin
+                        or self._github().branch_head(TARGET_BASE_BRANCH) != current_origin
+                    ):
+                        event["state"] = "refresh-failed"
+                        event["failure"] = "protected master changed during branch refresh"
+                        lease["updated_at"] = utc_now()
+                        StateStore.replace_json(lease_path, lease)
+                        raise TaskSessionError("Protected master changed during branch refresh")
+                    refreshes.append(
+                        {
+                            **pending_refresh,
+                            "fast_forwarded_at": utc_now(),
+                        }
+                    )
+                    event["base_refreshes"] = refreshes
+                    event.pop("pending_base_refresh", None)
+                    event["base_sha"] = current_origin
+                    event["head_sha"] = current_origin
+                    event["state"] = "worker-started"
+                    lease["base_origin_master_sha"] = current_origin
+                    lease["updated_at"] = utc_now()
+                    StateStore.replace_json(lease_path, lease)
+                if cli_failure_evidence is not None and event.get("state") == "worker-started":
+                    attempts = event["launch_attempts"]
+                    attempt = attempts[-1]
+                    timestamp = utc_now()
+                    failure_kind = "codex_cli_argument_conflict_before_implementation"
+                    attempt.update(
+                        {
+                            "state": "failed-before-implementation",
+                            "finished_at": timestamp,
+                            "worker_exit_code": 2,
+                            "failure_kind": failure_kind,
+                            "failure_evidence": cli_failure_evidence,
+                        }
+                    )
+                    event["last_preimplementation_failure"] = {
+                        "kind": failure_kind,
+                        "recorded_at": timestamp,
+                        "launch_id": attempt["launch_id"],
+                        "worker_exit_code": 2,
+                        "failure_evidence": cli_failure_evidence,
+                    }
+                    event.pop("launch_id", None)
+                    event.pop("launch_claimed_at", None)
+                    event["state"] = "prepared"
+                    lease["updated_at"] = timestamp
+                    StateStore.replace_json(lease_path, lease)
+                    return {
+                        "task_id": expected,
+                        "lease": dict(lease),
+                        "preimplementation_resume": dict(event),
+                        "control_state": control_state,
+                        "mutation_performed": True,
+                    }
                 return {
                     "task_id": expected,
                     "lease": dict(lease),

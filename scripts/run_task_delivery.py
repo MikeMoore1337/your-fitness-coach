@@ -2536,8 +2536,6 @@ def _launch_worker(
         codex,
         "exec",
         "--approve-for-me",
-        "-s",
-        "workspace-write",
         "-C",
         str(worktree),
         "--add-dir",
@@ -2756,6 +2754,42 @@ def _deliver_one(
     )
     status_issue = state_issue or control_issue
     resumed_worker = resume_reason is not None
+    if resumed_worker:
+        control_state = started.get("control_state")
+        if not isinstance(control_state, Mapping):
+            raise DeliveryError("HUMAN_REQUIRED: resumed task has no verified control state")
+        if control_state.get("state") == "blocked":
+            resume_event = started.get("preimplementation_resume")
+            failure = (
+                resume_event.get("last_preimplementation_failure")
+                if isinstance(resume_event, Mapping)
+                else None
+            )
+            if (
+                status_issue is None
+                or not isinstance(failure, Mapping)
+                or failure.get("kind") != "codex_cli_argument_conflict_before_implementation"
+            ):
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: blocked resume has no reconciled startup failure"
+                )
+            _post_control_state(
+                status_issue,
+                control_state_payload(
+                    task_id=task_id,
+                    state="human_required",
+                    issue_number=status_issue,
+                    branch=started["lease"]["branch"],
+                    blocker=(
+                        "Task worker stopped before implementation after the verified Codex CLI "
+                        "argument conflict; no worker-state remains and the zero-action retry is bounded."
+                    ),
+                ),
+            )
+        elif control_state.get("state") != "human_required":
+            raise DeliveryError(
+                "HUMAN_REQUIRED: resumed task is not in an executable control state"
+            )
     if status_issue is not None and not resumed_worker:
         _post_control_state(
             status_issue,

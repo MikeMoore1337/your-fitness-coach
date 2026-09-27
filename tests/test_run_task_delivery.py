@@ -285,6 +285,13 @@ def test_worker_launch_passes_active_delivery_artifacts_to_child(
     assert "--worker-state-path" in observed["args"]
     command_index = observed["args"].index("--worker-command")
     assert observed["args"][command_index + 1 : command_index + 3] == ["codex", "exec"]
+    worker_command = observed["args"][command_index + 1 :]
+    assert worker_command[2:5] == [
+        "--approve-for-me",
+        "-C",
+        str(worktree),
+    ]
+    assert "--sandbox" not in worker_command
     assert observed["worker_state_path"].name == "worker-state.json"
     assert observed["kwargs"]["shell"] is False
     if delivery.os.name != "nt" and delivery.sys.platform == "linux":
@@ -1948,6 +1955,75 @@ def test_continuous_cleanup_failure_posts_central_queue_stop(
     assert queue_stops
     assert queue_stops[0][0] == (218,)
     assert queue_stops[0][1]["task_id"] == "91"
+
+
+def test_resumed_cli_failure_returns_to_human_required_before_worker_claim(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    started = {
+        "lease": {
+            "branch": "task/504-program-import-coaching-rules-foundation",
+            "worktree": str(tmp_path / "worktree"),
+        },
+        "control_state": {"state": "blocked", "blocker": "worker exited with code 2"},
+        "preimplementation_resume": {
+            "state": "prepared",
+            "last_preimplementation_failure": {
+                "kind": "codex_cli_argument_conflict_before_implementation"
+            },
+        },
+    }
+    status_updates: list[dict[str, Any]] = []
+    monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
+    monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_agent_flow",
+        lambda *args, **kwargs: (
+            {
+                "worker_role_passes": [{"name": "implementer"}],
+                "graphify": {"bootstrap_required": False},
+                "agent_budget": _agent_budget(),
+            },
+            tmp_path / "agent-flow.json",
+        ),
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_skill_safety",
+        lambda *args, **kwargs: ({}, tmp_path / "skill-safety.json"),
+    )
+    monkeypatch.setattr(delivery, "_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        delivery,
+        "_post_control_state",
+        lambda _issue, payload: status_updates.append(dict(payload)),
+    )
+
+    def launch(*args: Any, **kwargs: Any) -> int:
+        del args, kwargs
+        assert status_updates[-1]["state"] == "human_required"
+        assert "before implementation" in status_updates[-1]["blocker"]
+        assert "worker-state" in status_updates[-1]["blocker"]
+        return 23
+
+    monkeypatch.setattr(delivery, "_launch_worker", launch)
+    monkeypatch.setattr(delivery, "_history", lambda task_id: None)
+
+    with pytest.raises(delivery.DeliveryError, match="Worker exited with code 23"):
+        delivery._deliver_one(
+            "504",
+            session_label="test",
+            poll_seconds=10,
+            max_wait_minutes=1,
+            offline=False,
+            control_issue=504,
+            resume_reason="owner-authorized retry after merged controller CLI fix",
+        )
+
+    assert status_updates[0]["state"] == "human_required"
 
 
 def test_continuous_worker_exit_after_finish_posts_central_queue_stop(
