@@ -3242,7 +3242,12 @@ class TaskController:
             status, path = record[:2], record[3:]
             if status == "!!":
                 normalized = path.replace("\\", "/").casefold()
-                if normalized != ".artifacts" and not normalized.startswith(".artifacts/"):
+                path_parts = set(normalized.split("/"))
+                if (
+                    normalized != ".artifacts"
+                    and not normalized.startswith(".artifacts/")
+                    and not path_parts & CANONICAL_MANAGED_IGNORED_BASENAMES
+                ):
                     ignored.append(path)
             elif "R" in status or "C" in status:
                 if index < len(records):
