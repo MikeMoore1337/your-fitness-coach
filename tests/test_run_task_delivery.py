@@ -227,6 +227,68 @@ def test_resume_launcher_uses_owner_authorized_controller_command(
     assert "start" not in command
 
 
+def test_guard_resume_launcher_uses_dedicated_controller_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = delivery._parser().parse_args(
+        [
+            "504",
+            "--control-issue",
+            "504",
+            "--resume-guard-interrupted",
+            "--resume-reason",
+            "owner-authorized one-time guard recovery",
+        ]
+    )
+    observed: dict[str, Any] = {}
+
+    def fake_run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["command"] = command
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"lease": {"branch": "task/504-test"}}), stderr=""
+        )
+
+    monkeypatch.setattr(delivery, "_run", fake_run)
+    delivery._start(
+        args.task_id,
+        session_label="test",
+        poll_seconds=10,
+        max_wait_minutes=1,
+        offline=args.offline,
+        resume_control_issue=args.control_issue,
+        resume_reason=args.resume_reason,
+        resume_guard_interrupted=args.resume_guard_interrupted,
+    )
+
+    command = observed["command"]
+    assert command[command.index("resume-guard-interrupted") + 1] == "504"
+    assert "--owner-authorize" in command
+    assert "--control-issue" in command
+    assert "--reason" in command
+    assert "resume-preimplementation" not in command
+
+
+def test_guard_resume_prompt_requires_full_wip_audit_before_edits_or_tests() -> None:
+    started = {
+        "lease": {"canonical_task_path": "codex-backlog/tasks/504-task.md"},
+        "preimplementation_resume": {
+            "guard_budget_recovery": {
+                "checkpoint_ref": "refs/codex/task-wip-checkpoints/task-504/attempt",
+                "checkpoint_commit": "a" * 40,
+                "changed_paths": ["backend/service.py", "backend/migrations/001.py"],
+            }
+        },
+    }
+
+    prompt = delivery._worker_prompt("504", started)
+
+    assert "Before editing source files or running tests" in prompt
+    assert "migrations" in prompt
+    assert "frontend/API type parity" in prompt
+    assert "Do not treat prior worker output or checks as passed evidence" in prompt
+    assert "refs/codex/task-wip-checkpoints/task-504/attempt" in prompt
+
+
 def test_run_scopes_git_safety_to_exact_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -2024,6 +2086,83 @@ def test_resumed_cli_failure_returns_to_human_required_before_worker_claim(
         )
 
     assert status_updates[0]["state"] == "human_required"
+
+
+def test_second_guard_budget_failure_exhausts_one_time_recovery(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    (artifacts / "worker-guard.json").write_text(
+        json.dumps({"block_reason_code": "TOOL_ACTION_BUDGET_EXCEEDED"}),
+        encoding="utf-8",
+    )
+    started = {
+        "lease": {
+            "branch": "task/504-program-import-coaching-rules-foundation",
+            "worktree": str(tmp_path / "worktree"),
+        },
+        "control_state": {
+            "state": "blocked",
+            "blocker": "worker guard blocked execution (TOOL_ACTION_BUDGET_EXCEEDED)",
+        },
+        "preimplementation_resume": {
+            "state": "prepared",
+            "guard_budget_recovery": {"recovery_attempt_number": 1},
+        },
+    }
+    status_updates: list[dict[str, Any]] = []
+    monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
+    monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_agent_flow",
+        lambda *args, **kwargs: (
+            {
+                "worker_role_passes": [{"name": "implementer"}],
+                "graphify": {"bootstrap_required": False},
+                "agent_budget": _agent_budget(),
+            },
+            tmp_path / "agent-flow.json",
+        ),
+    )
+    monkeypatch.setattr(
+        delivery, "_prepare_skill_safety", lambda *args, **kwargs: ({}, tmp_path / "skills.json")
+    )
+    monkeypatch.setattr(delivery, "_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        delivery,
+        "_controller_payload",
+        lambda *args, **kwargs: {"preimplementation_resume": {"state": "worker-started"}},
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_post_control_state",
+        lambda _issue, payload: status_updates.append(dict(payload)),
+    )
+
+    def guard_stop(*args: Any, **kwargs: Any) -> int:
+        del args
+        kwargs["on_command_started"](artifacts / "worker-state.json")
+        return delivery.WORKER_GUARD_EXIT_CODE
+
+    monkeypatch.setattr(delivery, "_launch_worker", guard_stop)
+    monkeypatch.setattr(delivery, "_history", lambda task_id: None)
+
+    with pytest.raises(delivery.DeliveryError, match="one-time guard-budget recovery"):
+        delivery._deliver_one(
+            "504",
+            session_label="test",
+            poll_seconds=10,
+            max_wait_minutes=1,
+            offline=False,
+            control_issue=504,
+            resume_reason="owner-authorized one-time guard recovery",
+            resume_guard_interrupted=True,
+        )
+
+    assert [item["state"] for item in status_updates] == ["in_progress", "human_required"]
+    assert "no further automatic guard recovery is allowed" in status_updates[-1]["blocker"]
 
 
 def test_continuous_worker_exit_after_finish_posts_central_queue_stop(

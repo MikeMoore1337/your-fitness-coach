@@ -11,9 +11,11 @@ and is never committed.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -21,7 +23,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from uuid import uuid4
 
@@ -37,6 +39,7 @@ try:
         parse_task_contract,
         task_risk_lane,
     )
+    from scripts.worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 except ModuleNotFoundError:
     from artifact_manager import ArtifactError, ArtifactManager
     from issue_workflow import (
@@ -49,6 +52,7 @@ except ModuleNotFoundError:
         parse_task_contract,
         task_risk_lane,
     )
+    from worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 
 TASK_ID_PATTERN = r"[0-9]+[A-Z]?"
 TASK_ID_RE = re.compile(rf"^{TASK_ID_PATTERN}$", re.IGNORECASE)
@@ -93,6 +97,8 @@ TASK_STATE_VERSION = 2
 STATE_DIRECTORY_NAME = "codex-task-sessions-v1"
 ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
+MAX_GUARD_BUDGET_RECOVERIES = 1
+MAX_GUARD_EVIDENCE_BYTES = 16 * 1024 * 1024
 TASK_INTEGRATION_BRANCHES = {"feature/app-experience-v3": "393"}
 DEPENDABOT_LOGIN = "dependabot[bot]"
 RENOVATE_LOGIN = "renovate[bot]"
@@ -2782,6 +2788,7 @@ class TaskController:
         lease: Mapping[str, Any],
         *,
         allow_cli_preflight_failure: bool = False,
+        allow_guard_budget_failure: bool = False,
     ) -> dict[str, Any]:
         github = self._github()
         owner = normalize_github_login(github.repo_slug.split("/", maxsplit=1)[0])
@@ -2877,7 +2884,19 @@ class TaskController:
             and state.get("state") == "blocked"
             and blocker_text == "worker exited with code 2"
         )
-        if not common_failure or not (valid_human_required or valid_cli_failure):
+        valid_guard_failure = (
+            allow_guard_budget_failure
+            and state.get("state") == "blocked"
+            and isinstance(blocker, str)
+            and re.fullmatch(
+                r"worker guard blocked execution \(TOOL_ACTION_BUDGET_EXCEEDED\); inspect .+",
+                blocker,
+                flags=re.IGNORECASE,
+            )
+        )
+        if not common_failure or not (
+            valid_human_required or valid_cli_failure or valid_guard_failure
+        ):
             raise TaskSessionError(
                 "Latest control state is not a matching pre-implementation failure"
             )
@@ -3126,12 +3145,432 @@ class TaskController:
             if phase != "idle" and claimed_task_id == task_id:
                 raise TaskSessionError("Task has an active continuous queue claim")
 
+    @staticmethod
+    def _reject_shared_task_lease_identity(
+        task_id: str, lease: Mapping[str, Any], leases: Sequence[Mapping[str, Any]]
+    ) -> None:
+        branch = lease.get("branch")
+        worktree_value = lease.get("worktree")
+        worktree_key = (
+            str(Path(worktree_value).resolve()).casefold()
+            if isinstance(worktree_value, str)
+            else ""
+        )
+        for other in leases:
+            if str(other.get("task_id", "")).upper() == task_id:
+                continue
+            other_worktree = other.get("worktree")
+            if branch == other.get("branch") or (
+                isinstance(other_worktree, str)
+                and str(Path(other_worktree).resolve()).casefold() == worktree_key
+            ):
+                raise TaskSessionError("Another task lease shares this task branch or worktree")
+
+    def _guard_worktree_snapshot(self, task_id: str, worktree: Path, head: str) -> dict[str, Any]:
+        self.store.root.mkdir(parents=True, exist_ok=True)
+        descriptor, raw_index_path = tempfile.mkstemp(
+            prefix=f"task-{task_id.lower()}-", suffix=".index", dir=self.store.root
+        )
+        os.close(descriptor)
+        index_path = Path(raw_index_path)
+        index_path.unlink()
+        env = {"GIT_INDEX_FILE": str(index_path)}
+        try:
+            _run(["git", "read-tree", head], cwd=worktree, env=env)
+            filters = _run(
+                [
+                    "git",
+                    "config",
+                    "--name-only",
+                    "--get-regexp",
+                    r"^filter\..*\.(clean|process)$",
+                ],
+                cwd=worktree,
+                check=False,
+            )
+            if filters.returncode not in {0, 1}:
+                raise TaskSessionError("Cannot inspect Git clean-filter configuration")
+            filter_overrides: list[str] = []
+            for key in filters.stdout.splitlines():
+                if re.fullmatch(r"filter\.[a-zA-Z0-9_.-]+\.(clean|process)", key) is None:
+                    raise TaskSessionError("Git clean-filter configuration contains an invalid key")
+                filter_overrides.extend(("-c", f"{key}="))
+            _run(["git", *filter_overrides, "add", "--all", "--"], cwd=worktree, env=env)
+            tree = _run(["git", "write-tree"], cwd=worktree, env=env).stdout.strip()
+            tracked = _run(["git", "diff", "--name-only", "-z", head], cwd=worktree).stdout.split(
+                "\0"
+            )
+            untracked = _run(
+                ["git", "ls-files", "--others", "--exclude-standard", "-z"], cwd=worktree
+            ).stdout.split("\0")
+            changed_paths = sorted({item for item in (*tracked, *untracked) if item})
+            patch = _run(
+                ["git", "diff", "--binary", "--no-ext-diff", "--no-textconv", head, tree],
+                cwd=worktree,
+            ).stdout
+            return {
+                "tree": tree,
+                "changed_paths": changed_paths,
+                "patch_sha256": hashlib.sha256(patch.encode("utf-8")).hexdigest(),
+            }
+        finally:
+            index_path.unlink(missing_ok=True)
+            Path(f"{index_path}.lock").unlink(missing_ok=True)
+
+    def _guard_ignored_paths(self, worktree: Path) -> list[str]:
+        output = _run(
+            [
+                "git",
+                "status",
+                "--porcelain=v1",
+                "--ignored=matching",
+                "--untracked-files=all",
+                "-z",
+            ],
+            cwd=worktree,
+        ).stdout
+        records = output.split("\0")
+        ignored: list[str] = []
+        index = 0
+        while index < len(records):
+            record = records[index]
+            index += 1
+            if not record:
+                continue
+            if len(record) < 4:
+                raise TaskSessionError("Task worktree status is malformed")
+            status, path = record[:2], record[3:]
+            if status == "!!":
+                normalized = path.replace("\\", "/").casefold()
+                if normalized != ".artifacts" and not normalized.startswith(".artifacts/"):
+                    ignored.append(path)
+            elif "R" in status or "C" in status:
+                if index < len(records):
+                    index += 1
+        return ignored
+
+    @staticmethod
+    def _read_guard_file(path: Path) -> tuple[bytes, os.stat_result]:
+        try:
+            with path.open("rb") as handle:
+                content = handle.read(MAX_GUARD_EVIDENCE_BYTES + 1)
+                file_stat = os.fstat(handle.fileno())
+        except OSError as error:
+            raise TaskSessionError(
+                "Guard interruption evidence is missing or unreadable"
+            ) from error
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise TaskSessionError("Guard interruption evidence must be a regular file")
+        if len(content) > MAX_GUARD_EVIDENCE_BYTES:
+            raise TaskSessionError("Guard interruption evidence exceeds its size limit")
+        return content, file_stat
+
+    def _guard_interruption_evidence(
+        self,
+        task_id: str,
+        worktree: Path,
+        event: Mapping[str, Any],
+        control_state: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        attempts = event.get("launch_attempts")
+        launch_id = event.get("launch_id")
+        if (
+            event.get("state") != "worker-started"
+            or not isinstance(attempts, list)
+            or not attempts
+            or not isinstance(launch_id, str)
+            or not isinstance(attempts[-1], Mapping)
+            or attempts[-1].get("state") != "worker-started"
+            or attempts[-1].get("launch_id") != launch_id
+        ):
+            raise TaskSessionError("Guard interruption has no matching worker launch audit")
+        attempt = attempts[-1]
+        if any(
+            not isinstance(item, Mapping)
+            or item.get("state") not in {"no-worker-started", "failed-before-implementation"}
+            for item in attempts[:-1]
+        ):
+            raise TaskSessionError("Guard interruption launch history is ambiguous")
+        worker_pid = event.get("worker_pid")
+        worker_state_value = event.get("worker_state_path")
+        command_started_at = event.get("command_started_at")
+        process_instance = event.get("worker_process_instance")
+        if (
+            isinstance(worker_pid, bool)
+            or not isinstance(worker_pid, int)
+            or worker_pid < 1
+            or attempt.get("worker_pid") != worker_pid
+            or attempt.get("worker_process_instance") != event.get("worker_process_instance")
+            or not isinstance(worker_state_value, str)
+            or not Path(worker_state_value).is_absolute()
+            or not isinstance(command_started_at, str)
+            or attempt.get("worker_state_path") != worker_state_value
+            or not isinstance(process_instance, Mapping)
+            or attempt.get("worker_process_instance") != dict(process_instance)
+            or not isinstance(process_instance.get("kind"), str)
+            or not process_instance.get("kind")
+            or any(
+                not isinstance(key, str) or not isinstance(value, str)
+                for key, value in process_instance.items()
+            )
+        ):
+            raise TaskSessionError("Guard interruption worker identity is malformed")
+        try:
+            started_at = datetime.fromisoformat(command_started_at.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise TaskSessionError("Guard interruption command start time is malformed") from error
+        if started_at.tzinfo is None:
+            raise TaskSessionError("Guard interruption command start time has no timezone")
+        if self.store._pid_is_alive(worker_pid):
+            raise TaskSessionError("Guard-interrupted worker is still live")
+
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / task_id / "temporary" / "delivery"
+        ).resolve()
+        worker_state_path = Path(worker_state_value).resolve()
+        try:
+            worker_state_path.relative_to(delivery_root)
+        except ValueError as error:
+            raise TaskSessionError(
+                "Guard worker state path is outside task delivery artifacts"
+            ) from error
+        if worker_state_path.name != "worker-state.json" or worker_state_path.exists():
+            raise TaskSessionError("Guard worker state has not been fully reconciled")
+        if self._preimplementation_worker_state_paths(task_id):
+            raise TaskSessionError("Task has unreconciled worker state")
+
+        blocker = control_state.get("blocker")
+        match = (
+            re.fullmatch(
+                r"worker guard blocked execution \(TOOL_ACTION_BUDGET_EXCEEDED\); inspect (.+)",
+                blocker,
+            )
+            if isinstance(blocker, str)
+            else None
+        )
+        if match is None:
+            raise TaskSessionError(
+                "Latest task blocker is not the supported tool-budget guard stop"
+            )
+        guard_path = Path(match.group(1)).resolve()
+        expected_guard_path = worker_state_path.with_name("worker-guard.json")
+        if guard_path != expected_guard_path:
+            raise TaskSessionError("Guard report path does not match the interrupted attempt")
+        attempt_id = guard_path.parent.name
+        if re.fullmatch(r"\d{8}T\d{12}Z-delivery", attempt_id) is None:
+            raise TaskSessionError("Guard report is outside a timestamped task delivery attempt")
+        events_path = guard_path.with_name("events.jsonl")
+        if events_path != worker_state_path.with_name("events.jsonl") or events_path.is_symlink():
+            raise TaskSessionError("Guard events path is outside the interrupted attempt")
+        report_bytes, report_stat = self._read_guard_file(guard_path)
+        events_bytes, _ = self._read_guard_file(events_path)
+        if not report_bytes or not events_bytes:
+            raise TaskSessionError("Guard interruption evidence is empty")
+        try:
+            report = json.loads(report_bytes.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as error:
+            raise TaskSessionError("Guard interruption report is not valid UTF-8 JSON") from error
+        counters = report.get("counters") if isinstance(report, Mapping) else None
+        limits = report.get("limits") if isinstance(report, Mapping) else None
+        privacy = report.get("privacy") if isinstance(report, Mapping) else None
+        completed = (
+            counters.get("completed_tool_actions") if isinstance(counters, Mapping) else None
+        )
+        maximum = limits.get("max_completed_tool_actions") if isinstance(limits, Mapping) else None
+        signature = report.get("block_signature_hash") if isinstance(report, Mapping) else None
+        if (
+            not isinstance(report, Mapping)
+            or report.get("schema_version") != 1
+            or report.get("classification") != "yfc-worker-guard-report"
+            or report.get("blocked") is not True
+            or report.get("block_reason_code") != "TOOL_ACTION_BUDGET_EXCEEDED"
+            or isinstance(completed, bool)
+            or not isinstance(completed, int)
+            or isinstance(maximum, bool)
+            or not isinstance(maximum, int)
+            or maximum < 1
+            or completed <= maximum
+            or not isinstance(signature, str)
+            or re.fullmatch(r"[0-9a-f]{64}", signature) is None
+            or not isinstance(privacy, Mapping)
+            or set(privacy)
+            != {
+                "raw_prompts_stored",
+                "raw_commands_stored",
+                "raw_tool_arguments_stored",
+                "raw_tool_results_stored",
+            }
+            or any(
+                privacy.get(key) is not False
+                for key in (
+                    "raw_prompts_stored",
+                    "raw_commands_stored",
+                    "raw_tool_arguments_stored",
+                    "raw_tool_results_stored",
+                )
+            )
+        ):
+            raise TaskSessionError("Guard report does not verify a privacy-safe tool-budget stop")
+        try:
+            replay = WorkerEventGuard(GuardLimits.from_mapping(limits))
+        except WorkerGuardConfigError as error:
+            raise TaskSessionError("Guard report has invalid budget limits") from error
+        for line in events_bytes.splitlines(keepends=True):
+            replay.observe_line(line)
+        if replay.report() != report:
+            raise TaskSessionError("Guard report does not match its captured events")
+        start_ns = int(started_at.timestamp() * 1_000_000_000)
+        if start_ns > report_stat.st_mtime_ns:
+            raise TaskSessionError("Guard report predates the interrupted worker start")
+        snapshot = self._guard_worktree_snapshot(
+            task_id, worktree, self.repository.head(cwd=worktree)
+        )
+        if not snapshot["changed_paths"]:
+            raise TaskSessionError(
+                "Guard-interrupted task has no tracked or untracked WIP to preserve"
+            )
+        ignored_paths = self._guard_ignored_paths(worktree)
+        if ignored_paths:
+            raise TaskSessionError(
+                "Guard recovery refuses ignored files outside task artifacts: "
+                + ", ".join(ignored_paths[:5])
+            )
+        for relative_path in snapshot["changed_paths"]:
+            parts = PurePosixPath(relative_path).parts
+            if not parts or PurePosixPath(relative_path).is_absolute() or ".." in parts:
+                raise TaskSessionError("Guard recovery found an unsafe changed path")
+            candidate = worktree.joinpath(*parts)
+            stat_path = candidate
+            while not stat_path.exists() and not stat_path.is_symlink() and stat_path != worktree:
+                stat_path = stat_path.parent
+            try:
+                changed_at_ns = stat_path.lstat().st_mtime_ns
+            except OSError as error:
+                raise TaskSessionError(
+                    "Cannot verify WIP modification time for the guard attempt"
+                ) from error
+            if changed_at_ns < start_ns or changed_at_ns > report_stat.st_mtime_ns:
+                raise TaskSessionError(
+                    "Task WIP includes a file changed outside the guarded attempt"
+                )
+        return {
+            "attempt_id": attempt_id,
+            "launch_id": launch_id,
+            "worker_pid": worker_pid,
+            "worker_state_path": str(worker_state_path),
+            "command_started_at": command_started_at,
+            "guard_stopped_at": datetime.fromtimestamp(
+                report_stat.st_mtime_ns / 1_000_000_000, UTC
+            ).isoformat(),
+            "guard_report_path": str(guard_path),
+            "guard_report_sha256": hashlib.sha256(report_bytes).hexdigest(),
+            "events_path": str(events_path.resolve()),
+            "events_sha256": hashlib.sha256(events_bytes).hexdigest(),
+            "completed_tool_actions": completed,
+            **snapshot,
+        }
+
+    def _validate_guard_wip_checkpoint(
+        self,
+        task_id: str,
+        worktree: Path,
+        lease: Mapping[str, Any],
+        checkpoint: Mapping[str, Any],
+    ) -> None:
+        head = self.repository.head(cwd=worktree)
+        checkpoint_ref = checkpoint.get("checkpoint_ref")
+        checkpoint_commit = checkpoint.get("checkpoint_commit")
+        attempt_id = checkpoint.get("attempt_id")
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / task_id / "temporary" / "delivery"
+        ).resolve()
+        attempt_root = delivery_root / attempt_id if isinstance(attempt_id, str) else delivery_root
+        expected_guard_path = (attempt_root / "worker-guard.json").resolve()
+        expected_events_path = (attempt_root / "events.jsonl").resolve()
+        expected_worker_state_path = (attempt_root / "worker-state.json").resolve()
+        if (
+            checkpoint.get("task_id") != task_id
+            or checkpoint.get("recovery_attempt_number") != MAX_GUARD_BUDGET_RECOVERIES
+            or checkpoint.get("head_sha") != head
+            or checkpoint.get("base_sha") != lease.get("base_origin_master_sha")
+            or checkpoint.get("original_base_sha") != lease.get("original_base_origin_master_sha")
+            or not isinstance(attempt_id, str)
+            or re.fullmatch(r"\d{8}T\d{12}Z-delivery", attempt_id) is None
+            or not isinstance(checkpoint_ref, str)
+            or not isinstance(checkpoint_commit, str)
+            or not re.fullmatch(r"[0-9a-f]{40}", checkpoint_commit)
+            or checkpoint.get("guard_report_path") != str(expected_guard_path)
+            or checkpoint.get("events_path") != str(expected_events_path)
+            or checkpoint.get("worker_state_path") != str(expected_worker_state_path)
+            or expected_guard_path.is_symlink()
+            or expected_events_path.is_symlink()
+            or expected_worker_state_path.exists()
+            or not self.repository.ref_exists(checkpoint_ref)
+            or self.repository.ref(checkpoint_ref) != checkpoint_commit
+        ):
+            raise TaskSessionError("Guard WIP checkpoint identity or ref has changed")
+        parents = self.repository.git("rev-list", "--parents", "-n", "1", checkpoint_commit).split()
+        tree = self.repository.git("rev-parse", f"{checkpoint_commit}^{{tree}}")
+        if (
+            parents != [checkpoint_commit, head]
+            or tree != checkpoint.get("checkpoint_tree")
+            or checkpoint_ref
+            != f"refs/codex/task-wip-checkpoints/task-{task_id.lower()}/{checkpoint.get('attempt_id')}"
+        ):
+            raise TaskSessionError(
+                "Guard WIP checkpoint commit does not match its original task head"
+            )
+        snapshot = self._guard_worktree_snapshot(task_id, worktree, head)
+        if (
+            snapshot.get("tree") != tree
+            or snapshot.get("changed_paths") != checkpoint.get("changed_paths")
+            or snapshot.get("patch_sha256") != checkpoint.get("patch_sha256")
+        ):
+            raise TaskSessionError(
+                "Task worktree no longer matches its durable guard WIP checkpoint"
+            )
+        for path_key, hash_key in (
+            ("guard_report_path", "guard_report_sha256"),
+            ("events_path", "events_sha256"),
+        ):
+            path_value = checkpoint.get(path_key)
+            expected_hash = checkpoint.get(hash_key)
+            if not isinstance(path_value, str) or not isinstance(expected_hash, str):
+                raise TaskSessionError("Guard WIP checkpoint evidence metadata is malformed")
+            path = Path(path_value)
+            content, _ = self._read_guard_file(path)
+            actual_hash = hashlib.sha256(content).hexdigest()
+            if actual_hash != expected_hash:
+                raise TaskSessionError("Guard WIP checkpoint evidence has changed")
+
+    @staticmethod
+    def _guard_control_state_matches_checkpoint(
+        control_state: Mapping[str, Any], checkpoint: Mapping[str, Any]
+    ) -> bool:
+        blocker = control_state.get("blocker")
+        expected = checkpoint.get("guard_report_path")
+        match = (
+            re.fullmatch(
+                r"worker guard blocked execution \(TOOL_ACTION_BUDGET_EXCEEDED\); inspect (.+)",
+                blocker,
+                flags=re.IGNORECASE,
+            )
+            if isinstance(blocker, str)
+            else None
+        )
+        return bool(
+            match
+            and isinstance(expected, str)
+            and Path(match.group(1)).resolve() == Path(expected).resolve()
+        )
+
     def _validate_preimplementation_worktree(
         self,
         task_id: str,
         lease: Mapping[str, Any],
         *,
         prepared_event: Mapping[str, Any] | None = None,
+        allow_guard_dirty: bool = False,
     ) -> tuple[Path, str, str]:
         branch = lease.get("branch")
         if not isinstance(branch, str):
@@ -3173,9 +3612,6 @@ class TaskController:
             raise TaskSessionError(
                 "Task worktree has an active Git operation: " + ", ".join(issues)
             )
-        dirty = self.repository.status(worktree, include_ignored=True)
-        if dirty:
-            raise TaskSessionError("Task worktree is dirty: " + ", ".join(dirty[:5]))
         head = self.repository.head(cwd=worktree)
         branch_head = self.repository.ref(f"refs/heads/{branch}")
         base = str(lease.get("base_origin_master_sha", ""))
@@ -3197,6 +3633,29 @@ class TaskController:
             raise TaskSessionError(
                 "Task branch has unique commits or no longer matches its original base"
             )
+        dirty = self.repository.status(worktree, include_ignored=True)
+        recovery = (
+            prepared_event.get("guard_budget_recovery")
+            if isinstance(prepared_event, Mapping)
+            else None
+        )
+        if isinstance(recovery, Mapping):
+            ignored = self._guard_ignored_paths(worktree)
+            if ignored:
+                raise TaskSessionError(
+                    "Guard recovery refuses ignored files outside task artifacts: "
+                    + ", ".join(ignored[:5])
+                )
+            self._validate_guard_wip_checkpoint(task_id, worktree, lease, recovery)
+        elif dirty and allow_guard_dirty:
+            ignored = self._guard_ignored_paths(worktree)
+            if ignored:
+                raise TaskSessionError(
+                    "Guard recovery refuses ignored files outside task artifacts: "
+                    + ", ".join(ignored[:5])
+                )
+        elif dirty:
+            raise TaskSessionError("Task worktree is dirty: " + ", ".join(dirty[:5]))
         remote_branch = f"refs/remotes/origin/{branch}"
         if self.repository.ref_exists(remote_branch) or self.repository.remote_branch_exists(
             branch, cwd=self._canonical_root()
@@ -3270,6 +3729,7 @@ class TaskController:
             ):
                 raise TaskSessionError("Task metadata is incompatible with the active lease")
             branch = str(lease.get("branch", ""))
+            self._reject_shared_task_lease_identity(expected, lease, leases)
             event = lease.get("preimplementation_resume")
             cli_failure_evidence: dict[str, Any] | None = None
             if event is not None:
@@ -3499,6 +3959,272 @@ class TaskController:
                 "mutation_performed": True,
             }
 
+    def resume_guard_interrupted(
+        self,
+        task_id: str,
+        *,
+        control_issue_number: int,
+        reason: str,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError("Guard recovery requires explicit owner authorization")
+        if (
+            isinstance(control_issue_number, bool)
+            or not isinstance(control_issue_number, int)
+            or control_issue_number < 1
+        ):
+            raise TaskSessionError("Guard recovery requires a valid control Issue number")
+        if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 1024:
+            raise TaskSessionError("Guard recovery reason must be a bounded non-empty string")
+        if self.github is None:
+            raise TaskSessionError("Guard recovery requires online GitHub state")
+
+        self.store.initialize()
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            leases = self.store.all_leases()
+            matching = [
+                item
+                for item in leases
+                if isinstance(item.get("task_id"), str) and str(item["task_id"]).upper() == expected
+            ]
+            lease = self.store.read_json(lease_path)
+            if len(matching) != 1 or matching[0] != lease:
+                raise TaskSessionError(f"Task {expected} has an ambiguous task lease")
+            if (
+                not isinstance(lease, dict)
+                or lease.get("mode") != "write"
+                or lease.get("owner_launch") is not True
+                or lease.get("queue_mode") is True
+                or self._lease_state(lease) != "implementation"
+            ):
+                raise TaskSessionError(f"Task {expected} has no active implementation lease")
+            self._reject_shared_task_lease_identity(expected, lease, leases)
+            document = find_task_document(self._canonical_root(), expected)
+            if (
+                not document.executable
+                or "blocked" in document.status.lower()
+                or "заблок" in document.status.lower()
+                or Path(str(lease.get("canonical_task_path", ""))).resolve()
+                != document.path.resolve()
+                or self._validated_lease_concurrency_class(lease) != document.concurrency_class
+                or lease.get("integration_policy") != document.integration_policy
+                or lease.get("target_base_branch") != TARGET_BASE_BRANCH
+            ):
+                raise TaskSessionError("Task document or metadata no longer matches its lease")
+            branch = str(lease.get("branch", ""))
+            event = lease.get("preimplementation_resume")
+            if (
+                not isinstance(event, dict)
+                or event.get("control_issue_number") != control_issue_number
+            ):
+                raise TaskSessionError("Task has no matching resumable pre-implementation launch")
+            existing = event.get("guard_budget_recovery")
+            if isinstance(existing, Mapping):
+                if (
+                    event.get("state") != "prepared"
+                    or event.get("guard_budget_recovery_reason") != reason.strip()
+                    or "launch_id" in event
+                ):
+                    raise TaskSessionError(
+                        "The one-time guard recovery was already launched or reconciled"
+                    )
+                control_state = self._preimplementation_issue_state(
+                    expected,
+                    control_issue_number,
+                    branch,
+                    document,
+                    lease,
+                    allow_guard_budget_failure=True,
+                )
+                if not self._guard_control_state_matches_checkpoint(control_state, existing):
+                    raise TaskSessionError(
+                        "Latest task guard blocker no longer matches its checkpoint"
+                    )
+                self._validate_preimplementation_worktree(expected, lease, prepared_event=event)
+                return {
+                    "task_id": expected,
+                    "lease": dict(lease),
+                    "preimplementation_resume": dict(event),
+                    "control_state": control_state,
+                    "mutation_performed": False,
+                }
+            if event.get("state") != "worker-started":
+                raise TaskSessionError("Task has no guard-interrupted worker to recover")
+
+            control_state = self._preimplementation_issue_state(
+                expected,
+                control_issue_number,
+                branch,
+                document,
+                lease,
+                allow_guard_budget_failure=True,
+            )
+            self._preimplementation_queue_claim(expected)
+            if self._preimplementation_worker_state_paths(expected):
+                raise TaskSessionError("Task has unreconciled worker state")
+            if any(
+                isinstance(item.get("head"), Mapping) and str(item["head"].get("ref", "")) == branch
+                for item in self._github().open_pull_requests()
+            ):
+                raise TaskSessionError("Task branch already has an open pull request")
+
+            canonical = self._canonical_root()
+            self.repository.fetch_origin_master(cwd=canonical, prune=False)
+            current_origin = self.repository.ref("origin/master")
+            live_master = self._github().branch_head(TARGET_BASE_BRANCH)
+            canonical_head = self.repository.head(cwd=canonical)
+            canonical_changes = self._canonical_worktree_status()
+            if current_origin != live_master:
+                raise TaskSessionError(
+                    "origin/master is not synchronized with live protected master"
+                )
+            if (
+                self.repository.current_branch(cwd=canonical) != TARGET_BASE_BRANCH
+                or self.repository.operation_issues(canonical)
+                or canonical_changes
+                or not self.repository.is_ancestor(canonical_head, current_origin)
+            ):
+                raise TaskSessionError(
+                    "Canonical master is not clean and safely behind origin/master"
+                )
+            if not self.repository.is_ancestor(
+                str(lease.get("base_origin_master_sha", "")), current_origin
+            ):
+                raise TaskSessionError("Task base is not an ancestor of synchronized origin/master")
+            worktree, branch, head = self._validate_preimplementation_worktree(
+                expected, lease, allow_guard_dirty=True
+            )
+            if (
+                head != event.get("head_sha")
+                or self.repository.unique_commits(branch, base=current_origin)
+                or self.repository.ref_exists(f"refs/remotes/origin/{branch}")
+                or self.repository.remote_branch_exists(branch, cwd=canonical)
+            ):
+                raise TaskSessionError("Task branch is not a clean ancestor of protected master")
+            evidence = self._guard_interruption_evidence(expected, worktree, event, control_state)
+            if self._preimplementation_worker_state_paths(expected):
+                raise TaskSessionError("Task worker state appeared during guard recovery")
+
+            checkpoint_ref = (
+                f"refs/codex/task-wip-checkpoints/task-{expected.lower()}/{evidence['attempt_id']}"
+            )
+            snapshot = self._guard_worktree_snapshot(expected, worktree, head)
+            if (
+                snapshot["tree"] != evidence["tree"]
+                or snapshot["changed_paths"] != evidence["changed_paths"]
+                or snapshot["patch_sha256"] != evidence["patch_sha256"]
+            ):
+                raise TaskSessionError("Task WIP changed while its guard checkpoint was prepared")
+            latest_evidence = self._guard_interruption_evidence(
+                expected, worktree, event, control_state
+            )
+            if any(latest_evidence[key] != evidence[key] for key in evidence):
+                raise TaskSessionError(
+                    "Guard evidence or task WIP changed during checkpoint creation"
+                )
+            if self.repository.ref_exists(checkpoint_ref):
+                checkpoint_commit = self.repository.ref(checkpoint_ref)
+                existing_parents = self.repository.git(
+                    "rev-list", "--parents", "-n", "1", checkpoint_commit
+                ).split()
+                existing_tree = self.repository.git("rev-parse", f"{checkpoint_commit}^{{tree}}")
+                if (
+                    existing_parents != [checkpoint_commit, head]
+                    or existing_tree != snapshot["tree"]
+                ):
+                    raise TaskSessionError("A conflicting guard WIP checkpoint ref already exists")
+            else:
+                checkpoint_commit = self.repository.git(
+                    "-c",
+                    "user.name=Codex Controller",
+                    "-c",
+                    "user.email=codex-controller@users.noreply.github.com",
+                    "commit-tree",
+                    snapshot["tree"],
+                    "-p",
+                    head,
+                    "-m",
+                    f"Checkpoint interrupted Task {expected} WIP",
+                )
+                self.repository.git(
+                    "update-ref",
+                    checkpoint_ref,
+                    checkpoint_commit,
+                    "0" * len(head),
+                )
+            checkpoint = {
+                "version": 1,
+                "task_id": expected,
+                "attempt_id": evidence["attempt_id"],
+                "launch_id": evidence["launch_id"],
+                "recovery_attempt_number": MAX_GUARD_BUDGET_RECOVERIES,
+                "original_base_sha": lease.get("original_base_origin_master_sha"),
+                "base_sha": lease.get("base_origin_master_sha"),
+                "head_sha": head,
+                "checkpoint_ref": checkpoint_ref,
+                "checkpoint_commit": checkpoint_commit,
+                "checkpoint_tree": snapshot["tree"],
+                "changed_paths": snapshot["changed_paths"],
+                "patch_sha256": snapshot["patch_sha256"],
+                "guard_stop_reason": "TOOL_ACTION_BUDGET_EXCEEDED",
+                "command_started_at": evidence["command_started_at"],
+                "guard_stopped_at": evidence["guard_stopped_at"],
+                "guard_report_path": evidence["guard_report_path"],
+                "guard_report_sha256": evidence["guard_report_sha256"],
+                "events_path": evidence["events_path"],
+                "events_sha256": evidence["events_sha256"],
+                "worker_state_path": evidence["worker_state_path"],
+                "worker_pid": evidence["worker_pid"],
+                "created_at": utc_now(),
+                "reason": reason.strip(),
+            }
+            self._validate_guard_wip_checkpoint(expected, worktree, lease, checkpoint)
+            attempts = event.get("launch_attempts")
+            if not isinstance(attempts, list) or not attempts or not isinstance(attempts[-1], dict):
+                raise TaskSessionError("Guard interruption launch audit changed during recovery")
+            timestamp = utc_now()
+            attempts[-1].update(
+                {
+                    "state": "failed-guard-budget",
+                    "finished_at": timestamp,
+                    "worker_exit_code": 124,
+                    "failure_kind": "TOOL_ACTION_BUDGET_EXCEEDED",
+                    "failure_evidence": {
+                        "guard_report_path": evidence["guard_report_path"],
+                        "guard_report_sha256": evidence["guard_report_sha256"],
+                        "events_path": evidence["events_path"],
+                        "events_sha256": evidence["events_sha256"],
+                        "completed_tool_actions": evidence["completed_tool_actions"],
+                    },
+                }
+            )
+            event["guard_budget_recovery"] = checkpoint
+            event["guard_budget_recovery_reason"] = reason.strip()
+            event["state"] = "prepared"
+            event["head_sha"] = head
+            for key in (
+                "launch_id",
+                "launch_claimed_at",
+                "worker_started_at",
+                "command_started_at",
+                "worker_pid",
+                "worker_process_instance",
+                "worker_state_path",
+            ):
+                event.pop(key, None)
+            lease["updated_at"] = timestamp
+            StateStore.replace_json(lease_path, lease)
+            return {
+                "task_id": expected,
+                "lease": dict(lease),
+                "preimplementation_resume": dict(event),
+                "control_state": control_state,
+                "mutation_performed": True,
+            }
+
     def claim_preimplementation_worker_launch(self, task_id: str) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
         lease_path = self.store.task_lease_path(expected)
@@ -3522,13 +4248,21 @@ class TaskController:
             if isinstance(control_issue, bool) or not isinstance(control_issue, int):
                 raise TaskSessionError("Prepared resume has an invalid control Issue identity")
             document = find_task_document(self._canonical_root(), expected)
-            self._preimplementation_issue_state(
+            control_state = self._preimplementation_issue_state(
                 expected,
                 control_issue,
                 branch,
                 document,
                 lease,
+                allow_guard_budget_failure=isinstance(
+                    resume_event.get("guard_budget_recovery"), Mapping
+                ),
             )
+            recovery = resume_event.get("guard_budget_recovery")
+            if isinstance(recovery, Mapping) and not self._guard_control_state_matches_checkpoint(
+                control_state, recovery
+            ):
+                raise TaskSessionError("Latest task guard blocker no longer matches its checkpoint")
             self._preimplementation_queue_claim(expected)
             worker_states = self._preimplementation_worker_state_paths(expected)
             if worker_states:
@@ -6583,6 +7317,11 @@ def _parser() -> argparse.ArgumentParser:
     resume.add_argument("--control-issue", type=int, required=True)
     resume.add_argument("--reason", required=True)
     resume.add_argument("--owner-authorize", action="store_true")
+    guard_resume = subparsers.add_parser("resume-guard-interrupted")
+    guard_resume.add_argument("task_id")
+    guard_resume.add_argument("--control-issue", type=int, required=True)
+    guard_resume.add_argument("--reason", required=True)
+    guard_resume.add_argument("--owner-authorize", action="store_true")
     claim_worker = subparsers.add_parser("claim-preimplementation-worker-launch")
     claim_worker.add_argument("task_id")
     release_worker = subparsers.add_parser("release-preimplementation-worker-launch")
@@ -6714,6 +7453,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                     owner_authorize=args.owner_authorize,
                 )
             )
+            return 0
+        if args.command == "resume-guard-interrupted":
+            try:
+                payload = controller.resume_guard_interrupted(
+                    args.task_id,
+                    control_issue_number=args.control_issue,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            except TaskSessionError as error:
+                raise TaskSessionError(f"HUMAN_REQUIRED: {error}") from error
+            _print(payload)
             return 0
         if args.command == "claim-preimplementation-worker-launch":
             _print(controller.claim_preimplementation_worker_launch(args.task_id))

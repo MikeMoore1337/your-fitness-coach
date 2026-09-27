@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -404,6 +407,445 @@ def _record_codex_cli_argument_failure(
         controller.repository.fetch_origin_master(cwd=root, prune=False)
         github.master_sha = controller.repository.ref("origin/master")
     return worker_state_path
+
+
+def _record_guard_budget_failure(
+    controller: Any,
+    root: Path,
+    github: FakeGitHub,
+    branch: str,
+    worktree: Path,
+    *,
+    worker_state_present: bool = False,
+    filter_attempt: bool = False,
+    reason: str = "owner-authorized resume after tool-budget interruption",
+) -> tuple[Path, Path, Path, str]:
+    controller.store._pid_is_alive = lambda _pid: False
+    controller.resume_preimplementation(
+        "241",
+        control_issue_number=241,
+        reason=reason,
+        owner_authorize=True,
+    )
+    first_claim = controller.claim_preimplementation_worker_launch("241")[
+        "preimplementation_resume"
+    ]
+    first_worker_state = (
+        root
+        / ".artifacts"
+        / "tasks"
+        / "241"
+        / "temporary"
+        / "delivery"
+        / "prestart-attempt"
+        / "worker-state.json"
+    )
+    controller.release_preimplementation_worker_launch(
+        "241",
+        launch_id=first_claim["launch_id"],
+        worker_state_path=first_worker_state,
+        reason="guarded supervisor failed before worker start",
+    )
+    controller.claim_preimplementation_worker_launch("241")
+    attempt_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ") + "-delivery"
+    attempt_root = root / ".artifacts" / "tasks" / "241" / "temporary" / "delivery" / attempt_id
+    attempt_root.mkdir(parents=True)
+    worker_state_path = attempt_root / "worker-state.json"
+    worker_state_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "pid": 701,
+                "process_group_id": None,
+                "process_instance": {"kind": "test", "instance": "supervisor"},
+                "started_at": task_session.utc_now(),
+                "command_process": {
+                    "pid": 702,
+                    "process_instance": {"kind": "test", "instance": "codex"},
+                },
+                "command_started_at": task_session.utc_now(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    controller.record_preimplementation_worker_started("241", worker_state_path=worker_state_path)
+    if not worker_state_present:
+        worker_state_path.unlink()
+
+    (worktree / "README.md").write_text("guarded implementation\n", encoding="utf-8")
+    (worktree / "new-module.py").write_text("value = 1\n", encoding="utf-8")
+    _git(worktree, "add", "README.md")
+    if filter_attempt:
+        (worktree / ".gitattributes").write_text("*.filtered filter=guard-test\n", encoding="utf-8")
+        (worktree / "new.filtered").write_text(
+            "checkpoint without running filters\n", encoding="utf-8"
+        )
+        _git(worktree, "config", "filter.guard-test.clean", "exit 1")
+    events_path = attempt_root / "events.jsonl"
+    limits = {
+        "max_completed_tool_actions": 240,
+        "max_collab_tool_calls": 10,
+        "max_spawned_subagents": 2,
+        "max_concurrent_subagents": 2,
+        "max_identical_failed_actions": 4,
+        "max_identical_actions_without_progress": 8,
+        "short_cycle_period_max": 3,
+        "short_cycle_repetitions": 4,
+    }
+    events = "".join(
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": f"guard-test-action-{action_number}",
+                    "status": "completed",
+                },
+            }
+        )
+        + "\n"
+        for action_number in range(1, 242)
+    )
+    events_path.write_text(events, encoding="utf-8")
+    guard = task_session.WorkerEventGuard(task_session.GuardLimits.from_mapping(limits))
+    for line in events.splitlines(keepends=True):
+        guard.observe_line(line)
+    guard_path = attempt_root / "worker-guard.json"
+    guard_path.write_text(json.dumps(guard.report()), encoding="utf-8")
+    github.issue_comment_map[241] = [
+        {
+            "id": 3,
+            "created_at": task_session.utc_now(),
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="241",
+                    state="blocked",
+                    issue_number=241,
+                    branch=branch,
+                    blocker=(
+                        "worker guard blocked execution (TOOL_ACTION_BUDGET_EXCEEDED); "
+                        f"inspect {guard_path}"
+                    ),
+                )
+            ),
+        }
+    ]
+    return worker_state_path, guard_path, events_path, attempt_id
+
+
+def test_task_session_exposes_guard_interrupted_resume_command() -> None:
+    args = task_session._parser().parse_args(
+        [
+            "resume-guard-interrupted",
+            "241",
+            "--control-issue",
+            "241",
+            "--reason",
+            "owner-authorized resume after guard stop",
+            "--owner-authorize",
+        ]
+    )
+
+    assert args.command == "resume-guard-interrupted"
+    assert args.control_issue == 241
+    assert args.owner_authorize is True
+
+
+def test_guard_interrupted_resume_checkpoints_and_preserves_wip(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, _, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    worker_state_path, guard_path, events_path, attempt_id = _record_guard_budget_failure(
+        controller, root, github, branch, worktree
+    )
+    before_head = git_repository.head(cwd=worktree)
+    before_status = git_repository.status(worktree)
+    lease_path = controller.store.task_lease_path("241")
+    before_lease = controller.store.read_json(lease_path)
+
+    resumed = controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized resume after tool-budget interruption",
+        owner_authorize=True,
+    )
+
+    event = resumed["preimplementation_resume"]
+    checkpoint = event["guard_budget_recovery"]
+    checkpoint_ref = checkpoint["checkpoint_ref"]
+    checkpoint_commit = checkpoint["checkpoint_commit"]
+    assert resumed["mutation_performed"] is True
+    assert resumed["control_state"]["state"] == "blocked"
+    assert event["state"] == "prepared"
+    assert (
+        event["launch_attempts"][0]
+        == before_lease["preimplementation_resume"]["launch_attempts"][0]
+    )
+    assert event["launch_attempts"][1]["state"] == "failed-guard-budget"
+    assert event["launch_attempts"][1]["failure_evidence"]["guard_report_path"] == str(guard_path)
+    assert checkpoint["task_id"] == "241"
+    assert checkpoint["attempt_id"] == attempt_id
+    assert checkpoint["recovery_attempt_number"] == 1
+    assert checkpoint["base_sha"] == before_head
+    assert checkpoint["head_sha"] == before_head
+    assert checkpoint["guard_stop_reason"] == "TOOL_ACTION_BUDGET_EXCEEDED"
+    assert checkpoint["guard_report_path"] == str(guard_path.resolve())
+    assert checkpoint["events_path"] == str(events_path.resolve())
+    assert set(checkpoint["changed_paths"]) == {"README.md", "new-module.py"}
+    assert git_repository.ref(checkpoint_ref) == checkpoint_commit
+    assert _git(worktree, "show", f"{checkpoint_ref}:README.md") == "guarded implementation"
+    assert _git(worktree, "show", f"{checkpoint_ref}:new-module.py") == "value = 1"
+    patch = subprocess.run(
+        ["git", "diff", "--binary", "--no-ext-diff", before_head, checkpoint_commit],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    ).stdout
+    assert hashlib.sha256(patch).hexdigest() == checkpoint["patch_sha256"]
+    assert git_repository.head(cwd=worktree) == before_head
+    assert git_repository.status(worktree) == before_status
+    assert (
+        controller.store.read_json(lease_path)["preimplementation_resume"]["launch_attempts"][:1]
+        == before_lease["preimplementation_resume"]["launch_attempts"][:1]
+    )
+    assert not worker_state_path.exists()
+
+
+def test_guard_checkpoint_does_not_execute_git_clean_filters(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_guard_budget_failure(controller, root, github, branch, worktree, filter_attempt=True)
+
+    resumed = controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized resume after tool-budget interruption",
+        owner_authorize=True,
+    )
+
+    checkpoint = resumed["preimplementation_resume"]["guard_budget_recovery"]
+    assert _git(worktree, "show", f"{checkpoint['checkpoint_ref']}:new.filtered") == (
+        "checkpoint without running filters"
+    )
+
+
+def test_guard_interrupted_resume_is_idempotent_and_claim_requires_checkpoint(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_guard_budget_failure(controller, root, github, branch, worktree)
+    kwargs = {
+        "control_issue_number": 241,
+        "reason": "owner-authorized resume after tool-budget interruption",
+        "owner_authorize": True,
+    }
+
+    first = controller.resume_guard_interrupted("241", **kwargs)
+    repeated = controller.resume_guard_interrupted("241", **kwargs)
+
+    assert first["mutation_performed"] is True
+    assert repeated["mutation_performed"] is False
+    assert (
+        repeated["preimplementation_resume"]["guard_budget_recovery"]
+        == (first["preimplementation_resume"]["guard_budget_recovery"])
+    )
+    claimed = controller.claim_preimplementation_worker_launch("241")
+    assert claimed["preimplementation_resume"]["state"] == "launching"
+    with pytest.raises(task_session.TaskSessionError, match="unclaimed prepared resume"):
+        controller.claim_preimplementation_worker_launch("241")
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["live-worker", "missing-report", "mismatched-report", "post-stop-file", "conflicting-pr"],
+)
+def test_guard_interrupted_resume_fails_closed_without_mutating_task(
+    repository: tuple[Path, Any],
+    failure: str,
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    worker_state_path, guard_path, _, _ = _record_guard_budget_failure(
+        controller,
+        root,
+        github,
+        branch,
+        worktree,
+        worker_state_present=failure == "live-worker",
+    )
+    if failure == "missing-report":
+        guard_path.unlink()
+        message = "evidence"
+    elif failure == "mismatched-report":
+        guard = json.loads(guard_path.read_text(encoding="utf-8"))
+        guard["block_reason_code"] = "SHORT_CYCLE"
+        guard_path.write_text(json.dumps(guard), encoding="utf-8")
+        message = "Guard report"
+    elif failure == "live-worker":
+        controller.store._pid_is_alive = lambda _pid: True
+        message = "worker"
+    elif failure == "conflicting-pr":
+        github.open_prs = [{"head": {"ref": branch}}]
+        message = "pull request"
+    else:
+        external_path = worktree / "external-after-stop.txt"
+        external_path.write_text("not from the guarded attempt\n", encoding="utf-8")
+        stopped_ns = guard_path.stat().st_mtime_ns
+        os.utime(external_path, ns=(stopped_ns + 5_000_000_000,) * 2)
+        message = "attempt"
+    lease_path = controller.store.task_lease_path("241")
+    before_lease = controller.store.read_json(lease_path)
+    before_head = controller.repository.head(cwd=worktree)
+    with pytest.raises(task_session.TaskSessionError, match=message):
+        controller.resume_guard_interrupted(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized resume after tool-budget interruption",
+            owner_authorize=True,
+        )
+    assert controller.store.read_json(lease_path) == before_lease
+    assert controller.repository.head(cwd=worktree) == before_head
+    assert worker_state_path.exists() is (failure == "live-worker")
+
+
+@pytest.mark.parametrize("invalid_identity", ["branch", "worktree", "dependencies", "shared-lease"])
+def test_guard_interrupted_resume_refuses_invalid_task_identity_without_mutation(
+    repository: tuple[Path, Any],
+    invalid_identity: str,
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_guard_budget_failure(controller, root, github, branch, worktree)
+    lease_path = controller.store.task_lease_path("241")
+    lease = controller.store.read_json(lease_path)
+    if invalid_identity == "branch":
+        lease["branch"] = "task/242-different-task"
+        task_session.StateStore.replace_json(lease_path, lease)
+        message = "branch"
+    elif invalid_identity == "worktree":
+        lease["worktree"] = str(root / "unregistered-worktree")
+        task_session.StateStore.replace_json(lease_path, lease)
+        message = "branch|worktree"
+    elif invalid_identity == "shared-lease":
+        duplicate = {**lease, "task_id": "242"}
+        task_session.StateStore.replace_json(controller.store.task_lease_path("242"), duplicate)
+        message = "shares this task branch"
+    else:
+        github.issues[241]["body"] = render_task_contract(
+            {
+                "version": 1,
+                "task_id": "241",
+                "scope": "Synthetic pre-implementation recovery",
+                "acceptance": ["resume safely"],
+                "dependencies": ["242"],
+                "owner_gate": "explicit-launch",
+                "risk_lane": "GREEN",
+                "source_spec": "codex-backlog/tasks/241-resume-me.md",
+                "issue_state": "in_progress",
+            }
+        )
+        message = "dependency"
+    before_lease = controller.store.read_json(lease_path)
+
+    with pytest.raises(task_session.TaskSessionError, match=message):
+        controller.resume_guard_interrupted(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized resume after tool-budget interruption",
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(lease_path) == before_lease
+
+
+def test_guard_interrupted_resume_refuses_active_queue_claim_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_guard_budget_failure(controller, root, github, branch, worktree)
+    claim_path = controller.store.root / "continuous-queue.lock"
+    claim_path.write_text(
+        json.dumps({"queue_phase": "task_running", "task_id": "241"}), encoding="utf-8"
+    )
+    lease_path = controller.store.task_lease_path("241")
+    before_lease = controller.store.read_json(lease_path)
+
+    with pytest.raises(task_session.TaskSessionError, match="queue claim"):
+        controller.resume_guard_interrupted(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized resume after tool-budget interruption",
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(lease_path) == before_lease
+
+
+def test_guard_interrupted_resume_claim_refuses_changed_checkpoint(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_guard_budget_failure(controller, root, github, branch, worktree)
+    controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized resume after tool-budget interruption",
+        owner_authorize=True,
+    )
+    lease_path = controller.store.task_lease_path("241")
+    before = controller.store.read_json(lease_path)
+    (worktree / "README.md").write_text("changed after checkpoint\n", encoding="utf-8")
+
+    with pytest.raises(task_session.TaskSessionError, match="checkpoint"):
+        controller.claim_preimplementation_worker_launch("241")
+
+    assert controller.store.read_json(lease_path) == before
+
+
+def test_guard_interrupted_resume_claim_refuses_changed_evidence(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _, guard_path, _, _ = _record_guard_budget_failure(controller, root, github, branch, worktree)
+    controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized resume after tool-budget interruption",
+        owner_authorize=True,
+    )
+    lease_path = controller.store.task_lease_path("241")
+    before = controller.store.read_json(lease_path)
+    guard = json.loads(guard_path.read_text(encoding="utf-8"))
+    guard["counters"]["completed_tool_actions"] += 1
+    guard_path.write_text(json.dumps(guard), encoding="utf-8")
+
+    with pytest.raises(task_session.TaskSessionError, match="evidence has changed"):
+        controller.claim_preimplementation_worker_launch("241")
+
+    assert controller.store.read_json(lease_path) == before
+
+
+def test_guard_interrupted_resume_recovery_budget_is_exhausted_after_claim(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_guard_budget_failure(controller, root, github, branch, worktree)
+    kwargs = {
+        "control_issue_number": 241,
+        "reason": "owner-authorized resume after tool-budget interruption",
+        "owner_authorize": True,
+    }
+    controller.resume_guard_interrupted("241", **kwargs)
+    controller.claim_preimplementation_worker_launch("241")
+    lease_path = controller.store.task_lease_path("241")
+    before = controller.store.read_json(lease_path)
+
+    with pytest.raises(task_session.TaskSessionError, match="already launched"):
+        controller.resume_guard_interrupted("241", **kwargs)
+
+    assert controller.store.read_json(lease_path) == before
 
 
 def test_task_session_exposes_supported_preimplementation_resume_command() -> None:
