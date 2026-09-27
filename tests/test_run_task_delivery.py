@@ -268,6 +268,86 @@ def test_guard_resume_launcher_uses_dedicated_controller_command(
     assert "resume-preimplementation" not in command
 
 
+def test_transport_resume_launcher_uses_dedicated_controller_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = delivery._parser().parse_args(
+        [
+            "504",
+            "--control-issue",
+            "504",
+            "--resume-transport-interrupted",
+            "--resume-reason",
+            "owner-authorized one-time post-start transport recovery",
+        ]
+    )
+    observed: dict[str, Any] = {}
+
+    def fake_run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["command"] = command
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"lease": {"branch": "task/504-test"}}), stderr=""
+        )
+
+    monkeypatch.setattr(delivery, "_run", fake_run)
+    delivery._start(
+        args.task_id,
+        session_label="test",
+        poll_seconds=10,
+        max_wait_minutes=1,
+        offline=args.offline,
+        resume_control_issue=args.control_issue,
+        resume_reason=args.resume_reason,
+        resume_transport_interrupted=args.resume_transport_interrupted,
+    )
+
+    command = observed["command"]
+    assert command[command.index("resume-transport-interrupted") + 1] == "504"
+    assert "--owner-authorize" in command
+    assert "resume-guard-interrupted" not in command
+
+
+def test_post_start_transport_blocker_requires_started_evidence(tmp_path: Path) -> None:
+    artifacts = tmp_path / "delivery"
+    attempt = artifacts / "20260927T160806015014Z-delivery"
+    attempt.mkdir(parents=True)
+    worker_state = attempt / "worker-state.json"
+    worker_state.write_text("{}", encoding="utf-8")
+    (attempt / "events.jsonl").write_text(
+        "Connection failed: error sending request (os error 11001)\n", encoding="utf-8"
+    )
+    (attempt / "worker-guard.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "classification": "yfc-worker-guard-report",
+                "blocked": False,
+                "block_reason_code": None,
+                "counters": {"completed_tool_actions": 1, "progress_events": 1},
+                "privacy": {
+                    "raw_prompts_stored": False,
+                    "raw_commands_stored": False,
+                    "raw_tool_arguments_stored": False,
+                    "raw_tool_results_stored": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    started = {
+        "preimplementation_resume": {
+            "state": "worker-started",
+            "worker_state_path": str(worker_state),
+        }
+    }
+
+    blocker = delivery._post_start_transport_blocker(started, artifacts)
+
+    assert blocker is not None
+    assert delivery.POST_START_TRANSPORT_FAILURE_KIND in blocker
+    assert str(attempt / "events.jsonl") in blocker
+
+
 def test_guard_resume_prompt_requires_full_wip_audit_before_edits_or_tests() -> None:
     started = {
         "lease": {"canonical_task_path": "codex-backlog/tasks/504-task.md"},
@@ -287,6 +367,24 @@ def test_guard_resume_prompt_requires_full_wip_audit_before_edits_or_tests() -> 
     assert "frontend/API type parity" in prompt
     assert "Do not treat prior worker output or checks as passed evidence" in prompt
     assert "refs/codex/task-wip-checkpoints/task-504/attempt" in prompt
+
+
+def test_transport_resume_prompt_requires_full_wip_audit_before_edits_or_tests() -> None:
+    started = {
+        "lease": {"canonical_task_path": "codex-backlog/tasks/504-task.md"},
+        "preimplementation_resume": {
+            "transport_interruption_recovery": {
+                "checkpoint_ref": "refs/codex/task-wip-checkpoints/task-504/attempt",
+                "checkpoint_commit": "a" * 40,
+                "changed_paths": ["backend/service.py"],
+            }
+        },
+    }
+
+    prompt = delivery._worker_prompt("504", started)
+
+    assert "external post-start transport interruption" in prompt
+    assert "Before editing source files or running tests" in prompt
 
 
 def test_run_scopes_git_safety_to_exact_directory(
@@ -2210,6 +2308,73 @@ def test_second_guard_budget_failure_exhausts_one_time_recovery(
         "human_required",
     ]
     assert "no further automatic guard recovery is allowed" in status_updates[-1]["blocker"]
+
+
+def test_second_post_start_transport_failure_exhausts_one_time_recovery(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    started = {
+        "lease": {
+            "branch": "task/504-program-import-coaching-rules-foundation",
+            "worktree": str(tmp_path / "worktree"),
+        },
+        "control_state": {
+            "state": "human_required",
+            "blocker": "worker stopped after post_start_external_transport_interruption",
+        },
+        "preimplementation_resume": {
+            "state": "prepared",
+            "transport_interruption_recovery": {"recovery_attempt_number": 1},
+        },
+    }
+    status_updates: list[dict[str, Any]] = []
+    monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
+    monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_agent_flow",
+        lambda *args, **kwargs: (
+            {
+                "worker_role_passes": [{"name": "implementer"}],
+                "graphify": {"bootstrap_required": False},
+                "agent_budget": _agent_budget(),
+            },
+            tmp_path / "agent-flow.json",
+        ),
+    )
+    monkeypatch.setattr(
+        delivery, "_prepare_skill_safety", lambda *args, **kwargs: ({}, tmp_path / "skills.json")
+    )
+    monkeypatch.setattr(delivery, "_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        delivery,
+        "_controller_payload",
+        lambda *args, **kwargs: {"preimplementation_resume": {"state": "worker-started"}},
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_post_control_state",
+        lambda _issue, payload: status_updates.append(dict(payload)),
+    )
+    monkeypatch.setattr(delivery, "_launch_worker", lambda *args, **kwargs: 23)
+    monkeypatch.setattr(delivery, "_history", lambda task_id: None)
+
+    with pytest.raises(delivery.DeliveryError, match="one-time post-start transport recovery"):
+        delivery._deliver_one(
+            "504",
+            session_label="test",
+            poll_seconds=10,
+            max_wait_minutes=1,
+            offline=False,
+            control_issue=504,
+            resume_reason="owner-authorized one-time post-start transport recovery",
+            resume_transport_interrupted=True,
+        )
+
+    assert [item["state"] for item in status_updates] == ["human_required", "human_required"]
+    assert "no further automatic transport recovery is allowed" in status_updates[-1]["blocker"]
 
 
 def test_continuous_worker_exit_after_finish_posts_central_queue_stop(

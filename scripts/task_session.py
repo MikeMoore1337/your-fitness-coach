@@ -98,6 +98,19 @@ STATE_DIRECTORY_NAME = "codex-task-sessions-v1"
 ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
 MAX_GUARD_BUDGET_RECOVERIES = 1
+MAX_POST_START_TRANSPORT_RECOVERIES = 1
+POST_START_TRANSPORT_FAILURE_KIND = "post_start_external_transport_interruption"
+POST_START_TRANSPORT_HANDOFF_BLOCKER = (
+    "Owner-authorized bounded post-start transport recovery is launching the preserved task WIP."
+)
+POST_START_TRANSPORT_SIGNATURES = (
+    "os error 11001",
+    "connection failed",
+    "error sending request",
+    "stream disconnected before completion",
+    "falling back from websockets to https transport",
+    "error running remote compact task",
+)
 GUARD_RECOVERY_HANDOFF_BLOCKER = (
     "Owner-authorized bounded guard recovery is launching the preserved task WIP."
 )
@@ -2792,6 +2805,7 @@ class TaskController:
         *,
         allow_cli_preflight_failure: bool = False,
         allow_guard_budget_failure: bool = False,
+        allow_transport_failure: bool = False,
     ) -> dict[str, Any]:
         github = self._github()
         owner = normalize_github_login(github.repo_slug.split("/", maxsplit=1)[0])
@@ -2902,11 +2916,30 @@ class TaskController:
             and state.get("state") == "human_required"
             and blocker == GUARD_RECOVERY_HANDOFF_BLOCKER
         )
+        valid_transport_failure = (
+            allow_transport_failure
+            and state.get("state") in {"blocked", "human_required"}
+            and isinstance(blocker, str)
+            and (
+                POST_START_TRANSPORT_FAILURE_KIND in blocker
+                or (
+                    "Codex worker turn failed while reconnecting to the API" in blocker
+                    and "os error" in blocker
+                )
+            )
+        )
+        valid_transport_recovery_handoff = (
+            allow_transport_failure
+            and state.get("state") == "human_required"
+            and blocker == POST_START_TRANSPORT_HANDOFF_BLOCKER
+        )
         if not common_failure or not (
             valid_human_required
             or valid_cli_failure
             or valid_guard_failure
             or valid_guard_recovery_handoff
+            or valid_transport_failure
+            or valid_transport_recovery_handoff
         ):
             raise TaskSessionError(
                 "Latest control state is not a matching pre-implementation failure"
@@ -3671,6 +3704,258 @@ class TaskController:
             if actual_hash != expected_hash:
                 raise TaskSessionError("Guard WIP checkpoint evidence has changed")
 
+    def _post_start_transport_interruption_evidence(
+        self,
+        task_id: str,
+        worktree: Path,
+        event: Mapping[str, Any],
+        control_state: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Verify a real worker attempt stopped after an external transport failure."""
+
+        attempts = event.get("launch_attempts")
+        launch_id = event.get("launch_id")
+        if (
+            event.get("state") != "worker-started"
+            or not isinstance(attempts, list)
+            or not attempts
+            or not isinstance(launch_id, str)
+            or not isinstance(attempts[-1], Mapping)
+            or attempts[-1].get("state") != "worker-started"
+            or attempts[-1].get("launch_id") != launch_id
+        ):
+            raise TaskSessionError(
+                "Post-start transport interruption has no matching worker launch"
+            )
+        attempt = attempts[-1]
+        allowed_previous_states = {
+            "no-worker-started",
+            "failed-before-implementation",
+            "failed-guard-budget",
+            "failed-post-start-transport",
+        }
+        if any(
+            not isinstance(item, Mapping) or item.get("state") not in allowed_previous_states
+            for item in attempts[:-1]
+        ):
+            raise TaskSessionError("Post-start transport launch history is ambiguous")
+        worker_pid = event.get("worker_pid")
+        worker_state_value = event.get("worker_state_path")
+        command_started_at = event.get("command_started_at")
+        process_instance = event.get("worker_process_instance")
+        if (
+            isinstance(worker_pid, bool)
+            or not isinstance(worker_pid, int)
+            or worker_pid < 1
+            or attempt.get("worker_pid") != worker_pid
+            or attempt.get("worker_process_instance") != event.get("worker_process_instance")
+            or not isinstance(worker_state_value, str)
+            or not Path(worker_state_value).is_absolute()
+            or not isinstance(command_started_at, str)
+            or attempt.get("worker_state_path") != worker_state_value
+            or not isinstance(process_instance, Mapping)
+            or attempt.get("worker_process_instance") != dict(process_instance)
+            or not isinstance(process_instance.get("kind"), str)
+            or not process_instance.get("kind")
+            or any(
+                not isinstance(key, str) or not isinstance(value, str)
+                for key, value in process_instance.items()
+            )
+        ):
+            raise TaskSessionError("Post-start transport worker identity is malformed")
+        try:
+            started_at = datetime.fromisoformat(command_started_at.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise TaskSessionError(
+                "Post-start transport command start time is malformed"
+            ) from error
+        if started_at.tzinfo is None:
+            raise TaskSessionError("Post-start transport command start time has no timezone")
+        if self.store._pid_is_alive(worker_pid):
+            raise TaskSessionError("Post-start transport worker is still live")
+
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / task_id / "temporary" / "delivery"
+        ).resolve()
+        worker_state_path = Path(worker_state_value).resolve()
+        try:
+            worker_state_path.relative_to(delivery_root)
+        except ValueError as error:
+            raise TaskSessionError(
+                "Post-start transport worker state is outside task delivery artifacts"
+            ) from error
+        if worker_state_path.name != "worker-state.json" or worker_state_path.exists():
+            raise TaskSessionError("Post-start transport worker state has not been reconciled")
+        if self._preimplementation_worker_state_paths(task_id):
+            raise TaskSessionError("Task has unreconciled worker state")
+
+        events_path = worker_state_path.with_name("events.jsonl")
+        guard_path = worker_state_path.with_name("worker-guard.json")
+        blocker = control_state.get("blocker")
+        if (
+            not isinstance(blocker, str)
+            or str(events_path) not in blocker
+            or not events_path.is_file()
+            or events_path.is_symlink()
+            or not guard_path.is_file()
+            or guard_path.is_symlink()
+        ):
+            raise TaskSessionError(
+                "Post-start transport blocker does not identify the attempt evidence"
+            )
+        report_bytes, report_stat = self._read_guard_file(guard_path)
+        events_bytes, _ = self._read_guard_file(events_path)
+        if not report_bytes or not events_bytes:
+            raise TaskSessionError("Post-start transport evidence is empty")
+        try:
+            report = json.loads(report_bytes.decode("utf-8"))
+            events_text = events_bytes.decode("utf-8")
+        except (UnicodeError, json.JSONDecodeError) as error:
+            raise TaskSessionError(
+                "Post-start transport evidence is not valid UTF-8 JSON"
+            ) from error
+        counters = report.get("counters") if isinstance(report, Mapping) else None
+        limits = report.get("limits") if isinstance(report, Mapping) else None
+        privacy = report.get("privacy") if isinstance(report, Mapping) else None
+        completed = (
+            counters.get("completed_tool_actions") if isinstance(counters, Mapping) else None
+        )
+        progress = counters.get("progress_events") if isinstance(counters, Mapping) else None
+        if (
+            not isinstance(report, Mapping)
+            or report.get("schema_version") != 1
+            or report.get("classification") != "yfc-worker-guard-report"
+            or report.get("blocked") is not False
+            or report.get("block_reason_code") is not None
+            or isinstance(completed, bool)
+            or not isinstance(completed, int)
+            or completed < 1
+            or isinstance(progress, bool)
+            or not isinstance(progress, int)
+            or progress < 1
+            or not isinstance(privacy, Mapping)
+            or set(privacy)
+            != {
+                "raw_prompts_stored",
+                "raw_commands_stored",
+                "raw_tool_arguments_stored",
+                "raw_tool_results_stored",
+            }
+            or any(privacy.get(key) is not False for key in privacy)
+        ):
+            raise TaskSessionError("Post-start transport evidence is ambiguous")
+        matched_signatures = tuple(
+            signature
+            for signature in POST_START_TRANSPORT_SIGNATURES
+            if signature in events_text.casefold()
+        )
+        if not matched_signatures:
+            raise TaskSessionError("Post-start transport evidence is ambiguous")
+        try:
+            replay = WorkerEventGuard(GuardLimits.from_mapping(limits))
+        except WorkerGuardConfigError as error:
+            raise TaskSessionError(
+                "Post-start transport guard report has invalid limits"
+            ) from error
+        for line in events_bytes.splitlines(keepends=True):
+            replay.observe_line(line)
+        if replay.report() != report:
+            raise TaskSessionError("Post-start transport guard report does not match its events")
+        start_ns = int(started_at.timestamp() * 1_000_000_000)
+        if start_ns > report_stat.st_mtime_ns:
+            raise TaskSessionError("Post-start transport evidence predates the worker start")
+        snapshot = self._guard_worktree_snapshot(
+            task_id, worktree, self.repository.head(cwd=worktree)
+        )
+        if not snapshot["changed_paths"]:
+            raise TaskSessionError("Post-start transport attempt has no task WIP")
+        ignored_paths = self._guard_ignored_paths(worktree)
+        if ignored_paths:
+            raise TaskSessionError(
+                "Post-start transport recovery refuses ignored files outside task artifacts: "
+                + ", ".join(ignored_paths[:5])
+            )
+        baseline_snapshot = attempt.get("prelaunch_snapshot")
+        baseline_tree = (
+            baseline_snapshot.get("tree") if isinstance(baseline_snapshot, Mapping) else None
+        )
+        if (
+            not isinstance(baseline_tree, str)
+            or re.fullmatch(r"[0-9a-f]{40}", baseline_tree) is None
+        ):
+            previous_recovery = event.get("guard_budget_recovery")
+            baseline_tree = (
+                previous_recovery.get("checkpoint_tree")
+                if isinstance(previous_recovery, Mapping)
+                else None
+            )
+        if (
+            not isinstance(baseline_tree, str)
+            or re.fullmatch(r"[0-9a-f]{40}", baseline_tree) is None
+        ):
+            baseline_tree = self.repository.git("rev-parse", f"{event.get('head_sha')}^{{tree}}")
+
+        def tree_entry(tree: str, relative_path: str) -> str:
+            return self.repository.git("ls-tree", "-z", tree, "--", relative_path)
+
+        for relative_path in snapshot["changed_paths"]:
+            parts = PurePosixPath(relative_path).parts
+            if not parts or PurePosixPath(relative_path).is_absolute() or ".." in parts:
+                raise TaskSessionError("Post-start transport recovery found an unsafe changed path")
+            candidate = worktree.joinpath(*parts)
+            stat_path = candidate
+            while not stat_path.exists() and not stat_path.is_symlink() and stat_path != worktree:
+                stat_path = stat_path.parent
+            try:
+                changed_at_ns = stat_path.lstat().st_mtime_ns
+            except OSError as error:
+                raise TaskSessionError(
+                    "Cannot verify WIP modification time for post-start transport recovery"
+                ) from error
+            if changed_at_ns > report_stat.st_mtime_ns:
+                raise TaskSessionError(
+                    "Task WIP includes a file changed outside the transport attempt"
+                )
+            if changed_at_ns < start_ns and tree_entry(baseline_tree, relative_path) != tree_entry(
+                snapshot["tree"], relative_path
+            ):
+                raise TaskSessionError(
+                    "Task WIP includes a file changed outside the transport attempt"
+                )
+        attempt_id = guard_path.parent.name
+        if re.fullmatch(r"\d{8}T\d{12}Z-delivery", attempt_id) is None:
+            raise TaskSessionError("Post-start transport evidence is outside a timestamped attempt")
+        return {
+            "kind": POST_START_TRANSPORT_FAILURE_KIND,
+            "attempt_id": attempt_id,
+            "launch_id": launch_id,
+            "worker_pid": worker_pid,
+            "worker_state_path": str(worker_state_path),
+            "command_started_at": command_started_at,
+            "transport_stopped_at": datetime.fromtimestamp(
+                report_stat.st_mtime_ns / 1_000_000_000, UTC
+            ).isoformat(),
+            "transport_signatures": list(matched_signatures),
+            "guard_report_path": str(guard_path),
+            "guard_report_sha256": hashlib.sha256(report_bytes).hexdigest(),
+            "events_path": str(events_path.resolve()),
+            "events_sha256": hashlib.sha256(events_bytes).hexdigest(),
+            "completed_tool_actions": completed,
+            "progress_events": progress,
+            **snapshot,
+        }
+
+    @staticmethod
+    def _transport_control_state_matches_checkpoint(
+        control_state: Mapping[str, Any], checkpoint: Mapping[str, Any]
+    ) -> bool:
+        blocker = control_state.get("blocker")
+        expected = checkpoint.get("events_path")
+        return bool(
+            blocker == POST_START_TRANSPORT_HANDOFF_BLOCKER
+            or (isinstance(blocker, str) and isinstance(expected, str) and expected in blocker)
+        )
+
     @staticmethod
     def _guard_control_state_matches_checkpoint(
         control_state: Mapping[str, Any], checkpoint: Mapping[str, Any]
@@ -3701,6 +3986,7 @@ class TaskController:
         *,
         prepared_event: Mapping[str, Any] | None = None,
         allow_guard_dirty: bool = False,
+        validate_recovery_checkpoint: bool = True,
     ) -> tuple[Path, str, str]:
         branch = lease.get("branch")
         if not isinstance(branch, str):
@@ -3764,18 +4050,29 @@ class TaskController:
                 "Task branch has unique commits or no longer matches its original base"
             )
         dirty = self.repository.status(worktree, include_ignored=True)
-        recovery = (
-            prepared_event.get("guard_budget_recovery")
+        recoveries = (
+            [
+                prepared_event.get("guard_budget_recovery"),
+                prepared_event.get("transport_interruption_recovery"),
+            ]
             if isinstance(prepared_event, Mapping)
-            else None
+            else []
         )
-        if isinstance(recovery, Mapping):
+        recoveries = [item for item in recoveries if isinstance(item, Mapping)]
+        if recoveries and validate_recovery_checkpoint:
             ignored = self._guard_ignored_paths(worktree)
             if ignored:
                 raise TaskSessionError(
                     "Guard recovery refuses ignored files outside task artifacts: "
                     + ", ".join(ignored[:5])
                 )
+            recovery = (
+                prepared_event.get("transport_interruption_recovery")
+                if isinstance(prepared_event, Mapping)
+                else None
+            )
+            if not isinstance(recovery, Mapping):
+                recovery = recoveries[0]
             self._validate_guard_wip_checkpoint(task_id, worktree, lease, recovery)
         elif dirty and allow_guard_dirty:
             ignored = self._guard_ignored_paths(worktree)
@@ -4160,6 +4457,28 @@ class TaskController:
                 startup_failure_evidence: dict[str, Any] | None = None
                 prepared_event: Mapping[str, Any] = event
                 if event.get("state") == "worker-started":
+                    classification_state = self._preimplementation_issue_state(
+                        expected,
+                        control_issue_number,
+                        branch,
+                        document,
+                        lease,
+                        allow_guard_budget_failure=True,
+                        allow_transport_failure=True,
+                    )
+                    try:
+                        self._post_start_transport_interruption_evidence(
+                            expected,
+                            Path(str(lease["worktree"])),
+                            event,
+                            classification_state,
+                        )
+                    except TaskSessionError:
+                        pass
+                    else:
+                        raise TaskSessionError(
+                            "Task has a post-start external transport interruption; use transport recovery"
+                        )
                     startup_failure_evidence = (
                         self._preimplementation_windows_command_line_failure_evidence(
                             expected, event
@@ -4169,6 +4488,10 @@ class TaskController:
                 elif event.get("state") != "prepared" or "launch_id" in event:
                     raise TaskSessionError(
                         "The one-time guard recovery was already launched or reconciled"
+                    )
+                if isinstance(event.get("transport_interruption_recovery"), Mapping):
+                    raise TaskSessionError(
+                        "Task has a post-start external transport interruption; use transport recovery"
                     )
                 control_state = self._preimplementation_issue_state(
                     expected,
@@ -4243,7 +4566,18 @@ class TaskController:
                 document,
                 lease,
                 allow_guard_budget_failure=True,
+                allow_transport_failure=True,
             )
+            try:
+                self._post_start_transport_interruption_evidence(
+                    expected, Path(str(lease["worktree"])), event, control_state
+                )
+            except TaskSessionError:
+                pass
+            else:
+                raise TaskSessionError(
+                    "Task has a post-start external transport interruption; use transport recovery"
+                )
             self._preimplementation_queue_claim(expected)
             if self._preimplementation_worker_state_paths(expected):
                 raise TaskSessionError("Task has unreconciled worker state")
@@ -4408,6 +4742,305 @@ class TaskController:
                 "mutation_performed": True,
             }
 
+    def resume_transport_interrupted(
+        self,
+        task_id: str,
+        *,
+        control_issue_number: int,
+        reason: str,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError(
+                "Post-start transport recovery requires explicit owner authorization"
+            )
+        if (
+            isinstance(control_issue_number, bool)
+            or not isinstance(control_issue_number, int)
+            or control_issue_number < 1
+        ):
+            raise TaskSessionError(
+                "Post-start transport recovery requires a valid control Issue number"
+            )
+        if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 1024:
+            raise TaskSessionError(
+                "Post-start transport recovery reason must be a bounded non-empty string"
+            )
+        if self.github is None:
+            raise TaskSessionError("Post-start transport recovery requires online GitHub state")
+
+        self.store.initialize()
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            leases = self.store.all_leases()
+            matching = [
+                item
+                for item in leases
+                if isinstance(item.get("task_id"), str) and str(item["task_id"]).upper() == expected
+            ]
+            lease = self.store.read_json(lease_path)
+            if len(matching) != 1 or matching[0] != lease:
+                raise TaskSessionError(f"Task {expected} has an ambiguous task lease")
+            if (
+                not isinstance(lease, dict)
+                or lease.get("mode") != "write"
+                or lease.get("owner_launch") is not True
+                or lease.get("queue_mode") is True
+                or self._lease_state(lease) != "implementation"
+            ):
+                raise TaskSessionError(f"Task {expected} has no active implementation lease")
+            self._reject_shared_task_lease_identity(expected, lease, leases)
+            document = find_task_document(self._canonical_root(), expected)
+            if (
+                not document.executable
+                or "blocked" in document.status.lower()
+                or "заблок" in document.status.lower()
+                or Path(str(lease.get("canonical_task_path", ""))).resolve()
+                != document.path.resolve()
+                or self._validated_lease_concurrency_class(lease) != document.concurrency_class
+                or lease.get("integration_policy") != document.integration_policy
+                or lease.get("target_base_branch") != TARGET_BASE_BRANCH
+            ):
+                raise TaskSessionError("Task document or metadata no longer matches its lease")
+            branch = str(lease.get("branch", ""))
+            event = lease.get("preimplementation_resume")
+            if (
+                not isinstance(event, dict)
+                or event.get("control_issue_number") != control_issue_number
+            ):
+                raise TaskSessionError("Task has no matching resumable pre-implementation launch")
+            existing = event.get("transport_interruption_recovery")
+            worktree = Path(str(lease["worktree"])).resolve()
+            if isinstance(existing, Mapping):
+                if event.get("transport_interruption_recovery_reason") != reason.strip():
+                    raise TaskSessionError(
+                        "The one-time post-start transport recovery was already launched or reconciled"
+                    )
+                control_state = self._preimplementation_issue_state(
+                    expected,
+                    control_issue_number,
+                    branch,
+                    document,
+                    lease,
+                    allow_guard_budget_failure=isinstance(
+                        event.get("guard_budget_recovery"), Mapping
+                    ),
+                    allow_transport_failure=True,
+                )
+                if event.get("state") == "prepared" and "launch_id" not in event:
+                    self._validate_preimplementation_worktree(expected, lease, prepared_event=event)
+                    if not self._transport_control_state_matches_checkpoint(
+                        control_state, existing
+                    ):
+                        raise TaskSessionError(
+                            "Latest task transport blocker no longer matches its checkpoint"
+                        )
+                    return {
+                        "task_id": expected,
+                        "lease": dict(lease),
+                        "preimplementation_resume": dict(event),
+                        "control_state": control_state,
+                        "mutation_performed": False,
+                    }
+                if event.get("state") != "worker-started":
+                    raise TaskSessionError(
+                        "The one-time post-start transport recovery was already launched or reconciled"
+                    )
+                self._post_start_transport_interruption_evidence(
+                    expected, worktree, event, control_state
+                )
+                raise TaskSessionError("Post-start transport retry budget was already used")
+            if event.get("state") != "worker-started":
+                raise TaskSessionError("Task has no post-start transport interruption to recover")
+
+            control_state = self._preimplementation_issue_state(
+                expected,
+                control_issue_number,
+                branch,
+                document,
+                lease,
+                allow_guard_budget_failure=isinstance(event.get("guard_budget_recovery"), Mapping),
+                allow_transport_failure=True,
+            )
+            self._preimplementation_queue_claim(expected)
+            if self._preimplementation_worker_state_paths(expected):
+                raise TaskSessionError("Task has unreconciled worker state")
+            if any(
+                isinstance(item.get("head"), Mapping) and str(item["head"].get("ref", "")) == branch
+                for item in self._github().open_pull_requests()
+            ):
+                raise TaskSessionError("Task branch already has an open pull request")
+
+            canonical = self._canonical_root()
+            self.repository.fetch_origin_master(cwd=canonical, prune=False)
+            current_origin = self.repository.ref("origin/master")
+            live_master = self._github().branch_head(TARGET_BASE_BRANCH)
+            canonical_head = self.repository.head(cwd=canonical)
+            canonical_changes = self._canonical_worktree_status()
+            if current_origin != live_master:
+                raise TaskSessionError(
+                    "origin/master is not synchronized with live protected master"
+                )
+            if (
+                self.repository.current_branch(cwd=canonical) != TARGET_BASE_BRANCH
+                or self.repository.operation_issues(canonical)
+                or canonical_changes
+                or not self.repository.is_ancestor(canonical_head, current_origin)
+            ):
+                raise TaskSessionError(
+                    "Canonical master is not clean and safely behind origin/master"
+                )
+            if not self.repository.is_ancestor(
+                str(lease.get("base_origin_master_sha", "")), current_origin
+            ):
+                raise TaskSessionError("Task base is not an ancestor of synchronized origin/master")
+            prepared_event = {**event, "state": "prepared"}
+            worktree, branch, head = self._validate_preimplementation_worktree(
+                expected,
+                lease,
+                prepared_event=prepared_event,
+                allow_guard_dirty=True,
+                validate_recovery_checkpoint=False,
+            )
+            if (
+                head != event.get("head_sha")
+                or self.repository.unique_commits(branch, base=current_origin)
+                or self.repository.ref_exists(f"refs/remotes/origin/{branch}")
+                or self.repository.remote_branch_exists(branch, cwd=canonical)
+            ):
+                raise TaskSessionError("Task branch is not a clean ancestor of protected master")
+            evidence = self._post_start_transport_interruption_evidence(
+                expected, worktree, event, control_state
+            )
+            if self._preimplementation_worker_state_paths(expected):
+                raise TaskSessionError("Task worker state appeared during transport recovery")
+
+            checkpoint_ref = (
+                f"refs/codex/task-wip-checkpoints/task-{expected.lower()}/{evidence['attempt_id']}"
+            )
+            snapshot = self._guard_worktree_snapshot(expected, worktree, head)
+            if (
+                snapshot["tree"] != evidence["tree"]
+                or snapshot["changed_paths"] != evidence["changed_paths"]
+                or snapshot["patch_sha256"] != evidence["patch_sha256"]
+            ):
+                raise TaskSessionError(
+                    "Task WIP changed while its transport checkpoint was prepared"
+                )
+            latest_evidence = self._post_start_transport_interruption_evidence(
+                expected, worktree, event, control_state
+            )
+            if any(latest_evidence[key] != evidence[key] for key in evidence):
+                raise TaskSessionError(
+                    "Transport evidence or task WIP changed during checkpoint creation"
+                )
+            if self.repository.ref_exists(checkpoint_ref):
+                checkpoint_commit = self.repository.ref(checkpoint_ref)
+                existing_parents = self.repository.git(
+                    "rev-list", "--parents", "-n", "1", checkpoint_commit
+                ).split()
+                existing_tree = self.repository.git("rev-parse", f"{checkpoint_commit}^{{tree}}")
+                if (
+                    existing_parents != [checkpoint_commit, head]
+                    or existing_tree != snapshot["tree"]
+                ):
+                    raise TaskSessionError(
+                        "A conflicting transport WIP checkpoint ref already exists"
+                    )
+            else:
+                checkpoint_commit = self.repository.git(
+                    "-c",
+                    "user.name=Codex Controller",
+                    "-c",
+                    "user.email=codex-controller@users.noreply.github.com",
+                    "commit-tree",
+                    snapshot["tree"],
+                    "-p",
+                    head,
+                    "-m",
+                    f"Checkpoint interrupted Task {expected} transport WIP",
+                )
+                self.repository.git(
+                    "update-ref",
+                    checkpoint_ref,
+                    checkpoint_commit,
+                    "0" * len(head),
+                )
+            checkpoint = {
+                "version": 1,
+                "task_id": expected,
+                "attempt_id": evidence["attempt_id"],
+                "launch_id": evidence["launch_id"],
+                "recovery_attempt_number": MAX_POST_START_TRANSPORT_RECOVERIES,
+                "original_base_sha": lease.get("original_base_origin_master_sha"),
+                "base_sha": lease.get("base_origin_master_sha"),
+                "head_sha": head,
+                "checkpoint_ref": checkpoint_ref,
+                "checkpoint_commit": checkpoint_commit,
+                "checkpoint_tree": snapshot["tree"],
+                "changed_paths": snapshot["changed_paths"],
+                "patch_sha256": snapshot["patch_sha256"],
+                "transport_failure_kind": POST_START_TRANSPORT_FAILURE_KIND,
+                "transport_signatures": evidence["transport_signatures"],
+                "command_started_at": evidence["command_started_at"],
+                "transport_stopped_at": evidence["transport_stopped_at"],
+                "guard_report_path": evidence["guard_report_path"],
+                "guard_report_sha256": evidence["guard_report_sha256"],
+                "events_path": evidence["events_path"],
+                "events_sha256": evidence["events_sha256"],
+                "worker_state_path": evidence["worker_state_path"],
+                "worker_pid": evidence["worker_pid"],
+                "completed_tool_actions": evidence["completed_tool_actions"],
+                "progress_events": evidence["progress_events"],
+                "created_at": utc_now(),
+                "reason": reason.strip(),
+            }
+            self._validate_guard_wip_checkpoint(expected, worktree, lease, checkpoint)
+            attempts = event.get("launch_attempts")
+            if not isinstance(attempts, list) or not attempts or not isinstance(attempts[-1], dict):
+                raise TaskSessionError("Post-start transport launch audit changed during recovery")
+            timestamp = utc_now()
+            attempts[-1].update(
+                {
+                    "state": "failed-post-start-transport",
+                    "finished_at": timestamp,
+                    "failure_kind": POST_START_TRANSPORT_FAILURE_KIND,
+                    "failure_evidence": {
+                        "events_path": evidence["events_path"],
+                        "events_sha256": evidence["events_sha256"],
+                        "guard_report_path": evidence["guard_report_path"],
+                        "guard_report_sha256": evidence["guard_report_sha256"],
+                        "completed_tool_actions": evidence["completed_tool_actions"],
+                        "progress_events": evidence["progress_events"],
+                        "transport_signatures": evidence["transport_signatures"],
+                    },
+                }
+            )
+            event["transport_interruption_recovery"] = checkpoint
+            event["transport_interruption_recovery_reason"] = reason.strip()
+            event["state"] = "prepared"
+            event["head_sha"] = head
+            for key in (
+                "launch_id",
+                "launch_claimed_at",
+                "worker_started_at",
+                "command_started_at",
+                "worker_pid",
+                "worker_process_instance",
+                "worker_state_path",
+            ):
+                event.pop(key, None)
+            lease["updated_at"] = timestamp
+            StateStore.replace_json(lease_path, lease)
+            return {
+                "task_id": expected,
+                "lease": dict(lease),
+                "preimplementation_resume": dict(event),
+                "control_state": control_state,
+                "mutation_performed": True,
+            }
+
     def claim_preimplementation_worker_launch(self, task_id: str) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
         lease_path = self.store.task_lease_path(expected)
@@ -4440,12 +5073,26 @@ class TaskController:
                 allow_guard_budget_failure=isinstance(
                     resume_event.get("guard_budget_recovery"), Mapping
                 ),
+                allow_transport_failure=isinstance(
+                    resume_event.get("transport_interruption_recovery"), Mapping
+                ),
             )
             recovery = resume_event.get("guard_budget_recovery")
-            if isinstance(recovery, Mapping) and not self._guard_control_state_matches_checkpoint(
-                control_state, recovery
+            transport_recovery = resume_event.get("transport_interruption_recovery")
+            if (
+                isinstance(recovery, Mapping)
+                and not isinstance(transport_recovery, Mapping)
+                and not self._guard_control_state_matches_checkpoint(control_state, recovery)
             ):
                 raise TaskSessionError("Latest task guard blocker no longer matches its checkpoint")
+            if isinstance(
+                transport_recovery, Mapping
+            ) and not self._transport_control_state_matches_checkpoint(
+                control_state, transport_recovery
+            ):
+                raise TaskSessionError(
+                    "Latest task transport blocker no longer matches its checkpoint"
+                )
             self._preimplementation_queue_claim(expected)
             worker_states = self._preimplementation_worker_state_paths(expected)
             if worker_states:
@@ -4461,7 +5108,12 @@ class TaskController:
             launch_id = uuid4().hex
             claimed_at = utc_now()
             attempts.append(
-                {"launch_id": launch_id, "state": "launching", "claimed_at": claimed_at}
+                {
+                    "launch_id": launch_id,
+                    "state": "launching",
+                    "claimed_at": claimed_at,
+                    "prelaunch_snapshot": self._guard_worktree_snapshot(expected, worktree, head),
+                }
             )
             resume_event["launch_attempts"] = attempts
             resume_event.update(
@@ -7505,6 +8157,11 @@ def _parser() -> argparse.ArgumentParser:
     guard_resume.add_argument("--control-issue", type=int, required=True)
     guard_resume.add_argument("--reason", required=True)
     guard_resume.add_argument("--owner-authorize", action="store_true")
+    transport_resume = subparsers.add_parser("resume-transport-interrupted")
+    transport_resume.add_argument("task_id")
+    transport_resume.add_argument("--control-issue", type=int, required=True)
+    transport_resume.add_argument("--reason", required=True)
+    transport_resume.add_argument("--owner-authorize", action="store_true")
     claim_worker = subparsers.add_parser("claim-preimplementation-worker-launch")
     claim_worker.add_argument("task_id")
     release_worker = subparsers.add_parser("release-preimplementation-worker-launch")
@@ -7640,6 +8297,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "resume-guard-interrupted":
             try:
                 payload = controller.resume_guard_interrupted(
+                    args.task_id,
+                    control_issue_number=args.control_issue,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            except TaskSessionError as error:
+                raise TaskSessionError(f"HUMAN_REQUIRED: {error}") from error
+            _print(payload)
+            return 0
+        if args.command == "resume-transport-interrupted":
+            try:
+                payload = controller.resume_transport_interrupted(
                     args.task_id,
                     control_issue_number=args.control_issue,
                     reason=args.reason,

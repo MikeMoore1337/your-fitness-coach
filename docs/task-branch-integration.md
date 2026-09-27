@@ -279,6 +279,23 @@ worker PID, неизменённый task head без PR/queue claim и WIP, tim
 продолжает работу. Повторный guard budget stop переводит Issue в `human_required`; второго
 автоматического recovery нет.
 
+Если Codex уже был запущен и worker завершился из-за внешнего сбоя transport/API (например,
+`os error 11001`, `Connection failed` или `stream disconnected before completion`), controller
+помечает попытку как `post_start_external_transport_interruption`. Это состояние не считается
+Windows startup failure и не использует startup или guard budget. Владелец может ровно один раз
+запросить отдельный bounded retry:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_task_delivery.py 504 `
+    --control-issue 504 --resume-transport-interrupted `
+    --resume-reason "owner-authorized one-time post-start transport recovery"
+```
+
+Перед retry controller проверяет завершённый worker, privacy-safe guard report и события,
+сохраняет полный WIP в checkpoint ref и делает recovery idempotent. Повторный transport failure,
+live worker, изменённый checkpoint/WIP или неоднозначные evidence переводят Issue в
+`human_required`; общий лимит guard/startup не изменяется.
+
 Низкоуровневые команды:
 
 ```powershell
