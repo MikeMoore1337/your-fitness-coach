@@ -534,6 +534,145 @@ def _record_guard_budget_failure(
     return worker_state_path, guard_path, events_path, attempt_id
 
 
+def _record_post_start_transport_failure(
+    controller: Any,
+    root: Path,
+    github: FakeGitHub,
+    branch: str,
+    worktree: Path,
+    *,
+    reason: str = "owner-authorized resume after tool-budget interruption",
+) -> tuple[Path, Path, Path, str]:
+    _record_guard_budget_failure(controller, root, github, branch, worktree, reason=reason)
+    controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason=reason,
+        owner_authorize=True,
+    )
+    github.issue_comment_map[241] = [
+        {
+            "id": 4,
+            "created_at": task_session.utc_now(),
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="241",
+                    state="human_required",
+                    issue_number=241,
+                    branch=branch,
+                    blocker=task_session.GUARD_RECOVERY_HANDOFF_BLOCKER,
+                )
+            ),
+        }
+    ]
+    claimed = controller.claim_preimplementation_worker_launch("241")["preimplementation_resume"]
+    attempt_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ") + "-delivery"
+    attempt_root = root / ".artifacts" / "tasks" / "241" / "temporary" / "delivery" / attempt_id
+    attempt_root.mkdir(parents=True)
+    worker_state_path = attempt_root / "worker-state.json"
+    worker_state_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "pid": 901,
+                "process_group_id": None,
+                "process_instance": {"kind": "test", "instance": "supervisor"},
+                "started_at": task_session.utc_now(),
+                "command_process": {
+                    "pid": 902,
+                    "process_instance": {"kind": "test", "instance": "codex"},
+                },
+                "command_started_at": task_session.utc_now(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    controller.record_preimplementation_worker_started("241", worker_state_path=worker_state_path)
+    worker_state_path.unlink()
+
+    (worktree / "README.md").write_text("transport implementation\n", encoding="utf-8")
+    (worktree / "transport-new.py").write_text("value = 2\n", encoding="utf-8")
+    _git(worktree, "add", "README.md")
+
+    limits = {
+        "max_completed_tool_actions": 240,
+        "max_collab_tool_calls": 10,
+        "max_spawned_subagents": 2,
+        "max_concurrent_subagents": 2,
+        "max_identical_failed_actions": 4,
+        "max_identical_actions_without_progress": 8,
+        "short_cycle_period_max": 3,
+        "short_cycle_repetitions": 4,
+    }
+    events = [
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": "transport-test-action-1",
+                    "status": "completed",
+                },
+            }
+        ),
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "file_change",
+                    "status": "completed",
+                    "changes": ["README.md"],
+                },
+            }
+        ),
+        json.dumps(
+            {
+                "type": "error",
+                "message": "Connection failed: error sending request (os error 11001)",
+            }
+        ),
+        json.dumps(
+            {
+                "type": "turn.failed",
+                "error": {"message": "Error running remote compact task: Connection failed"},
+            }
+        ),
+    ]
+    events_path = attempt_root / "events.jsonl"
+    events_path.write_text("\n".join(events) + "\n", encoding="utf-8")
+    guard = task_session.WorkerEventGuard(task_session.GuardLimits.from_mapping(limits))
+    for line in events_path.read_text(encoding="utf-8").splitlines(keepends=True):
+        guard.observe_line(line)
+    guard_path = attempt_root / "worker-guard.json"
+    guard_path.write_text(json.dumps(guard.report()), encoding="utf-8")
+    assert guard.report()["blocked"] is False
+    assert guard.report()["counters"]["completed_tool_actions"] > 0
+    assert guard.report()["counters"]["progress_events"] > 0
+
+    github.issue_comment_map[241] = [
+        {
+            "id": 5,
+            "created_at": task_session.utc_now(),
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="241",
+                    state="human_required",
+                    issue_number=241,
+                    branch=branch,
+                    blocker=(
+                        f"worker stopped after {task_session.POST_START_TRANSPORT_FAILURE_KIND}; "
+                        f"inspect {events_path}"
+                    ),
+                )
+            ),
+        }
+    ]
+    assert claimed["state"] == "launching"
+    return worker_state_path, guard_path, events_path, attempt_id
+
+
 def test_task_session_exposes_guard_interrupted_resume_command() -> None:
     args = task_session._parser().parse_args(
         [
@@ -548,6 +687,24 @@ def test_task_session_exposes_guard_interrupted_resume_command() -> None:
     )
 
     assert args.command == "resume-guard-interrupted"
+    assert args.control_issue == 241
+    assert args.owner_authorize is True
+
+
+def test_task_session_exposes_transport_interrupted_resume_command() -> None:
+    args = task_session._parser().parse_args(
+        [
+            "resume-transport-interrupted",
+            "241",
+            "--control-issue",
+            "241",
+            "--reason",
+            "owner-authorized one-time post-start transport recovery",
+            "--owner-authorize",
+        ]
+    )
+
+    assert args.command == "resume-transport-interrupted"
     assert args.control_issue == 241
     assert args.owner_authorize is True
 
@@ -767,6 +924,283 @@ def test_guard_interrupted_resume_reconciles_windows_command_line_failure(
     assert event["launch_attempts"][-1]["launch_id"] == claimed["launch_id"]
     repeated = controller.resume_guard_interrupted("241", **kwargs)
     assert repeated["mutation_performed"] is False
+
+
+def test_post_start_transport_resume_does_not_use_windows_startup_recovery(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    reason = "owner-authorized one-time post-start transport recovery"
+    _record_post_start_transport_failure(
+        controller,
+        root,
+        github,
+        branch,
+        worktree,
+        reason="owner-authorized resume after tool-budget interruption",
+    )
+
+    monkeypatch.setattr(
+        controller,
+        "_preimplementation_windows_command_line_failure_evidence",
+        lambda *_args: pytest.fail(
+            "post-start transport recovery must not use Windows startup evidence"
+        ),
+    )
+
+    resumed = controller.resume_transport_interrupted(
+        "241",
+        control_issue_number=241,
+        reason=reason,
+        owner_authorize=True,
+    )
+
+    event = resumed["preimplementation_resume"]
+    attempt = event["launch_attempts"][-1]
+    recovery = event["transport_interruption_recovery"]
+    assert resumed["mutation_performed"] is True
+    assert event["state"] == "prepared"
+    assert attempt["state"] == "failed-post-start-transport"
+    assert attempt["failure_kind"] == task_session.POST_START_TRANSPORT_FAILURE_KIND
+    assert recovery["recovery_attempt_number"] == 1
+    assert recovery["transport_failure_kind"] == task_session.POST_START_TRANSPORT_FAILURE_KIND
+    assert recovery["completed_tool_actions"] > 0
+    assert recovery["checkpoint_ref"].startswith("refs/codex/task-wip-checkpoints/task-241/")
+
+    with pytest.raises(task_session.TaskSessionError, match="post-start external transport"):
+        controller.resume_guard_interrupted(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized resume after tool-budget interruption",
+            owner_authorize=True,
+        )
+
+
+def test_post_start_transport_resume_refuses_ambiguous_evidence_without_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, branch, _, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    _, guard_path, events_path, _ = _record_post_start_transport_failure(
+        controller,
+        root,
+        github,
+        branch,
+        worktree,
+    )
+    events_path.write_text(
+        '{"type":"turn.failed","error":{"message":"unknown"}}\n', encoding="utf-8"
+    )
+    guard = json.loads(guard_path.read_text(encoding="utf-8"))
+    guard["counters"]["completed_tool_actions"] = 0
+    guard["counters"]["progress_events"] = 0
+    guard_path.write_text(json.dumps(guard), encoding="utf-8")
+    lease_path = controller.store.task_lease_path("241")
+    before = controller.store.read_json(lease_path)
+    before_head = git_repository.head(cwd=worktree)
+
+    with pytest.raises(task_session.TaskSessionError, match="ambiguous"):
+        controller.resume_transport_interrupted(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized one-time post-start transport recovery",
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(lease_path) == before
+    assert git_repository.head(cwd=worktree) == before_head
+
+
+def test_post_start_transport_resume_budget_is_independent_and_bounded(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_post_start_transport_failure(controller, root, github, branch, worktree)
+    reason = "owner-authorized one-time post-start transport recovery"
+    first = controller.resume_transport_interrupted(
+        "241",
+        control_issue_number=241,
+        reason=reason,
+        owner_authorize=True,
+    )
+    assert (
+        first["preimplementation_resume"]["guard_budget_recovery"]["recovery_attempt_number"] == 1
+    )
+
+    github.issue_comment_map[241] = [
+        {
+            "id": 6,
+            "created_at": task_session.utc_now(),
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="241",
+                    state="human_required",
+                    issue_number=241,
+                    branch=branch,
+                    blocker=task_session.POST_START_TRANSPORT_HANDOFF_BLOCKER,
+                )
+            ),
+        }
+    ]
+    claimed = controller.claim_preimplementation_worker_launch("241")["preimplementation_resume"]
+    assert claimed["state"] == "launching"
+    lease = controller.store.read_json(controller.store.task_lease_path("241"))
+    attempt_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ") + "-delivery"
+    attempt_root = root / ".artifacts" / "tasks" / "241" / "temporary" / "delivery" / attempt_id
+    attempt_root.mkdir(parents=True)
+    worker_state_path = attempt_root / "worker-state.json"
+    worker_state_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "pid": 903,
+                "process_group_id": None,
+                "process_instance": {"kind": "test", "instance": "supervisor"},
+                "started_at": task_session.utc_now(),
+                "command_process": {
+                    "pid": 904,
+                    "process_instance": {"kind": "test", "instance": "codex"},
+                },
+                "command_started_at": task_session.utc_now(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    controller.record_preimplementation_worker_started("241", worker_state_path=worker_state_path)
+    worker_state_path.unlink()
+    (worktree / "transport-second.py").write_text("value = 3\n", encoding="utf-8")
+    _git(worktree, "add", "transport-second.py")
+    events_path = attempt_root / "events.jsonl"
+    events_path.write_text(
+        '{"type":"item.completed","item":{"type":"command_execution","command":"second","status":"completed"}}\n'
+        '{"type":"item.completed","item":{"type":"file_change","status":"completed","changes":["transport-second.py"]}}\n'
+        '{"type":"error","message":"Connection failed: error sending request (os error 11001)"}\n',
+        encoding="utf-8",
+    )
+    limits = {
+        "max_completed_tool_actions": 240,
+        "max_collab_tool_calls": 10,
+        "max_spawned_subagents": 2,
+        "max_concurrent_subagents": 2,
+        "max_identical_failed_actions": 4,
+        "max_identical_actions_without_progress": 8,
+        "short_cycle_period_max": 3,
+        "short_cycle_repetitions": 4,
+    }
+    guard = task_session.WorkerEventGuard(task_session.GuardLimits.from_mapping(limits))
+    for line in events_path.read_text(encoding="utf-8").splitlines(keepends=True):
+        guard.observe_line(line)
+    (attempt_root / "worker-guard.json").write_text(json.dumps(guard.report()), encoding="utf-8")
+    github.issue_comment_map[241] = [
+        {
+            "id": 7,
+            "created_at": task_session.utc_now(),
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="241",
+                    state="human_required",
+                    issue_number=241,
+                    branch=branch,
+                    blocker=(
+                        f"worker stopped after {task_session.POST_START_TRANSPORT_FAILURE_KIND}; "
+                        f"inspect {events_path}"
+                    ),
+                )
+            ),
+        }
+    ]
+    monkeypatch.setattr(controller.store, "_pid_is_alive", lambda _pid: False)
+    before = controller.store.read_json(controller.store.task_lease_path("241"))
+
+    with pytest.raises(
+        task_session.TaskSessionError, match="transport retry budget was already used"
+    ):
+        controller.resume_transport_interrupted(
+            "241",
+            control_issue_number=241,
+            reason=reason,
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(controller.store.task_lease_path("241")) == before
+    assert (
+        lease["preimplementation_resume"]["transport_interruption_recovery"][
+            "recovery_attempt_number"
+        ]
+        == 1
+    )
+
+
+def test_post_start_transport_resume_refuses_live_worker_without_mutation(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_post_start_transport_failure(controller, root, github, branch, worktree)
+    lease_path = controller.store.task_lease_path("241")
+    before = controller.store.read_json(lease_path)
+    monkeypatch.setattr(controller.store, "_pid_is_alive", lambda _pid: True)
+
+    with pytest.raises(task_session.TaskSessionError, match="worker is still live"):
+        controller.resume_transport_interrupted(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized one-time post-start transport recovery",
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(lease_path) == before
+
+
+def test_post_start_transport_resume_refuses_external_wip_mutation(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _, guard_path, _, _ = _record_post_start_transport_failure(
+        controller, root, github, branch, worktree
+    )
+    (worktree / "transport-new.py").write_text("mutated after worker stop\n", encoding="utf-8")
+    report_mtime_ns = guard_path.stat().st_mtime_ns
+    os.utime(worktree / "transport-new.py", ns=(report_mtime_ns + 1_000_000_000,) * 2)
+
+    with pytest.raises(
+        task_session.TaskSessionError, match="changed outside the transport attempt"
+    ):
+        controller.resume_transport_interrupted(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized one-time post-start transport recovery",
+            owner_authorize=True,
+        )
+
+
+def test_post_start_transport_resume_refuses_checkpoint_mismatch(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, branch, _, github = _prepare_preimplementation_resume(repository)
+    _record_post_start_transport_failure(controller, root, github, branch, worktree)
+    controller.resume_transport_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized one-time post-start transport recovery",
+        owner_authorize=True,
+    )
+    lease_path = controller.store.task_lease_path("241")
+    lease = controller.store.read_json(lease_path)
+    lease["preimplementation_resume"]["transport_interruption_recovery"]["patch_sha256"] = "0" * 64
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    with pytest.raises(task_session.TaskSessionError, match="checkpoint"):
+        controller.claim_preimplementation_worker_launch("241")
+
+    assert (
+        controller.store.read_json(lease_path)["preimplementation_resume"][
+            "transport_interruption_recovery"
+        ]["patch_sha256"]
+        == "0" * 64
+    )
 
 
 def test_guard_interrupted_resume_is_idempotent_and_claim_requires_checkpoint(

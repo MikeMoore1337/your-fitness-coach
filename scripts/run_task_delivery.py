@@ -54,6 +54,9 @@ try:
     from scripts.skill_safety import SkillSafetyError, scan_repository_skills
     from scripts.task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
+        POST_START_TRANSPORT_FAILURE_KIND,
+        POST_START_TRANSPORT_HANDOFF_BLOCKER,
+        POST_START_TRANSPORT_SIGNATURES,
         GitRepository,
         TaskController,
         find_task_document,
@@ -81,6 +84,9 @@ except ModuleNotFoundError:
     from skill_safety import SkillSafetyError, scan_repository_skills
     from task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
+        POST_START_TRANSPORT_FAILURE_KIND,
+        POST_START_TRANSPORT_HANDOFF_BLOCKER,
+        POST_START_TRANSPORT_SIGNATURES,
         GitRepository,
         TaskController,
         find_task_document,
@@ -1278,6 +1284,7 @@ def _start(
     resume_control_issue: int | None = None,
     resume_reason: str | None = None,
     resume_guard_interrupted: bool = False,
+    resume_transport_interrupted: bool = False,
 ) -> dict[str, Any]:
     deadline = time.monotonic() + max_wait_minutes * 60
     if resume_control_issue is not None:
@@ -1291,9 +1298,13 @@ def _start(
             "--repo",
             str(REPOSITORY_ROOT),
             (
-                "resume-guard-interrupted"
-                if resume_guard_interrupted
-                else "resume-preimplementation"
+                "resume-transport-interrupted"
+                if resume_transport_interrupted
+                else (
+                    "resume-guard-interrupted"
+                    if resume_guard_interrupted
+                    else "resume-preimplementation"
+                )
             ),
             task_id,
             "--control-issue",
@@ -1330,7 +1341,9 @@ def _start(
                 raise DeliveryError("Controller returned invalid start JSON") from error
         detail = completed.stderr.strip() or completed.stdout.strip() or "unknown start error"
         if not _is_transient_start_error(detail):
-            if resume_guard_interrupted and not detail.startswith("HUMAN_REQUIRED:"):
+            if (resume_guard_interrupted or resume_transport_interrupted) and not detail.startswith(
+                "HUMAN_REQUIRED:"
+            ):
                 detail = f"HUMAN_REQUIRED: {detail}"
             raise DeliveryError(detail)
         if time.monotonic() >= deadline:
@@ -1368,14 +1381,29 @@ def _worker_prompt(
     guard_recovery = (
         resume_event.get("guard_budget_recovery") if isinstance(resume_event, Mapping) else None
     )
+    transport_recovery = (
+        resume_event.get("transport_interruption_recovery")
+        if isinstance(resume_event, Mapping)
+        else None
+    )
     guard_recovery_context = ""
-    if isinstance(guard_recovery, Mapping):
-        checkpoint_ref = guard_recovery.get("checkpoint_ref", "<unknown>")
-        checkpoint_commit = guard_recovery.get("checkpoint_commit", "<unknown>")
-        changed_paths = guard_recovery.get("changed_paths", [])
+    recovery = transport_recovery if isinstance(transport_recovery, Mapping) else guard_recovery
+    if isinstance(recovery, Mapping):
+        checkpoint_ref = recovery.get("checkpoint_ref", "<unknown>")
+        checkpoint_commit = recovery.get("checkpoint_commit", "<unknown>")
+        changed_paths = recovery.get("changed_paths", [])
+        if isinstance(transport_recovery, Mapping):
+            recovery_intro = (
+                "This is the single bounded continuation after a worker stopped following an "
+                "external post-start transport interruption."
+            )
+        else:
+            recovery_intro = (
+                "This is the single bounded continuation after a worker guard stopped at the "
+                "normal tool-action limit."
+            )
         guard_recovery_context = (
-            "This is the single bounded continuation after a worker guard stopped at the normal "
-            "tool-action limit. The complete tracked and untracked WIP is durably checkpointed "
+            recovery_intro + " The complete tracked and untracked WIP is durably checkpointed "
             f"at `{checkpoint_ref}` (`{checkpoint_commit}`); the working tree still contains that WIP. "
             "Before editing source files or running tests, audit the entire existing WIP against "
             "the task acceptance criteria and compare the current diff with the checkpoint. Inspect "
@@ -2679,8 +2707,73 @@ def _launch_worker(
     return worker_exit
 
 
-def _worker_exit_blocker(worker_exit: int, artifacts: Path) -> str:
-    if worker_exit != WORKER_GUARD_EXIT_CODE:
+def _post_start_transport_blocker(started: Mapping[str, Any] | None, artifacts: Path) -> str | None:
+    resume_event = started.get("preimplementation_resume") if isinstance(started, Mapping) else None
+    if not isinstance(resume_event, Mapping):
+        return None
+    if resume_event.get("state") != "worker-started" and not (
+        isinstance(resume_event.get("guard_budget_recovery"), Mapping)
+        or isinstance(resume_event.get("transport_interruption_recovery"), Mapping)
+    ):
+        return None
+    worker_state_value = resume_event.get("worker_state_path")
+    worker_state_path = (
+        Path(worker_state_value).resolve()
+        if isinstance(worker_state_value, str)
+        else (artifacts / "worker-state.json").resolve()
+    )
+    try:
+        worker_state_path.relative_to(artifacts.resolve())
+    except ValueError:
+        return None
+    events_path = worker_state_path.with_name("events.jsonl")
+    report_path = worker_state_path.with_name("worker-guard.json")
+    try:
+        events_text = events_path.read_text(encoding="utf-8").casefold()
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except OSError, UnicodeError, json.JSONDecodeError:
+        return None
+    counters = report.get("counters") if isinstance(report, Mapping) else None
+    privacy = report.get("privacy") if isinstance(report, Mapping) else None
+    if (
+        not isinstance(report, Mapping)
+        or report.get("schema_version") != 1
+        or report.get("classification") != "yfc-worker-guard-report"
+        or report.get("blocked") is not False
+        or report.get("block_reason_code") is not None
+        or not isinstance(counters, Mapping)
+        or isinstance(counters.get("completed_tool_actions"), bool)
+        or not isinstance(counters.get("completed_tool_actions"), int)
+        or counters["completed_tool_actions"] < 1
+        or isinstance(counters.get("progress_events"), bool)
+        or not isinstance(counters.get("progress_events"), int)
+        or counters["progress_events"] < 1
+        or not isinstance(privacy, Mapping)
+        or any(
+            privacy.get(key) is not False
+            for key in (
+                "raw_prompts_stored",
+                "raw_commands_stored",
+                "raw_tool_arguments_stored",
+                "raw_tool_results_stored",
+            )
+        )
+    ):
+        return None
+    if not any(signature in events_text for signature in POST_START_TRANSPORT_SIGNATURES):
+        return None
+    return f"worker stopped after {POST_START_TRANSPORT_FAILURE_KIND}; inspect {events_path}"
+
+
+def _worker_exit_blocker(
+    worker_exit: int, artifacts: Path, *, started: Mapping[str, Any] | None = None
+) -> str:
+    if worker_exit == WORKER_GUARD_EXIT_CODE:
+        pass
+    else:
+        transport_blocker = _post_start_transport_blocker(started, artifacts)
+        if transport_blocker is not None:
+            return transport_blocker
         return f"worker exited with code {worker_exit}"
     report_path = artifacts / "worker-guard.json"
     reason = "UNKNOWN_GUARD_REASON"
@@ -2688,7 +2781,7 @@ def _worker_exit_blocker(worker_exit: int, artifacts: Path) -> str:
         raw = json.loads(report_path.read_text(encoding="utf-8"))
         if isinstance(raw, Mapping) and isinstance(raw.get("block_reason_code"), str):
             reason = str(raw["block_reason_code"])
-    except OSError, json.JSONDecodeError:
+    except OSError, UnicodeError, json.JSONDecodeError:
         pass
     return f"worker guard blocked execution ({reason}); inspect {report_path}"
 
@@ -2767,10 +2860,13 @@ def _deliver_one(
     queue_claim: _ContinuousQueueClaim | None = None,
     resume_reason: str | None = None,
     resume_guard_interrupted: bool = False,
+    resume_transport_interrupted: bool = False,
 ) -> dict[str, Any]:
-    if resume_guard_interrupted and (resume_reason is None or control_issue is None):
+    if (resume_guard_interrupted or resume_transport_interrupted) and (
+        resume_reason is None or control_issue is None
+    ):
         raise DeliveryError(
-            "HUMAN_REQUIRED: guard-interrupted resume requires --control-issue and --resume-reason"
+            "HUMAN_REQUIRED: interrupted-worker resume requires --control-issue and --resume-reason"
         )
     if resume_reason is not None and control_issue is None:
         raise DeliveryError("HUMAN_REQUIRED: pre-implementation resume requires --control-issue")
@@ -2789,6 +2885,7 @@ def _deliver_one(
         resume_control_issue=control_issue if resume_reason is not None else None,
         resume_reason=resume_reason,
         resume_guard_interrupted=resume_guard_interrupted,
+        resume_transport_interrupted=resume_transport_interrupted,
     )
     status_issue = state_issue or control_issue
     resumed_worker = resume_reason is not None
@@ -2813,8 +2910,18 @@ def _deliver_one(
                 and isinstance(failure, Mapping)
                 and failure.get("kind") == "codex_cli_argument_conflict_before_implementation"
             )
+            transport_recovery = (
+                resume_event.get("transport_interruption_recovery")
+                if isinstance(resume_event, Mapping)
+                else None
+            )
             valid_guard_retry = resume_guard_interrupted and isinstance(guard_recovery, Mapping)
-            if status_issue is None or not (valid_cli_retry or valid_guard_retry):
+            valid_transport_retry = resume_transport_interrupted and isinstance(
+                transport_recovery, Mapping
+            )
+            if status_issue is None or not (
+                valid_cli_retry or valid_guard_retry or valid_transport_retry
+            ):
                 raise DeliveryError(
                     "HUMAN_REQUIRED: blocked resume has no reconciled startup failure"
                 )
@@ -2848,9 +2955,41 @@ def _deliver_one(
                         ),
                     ),
                 )
+            elif valid_transport_retry:
+                _post_control_state(
+                    status_issue,
+                    control_state_payload(
+                        task_id=task_id,
+                        state="human_required",
+                        issue_number=status_issue,
+                        branch=started["lease"]["branch"],
+                        blocker=POST_START_TRANSPORT_HANDOFF_BLOCKER,
+                    ),
+                )
         elif control_state.get("state") != "human_required":
             raise DeliveryError(
                 "HUMAN_REQUIRED: resumed task is not in an executable control state"
+            )
+        elif resume_transport_interrupted:
+            resume_event = started.get("preimplementation_resume")
+            transport_recovery = (
+                resume_event.get("transport_interruption_recovery")
+                if isinstance(resume_event, Mapping)
+                else None
+            )
+            if not isinstance(transport_recovery, Mapping) or status_issue is None:
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: transport resume has no reconciled transport checkpoint"
+                )
+            _post_control_state(
+                status_issue,
+                control_state_payload(
+                    task_id=task_id,
+                    state="human_required",
+                    issue_number=status_issue,
+                    branch=started["lease"]["branch"],
+                    blocker=POST_START_TRANSPORT_HANDOFF_BLOCKER,
+                ),
             )
     if status_issue is not None and not resumed_worker:
         _post_control_state(
@@ -2893,7 +3032,9 @@ def _deliver_one(
         try:
             result = _controller_payload("claim-preimplementation-worker-launch", task_id)
         except DeliveryError as error:
-            if resume_guard_interrupted and not str(error).startswith("HUMAN_REQUIRED:"):
+            if (resume_guard_interrupted or resume_transport_interrupted) and not str(
+                error
+            ).startswith("HUMAN_REQUIRED:"):
                 raise DeliveryError(f"HUMAN_REQUIRED: {error}") from error
             raise
         event = result.get("preimplementation_resume")
@@ -2961,12 +3102,15 @@ def _deliver_one(
     history = _history(task_id)
     budget_report: dict[str, int] | None = None
     if worker_exit != 0:
-        blocker = _worker_exit_blocker(worker_exit, artifacts)
+        blocker = _worker_exit_blocker(worker_exit, artifacts, started=started)
         guard_retry_exhausted = (
             resume_guard_interrupted and "TOOL_ACTION_BUDGET_EXCEEDED" in blocker
         )
         guard_recovery_failed = resume_guard_interrupted
-        control_state_name = "human_required" if guard_recovery_failed else "blocked"
+        transport_recovery_failed = resume_transport_interrupted
+        control_state_name = (
+            "human_required" if guard_recovery_failed or transport_recovery_failed else "blocked"
+        )
         if guard_recovery_failed and guard_retry_exhausted:
             blocker = (
                 "The one-time guard-budget recovery also reached TOOL_ACTION_BUDGET_EXCEEDED; "
@@ -2976,6 +3120,11 @@ def _deliver_one(
             blocker = (
                 "The one-time guard-budget recovery did not complete the task; no further automatic "
                 "recovery is allowed. " + blocker
+            )
+        elif transport_recovery_failed:
+            blocker = (
+                "The one-time post-start transport recovery did not complete; no further automatic "
+                "transport recovery is allowed. " + blocker
             )
         if (
             issue_contract is not None
@@ -3266,6 +3415,7 @@ def _parser() -> argparse.ArgumentParser:
     resume_group = parser.add_mutually_exclusive_group()
     resume_group.add_argument("--resume-preimplementation", action="store_true")
     resume_group.add_argument("--resume-guard-interrupted", action="store_true")
+    resume_group.add_argument("--resume-transport-interrupted", action="store_true")
     parser.add_argument("--resume-reason")
     parser.add_argument("--max-tasks", type=int, default=4)
     parser.add_argument("--offline", action="store_true", help=argparse.SUPPRESS)
@@ -3307,6 +3457,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if (
                 args.resume_preimplementation
                 or args.resume_guard_interrupted
+                or args.resume_transport_interrupted
                 or args.resume_reason is not None
             ):
                 raise DeliveryError("continuous queue mode does not support task resume")
@@ -3322,14 +3473,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         if args.task_id is None:
             raise DeliveryError("a task ID is required unless --continue-queue is selected")
-        if (args.resume_preimplementation or args.resume_guard_interrupted) and (
-            args.control_issue is None or not args.resume_reason or args.offline
-        ):
+        if (
+            args.resume_preimplementation
+            or args.resume_guard_interrupted
+            or args.resume_transport_interrupted
+        ) and (args.control_issue is None or not args.resume_reason or args.offline):
             raise DeliveryError(
                 "pre-implementation resume requires --control-issue, --resume-reason and online mode"
             )
         if (
-            not (args.resume_preimplementation or args.resume_guard_interrupted)
+            not (
+                args.resume_preimplementation
+                or args.resume_guard_interrupted
+                or args.resume_transport_interrupted
+            )
             and args.resume_reason is not None
         ):
             raise DeliveryError("--resume-reason requires a resume mode")
@@ -3345,10 +3502,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             state_issue=args.control_issue,
             resume_reason=(
                 args.resume_reason
-                if args.resume_preimplementation or args.resume_guard_interrupted
+                if (
+                    args.resume_preimplementation
+                    or args.resume_guard_interrupted
+                    or args.resume_transport_interrupted
+                )
                 else None
             ),
             resume_guard_interrupted=args.resume_guard_interrupted,
+            resume_transport_interrupted=args.resume_transport_interrupted,
         )
         return 0
     except (DeliveryError, IssueWorkflowError, OSError) as error:
