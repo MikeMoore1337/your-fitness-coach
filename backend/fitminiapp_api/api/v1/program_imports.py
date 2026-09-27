@@ -10,9 +10,11 @@ from fitminiapp_api.core.rate_limit import limiter
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.program_import import (
+    ProgramImportConfirmRequest,
     ProgramImportConfirmResponse,
     ProgramImportResolveRequest,
     ProgramImportResponse,
+    ProgramImportTarget,
 )
 from fitminiapp_api.services.program_imports import (
     PROGRAM_IMPORT_SUPPORTED_FORMATS,
@@ -25,6 +27,7 @@ from fitminiapp_api.services.program_imports import (
     resolve_program_import,
     serialize_import,
 )
+from fitminiapp_api.services.program_versioning import list_program_import_targets
 from fitminiapp_api.services.programs import build_template_response
 
 router = APIRouter()
@@ -103,6 +106,14 @@ async def upload_program_import(
         await file.close()
 
 
+@router.get("/targets", response_model=list[ProgramImportTarget])
+def list_import_targets(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> list[dict[str, object]]:
+    return list_program_import_targets(db, current_user)
+
+
 @router.get("/{import_id}", response_model=ProgramImportResponse)
 def get_import_preview(
     import_id: str,
@@ -136,6 +147,11 @@ def resolve_import_preview(
             title=payload.title,
             goal=payload.goal,
             level=payload.level,
+            provenance=(
+                payload.provenance.model_dump(mode="json", exclude_none=True)
+                if payload.provenance is not None
+                else None
+            ),
             row_resolutions=[(item.row_number, item.exercise_id) for item in payload.rows],
         )
         return serialize_import(import_row)
@@ -147,20 +163,35 @@ def resolve_import_preview(
 @router.post("/{import_id}/confirm", response_model=ProgramImportConfirmResponse)
 def confirm_import_preview(
     import_id: str,
+    payload: ProgramImportConfirmRequest | None = None,
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
     try:
-        import_row, template = confirm_program_import(db, current_user, import_id)
+        import_row, template, program, workouts_updated, revision_number = confirm_program_import(
+            db,
+            current_user,
+            import_id,
+            target_program_id=payload.target_program_id if payload else None,
+            expected_revision_number=payload.expected_revision_number if payload else None,
+        )
+        assigned_program_id = program.id if program is not None else import_row.confirmed_program_id
+        target = (
+            db.query(User).filter(User.id == program.user_id).first()
+            if program is not None
+            else current_user
+        )
         return {
             "import_id": import_row.id,
             "template": build_template_response(template, db, current_user),
-            "assigned_program_id": None,
+            "assigned_program_id": assigned_program_id,
+            "revision_number": revision_number,
             "workouts_created": 0,
+            "workouts_updated": workouts_updated,
             "target_user": {
-                "id": current_user.id,
-                "telegram_user_id": current_user.telegram_user_id,
-                "full_name": getattr(getattr(current_user, "profile", None), "full_name", None),
+                "id": target.id if target is not None else current_user.id,
+                "telegram_user_id": target.telegram_user_id if target is not None else None,
+                "full_name": getattr(getattr(target, "profile", None), "full_name", None),
             },
         }
     except ProgramImportError as exc:

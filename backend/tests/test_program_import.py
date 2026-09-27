@@ -10,12 +10,18 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from fitminiapp_api.core.config import settings
-from fitminiapp_api.core.timezone import now_msk_naive
+from fitminiapp_api.core.timezone import now_msk_naive, today_msk
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.audit import AuditEvent
-from fitminiapp_api.models.program import UserProgram, UserWorkout, UserWorkoutExercise
+from fitminiapp_api.models.program import (
+    ProgramRevision,
+    TrainingBlock,
+    UserProgram,
+    UserWorkout,
+    UserWorkoutExercise,
+)
 from fitminiapp_api.models.program_import import ProgramImport
-from fitminiapp_api.models.user import User
+from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.services.program_import_ai import (
     ProgramImportAiProposal,
     ProgramImportAiResponse,
@@ -28,22 +34,23 @@ from fitminiapp_api.services.program_imports import (
 )
 
 
-def _auth(client, telegram_user_id: int) -> dict[str, str]:
+def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
     response = client.post(
         "/api/v1/auth/dev-login",
-        json={"telegram_user_id": telegram_user_id, "is_coach": False},
+        json={"telegram_user_id": telegram_user_id, "is_coach": is_coach},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 def _csv_payload(rows: list[list[str]], *, marker: bool = True) -> bytes:
-    lines = []
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\n")
     if marker:
-        lines.append("#yfc_template_version,1")
-    lines.append(",".join(PROGRAM_IMPORT_COLUMNS))
-    lines.extend(",".join(row) for row in rows)
-    return ("\n".join(lines) + "\n").encode("utf-8-sig")
+        writer.writerow(("#yfc_template_version", "1"))
+    writer.writerow(PROGRAM_IMPORT_COLUMNS)
+    writer.writerows(rows)
+    return output.getvalue().encode("utf-8-sig")
 
 
 def _xlsx_column_label(column_number: int) -> str:
@@ -357,11 +364,11 @@ def test_canonical_csv_and_xlsx_round_trip_to_private_unassigned_template(client
         preview = _upload(client, headers, filename, source)
         assert preview.status_code == 201, preview.text
         body = preview.json()
-        assert body["schema_version"] == 2
+        assert body["schema_version"] == 3
         assert body["source_format"] == source_format
         assert body["summary"]["blocking_issue_count"] == 0, body
         assert body["rows"][0]["match_status"] == "matched"
-        assert body["rows"][0]["source_range"] == "A3:P3"
+        assert body["rows"][0]["source_range"] == "A3:U3"
         assert body["rows"][0]["source_cells"]["exercise_name"] == "F3"
         assert body["rows"][0]["source_sheet"] == (
             "YFC Import" if source_format == "xlsx" else None
@@ -379,6 +386,9 @@ def test_canonical_csv_and_xlsx_round_trip_to_private_unassigned_template(client
         assert result["workouts_created"] == 0
         assert result["template"]["is_public"] is False
         assert result["template"]["owner_user_id"] == result["target_user"]["id"]
+        assert result["template"]["provenance_type"] == "CUSTOM"
+        assert result["template"]["provenance"]["source_type"] == "file_upload"
+        assert result["template"]["program_metadata"]["source_format"] == source_format
 
         replay = client.post(
             f"/api/v1/programs/imports/{body['id']}/confirm",
@@ -472,6 +482,583 @@ def test_missing_manual_fields_and_unknown_exercise_are_resolvable(client):
         headers=headers,
     )
     assert confirmed.status_code == 200, confirmed.text
+
+
+def test_transliteration_is_a_manual_suggestion(client):
+    headers = _auth(client, 931020)
+    row = _valid_row(exercise_name="Prisedaniya bez vesa", exercise_slug="")
+    preview = _upload(client, headers, "transliteration.csv", _csv_payload([row]))
+    assert preview.status_code == 201, preview.text
+    unresolved = preview.json()["rows"][0]
+    assert unresolved["match_status"] == "needs_resolution"
+    assert unresolved["candidates"][0]["match_type"] == "transliteration"
+    assert "exercise_suggested" in {issue["code"] for issue in unresolved["issues"]}
+
+    resolved = client.post(
+        f"/api/v1/programs/imports/{preview.json()['id']}/resolve",
+        headers=headers,
+        json={
+            "rows": [{"row_number": 3, "exercise_id": unresolved["candidates"][0]["exercise_id"]}]
+        },
+    )
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["rows"][0]["match_status"] == "matched"
+    assert resolved.json()["rows"][0]["match_type"] == "manual"
+    assert resolved.json()["summary"]["blocking_issue_count"] == 0
+
+
+def test_structured_rules_provenance_advanced_prescription_and_export_round_trip(client):
+    headers = _auth(client, 931021)
+    row = _valid_row()
+    row.extend([""] * (len(PROGRAM_IMPORT_COLUMNS) - len(row)))
+    row[6] = "2"
+    row[16] = json.dumps(
+        {
+            "version": 1,
+            "metric_type": "strength",
+            "segments": [
+                {
+                    "position": 1,
+                    "role": "top",
+                    "rep_target": {"kind": "range", "min_reps": 6, "max_reps": 8},
+                    "load_target": {"kind": "percent_training_max", "value": 85},
+                    "effort_target": {"kind": "rir", "value": 1},
+                    "rest_after_seconds": 120,
+                },
+                {
+                    "position": 2,
+                    "role": "backoff",
+                    "rep_target": {"kind": "range", "min_reps": 8, "max_reps": 10},
+                    "load_target": {"kind": "relative_to_top", "value": 0.8},
+                    "effort_target": {"kind": "rpe", "value": 8},
+                    "rest_after_seconds": 90,
+                },
+            ],
+            "groups": [],
+        }
+    )
+    row[17] = "1"
+    row[18] = "Разгрузочная неделя"
+    row[19] = "true"
+    row[20] = json.dumps(
+        {
+            "kind": "double_progression",
+            "scope": "program",
+            "rep_target": {"kind": "range", "min_reps": 8, "max_reps": 12},
+            "increment_value": 2.5,
+            "increment_unit": "kg",
+            "reset_on_failure": True,
+        }
+    )
+    preview = _upload(client, headers, "rules.csv", _csv_payload([row]))
+    assert preview.status_code == 201, preview.text
+    body = preview.json()
+    assert body["summary"]["blocking_issue_count"] == 0, body
+    assert body["blocks"] == [
+        {
+            "block_number": 1,
+            "title": "Разгрузочная неделя",
+            "week_start": 1,
+            "week_end": 1,
+            "is_deload": True,
+        }
+    ]
+    assert body["coaching_rules"][0]["kind"] == "double_progression"
+
+    resolved = client.post(
+        f"/api/v1/programs/imports/{body['id']}/resolve",
+        headers=headers,
+        json={
+            "provenance": {
+                "provenance_type": "SOURCE_ADAPTATION",
+                "source_name": "Исходная программа",
+                "creator": "Автор программы",
+                "organization": "Сообщество",
+                "source_reference": "https://example.test/program",
+                "source_version": "редакция 2",
+                "source_date": "2026-09-14",
+                "adaptation_notes": "Изменён выбор упражнений",
+            }
+        },
+    )
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["summary"]["blocking_issue_count"] == 0
+    confirmed = client.post(
+        f"/api/v1/programs/imports/{body['id']}/confirm",
+        headers=headers,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    template = confirmed.json()["template"]
+    assert template["provenance_type"] == "SOURCE_ADAPTATION"
+    assert template["provenance"]["creator"] == "Автор программы"
+    assert template["provenance"]["source_date"] == "2026-09-14"
+    assert template["provenance"]["imported_at"]
+    assert template["program_metadata"]["training_blocks"] == body["blocks"]
+    assert template["program_metadata"]["coaching_rules"][0]["reset_on_failure"] is True
+    assert template["days"][0]["exercises"][0]["prescription"]["segments"][0]["role"] == "top"
+
+    exported = client.get("/api/v1/me/export", headers=headers)
+    assert exported.status_code == 200, exported.text
+    exported_template = next(
+        item for item in exported.json()["program_templates"] if item["id"] == template["id"]
+    )
+    assert exported_template["provenance"] == template["provenance"]
+    assert exported_template["program_metadata"] == template["program_metadata"]
+    assert (
+        exported_template["days"][0]["exercises"][0]["prescription"]["segments"][0]["role"] == "top"
+    )
+
+    exported_exercise = exported_template["days"][0]["exercises"][0]
+    exported_source = exported_template["provenance"]
+    round_trip_row = _valid_row(
+        exercise_name=exported_exercise["exercise_title"],
+        exercise_slug="",
+    )
+    round_trip_row.extend([""] * (len(PROGRAM_IMPORT_COLUMNS) - len(round_trip_row)))
+    round_trip_row[0] = exported_template["title"]
+    round_trip_row[1] = exported_template["goal"]
+    round_trip_row[2] = exported_template["level"]
+    round_trip_row[6] = str(exported_exercise["prescribed_sets"])
+    round_trip_row[7] = exported_exercise["prescribed_reps"]
+    round_trip_row[8] = str(exported_exercise["rest_seconds"])
+    round_trip_row[9] = str(exported_exercise["exercise_id"])
+    round_trip_row[16] = json.dumps(exported_exercise["prescription"])
+    round_trip_row[17] = "1"
+    round_trip_row[18] = template["program_metadata"]["training_blocks"][0]["title"]
+    round_trip_row[19] = "true"
+    round_trip_row[20] = json.dumps(template["program_metadata"]["coaching_rules"][0])
+    round_trip_preview = _upload(
+        client, headers, "exported-template.csv", _csv_payload([round_trip_row])
+    )
+    assert round_trip_preview.status_code == 201, round_trip_preview.text
+    round_trip_resolved = client.post(
+        f"/api/v1/programs/imports/{round_trip_preview.json()['id']}/resolve",
+        headers=headers,
+        json={
+            "provenance": {
+                "provenance_type": exported_template["provenance_type"],
+                "source_name": exported_source["source_program_name"],
+                "creator": exported_source["creator"],
+                "organization": exported_source["organization"],
+                "source_reference": exported_source["canonical_source"],
+                "source_version": exported_source["source_version"],
+                "source_date": exported_source["source_date"],
+                "adaptation_notes": exported_source["adaptation_notes"],
+            }
+        },
+    )
+    assert round_trip_resolved.status_code == 200, round_trip_resolved.text
+    assert round_trip_resolved.json()["summary"]["blocking_issue_count"] == 0
+    round_trip_confirmed = client.post(
+        f"/api/v1/programs/imports/{round_trip_preview.json()['id']}/confirm",
+        headers=headers,
+    )
+    assert round_trip_confirmed.status_code == 200, round_trip_confirmed.text
+    assert (
+        round_trip_confirmed.json()["template"]["program_metadata"]["training_blocks"]
+        == (template["program_metadata"]["training_blocks"])
+    )
+    assert (
+        round_trip_confirmed.json()["template"]["program_metadata"]["coaching_rules"]
+        == (template["program_metadata"]["coaching_rules"])
+    )
+    assert (
+        round_trip_confirmed.json()["template"]["days"][0]["exercises"][0]["prescription"]
+        == (template["days"][0]["exercises"][0]["prescription"])
+    )
+
+
+def test_resolve_without_provenance_preserves_existing_source_metadata(client):
+    headers = _auth(client, 931027)
+    preview = _upload(client, headers, "provenance.csv", _csv_payload([_valid_row()]))
+    assert preview.status_code == 201, preview.text
+    import_id = preview.json()["id"]
+
+    adapted = client.post(
+        f"/api/v1/programs/imports/{import_id}/resolve",
+        headers=headers,
+        json={
+            "provenance": {
+                "provenance_type": "SOURCE_ADAPTATION",
+                "source_name": "Источник",
+                "source_reference": "https://example.test/program",
+            }
+        },
+    )
+    assert adapted.status_code == 200, adapted.text
+
+    resolved = client.post(
+        f"/api/v1/programs/imports/{import_id}/resolve",
+        headers=headers,
+        json={"title": "Моя адаптация"},
+    )
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["provenance"]["provenance_type"] == "SOURCE_ADAPTATION"
+    assert resolved.json()["provenance"]["source_reference"] == "https://example.test/program"
+
+
+def test_pending_legacy_draft_without_import_metadata_remains_readable(client):
+    headers = _auth(client, 931028)
+    preview = _upload(client, headers, "legacy-draft.csv", _csv_payload([_valid_row()]))
+    assert preview.status_code == 201, preview.text
+    import_id = preview.json()["id"]
+
+    with get_session_context() as db:
+        import_row = db.query(ProgramImport).filter(ProgramImport.id == import_id).one()
+        legacy_draft = dict(import_row.draft_json)
+        for key in ("provenance", "blocks", "coaching_rules"):
+            legacy_draft.pop(key, None)
+        import_row.schema_version = 2
+        import_row.draft_json = legacy_draft
+        db.commit()
+
+    readable = client.get(f"/api/v1/programs/imports/{import_id}", headers=headers)
+    assert readable.status_code == 200, readable.text
+    assert readable.json()["provenance"]["provenance_type"] == "CUSTOM"
+    assert readable.json()["blocks"] == []
+    assert readable.json()["coaching_rules"] == []
+
+
+def test_import_can_create_one_revision_and_preserve_completed_workouts_and_blocks(client):
+    headers = _auth(client, 931022)
+    exercises = [
+        item
+        for item in client.get("/api/v1/programs/exercises", headers=headers).json()
+        if item["metric_type"] == "strength"
+    ]
+    assert len(exercises) >= 2
+    start = today_msk() + timedelta(days=1)
+    assigned = client.post(
+        "/api/v1/programs/templates",
+        headers=headers,
+        json={
+            "title": "Исходная назначенная программа",
+            "goal": "maintenance",
+            "level": "beginner",
+            "mode": "self",
+            "assign_after_create": True,
+            "start_date": start.isoformat(),
+            "duration_weeks": 1,
+            "days": [
+                {
+                    "title": "День 1",
+                    "exercises": [
+                        {
+                            "exercise_id": exercises[0]["id"],
+                            "prescribed_sets": 2,
+                            "prescribed_reps": "8",
+                            "rest_seconds": 90,
+                        }
+                    ],
+                },
+                {
+                    "title": "День 2",
+                    "exercises": [
+                        {
+                            "exercise_id": exercises[0]["id"],
+                            "prescribed_sets": 2,
+                            "prescribed_reps": "8",
+                            "rest_seconds": 90,
+                        }
+                    ],
+                },
+            ],
+        },
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["assigned_program_id"]
+    with get_session_context() as db:
+        workouts = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id)
+            .order_by(UserWorkout.day_number)
+            .all()
+        )
+        workout_dates = [workout.scheduled_date for workout in workouts]
+        completed_workout_id = workouts[0].id
+        planned_workout_id = workouts[1].id
+        workouts[0].status = "completed"
+        workouts[0].completed_at = now_msk_naive()
+        db.commit()
+
+    block = client.post(
+        f"/api/v1/programs/assigned/{program_id}/blocks",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "title": "Текущий блок",
+            "start_date": workout_dates[0].isoformat(),
+            "end_date": workout_dates[-1].isoformat(),
+            "purpose": "Сохранить исходную структуру блока",
+        },
+    )
+    assert block.status_code == 201, block.text
+    block_id = block.json()["block"]["id"]
+
+    rows = []
+    for day_number in (1, 2):
+        row = _valid_row(
+            exercise_name=exercises[1]["title"],
+            exercise_slug=exercises[1]["slug"],
+        )
+        row[3] = str(day_number)
+        row[4] = f"Импортированный день {day_number}"
+        rows.append(row)
+    preview = _upload(client, headers, "revision.csv", _csv_payload(rows))
+    assert preview.status_code == 201, preview.text
+    import_id = preview.json()["id"]
+    targets = client.get("/api/v1/programs/imports/targets", headers=headers)
+    assert targets.status_code == 200, targets.text
+    target = next(item for item in targets.json() if item["program_id"] == program_id)
+    assert target["current_revision_number"] == 2
+    assert target["day_numbers"] == [1, 2]
+
+    confirm_payload = {
+        "target_program_id": program_id,
+        "expected_revision_number": 2,
+    }
+    stale_revision = client.post(
+        f"/api/v1/programs/imports/{import_id}/confirm",
+        headers=headers,
+        json={"target_program_id": program_id, "expected_revision_number": 1},
+    )
+    assert stale_revision.status_code == 409
+    assert stale_revision.json()["detail"] == (
+        "Назначенная программа уже изменилась. Обновите список и повторите импорт."
+    )
+    confirmed = client.post(
+        f"/api/v1/programs/imports/{import_id}/confirm",
+        headers=headers,
+        json=confirm_payload,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["assigned_program_id"] == program_id
+    assert confirmed.json()["revision_number"] == 3
+    assert confirmed.json()["workouts_updated"] == 1
+
+    replay = client.post(
+        f"/api/v1/programs/imports/{import_id}/confirm",
+        headers=headers,
+        json=confirm_payload,
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["revision_number"] == 3
+    assert replay.json()["template"]["id"] == confirmed.json()["template"]["id"]
+    conflicting_replay = client.post(
+        f"/api/v1/programs/imports/{import_id}/confirm",
+        headers=headers,
+        json={},
+    )
+    assert conflicting_replay.status_code == 409
+
+    with get_session_context() as db:
+        completed = db.query(UserWorkout).filter(UserWorkout.id == completed_workout_id).one()
+        planned = db.query(UserWorkout).filter(UserWorkout.id == planned_workout_id).one()
+        assert completed.status == "completed"
+        assert [item.exercise_id for item in completed.exercises] == [exercises[0]["id"]]
+        assert planned.status == "planned"
+        assert [item.exercise_id for item in planned.exercises] == [exercises[1]["id"]]
+        assert db.query(TrainingBlock).filter(TrainingBlock.id == block_id).count() == 1
+        revisions = (
+            db.query(ProgramRevision)
+            .filter(ProgramRevision.user_program_id == program_id)
+            .order_by(ProgramRevision.revision_number)
+            .all()
+        )
+        assert [row.revision_number for row in revisions] == [1, 2, 3]
+        assert revisions[2].snapshot["program"]["provenance_type"] == "CUSTOM"
+        assert revisions[2].snapshot["program"]["program_metadata"]["source_type"] == "file_upload"
+        assert len(revisions[2].snapshot["training_blocks"]) == 1
+
+    exported = client.get("/api/v1/me/export", headers=headers)
+    assert exported.status_code == 200, exported.text
+    exported_program = next(
+        item for item in exported.json()["programs"] if item["id"] == program_id
+    )
+    exported_revision = next(
+        item for item in exported_program["revisions"] if item["revision_number"] == 3
+    )
+    assert exported_revision["snapshot"]["program"]["program_metadata"]["schema_version"] == 1
+
+    with get_session_context() as db:
+        for workout in db.query(UserWorkout).filter(
+            UserWorkout.user_program_id == program_id,
+            UserWorkout.status == "planned",
+        ):
+            workout.scheduled_date = today_msk() - timedelta(days=1)
+        db.commit()
+
+    no_future_rows = [list(row) for row in rows]
+    for row in no_future_rows:
+        row[0] = "Ревизия без будущих тренировок"
+    no_future_preview = _upload(
+        client,
+        headers,
+        "revision-without-future-workouts.csv",
+        _csv_payload(no_future_rows),
+    )
+    assert no_future_preview.status_code == 201, no_future_preview.text
+    no_future_confirm = client.post(
+        f"/api/v1/programs/imports/{no_future_preview.json()['id']}/confirm",
+        headers=headers,
+        json={"target_program_id": program_id, "expected_revision_number": 3},
+    )
+    assert no_future_confirm.status_code == 200, no_future_confirm.text
+    assert no_future_confirm.json()["revision_number"] == 4
+    assert no_future_confirm.json()["workouts_updated"] == 0
+
+
+def test_import_targets_enforce_trainer_relationship_and_owner_isolation(client):
+    coach_headers = _auth(client, 931023, is_coach=True)
+    client_headers = _auth(client, 931024)
+    outsider_headers = _auth(client, 931025)
+    coach_id = client.get("/api/v1/me", headers=coach_headers).json()["id"]
+    client_id = client.get("/api/v1/me", headers=client_headers).json()["id"]
+    with get_session_context() as db:
+        db.add(
+            CoachClient(
+                coach_user_id=coach_id,
+                client_user_id=client_id,
+                status="active",
+                accepted_at=now_msk_naive(),
+            )
+        )
+        db.commit()
+
+    client_exercises = client.get("/api/v1/programs/exercises", headers=client_headers).json()
+    coach_exercises = client.get("/api/v1/programs/exercises", headers=coach_headers).json()
+    outsider_exercises = client.get("/api/v1/programs/exercises", headers=outsider_headers).json()
+    coach_exercise_ids = {
+        item["id"] for item in coach_exercises if item["metric_type"] == "strength"
+    }
+    outsider_exercise_ids = {
+        item["id"] for item in outsider_exercises if item["metric_type"] == "strength"
+    }
+    exercise = next(
+        item
+        for item in client_exercises
+        if item["metric_type"] == "strength"
+        and item["id"] in coach_exercise_ids
+        and item["id"] in outsider_exercise_ids
+    )
+    start = today_msk() + timedelta(days=1)
+    assigned = client.post(
+        "/api/v1/programs/templates",
+        headers=coach_headers,
+        json={
+            "title": "Программа клиента",
+            "goal": "maintenance",
+            "level": "beginner",
+            "mode": "coach",
+            "target_telegram_user_id": 931024,
+            "assign_after_create": True,
+            "start_date": start.isoformat(),
+            "duration_weeks": 1,
+            "days": [
+                {
+                    "title": "День 1",
+                    "exercises": [
+                        {
+                            "exercise_id": exercise["id"],
+                            "prescribed_sets": 2,
+                            "prescribed_reps": "8",
+                            "rest_seconds": 90,
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    assert assigned.status_code == 200, assigned.text
+    program_id = assigned.json()["assigned_program_id"]
+    assert [
+        item["program_id"]
+        for item in client.get("/api/v1/programs/imports/targets", headers=coach_headers).json()
+    ] == [program_id]
+    assert [
+        item["program_id"]
+        for item in client.get("/api/v1/programs/imports/targets", headers=client_headers).json()
+    ] == [program_id]
+    assert client.get("/api/v1/programs/imports/targets", headers=outsider_headers).json() == []
+
+    row = _valid_row(exercise_name=exercise["title"], exercise_slug=exercise["slug"])
+    row[9] = str(exercise["id"])
+    unresolved_row = _valid_row(exercise_name="Неизвестное упражнение", exercise_slug="")
+    trainer_preview = _upload(
+        client, coach_headers, "trainer-import.csv", _csv_payload([unresolved_row])
+    )
+    assert trainer_preview.status_code == 201, trainer_preview.text
+    trainer_resolution = client.post(
+        f"/api/v1/programs/imports/{trainer_preview.json()['id']}/resolve",
+        headers=coach_headers,
+        json={"rows": [{"row_number": 3, "exercise_id": exercise["id"]}]},
+    )
+    assert trainer_resolution.status_code == 200, trainer_resolution.text
+    assert trainer_resolution.json()["summary"]["blocking_issue_count"] == 0
+    imported = client.post(
+        f"/api/v1/programs/imports/{trainer_preview.json()['id']}/confirm",
+        headers=coach_headers,
+        json={"target_program_id": program_id, "expected_revision_number": 1},
+    )
+    assert imported.status_code == 200, imported.text
+    assert imported.json()["revision_number"] == 2
+    assert imported.json()["target_user"]["id"] == client_id
+    assert imported.json()["template"]["owner_user_id"] == client_id
+
+    outsider_preview = _upload(client, outsider_headers, "outsider-import.csv", _csv_payload([row]))
+    assert outsider_preview.status_code == 201, outsider_preview.text
+    outsider_preview_body = outsider_preview.json()
+    assert outsider_preview_body["summary"]["blocking_issue_count"] == 0, [
+        issue["code"] for issue in outsider_preview_body["issues"]
+    ]
+    outsider_confirm = client.post(
+        f"/api/v1/programs/imports/{outsider_preview.json()['id']}/confirm",
+        headers=outsider_headers,
+        json={"target_program_id": program_id, "expected_revision_number": 2},
+    )
+    assert outsider_confirm.status_code == 404, outsider_confirm.text
+
+    detached = client.delete("/api/v1/me/trainer", headers=client_headers)
+    assert detached.status_code == 204, detached.text
+    assert client.get("/api/v1/programs/imports/targets", headers=coach_headers).json() == []
+    revoked_preview = _upload(client, coach_headers, "revoked-import.csv", _csv_payload([row]))
+    assert revoked_preview.status_code == 201, revoked_preview.text
+    assert revoked_preview.json()["summary"]["blocking_issue_count"] == 0
+    revoked_confirm = client.post(
+        f"/api/v1/programs/imports/{revoked_preview.json()['id']}/confirm",
+        headers=coach_headers,
+        json={"target_program_id": program_id, "expected_revision_number": 2},
+    )
+    assert revoked_confirm.status_code == 404
+
+
+def test_unstructured_coaching_rule_blocks_confirmation(client):
+    headers = _auth(client, 931026)
+    row = _valid_row()
+    row.extend([""] * (len(PROGRAM_IMPORT_COLUMNS) - len(row)))
+    row[20] = "Добавлять вес, когда все повторения выполнены"
+    preview = _upload(client, headers, "unstructured-rule.csv", _csv_payload([row]))
+    assert preview.status_code == 201, preview.text
+    body = preview.json()
+    assert body["summary"]["blocking_issue_count"] > 0
+    assert "coaching_rule_invalid" in {issue["code"] for issue in body["rows"][0]["issues"]}
+    confirmed = client.post(
+        f"/api/v1/programs/imports/{body['id']}/confirm",
+        headers=headers,
+    )
+    assert confirmed.status_code == 409
+
+
+def test_unsupported_progression_in_notes_blocks_confirmation(client):
+    headers = _auth(client, 931029)
+    row = _valid_row()
+    row.extend([""] * (len(PROGRAM_IMPORT_COLUMNS) - len(row)))
+    row[13] = "Add 2.5 kg once all reps are completed"
+    preview = _upload(client, headers, "unsupported-progression.csv", _csv_payload([row]))
+    assert preview.status_code == 201, preview.text
+    body = preview.json()
+    assert body["summary"]["blocking_issue_count"] > 0
+    assert "coaching_rule_unstructured" in {issue["code"] for issue in body["rows"][0]["issues"]}
 
 
 def test_import_rejects_conflicting_exercise_identities_until_manual_resolution(client):
