@@ -32,6 +32,9 @@ import {
 type TrainingBlockMutation = ApiSchemas['TrainingBlockMutationResponse'];
 type ProgressionProposalList = ApiSchemas['ProgramProgressionProposalList'];
 type ProgressionReviewResponse = ApiSchemas['ProgressionProposalReviewResponse'];
+type ProgramLifecycleSummary = ApiSchemas['ProgramLifecycleResponse'];
+type ProgramLifecycleAction = ApiSchemas['ProgramLifecycleActionRequest']['action'];
+type ProgramLifecycleMutation = ApiSchemas['ProgramLifecycleMutationResponse'];
 
 const changeLabels: Record<ProgramRevision['change_kind'], string> = {
   assigned: 'Программа назначена',
@@ -40,6 +43,17 @@ const changeLabels: Record<ProgramRevision['change_kind'], string> = {
   block_created: 'Добавлен тренировочный блок',
   block_updated: 'Тренировочный блок изменён',
   block_status_changed: 'Изменён статус тренировочного блока',
+  program_lifecycle: 'Изменён жизненный цикл программы',
+  program_restarted: 'Начат новый цикл программы',
+};
+
+const programStatusLabels: Record<ProgramLifecycleSummary['status'], string> = {
+  scheduled: 'Запланирована',
+  active: 'Выполняется',
+  paused: 'На паузе',
+  completed: 'Завершена',
+  terminated: 'Прекращена',
+  archived: 'В архиве',
 };
 
 function revisionChangeLabel(revision: ProgramRevision): string {
@@ -274,6 +288,8 @@ export function AssignedProgramDetails({
   const [historyOpen, setHistoryOpen] = useState(initialReturn.shouldOpen);
   const [mutationRevisionNumber, setMutationRevisionNumber] = useState(currentRevisionNumber);
   const [editingBlock, setEditingBlock] = useState<TrainingBlock | 'new' | null>(null);
+  const [historyReason, setHistoryReason] = useState('');
+  const [lifecycleActionsOpen, setLifecycleActionsOpen] = useState(false);
   const [dismissedProposals, setDismissedProposals] = useState<Set<string>>(() => new Set());
   const [adjustedWeights, setAdjustedWeights] = useState<Record<string, string>>({});
   const returnedRevisionRef = useRef<HTMLDetailsElement>(null);
@@ -286,6 +302,10 @@ export function AssignedProgramDetails({
     queryKey: ['assigned-program', programId, 'revisions'],
     queryFn: () => api<ProgramRevision[]>(`/api/v1/programs/assigned/${programId}/revisions`),
     enabled: historyOpen,
+  });
+  const lifecycle = useQuery({
+    queryKey: ['assigned-program', programId, 'lifecycle'],
+    queryFn: () => api<ProgramLifecycleSummary>(`/api/v1/programs/assigned/${programId}/lifecycle`),
   });
   const blocks = useQuery({
     queryKey: ['assigned-program', programId, 'blocks'],
@@ -302,8 +322,20 @@ export function AssignedProgramDetails({
     currentRevisionNumber,
     mutationRevisionNumber,
     latestRevisionNumber,
+    lifecycle.data?.current_revision_number ?? 0,
   );
   const primaryBlock = primaryTrainingBlock(blocks.data ?? []);
+  const canManageProgram =
+    lifecycle.data?.status === 'scheduled' || lifecycle.data?.status === 'active';
+  const canRestartProgram = Boolean(lifecycle.data);
+
+  const invalidateProgramContext = async () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['assigned-program', programId] }),
+      queryClient.invalidateQueries({ queryKey: ['templates'] }),
+      queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
+      queryClient.invalidateQueries({ queryKey: ['workout'] }),
+    ]);
 
   useEffect(() => {
     if (!initialReturn.revision || revisions.isLoading || !returnedRevisionRef.current) return;
@@ -325,25 +357,85 @@ export function AssignedProgramDetails({
     onSuccess: async (result, variables) => {
       setMutationRevisionNumber(result.current_revision_number);
       setEditingBlock(null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['assigned-program', programId] }),
-        queryClient.invalidateQueries({ queryKey: ['templates'] }),
-        queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
-      ]);
+      await invalidateProgramContext();
       toast(variables.blockId ? 'Тренировочный блок обновлён' : 'Тренировочный блок добавлен');
     },
     onError: async (reason) => {
       if (reason instanceof ApiError && reason.status === 409) {
         setEditingBlock(null);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ['assigned-program', programId] }),
-          queryClient.invalidateQueries({ queryKey: ['templates'] }),
-          queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
-        ]);
+        await invalidateProgramContext();
         toast(
           'Программа уже изменилась. Редактор закрыт, данные обновлены — откройте этап заново.',
           'error',
         );
+        return;
+      }
+      toast(queryErrorMessage(reason), 'error');
+    },
+  });
+
+  const lifecycleMutation = useMutation({
+    mutationFn: ({ action, reason }: { action: ProgramLifecycleAction; reason: string }) =>
+      api<ProgramLifecycleMutation>(`/api/v1/programs/assigned/${programId}/lifecycle`, {
+        method: 'POST',
+        body: {
+          expected_revision_number: revisionNumber,
+          action,
+          reason,
+        },
+      }),
+    onSuccess: async (result) => {
+      setMutationRevisionNumber(result.current_revision_number);
+      setHistoryReason('');
+      setLifecycleActionsOpen(false);
+      await invalidateProgramContext();
+      toast(
+        result.new_program_id
+          ? 'Новый цикл создан, история исходной программы сохранена'
+          : `Статус программы: ${programStatusLabels[result.status]}`,
+      );
+    },
+    onError: async (reason) => {
+      if (reason instanceof ApiError && reason.status === 409) {
+        await invalidateProgramContext();
+        toast('Программа уже изменилась. Данные обновлены.', 'error');
+        return;
+      }
+      toast(queryErrorMessage(reason), 'error');
+    },
+  });
+
+  const blockActionMutation = useMutation({
+    mutationFn: ({
+      blockId,
+      action,
+      reason,
+    }: {
+      blockId: number;
+      action: 'advance' | 'repeat';
+      reason: string;
+    }) =>
+      api<{ block: TrainingBlock; current_revision_number: number }>(
+        `/api/v1/programs/assigned/${programId}/blocks/${blockId}/${action}`,
+        {
+          method: 'POST',
+          body: { expected_revision_number: revisionNumber, reason },
+        },
+      ),
+    onSuccess: async (result, variables) => {
+      setMutationRevisionNumber(result.current_revision_number);
+      setHistoryReason('');
+      await invalidateProgramContext();
+      toast(
+        variables.action === 'advance'
+          ? 'Следующий тренировочный блок начат'
+          : 'Тренировочный блок добавлен в новый цикл недель',
+      );
+    },
+    onError: async (reason) => {
+      if (reason instanceof ApiError && reason.status === 409) {
+        await invalidateProgramContext();
+        toast('Программа или блок уже изменились. Данные обновлены.', 'error');
         return;
       }
       toast(queryErrorMessage(reason), 'error');
@@ -422,15 +514,68 @@ export function AssignedProgramDetails({
       },
     });
 
+  const applyLifecycleAction = (action: ProgramLifecycleAction) => {
+    const reason = historyReason.trim();
+    if (!reason) return;
+    const confirmation =
+      action === 'complete'
+        ? 'Завершить программу? Будущие запланированные тренировки будут отменены.'
+        : action === 'terminate'
+          ? 'Прекратить программу? Будущие запланированные тренировки будут отменены.'
+          : action === 'restart'
+            ? 'Начать новый цикл? Исходная история останется отдельной программой.'
+            : null;
+    if (confirmation && !window.confirm(confirmation)) return;
+    lifecycleMutation.mutate({ action, reason });
+  };
+
   const blockActions = (block: TrainingBlock) => {
-    if (block.status === 'completed' || block.status === 'archived') return null;
+    if (!canManageProgram || block.status === 'archived') return null;
+    const busy = mutation.isPending || blockActionMutation.isPending;
+    if (block.status === 'completed') {
+      return (
+        <div className="program-block-actions">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={busy || !historyReason.trim()}
+            onClick={() => {
+              if (!window.confirm(`Повторить блок «${block.title}» в новых неделях?`)) return;
+              blockActionMutation.mutate({
+                blockId: block.id,
+                action: 'repeat',
+                reason: historyReason.trim(),
+              });
+            }}
+          >
+            Повторить блок
+          </Button>
+        </div>
+      );
+    }
     return (
       <div className="program-block-actions">
+        {block.status === 'active' && lifecycle.data?.next_block && (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={busy || !historyReason.trim()}
+            onClick={() =>
+              blockActionMutation.mutate({
+                blockId: block.id,
+                action: 'advance',
+                reason: historyReason.trim(),
+              })
+            }
+          >
+            Перейти к следующему блоку
+          </Button>
+        )}
         {block.status === 'planned' && (
           <Button
             type="button"
             variant="secondary"
-            disabled={mutation.isPending}
+            disabled={busy}
             onClick={() => updateBlockStatus(block, 'active')}
           >
             Начать этап
@@ -452,7 +597,7 @@ export function AssignedProgramDetails({
         <Button
           type="button"
           variant="ghost"
-          disabled={mutation.isPending}
+          disabled={busy}
           onClick={() => updateBlockStatus(block, 'archived')}
         >
           В архив
@@ -470,6 +615,152 @@ export function AssignedProgramDetails({
         </div>
         <span className="program-history__version">Версия {revisionNumber}</span>
       </div>
+
+      {lifecycle.isLoading ? (
+        <LoadingState label="Загружаем состояние программы…" />
+      ) : lifecycle.error instanceof ApiError &&
+        (lifecycle.error.status === 403 ||
+          lifecycle.error.status === 404) ? null : lifecycle.error ? (
+        <ErrorState
+          message={queryErrorMessage(lifecycle.error)}
+          retry={() => void lifecycle.refetch()}
+        />
+      ) : lifecycle.data ? (
+        <>
+          <div className="program-lifecycle__reason">
+            <Field
+              label="Причина для истории"
+              labelFor={`program-lifecycle-reason-${programId}`}
+              hint="Причина сохранится вместе с изменением программы или этапа."
+            >
+              <Input
+                id={`program-lifecycle-reason-${programId}`}
+                maxLength={500}
+                value={historyReason}
+                onChange={(event) => setHistoryReason(event.target.value)}
+                required
+              />
+            </Field>
+          </div>
+          <article className="program-lifecycle" aria-label="Жизненный цикл программы">
+            <div className="program-lifecycle__summary">
+              <div className="program-lifecycle__status">
+                <Badge
+                  tone={
+                    lifecycle.data.status === 'active'
+                      ? 'success'
+                      : lifecycle.data.status === 'paused'
+                        ? 'warning'
+                        : 'neutral'
+                  }
+                >
+                  {programStatusLabels[lifecycle.data.status]}
+                </Badge>
+                <strong>
+                  {lifecycle.data.current_week_number
+                    ? `Неделя ${lifecycle.data.current_week_number} из ${lifecycle.data.duration_weeks}`
+                    : `${lifecycle.data.duration_weeks} нед.`}
+                </strong>
+              </div>
+              <div className="program-lifecycle__next">
+                <span>Следующая тренировка</span>
+                {lifecycle.data.next_workout ? (
+                  <strong>
+                    {lifecycle.data.next_workout.title} ·{' '}
+                    {formatProgramDate(lifecycle.data.next_workout.scheduled_date)}
+                  </strong>
+                ) : (
+                  <strong>Не запланирована</strong>
+                )}
+              </div>
+            </div>
+            {(lifecycle.data.next_block || lifecycle.data.next_deload) && (
+              <div className="program-lifecycle__upcoming">
+                {lifecycle.data.next_block && (
+                  <span>
+                    Дальше: {lifecycle.data.next_block.title} · неделя{' '}
+                    {lifecycle.data.next_block.week_start ?? '—'}
+                  </span>
+                )}
+                {lifecycle.data.next_deload && (
+                  <span>
+                    <Badge tone="warning">
+                      {lifecycle.data.next_deload.status === 'active'
+                        ? 'Идёт облегчённый блок'
+                        : 'Запланирован облегчённый блок'}
+                    </Badge>{' '}
+                    {formatProgramDate(lifecycle.data.next_deload.start_date)}
+                  </span>
+                )}
+              </div>
+            )}
+            <details
+              className="program-lifecycle__controls"
+              open={lifecycleActionsOpen}
+              onToggle={(event) => setLifecycleActionsOpen(event.currentTarget.open)}
+            >
+              <summary>
+                <span>Действия с программой</span>
+                <DisclosureIcon />
+              </summary>
+              <div className="program-lifecycle__actions">
+                <div className="program-lifecycle__buttons">
+                  {canManageProgram && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={lifecycleMutation.isPending || !historyReason.trim()}
+                      onClick={() => applyLifecycleAction('pause')}
+                    >
+                      Приостановить
+                    </Button>
+                  )}
+                  {lifecycle.data.status === 'paused' && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={lifecycleMutation.isPending || !historyReason.trim()}
+                      onClick={() => applyLifecycleAction('resume')}
+                    >
+                      Продолжить
+                    </Button>
+                  )}
+                  {(canManageProgram || lifecycle.data.status === 'paused') && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={lifecycleMutation.isPending || !historyReason.trim()}
+                        onClick={() => applyLifecycleAction('complete')}
+                      >
+                        Завершить программу
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={lifecycleMutation.isPending || !historyReason.trim()}
+                        onClick={() => applyLifecycleAction('terminate')}
+                      >
+                        Прекратить программу
+                      </Button>
+                    </>
+                  )}
+                  {canRestartProgram && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={lifecycleMutation.isPending || !historyReason.trim()}
+                      onClick={() => applyLifecycleAction('restart')}
+                    >
+                      Начать новый цикл
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </details>
+          </article>
+        </>
+      ) : null}
 
       {blocks.isLoading ? (
         <LoadingState label="Загружаем текущий этап…" />
@@ -584,7 +875,7 @@ export function AssignedProgramDetails({
                       })
                     }
                   />
-                  {proposal.eligibility_status === 'eligible' && (
+                  {proposal.eligibility_status === 'eligible' && canManageProgram && (
                     <div className="progression-proposals__adjust">
                       <Field
                         label="Изменить предложенный вес, кг"
@@ -659,9 +950,11 @@ export function AssignedProgramDetails({
                 <h4 id={`blocks-${programId}`}>Тренировочные блоки</h4>
                 <p>Текущий, будущие и архивные этапы в хронологическом порядке.</p>
               </div>
-              <Button type="button" variant="secondary" onClick={() => setEditingBlock('new')}>
-                Добавить этап
-              </Button>
+              {canManageProgram && (
+                <Button type="button" variant="secondary" onClick={() => setEditingBlock('new')}>
+                  Добавить этап
+                </Button>
+              )}
             </div>
 
             {editingBlock && (

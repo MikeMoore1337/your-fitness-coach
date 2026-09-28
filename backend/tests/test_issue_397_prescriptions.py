@@ -273,6 +273,7 @@ def test_prescription_edit_uses_0092_revision_kind_and_keeps_advanced_plan(clien
         headers=headers,
         json={
             "expected_revision_number": 1,
+            "effective_scope": "future_program",
             "day_number": 1,
             "exercise_id": exercises[0]["id"],
             "prescription": updated_plan,
@@ -348,6 +349,7 @@ def test_assigned_program_update_rejects_inconsistent_group_kind(client) -> None
         headers=headers,
         json={
             "expected_revision_number": 1,
+            "effective_scope": "future_program",
             "day_number": 1,
             "exercise_id": exercises[0]["id"],
             "prescribed_sets": 2,
@@ -555,6 +557,7 @@ def test_scope_b_replaces_only_future_rows_and_records_lineage(client) -> None:
         headers=headers,
         json={
             "expected_revision_number": 1,
+            "effective_scope": "future_program",
             "exercise_id": exercises[1]["id"],
             "target_template_exercise_id": source_id,
             "prescription": _top_backoff_plan(),

@@ -1018,6 +1018,7 @@ def test_coach_can_assign_existing_template_to_own_client(client):
         f"{assigned.json()['user_program_id']}/exercises",
         json={
             "expected_revision_number": 1,
+            "effective_scope": "future_program",
             "exercise_id": second_exercise["id"],
             "day_number": 1,
             "prescribed_sets": 4,

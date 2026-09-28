@@ -215,7 +215,7 @@ class UserProgram(Base):
             sqlite_where=text("is_active = 1"),
         ),
         CheckConstraint(
-            "status IN ('scheduled', 'active', 'completed', 'archived')",
+            "status IN ('scheduled', 'active', 'paused', 'completed', 'terminated', 'archived')",
             name="ck_user_programs_status",
         ),
         CheckConstraint("duration_weeks >= 1", name="ck_user_programs_duration_weeks"),
@@ -257,6 +257,9 @@ class UserProgram(Base):
     current_revision_number: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
+    restarted_from_program_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_programs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     template: Mapped[ProgramTemplate | None] = relationship("ProgramTemplate")
     workouts: Mapped[list[UserWorkout]] = relationship(
@@ -292,7 +295,8 @@ class ProgramRevision(Base):
         CheckConstraint(
             "change_kind IN "
             "('assigned', 'program_archived', 'plan_updated', 'block_created', "
-            "'block_updated', 'block_status_changed')",
+            "'block_updated', 'block_status_changed', 'program_lifecycle', "
+            "'program_restarted')",
             name="ck_program_revisions_change_kind",
         ),
     )

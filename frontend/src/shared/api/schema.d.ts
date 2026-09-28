@@ -1245,6 +1245,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/assigned/{program_id}/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assigned Program Lifecycle */
+        get: operations["assigned_program_lifecycle_api_v1_programs_assigned__program_id__lifecycle_get"];
+        put?: never;
+        /** Mutate Assigned Program Lifecycle */
+        post: operations["mutate_assigned_program_lifecycle_api_v1_programs_assigned__program_id__lifecycle_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/assigned/{program_id}/blocks": {
         parameters: {
             query?: never;
@@ -1278,6 +1296,40 @@ export interface paths {
         head?: never;
         /** Edit Assigned Program Block */
         patch: operations["edit_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/blocks/{block_id}/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Advance Assigned Program Block */
+        post: operations["advance_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__advance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/assigned/{program_id}/blocks/{block_id}/repeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Repeat Assigned Program Block */
+        post: operations["repeat_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__repeat_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/programs/assigned/{program_id}/exercises": {
@@ -6127,7 +6179,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "scheduled" | "active" | "completed" | "archived";
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
             /**
              * Start Date
              * Format: date
@@ -6451,6 +6503,13 @@ export interface components {
         CoachProgramExerciseCreate: {
             /** Expected Revision Number */
             expected_revision_number: number;
+            /**
+             * Effective Scope
+             * @enum {string}
+             */
+            effective_scope: "next_workout" | "current_block" | "future_program";
+            /** Effective Date */
+            effective_date?: string | null;
             /** Exercise Id */
             exercise_id: number;
             /** Day Number */
@@ -10167,6 +10226,111 @@ export interface components {
             /** Day Numbers */
             day_numbers: number[];
         };
+        /** ProgramLifecycleActionRequest */
+        ProgramLifecycleActionRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "pause" | "resume" | "complete" | "terminate" | "restart";
+            /** Reason */
+            reason: string;
+        };
+        /** ProgramLifecycleBlockSummary */
+        ProgramLifecycleBlockSummary: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Week Start */
+            week_start?: number | null;
+            /** Week End */
+            week_end?: number | null;
+            /** Is Deload */
+            is_deload: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "active" | "completed" | "archived";
+        };
+        /** ProgramLifecycleMutationResponse */
+        ProgramLifecycleMutationResponse: {
+            /** Program Id */
+            program_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /** Is Active */
+            is_active: boolean;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /** Restarted From Program Id */
+            restarted_from_program_id?: number | null;
+            /** New Program Id */
+            new_program_id?: number | null;
+        };
+        /** ProgramLifecycleResponse */
+        ProgramLifecycleResponse: {
+            /** Program Id */
+            program_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /** Current Week Number */
+            current_week_number?: number | null;
+            current_block?: components["schemas"]["ProgramLifecycleBlockSummary"] | null;
+            next_block?: components["schemas"]["ProgramLifecycleBlockSummary"] | null;
+            next_workout?: components["schemas"]["ProgramLifecycleWorkoutSummary"] | null;
+            next_deload?: components["schemas"]["ProgramLifecycleBlockSummary"] | null;
+            /** Restarted From Program Id */
+            restarted_from_program_id?: number | null;
+        };
+        /** ProgramLifecycleWorkoutSummary */
+        ProgramLifecycleWorkoutSummary: {
+            /** Id */
+            id: number;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+        };
         /** ProgramProgressionProposalExercise */
         ProgramProgressionProposalExercise: {
             /** Exercise Id */
@@ -10269,7 +10433,7 @@ export interface components {
              * Change Kind
              * @enum {string}
              */
-            change_kind: "assigned" | "program_archived" | "plan_updated" | "block_created" | "block_updated" | "block_status_changed";
+            change_kind: "assigned" | "program_archived" | "plan_updated" | "block_created" | "block_updated" | "block_status_changed" | "program_lifecycle" | "program_restarted";
             /** Reason */
             reason?: string | null;
             /** Changed Fields */
@@ -10512,7 +10676,7 @@ export interface components {
             /** Assigned Program Id */
             assigned_program_id?: number | null;
             /** Assigned Program Status */
-            assigned_program_status?: ("scheduled" | "active" | "completed" | "archived") | null;
+            assigned_program_status?: ("scheduled" | "active" | "paused" | "completed" | "terminated" | "archived") | null;
             /** Assigned Program Start Date */
             assigned_program_start_date?: string | null;
             /** Assigned Program Duration Weeks */
@@ -11704,6 +11868,21 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** TrainingBlockActionRequest */
+        TrainingBlockActionRequest: {
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Reason */
+            reason: string;
+        };
+        /** TrainingBlockAdvanceResponse */
+        TrainingBlockAdvanceResponse: {
+            /** Completed Block Id */
+            completed_block_id: number;
+            block: components["schemas"]["TrainingBlockResponse"];
+            /** Current Revision Number */
+            current_revision_number: number;
+        };
         /** TrainingBlockCreate */
         TrainingBlockCreate: {
             /** Expected Revision Number */
@@ -11737,6 +11916,16 @@ export interface components {
         /** TrainingBlockMutationResponse */
         TrainingBlockMutationResponse: {
             block: components["schemas"]["TrainingBlockResponse"];
+            /** Current Revision Number */
+            current_revision_number: number;
+        };
+        /** TrainingBlockRepeatResponse */
+        TrainingBlockRepeatResponse: {
+            /** Source Block Id */
+            source_block_id: number;
+            block: components["schemas"]["TrainingBlockResponse"];
+            /** Duration Weeks */
+            duration_weeks: number;
             /** Current Revision Number */
             current_revision_number: number;
         };
@@ -15733,6 +15922,72 @@ export interface operations {
             };
         };
     };
+    assigned_program_lifecycle_api_v1_programs_assigned__program_id__lifecycle_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramLifecycleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mutate_assigned_program_lifecycle_api_v1_programs_assigned__program_id__lifecycle_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramLifecycleActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramLifecycleMutationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     assigned_program_blocks_api_v1_programs_assigned__program_id__blocks_get: {
         parameters: {
             query?: never;
@@ -15822,6 +16077,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrainingBlockMutationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    advance_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__advance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+                block_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrainingBlockActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingBlockAdvanceResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    repeat_assigned_program_block_api_v1_programs_assigned__program_id__blocks__block_id__repeat_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: number;
+                block_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrainingBlockActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrainingBlockRepeatResponse"];
                 };
             };
             /** @description Validation Error */

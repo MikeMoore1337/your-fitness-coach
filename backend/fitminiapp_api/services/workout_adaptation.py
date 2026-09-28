@@ -195,7 +195,7 @@ def _validate_today_state(workout: UserWorkout, current_user: User, *, safety: b
             "Изменить состав можно только до начала тренировки",
         )
     if not workout.user_program.is_active:
-        raise WorkoutAdaptationError("Программа уже завершена или архивирована")
+        raise WorkoutAdaptationError("Программа сейчас неактивна")
 
 
 def _find_workout_exercise(workout: UserWorkout, workout_exercise_id: int | None):

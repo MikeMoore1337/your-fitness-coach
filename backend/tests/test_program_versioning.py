@@ -96,6 +96,7 @@ def test_revision_history_conflict_and_completed_workout_immutability(client):
         headers=headers,
         json={
             "expected_revision_number": 1,
+            "effective_scope": "future_program",
             "exercise_id": exercises[1]["id"],
             "day_number": 1,
             "prescribed_sets": 3,
@@ -115,6 +116,7 @@ def test_revision_history_conflict_and_completed_workout_immutability(client):
         headers=headers,
         json={
             "expected_revision_number": 1,
+            "effective_scope": "future_program",
             "exercise_id": exercises[1]["id"],
             "day_number": 1,
             "prescribed_sets": 4,
@@ -135,6 +137,8 @@ def test_revision_history_conflict_and_completed_workout_immutability(client):
         "day_number": 1,
         "exercise_id": exercises[1]["id"],
         "workouts_updated": 2,
+        "effective_scope": "future_program",
+        "effective_date": today_msk().isoformat(),
     }
     with get_session_context() as db:
         workouts = (
@@ -150,6 +154,119 @@ def test_revision_history_conflict_and_completed_workout_immutability(client):
             for workout in workouts
             if workout.id != immutable_workout_id
         )
+
+
+def test_next_workout_revision_scope_changes_only_the_earliest_planned_workout(client):
+    headers = _auth(client, 93006)
+    start = today_msk() + timedelta(days=1)
+    program_id, exercises = _assigned_program(
+        client,
+        headers,
+        start_date=start,
+        duration_weeks=3,
+    )
+
+    changed = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "effective_scope": "next_workout",
+            "exercise_id": exercises[1]["id"],
+            "day_number": 1,
+            "prescribed_sets": 3,
+            "prescribed_reps": "8",
+            "rest_seconds": 90,
+            "reason": "Начать прогрессию со следующей тренировки",
+        },
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["workouts_updated"] == 1
+
+    with get_session_context() as db:
+        workouts = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id)
+            .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
+            .all()
+        )
+        assert len(workouts) == 3
+        assert exercises[1]["id"] in {item.exercise_id for item in workouts[0].exercises}
+        assert all(
+            exercises[1]["id"] not in {item.exercise_id for item in workout.exercises}
+            for workout in workouts[1:]
+        )
+
+    history = client.get(
+        f"/api/v1/programs/assigned/{program_id}/revisions", headers=headers
+    ).json()
+    assert history[0]["changed_fields"]["effective_scope"] == "next_workout"
+    assert history[0]["changed_fields"]["effective_date"] == start.isoformat()
+
+
+def test_current_block_revision_scope_leaves_later_weeks_unchanged(client):
+    headers = _auth(client, 93007)
+    start = today_msk() + timedelta(days=1)
+    program_id, exercises = _assigned_program(
+        client,
+        headers,
+        start_date=start,
+        duration_weeks=3,
+    )
+    block = client.post(
+        f"/api/v1/programs/assigned/{program_id}/blocks",
+        headers=headers,
+        json={
+            "expected_revision_number": 1,
+            "title": "Первый цикл",
+            "start_date": start.isoformat(),
+            "end_date": (start + timedelta(days=13)).isoformat(),
+            "purpose": "Постепенно освоить программу",
+            "reason": "Сформировать первый этап",
+        },
+    )
+    assert block.status_code == 201, block.text
+    active = client.patch(
+        f"/api/v1/programs/assigned/{program_id}/blocks/{block.json()['block']['id']}",
+        headers=headers,
+        json={
+            "expected_revision_number": 2,
+            "status": "active",
+            "reason": "Начать первый этап",
+        },
+    )
+    assert active.status_code == 200, active.text
+
+    changed = client.post(
+        f"/api/v1/programs/assigned/{program_id}/exercises",
+        headers=headers,
+        json={
+            "expected_revision_number": 3,
+            "effective_scope": "current_block",
+            "exercise_id": exercises[1]["id"],
+            "day_number": 1,
+            "prescribed_sets": 3,
+            "prescribed_reps": "8",
+            "rest_seconds": 90,
+            "reason": "Обновить оставшуюся часть первого цикла",
+        },
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["workouts_updated"] == 2
+
+    with get_session_context() as db:
+        workouts = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id)
+            .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
+            .all()
+        )
+        assert len(workouts) == 3
+        assert all(
+            exercises[1]["id"] in {item.exercise_id for item in workout.exercises}
+            for workout in workouts[:2]
+        )
+        assert exercises[1]["id"] not in {item.exercise_id for item in workouts[2].exercises}
 
 
 def test_training_blocks_reject_overlap_and_enforce_manual_lifecycle(client):
@@ -354,13 +471,30 @@ def test_program_revisions_and_blocks_are_exported_and_deleted_with_account(clie
         },
     )
     assert created.status_code == 201, created.text
+    restarted = client.post(
+        f"/api/v1/programs/assigned/{program_id}/lifecycle",
+        headers=headers,
+        json={
+            "expected_revision_number": created.json()["current_revision_number"],
+            "action": "restart",
+            "reason": "Начать следующий цикл",
+        },
+    )
+    assert restarted.status_code == 200, restarted.text
+    new_program_id = restarted.json()["new_program_id"]
+    assert new_program_id is not None
 
     exported = client.get("/api/v1/me/export", headers=headers)
     assert exported.status_code == 200, exported.text
     program_export = next(row for row in exported.json()["programs"] if row["id"] == program_id)
-    assert program_export["current_revision_number"] == 2
-    assert [row["revision_number"] for row in program_export["revisions"]] == [1, 2]
+    new_program_export = next(
+        row for row in exported.json()["programs"] if row["id"] == new_program_id
+    )
+    assert program_export["current_revision_number"] == 3
+    assert [row["revision_number"] for row in program_export["revisions"]] == [1, 2, 3]
     assert program_export["training_blocks"][0]["title"] == "Экспортируемый блок"
+    assert new_program_export["restarted_from_program_id"] == program_id
+    assert new_program_export["training_blocks"][0]["title"] == "Экспортируемый блок"
 
     deleted = client.request(
         "DELETE",
@@ -372,10 +506,21 @@ def test_program_revisions_and_blocks_are_exported_and_deleted_with_account(clie
     with get_session_context() as db:
         assert db.query(User).filter(User.id == user_id).first() is None
         assert db.query(UserProgram).filter(UserProgram.id == program_id).first() is None
+        assert db.query(UserProgram).filter(UserProgram.id == new_program_id).first() is None
         assert (
             db.query(ProgramRevision).filter(ProgramRevision.user_program_id == program_id).count()
             == 0
         )
         assert (
+            db.query(ProgramRevision)
+            .filter(ProgramRevision.user_program_id == new_program_id)
+            .count()
+            == 0
+        )
+        assert (
             db.query(TrainingBlock).filter(TrainingBlock.user_program_id == program_id).count() == 0
+        )
+        assert (
+            db.query(TrainingBlock).filter(TrainingBlock.user_program_id == new_program_id).count()
+            == 0
         )

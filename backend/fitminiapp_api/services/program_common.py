@@ -1,3 +1,6 @@
+MAX_PROGRAM_DURATION_WEEKS = 24
+
+
 class ProgramError(ValueError):
     """Domain validation error returned by program and coaching workflows."""
 
@@ -6,6 +9,8 @@ ASSIGNMENT_CONFLICT_ERRORS = {
     "Active program replacement requires confirmation",
     "Cannot replace a program while a workout is in progress",
     "Cannot delete a program while a workout is in progress",
+    "Another active program must be completed or paused before resuming",
+    "Cannot change program lifecycle while a workout is in progress",
 }
 
 ASSIGNMENT_VALIDATION_PREFIXES = (

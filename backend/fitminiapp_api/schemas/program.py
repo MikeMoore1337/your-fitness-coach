@@ -14,6 +14,9 @@ ProgramRecommendationGoal = Literal[
 ProgramExperience = Literal["beginner", "intermediate", "advanced"]
 ProgramSplitType = Literal["full_body", "upper_lower", "push_pull_legs", "body_part", "hybrid"]
 ProgramProvenanceType = Literal["YFC_GENERIC", "SOURCE_ADAPTATION", "CUSTOM"]
+ProgramLifecycleStatus = Literal[
+    "scheduled", "active", "paused", "completed", "terminated", "archived"
+]
 TrainingLocation = Literal["gym", "home", "other"]
 EquipmentIdentifier = Literal[
     "bodyweight",
@@ -571,7 +574,7 @@ class ProgramTemplateResponse(BaseModel):
     assigned_by_user_id: int | None = None
     assigned_by_full_name: str | None = None
     assigned_program_id: int | None = None
-    assigned_program_status: Literal["scheduled", "active", "completed", "archived"] | None = None
+    assigned_program_status: ProgramLifecycleStatus | None = None
     assigned_program_start_date: date | None = None
     assigned_program_duration_weeks: int | None = None
     current_revision_number: int | None = None
@@ -670,7 +673,7 @@ class CoachAssignedProgramResponse(BaseModel):
     level: str | None = None
     assigned_at: datetime
     is_active: bool
-    status: Literal["scheduled", "active", "completed", "archived"]
+    status: ProgramLifecycleStatus
     start_date: date
     duration_weeks: int
     schedule_weekdays: list[int]
@@ -690,6 +693,8 @@ ProgramRevisionChangeKind = Literal[
     "block_created",
     "block_updated",
     "block_status_changed",
+    "program_lifecycle",
+    "program_restarted",
 ]
 TrainingBlockStatus = Literal["planned", "active", "completed", "archived"]
 
@@ -705,6 +710,86 @@ class ProgramRevisionResponse(BaseModel):
     changed_fields: dict
     snapshot: dict
     created_at: datetime
+
+
+class ProgramLifecycleActionRequest(BaseModel):
+    expected_revision_number: int = Field(ge=0)
+    action: Literal["pause", "resume", "complete", "terminate", "restart"]
+    reason: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_reason(self):
+        if not self.reason.strip():
+            raise ValueError("reason is required")
+        return self
+
+
+class ProgramLifecycleBlockSummary(BaseModel):
+    id: int
+    title: str
+    start_date: date
+    end_date: date
+    week_start: int | None = None
+    week_end: int | None = None
+    is_deload: bool
+    status: TrainingBlockStatus
+
+
+class ProgramLifecycleWorkoutSummary(BaseModel):
+    id: int
+    scheduled_date: date
+    week_number: int
+    day_number: int
+    title: str
+    status: str
+
+
+class ProgramLifecycleResponse(BaseModel):
+    program_id: int
+    status: ProgramLifecycleStatus
+    is_active: bool
+    start_date: date
+    duration_weeks: int
+    current_revision_number: int
+    current_week_number: int | None = None
+    current_block: ProgramLifecycleBlockSummary | None = None
+    next_block: ProgramLifecycleBlockSummary | None = None
+    next_workout: ProgramLifecycleWorkoutSummary | None = None
+    next_deload: ProgramLifecycleBlockSummary | None = None
+    restarted_from_program_id: int | None = None
+
+
+class ProgramLifecycleMutationResponse(BaseModel):
+    program_id: int
+    status: ProgramLifecycleStatus
+    is_active: bool
+    current_revision_number: int
+    restarted_from_program_id: int | None = None
+    new_program_id: int | None = None
+
+
+class TrainingBlockActionRequest(BaseModel):
+    expected_revision_number: int = Field(ge=0)
+    reason: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def validate_reason(self):
+        if not self.reason.strip():
+            raise ValueError("reason is required")
+        return self
+
+
+class TrainingBlockAdvanceResponse(BaseModel):
+    completed_block_id: int
+    block: TrainingBlockResponse
+    current_revision_number: int
+
+
+class TrainingBlockRepeatResponse(BaseModel):
+    source_block_id: int
+    block: TrainingBlockResponse
+    duration_weeks: int
+    current_revision_number: int
 
 
 class TrainingBlockCreate(BaseModel):
@@ -781,6 +866,8 @@ class TrainingBlockMutationResponse(BaseModel):
 
 class CoachProgramExerciseCreate(BaseModel):
     expected_revision_number: int = Field(ge=0)
+    effective_scope: Literal["next_workout", "current_block", "future_program"]
+    effective_date: date | None = None
     exercise_id: int = Field(ge=1)
     day_number: int | None = Field(default=None, ge=1, le=14)
     prescribed_sets: int | None = Field(default=None, ge=1, le=10)
@@ -799,6 +886,10 @@ class CoachProgramExerciseCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_superset_pair(self):
+        if self.effective_scope == "next_workout" and self.effective_date is not None:
+            raise ValueError("effective_date cannot be combined with next_workout scope")
+        if self.effective_scope == "current_block" and self.effective_date is not None:
+            raise ValueError("effective_date cannot be combined with current_block scope")
         if (self.superset_group is None) != (self.superset_order is None):
             raise ValueError("superset_group and superset_order must be provided together")
         group_values = (self.group_id, self.group_kind, self.group_order)
