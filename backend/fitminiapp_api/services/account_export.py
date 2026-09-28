@@ -558,6 +558,7 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
         "completed_at": program.completed_at,
         "archived_at": program.archived_at,
         "current_revision_number": program.current_revision_number,
+        "restarted_from_program_id": program.restarted_from_program_id,
         "revisions": [
             _fields(
                 revision,

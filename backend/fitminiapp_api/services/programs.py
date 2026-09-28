@@ -45,7 +45,7 @@ from fitminiapp_api.services.nutrition import build_nutrition_target_response_fr
 from fitminiapp_api.services.prescription_semantics import (
     ensure_plan,
 )
-from fitminiapp_api.services.program_common import ProgramError
+from fitminiapp_api.services.program_common import MAX_PROGRAM_DURATION_WEEKS, ProgramError
 from fitminiapp_api.services.program_versioning import record_program_revision
 from fitminiapp_api.services.root_admin import has_verified_root_identity
 from fitminiapp_api.services.workout_metrics import (
@@ -57,7 +57,6 @@ GOALS = {"muscle_gain", "fat_loss", "maintenance", "recomposition", "strength"}
 LEVELS = {"beginner", "intermediate", "advanced"}
 MODES = {"self", "coach"}
 LEGACY_DEMO_TEMPLATE_SLUG = "upper-lower-4x"
-MAX_PROGRAM_DURATION_WEEKS = 24
 MAX_GENERATED_SETS = 20_000
 
 

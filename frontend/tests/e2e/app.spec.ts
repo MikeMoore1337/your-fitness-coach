@@ -1131,6 +1131,30 @@ async function mockApi(
           },
         ],
       });
+    if (path.endsWith('/programs/assigned/501/lifecycle'))
+      return route.fulfill({
+        json: {
+          program_id: 501,
+          status: 'active',
+          is_active: true,
+          start_date: '2030-01-01',
+          duration_weeks: 4,
+          current_revision_number: 1,
+          current_week_number: 1,
+          current_block: null,
+          next_block: null,
+          next_workout: {
+            id: 1,
+            scheduled_date: '2030-01-01',
+            week_number: 1,
+            day_number: 1,
+            title: 'Всё тело A',
+            status: 'planned',
+          },
+          next_deload: null,
+          restarted_from_program_id: null,
+        },
+      });
     if (path.endsWith('/programs/assigned/501/blocks')) return route.fulfill({ json: [] });
     if (path.endsWith('/programs/assigned/501/progression-proposals'))
       return route.fulfill({
@@ -1178,6 +1202,30 @@ async function mockApi(
           : [],
       });
     if (path.endsWith('/programs/assigned/701/revisions')) return route.fulfill({ json: [] });
+    if (path.endsWith('/programs/assigned/701/lifecycle'))
+      return route.fulfill({
+        json: {
+          program_id: 701,
+          status: 'active',
+          is_active: true,
+          start_date: '2030-01-01',
+          duration_weeks: 4,
+          current_revision_number: 2,
+          current_week_number: 2,
+          current_block: null,
+          next_block: null,
+          next_workout: {
+            id: 1,
+            scheduled_date: '2030-01-08',
+            week_number: 2,
+            day_number: 1,
+            title: 'Силовая A',
+            status: 'planned',
+          },
+          next_deload: null,
+          restarted_from_program_id: null,
+        },
+      });
     if (path.endsWith('/programs/assigned/701/blocks')) return route.fulfill({ json: [] });
     if (path.endsWith('/programs/assigned/701/progression-proposals'))
       return route.fulfill({

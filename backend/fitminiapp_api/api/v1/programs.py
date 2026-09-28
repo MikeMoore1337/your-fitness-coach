@@ -14,6 +14,9 @@ from fitminiapp_api.schemas.program import (
     ExerciseCatalogItem,
     ExerciseGuide,
     ProgramAssignmentResponse,
+    ProgramLifecycleActionRequest,
+    ProgramLifecycleMutationResponse,
+    ProgramLifecycleResponse,
     ProgramRecommendationRequest,
     ProgramRecommendationResponse,
     ProgramRevisionResponse,
@@ -21,8 +24,11 @@ from fitminiapp_api.schemas.program import (
     ProgramTemplateCreateResponse,
     ProgramTemplateResponse,
     TemplateExerciseReplacementRequest,
+    TrainingBlockActionRequest,
+    TrainingBlockAdvanceResponse,
     TrainingBlockCreate,
     TrainingBlockMutationResponse,
+    TrainingBlockRepeatResponse,
     TrainingBlockResponse,
     TrainingBlockUpdate,
 )
@@ -53,9 +59,13 @@ from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.program_common import ProgramError, assignment_error_status
 from fitminiapp_api.services.program_recommendation import recommend_program_templates
 from fitminiapp_api.services.program_versioning import (
+    advance_training_block,
+    apply_program_lifecycle_action,
     create_training_block,
     list_program_revisions,
     list_training_blocks,
+    program_lifecycle_summary,
+    repeat_training_block,
     update_training_block,
     upsert_future_program_exercise,
 )
@@ -100,6 +110,19 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
         "Progression proposal could not be applied",
         "Assigned program is not editable",
         "Cannot delete a program while a workout is in progress",
+        "Cannot change program lifecycle while a workout is in progress",
+        "Cannot advance a block while a workout is in progress",
+        "Another active program must be completed or paused before resuming",
+        "Only an active or scheduled program can be paused",
+        "Only a paused program can be resumed",
+        "Only an active, scheduled, or paused program can be ended",
+        "Only the active training block can advance",
+        "There is no planned training block to advance to",
+        "Complete the training block before repeating it",
+        "Training block has no scheduled workouts to repeat",
+        "A current training block is required for this revision scope",
+        "No next planned workout for this revision",
+        "Program reached its 24-week limit; restart it to begin a new cycle",
         "Training blocks must not overlap",
         "Invalid training block status transition",
         "Complete the previous training block first",
@@ -635,6 +658,37 @@ def assigned_program_revisions(
 
 
 @router.get(
+    "/assigned/{program_id}/lifecycle",
+    response_model=ProgramLifecycleResponse,
+)
+def assigned_program_lifecycle(
+    program_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return program_lifecycle_summary(db, current_user, program_id)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post(
+    "/assigned/{program_id}/lifecycle",
+    response_model=ProgramLifecycleMutationResponse,
+)
+def mutate_assigned_program_lifecycle(
+    program_id: int,
+    payload: ProgramLifecycleActionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return apply_program_lifecycle_action(db, current_user, program_id, payload)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.get(
     "/assigned/{program_id}/blocks",
     response_model=list[TrainingBlockResponse],
 )
@@ -685,6 +739,55 @@ def edit_assigned_program_block(
     except ProgramError as exc:
         raise _assigned_program_error(exc) from exc
     return {"block": block, "current_revision_number": revision_number}
+
+
+@router.post(
+    "/assigned/{program_id}/blocks/{block_id}/advance",
+    response_model=TrainingBlockAdvanceResponse,
+)
+def advance_assigned_program_block(
+    program_id: int,
+    block_id: int,
+    payload: TrainingBlockActionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        block, completed_block_id, revision_number = advance_training_block(
+            db, current_user, program_id, block_id, payload
+        )
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    return {
+        "block": block,
+        "completed_block_id": completed_block_id,
+        "current_revision_number": revision_number,
+    }
+
+
+@router.post(
+    "/assigned/{program_id}/blocks/{block_id}/repeat",
+    response_model=TrainingBlockRepeatResponse,
+)
+def repeat_assigned_program_block(
+    program_id: int,
+    block_id: int,
+    payload: TrainingBlockActionRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        block, duration_weeks, revision_number = repeat_training_block(
+            db, current_user, program_id, block_id, payload
+        )
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    return {
+        "block": block,
+        "source_block_id": block_id,
+        "duration_weeks": duration_weeks,
+        "current_revision_number": revision_number,
+    }
 
 
 @router.post(
