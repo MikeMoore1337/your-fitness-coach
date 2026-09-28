@@ -1501,6 +1501,220 @@ def test_legacy_completed_contract_rejects_conflicting_control_state(
         delivery._task_issue_contracts()
 
 
+def _legacy_active_body(task_id: str, *, source_spec: str | None = None) -> str:
+    source = f',"source_spec":"{source_spec}"' if source_spec is not None else ""
+    return f"""<!-- yfc-task-contract:v1 -->
+{{"version":1,"task_id":"{task_id}","scope":"legacy active task","acceptance":["terminal evidence is required"],"dependencies":[],"owner_gate":"none","risk_lane":"YELLOW"{source},"issue_state":"active"}}
+<!-- yfc-task-contract:v1 -->"""
+
+
+def _legacy_control_snapshot(
+    issue: dict[str, Any], *, task_id: str, state: str
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    payload = control_state_payload(
+        task_id=task_id,
+        state=state,
+        issue_number=issue["number"],
+        branch=f"task/{task_id.lower()}-legacy",
+    )
+    return issue, [
+        {
+            "id": 1,
+            "user": {"login": "owner"},
+            "created_at": "2026-09-28T00:00:00Z",
+            "body": render_control_state_comment(payload),
+        }
+    ]
+
+
+def test_legacy_active_contract_requires_closed_github_issue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue = {
+        "number": 448,
+        "title": "[Task 346A] legacy active",
+        "body": _legacy_active_body(
+            "346A", source_spec="codex-backlog/tasks/346A-production-log-retention.md"
+        ),
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+
+    with pytest.raises(delivery.DeliveryError, match="legacy active contract requires a closed"):
+        delivery._task_issue_contracts(terminal_task_ids={"346A"})
+
+
+@pytest.mark.parametrize("state", ["in_progress", "blocked", "human_required"])
+def test_legacy_active_contract_rejects_closed_issue_without_terminal_control_state(
+    monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    issue = {
+        "number": 448,
+        "title": "[Task 346A] legacy active",
+        "body": _legacy_active_body(
+            "346A", source_spec="codex-backlog/tasks/346A-production-log-retention.md"
+        ),
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+    snapshot = _legacy_control_snapshot(issue, task_id="346A", state=state)
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda item: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue_number: snapshot)
+
+    with pytest.raises(delivery.DeliveryError, match="legacy active contract conflicts"):
+        delivery._task_issue_contracts(terminal_task_ids={"346A"})
+
+
+def test_legacy_active_contract_requires_terminal_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue = {
+        "number": 310,
+        "title": "[Task 128H] legacy active",
+        "body": _legacy_active_body("128H"),
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda item: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue_number: (issue, []))
+
+    with pytest.raises(delivery.DeliveryError, match="requires terminal evidence"):
+        delivery._task_issue_contracts()
+
+
+def test_legacy_active_contract_uses_completed_dependency_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue = {
+        "number": 310,
+        "title": "[Task 128H] legacy active",
+        "body": _legacy_active_body("128H"),
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda item: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue_number: (issue, []))
+
+    contracts = delivery._task_issue_contracts(terminal_task_ids={"128H"})
+
+    assert contracts["128H"]["issue_state"] == "closed"
+    assert contracts["128H"]["latest_control_state"] is None
+    assert contracts["128H"]["legacy_issue_state"] == "active"
+    assert contracts["128H"]["legacy_terminal_evidence"] == "completed_dependency_record"
+
+
+def test_queue_inventory_skips_verified_legacy_active_contracts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True)
+    (tasks_root / "505-progression.md").write_text("task", encoding="utf-8")
+    current_body = render_task_contract(
+        {
+            "task_id": "505",
+            "scope": "progression",
+            "acceptance": ["deterministic proposals"],
+            "dependencies": ["504"],
+            "owner_gate": "none",
+            "risk_lane": "GREEN",
+            "source_spec": "codex-backlog/tasks/505-progression.md",
+            "issue_state": "queued",
+        }
+    )
+    issue_494 = {
+        "number": 494,
+        "title": "[Task 494] legacy completed",
+        "body": """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"494","scope":"legacy completed task","acceptance":["historical completion is preserved"],"dependencies":[],"owner_gate":"none","risk_lane":"YELLOW","issue_state":"completed"}
+<!-- yfc-task-contract:v1 -->""",
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+    issue_448 = {
+        "number": 448,
+        "title": "[Task 346A] legacy active",
+        "body": _legacy_active_body(
+            "346A", source_spec="codex-backlog/tasks/346A-production-log-retention.md"
+        ),
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+    issue_310 = {
+        "number": 310,
+        "title": "[Task 128H] legacy active",
+        "body": _legacy_active_body("128H"),
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+    issue_505 = {
+        "number": 505,
+        "title": "[Task 505] progression",
+        "body": current_body,
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+    issues = [issue_494, issue_448, issue_310, issue_505]
+    snapshots = {
+        448: _legacy_control_snapshot(issue_448, task_id="346A", state="production_verified"),
+        494: (issue_494, []),
+        310: (issue_310, []),
+        505: (issue_505, []),
+    }
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return []
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return {"504", "128H"}
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(
+        delivery,
+        "find_task_document",
+        lambda root, task_id: SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug="progression",
+            path=root / "codex-backlog" / "tasks" / "505-progression.md",
+        ),
+    )
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: issues)
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue_number: snapshots[issue_number],
+    )
+
+    candidates = delivery._queue_candidates()
+
+    assert [candidate["task_id"] for candidate in candidates] == ["505"]
+
+
 def test_queue_candidates_excludes_pending_bug_documents(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -1544,7 +1758,7 @@ def test_queue_candidates_excludes_pending_bug_documents(
     monkeypatch.setattr(
         delivery,
         "_task_issue_contracts",
-        lambda: {
+        lambda **kwargs: {
             "1": {
                 "task_id": "1",
                 "issue_number": 101,

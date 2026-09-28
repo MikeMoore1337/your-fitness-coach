@@ -21,7 +21,7 @@ import sys
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1044,7 +1044,9 @@ def _continuous_queue_claim(control_issue: int) -> Iterator[_ContinuousQueueClai
             ) from error
 
 
-def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
+def _task_issue_contracts(
+    *, terminal_task_ids: Collection[str] = ()
+) -> dict[str, dict[str, Any] | None]:
     issues: list[dict[str, Any]] = []
     page = 1
     while True:
@@ -1055,6 +1057,7 @@ def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
         if len(batch) < 100:
             break
         page += 1
+    completed_task_ids = {str(task_id).strip().upper() for task_id in terminal_task_ids}
     contracts: dict[str, dict[str, Any] | None] = {}
     for issue in issues:
         if issue.get("pull_request"):
@@ -1071,13 +1074,13 @@ def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
             contract = parse_task_contract(str(issue.get("body", "")))
         except IssueWorkflowError as error:
             raise DeliveryError(f"Task {task_id} Issue contract is malformed: {error}") from error
+        legacy_issue_state = str(contract.get("legacy_issue_state", "")).lower() if contract else ""
         if (
-            contract is not None
-            and contract.get("legacy_issue_state") == "completed"
+            legacy_issue_state in {"active", "completed"}
             and str(issue.get("state", "")).lower() != "closed"
         ):
             raise DeliveryError(
-                f"Task {task_id} legacy completed contract requires a closed GitHub Issue"
+                f"Task {task_id} legacy {legacy_issue_state} contract requires a closed GitHub Issue"
             )
         contracts[task_id] = contract
         if contract is None:
@@ -1092,27 +1095,40 @@ def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
             authorized_logins=_trusted_issue_logins(issue),
         )
         if (
-            contract.get("legacy_issue_state") == "completed"
+            legacy_issue_state in {"active", "completed"}
             and latest is not None
             and latest.get("state") != "production_verified"
         ):
             raise DeliveryError(
-                f"Task {task_id} legacy completed contract conflicts with control state "
+                f"Task {task_id} legacy {legacy_issue_state} contract conflicts with control state "
                 f"{latest.get('state', 'unknown')!r}"
             )
+        legacy_terminal_evidence: str | None = None
+        if legacy_issue_state == "active":
+            if latest is not None:
+                legacy_terminal_evidence = "latest_control_state:production_verified"
+            elif task_id in completed_task_ids:
+                legacy_terminal_evidence = "completed_dependency_record"
+            else:
+                raise DeliveryError(
+                    f"HUMAN_REQUIRED: Task {task_id} legacy active contract requires terminal "
+                    "evidence from production_verified control state or completed dependency record"
+                )
         normalized_contract = {
             **contract,
             "issue_number": issue_number,
             "issue_state": str(issue.get("state", "")).lower(),
             "latest_control_state": latest,
         }
-        if contract.get("legacy_issue_state") == "completed":
+        if legacy_issue_state in {"active", "completed"}:
             normalized_contract.update(
                 {
                     "legacy_issue_state_verified": True,
                     "legacy_github_issue_state": "closed",
                 }
             )
+        if legacy_terminal_evidence is not None:
+            normalized_contract["legacy_terminal_evidence"] = legacy_terminal_evidence
         contracts[task_id] = normalized_contract
     return contracts
 
@@ -1186,7 +1202,7 @@ def _queue_candidates() -> list[dict[str, Any]]:
             item.task_id,
         )
     )
-    contracts = _task_issue_contracts()
+    contracts = _task_issue_contracts(terminal_task_ids=completed)
     result: list[dict[str, Any]] = []
     for document in documents:
         task_id = document.task_id

@@ -32,7 +32,10 @@ CONTROL_STATES = frozenset(
         "cleanup_deferred",
     }
 )
-LEGACY_TERMINAL_TASK_CONTRACT_STATES = frozenset({"completed"})
+# Historical Issue bodies used these values before the current task-contract state machine was
+# introduced.  ``active`` is only a terminal candidate; inventory reconciliation must provide
+# factual closeout evidence before it can be treated as ``production_verified``.
+LEGACY_TASK_CONTRACT_STATES = frozenset({"active", "completed"})
 CONTROL_STATE_TRANSITIONS: dict[str | None, frozenset[str]] = {
     None: frozenset({"queued", "in_progress", "human_required", "blocked"}),
     "queued": frozenset({"in_progress", "human_required", "blocked"}),
@@ -568,7 +571,11 @@ def render_task_contract(contract: Mapping[str, Any]) -> str:
     return f"{TASK_CONTRACT_MARKER}\n{serialized}\n{TASK_CONTRACT_MARKER}"
 
 
-def _parse_legacy_completed_task_contract(payload: Mapping[str, Any]) -> dict[str, Any]:
+def _parse_legacy_task_contract(
+    payload: Mapping[str, Any], *, legacy_issue_state: str
+) -> dict[str, Any]:
+    if legacy_issue_state not in LEGACY_TASK_CONTRACT_STATES:
+        raise IssueWorkflowError(f"Unknown legacy task issue state: {legacy_issue_state!r}")
     source_spec = payload.get("source_spec", "")
     if not isinstance(source_spec, str):
         raise IssueWorkflowError("Task contract scope and source_spec must be strings")
@@ -581,15 +588,15 @@ def _parse_legacy_completed_task_contract(payload: Mapping[str, Any]) -> dict[st
         dependencies=payload.get("dependencies", []),
         owner_gate=payload.get("owner_gate", ""),
         risk_lane=payload.get("risk_lane", ""),
-        # Historical completed contracts predate source_spec.  Use a private validation
+        # Historical legacy contracts may predate source_spec.  Use a private validation
         # placeholder, then preserve the missing field explicitly in the inventory result.
         # Keep the normalized mapping renderable while marking that this is not a real
         # source path when the historical contract omitted source_spec.
         source_spec=normalized_source_spec,
         issue_state="production_verified",
     )
-    normalized["legacy_issue_state"] = "completed"
-    normalized["legacy_normalization"] = "completed->production_verified"
+    normalized["legacy_issue_state"] = legacy_issue_state
+    normalized["legacy_normalization"] = f"{legacy_issue_state}->production_verified"
     normalized["legacy_source_spec_missing"] = not bool(source_spec.strip())
     return normalized
 
@@ -612,8 +619,8 @@ def parse_task_contract(body: str) -> dict[str, Any] | None:
     normalized_raw_issue_state = (
         raw_issue_state.strip().lower() if isinstance(raw_issue_state, str) else raw_issue_state
     )
-    if normalized_raw_issue_state in LEGACY_TERMINAL_TASK_CONTRACT_STATES:
-        return _parse_legacy_completed_task_contract(payload)
+    if normalized_raw_issue_state in LEGACY_TASK_CONTRACT_STATES:
+        return _parse_legacy_task_contract(payload, legacy_issue_state=normalized_raw_issue_state)
     return task_contract_payload(
         task_id=payload.get("task_id", ""),
         scope=payload.get("scope", ""),
