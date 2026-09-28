@@ -1615,6 +1615,413 @@ def test_legacy_active_contract_uses_completed_dependency_record(
     assert contracts["128H"]["legacy_terminal_evidence"] == "completed_dependency_record"
 
 
+def test_closed_historical_incomplete_contract_is_terminal_with_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue = {
+        "number": 301,
+        "title": "[Task 279] historical visual audit",
+        "body": """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"279","scope":"historical visual audit","acceptance":["terminal evidence is preserved"],"dependencies":["276"],"owner_gate":"none","risk_lane":"GREEN","issue_state":"queued"}
+<!-- yfc-task-contract:v1 -->""",
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda item: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue_number: (issue, []))
+
+    contracts = delivery._task_issue_contracts(terminal_task_ids={"279"})
+    contract = contracts["279"]
+
+    assert contract is not None
+    assert contract["issue_state"] == "closed"
+    assert contract["legacy_contract"] is True
+    assert contract["legacy_raw_issue_state"] == "queued"
+    assert contract["legacy_source_spec_missing"] is True
+    assert contract["legacy_terminal_evidence"] == "completed_dependency_record"
+    assert "source_spec" not in contract
+
+
+def test_closed_historical_incomplete_contract_uses_production_verified_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue = {
+        "number": 301,
+        "title": "[Task 279] historical visual audit",
+        "body": """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"279","scope":"historical visual audit","acceptance":["terminal evidence is preserved"],"dependencies":["276"],"owner_gate":"none","risk_lane":"GREEN","issue_state":"queued"}
+<!-- yfc-task-contract:v1 -->""",
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+    snapshot = _legacy_control_snapshot(issue, task_id="279", state="production_verified")
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda item: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue_number: snapshot)
+
+    contracts = delivery._task_issue_contracts()
+
+    assert contracts["279"]["legacy_terminal_evidence"] == (
+        "latest_control_state:production_verified"
+    )
+
+
+def test_open_incomplete_contract_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue = {
+        "number": 301,
+        "title": "[Task 279] historical visual audit",
+        "body": """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"279","scope":"historical visual audit","acceptance":["must remain blocked"],"dependencies":["276"],"owner_gate":"none","risk_lane":"GREEN","issue_state":"queued"}
+<!-- yfc-task-contract:v1 -->""",
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+
+    with pytest.raises(delivery.DeliveryError, match="Task 279 Issue contract is malformed"):
+        delivery._task_issue_contracts(terminal_task_ids={"279"})
+
+
+def test_inventory_reaches_queued_task_after_closed_historical_contract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True)
+    (tasks_root / "279-historical.md").write_text("historical", encoding="utf-8")
+    (tasks_root / "505-progression.md").write_text("progression", encoding="utf-8")
+    issue_279 = {
+        "number": 301,
+        "title": "[Task 279] historical visual audit",
+        "body": """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"279","scope":"historical visual audit","acceptance":["terminal evidence is preserved"],"dependencies":["276"],"owner_gate":"none","risk_lane":"GREEN","issue_state":"queued"}
+<!-- yfc-task-contract:v1 -->""",
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+    issue_505 = {
+        "number": 505,
+        "title": "[Task 505] progression",
+        "body": render_task_contract(
+            {
+                "task_id": "505",
+                "scope": "progression",
+                "acceptance": ["deterministic proposals"],
+                "dependencies": ["504"],
+                "owner_gate": "behavior_contract",
+                "risk_lane": "YELLOW",
+                "source_spec": "codex-backlog/tasks/505-progression.md",
+                "issue_state": "queued",
+            }
+        ),
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+    issues = [issue_279, issue_505]
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return []
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return {"279", "504"}
+
+    def fake_find_task_document(root: Path, task_id: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug=f"task-{task_id}",
+            path=root / "codex-backlog" / "tasks" / f"{task_id}-fixture.md",
+        )
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(delivery, "find_task_document", fake_find_task_document)
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: issues)
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: (issue, []))
+
+    candidates = delivery._queue_candidates()
+
+    assert [candidate["task_id"] for candidate in candidates] == ["505"]
+
+
+@pytest.mark.parametrize(
+    ("task_id", "dependencies", "owner_gate", "risk_lane"),
+    [
+        ("505", ["504"], "behavior_contract", "YELLOW"),
+        ("506", ["505"], "none", "YELLOW"),
+        ("507", ["504", "506"], "owner_visual_acceptance", "RED"),
+        ("508", ["507"], "safety_and_prompt_contract", "YELLOW"),
+        ("509", ["508"], "final_acceptance", "RED"),
+    ],
+)
+def test_canonical_product_v4_contracts_preserve_dependency_chain_and_gates(
+    task_id: str, dependencies: list[str], owner_gate: str, risk_lane: str
+) -> None:
+    contract = render_task_contract(
+        {
+            "task_id": task_id,
+            "scope": f"Product v4 stage {task_id}",
+            "acceptance": ["existing Issue acceptance remains authoritative"],
+            "dependencies": dependencies,
+            "owner_gate": owner_gate,
+            "risk_lane": risk_lane,
+            "source_spec": f"codex-backlog/tasks/{task_id}-product-v4.md",
+            "issue_state": "queued",
+        }
+    )
+
+    parsed = delivery.parse_task_contract(contract)
+
+    assert parsed is not None
+    assert parsed["task_id"] == task_id
+    assert parsed["dependencies"] == dependencies
+    assert parsed["owner_gate"] == owner_gate
+    assert parsed["risk_lane"] == risk_lane
+    assert parsed["issue_state"] == "queued"
+
+
+def test_queue_blocks_product_v4_stage_two_until_stage_one_completes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True)
+    (tasks_root / "506-lifecycle.md").write_text("lifecycle", encoding="utf-8")
+    issue_506 = {
+        "number": 506,
+        "title": "[Task 506] lifecycle",
+        "body": render_task_contract(
+            {
+                "task_id": "506",
+                "scope": "Product v4 stage 2",
+                "acceptance": ["lifecycle remains deterministic"],
+                "dependencies": ["505"],
+                "owner_gate": "none",
+                "risk_lane": "YELLOW",
+                "source_spec": "codex-backlog/tasks/506-lifecycle.md",
+                "issue_state": "queued",
+            }
+        ),
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return []
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return {"504"}
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(
+        delivery,
+        "find_task_document",
+        lambda root, task_id: SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug="lifecycle",
+            path=root / "codex-backlog" / "tasks" / "506-lifecycle.md",
+        ),
+    )
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue_506])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: (issue, []))
+
+    candidates = delivery._queue_candidates()
+
+    assert candidates[0]["task_id"] == "506"
+    assert candidates[0]["state"] == "blocked"
+    assert candidates[0]["risk_lane"] == "RED"
+    assert "505" in candidates[0]["blocker"]
+
+
+def test_queue_retains_product_v4_visual_acceptance_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True)
+    (tasks_root / "507-operations.md").write_text("operations", encoding="utf-8")
+    issue_507 = {
+        "number": 507,
+        "title": "[Task 507] operations",
+        "body": render_task_contract(
+            {
+                "task_id": "507",
+                "scope": "Product v4 stage 3",
+                "acceptance": ["owner visual acceptance remains required"],
+                "dependencies": ["504", "506"],
+                "owner_gate": "owner_visual_acceptance",
+                "risk_lane": "RED",
+                "source_spec": "codex-backlog/tasks/507-operations.md",
+                "issue_state": "queued",
+            }
+        ),
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return []
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return {"504", "505", "506"}
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(
+        delivery,
+        "find_task_document",
+        lambda root, task_id: SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug="operations",
+            path=root / "codex-backlog" / "tasks" / "507-operations.md",
+        ),
+    )
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue_507])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: (issue, []))
+
+    candidates = delivery._queue_candidates()
+
+    assert candidates[0]["task_id"] == "507"
+    assert candidates[0]["state"] == "human_required"
+    assert candidates[0]["risk_lane"] == "RED"
+    assert "declared RED gate" in candidates[0]["blocker"]
+
+
+def test_noncanonical_open_evidence_gated_issues_are_excluded_from_inventory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issues = [
+        {
+            "number": 320,
+            "title": "[Task 287 / SEO Growth Stage 2] evidence",
+            "body": '<!-- yfc-task-contract:v1 -->\n{"version":1,"task_id":"287","scope":"evidence","acceptance":["remain blocked"],"dependencies":[],"owner_gate":"evidence_gate","risk_lane":"RED","issue_state":"blocked_on_evidence"}\n<!-- yfc-task-contract:v1 -->',
+            "state": "open",
+            "user": {"login": "owner"},
+        },
+        {
+            "number": 323,
+            "title": "[Task 290 / SEO Growth Stage 5] evidence",
+            "body": '<!-- yfc-task-contract:v1 -->\n{"version":1,"task_id":"290","scope":"evidence","acceptance":["remain blocked"],"dependencies":[],"owner_gate":"evidence_gate","risk_lane":"RED","issue_state":"blocked_on_evidence"}\n<!-- yfc-task-contract:v1 -->',
+            "state": "open",
+            "user": {"login": "owner"},
+        },
+    ]
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: issues)
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+
+    assert delivery._task_issue_contracts() == {}
+
+
+def test_queue_ignores_unbacked_local_specs_and_selects_issue_backed_product_task(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True)
+    (tasks_root / "138-unbacked.md").write_text("unbacked", encoding="utf-8")
+    (tasks_root / "505-progression.md").write_text("progression", encoding="utf-8")
+    issue_505 = {
+        "number": 505,
+        "title": "[Task 505] progression",
+        "body": render_task_contract(
+            {
+                "task_id": "505",
+                "scope": "progression",
+                "acceptance": ["deterministic proposals"],
+                "dependencies": ["504"],
+                "owner_gate": "behavior_contract",
+                "risk_lane": "YELLOW",
+                "source_spec": "codex-backlog/tasks/505-progression.md",
+                "issue_state": "queued",
+            }
+        ),
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return []
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return {"504"}
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(
+        delivery,
+        "find_task_document",
+        lambda root, task_id: SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug=f"task-{task_id}",
+            path=root / "codex-backlog" / "tasks" / f"{task_id}-fixture.md",
+        ),
+    )
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue_505])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: (issue, []))
+
+    candidates = delivery._queue_candidates()
+
+    assert [candidate["task_id"] for candidate in candidates] == ["505"]
+
+
 def test_queue_inventory_skips_verified_legacy_active_contracts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

@@ -43,6 +43,7 @@ try:
         latest_control_state,
         normalize_github_login,
         parse_control_state_comment,
+        parse_historical_terminal_task_contract,
         parse_queue_budget_report,
         parse_task_contract,
         queue_authorization,
@@ -73,6 +74,7 @@ except ModuleNotFoundError:
         latest_control_state,
         normalize_github_login,
         parse_control_state_comment,
+        parse_historical_terminal_task_contract,
         parse_queue_budget_report,
         parse_task_contract,
         queue_authorization,
@@ -1070,10 +1072,45 @@ def _task_issue_contracts(
             continue
         if task_id in contracts:
             raise DeliveryError(f"Multiple GitHub Issues claim Task {task_id}")
+        issue_number = issue.get("number")
+        if not isinstance(issue_number, int) or isinstance(issue_number, bool):
+            raise DeliveryError(f"Task {task_id} Issue has no valid number")
+        snapshot_loaded = False
+        comments: list[dict[str, Any]] = []
+        latest: dict[str, Any] | None = None
+        historical_contract = False
         try:
             contract = parse_task_contract(str(issue.get("body", "")))
         except IssueWorkflowError as error:
-            raise DeliveryError(f"Task {task_id} Issue contract is malformed: {error}") from error
+            is_closed = str(issue.get("state", "")).lower() == "closed"
+            if is_closed and str(error) == "Task contract requires scope and source_spec":
+                _, comments = _control_issue_snapshot(issue_number)
+                snapshot_loaded = True
+                latest = latest_control_state(
+                    comments,
+                    task_id=task_id,
+                    authorized_logins=_trusted_issue_logins(issue),
+                )
+                if task_id in completed_task_ids or (
+                    latest is not None and latest.get("state") == "production_verified"
+                ):
+                    try:
+                        contract = parse_historical_terminal_task_contract(
+                            str(issue.get("body", ""))
+                        )
+                    except IssueWorkflowError as historical_error:
+                        raise DeliveryError(
+                            f"Task {task_id} Issue contract is malformed: {historical_error}"
+                        ) from historical_error
+                    historical_contract = True
+                else:
+                    raise DeliveryError(
+                        f"Task {task_id} closed incomplete contract lacks terminal evidence"
+                    ) from error
+            else:
+                raise DeliveryError(
+                    f"Task {task_id} Issue contract is malformed: {error}"
+                ) from error
         legacy_issue_state = str(contract.get("legacy_issue_state", "")).lower() if contract else ""
         if (
             legacy_issue_state in {"active", "completed"}
@@ -1082,18 +1119,16 @@ def _task_issue_contracts(
             raise DeliveryError(
                 f"Task {task_id} legacy {legacy_issue_state} contract requires a closed GitHub Issue"
             )
-        contracts[task_id] = contract
         if contract is None:
+            contracts[task_id] = None
             continue
-        issue_number = issue.get("number")
-        if not isinstance(issue_number, int) or isinstance(issue_number, bool):
-            raise DeliveryError(f"Task {task_id} Issue has no valid number")
-        _, comments = _control_issue_snapshot(issue_number)
-        latest = latest_control_state(
-            comments,
-            task_id=task_id,
-            authorized_logins=_trusted_issue_logins(issue),
-        )
+        if not snapshot_loaded:
+            _, comments = _control_issue_snapshot(issue_number)
+            latest = latest_control_state(
+                comments,
+                task_id=task_id,
+                authorized_logins=_trusted_issue_logins(issue),
+            )
         if (
             legacy_issue_state in {"active", "completed"}
             and latest is not None
@@ -1129,6 +1164,24 @@ def _task_issue_contracts(
             )
         if legacy_terminal_evidence is not None:
             normalized_contract["legacy_terminal_evidence"] = legacy_terminal_evidence
+        if historical_contract:
+            if latest is not None and latest.get("state") != "production_verified":
+                raise DeliveryError(
+                    f"Task {task_id} historical terminal contract conflicts with control state "
+                    f"{latest.get('state', 'unknown')!r}"
+                )
+            normalized_contract.update(
+                {
+                    "legacy_contract": True,
+                    "legacy_contract_verified": True,
+                    "legacy_github_issue_state": "closed",
+                    "legacy_terminal_evidence": (
+                        "latest_control_state:production_verified"
+                        if latest is not None
+                        else "completed_dependency_record"
+                    ),
+                }
+            )
         contracts[task_id] = normalized_contract
     return contracts
 
@@ -1220,6 +1273,11 @@ def _queue_candidates() -> list[dict[str, Any]]:
             break
         contract = contracts.get(task_id)
         if contract is None:
+            if task_id not in contracts:
+                # Owner-only backlog specs without a GitHub control Issue are not queue
+                # candidates.  Keep them non-runnable until explicit Issue migration;
+                # malformed Issue-backed contracts still fail closed below.
+                continue
             result.append(
                 {
                     "task_id": task_id,

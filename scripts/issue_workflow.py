@@ -631,3 +631,52 @@ def parse_task_contract(body: str) -> dict[str, Any] | None:
         source_spec=payload.get("source_spec", ""),
         issue_state=raw_issue_state,
     )
+
+
+def parse_historical_terminal_task_contract(body: str) -> dict[str, Any]:
+    """Validate a closed historical contract that predates ``source_spec``.
+
+    This is deliberately separate from :func:`parse_task_contract`: it never makes a
+    missing source path runnable and is only used by the inventory boundary after
+    factual terminal evidence has been established there.
+    """
+
+    if TASK_CONTRACT_MARKER not in body:
+        raise IssueWorkflowError("Historical task contract marker is missing")
+    parts = body.split(TASK_CONTRACT_MARKER)
+    if len(parts) != 3:
+        raise IssueWorkflowError("Malformed task-contract markers")
+    try:
+        payload = json.loads(parts[1].strip())
+    except json.JSONDecodeError as error:
+        raise IssueWorkflowError("Malformed task-contract JSON") from error
+    if not isinstance(payload, Mapping):
+        raise IssueWorkflowError("Task-contract payload must be an object")
+    if payload.get("version") != TASK_CONTRACT_VERSION:
+        raise IssueWorkflowError("Unsupported task-contract version")
+    source_spec = payload.get("source_spec", "")
+    if source_spec is not None and (not isinstance(source_spec, str) or source_spec.strip()):
+        raise IssueWorkflowError("Historical terminal fallback requires missing source_spec")
+    raw_issue_state = payload.get("issue_state", "queued")
+    normalized = task_contract_payload(
+        task_id=payload.get("task_id", ""),
+        scope=payload.get("scope", ""),
+        acceptance=payload.get("acceptance", []),
+        dependencies=payload.get("dependencies", []),
+        owner_gate=payload.get("owner_gate", ""),
+        risk_lane=payload.get("risk_lane", ""),
+        # Validate the complete historical shape without exposing a fabricated path as
+        # the source of truth.  The inventory result removes it immediately below.
+        source_spec="legacy:historical-terminal",
+        issue_state=raw_issue_state,
+    )
+    normalized.pop("source_spec", None)
+    normalized.update(
+        {
+            "legacy_contract": True,
+            "legacy_raw_issue_state": normalized["issue_state"],
+            "legacy_normalization": "historical_closed->terminal",
+            "legacy_source_spec_missing": True,
+        }
+    )
+    return normalized
