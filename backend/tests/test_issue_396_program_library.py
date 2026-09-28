@@ -26,9 +26,7 @@ SOURCE_TITLES = {
     "metallicdpa-linear-progression-ppl": (
         "Линейная прогрессия Metallicdpa - PPL (толкай/тяни/ноги)"
     ),
-    "bwf-recommended-routine": (
-        "BWF (тренировки с собственным весом) - рекомендуемая программа"
-    ),
+    "bwf-recommended-routine": ("BWF (тренировки с собственным весом) - рекомендуемая программа"),
     "dumbbell-ppl-gregarioushermit": "Гантельная PPL (толкай/тяни/ноги)",
 }
 
@@ -97,8 +95,7 @@ def test_issue_396_seeded_library_exposes_16_templates_and_periodization(client)
     assert all(templates[slug]["provenance_type"] == "SOURCE_ADAPTATION" for slug in SOURCE_SLUGS)
     assert {slug: templates[slug]["title"] for slug in SOURCE_SLUGS} == SOURCE_TITLES
     assert {
-        slug: [day["title"] for day in templates[slug]["days"]]
-        for slug in SOURCE_SLUGS
+        slug: [day["title"] for day in templates[slug]["days"]] for slug in SOURCE_SLUGS
     } == SOURCE_DAY_TITLES
 
     assert templates["phul"]["default_duration_weeks"] == 12
