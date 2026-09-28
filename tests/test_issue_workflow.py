@@ -189,9 +189,25 @@ def test_legacy_completed_task_contract_normalizes_to_terminal_without_runtime_s
     assert "completed" not in CONTROL_STATES
 
 
-def test_unknown_task_contract_state_remains_fail_closed() -> None:
+def test_legacy_active_task_contract_preserves_terminal_candidate_without_runtime_state() -> None:
     body = """<!-- yfc-task-contract:v1 -->
-{"version":1,"task_id":"494","scope":"unknown state","acceptance":["must fail"],"dependencies":[],"owner_gate":"none","risk_lane":"GREEN","source_spec":"spec.md","issue_state":"magic"}
+{"version":1,"task_id":"346A","scope":"legacy active task","acceptance":["historical terminal evidence is required"],"dependencies":[],"owner_gate":"none","risk_lane":"YELLOW","source_spec":"codex-backlog/tasks/346A-production-log-retention.md","issue_state":"active"}
+<!-- yfc-task-contract:v1 -->"""
+
+    contract = parse_task_contract(body)
+
+    assert contract is not None
+    assert contract["issue_state"] == "production_verified"
+    assert contract["legacy_issue_state"] == "active"
+    assert contract["legacy_normalization"] == "active->production_verified"
+    assert contract["legacy_source_spec_missing"] is False
+    assert "active" not in CONTROL_STATES
+
+
+@pytest.mark.parametrize("state", ["done123", "magic", "blocked_on_evidence"])
+def test_unknown_task_contract_state_remains_fail_closed(state: str) -> None:
+    body = f"""<!-- yfc-task-contract:v1 -->
+{{"version":1,"task_id":"494","scope":"unknown state","acceptance":["must fail"],"dependencies":[],"owner_gate":"none","risk_lane":"GREEN","source_spec":"spec.md","issue_state":"{state}"}}
 <!-- yfc-task-contract:v1 -->"""
 
     with pytest.raises(IssueWorkflowError, match="Unknown task issue state"):
@@ -211,6 +227,23 @@ def test_current_terminal_task_contract_state_remains_unchanged() -> None:
     )
 
     assert contract["issue_state"] == "production_verified"
+    assert "legacy_issue_state" not in contract
+
+
+@pytest.mark.parametrize("state", ["queued", "in_progress", "production_verified"])
+def test_current_task_contract_states_round_trip_without_legacy_metadata(state: str) -> None:
+    contract = task_contract_payload(
+        task_id="91",
+        scope="current task contract",
+        acceptance=("current state remains supported",),
+        dependencies=(),
+        owner_gate="none",
+        risk_lane="GREEN",
+        source_spec="spec.md",
+        issue_state=state,
+    )
+
+    assert parse_task_contract(render_task_contract(contract)) == contract
     assert "legacy_issue_state" not in contract
 
 
