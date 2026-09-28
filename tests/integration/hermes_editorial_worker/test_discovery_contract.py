@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from subprocess import CompletedProcess
 from urllib.parse import parse_qs, unquote
@@ -894,6 +895,7 @@ def test_relevance_gate_rejects_before_outbox_and_records_bounded_state(
         title="Clinical study of a hospital population",
         summary="A general medical outcome without training or sports context.",
         content="The paper reports hospital outcomes and medication response.",
+        published_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=1),
     )
     monkeypatch.setattr(
         discovery_runner,
@@ -926,6 +928,104 @@ def test_relevance_gate_rejects_before_outbox_and_records_bounded_state(
     assert list(outbox_dir.glob("*.json")) == []
     state = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
     assert next(iter(state["candidates"].values()))["error_code"] == "relevance_gate_rejected"
+
+
+def test_discovery_freshness_gate_rejects_stale_missing_and_future_items(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = discovery_runner.SourceDefinition(
+        source_id="source-one",
+        name="Source One",
+        source_type="reputable_secondary",
+        fetch_kind="rss",
+        url="https://source.example/feed",
+        language="en",
+        enabled=True,
+        topics=("fitness_training",),
+        authoritative=False,
+        allowed_redirect_hosts=("source.example",),
+        allowed_item_hosts=("source.example",),
+    )
+    current = datetime.now(UTC).replace(tzinfo=None)
+    candidates = (
+        discovery_runner.ParsedCandidate(
+            external_id="fresh",
+            canonical_url="https://source.example/fresh",
+            title="Resistance training study reports strength gains",
+            summary="Resistance training and muscle strength outcomes.",
+            content="Resistance training and muscle strength outcomes.",
+            published_at=current - timedelta(days=7),
+        ),
+        discovery_runner.ParsedCandidate(
+            external_id="stale",
+            canonical_url="https://source.example/stale",
+            title="Resistance training study reports strength gains",
+            summary="Resistance training and muscle strength outcomes.",
+            content="Resistance training and muscle strength outcomes.",
+            published_at=current - timedelta(days=7, seconds=2),
+        ),
+        discovery_runner.ParsedCandidate(
+            external_id="missing",
+            canonical_url="https://source.example/missing",
+            title="Resistance training study reports strength gains",
+            summary="Resistance training and muscle strength outcomes.",
+            content="Resistance training and muscle strength outcomes.",
+            published_at=None,
+        ),
+        discovery_runner.ParsedCandidate(
+            external_id="future",
+            canonical_url="https://source.example/future",
+            title="Resistance training study reports strength gains",
+            summary="Resistance training and muscle strength outcomes.",
+            content="Resistance training and muscle strength outcomes.",
+            published_at=current + timedelta(minutes=5),
+        ),
+    )
+    monkeypatch.setattr(
+        discovery_runner,
+        "load_source_definitions",
+        lambda *_args, **_kwargs: (
+            {"definitions_version": "v1", "source_registry_sha256": "a" * 64},
+            (source,),
+        ),
+    )
+    monkeypatch.setattr(
+        discovery_runner,
+        "_source_outcome",
+        lambda *_args, **_kwargs: discovery_runner.SourceFetchOutcome(
+            source=source,
+            result=discovery_runner.FetchResult(status="fetched", items=candidates),
+        ),
+    )
+    monkeypatch.setenv("HERMES_DISCOVERY_FRESHNESS_MAX_AGE_HOURS", "168")
+
+    state_dir = tmp_path / "state"
+    outbox_dir = state_dir / "outbox"
+    result = discovery_runner.run_once(
+        definitions_path=tmp_path / "definitions.json",
+        state_dir=state_dir,
+        outbox_dir=outbox_dir,
+        mode=discovery_runner.EXTERNAL_MODE,
+    )
+
+    assert result["candidates_created"] == 1
+    assert result["freshness_rejected"] == 3
+    assert len(list(outbox_dir.glob("*.json"))) == 1
+    state = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+    errors = {
+        row.get("error_code")
+        for row in state["candidates"].values()
+        if row.get("status") == "rejected"
+    }
+    assert errors == {"freshness_gate_rejected"}
+
+
+def test_discovery_freshness_contract_is_seven_days() -> None:
+    assert discovery_runner.DEFAULT_FRESHNESS_MAX_AGE_HOURS == 7 * 24
+    service = (DISCOVERY_ROOT / "systemd" / "hermes-discovery.service.template").read_text(
+        encoding="utf-8"
+    )
+    assert "HERMES_DISCOVERY_FRESHNESS_MAX_AGE_HOURS=168" in service
 
 
 def test_json_feed_and_html_metadata_paths_normalize_bounded_candidates() -> None:

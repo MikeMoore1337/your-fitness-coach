@@ -32,6 +32,7 @@ ALERT_THRESHOLDS = {
 }
 HEALTH_COUNTERS = (
     "relevance_rejected",
+    "freshness_rejected",
     "accepted",
     "duplicate",
     "terminal",

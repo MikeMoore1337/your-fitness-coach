@@ -143,8 +143,8 @@ def test_signed_hermes_intake_creates_preview_and_is_idempotent(client, monkeypa
     [
         (None, 422),
         (datetime(2026, 8, 30, 12, 0, 1), 422),
-        (datetime(2026, 6, 30, 11, 59, 59), 422),
-        (datetime(2026, 7, 1, 12, 0, 0), 200),
+        (datetime(2026, 8, 23, 11, 59, 59), 422),
+        (datetime(2026, 8, 23, 12, 0, 0), 200),
         (datetime(2026, 8, 29, 12, 0, 0), 200),
     ],
 )
@@ -199,6 +199,47 @@ def test_signed_hermes_intake_enforces_source_freshness_before_ingestion(
             assert db.query(NewsDraftRevision).count() == before_drafts
         else:
             assert response.json()["status"] == "accepted"
+
+
+def test_fresh_hermes_relevance_bypasses_legacy_numeric_candidate_gate(client, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", "hermes-test")
+    monkeypatch.setattr(
+        settings,
+        "hermes_intake_shared_secret",
+        SecretStr("test-hermes-shared-secret-that-is-long-enough"),
+    )
+    monkeypatch.setattr(settings, "news_candidate_score_threshold", 100)
+    with get_session_context() as db:
+        db.add(
+            NewsSource(
+                id="journal-one",
+                name="Journal One",
+                source_type="reputable_secondary",
+                fetch_kind="rss",
+                feed_url="https://example.com/feed",
+                language="en",
+                enabled=True,
+            )
+        )
+
+    payload = _payload()
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+    response = client.post(
+        "/api/v1/hermes/editorial/intake",
+        content=body,
+        headers=_signed_headers(body),
+    )
+
+    assert response.status_code == 200, response.text
+    with get_session_context() as db:
+        submission = db.query(HermesEditorialSubmission).one()
+        cluster = db.get(NewsCluster, submission.cluster_id)
+        assert cluster is not None
+        assert cluster.score < settings.news_candidate_score_threshold
+        assert cluster.discovery_eligible is True
+        assert "hermes_relevance_v2_accepted" in cluster.discovery_reasons
+        assert "hermes_fresh_7d" in cluster.discovery_reasons
 
 
 def test_hermes_intake_rejects_bad_signature_without_source_processing(client, monkeypatch) -> None:
