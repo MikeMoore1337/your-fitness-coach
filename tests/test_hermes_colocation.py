@@ -198,6 +198,52 @@ def test_disable_timer_preserves_installed_unit_link(
     ]
 
 
+def test_release_switch_quiesces_timer_before_replacing_systemd_links(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    events: list[str] = []
+    records = [(tmp_path / "unit", "missing", None)]
+
+    monkeypatch.setattr(
+        hermes,
+        "_disable_timer",
+        lambda _root: events.append("disable"),
+    )
+
+    def install_links(**_kwargs):
+        events.append("links")
+        return records
+
+    monkeypatch.setattr(hermes, "_install_release_links", install_links)
+
+    class Result:
+        returncode = 0
+        stdout = ""
+
+    def fake_run(args: list[str], *, check: bool = True, capture: bool = False) -> Result:
+        assert args == ["systemctl", "daemon-reload"]
+        events.append("daemon-reload")
+        return Result()
+
+    monkeypatch.setattr(hermes, "_run", fake_run)
+    monkeypatch.setattr(
+        hermes,
+        "_assert_timer_disabled",
+        lambda: events.append("assert-disabled"),
+    )
+
+    result = hermes._switch_release_links(
+        runtime_root=tmp_path / "runtime",
+        config_root=tmp_path / "config",
+        systemd_root=tmp_path / "systemd",
+        release_dir=tmp_path / "release",
+        backup_dir=tmp_path / "backup",
+    )
+
+    assert result == records
+    assert events == ["disable", "links", "daemon-reload", "assert-disabled"]
+
+
 def test_definitions_provenance_is_content_addressed(tmp_path: Path) -> None:
     registry_hash = "a" * 64
     path = tmp_path / "source-definitions.json"
