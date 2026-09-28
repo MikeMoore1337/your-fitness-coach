@@ -40,7 +40,7 @@ const workout: Workout = {
       rest_seconds: 90,
       has_guide: false,
       progression_guidance: {
-        ruleset_version: 'progression-guidance-v1',
+        ruleset_version: 'progression-guidance-v2',
         outcome: 'review',
         message: 'Данных недостаточно — сначала закрепите текущий диапазон повторений',
         detail: 'Нужны полные сопоставимые рабочие подходы в текущем контексте программы.',

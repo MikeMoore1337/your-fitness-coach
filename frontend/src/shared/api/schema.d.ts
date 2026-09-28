@@ -10167,6 +10167,30 @@ export interface components {
             /** Day Numbers */
             day_numbers: number[];
         };
+        /** ProgramProgressionProposalExercise */
+        ProgramProgressionProposalExercise: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string;
+            guidance: components["schemas"]["ProgressionGuidance"];
+        };
+        /** ProgramProgressionProposalList */
+        ProgramProgressionProposalList: {
+            /** Target Program Id */
+            target_program_id: number;
+            /** Target Revision Number */
+            target_revision_number: number;
+            /** Target Workout Id */
+            target_workout_id: number;
+            /**
+             * Scheduled Date
+             * Format: date
+             */
+            scheduled_date: string;
+            /** Exercises */
+            exercises: components["schemas"]["ProgramProgressionProposalExercise"][];
+        };
         /** ProgramRecommendationCriteria */
         ProgramRecommendationCriteria: {
             /** Goal */
@@ -10813,132 +10837,6 @@ export interface components {
             /** Sessions */
             sessions: components["schemas"]["ProgressionSessionEvidence"][];
         };
-        /** ProgressionProposal */
-        ProgressionProposal: {
-            /** Proposal Id */
-            proposal_id: string;
-            /** Rule Id */
-            rule_id: string;
-            /**
-             * Rule Kind
-             * @enum {string}
-             */
-            rule_kind:
-                | "legacy_progression_guidance"
-                | "fixed_prescription"
-                | "double_progression"
-                | "linear_load"
-                | "percentage_training_max"
-                | "rir_rpe"
-                | "amrap_success_failure"
-                | "deload";
-            /** Rule Snapshot */
-            rule_snapshot: {
-                [key: string]: unknown;
-            };
-            /** Target Program Id */
-            target_program_id: number;
-            /** Target Revision Number */
-            target_revision_number: number;
-            /** Target Exercise Id */
-            target_exercise_id: number;
-            /** Target Workout Id */
-            target_workout_id: number;
-            /** Current Weight */
-            current_weight?: number | null;
-            /** Proposed Weight */
-            proposed_weight?: number | null;
-            /** Deload Volume Percent */
-            deload_volume_percent?: number | null;
-            /** Deload Intensity Percent */
-            deload_intensity_percent?: number | null;
-            /**
-             * Proposed Action
-             * @enum {string}
-             */
-            proposed_action: "set_load" | "hold" | "reset_recommended" | "deload";
-            /** Target Set Updates */
-            target_set_updates: components["schemas"]["ProgressionTargetSetUpdate"][];
-            /** Source Evidence Ids */
-            source_evidence_ids: string[];
-            /** Comparable Session Count */
-            comparable_session_count: number;
-            /** Reason Codes */
-            reason_codes: string[];
-            /**
-             * Eligibility Status
-             * @enum {string}
-             */
-            eligibility_status: "eligible" | "no_change" | "review";
-            /**
-             * Requires Confirmation
-             * @constant
-             */
-            requires_confirmation: true;
-        };
-        /** ProgressionProposalReviewRequest */
-        ProgressionProposalReviewRequest: {
-            /**
-             * Decision
-             * @enum {string}
-             */
-            decision: "confirm" | "reject" | "adjust";
-            /** Workout Id */
-            workout_id: number;
-            /** Exercise Id */
-            exercise_id: number;
-            /** Expected Revision Number */
-            expected_revision_number: number;
-            /** Adjusted Weight */
-            adjusted_weight?: number | null;
-            /** Expected Set Versions */
-            expected_set_versions: {
-                [key: string]: number;
-            };
-        };
-        /** ProgressionProposalReviewResponse */
-        ProgressionProposalReviewResponse: {
-            /** Proposal Id */
-            proposal_id: string;
-            /**
-             * Decision
-             * @enum {string}
-             */
-            decision: "confirm" | "reject" | "adjust";
-            /** Applied Set Ids */
-            applied_set_ids: number[];
-            /** Current Revision Number */
-            current_revision_number: number;
-        };
-        /** ProgressionTargetSetUpdate */
-        ProgressionTargetSetUpdate: {
-            /** Set Id */
-            set_id: number;
-            /** Set Number */
-            set_number: number;
-            /**
-             * Planned Role
-             * @enum {string}
-             */
-            planned_role?:
-                | "warmup"
-                | "working"
-                | "top"
-                | "backoff"
-                | "drop"
-                | "activation"
-                | "mini_set"
-                | "cluster_member"
-                | null;
-            /** Current Weight */
-            current_weight?: number | null;
-            /** Set Version */
-            set_version: number;
-            /** Relative To Top */
-            relative_to_top?: number | null;
-            /** Proposed Weight */
-            proposed_weight: number;
-        };
         /** ProgressionGuidance */
         ProgressionGuidance: {
             /**
@@ -10967,29 +10865,95 @@ export interface components {
             evidence: components["schemas"]["ProgressionEvidence"];
             proposal?: components["schemas"]["ProgressionProposal"] | null;
         };
-        /** ProgramProgressionProposalExercise */
-        ProgramProgressionProposalExercise: {
-            /** Exercise Id */
-            exercise_id: number;
-            /** Exercise Title */
-            exercise_title: string;
-            guidance: components["schemas"]["ProgressionGuidance"];
-        };
-        /** ProgramProgressionProposalList */
-        ProgramProgressionProposalList: {
+        /** ProgressionProposal */
+        ProgressionProposal: {
+            /** Proposal Id */
+            proposal_id: string;
+            /** Rule Id */
+            rule_id: string;
+            /**
+             * Rule Kind
+             * @enum {string}
+             */
+            rule_kind: "legacy_progression_guidance" | "fixed_prescription" | "double_progression" | "linear_load" | "percentage_training_max" | "rir_rpe" | "amrap_success_failure" | "deload";
+            /** Rule Snapshot */
+            rule_snapshot: {
+                [key: string]: unknown;
+            };
             /** Target Program Id */
             target_program_id: number;
             /** Target Revision Number */
             target_revision_number: number;
+            /** Target Exercise Id */
+            target_exercise_id: number;
             /** Target Workout Id */
             target_workout_id: number;
+            /** Current Weight */
+            current_weight?: number | null;
+            /** Proposed Weight */
+            proposed_weight?: number | null;
+            /** Deload Volume Percent */
+            deload_volume_percent?: number | null;
+            /** Deload Intensity Percent */
+            deload_intensity_percent?: number | null;
             /**
-             * Scheduled Date
-             * Format: date
+             * Proposed Action
+             * @enum {string}
              */
-            scheduled_date: string;
-            /** Exercises */
-            exercises: components["schemas"]["ProgramProgressionProposalExercise"][];
+            proposed_action: "set_load" | "hold" | "reset_recommended" | "deload";
+            /** Target Set Updates */
+            target_set_updates?: components["schemas"]["ProgressionTargetSetUpdate"][];
+            /** Source Evidence Ids */
+            source_evidence_ids: string[];
+            /** Comparable Session Count */
+            comparable_session_count: number;
+            /** Reason Codes */
+            reason_codes: string[];
+            /**
+             * Eligibility Status
+             * @enum {string}
+             */
+            eligibility_status: "eligible" | "no_change" | "review";
+            /**
+             * Requires Confirmation
+             * @default true
+             * @constant
+             */
+            requires_confirmation: true;
+        };
+        /** ProgressionProposalReviewRequest */
+        ProgressionProposalReviewRequest: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "reject" | "adjust";
+            /** Workout Id */
+            workout_id: number;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Adjusted Weight */
+            adjusted_weight?: number | null;
+            /** Expected Set Versions */
+            expected_set_versions?: {
+                [key: string]: number;
+            };
+        };
+        /** ProgressionProposalReviewResponse */
+        ProgressionProposalReviewResponse: {
+            /** Proposal Id */
+            proposal_id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "reject" | "adjust";
+            /** Applied Set Ids */
+            applied_set_ids: number[];
+            /** Current Revision Number */
+            current_revision_number: number;
         };
         /** ProgressionSessionEvidence */
         ProgressionSessionEvidence: {
@@ -11021,6 +10985,23 @@ export interface components {
             reached_failure: boolean;
             /** Completion Feedback */
             completion_feedback?: ("easier_than_expected" | "as_expected" | "harder_than_expected") | null;
+        };
+        /** ProgressionTargetSetUpdate */
+        ProgressionTargetSetUpdate: {
+            /** Set Id */
+            set_id: number;
+            /** Set Number */
+            set_number: number;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /** Current Weight */
+            current_weight?: number | null;
+            /** Set Version */
+            set_version: number;
+            /** Relative To Top */
+            relative_to_top?: number | null;
+            /** Proposed Weight */
+            proposed_weight: number;
         };
         /** PublicExerciseDetail */
         PublicExerciseDetail: {

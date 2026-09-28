@@ -294,9 +294,8 @@ export function AssignedProgramDetails({
   const progressionProposals = useQuery({
     queryKey: ['assigned-program', programId, 'progression-proposals'],
     queryFn: () =>
-      api<ProgressionProposalList>(
-        `/api/v1/programs/assigned/${programId}/progression-proposals`,
-      ),
+      api<ProgressionProposalList>(`/api/v1/programs/assigned/${programId}/progression-proposals`),
+    enabled: blocks.isSuccess,
   });
   const latestRevisionNumber = revisions.data?.[0]?.revision_number ?? 0;
   const revisionNumber = Math.max(
@@ -519,6 +518,7 @@ export function AssignedProgramDetails({
       <section
         className="program-history__region progression-proposals"
         aria-labelledby={`progression-proposals-${programId}`}
+        hidden={!blocks.isSuccess}
       >
         <div className="program-history__heading">
           <div>
@@ -545,7 +545,7 @@ export function AssignedProgramDetails({
             {progressionProposals.data.exercises.map((item) => {
               const proposal = item.guidance.proposal;
               if (!proposal || dismissedProposals.has(proposal.proposal_id)) return null;
-              const updates = proposal.target_set_updates;
+              const updates = proposal.target_set_updates ?? [];
               const expectedSetVersions = Object.fromEntries(
                 updates.map((update) => [update.set_id, update.set_version]),
               );

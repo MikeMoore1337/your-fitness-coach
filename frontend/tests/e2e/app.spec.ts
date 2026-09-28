@@ -1132,6 +1132,16 @@ async function mockApi(
         ],
       });
     if (path.endsWith('/programs/assigned/501/blocks')) return route.fulfill({ json: [] });
+    if (path.endsWith('/programs/assigned/501/progression-proposals'))
+      return route.fulfill({
+        json: {
+          target_program_id: 501,
+          target_revision_number: 1,
+          target_workout_id: 1,
+          scheduled_date: '2030-01-01',
+          exercises: [],
+        },
+      });
     if (path.endsWith('/programs/templates/hidden')) return route.fulfill({ json: [] });
     if (path.endsWith('/admin/users')) return route.fulfill({ json: [] });
     if (/\/coach\/clients\/\d+\/analytics$/.test(path))
@@ -1169,6 +1179,16 @@ async function mockApi(
       });
     if (path.endsWith('/programs/assigned/701/revisions')) return route.fulfill({ json: [] });
     if (path.endsWith('/programs/assigned/701/blocks')) return route.fulfill({ json: [] });
+    if (path.endsWith('/programs/assigned/701/progression-proposals'))
+      return route.fulfill({
+        json: {
+          target_program_id: 701,
+          target_revision_number: 2,
+          target_workout_id: 1,
+          scheduled_date: '2030-01-01',
+          exercises: [],
+        },
+      });
     if (path.endsWith('/coach/client-summaries'))
       return route.fulfill({
         json: {
