@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import errno
+import hashlib
 import json
 import os
 import queue
@@ -56,12 +57,16 @@ try:
     from scripts.task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
         CLOSED_LEASE_STATES,
+        IMPLEMENTATION_STATES,
+        KNOWN_LEASE_STATES,
         POST_START_TRANSPORT_FAILURE_KIND,
         POST_START_TRANSPORT_HANDOFF_BLOCKER,
         POST_START_TRANSPORT_SIGNATURES,
         GitRepository,
         TaskController,
+        TaskSessionError,
         find_task_document,
+        task_id_from_branch,
     )
     from scripts.worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 except ModuleNotFoundError:
@@ -88,12 +93,16 @@ except ModuleNotFoundError:
     from task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
         CLOSED_LEASE_STATES,
+        IMPLEMENTATION_STATES,
+        KNOWN_LEASE_STATES,
         POST_START_TRANSPORT_FAILURE_KIND,
         POST_START_TRANSPORT_HANDOFF_BLOCKER,
         POST_START_TRANSPORT_SIGNATURES,
         GitRepository,
         TaskController,
+        TaskSessionError,
         find_task_document,
+        task_id_from_branch,
     )
     from worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 
@@ -887,6 +896,131 @@ def _queue_owner_is_alive(
     raise DeliveryError("HUMAN_REQUIRED: unsupported platform for queue owner liveness")
 
 
+def _running_process_command_lines() -> list[tuple[int, str]]:
+    """Return process IDs and command lines needed by queue recovery checks."""
+
+    if os.name == "nt":
+        executable = shutil.which("powershell") or shutil.which("pwsh")
+        if executable is None:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: cannot inspect Windows processes for queue recovery"
+            )
+        query = (
+            "$ErrorActionPreference='Stop'; "
+            "Get-CimInstance Win32_Process | "
+            "Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress"
+        )
+        try:
+            completed = subprocess.run(
+                [executable, "-NoProfile", "-NonInteractive", "-Command", query],
+                check=False,
+                shell=False,
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: cannot inspect Windows processes for queue recovery"
+            ) from error
+        if completed.returncode != 0:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: cannot inspect Windows processes for queue recovery"
+            )
+        try:
+            raw = json.loads(completed.stdout.lstrip("\ufeff"))
+        except json.JSONDecodeError as error:
+            raise DeliveryError("HUMAN_REQUIRED: Windows process inventory is malformed") from error
+        records = raw if isinstance(raw, list) else [raw]
+        result: list[tuple[int, str]] = []
+        for record in records:
+            if not isinstance(record, Mapping):
+                raise DeliveryError("HUMAN_REQUIRED: Windows process inventory is malformed")
+            pid = record.get("ProcessId")
+            command = record.get("CommandLine")
+            if command is None:
+                continue
+            if (
+                isinstance(pid, bool)
+                or not isinstance(pid, int)
+                or pid < 1
+                or not isinstance(command, str)
+            ):
+                raise DeliveryError("HUMAN_REQUIRED: Windows process inventory is malformed")
+            if command:
+                result.append((pid, command))
+        return result
+
+    if os.name == "posix" and Path("/proc").is_dir():
+        result = []
+        for process_path in Path("/proc").glob("[0-9]*"):
+            try:
+                pid = int(process_path.name)
+                raw = (process_path / "cmdline").read_bytes()
+            except OSError, ValueError:
+                continue
+            command = raw.replace(b"\x00", b" ").decode("utf-8", errors="replace").strip()
+            if command:
+                result.append((pid, command))
+        return result
+
+    if sys.platform == "darwin":
+        try:
+            completed = subprocess.run(
+                ["ps", "-axo", "pid=,command="],
+                check=False,
+                shell=False,
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: cannot inspect macOS processes for queue recovery"
+            ) from error
+        if completed.returncode != 0:
+            raise DeliveryError("HUMAN_REQUIRED: cannot inspect macOS processes for queue recovery")
+        result = []
+        for line in completed.stdout.splitlines():
+            fields = line.strip().split(maxsplit=1)
+            if len(fields) != 2:
+                continue
+            try:
+                pid = int(fields[0])
+            except ValueError:
+                continue
+            result.append((pid, fields[1]))
+        return result
+
+    raise DeliveryError("HUMAN_REQUIRED: unsupported platform for process recovery checks")
+
+
+def _live_continuous_queue_supervisors() -> list[tuple[int, str]]:
+    result = []
+    for pid, command in _running_process_command_lines():
+        normalized = command.replace("\\", "/").lower()
+        if (
+            pid != os.getpid()
+            and "run_task_delivery.py" in normalized
+            and "--continue-queue" in normalized
+        ):
+            result.append((pid, command))
+    return result
+
+
+def _live_task_workers() -> list[tuple[int, str]]:
+    result = []
+    for pid, command in _running_process_command_lines():
+        normalized = command.replace("\\", "/").lower()
+        if pid == os.getpid() or "run_task_delivery.py" not in normalized:
+            continue
+        if "--worker-supervisor" in normalized or "--worker-bootstrap" in normalized:
+            result.append((pid, command))
+    return result
+
+
 def _controller_state_for_interrupted_claim(claim_path: Path, task_id: str) -> str:
     history_path = claim_path.parent / "history" / f"task-{task_id}.json"
     try:
@@ -915,6 +1049,80 @@ def _reject_interrupted_queue_claim(claim_path: Path, claim: Mapping[str, Any]) 
     )
 
 
+def _reclaim_queue_claim_atomically(
+    claim_path: Path,
+    *,
+    content: str,
+    claim: Mapping[str, Any],
+    expected_bytes: bytes,
+    event_stage: str,
+    missing_is_success: bool = False,
+) -> bool:
+    del content
+    try:
+        current_bytes = claim_path.read_bytes()
+    except FileNotFoundError:
+        if missing_is_success:
+            return True
+        raise DeliveryError("HUMAN_REQUIRED: continuous queue claim disappeared")
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot inspect continuous queue claim {claim_path}"
+        ) from error
+    if current_bytes != expected_bytes:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: continuous queue claim changed before atomic recovery; "
+            f"inspect {claim_path}"
+        )
+    quarantine_path = claim_path.with_name(f"{claim_path.name}.stale-{uuid4().hex}")
+    try:
+        os.rename(claim_path, quarantine_path)
+    except FileNotFoundError as error:
+        if missing_is_success:
+            return True
+        raise DeliveryError("HUMAN_REQUIRED: continuous queue claim disappeared") from error
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot atomically reclaim stale continuous queue claim {claim_path}"
+        ) from error
+    try:
+        quarantined_bytes = quarantine_path.read_bytes()
+    except FileNotFoundError as error:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: stale continuous queue claim disappeared during recovery; "
+            f"inspect {quarantine_path}"
+        ) from error
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot inspect quarantined continuous queue claim {quarantine_path}"
+        ) from error
+    if quarantined_bytes != expected_bytes:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: continuous queue claim changed during atomic stale-owner "
+            f"recovery; inspect {quarantine_path}"
+        )
+    pid = int(claim["pid"])
+    process_instance = _queue_claim_process_instance(claim.get("process_instance"), claim_path)
+    if _queue_owner_is_alive(pid, process_instance):
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: continuous queue owner PID {pid} became live during recovery; "
+            f"inspect {quarantine_path}"
+        )
+    try:
+        quarantine_path.unlink()
+    except FileNotFoundError as error:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: quarantined continuous queue claim disappeared during recovery; "
+            f"inspect {quarantine_path}"
+        ) from error
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot remove reclaimed continuous queue claim {quarantine_path}"
+        ) from error
+    _event(event_stage, claim_path=str(claim_path), owner_pid=pid, task_id=claim.get("task_id"))
+    return True
+
+
 def _recover_stale_queue_claim(claim_path: Path) -> bool:
     snapshot = _read_queue_claim(claim_path)
     if snapshot is None:
@@ -925,49 +1133,275 @@ def _recover_stale_queue_claim(claim_path: Path) -> bool:
     if _queue_owner_is_alive(pid, process_instance):
         return False
     _reject_interrupted_queue_claim(claim_path, claim)
-    quarantine_path = claim_path.with_name(f"{claim_path.name}.stale-{uuid4().hex}")
     try:
-        os.rename(claim_path, quarantine_path)
-    except FileNotFoundError:
-        return True
+        expected_bytes = claim_path.read_bytes()
     except OSError as error:
         raise DeliveryError(
-            f"HUMAN_REQUIRED: cannot atomically reclaim stale continuous queue claim {claim_path}"
+            f"HUMAN_REQUIRED: cannot inspect continuous queue claim {claim_path}"
         ) from error
+    return _reclaim_queue_claim_atomically(
+        claim_path,
+        content=content,
+        claim=claim,
+        expected_bytes=expected_bytes,
+        event_stage="STALE_QUEUE_CLAIM_RECOVERED",
+        missing_is_success=True,
+    )
+
+
+def _record_queue_reconciliation_evidence(
+    *,
+    task_id: str,
+    control_issue: int,
+    reason: str,
+    claim: Mapping[str, Any],
+    claim_bytes: bytes,
+) -> str:
+    manager = ArtifactManager(REPOSITORY_ROOT / ".artifacts", repo_root=REPOSITORY_ROOT)
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    path = manager.allocate(
+        task_id,
+        "evidence",
+        Path("evidence") / "queue-reconciliation" / f"{timestamp}-{task_id}.json",
+        purpose="owner-authorized stale interrupted continuous queue claim reconciliation",
+        command="scripts/run_task_delivery.py",
+        owner="controller",
+        retention="retain-for-review-and-investigation",
+    )
+    payload = {
+        "version": 1,
+        "operation": "owner-authorized-interrupted-queue-claim-reconciliation",
+        "task_id": task_id,
+        "control_issue": control_issue,
+        "reason": reason,
+        "reclaimed_at": datetime.now(UTC).isoformat(timespec="microseconds"),
+        "claim_sha256": hashlib.sha256(claim_bytes).hexdigest(),
+        "claim": dict(claim),
+    }
     try:
-        quarantined_content = quarantine_path.read_text(encoding="utf-8")
-    except FileNotFoundError as error:
-        raise DeliveryError(
-            f"HUMAN_REQUIRED: stale continuous queue claim disappeared during recovery; "
-            f"inspect {quarantine_path}"
-        ) from error
-    except OSError as error:
-        raise DeliveryError(
-            f"HUMAN_REQUIRED: cannot inspect quarantined continuous queue claim {quarantine_path}"
-        ) from error
-    if quarantined_content != content:
-        raise DeliveryError(
-            f"HUMAN_REQUIRED: continuous queue claim changed during atomic stale-owner "
-            f"recovery; inspect {quarantine_path}"
+        path.write_text(
+            json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
         )
-    if _queue_owner_is_alive(pid, process_instance):
-        raise DeliveryError(
-            f"HUMAN_REQUIRED: continuous queue owner PID {pid} became live during recovery; "
-            f"inspect {quarantine_path}"
-        )
-    try:
-        quarantine_path.unlink()
-    except FileNotFoundError as error:
-        raise DeliveryError(
-            f"HUMAN_REQUIRED: quarantined continuous queue claim disappeared during recovery; "
-            f"inspect {quarantine_path}"
-        ) from error
     except OSError as error:
         raise DeliveryError(
-            f"HUMAN_REQUIRED: cannot remove reclaimed continuous queue claim {quarantine_path}"
+            f"HUMAN_REQUIRED: cannot write queue reconciliation evidence {path}"
         ) from error
-    _event("STALE_QUEUE_CLAIM_RECOVERED", claim_path=str(claim_path), owner_pid=pid)
-    return True
+    return str(path)
+
+
+def _reconcile_interrupted_queue_claim(
+    task_id: str,
+    *,
+    control_issue: int,
+    reason: str,
+    owner_authorize: bool,
+) -> dict[str, Any]:
+    expected_task_id = _normalize_task_id(task_id)
+    if not owner_authorize:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: interrupted queue reconciliation requires explicit owner authorization"
+        )
+    if isinstance(control_issue, bool) or not isinstance(control_issue, int) or control_issue < 1:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: interrupted queue reconciliation requires a valid control Issue"
+        )
+    if not isinstance(reason, str) or not reason.strip() or len(reason.strip()) > 1024:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: interrupted queue reconciliation reason must be bounded and non-empty"
+        )
+
+    state_root = _git_common_dir() / "codex-task-sessions-v1"
+    claim_path = state_root / "continuous-queue.lock"
+    repository = GitRepository(REPOSITORY_ROOT)
+    controller = TaskController(repository)
+    with controller.store.lock():
+        snapshot = _read_queue_claim(claim_path)
+        if snapshot is None:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: continuous queue claim is missing; inspect {claim_path}"
+            )
+        content, claim = snapshot
+        try:
+            claim_bytes = claim_path.read_bytes()
+        except OSError as error:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: cannot inspect continuous queue claim {claim_path}"
+            ) from error
+        if claim.get("queue_phase") != QUEUE_CLAIM_TASK_PHASE:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: interrupted queue reconciliation requires queue_phase=task_running"
+            )
+        if str(claim.get("task_id", "")).upper() != expected_task_id:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: interrupted queue claim task identity does not match expected task identity"
+            )
+        if claim.get("control_issue") != control_issue:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: interrupted queue claim control Issue does not match expected control Issue"
+            )
+        pid = int(claim["pid"])
+        process_instance = _queue_claim_process_instance(claim.get("process_instance"), claim_path)
+        if _queue_owner_is_alive(pid, process_instance):
+            raise DeliveryError(f"HUMAN_REQUIRED: continuous queue owner PID {pid} is still live")
+        supervisors = _live_continuous_queue_supervisors()
+        if supervisors:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: another CONTINUE_QUEUE supervisor is live: "
+                + "; ".join(str(item[0]) for item in supervisors)
+            )
+        workers = _live_task_workers()
+        if workers:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: another task worker is live: "
+                + "; ".join(str(item[0]) for item in workers)
+            )
+
+        leases = controller.store.all_leases()
+        matches = [
+            item
+            for item in leases
+            if str(item.get("task_id", "")).strip().upper() == expected_task_id
+        ]
+        if len(matches) != 1:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: interrupted queue reconciliation requires exactly one task lease for Task {expected_task_id}"
+            )
+        lease = matches[0]
+        lifecycle_state = str(lease.get("lifecycle_state", "")).strip().lower()
+        if lifecycle_state not in KNOWN_LEASE_STATES:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Task {expected_task_id} lease has ambiguous lifecycle state {lifecycle_state or '<missing>'}"
+            )
+        if lifecycle_state not in IMPLEMENTATION_STATES:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Task {expected_task_id} lease is not an active implementation state"
+            )
+        if lease.get("mode") != "write" or lease.get("queue_mode") is not True:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Task {expected_task_id} lease is not the expected queue write lease"
+            )
+        delivery = controller.store.delivery_state()
+        if delivery.get("owner") is not None:
+            raise DeliveryError("HUMAN_REQUIRED: delivery lane has another live owner")
+
+        branch = lease.get("branch")
+        if not isinstance(branch, str) or not branch:
+            raise DeliveryError("HUMAN_REQUIRED: Task lease branch identity is ambiguous")
+        try:
+            if task_id_from_branch(branch) != expected_task_id:
+                raise DeliveryError("HUMAN_REQUIRED: Task lease branch identity is ambiguous")
+        except TaskSessionError as error:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: Task lease branch identity is ambiguous"
+            ) from error
+        worktree_value = lease.get("worktree")
+        if not isinstance(worktree_value, str) or not worktree_value:
+            raise DeliveryError("HUMAN_REQUIRED: Task lease worktree identity is ambiguous")
+        worktree = Path(worktree_value).resolve()
+        try:
+            worktree.relative_to((REPOSITORY_ROOT / ".artifacts" / "worktrees").resolve())
+        except ValueError as error:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: Task lease worktree identity is ambiguous"
+            ) from error
+        repository_worktrees = repository.worktrees()
+        worktree_matches = [item for item in repository_worktrees if item.path == worktree]
+        branch_matches = [item for item in repository_worktrees if item.branch == branch]
+        local_branch_matches = [
+            item for item in repository.local_branches() if item.get("branch") == branch
+        ]
+        if (
+            len(worktree_matches) != 1
+            or len(branch_matches) != 1
+            or len(local_branch_matches) != 1
+            or worktree_matches[0].branch != branch
+            or repository.current_branch(cwd=worktree) != branch
+        ):
+            raise DeliveryError("HUMAN_REQUIRED: Task lease branch/worktree identity is ambiguous")
+        for other in leases:
+            if other is lease:
+                continue
+            if str(other.get("branch", "")) == branch:
+                raise DeliveryError("HUMAN_REQUIRED: Task lease branch identity is ambiguous")
+            other_worktree = other.get("worktree")
+            if isinstance(other_worktree, str) and Path(other_worktree).resolve() == worktree:
+                raise DeliveryError("HUMAN_REQUIRED: Task lease worktree identity is ambiguous")
+
+        task_issue = claim.get("task_issue")
+        if isinstance(task_issue, bool) or not isinstance(task_issue, int) or task_issue < 1:
+            raise DeliveryError("HUMAN_REQUIRED: interrupted queue claim task Issue is invalid")
+        task_issue_snapshot, comments = _control_issue_snapshot(task_issue)
+        if not _issue_authorized(task_issue_snapshot):
+            raise DeliveryError(
+                "HUMAN_REQUIRED: task control Issue must be authored by the repository owner"
+            )
+        task_match = CONTROL_ISSUE_RE.match(str(task_issue_snapshot.get("title", "")))
+        if task_match is None or task_match.group("task_id").upper() != expected_task_id:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: interrupted queue claim task Issue does not match task identity"
+            )
+        latest = latest_control_state(
+            comments,
+            task_id=expected_task_id,
+            authorized_logins=_trusted_issue_logins(task_issue_snapshot),
+        )
+        if (
+            str(task_issue_snapshot.get("state", "")).upper() != "OPEN"
+            or not isinstance(latest, Mapping)
+            or latest.get("state") != "human_required"
+        ):
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: Task {expected_task_id} control Issue is not in the allowed human_required recovery state"
+            )
+        _, _, authorization = _queue_authorization_snapshot(control_issue)
+        if not authorization.get("active") or authorization.get("queue_stop") is not None:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: CONTINUE_QUEUE control Issue is not active for reconciliation"
+            )
+
+        current = _read_queue_claim(claim_path)
+        if current is None or current[0] != content:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: continuous queue claim changed before owner-authorized recovery"
+            )
+        try:
+            current_bytes = claim_path.read_bytes()
+        except OSError as error:
+            raise DeliveryError(
+                f"HUMAN_REQUIRED: cannot inspect continuous queue claim {claim_path}"
+            ) from error
+        if current_bytes != claim_bytes:
+            raise DeliveryError(
+                "HUMAN_REQUIRED: continuous queue claim changed before owner-authorized recovery"
+            )
+        _reclaim_queue_claim_atomically(
+            claim_path,
+            content=content,
+            claim=claim,
+            expected_bytes=claim_bytes,
+            event_stage="OWNER_AUTHORIZED_INTERRUPTED_QUEUE_CLAIM_RECLAIMED",
+        )
+        evidence_path = _record_queue_reconciliation_evidence(
+            task_id=expected_task_id,
+            control_issue=control_issue,
+            reason=reason.strip(),
+            claim=claim,
+            claim_bytes=claim_bytes,
+        )
+    _event(
+        "OWNER_AUTHORIZED_INTERRUPTED_QUEUE_CLAIM_RECONCILED",
+        task_id=expected_task_id,
+        control_issue=control_issue,
+        reason=reason.strip(),
+        evidence_path=evidence_path,
+    )
+    return {
+        "task_id": expected_task_id,
+        "control_issue": control_issue,
+        "evidence_path": evidence_path,
+        "status": "reconciled",
+    }
 
 
 @contextmanager
@@ -3533,7 +3967,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--poll-seconds", type=int, default=30)
     parser.add_argument("--max-wait-minutes", type=int, default=1440)
     parser.add_argument("--continue-queue", action="store_true")
+    parser.add_argument("--reconcile-interrupted-queue-claim", action="store_true")
     parser.add_argument("--control-issue", type=int)
+    parser.add_argument("--reconcile-reason")
+    parser.add_argument("--owner-authorize", action="store_true")
     resume_group = parser.add_mutually_exclusive_group()
     resume_group.add_argument("--resume-preimplementation", action="store_true")
     resume_group.add_argument("--resume-guard-interrupted", action="store_true")
@@ -3567,6 +4004,31 @@ def main(argv: Sequence[str] | None = None) -> int:
                 command=args.worker_command,
                 worker_state_path_value=args.worker_state_path,
             )
+        if args.reconcile_interrupted_queue_claim:
+            if args.task_id is None:
+                raise DeliveryError(
+                    "interrupted queue reconciliation requires the expected task ID"
+                )
+            if args.continue_queue:
+                raise DeliveryError(
+                    "interrupted queue reconciliation cannot run with --continue-queue"
+                )
+            if args.control_issue is None:
+                raise DeliveryError("interrupted queue reconciliation requires --control-issue")
+            if args.offline:
+                raise DeliveryError(
+                    "interrupted queue reconciliation requires online GitHub control state"
+                )
+            if args.reconcile_reason is None:
+                raise DeliveryError("interrupted queue reconciliation requires --reconcile-reason")
+            result = _reconcile_interrupted_queue_claim(
+                args.task_id,
+                control_issue=args.control_issue,
+                reason=args.reconcile_reason,
+                owner_authorize=args.owner_authorize,
+            )
+            _event("OWNER_AUTHORIZED_INTERRUPTED_QUEUE_CLAIM_RECONCILED", **result)
+            return 0
         if args.poll_seconds < 10:
             raise DeliveryError("poll-seconds must be at least 10")
         if args.max_wait_minutes < 1:

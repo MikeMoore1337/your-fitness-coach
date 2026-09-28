@@ -4,6 +4,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -3554,3 +3555,365 @@ def test_delivery_cleanup_refuses_artifacts_outside_exact_task_path(
 
     with pytest.raises(delivery.DeliveryError, match="outside exact task root"):
         delivery._cleanup_delivery_artifacts("133", outside)
+
+
+def _owner_reconcile_claim(
+    common_dir: Path,
+    *,
+    task_id: str = "506",
+    task_issue: int = 506,
+    control_issue: int = 550,
+    queue_phase: str = "task_running",
+) -> tuple[Path, str]:
+    claim_path = common_dir / "codex-task-sessions-v1" / "continuous-queue.lock"
+    claim_path.parent.mkdir(parents=True, exist_ok=True)
+    claim = {
+        "control_issue": control_issue,
+        "pid": 424242,
+        "process_instance": _claim_process_instance(),
+        "started_at": "2026-09-28T18:42:33.740847+00:00",
+        "queue_phase": queue_phase,
+        "task_id": task_id if queue_phase == "task_running" else None,
+        "task_issue": task_issue if queue_phase == "task_running" else None,
+        "worker_state": "running" if queue_phase == "task_running" else "idle",
+        "worker_state_path": None,
+    }
+    content = json.dumps(claim, ensure_ascii=True, sort_keys=True) + "\n"
+    claim_path.write_text(content, encoding="utf-8")
+    return claim_path, content
+
+
+def _configure_owner_reconcile(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    leases: list[dict[str, Any]] | None = None,
+    process_lines: list[tuple[int, str]] | None = None,
+) -> tuple[Path, Path, dict[str, Any]]:
+    common_root = tmp_path / "git-common"
+    worktree = tmp_path / ".artifacts" / "worktrees" / "506-program-lifecycle"
+    worktree.mkdir(parents=True)
+    branch = "task/506-product-v4-stage-2-program-lifecycle"
+    lease = {
+        "task_id": "506",
+        "mode": "write",
+        "lifecycle_state": "implementation",
+        "queue_mode": True,
+        "queue_budget": {
+            "review_fix_cycles": 0,
+            "ci_fix_cycles": 0,
+            "scope_expansions": 0,
+            "events": [],
+        },
+        "branch": branch,
+        "worktree": str(worktree),
+    }
+    current_leases = leases if leases is not None else [lease]
+
+    class FakeRepository:
+        def __init__(self, root: Path) -> None:
+            del root
+
+        def worktrees(self) -> list[SimpleNamespace]:
+            return [SimpleNamespace(path=worktree.resolve(), branch=branch)]
+
+        def local_branches(self) -> list[dict[str, str]]:
+            return [{"branch": branch}]
+
+        def current_branch(self, *, cwd: Path | None = None) -> str:
+            del cwd
+            return branch
+
+    FakeRepository.common_dir = common_root
+    FakeRepository.repository_root = tmp_path
+    FakeRepository.current_worktree = tmp_path
+
+    class FakeStore:
+        def all_leases(self) -> list[dict[str, Any]]:
+            return current_leases
+
+        def delivery_state(self) -> dict[str, Any]:
+            return {"owner": None}
+
+        def lock(self) -> Any:
+            return nullcontext()
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+    task_issue = {
+        "number": 506,
+        "state": "OPEN",
+        "title": "[Task 506] Product v4",
+        "user": {"login": "MikeMoore1337"},
+    }
+    task_state = delivery.control_state_payload(
+        task_id="506",
+        state="human_required",
+        issue_number=506,
+        branch=branch,
+        blocker="worker returned before terminal controller finish",
+    )
+    comments = [
+        {
+            "id": 1,
+            "created_at": "2026-09-28T20:12:46Z",
+            "user": {"login": "MikeMoore1337"},
+            "body": delivery.render_control_state_comment(task_state),
+        }
+    ]
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_root)
+    monkeypatch.setattr(delivery, "GitRepository", FakeRepository)
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("MikeMoore1337",))
+    monkeypatch.setattr(
+        delivery,
+        "_queue_authorization_snapshot",
+        lambda issue: ({"number": issue, "state": "OPEN"}, [], {"active": True}),
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue: (task_issue, comments) if issue == 506 else ({"number": issue}, []),
+    )
+    monkeypatch.setattr(delivery, "_queue_owner_is_alive", lambda pid, identity: False)
+    monkeypatch.setattr(
+        delivery,
+        "_running_process_command_lines",
+        lambda: process_lines or [],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_record_queue_reconciliation_evidence",
+        lambda **kwargs: None,
+        raising=False,
+    )
+    claim_path, _ = _owner_reconcile_claim(common_root)
+    return claim_path, worktree, lease
+
+
+def test_owner_reconcile_cli_contract_is_explicit() -> None:
+    args = delivery._parser().parse_args(
+        [
+            "506",
+            "--reconcile-interrupted-queue-claim",
+            "--control-issue",
+            "550",
+            "--reconcile-reason",
+            "owner-authorized stale claim recovery",
+            "--owner-authorize",
+        ]
+    )
+
+    assert args.task_id == "506"
+    assert args.reconcile_interrupted_queue_claim is True
+    assert args.control_issue == 550
+    assert args.reconcile_reason == "owner-authorized stale claim recovery"
+    assert args.owner_authorize is True
+
+
+def test_owner_reconcile_requires_explicit_authorization_and_preserves_claim(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, _, _ = _configure_owner_reconcile(monkeypatch, tmp_path)
+    original = claim_path.read_bytes()
+
+    with pytest.raises(delivery.DeliveryError, match="explicit owner authorization"):
+        delivery._reconcile_interrupted_queue_claim(
+            "506", control_issue=550, reason="resume stale queue", owner_authorize=False
+        )
+
+    assert claim_path.read_bytes() == original
+
+
+def test_owner_reconcile_refuses_live_owner(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, _, _ = _configure_owner_reconcile(monkeypatch, tmp_path)
+    monkeypatch.setattr(delivery, "_queue_owner_is_alive", lambda pid, identity: True)
+
+    with pytest.raises(delivery.DeliveryError, match="owner PID 424242 is still live"):
+        delivery._reconcile_interrupted_queue_claim(
+            "506", control_issue=550, reason="resume stale queue", owner_authorize=True
+        )
+
+    assert claim_path.is_file()
+
+
+@pytest.mark.parametrize(
+    ("task_id", "control_issue", "message"),
+    (
+        ("505", 550, "task identity"),
+        ("506", 551, "control Issue"),
+    ),
+)
+def test_owner_reconcile_refuses_claim_identity_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    task_id: str,
+    control_issue: int,
+    message: str,
+) -> None:
+    claim_path, _, _ = _configure_owner_reconcile(monkeypatch, tmp_path)
+
+    with pytest.raises(delivery.DeliveryError, match=message):
+        delivery._reconcile_interrupted_queue_claim(
+            task_id, control_issue=control_issue, reason="resume stale queue", owner_authorize=True
+        )
+
+    assert claim_path.is_file()
+
+
+@pytest.mark.parametrize(
+    "leases",
+    (
+        [],
+        [
+            {
+                "task_id": "506",
+                "mode": "write",
+                "lifecycle_state": "implementation",
+                "queue_mode": True,
+                "branch": "task/506-product-v4-stage-2-program-lifecycle",
+                "worktree": "C:/one",
+            },
+            {
+                "task_id": "506",
+                "mode": "write",
+                "lifecycle_state": "implementation",
+                "queue_mode": True,
+                "branch": "task/506-product-v4-stage-2-program-lifecycle",
+                "worktree": "C:/two",
+            },
+        ],
+    ),
+)
+def test_owner_reconcile_refuses_missing_or_ambiguous_lease(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, leases: list[dict[str, Any]]
+) -> None:
+    claim_path, _, _ = _configure_owner_reconcile(monkeypatch, tmp_path, leases=leases)
+
+    with pytest.raises(delivery.DeliveryError, match="exactly one task lease"):
+        delivery._reconcile_interrupted_queue_claim(
+            "506", control_issue=550, reason="resume stale queue", owner_authorize=True
+        )
+
+    assert claim_path.is_file()
+
+
+def test_owner_reconcile_refuses_ambiguous_lease_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    lease = {
+        "task_id": "506",
+        "mode": "write",
+        "lifecycle_state": "magic-state",
+        "queue_mode": True,
+        "branch": "task/506-product-v4-stage-2-program-lifecycle",
+        "worktree": str(tmp_path / ".artifacts" / "worktrees" / "506-program-lifecycle"),
+    }
+    claim_path, _, _ = _configure_owner_reconcile(monkeypatch, tmp_path, leases=[lease])
+
+    with pytest.raises(delivery.DeliveryError, match="ambiguous lifecycle"):
+        delivery._reconcile_interrupted_queue_claim(
+            "506", control_issue=550, reason="resume stale queue", owner_authorize=True
+        )
+
+    assert claim_path.is_file()
+
+
+@pytest.mark.parametrize(
+    "process_lines",
+    (
+        [(3101, "python scripts/run_task_delivery.py --continue-queue --control-issue 550")],
+        [(3102, "python scripts/run_task_delivery.py --worker-supervisor --task 504")],
+    ),
+)
+def test_owner_reconcile_refuses_live_queue_or_task_worker(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    process_lines: list[tuple[int, str]],
+) -> None:
+    claim_path, _, _ = _configure_owner_reconcile(
+        monkeypatch, tmp_path, process_lines=process_lines
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="live"):
+        delivery._reconcile_interrupted_queue_claim(
+            "506", control_issue=550, reason="resume stale queue", owner_authorize=True
+        )
+
+    assert claim_path.is_file()
+
+
+def test_owner_reconcile_refuses_claim_drift_before_mutation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, _, _ = _configure_owner_reconcile(monkeypatch, tmp_path)
+    original_read = delivery._read_queue_claim
+    calls = 0
+
+    def changed_read(path: Path) -> tuple[str, dict[str, Any]] | None:
+        nonlocal calls
+        calls += 1
+        snapshot = original_read(path)
+        if snapshot is None or calls != 2:
+            return snapshot
+        content, claim = snapshot
+        return content + "drift", claim
+
+    monkeypatch.setattr(delivery, "_read_queue_claim", changed_read)
+    with pytest.raises(delivery.DeliveryError, match="changed before owner-authorized"):
+        delivery._reconcile_interrupted_queue_claim(
+            "506", control_issue=550, reason="resume stale queue", owner_authorize=True
+        )
+
+    assert claim_path.is_file()
+
+
+def test_owner_reconcile_task_506_preserves_lease_and_reclaims_claim(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, worktree, lease = _configure_owner_reconcile(monkeypatch, tmp_path)
+    before_lease = json.loads(json.dumps(lease))
+    evidence: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        delivery,
+        "_record_queue_reconciliation_evidence",
+        lambda **kwargs: evidence.append(kwargs) or None,
+    )
+
+    result = delivery._reconcile_interrupted_queue_claim(
+        "506",
+        control_issue=550,
+        reason="owner-authorized resume after stale interrupted queue worker",
+        owner_authorize=True,
+    )
+
+    assert result["task_id"] == "506"
+    assert result["control_issue"] == 550
+    assert not claim_path.exists()
+    assert lease == before_lease
+    assert worktree.is_dir()
+    assert evidence and evidence[0]["task_id"] == "506"
+
+
+def test_owner_reconcile_allows_fresh_queue_claim_after_reclaim(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, _, _ = _configure_owner_reconcile(monkeypatch, tmp_path)
+    delivery._reconcile_interrupted_queue_claim(
+        "506", control_issue=550, reason="owner-authorized resume", owner_authorize=True
+    )
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
+
+    with delivery._continuous_queue_claim(550):
+        assert claim_path.is_file()
+        assert json.loads(claim_path.read_text(encoding="utf-8"))["queue_phase"] == "idle"
+
+    assert not claim_path.exists()
