@@ -76,6 +76,14 @@ function revisions(currentBlock: TrainingBlock): ProgramRevision[] {
   ];
 }
 
+const emptyProgressionProposalList = {
+  target_program_id: 77,
+  target_revision_number: 2,
+  target_workout_id: 42,
+  scheduled_date: '2026-08-24',
+  exercises: [],
+};
+
 function renderDetails() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -115,6 +123,7 @@ describe('AssignedProgramDetails', () => {
     apiMock.mockImplementation(async (path: string) => {
       if (path.endsWith('/blocks')) return [currentBlock];
       if (path.endsWith('/revisions')) return revisions(currentBlock);
+      if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
       throw new Error(`Unexpected API path: ${path}`);
     });
 
@@ -147,6 +156,7 @@ describe('AssignedProgramDetails', () => {
     const currentBlock = block();
     apiMock.mockImplementation(async (path: string) => {
       if (path.endsWith('/blocks')) return [currentBlock];
+      if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
       if (path.endsWith('/revisions')) {
         const history = revisions(currentBlock);
         history[0] = {
@@ -166,7 +176,9 @@ describe('AssignedProgramDetails', () => {
   });
 
   it('keeps empty blocks distinct from empty revision history', async () => {
-    apiMock.mockResolvedValue([]);
+    apiMock.mockImplementation(async (path: string) =>
+      path.endsWith('/progression-proposals') ? emptyProgressionProposalList : [],
+    );
 
     renderDetails();
 
@@ -187,6 +199,7 @@ describe('AssignedProgramDetails', () => {
         'История недоступна. Возможно, доступ тренера к программе был отозван.',
       ),
     ).toBeInTheDocument();
+    expect(apiMock).not.toHaveBeenCalledWith('/api/v1/programs/assigned/77/progression-proposals');
   });
 
   it('requires a reason for a trainer-compatible edit and sends it with the optimistic revision', async () => {
@@ -198,6 +211,7 @@ describe('AssignedProgramDetails', () => {
         }
         if (path.endsWith('/blocks')) return [currentBlock];
         if (path.endsWith('/revisions')) return revisions(currentBlock);
+        if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
         throw new Error(`Unexpected API path: ${path}`);
       },
     );
@@ -243,6 +257,7 @@ describe('AssignedProgramDetails', () => {
           return [blockReads === 1 ? staleBlock : freshBlock];
         }
         if (path.endsWith('/revisions')) return revisions(freshBlock);
+        if (path.endsWith('/progression-proposals')) return emptyProgressionProposalList;
         throw new Error(`Unexpected API path: ${path}`);
       },
     );

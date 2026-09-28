@@ -79,8 +79,9 @@ def apply_workout_set_update(
     *,
     expected_version: int | None,
     mutation_id: str | None,
+    allow_planned: bool = False,
 ) -> UserWorkoutSet:
-    if workout.status != "in_progress":
+    if workout.status != "in_progress" and not (allow_planned and workout.status == "planned"):
         raise WorkoutSetSyncError(
             409,
             {

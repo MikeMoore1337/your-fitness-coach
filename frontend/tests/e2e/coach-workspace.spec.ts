@@ -688,6 +688,16 @@ async function mockCoachWorkspace(
         ],
       });
     if (path.endsWith('/programs/exercises')) return route.fulfill({ json: [] });
+    if (/\/programs\/assigned\/\d+\/progression-proposals$/.test(path))
+      return route.fulfill({
+        json: {
+          target_program_id: 701,
+          target_revision_number: 2,
+          target_workout_id: 501,
+          scheduled_date: '2026-08-22',
+          exercises: [],
+        },
+      });
     if (/\/programs\/assigned\/\d+\/(revisions|blocks)$/.test(path))
       return route.fulfill({ json: [] });
     if (path.endsWith('/coach/invite-links') && request.method() === 'POST')

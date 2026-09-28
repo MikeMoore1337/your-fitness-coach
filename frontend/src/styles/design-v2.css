@@ -7282,6 +7282,60 @@ button.notification-row__main:focus-visible {
   font-size: 0.78rem;
 }
 
+.app-section--programs .progression-proposals__items {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.app-section--programs .progression-proposals__item {
+  display: grid;
+  gap: var(--v2-space-3);
+  min-width: 0;
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.app-section--programs .progression-proposals__item h5 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.app-section--programs .progression-guidance {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+  color: var(--v2-text-primary);
+}
+
+.app-section--programs .progression-guidance__copy {
+  display: grid;
+  gap: var(--v2-space-1);
+}
+
+.app-section--programs .progression-guidance__copy > p,
+.app-section--programs .progression-guidance__empty {
+  color: var(--v2-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.app-section--programs .progression-guidance__rule {
+  font-weight: 600;
+}
+
+.app-section--programs .progression-guidance__actions,
+.app-section--programs .progression-proposals__adjust {
+  display: grid;
+  gap: var(--v2-space-2);
+  max-width: 32rem;
+}
+
+.app-section--programs .progression-proposals__adjust .ui-button {
+  justify-self: start;
+}
+
 .app-section--programs .program-block-editor {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

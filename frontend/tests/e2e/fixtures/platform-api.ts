@@ -435,6 +435,20 @@ export async function installPlatformApi(
     const requiredSessionCount =
       progressionOutcome === 'hold' ? 3 : progressionOutcome === 'review' ? 2 : 2;
     const reps = progressionOutcome === 'consider_reducing' ? [6, 7] : [10, 10];
+    const suggestedWeight =
+      progressionOutcome === 'consider_progressing'
+        ? 42.5
+        : progressionOutcome === 'consider_reducing'
+          ? 37.5
+          : null;
+    const reasonCodes =
+      progressionOutcome === 'consider_progressing'
+        ? ['top_range_repeated', 'full_rir_coverage']
+        : progressionOutcome === 'consider_reducing'
+          ? ['below_range_two_sessions']
+          : progressionOutcome === 'hold'
+            ? ['need_one_more_stable_session']
+            : ['too_few_comparable_sessions'];
     const messages = {
       consider_progressing: 'Можно рассмотреть небольшое увеличение веса',
       hold: 'Пока оставьте текущую нагрузку',
@@ -442,7 +456,7 @@ export async function installPlatformApi(
       consider_reducing: 'Можно рассмотреть небольшое снижение веса',
     } as const;
     return {
-      ruleset_version: 'progression-guidance-v1',
+      ruleset_version: 'progression-guidance-v2',
       outcome: progressionOutcome,
       message: messages[progressionOutcome],
       detail:
@@ -459,12 +473,7 @@ export async function installPlatformApi(
           : progressionOutcome === 'consider_reducing'
             ? -2.5
             : null,
-      suggested_weight:
-        progressionOutcome === 'consider_progressing'
-          ? 42.5
-          : progressionOutcome === 'consider_reducing'
-            ? 37.5
-            : null,
+      suggested_weight: suggestedWeight,
       load_unit: 'kg',
       evidence: {
         target_reps_min: 8,
@@ -474,14 +483,7 @@ export async function installPlatformApi(
         required_session_count: requiredSessionCount,
         working_set_count: sessionCount,
         rir_recorded_set_count: progressionOutcome === 'consider_progressing' ? sessionCount : 0,
-        reason_keys:
-          progressionOutcome === 'consider_progressing'
-            ? ['top_range_repeated', 'full_rir_coverage']
-            : progressionOutcome === 'consider_reducing'
-              ? ['below_range_two_sessions']
-              : progressionOutcome === 'hold'
-                ? ['need_one_more_stable_session']
-                : ['too_few_comparable_sessions'],
+        reason_keys: reasonCodes,
         sessions: Array.from({ length: sessionCount }, (_, index) => ({
           workout_id: 30 + index,
           scheduled_date: new Date(todayDate.getTime() - (index + 1) * 7 * 86_400_000)
@@ -499,6 +501,48 @@ export async function installPlatformApi(
           completion_feedback: index === 0 ? 'as_expected' : null,
         })),
       },
+      proposal:
+        suggestedWeight == null
+          ? null
+          : {
+              proposal_id: 'a'.repeat(64),
+              rule_id: 'b'.repeat(64),
+              rule_kind: 'double_progression',
+              rule_snapshot: {
+                kind: 'double_progression',
+                scope: 'exercise',
+                exercise_id: 11,
+                rep_target: { kind: 'range', min_reps: 8, max_reps: 10 },
+                increment_value: 2.5,
+                increment_unit: 'kg',
+              },
+              target_program_id: 77,
+              target_revision_number: currentRevisionNumber,
+              target_exercise_id: 11,
+              target_workout_id: 42,
+              current_weight: 40,
+              proposed_weight: suggestedWeight,
+              proposed_action: 'set_load',
+              target_set_updates: [
+                {
+                  set_id: 201,
+                  set_number: 1,
+                  planned_role: 'working',
+                  current_weight: 40,
+                  set_version: setVersion,
+                  relative_to_top: null,
+                  proposed_weight: suggestedWeight,
+                },
+              ],
+              source_evidence_ids: Array.from(
+                { length: sessionCount },
+                (_, index) => `workout:${30 + index}/set:${201 + index}`,
+              ),
+              comparable_session_count: sessionCount,
+              reason_codes: reasonCodes,
+              eligibility_status: 'eligible',
+              requires_confirmation: true,
+            },
     };
   };
 
@@ -1416,6 +1460,17 @@ export async function installPlatformApi(
     }
     if (programHistory && path.endsWith('/programs/assigned/77/blocks')) {
       return route.fulfill({ json: programBlocks });
+    }
+    if (programHistory && path.endsWith('/programs/assigned/77/progression-proposals')) {
+      return route.fulfill({
+        json: {
+          target_program_id: 77,
+          target_revision_number: currentRevisionNumber,
+          target_workout_id: 943,
+          scheduled_date: today,
+          exercises: [],
+        },
+      });
     }
     if (programHistory && path.endsWith('/programs/assigned/77/revisions')) {
       return route.fulfill({ json: programRevisions });

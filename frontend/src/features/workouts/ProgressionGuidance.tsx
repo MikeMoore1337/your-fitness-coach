@@ -12,6 +12,17 @@ const feedbackLabels: Record<NonNullable<Session['completion_feedback']>, string
   harder_than_expected: 'тяжелее ожидаемого',
 };
 
+const ruleLabels: Record<NonNullable<Guidance['proposal']>['rule_kind'], string> = {
+  legacy_progression_guidance: 'Общее правило прогрессии',
+  fixed_prescription: 'Фиксированное назначение',
+  double_progression: 'Двойная прогрессия',
+  linear_load: 'Линейная прогрессия нагрузки',
+  percentage_training_max: 'Процент тренировочного максимума',
+  rir_rpe: 'Целевое усилие RIR/RPE',
+  amrap_success_failure: 'Условие AMRAP',
+  deload: 'Облегчённый блок',
+};
+
 function formatNumber(value: number): string {
   return value.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
 }
@@ -45,6 +56,127 @@ function sessionLabel(session: Session): string {
   return `${date} · ${load} · ${reps}`;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function ruleSummary(guidance: Guidance): string | null {
+  const proposal = guidance.proposal;
+  if (!proposal || proposal.rule_kind === 'legacy_progression_guidance') return null;
+  const rule = proposal.rule_snapshot;
+  const repTarget = asRecord(rule.rep_target);
+  const loadTarget = asRecord(rule.load_target);
+  const effortTarget = asRecord(rule.effort_target);
+  const increment = rule.increment_value;
+  const incrementUnit = rule.increment_unit;
+  const unit =
+    incrementUnit === 'kg'
+      ? 'кг'
+      : incrementUnit === 'lb'
+        ? 'lb'
+        : incrementUnit === 'percent'
+          ? '%'
+          : null;
+  const facts: string[] = [];
+
+  if (
+    repTarget?.kind === 'range' &&
+    typeof repTarget.min_reps === 'number' &&
+    typeof repTarget.max_reps === 'number'
+  ) {
+    facts.push(`диапазон ${repTarget.min_reps}–${repTarget.max_reps} повторений`);
+  } else if (repTarget?.kind === 'exact' && typeof repTarget.value === 'number') {
+    facts.push(`${repTarget.value} повторений`);
+  } else if (repTarget?.kind === 'amrap') {
+    facts.push(
+      typeof repTarget.cap_reps === 'number'
+        ? `AMRAP, не более ${repTarget.cap_reps} повторений`
+        : 'AMRAP',
+    );
+  }
+
+  if (loadTarget?.kind === 'user_selected') {
+    facts.push('нагрузку выбирает пользователь');
+  } else if (typeof loadTarget?.value === 'number') {
+    if (loadTarget.kind === 'percent_training_max') {
+      facts.push(`${formatNumber(loadTarget.value)}% от тренировочного максимума`);
+    } else if (loadTarget.kind === 'percent_1rm') {
+      facts.push(`${formatNumber(loadTarget.value)}% от 1ПМ`);
+    } else if (loadTarget.kind === 'relative_to_top') {
+      facts.push(`${formatNumber(loadTarget.value * 100)}% от верхнего подхода`);
+    } else if (loadTarget.kind === 'relative_to_previous') {
+      facts.push(`${formatNumber(loadTarget.value * 100)}% от предыдущего подхода`);
+    } else if (loadTarget.kind === 'absolute') {
+      facts.push(`нагрузка ${formatNumber(loadTarget.value)} кг`);
+    }
+  }
+
+  if (
+    (effortTarget?.kind === 'rir' || effortTarget?.kind === 'rpe') &&
+    (typeof effortTarget.value === 'number' || typeof effortTarget.value === 'string')
+  ) {
+    facts.push(`цель ${effortTarget.kind.toUpperCase()} ${effortTarget.value}`);
+  } else if (effortTarget?.kind === 'failure') {
+    facts.push('до отказа');
+  }
+
+  if (typeof increment === 'number') {
+    facts.push(
+      unit
+        ? `шаг ${formatNumber(increment)} ${unit}`
+        : `шаг ${formatNumber(increment)}, единица не задана`,
+    );
+  }
+
+  if (typeof rule.amrap_min_reps === 'number') {
+    facts.push(`успех от ${rule.amrap_min_reps} повторений`);
+  }
+  const failureActions: Record<string, string> = {
+    repeat: 'повторить нагрузку',
+    reduce_load:
+      typeof increment === 'number'
+        ? `снизить на ${formatNumber(increment)}${unit ? ` ${unit}` : ', единица не задана'}`
+        : 'снизить без заданной величины',
+    deload: 'предложить облегчённый блок',
+    manual_review: 'передать на проверку',
+  };
+  if (typeof rule.amrap_failure_action === 'string' && failureActions[rule.amrap_failure_action]) {
+    facts.push(`при невыполнении: ${failureActions[rule.amrap_failure_action]}`);
+  }
+
+  if (rule.reset_on_failure === true) facts.push('сброс при отказе без заданной величины');
+  if (typeof proposal.deload_volume_percent === 'number') {
+    facts.push(`объём ${proposal.deload_volume_percent}%`);
+  }
+  if (typeof proposal.deload_intensity_percent === 'number') {
+    facts.push(`интенсивность ${proposal.deload_intensity_percent}%`);
+  }
+
+  if (rule.scope === 'exercise') facts.push('уровень упражнения');
+  else if (rule.scope === 'block' && typeof rule.block_number === 'number') {
+    facts.push(`блок ${rule.block_number}`);
+  } else if (rule.scope === 'program') facts.push('уровень программы');
+
+  if (typeof rule.week_start === 'number' && typeof rule.week_end === 'number') {
+    facts.push(
+      rule.week_start === rule.week_end
+        ? `неделя ${rule.week_start}`
+        : `недели ${rule.week_start}–${rule.week_end}`,
+    );
+  } else if (typeof rule.week_start === 'number') {
+    facts.push(`с недели ${rule.week_start}`);
+  } else if (typeof rule.week_end === 'number') {
+    facts.push(`по неделю ${rule.week_end}`);
+  }
+
+  const details = facts.join(' · ');
+  return details
+    ? `${ruleLabels[proposal.rule_kind]} · ${details}`
+    : ruleLabels[proposal.rule_kind];
+}
+
 export function ProgressionGuidance({
   guidance,
   exerciseKey,
@@ -59,7 +191,8 @@ export function ProgressionGuidance({
   onDismiss: () => void;
 }) {
   const applyStarted = useRef(false);
-  const exactSuggestion = guidance.suggested_weight;
+  const exactSuggestion = guidance.proposal?.proposed_weight ?? guidance.suggested_weight;
+  const explanation = ruleSummary(guidance);
 
   useEffect(() => {
     trackProductEvent(
@@ -77,6 +210,7 @@ export function ProgressionGuidance({
         <span>Следующая нагрузка</span>
         <strong>{guidance.message}</strong>
         <p>{guidance.detail}</p>
+        {explanation && <p className="progression-guidance__rule">Правило: {explanation}</p>}
       </div>
 
       <details className="progression-guidance__details">
@@ -136,7 +270,7 @@ export function ProgressionGuidance({
           >
             {applied
               ? 'Вес подставлен'
-              : `Подставить ${formatNumber(exactSuggestion)} ${unitLabel(guidance.load_unit)}`}
+              : `Применить ${formatNumber(exactSuggestion)} ${unitLabel(guidance.load_unit)}`}
           </Button>
         )}
         <Button
@@ -150,7 +284,7 @@ export function ProgressionGuidance({
             onDismiss();
           }}
         >
-          Скрыть подсказку
+          Оставить текущую нагрузку
         </Button>
       </div>
     </section>

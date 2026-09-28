@@ -1268,18 +1268,17 @@ export function TodayWorkout({
               metricType === 'strength'
                 ? (exercise.progression_guidance?.suggested_weight ?? null)
                 : null;
-            const applicableSets = exercise.sets.filter((set) => {
-              const pending = activeSync.pendingBySet.get(set.id)?.values;
-              const completedSet = pending?.is_completed ?? set.is_completed;
-              const kind = pending?.set_kind ?? set.set_kind ?? 'working';
-              return !completedSet && kind === 'working';
-            });
+            const targetSetUpdates =
+              exercise.progression_guidance?.proposal?.target_set_updates ?? [];
             const guidanceApplied =
-              suggestedWeight != null &&
-              applicableSets.length > 0 &&
-              applicableSets.every((set) => {
-                const pending = activeSync.pendingBySet.get(set.id)?.values;
-                return (pending?.actual_weight ?? set.actual_weight) === suggestedWeight;
+              targetSetUpdates.length > 0 &&
+              targetSetUpdates.every((update) => {
+                const set = exercise.sets.find((item) => item.id === update.set_id);
+                const pending = set ? activeSync.pendingBySet.get(set.id)?.values : undefined;
+                return (
+                  set != null &&
+                  (pending?.actual_weight ?? set.actual_weight) === update.proposed_weight
+                );
               });
 
             return (
@@ -1384,13 +1383,18 @@ export function TodayWorkout({
                         exerciseKey={exercise.id}
                         guidance={exercise.progression_guidance}
                         onApply={
-                          started && suggestedWeight != null && applicableSets.length > 0
+                          started && suggestedWeight != null && targetSetUpdates.length > 0
                             ? () => {
-                                for (const set of applicableSets) {
+                                for (const update of targetSetUpdates) {
+                                  const set = exercise.sets.find(
+                                    (item) => item.id === update.set_id,
+                                  );
+                                  if (!set) continue;
                                   const pending = activeSync.pendingBySet.get(set.id)?.values;
-                                  activeSync.enqueue(set.id, set.version ?? 1, {
+                                  if (pending?.is_completed ?? set.is_completed) continue;
+                                  activeSync.enqueue(set.id, update.set_version, {
                                     actual_reps: pending?.actual_reps ?? set.actual_reps ?? null,
-                                    actual_weight: suggestedWeight,
+                                    actual_weight: update.proposed_weight,
                                     rir: pending?.rir ?? set.rir ?? null,
                                     set_kind: pending?.set_kind ?? set.set_kind ?? 'working',
                                     reached_failure:

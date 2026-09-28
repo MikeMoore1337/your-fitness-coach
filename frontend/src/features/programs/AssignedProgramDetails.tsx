@@ -16,6 +16,7 @@ import {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { Icon } from '../../shared/ui/Icon';
+import { ProgressionGuidance } from '../workouts/ProgressionGuidance';
 import {
   blockStatusLabel,
   buildRevisionPresentation,
@@ -29,6 +30,8 @@ import {
 } from './programHistory';
 
 type TrainingBlockMutation = ApiSchemas['TrainingBlockMutationResponse'];
+type ProgressionProposalList = ApiSchemas['ProgramProgressionProposalList'];
+type ProgressionReviewResponse = ApiSchemas['ProgressionProposalReviewResponse'];
 
 const changeLabels: Record<ProgramRevision['change_kind'], string> = {
   assigned: 'Программа назначена',
@@ -271,6 +274,8 @@ export function AssignedProgramDetails({
   const [historyOpen, setHistoryOpen] = useState(initialReturn.shouldOpen);
   const [mutationRevisionNumber, setMutationRevisionNumber] = useState(currentRevisionNumber);
   const [editingBlock, setEditingBlock] = useState<TrainingBlock | 'new' | null>(null);
+  const [dismissedProposals, setDismissedProposals] = useState<Set<string>>(() => new Set());
+  const [adjustedWeights, setAdjustedWeights] = useState<Record<string, string>>({});
   const returnedRevisionRef = useRef<HTMLDetailsElement>(null);
   const programEndDate = useMemo(
     () => addDays(startDate, Math.max(1, durationWeeks) * 7 - 1),
@@ -285,6 +290,12 @@ export function AssignedProgramDetails({
   const blocks = useQuery({
     queryKey: ['assigned-program', programId, 'blocks'],
     queryFn: () => api<TrainingBlock[]>(`/api/v1/programs/assigned/${programId}/blocks`),
+  });
+  const progressionProposals = useQuery({
+    queryKey: ['assigned-program', programId, 'progression-proposals'],
+    queryFn: () =>
+      api<ProgressionProposalList>(`/api/v1/programs/assigned/${programId}/progression-proposals`),
+    enabled: blocks.isSuccess,
   });
   const latestRevisionNumber = revisions.data?.[0]?.revision_number ?? 0;
   const revisionNumber = Math.max(
@@ -333,6 +344,63 @@ export function AssignedProgramDetails({
           'Программа уже изменилась. Редактор закрыт, данные обновлены — откройте этап заново.',
           'error',
         );
+        return;
+      }
+      toast(queryErrorMessage(reason), 'error');
+    },
+  });
+
+  const progressionReview = useMutation({
+    mutationFn: ({
+      exerciseId,
+      proposalId,
+      workoutId,
+      decision,
+      adjustedWeight,
+      expectedSetVersions,
+      expectedRevisionNumber,
+    }: {
+      exerciseId: number;
+      proposalId: string;
+      workoutId: number;
+      decision: 'confirm' | 'reject' | 'adjust';
+      adjustedWeight?: number;
+      expectedSetVersions?: Record<number, number>;
+      expectedRevisionNumber: number;
+    }) =>
+      api<ProgressionReviewResponse>(
+        `/api/v1/programs/assigned/${programId}/progression-proposals/${proposalId}/review`,
+        {
+          method: 'POST',
+          body: {
+            decision,
+            workout_id: workoutId,
+            exercise_id: exerciseId,
+            expected_revision_number: expectedRevisionNumber,
+            adjusted_weight: adjustedWeight,
+            expected_set_versions: expectedSetVersions ?? {},
+          },
+        },
+      ),
+    onSuccess: async (_result, variables) => {
+      if (variables.decision === 'reject') {
+        setDismissedProposals((current) => new Set(current).add(variables.proposalId));
+      }
+      await queryClient.invalidateQueries({
+        queryKey: ['assigned-program', programId, 'progression-proposals'],
+      });
+      toast(
+        variables.decision === 'reject'
+          ? 'Предложение отклонено, текущая нагрузка сохранена'
+          : 'Предложенная нагрузка добавлена в незавершённые подходы',
+      );
+    },
+    onError: async (reason) => {
+      if (reason instanceof ApiError && reason.status === 409) {
+        await queryClient.invalidateQueries({
+          queryKey: ['assigned-program', programId, 'progression-proposals'],
+        });
+        toast('Программа или подход изменились. Данные обновлены.', 'error');
         return;
       }
       toast(queryErrorMessage(reason), 'error');
@@ -446,6 +514,130 @@ export function AssignedProgramDetails({
           text="Программа продолжает работать. Добавьте первый этап, чтобы зафиксировать его цель и период."
         />
       )}
+
+      <section
+        className="program-history__region progression-proposals"
+        aria-labelledby={`progression-proposals-${programId}`}
+        hidden={!blocks.isSuccess}
+      >
+        <div className="program-history__heading">
+          <div>
+            <h4 id={`progression-proposals-${programId}`}>Предложение на ближайшую тренировку</h4>
+            <p>Изменение попадёт в незавершённые подходы только после подтверждения.</p>
+          </div>
+        </div>
+        {progressionProposals.isLoading ? (
+          <LoadingState label="Проверяем результаты тренировок…" />
+        ) : progressionProposals.error ? (
+          progressionProposals.error instanceof ApiError &&
+          progressionProposals.error.status === 409 ? (
+            <p className="program-history__quiet">
+              Нет ближайшей тренировки для предложения прогрессии.
+            </p>
+          ) : (
+            <ErrorState
+              message={queryErrorMessage(progressionProposals.error)}
+              retry={() => void progressionProposals.refetch()}
+            />
+          )
+        ) : progressionProposals.data?.exercises.length ? (
+          <div className="progression-proposals__items">
+            {progressionProposals.data.exercises.map((item) => {
+              const proposal = item.guidance.proposal;
+              if (!proposal || dismissedProposals.has(proposal.proposal_id)) return null;
+              const updates = proposal.target_set_updates ?? [];
+              const expectedSetVersions = Object.fromEntries(
+                updates.map((update) => [update.set_id, update.set_version]),
+              );
+              const adjustedWeight =
+                adjustedWeights[proposal.proposal_id] ?? String(proposal.proposed_weight ?? '');
+              const alreadyApplied =
+                updates.length > 0 &&
+                updates.every((update) => update.current_weight === update.proposed_weight);
+              return (
+                <article className="progression-proposals__item" key={item.exercise_id}>
+                  <h5>{item.exercise_title}</h5>
+                  <ProgressionGuidance
+                    applied={alreadyApplied}
+                    exerciseKey={item.exercise_id}
+                    guidance={item.guidance}
+                    onApply={
+                      proposal.eligibility_status === 'eligible'
+                        ? () =>
+                            progressionReview.mutate({
+                              exerciseId: item.exercise_id,
+                              proposalId: proposal.proposal_id,
+                              workoutId: proposal.target_workout_id,
+                              decision: 'confirm',
+                              expectedRevisionNumber: proposal.target_revision_number,
+                              expectedSetVersions,
+                            })
+                        : undefined
+                    }
+                    onDismiss={() =>
+                      progressionReview.mutate({
+                        exerciseId: item.exercise_id,
+                        proposalId: proposal.proposal_id,
+                        workoutId: proposal.target_workout_id,
+                        decision: 'reject',
+                        expectedRevisionNumber: proposal.target_revision_number,
+                      })
+                    }
+                  />
+                  {proposal.eligibility_status === 'eligible' && (
+                    <div className="progression-proposals__adjust">
+                      <Field
+                        label="Изменить предложенный вес, кг"
+                        labelFor={`progression-adjust-${proposal.proposal_id}`}
+                        hint="Тренерское или пользовательское изменение применится к незавершённым подходам."
+                      >
+                        <Input
+                          id={`progression-adjust-${proposal.proposal_id}`}
+                          type="number"
+                          min="0.01"
+                          max="100000"
+                          step="any"
+                          value={adjustedWeight}
+                          onChange={(event) =>
+                            setAdjustedWeights((current) => ({
+                              ...current,
+                              [proposal.proposal_id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </Field>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={
+                          progressionReview.isPending ||
+                          !Number.isFinite(Number(adjustedWeight)) ||
+                          Number(adjustedWeight) <= 0
+                        }
+                        onClick={() =>
+                          progressionReview.mutate({
+                            exerciseId: item.exercise_id,
+                            proposalId: proposal.proposal_id,
+                            workoutId: proposal.target_workout_id,
+                            decision: 'adjust',
+                            adjustedWeight: Number(adjustedWeight),
+                            expectedRevisionNumber: proposal.target_revision_number,
+                            expectedSetVersions,
+                          })
+                        }
+                      >
+                        Применить изменённый вес
+                      </Button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="program-history__quiet">Для ближайшей тренировки нет предложений.</p>
+        )}
+      </section>
 
       <details className="program-history__disclosure" open={historyOpen}>
         <summary
