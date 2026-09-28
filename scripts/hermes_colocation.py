@@ -628,16 +628,49 @@ def _install_release_links(
     return records
 
 
-def _disable_timer(systemd_root: Path) -> None:
-    _run(["systemctl", "stop", "hermes-discovery.timer"], check=False)
-    (systemd_root / "timers.target.wants" / "hermes-discovery.timer").unlink(missing_ok=True)
-    _run(["systemctl", "daemon-reload"], check=False)
+def _assert_timer_disabled() -> None:
     enabled = _run(["systemctl", "is-enabled", "hermes-discovery.timer"], check=False, capture=True)
     if enabled.stdout.strip() in {"enabled", "enabled-runtime"}:
         raise ColocationError("Hermes timer must remain disabled until shadow approval")
     active = _run(["systemctl", "is-active", "hermes-discovery.timer"], check=False, capture=True)
     if active.returncode == 0 or active.stdout.strip() == "active":
         raise ColocationError("Hermes timer must remain inactive until shadow approval")
+
+
+def _disable_timer(systemd_root: Path) -> None:
+    _run(["systemctl", "stop", "hermes-discovery.timer"], check=False)
+    (systemd_root / "timers.target.wants" / "hermes-discovery.timer").unlink(missing_ok=True)
+    _run(["systemctl", "daemon-reload"], check=False)
+    _assert_timer_disabled()
+
+
+def _switch_release_links(
+    *,
+    runtime_root: Path,
+    config_root: Path,
+    systemd_root: Path,
+    release_dir: Path,
+    backup_dir: Path,
+) -> list[tuple[Path, str, str | Path | None]]:
+    # Stop and disable the timer while its current trigger unit still exists. Replacing
+    # release-managed systemd links under an active timer can make systemd fail it with
+    # "Unit to trigger vanished".
+    _disable_timer(systemd_root)
+    link_records = _install_release_links(
+        runtime_root=runtime_root,
+        config_root=config_root,
+        systemd_root=systemd_root,
+        release_dir=release_dir,
+        backup_dir=backup_dir,
+    )
+    try:
+        _run(["systemctl", "daemon-reload"])
+        _assert_timer_disabled()
+    except BaseException:
+        _restore_link_state(link_records)
+        _run(["systemctl", "daemon-reload"], check=False)
+        raise
+    return link_records
 
 
 def _retire_legacy_egress() -> None:
@@ -732,7 +765,7 @@ def install(args: argparse.Namespace) -> dict[str, object]:
     )
     if args.mode == "separate-vm":
         _retire_legacy_egress()
-    link_records = _install_release_links(
+    _switch_release_links(
         runtime_root=runtime_root,
         config_root=config_root,
         systemd_root=args.systemd_root,
@@ -741,13 +774,6 @@ def install(args: argparse.Namespace) -> dict[str, object]:
         / "rollback-predecessor"
         / f"{manifest['release_id']}-{os.getpid()}",
     )
-    try:
-        _run(["systemctl", "daemon-reload"])
-        _disable_timer(args.systemd_root)
-    except BaseException:
-        _restore_link_state(link_records)
-        _run(["systemctl", "daemon-reload"], check=False)
-        raise
     return {
         "status": "installed",
         "mode": args.mode,
@@ -790,20 +816,13 @@ def rollback(args: argparse.Namespace) -> dict[str, object]:
     parent_manifest = validate_manifest(
         json.loads((parent / "manifest.json").read_text(encoding="utf-8"))
     )
-    link_records = _install_release_links(
+    _switch_release_links(
         runtime_root=args.runtime_root,
         config_root=args.config_root,
         systemd_root=args.systemd_root,
         release_dir=parent,
         backup_dir=args.runtime_root / "rollback-predecessor" / f"{parent_id}-{os.getpid()}",
     )
-    try:
-        _run(["systemctl", "daemon-reload"])
-        _disable_timer(args.systemd_root)
-    except BaseException:
-        _restore_link_state(link_records)
-        _run(["systemctl", "daemon-reload"], check=False)
-        raise
     return {
         "status": "rolled_back",
         "release_id": parent_manifest["release_id"],
