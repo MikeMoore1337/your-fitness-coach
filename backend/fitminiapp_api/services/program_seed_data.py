@@ -1128,7 +1128,7 @@ def _repeat_plan(plan: dict[str, object], weeks: int) -> list[dict[str, object]]
 _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     {
         "slug": "stronglifts-5x5",
-        "title": "StrongLifts 5x5",
+        "title": "StrongLifts 5x5 (силовая программа 5x5)",
         "goal": "strength",
         "level": "beginner",
         "split_type": "full_body",
@@ -1167,7 +1167,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
         ),
         "days": [
             (
-                "Workout A",
+                "Тренировка A",
                 [
                     _seed_exercise("squat", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
                     _seed_exercise("bench-press", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
@@ -1175,7 +1175,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Workout B",
+                "Тренировка B",
                 [
                     _seed_exercise("squat", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
                     _seed_exercise("overhead-press", 5, "5", 150, plan=_straight_plan(5, "5", 150)),
@@ -1186,7 +1186,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "gzclp",
-        "title": "GZCLP",
+        "title": "GZCLP (линейная прогрессия GZCL)",
         "goal": "strength",
         "level": "beginner",
         "split_type": "full_body",
@@ -1230,7 +1230,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
         ),
         "days": [
             (
-                "Workout 1",
+                "Тренировка 1",
                 [
                     _seed_exercise(
                         "squat",
@@ -1259,7 +1259,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Workout 2",
+                "Тренировка 2",
                 [
                     _seed_exercise(
                         "overhead-press",
@@ -1288,7 +1288,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Workout 3",
+                "Тренировка 3",
                 [
                     _seed_exercise(
                         "bench-press",
@@ -1317,7 +1317,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Workout 4",
+                "Тренировка 4",
                 [
                     _seed_exercise(
                         "deadlift",
@@ -1349,7 +1349,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "531-for-beginners",
-        "title": "5/3/1 for Beginners",
+        "title": "5/3/1 для начинающих",
         "goal": "strength",
         "level": "beginner",
         "split_type": "full_body",
@@ -1392,7 +1392,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
         ),
         "days": [
             (
-                "Day 1 · Squat + Bench",
+                "День 1 · Присед + жим лёжа",
                 [
                     _seed_exercise(
                         "squat",
@@ -1449,7 +1449,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Day 2 · Deadlift + Overhead Press",
+                "День 2 · Становая тяга + жим стоя",
                 [
                     _seed_exercise(
                         "deadlift",
@@ -1490,7 +1490,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Day 3 · Bench + Squat",
+                "День 3 · Жим лёжа + присед",
                 [
                     _seed_exercise(
                         "bench-press",
@@ -1534,7 +1534,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "phul",
-        "title": "PHUL",
+        "title": "PHUL (сила и гипертрофия, верх/низ)",
         "goal": "muscle_gain",
         "level": "intermediate",
         "split_type": "upper_lower",
@@ -1581,7 +1581,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
         ),
         "days": [
             (
-                "Upper Power",
+                "Верх тела · сила",
                 [
                     _seed_exercise(
                         "bench-press",
@@ -1634,7 +1634,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Lower Power",
+                "Низ тела · сила",
                 [
                     _seed_exercise(
                         "squat",
@@ -1679,7 +1679,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Upper Hypertrophy",
+                "Верх тела · гипертрофия",
                 [
                     _seed_exercise(
                         "incline-dumbbell-press",
@@ -1732,7 +1732,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Lower Hypertrophy",
+                "Низ тела · гипертрофия",
                 [
                     _seed_exercise(
                         "front-squat",
@@ -1788,7 +1788,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "nsuns-4d",
-        "title": "nSuns 4-day",
+        "title": "nSuns - 4-дневная программа",
         "goal": "strength",
         "level": "intermediate",
         "split_type": "hybrid",
@@ -1834,7 +1834,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
         ),
         "days": [
             (
-                "Day 1 · Bench + OHP",
+                "День 1 · Жим лёжа + жим стоя",
                 [
                     _seed_exercise(
                         "bench-press",
@@ -1871,7 +1871,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Day 2 · Squat + Sumo Deadlift",
+                "День 2 · Присед + становая сумо",
                 [
                     _seed_exercise(
                         "squat",
@@ -1908,7 +1908,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Day 3 · OHP + Bench",
+                "День 3 · Жим стоя + жим лёжа",
                 [
                     _seed_exercise(
                         "overhead-press",
@@ -1945,7 +1945,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Day 4 · Deadlift + Squat",
+                "День 4 · Становая тяга + присед",
                 [
                     _seed_exercise(
                         "deadlift",
@@ -1985,7 +1985,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "metallicdpa-linear-progression-ppl",
-        "title": "Metallicdpa Linear Progression PPL",
+        "title": "Линейная прогрессия Metallicdpa - PPL (толкай/тяни/ноги)",
         "goal": "muscle_gain",
         "level": "beginner",
         "split_type": "push_pull_legs",
@@ -2026,7 +2026,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
         ),
         "days": [
             (
-                "Pull A",
+                "Тяни A",
                 [
                     _seed_exercise(
                         "deadlift",
@@ -2046,7 +2046,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Push A",
+                "Толкай A",
                 [
                     _seed_exercise(
                         "bench-press",
@@ -2068,7 +2068,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Legs A",
+                "Ноги A",
                 [
                     _seed_exercise(
                         "squat",
@@ -2090,7 +2090,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Pull B",
+                "Тяни B",
                 [
                     _seed_exercise(
                         "barbell-row",
@@ -2112,7 +2112,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Push B",
+                "Толкай B",
                 [
                     _seed_exercise(
                         "incline-bench-press",
@@ -2138,7 +2138,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Legs B",
+                "Ноги B",
                 [
                     _seed_exercise(
                         "front-squat",
@@ -2161,7 +2161,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "bwf-recommended-routine",
-        "title": "BWF Recommended Routine",
+        "title": "BWF (тренировки с собственным весом) - рекомендуемая программа",
         "goal": "muscle_gain",
         "level": "beginner",
         "split_type": "full_body",
@@ -2215,7 +2215,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
         ),
         "days": [
             (
-                "Recommended Routine A",
+                "Рекомендуемая программа A",
                 [
                     _seed_exercise(
                         "pull-up",
@@ -2290,7 +2290,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Recommended Routine B",
+                "Рекомендуемая программа B",
                 [
                     _seed_exercise(
                         "inverted-row",
@@ -2365,7 +2365,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Recommended Routine C",
+                "Рекомендуемая программа C",
                 [
                     _seed_exercise(
                         "pull-up",
@@ -2443,7 +2443,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "dumbbell-ppl-gregarioushermit",
-        "title": "Dumbbell P/P/L (Proposed Alternative to Dumbbell Stopgap)",
+        "title": "Гантельная PPL (толкай/тяни/ноги)",
         "goal": "muscle_gain",
         "level": "intermediate",
         "split_type": "push_pull_legs",
@@ -2500,7 +2500,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
         ),
         "days": [
             (
-                "Push A",
+                "Толкай A",
                 [
                     _seed_exercise(
                         "dumbbell-bench-press",
@@ -2540,7 +2540,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Pull A",
+                "Тяни A",
                 [
                     _seed_exercise(
                         "one-arm-dumbbell-row",
@@ -2568,7 +2568,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Legs A",
+                "Ноги A",
                 [
                     _seed_exercise(
                         "goblet-squat", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
@@ -2588,7 +2588,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Push B",
+                "Толкай B",
                 [
                     _seed_exercise(
                         "incline-dumbbell-press",
@@ -2620,7 +2620,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Pull B",
+                "Тяни B",
                 [
                     _seed_exercise(
                         "chest-supported-dumbbell-row",
@@ -2648,7 +2648,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Legs B",
+                "Ноги B",
                 [
                     _seed_exercise(
                         "bulgarian-split-squat",

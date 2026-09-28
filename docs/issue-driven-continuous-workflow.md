@@ -79,6 +79,22 @@ Claim атомарно обновляет `queue_phase`, `task_id`, `task_issue`
 содержит активную задачу, recovery сначала читает durable controller history и останавливается
 с `HUMAN_REQUIRED`: claim не переносится в quarantine и не удаляется до ручной reconciliation
 controller, supervisor и control Issue.
+Для owner-authorized reconciliation именно такого stale `task_running` claim controller предоставляет
+отдельную bounded operation:
+
+```powershell
+& .\.venv\Scripts\python.exe scripts\run_task_delivery.py <TASK_ID> `
+  --reconcile-interrupted-queue-claim --control-issue <CONTROL_ISSUE> `
+  --reconcile-reason "bounded owner recovery reason" --owner-authorize
+```
+
+Она требует точные task/control Issue IDs, bounded reason и явную owner authorization, проверяет
+мертвый PID с process identity, отсутствие другого queue supervisor/worker, единственный
+однозначный task lease/worktree и `human_required` на task Issue. Любая неоднозначность оставляет
+claim без изменений; после проверки claim атомарно quarantine-ится, byte-for-byte сверяется и
+удаляется с audit/evidence. Lease, history, delivery state, queue budget и task WIP эта операция
+не изменяет. Idle stale claim по-прежнему reclaim-ится штатно, а interrupted claim без этой
+операции остаётся fail-closed.
 Только подтверждённый stale claim после аварийного завершения процесса атомарно переносится в
 quarantine, повторно сверяется и удаляется, после чего acquire повторяется. Активный,
 повреждённый, изменившийся во время recovery или непроверяемый claim остаётся `HUMAN_REQUIRED`
