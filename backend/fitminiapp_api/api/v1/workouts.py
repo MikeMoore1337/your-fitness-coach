@@ -61,6 +61,7 @@ from fitminiapp_api.services.analytics import (
     build_training_analytics_for_range,
     build_user_progress,
 )
+from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.cardio import (
     CardioSessionError,
     complete_cardio_session,
@@ -101,6 +102,7 @@ from fitminiapp_api.services.nutrition_reports import (
 )
 from fitminiapp_api.services.period_bounds import PeriodBoundsError, resolve_progress_bounds
 from fitminiapp_api.services.program_common import ProgramError
+from fitminiapp_api.services.program_versioning import record_program_revision
 from fitminiapp_api.services.progress import (
     build_progress_summary_for_range,
 )
@@ -264,7 +266,7 @@ def _lock_program(db: Session, program_id: int) -> UserProgram:
 
 def _require_active_program(program: UserProgram) -> None:
     if not program.is_active:
-        raise HTTPException(status_code=409, detail="Программа уже завершена или архивирована")
+        raise HTTPException(status_code=409, detail="Программа сейчас неактивна")
 
 
 def _reconcile_program_completion(db: Session, program: UserProgram, current_user: User) -> None:
@@ -277,10 +279,33 @@ def _reconcile_program_completion(db: Session, program: UserProgram, current_use
         )
         .first()
     )
-    if remaining_workout is None:
+    if remaining_workout is None and program.status != "completed":
+        previous_status = program.status
         program.status = "completed"
         program.is_active = False
         program.completed_at = now_for_user_naive(current_user)
+        revision = record_program_revision(
+            db,
+            program,
+            actor=current_user,
+            change_kind="program_lifecycle",
+            reason="Все тренировки программы завершены",
+            changed_fields={
+                "operation": "program_completed_from_schedule",
+                "previous_status": previous_status,
+                "status": program.status,
+                "is_active": program.is_active,
+            },
+        )
+        record_audit_event(
+            db,
+            actor_user_id=current_user.id,
+            target_user_id=program.user_id,
+            action="program.completed",
+            resource_type="user_program",
+            resource_id=program.id,
+            details={"revision_number": revision.revision_number},
+        )
 
 
 def _delete_workouts(db: Session, workout_ids: list[int]) -> int:
@@ -912,7 +937,29 @@ def start_workout(
     workout.status = "in_progress"
     cancel_workout_reminder(db, workout.id)
     if program.status == "scheduled":
+        previous_status = program.status
         program.status = "active"
+        revision = record_program_revision(
+            db,
+            program,
+            actor=current_user,
+            change_kind="program_lifecycle",
+            reason="Первая тренировка программы начата",
+            changed_fields={
+                "operation": "program_started",
+                "previous_status": previous_status,
+                "status": program.status,
+            },
+        )
+        record_audit_event(
+            db,
+            actor_user_id=current_user.id,
+            target_user_id=program.user_id,
+            action="program.started",
+            resource_type="user_program",
+            resource_id=program.id,
+            details={"revision_number": revision.revision_number},
+        )
     db.commit()
     db.refresh(workout)
 

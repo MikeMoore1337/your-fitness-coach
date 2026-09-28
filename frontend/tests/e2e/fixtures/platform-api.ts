@@ -1458,6 +1458,58 @@ export async function installPlatformApi(
     if (programHistory && path.endsWith('/programs/templates/hidden')) {
       return route.fulfill({ json: [] });
     }
+    if (programHistory && path.endsWith('/programs/assigned/77/lifecycle')) {
+      return route.fulfill({
+        json: {
+          program_id: 77,
+          status: 'active',
+          is_active: true,
+          start_date: shiftedDay(-42),
+          duration_weeks: 10,
+          current_revision_number: currentRevisionNumber,
+          current_week_number: 3,
+          current_block: {
+            id: 302,
+            title: 'Рабочий объём',
+            start_date: shiftedDay(0),
+            end_date: shiftedDay(6),
+            week_start: 3,
+            week_end: 3,
+            is_deload: false,
+            status: 'active',
+          },
+          next_block: {
+            id: 303,
+            title: plannedBlock.title,
+            start_date: plannedBlock.start_date,
+            end_date: plannedBlock.end_date,
+            week_start: 4,
+            week_end: 4,
+            is_deload: true,
+            status: 'planned',
+          },
+          next_workout: {
+            id: 943,
+            scheduled_date: today,
+            week_number: 3,
+            day_number: 2,
+            title: 'Контекст версии',
+            status: 'planned',
+          },
+          next_deload: {
+            id: 303,
+            title: plannedBlock.title,
+            start_date: plannedBlock.start_date,
+            end_date: plannedBlock.end_date,
+            week_start: 4,
+            week_end: 4,
+            is_deload: true,
+            status: 'planned',
+          },
+          restarted_from_program_id: null,
+        },
+      });
+    }
     if (programHistory && path.endsWith('/programs/assigned/77/blocks')) {
       return route.fulfill({ json: programBlocks });
     }

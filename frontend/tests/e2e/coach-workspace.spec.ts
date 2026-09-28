@@ -688,6 +688,32 @@ async function mockCoachWorkspace(
         ],
       });
     if (path.endsWith('/programs/exercises')) return route.fulfill({ json: [] });
+    if (/\/programs\/assigned\/\d+\/lifecycle$/.test(path)) {
+      const programId = Number(path.match(/\/programs\/assigned\/(\d+)\/lifecycle$/)?.[1]);
+      return route.fulfill({
+        json: {
+          program_id: programId,
+          status: 'active',
+          is_active: true,
+          start_date: '2026-08-03',
+          duration_weeks: 8,
+          current_revision_number: 2,
+          current_week_number: 3,
+          current_block: null,
+          next_block: null,
+          next_workout: {
+            id: 501,
+            scheduled_date: '2026-08-22',
+            week_number: 3,
+            day_number: 1,
+            title: 'Ноги и корпус',
+            status: 'planned',
+          },
+          next_deload: null,
+          restarted_from_program_id: null,
+        },
+      });
+    }
     if (/\/programs\/assigned\/\d+\/progression-proposals$/.test(path))
       return route.fulfill({
         json: {
@@ -1568,6 +1594,26 @@ test('trainer leaves contextual workout and exercise feedback without messenger 
   }
 });
 
+test('Program lifecycle summary stays compact on a phone', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openCoach(page);
+  await trainerPrimaryNavigation(page)
+    .getByRole('link', { name: 'Программы', exact: true })
+    .click();
+  const card = page.locator('.coach-programs-card');
+  await card.locator(':scope > summary').click();
+
+  const lifecycle = page.locator('.program-lifecycle');
+  await expect(lifecycle).toBeVisible();
+  await expect(lifecycle).toContainText('Неделя 3 из 8');
+  await expect(lifecycle).toContainText('Следующая тренировка');
+  const bounds = await lifecycle.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.height).toBeLessThanOrEqual(220);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
 test('Coach Programs keeps responsive geometry content-driven', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1642,6 +1688,7 @@ test('Coach Programs keeps responsive geometry content-driven', async ({ page })
       const programsDivider = box('.coach-programs-card .list-grid');
       const programRow = box('.coach-program-row');
       const evolution = box('.program-history');
+      const lifecycle = box('.program-lifecycle');
       const evolutionIntro = box('.program-history__intro');
       const evolutionEmpty = box('.program-history .empty-state');
       const evolutionSummary = box('.program-history__disclosure > summary');
@@ -1662,6 +1709,7 @@ test('Coach Programs keeps responsive geometry content-driven', async ({ page })
         programsDivider,
         programRow,
         evolution,
+        lifecycle,
         evolutionIntro,
         evolutionEmpty,
         evolutionSummary,
@@ -1673,6 +1721,11 @@ test('Coach Programs keeps responsive geometry content-driven', async ({ page })
 
   const assertGeometry = (geometry: Awaited<ReturnType<typeof measureGeometry>>) => {
     expect(geometry.documentScrollWidth).toBeLessThanOrEqual(geometry.viewportWidth);
+    expect(geometry.lifecycle.left).toBeGreaterThanOrEqual(geometry.evolution.left);
+    expect(geometry.lifecycle.right).toBeLessThanOrEqual(geometry.evolution.right);
+    if (geometry.viewportWidth <= 430) {
+      expect(geometry.lifecycle.height).toBeLessThanOrEqual(220);
+    }
     expect(geometry.heading.left).toBeGreaterThanOrEqual(geometry.summary.left);
     expect(geometry.heading.right).toBeLessThanOrEqual(
       geometry.collapse.left - geometry.summaryGap + 1,
