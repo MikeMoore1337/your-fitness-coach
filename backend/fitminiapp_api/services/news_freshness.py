@@ -5,6 +5,8 @@ from datetime import UTC, datetime, timedelta
 
 FRESHNESS_WINDOW_DAYS = 60
 FRESHNESS_WINDOW = timedelta(days=FRESHNESS_WINDOW_DAYS)
+HERMES_NEWS_FRESHNESS_DAYS = 7
+HERMES_NEWS_FRESHNESS_WINDOW = timedelta(days=HERMES_NEWS_FRESHNESS_DAYS)
 
 
 def _as_utc_naive(value: datetime) -> datetime:
@@ -38,6 +40,20 @@ def is_fresh_publication(
     current = _as_utc_naive(now)
     published = _as_utc_naive(published_at)
     return current - FRESHNESS_WINDOW <= published <= current
+
+
+def is_hermes_news_fresh(
+    published_at: datetime | None,
+    *,
+    now: datetime,
+) -> bool:
+    """Return whether a Hermes news item is inside the inclusive 7-day window."""
+
+    if published_at is None:
+        return False
+    current = _as_utc_naive(now)
+    published = _as_utc_naive(published_at)
+    return current - HERMES_NEWS_FRESHNESS_WINDOW <= published <= current
 
 
 def source_metadata_is_fresh(

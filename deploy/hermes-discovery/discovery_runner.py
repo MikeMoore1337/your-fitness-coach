@@ -27,7 +27,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from pathlib import Path
@@ -88,6 +88,7 @@ MAX_SOURCE_STATE_ENTRIES = 100
 DEFAULT_TIMEOUT_SECONDS = 10.0
 DEFAULT_MAX_CONCURRENCY = 4
 DEFAULT_MAX_ITEMS_PER_SOURCE = 20
+DEFAULT_FRESHNESS_MAX_AGE_HOURS = 7 * 24
 DEFAULT_LOCK_STALE_SECONDS = 900.0
 USER_AGENT = "YourFitnessCoach-HermesDiscovery/1.0"
 TRACKING_PARAMS = frozenset({"fbclid", "gclid", "mc_cid", "mc_eid", "ref", "ref_src"})
@@ -1710,6 +1711,25 @@ def _mode() -> str:
     return value
 
 
+def _as_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
+def _candidate_is_fresh(
+    candidate: ParsedCandidate,
+    *,
+    now: datetime,
+    max_age_hours: float,
+) -> bool:
+    if candidate.published_at is None:
+        return False
+    current = _as_utc_naive(now)
+    published = _as_utc_naive(candidate.published_at)
+    return current - timedelta(hours=max_age_hours) <= published <= current
+
+
 def _candidate_content_hash(candidate: ParsedCandidate) -> str:
     return hashlib.sha256(candidate.content.encode("utf-8")).hexdigest()
 
@@ -1873,6 +1893,12 @@ def run_once(
         minimum=1,
         maximum=8,
     )
+    freshness_max_age_hours = _bounded_float(
+        "HERMES_DISCOVERY_FRESHNESS_MAX_AGE_HOURS",
+        DEFAULT_FRESHNESS_MAX_AGE_HOURS,
+        minimum=24,
+        maximum=31 * 24,
+    )
     stale_seconds = _bounded_float(
         "HERMES_DISCOVERY_LOCK_STALE_SECONDS",
         DEFAULT_LOCK_STALE_SECONDS,
@@ -1889,9 +1915,10 @@ def run_once(
         _exclusive_lock(state_lock, stale_seconds=stale_seconds),
     ):
         state = _load_state(state_path)
+        run_at = datetime.now(UTC).replace(microsecond=0)
         state["source_definitions_version"] = definitions["definitions_version"]
         state["source_registry_sha256"] = definitions["source_registry_sha256"]
-        state["last_run_at"] = datetime.now(UTC).replace(microsecond=0).isoformat()
+        state["last_run_at"] = run_at.isoformat()
         outcomes: list[SourceFetchOutcome] = []
         with ThreadPoolExecutor(
             max_workers=max_concurrency, thread_name_prefix="hermes-discovery"
@@ -1916,6 +1943,7 @@ def run_once(
         source_errors: list[dict[str, str]] = []
         fetched_sources = 0
         relevance_rejected = 0
+        freshness_rejected = 0
         for outcome in outcomes:
             source = outcome.source
             source_state = state["sources"].setdefault(source.source_id, {})
@@ -1983,6 +2011,22 @@ def run_once(
                 ):
                     duplicates += 1
                     continue
+                if not _candidate_is_fresh(
+                    normalized_candidate,
+                    now=run_at,
+                    max_age_hours=freshness_max_age_hours,
+                ):
+                    freshness_rejected += 1
+                    state["candidates"][key] = {
+                        "status": "rejected",
+                        "error_code": "freshness_gate_rejected",
+                        "source_id": source.source_id,
+                        "canonical_url": normalized_url,
+                        "content_hash": _candidate_content_hash(normalized_candidate),
+                        "event_date": _event_date(normalized_candidate),
+                        "created_at": state["last_run_at"],
+                    }
+                    continue
                 relevance = _evaluate_relevance(normalized_candidate)
                 if not relevance["allowed"]:
                     relevance_rejected += 1
@@ -2025,6 +2069,7 @@ def run_once(
                 "accepted": created,
                 "duplicate": duplicates,
                 "relevance_rejected": relevance_rejected,
+                "freshness_rejected": freshness_rejected,
                 "source_errors": len(source_errors),
             },
             pending_jobs=pending_jobs,
@@ -2043,6 +2088,7 @@ def run_once(
         "candidates_created": created,
         "duplicates": duplicates,
         "relevance_rejected": relevance_rejected,
+        "freshness_rejected": freshness_rejected,
         "outbox_pending": len(list(outbox_dir.glob("*.json"))),
         "health": health,
         "publication": "not evaluated by discovery; YFC intake owns taxonomy/risk/publication",
@@ -2102,6 +2148,7 @@ def _self_check() -> dict[str, Any]:
             "before_outbox": True,
             "provider_call": False,
             "bounded_content_chars": MAX_CONTENT_CHARS,
+            "freshness_max_age_hours": DEFAULT_FRESHNESS_MAX_AGE_HOURS,
         },
     }
 

@@ -35,7 +35,7 @@ from fitminiapp_api.services.news_drafts import (
     quality_warnings,
     render_draft,
 )
-from fitminiapp_api.services.news_freshness import is_fresh_publication
+from fitminiapp_api.services.news_freshness import is_hermes_news_fresh
 from fitminiapp_api.services.news_growth import article_candidate_handoff
 from fitminiapp_api.services.news_ingestion import (
     ParsedNewsItem,
@@ -322,7 +322,7 @@ def accept_hermes_submission(
     )
     if recent_count >= settings.hermes_intake_rate_limit_per_minute:
         raise HermesIntakeError("rate_limited")
-    if not is_fresh_publication(payload.source.published_at, now=current):
+    if not is_hermes_news_fresh(payload.source.published_at, now=current):
         raise HermesIntakeError("source_publication_not_fresh")
 
     source = db.get(NewsSource, payload.source.source_id)
@@ -407,6 +407,17 @@ def accept_hermes_submission(
     )
     if cluster is None:
         raise HermesIntakeError("cluster_missing")
+    if relevance.strength in {"strong", "moderate"}:
+        cluster.discovery_eligible = True
+        cluster.discovery_reasons = list(
+            dict.fromkeys(
+                [
+                    *(cluster.discovery_reasons or []),
+                    "hermes_relevance_v2_accepted",
+                    "hermes_fresh_7d",
+                ]
+            )
+        )
 
     try:
         fields = _validated_fields(payload.draft.model_dump())
