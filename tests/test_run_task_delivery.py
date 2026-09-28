@@ -1866,6 +1866,147 @@ def test_queue_blocks_product_v4_stage_two_until_stage_one_completes(
     assert "505" in candidates[0]["blocker"]
 
 
+def _configure_queue_lease_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    leases: list[dict[str, Any]],
+    completed: set[str],
+    delivery_owner: dict[str, Any] | None = None,
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True)
+    (tasks_root / "403-superseded.md").write_text("superseded", encoding="utf-8")
+    (tasks_root / "506-lifecycle.md").write_text("lifecycle", encoding="utf-8")
+    issues = [
+        {
+            "number": 403,
+            "title": "[Task 403] superseded",
+            "body": render_task_contract(
+                {
+                    "task_id": "403",
+                    "scope": "legacy task",
+                    "acceptance": ["legacy state is preserved"],
+                    "dependencies": [],
+                    "owner_gate": "none",
+                    "risk_lane": "GREEN",
+                    "source_spec": "codex-backlog/tasks/403-superseded.md",
+                    "issue_state": "queued",
+                }
+            ),
+            "state": "open",
+            "user": {"login": "owner"},
+        },
+        {
+            "number": 506,
+            "title": "[Task 506] lifecycle",
+            "body": render_task_contract(
+                {
+                    "task_id": "506",
+                    "scope": "Product v4 stage 2",
+                    "acceptance": ["lifecycle remains deterministic"],
+                    "dependencies": ["505"],
+                    "owner_gate": "none",
+                    "risk_lane": "GREEN",
+                    "source_spec": "codex-backlog/tasks/506-lifecycle.md",
+                    "issue_state": "queued",
+                }
+            ),
+            "state": "open",
+            "user": {"login": "owner"},
+        },
+    ]
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {"owner": delivery_owner}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return leases
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return completed
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(
+        delivery,
+        "find_task_document",
+        lambda root, task_id: SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug=f"task-{task_id}",
+            path=root / "codex-backlog" / "tasks" / f"{task_id}-fixture.md",
+        ),
+    )
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: issues)
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue_number: (next(item for item in issues if item["number"] == issue_number), []),
+    )
+
+
+@pytest.mark.parametrize(
+    ("lease_state", "completed", "expected_state"),
+    [
+        ("review", set(), "human_required"),
+        ("implementation", set(), "human_required"),
+        ("superseded", {"505"}, "queued"),
+        ("production-success", {"403", "505"}, "queued"),
+    ],
+)
+def test_queue_lease_semantics_keep_superseded_nonblocking_and_nonrunnable(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    lease_state: str,
+    completed: set[str],
+    expected_state: str,
+) -> None:
+    _configure_queue_lease_fixture(
+        monkeypatch,
+        tmp_path,
+        leases=[{"task_id": "403", "mode": "write", "lifecycle_state": lease_state}],
+        completed=completed,
+    )
+
+    candidates = delivery._queue_candidates()
+
+    if lease_state in {"review", "implementation"}:
+        assert candidates[0]["task_id"] == "403"
+        assert candidates[0]["state"] == expected_state
+        assert "active controller lease" in candidates[0]["blocker"]
+    else:
+        assert [candidate["task_id"] for candidate in candidates] == ["506"]
+        assert candidates[0]["state"] == expected_state
+
+
+def test_superseded_lease_does_not_satisfy_dependency_or_delivery_owner_gate(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _configure_queue_lease_fixture(
+        monkeypatch,
+        tmp_path,
+        leases=[{"task_id": "403", "mode": "write", "lifecycle_state": "superseded"}],
+        completed={"505"},
+        delivery_owner={"task_id": "403"},
+    )
+
+    candidates = delivery._queue_candidates()
+
+    assert candidates[0]["task_id"] == "403"
+    assert candidates[0]["state"] == "human_required"
+    assert "still owns the delivery lane" in candidates[0]["blocker"]
+
+
 def test_queue_retains_product_v4_visual_acceptance_gate(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

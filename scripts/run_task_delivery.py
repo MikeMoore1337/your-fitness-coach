@@ -55,6 +55,7 @@ try:
     from scripts.skill_safety import SkillSafetyError, scan_repository_skills
     from scripts.task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
+        CLOSED_LEASE_STATES,
         POST_START_TRANSPORT_FAILURE_KIND,
         POST_START_TRANSPORT_HANDOFF_BLOCKER,
         POST_START_TRANSPORT_SIGNATURES,
@@ -86,6 +87,7 @@ except ModuleNotFoundError:
     from skill_safety import SkillSafetyError, scan_repository_skills
     from task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
+        CLOSED_LEASE_STATES,
         POST_START_TRANSPORT_FAILURE_KIND,
         POST_START_TRANSPORT_HANDOFF_BLOCKER,
         POST_START_TRANSPORT_SIGNATURES,
@@ -1199,6 +1201,20 @@ def _read_task_order(root: Path) -> dict[str, int]:
     return order
 
 
+def _is_superseded_lease(lease: Mapping[str, Any]) -> bool:
+    return (
+        lease.get("mode") == "write"
+        and str(lease.get("lifecycle_state", "")).strip().lower() == "superseded"
+    )
+
+
+def _is_implementation_blocking_lease(lease: Mapping[str, Any]) -> bool:
+    return (
+        lease.get("mode") == "write"
+        and str(lease.get("lifecycle_state", "")).strip().lower() not in CLOSED_LEASE_STATES
+    )
+
+
 def _queue_candidates() -> list[dict[str, Any]]:
     root = REPOSITORY_ROOT
     tasks_root = root / "codex-backlog" / "tasks"
@@ -1223,11 +1239,14 @@ def _queue_candidates() -> list[dict[str, Any]]:
                     ),
                 }
             ]
+    leases = controller.store.all_leases()
+    superseded = {
+        str(item.get("task_id", "")).upper() for item in leases if _is_superseded_lease(item)
+    }
     active = {
         str(item.get("task_id", "")).upper()
-        for item in controller.store.all_leases()
-        if item.get("mode") == "write"
-        and str(item.get("lifecycle_state", "")) not in {"production-success"}
+        for item in leases
+        if _is_implementation_blocking_lease(item)
     }
     order = _read_task_order(root)
     task_roots = (
@@ -1260,6 +1279,8 @@ def _queue_candidates() -> list[dict[str, Any]]:
     for document in documents:
         task_id = document.task_id
         if not document.executable:
+            continue
+        if task_id in superseded:
             continue
         if task_id in active:
             result.append(
