@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -834,17 +835,16 @@ def rollback(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
-def health(args: argparse.Namespace) -> dict[str, object]:
-    release = _runtime_release(args)
+def _health_snapshot(release: Path, state_root: Path) -> dict[str, object]:
     result = _run(
         [
             sys.executable,
             str(release / "hermes_health.py"),
             "health",
             "--state-dir",
-            str(args.state_root),
+            str(state_root),
             "--outbox-dir",
-            str(args.state_root / "outbox"),
+            str(state_root / "outbox"),
         ],
         capture=True,
     )
@@ -855,6 +855,94 @@ def health(args: argparse.Namespace) -> dict[str, object]:
     if not isinstance(document, dict):
         raise ColocationError("Hermes health output is invalid")
     return document
+
+
+def health(args: argparse.Namespace) -> dict[str, object]:
+    return _health_snapshot(_runtime_release(args), args.state_root)
+
+
+def _activation_release(args: argparse.Namespace) -> tuple[Path, dict[str, Any], float]:
+    current = args.runtime_root / "current"
+    release = _runtime_release(args)
+    try:
+        manifest = validate_manifest(
+            json.loads((release / "manifest.json").read_text(encoding="utf-8"))
+        )
+    except (OSError, json.JSONDecodeError, ReleaseManifestError) as exc:
+        raise ColocationError("current Hermes release manifest is invalid") from exc
+    return release, manifest, current.lstat().st_mtime
+
+
+def _health_timestamp(value: object, *, field: str) -> float:
+    if not isinstance(value, str):
+        raise ColocationError(f"Hermes health is missing {field}")
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ColocationError(f"Hermes health has invalid {field}") from exc
+    if timestamp.tzinfo is None:
+        raise ColocationError(f"Hermes health has timezone-naive {field}")
+    return timestamp.timestamp()
+
+
+def activate(args: argparse.Namespace) -> dict[str, object]:
+    release, manifest, switched_at = _activation_release(args)
+
+    anchor = _run(
+        ["systemctl", "is-active", "hermes-network-anchor.service"],
+        check=False,
+        capture=True,
+    )
+    if anchor.returncode != 0 or anchor.stdout.strip() != "active":
+        raise ColocationError("Hermes network anchor must be active before timer activation")
+
+    document = _health_snapshot(release, args.state_root)
+    health_document = document.get("health")
+    if (
+        document.get("status") != "healthy"
+        or document.get("pending_jobs") != 0
+        or not isinstance(health_document, dict)
+        or health_document.get("active_alerts") != []
+    ):
+        raise ColocationError("Hermes health must be clean before timer activation")
+
+    accepted_at: dict[str, float] = {}
+    for field in ("last_successful_discovery_at", "last_successful_drain_at"):
+        value = _health_timestamp(health_document.get(field), field=field)
+        if value < switched_at:
+            raise ColocationError(
+                f"Hermes {field} predates the current release switch; shadow acceptance is incomplete"
+            )
+        accepted_at[field] = value
+
+    _run(["systemctl", "enable", "--now", "hermes-discovery.timer"])
+    enabled = _run(
+        ["systemctl", "is-enabled", "hermes-discovery.timer"],
+        check=False,
+        capture=True,
+    )
+    active = _run(
+        ["systemctl", "is-active", "hermes-discovery.timer"],
+        check=False,
+        capture=True,
+    )
+    if enabled.stdout.strip() not in {"enabled", "enabled-runtime"}:
+        raise ColocationError("Hermes discovery timer did not become enabled")
+    if active.returncode != 0 or active.stdout.strip() != "active":
+        raise ColocationError("Hermes discovery timer did not become active")
+
+    return {
+        "status": "activated",
+        "release_id": manifest["release_id"],
+        "yfc_sha": manifest["yfc_sha"],
+        "timer_enabled": True,
+        "timer_active": True,
+        "network_anchor_active": True,
+        "pending_jobs": 0,
+        "last_successful_discovery_at": health_document["last_successful_discovery_at"],
+        "last_successful_drain_at": health_document["last_successful_drain_at"],
+        "secrets_logged": False,
+    }
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -884,6 +972,9 @@ def _parser() -> argparse.ArgumentParser:
     health_parser = subparsers.add_parser("health")
     health_parser.add_argument("--runtime-root", type=Path, default=Path("/opt/hermes"))
     health_parser.add_argument("--state-root", type=Path, default=Path("/var/lib/hermes"))
+    activate_parser = subparsers.add_parser("activate")
+    activate_parser.add_argument("--runtime-root", type=Path, default=Path("/opt/hermes"))
+    activate_parser.add_argument("--state-root", type=Path, default=Path("/var/lib/hermes"))
     return parser
 
 
@@ -894,6 +985,8 @@ def main(argv: list[str] | None = None) -> int:
             result = install(args)
         elif args.command == "rollback":
             result = rollback(args)
+        elif args.command == "activate":
+            result = activate(args)
         else:
             result = health(args)
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))

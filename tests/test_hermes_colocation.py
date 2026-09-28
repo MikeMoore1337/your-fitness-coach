@@ -244,6 +244,212 @@ def test_release_switch_quiesces_timer_before_replacing_systemd_links(
     assert events == ["disable", "links", "daemon-reload", "assert-disabled"]
 
 
+def _activate_args(*extra: str):
+    return hermes._parser().parse_args(
+        [
+            "activate",
+            "--runtime-root",
+            "/opt/hermes",
+            "--state-root",
+            "/var/lib/hermes",
+            *extra,
+        ]
+    )
+
+
+def _healthy_activation_snapshot(
+    *,
+    discovery_at: str = "2026-09-28T05:20:56+00:00",
+    drain_at: str = "2026-09-28T05:21:13+00:00",
+    pending_jobs: int = 0,
+    status: str = "healthy",
+    active_alerts: list[str] | None = None,
+) -> dict[str, object]:
+    return {
+        "status": status,
+        "pending_jobs": pending_jobs,
+        "health": {
+            "active_alerts": [] if active_alerts is None else active_alerts,
+            "last_successful_discovery_at": discovery_at,
+            "last_successful_drain_at": drain_at,
+        },
+    }
+
+
+def test_activate_enables_timer_only_after_current_release_acceptance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = _activate_args()
+    release = Path("/opt/hermes/releases/hermes-current")
+    manifest = {
+        "release_id": "hermes-" + "a" * 12 + "-" + "b" * 16,
+        "yfc_sha": "c" * 40,
+    }
+    switch_epoch = 1790570000.0
+    calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        hermes,
+        "_activation_release",
+        lambda _args: (release, manifest, switch_epoch),
+    )
+    monkeypatch.setattr(
+        hermes,
+        "_health_snapshot",
+        lambda _release, _state: _healthy_activation_snapshot(),
+    )
+
+    class Result:
+        def __init__(self, returncode: int = 0, stdout: str = "") -> None:
+            self.returncode = returncode
+            self.stdout = stdout
+
+    def fake_run(command: list[str], *, check: bool = True, capture: bool = False) -> Result:
+        calls.append(command)
+        if command == ["systemctl", "is-active", "hermes-network-anchor.service"]:
+            return Result(0, "active\n")
+        if command == ["systemctl", "is-enabled", "hermes-discovery.timer"]:
+            return Result(0, "enabled\n")
+        if command == ["systemctl", "is-active", "hermes-discovery.timer"]:
+            return Result(0, "active\n")
+        return Result()
+
+    monkeypatch.setattr(hermes, "_run", fake_run)
+
+    result = hermes.activate(args)
+
+    assert result["status"] == "activated"
+    assert result["release_id"] == manifest["release_id"]
+    assert result["timer_enabled"] is True
+    assert result["timer_active"] is True
+    assert result["pending_jobs"] == 0
+    assert ["systemctl", "enable", "--now", "hermes-discovery.timer"] in calls
+
+
+@pytest.mark.parametrize(
+    ("snapshot", "message"),
+    [
+        (_healthy_activation_snapshot(status="attention"), "health must be clean"),
+        (_healthy_activation_snapshot(pending_jobs=1), "health must be clean"),
+        (
+            _healthy_activation_snapshot(active_alerts=["drain_failures"]),
+            "health must be clean",
+        ),
+    ],
+)
+def test_activate_rejects_unhealthy_or_pending_state(
+    monkeypatch: pytest.MonkeyPatch,
+    snapshot: dict[str, object],
+    message: str,
+) -> None:
+    args = _activate_args()
+    monkeypatch.setattr(
+        hermes,
+        "_activation_release",
+        lambda _args: (
+            Path("/release"),
+            {"release_id": "hermes-" + "a" * 12 + "-" + "b" * 16, "yfc_sha": "c" * 40},
+            1790570000.0,
+        ),
+    )
+    monkeypatch.setattr(hermes, "_health_snapshot", lambda _release, _state: snapshot)
+
+    class Result:
+        returncode = 0
+        stdout = "active\n"
+
+    monkeypatch.setattr(hermes, "_run", lambda *args, **kwargs: Result())
+
+    with pytest.raises(hermes.ColocationError, match=message):
+        hermes.activate(args)
+
+
+def test_activate_rejects_previous_release_health(monkeypatch: pytest.MonkeyPatch) -> None:
+    args = _activate_args()
+    monkeypatch.setattr(
+        hermes,
+        "_activation_release",
+        lambda _args: (
+            Path("/release"),
+            {"release_id": "hermes-" + "a" * 12 + "-" + "b" * 16, "yfc_sha": "c" * 40},
+            1790570000.0,
+        ),
+    )
+    monkeypatch.setattr(
+        hermes,
+        "_health_snapshot",
+        lambda _release, _state: _healthy_activation_snapshot(
+            discovery_at="2026-09-27T05:20:56+00:00",
+            drain_at="2026-09-27T05:21:13+00:00",
+        ),
+    )
+
+    class Result:
+        returncode = 0
+        stdout = "active\n"
+
+    monkeypatch.setattr(hermes, "_run", lambda *args, **kwargs: Result())
+
+    with pytest.raises(hermes.ColocationError, match="predates the current release switch"):
+        hermes.activate(args)
+
+
+def test_activate_requires_active_network_anchor(monkeypatch: pytest.MonkeyPatch) -> None:
+    args = _activate_args()
+    monkeypatch.setattr(
+        hermes,
+        "_activation_release",
+        lambda _args: (
+            Path("/release"),
+            {"release_id": "hermes-" + "a" * 12 + "-" + "b" * 16, "yfc_sha": "c" * 40},
+            1790570000.0,
+        ),
+    )
+
+    class Result:
+        returncode = 3
+        stdout = "inactive\n"
+
+    monkeypatch.setattr(hermes, "_run", lambda *args, **kwargs: Result())
+
+    with pytest.raises(hermes.ColocationError, match="network anchor must be active"):
+        hermes.activate(args)
+
+
+def test_activate_propagates_systemd_activation_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = _activate_args()
+    monkeypatch.setattr(
+        hermes,
+        "_activation_release",
+        lambda _args: (
+            Path("/release"),
+            {"release_id": "hermes-" + "a" * 12 + "-" + "b" * 16, "yfc_sha": "c" * 40},
+            1790570000.0,
+        ),
+    )
+    monkeypatch.setattr(
+        hermes,
+        "_health_snapshot",
+        lambda _release, _state: _healthy_activation_snapshot(),
+    )
+
+    class Result:
+        returncode = 0
+        stdout = "active\n"
+
+    def fake_run(command: list[str], *, check: bool = True, capture: bool = False):
+        if command == ["systemctl", "enable", "--now", "hermes-discovery.timer"]:
+            raise hermes.subprocess.CalledProcessError(1, command)
+        return Result()
+
+    monkeypatch.setattr(hermes, "_run", fake_run)
+
+    with pytest.raises(hermes.subprocess.CalledProcessError):
+        hermes.activate(args)
+
+
 def test_definitions_provenance_is_content_addressed(tmp_path: Path) -> None:
     registry_hash = "a" * 64
     path = tmp_path / "source-definitions.json"
