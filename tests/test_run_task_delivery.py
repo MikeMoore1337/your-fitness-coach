@@ -9,7 +9,11 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from scripts.issue_workflow import render_task_contract
+from scripts.issue_workflow import (
+    control_state_payload,
+    render_control_state_comment,
+    render_task_contract,
+)
 
 
 def _load_module():
@@ -1356,6 +1360,145 @@ def test_task_issue_inventory_authenticates_before_parsing_or_duplicate_detectio
     contracts = delivery._task_issue_contracts()
 
     assert contracts["91"]["issue_number"] == 902
+
+
+def test_queue_inventory_skips_closed_legacy_completed_contract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True)
+    (tasks_root / "505-progression.md").write_text("task", encoding="utf-8")
+    legacy_body = """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"494","scope":"legacy completed task","acceptance":["historical completion is preserved"],"dependencies":[],"owner_gate":"none","risk_lane":"YELLOW","issue_state":"completed"}
+<!-- yfc-task-contract:v1 -->"""
+    current_body = render_task_contract(
+        {
+            "task_id": "505",
+            "scope": "progression",
+            "acceptance": ["deterministic proposals"],
+            "dependencies": ["504"],
+            "owner_gate": "none",
+            "risk_lane": "GREEN",
+            "source_spec": "codex-backlog/tasks/505-progression.md",
+            "issue_state": "queued",
+        }
+    )
+    issues = [
+        {
+            "number": 494,
+            "title": "[Task 494] legacy",
+            "body": legacy_body,
+            "state": "closed",
+            "user": {"login": "owner"},
+        },
+        {
+            "number": 505,
+            "title": "[Task 505] progression",
+            "body": current_body,
+            "state": "open",
+            "user": {"login": "owner"},
+        },
+    ]
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return []
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return {"504"}
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(
+        delivery,
+        "find_task_document",
+        lambda root, task_id: SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug="progression",
+            path=root / "codex-backlog" / "tasks" / "505-progression.md",
+        ),
+    )
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: issues)
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: (issue, []))
+
+    candidates = delivery._queue_candidates()
+
+    assert [candidate["task_id"] for candidate in candidates] == ["505"]
+
+
+def test_legacy_completed_contract_requires_closed_github_issue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    legacy_body = """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"494","scope":"legacy completed task","acceptance":["historical completion is preserved"],"dependencies":[],"owner_gate":"none","risk_lane":"YELLOW","issue_state":"completed"}
+<!-- yfc-task-contract:v1 -->"""
+    issue = {
+        "number": 494,
+        "title": "[Task 494] legacy",
+        "body": legacy_body,
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+
+    with pytest.raises(delivery.DeliveryError, match="requires a closed GitHub Issue"):
+        delivery._task_issue_contracts()
+
+
+def test_legacy_completed_contract_rejects_conflicting_control_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    legacy_body = """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"494","scope":"legacy completed task","acceptance":["historical completion is preserved"],"dependencies":[],"owner_gate":"none","risk_lane":"YELLOW","issue_state":"completed"}
+<!-- yfc-task-contract:v1 -->"""
+    issue = {
+        "number": 494,
+        "title": "[Task 494] legacy",
+        "body": legacy_body,
+        "state": "closed",
+        "user": {"login": "owner"},
+    }
+    conflicting_state = control_state_payload(
+        task_id="494",
+        state="in_progress",
+        issue_number=494,
+        branch="task/494-legacy",
+    )
+
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda item: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda item: ("owner",))
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue_number: (
+            issue,
+            [
+                {
+                    "id": 1,
+                    "user": {"login": "owner"},
+                    "body": render_control_state_comment(conflicting_state),
+                }
+            ],
+        ),
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="conflicts with control state"):
+        delivery._task_issue_contracts()
 
 
 def test_queue_candidates_excludes_pending_bug_documents(

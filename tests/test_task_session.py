@@ -3716,6 +3716,15 @@ def test_controller_pr_accepts_only_the_new_artifact_cleanup_paths() -> None:
         )
 
 
+def test_controller_pr_accepts_issue_workflow_contract_paths() -> None:
+    task_session.validate_controller_pull_request_files(
+        [
+            {"filename": "scripts/issue_workflow.py"},
+            {"filename": "tests/test_issue_workflow.py"},
+        ]
+    )
+
+
 def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(
     tmp_path: Path,
 ) -> None:

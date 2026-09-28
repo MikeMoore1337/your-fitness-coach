@@ -1068,25 +1068,52 @@ def _task_issue_contracts() -> dict[str, dict[str, Any] | None]:
         if task_id in contracts:
             raise DeliveryError(f"Multiple GitHub Issues claim Task {task_id}")
         try:
-            contracts[task_id] = parse_task_contract(str(issue.get("body", "")))
+            contract = parse_task_contract(str(issue.get("body", "")))
         except IssueWorkflowError as error:
             raise DeliveryError(f"Task {task_id} Issue contract is malformed: {error}") from error
-        if contracts[task_id] is not None:
-            issue_number = issue.get("number")
-            if not isinstance(issue_number, int) or isinstance(issue_number, bool):
-                raise DeliveryError(f"Task {task_id} Issue has no valid number")
-            _, comments = _control_issue_snapshot(issue_number)
-            latest = latest_control_state(
-                comments,
-                task_id=task_id,
-                authorized_logins=_trusted_issue_logins(issue),
+        if (
+            contract is not None
+            and contract.get("legacy_issue_state") == "completed"
+            and str(issue.get("state", "")).lower() != "closed"
+        ):
+            raise DeliveryError(
+                f"Task {task_id} legacy completed contract requires a closed GitHub Issue"
             )
-            contracts[task_id] = {
-                **contracts[task_id],
-                "issue_number": issue_number,
-                "issue_state": str(issue.get("state", "")).lower(),
-                "latest_control_state": latest,
-            }
+        contracts[task_id] = contract
+        if contract is None:
+            continue
+        issue_number = issue.get("number")
+        if not isinstance(issue_number, int) or isinstance(issue_number, bool):
+            raise DeliveryError(f"Task {task_id} Issue has no valid number")
+        _, comments = _control_issue_snapshot(issue_number)
+        latest = latest_control_state(
+            comments,
+            task_id=task_id,
+            authorized_logins=_trusted_issue_logins(issue),
+        )
+        if (
+            contract.get("legacy_issue_state") == "completed"
+            and latest is not None
+            and latest.get("state") != "production_verified"
+        ):
+            raise DeliveryError(
+                f"Task {task_id} legacy completed contract conflicts with control state "
+                f"{latest.get('state', 'unknown')!r}"
+            )
+        normalized_contract = {
+            **contract,
+            "issue_number": issue_number,
+            "issue_state": str(issue.get("state", "")).lower(),
+            "latest_control_state": latest,
+        }
+        if contract.get("legacy_issue_state") == "completed":
+            normalized_contract.update(
+                {
+                    "legacy_issue_state_verified": True,
+                    "legacy_github_issue_state": "closed",
+                }
+            )
+        contracts[task_id] = normalized_contract
     return contracts
 
 

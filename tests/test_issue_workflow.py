@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from scripts.issue_workflow import (
     CONTROL_STATE_MARKER,
+    CONTROL_STATES,
     DEFAULT_QUEUE_BUDGET,
     IssueWorkflowError,
     QueueBudget,
@@ -172,6 +173,45 @@ def test_task_issue_contract_round_trip_preserves_dependencies_and_acceptance() 
     )
     assert parse_task_contract(render_task_contract(contract)) == contract
     assert parse_task_contract("ordinary issue body") is None
+
+
+def test_legacy_completed_task_contract_normalizes_to_terminal_without_runtime_state() -> None:
+    body = """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"494","scope":"legacy completed task","acceptance":["historical completion is preserved"],"dependencies":[],"owner_gate":"none","risk_lane":"YELLOW","issue_state":"completed"}
+<!-- yfc-task-contract:v1 -->"""
+
+    contract = parse_task_contract(body)
+
+    assert contract is not None
+    assert contract["issue_state"] == "production_verified"
+    assert contract["legacy_issue_state"] == "completed"
+    assert contract["legacy_source_spec_missing"] is True
+    assert "completed" not in CONTROL_STATES
+
+
+def test_unknown_task_contract_state_remains_fail_closed() -> None:
+    body = """<!-- yfc-task-contract:v1 -->
+{"version":1,"task_id":"494","scope":"unknown state","acceptance":["must fail"],"dependencies":[],"owner_gate":"none","risk_lane":"GREEN","source_spec":"spec.md","issue_state":"magic"}
+<!-- yfc-task-contract:v1 -->"""
+
+    with pytest.raises(IssueWorkflowError, match="Unknown task issue state"):
+        parse_task_contract(body)
+
+
+def test_current_terminal_task_contract_state_remains_unchanged() -> None:
+    contract = task_contract_payload(
+        task_id="494",
+        scope="current terminal task",
+        acceptance=("terminal state remains supported",),
+        dependencies=(),
+        owner_gate="none",
+        risk_lane="GREEN",
+        source_spec="spec.md",
+        issue_state="production_verified",
+    )
+
+    assert contract["issue_state"] == "production_verified"
+    assert "legacy_issue_state" not in contract
 
 
 def test_machine_contracts_reject_unsafe_shapes_and_weaker_gate_lane() -> None:
