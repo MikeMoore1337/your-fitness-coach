@@ -17,6 +17,64 @@ SOURCE_SLUGS = {
     "dumbbell-ppl-gregarioushermit",
 }
 
+SOURCE_TITLES = {
+    "stronglifts-5x5": "StrongLifts 5x5 (силовая программа 5x5)",
+    "gzclp": "GZCLP (линейная прогрессия GZCL)",
+    "531-for-beginners": "5/3/1 для начинающих",
+    "phul": "PHUL (сила и гипертрофия, верх/низ)",
+    "nsuns-4d": "nSuns - 4-дневная программа",
+    "metallicdpa-linear-progression-ppl": (
+        "Линейная прогрессия Metallicdpa - PPL (толкай/тяни/ноги)"
+    ),
+    "bwf-recommended-routine": (
+        "BWF (тренировки с собственным весом) - рекомендуемая программа"
+    ),
+    "dumbbell-ppl-gregarioushermit": "Гантельная PPL (толкай/тяни/ноги)",
+}
+
+SOURCE_DAY_TITLES = {
+    "stronglifts-5x5": ["Тренировка A", "Тренировка B"],
+    "gzclp": ["Тренировка 1", "Тренировка 2", "Тренировка 3", "Тренировка 4"],
+    "531-for-beginners": [
+        "День 1 · Присед + жим лёжа",
+        "День 2 · Становая тяга + жим стоя",
+        "День 3 · Жим лёжа + присед",
+    ],
+    "phul": [
+        "Верх тела · сила",
+        "Низ тела · сила",
+        "Верх тела · гипертрофия",
+        "Низ тела · гипертрофия",
+    ],
+    "nsuns-4d": [
+        "День 1 · Жим лёжа + жим стоя",
+        "День 2 · Присед + становая сумо",
+        "День 3 · Жим стоя + жим лёжа",
+        "День 4 · Становая тяга + присед",
+    ],
+    "metallicdpa-linear-progression-ppl": [
+        "Тяни A",
+        "Толкай A",
+        "Ноги A",
+        "Тяни B",
+        "Толкай B",
+        "Ноги B",
+    ],
+    "bwf-recommended-routine": [
+        "Рекомендуемая программа A",
+        "Рекомендуемая программа B",
+        "Рекомендуемая программа C",
+    ],
+    "dumbbell-ppl-gregarioushermit": [
+        "Толкай A",
+        "Тяни A",
+        "Ноги A",
+        "Толкай B",
+        "Тяни B",
+        "Ноги B",
+    ],
+}
+
 
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
     response = client.post(
@@ -37,6 +95,11 @@ def test_issue_396_seeded_library_exposes_16_templates_and_periodization(client)
     assert templates.keys() >= SOURCE_SLUGS
     assert sum(item["provenance_type"] == "YFC_GENERIC" for item in templates.values()) == 8
     assert all(templates[slug]["provenance_type"] == "SOURCE_ADAPTATION" for slug in SOURCE_SLUGS)
+    assert {slug: templates[slug]["title"] for slug in SOURCE_SLUGS} == SOURCE_TITLES
+    assert {
+        slug: [day["title"] for day in templates[slug]["days"]]
+        for slug in SOURCE_SLUGS
+    } == SOURCE_DAY_TITLES
 
     assert templates["phul"]["default_duration_weeks"] == 12
     assert all(
@@ -70,7 +133,7 @@ def test_issue_396_seeded_library_exposes_16_templates_and_periodization(client)
     )
 
     stronglifts = templates["stronglifts-5x5"]
-    assert [day["title"] for day in stronglifts["days"]] == ["Workout A", "Workout B"]
+    assert [day["title"] for day in stronglifts["days"]] == ["Тренировка A", "Тренировка B"]
     assert stronglifts["days"][0]["exercises"][0]["prescribed_sets"] == 5
     assert stronglifts["days"][1]["exercises"][-1]["prescribed_sets"] == 1
 
@@ -92,10 +155,10 @@ def test_issue_396_seeded_library_exposes_16_templates_and_periodization(client)
     )
 
     assert [day["title"] for day in templates["phul"]["days"]] == [
-        "Upper Power",
-        "Lower Power",
-        "Upper Hypertrophy",
-        "Lower Hypertrophy",
+        "Верх тела · сила",
+        "Низ тела · сила",
+        "Верх тела · гипертрофия",
+        "Низ тела · гипертрофия",
     ]
     assert all(len(day["exercises"]) == 2 for day in templates["nsuns-4d"]["days"])
     assert len(templates["metallicdpa-linear-progression-ppl"]["days"]) == 6
@@ -105,12 +168,12 @@ def test_issue_396_seeded_library_exposes_16_templates_and_periodization(client)
         for exercise in day["exercises"]
     )
     assert [day["title"] for day in templates["dumbbell-ppl-gregarioushermit"]["days"]] == [
-        "Push A",
-        "Pull A",
-        "Legs A",
-        "Push B",
-        "Pull B",
-        "Legs B",
+        "Толкай A",
+        "Тяни A",
+        "Ноги A",
+        "Толкай B",
+        "Тяни B",
+        "Ноги B",
     ]
 
 
