@@ -26,6 +26,11 @@ from fitminiapp_api.schemas.program import (
     TrainingBlockResponse,
     TrainingBlockUpdate,
 )
+from fitminiapp_api.schemas.workout import (
+    ProgramProgressionProposalList,
+    ProgressionProposalReviewRequest,
+    ProgressionProposalReviewResponse,
+)
 from fitminiapp_api.services.exercise_catalog import (
     _effective_exercise_id,
     _source_exercise_slug,
@@ -69,6 +74,10 @@ from fitminiapp_api.services.programs import (
     restore_example_template_for_user,
     update_template_for_user,
 )
+from fitminiapp_api.services.progression_guidance import (
+    list_assigned_program_progression_proposals,
+    review_assigned_program_progression_proposal,
+)
 from fitminiapp_api.services.workout_metrics import exercise_metric_type
 
 router = APIRouter()
@@ -80,6 +89,15 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
         return HTTPException(status_code=404, detail=detail)
     if detail in {
         "Program revision conflict",
+        "Progression proposal is stale",
+        "Progression proposal already rejected",
+        "Progression proposal already reviewed",
+        "Progression proposal target set changed",
+        "Progression proposal has no applicable exact load change",
+        "Progression proposal has no incomplete target sets",
+        "Progression proposal target set versions are incomplete",
+        "Progression proposal target set is no longer available",
+        "Progression proposal could not be applied",
         "Assigned program is not editable",
         "Cannot delete a program while a workout is in progress",
         "Training blocks must not overlap",
@@ -89,6 +107,9 @@ def _assigned_program_error(exc: ProgramError) -> HTTPException:
         "Completed or archived training blocks are immutable",
         "No future planned workouts for the selected day",
         "Superset position is already occupied",
+        "No upcoming workout for progression review",
+        "Progression workout is not available",
+        "Progression exercise is not available",
     }:
         return HTTPException(status_code=409, detail=detail)
     return HTTPException(status_code=422, detail=detail)
@@ -536,6 +557,51 @@ def delete_assigned_program(
         delete_assigned_program_for_user(db, current_user, program_id)
     except ProgramError as exc:
         raise _assigned_program_error(exc) from exc
+
+
+@router.get(
+    "/assigned/{program_id}/progression-proposals",
+    response_model=ProgramProgressionProposalList,
+)
+def assigned_program_progression_proposals(
+    program_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return list_assigned_program_progression_proposals(db, current_user, program_id)
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+
+
+@router.post(
+    "/assigned/{program_id}/progression-proposals/{proposal_id}/review",
+    response_model=ProgressionProposalReviewResponse,
+)
+def review_assigned_program_progression_proposal_endpoint(
+    program_id: int,
+    proposal_id: str,
+    payload: ProgressionProposalReviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        result = review_assigned_program_progression_proposal(
+            db,
+            current_user,
+            program_id,
+            proposal_id,
+            decision=payload.decision,
+            workout_id=payload.workout_id,
+            exercise_id=payload.exercise_id,
+            expected_revision_number=payload.expected_revision_number,
+            expected_set_versions=payload.expected_set_versions,
+            adjusted_weight=payload.adjusted_weight,
+        )
+    except ProgramError as exc:
+        raise _assigned_program_error(exc) from exc
+    db.commit()
+    return result
 
 
 @router.get(

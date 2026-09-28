@@ -195,8 +195,71 @@ class ProgressionEvidence(BaseModel):
     sessions: list[ProgressionSessionEvidence]
 
 
+class ProgressionTargetSetUpdate(BaseModel):
+    set_id: int = Field(ge=1)
+    set_number: int = Field(ge=1)
+    planned_role: PrescriptionRole | None = None
+    current_weight: float | None = Field(default=None, ge=0)
+    set_version: int = Field(ge=1)
+    relative_to_top: float | None = Field(default=None, gt=0, le=1)
+    proposed_weight: float = Field(ge=0)
+
+
+class ProgressionProposal(BaseModel):
+    proposal_id: str = Field(min_length=64, max_length=64)
+    rule_id: str = Field(min_length=64, max_length=64)
+    rule_kind: Literal[
+        "legacy_progression_guidance",
+        "fixed_prescription",
+        "double_progression",
+        "linear_load",
+        "percentage_training_max",
+        "rir_rpe",
+        "amrap_success_failure",
+        "deload",
+    ]
+    rule_snapshot: dict[str, object]
+    target_program_id: int = Field(ge=1)
+    target_revision_number: int = Field(ge=0)
+    target_exercise_id: int = Field(ge=1)
+    target_workout_id: int = Field(ge=1)
+    current_weight: float | None = Field(default=None, ge=0)
+    proposed_weight: float | None = Field(default=None, ge=0)
+    deload_volume_percent: int | None = Field(default=None, ge=0, le=100)
+    deload_intensity_percent: int | None = Field(default=None, ge=0, le=100)
+    proposed_action: Literal["set_load", "hold", "reset_recommended", "deload"]
+    target_set_updates: list[ProgressionTargetSetUpdate] = Field(default_factory=list)
+    source_evidence_ids: list[str]
+    comparable_session_count: int = Field(ge=0)
+    reason_codes: list[str]
+    eligibility_status: Literal["eligible", "no_change", "review"]
+    requires_confirmation: Literal[True] = True
+
+
+class ProgressionProposalReviewRequest(BaseModel):
+    decision: Literal["confirm", "reject", "adjust"]
+    workout_id: int = Field(ge=1)
+    exercise_id: int = Field(ge=1)
+    expected_revision_number: int = Field(ge=0)
+    adjusted_weight: float | None = Field(default=None, gt=0, le=100_000)
+    expected_set_versions: dict[int, int] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_adjustment(self):
+        if (self.decision == "adjust") != (self.adjusted_weight is not None):
+            raise ValueError("An adjusted weight is required only for an adjusted decision")
+        return self
+
+
+class ProgressionProposalReviewResponse(BaseModel):
+    proposal_id: str
+    decision: Literal["confirm", "reject", "adjust"]
+    applied_set_ids: list[int]
+    current_revision_number: int = Field(ge=0)
+
+
 class ProgressionGuidance(BaseModel):
-    ruleset_version: Literal["progression-guidance-v1"]
+    ruleset_version: Literal["progression-guidance-v2"]
     outcome: Literal["consider_progressing", "hold", "review", "consider_reducing"]
     message: str
     detail: str
@@ -204,6 +267,21 @@ class ProgressionGuidance(BaseModel):
     suggested_weight: float | None = Field(default=None, ge=0)
     load_unit: Literal["kg", "lb"]
     evidence: ProgressionEvidence
+    proposal: ProgressionProposal | None = None
+
+
+class ProgramProgressionProposalExercise(BaseModel):
+    exercise_id: int = Field(ge=1)
+    exercise_title: str
+    guidance: ProgressionGuidance
+
+
+class ProgramProgressionProposalList(BaseModel):
+    target_program_id: int = Field(ge=1)
+    target_revision_number: int = Field(ge=0)
+    target_workout_id: int = Field(ge=1)
+    scheduled_date: date
+    exercises: list[ProgramProgressionProposalExercise]
 
 
 class WorkoutExerciseItem(BaseModel):
