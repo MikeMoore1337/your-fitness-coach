@@ -32,6 +32,7 @@ CONTROL_STATES = frozenset(
         "cleanup_deferred",
     }
 )
+LEGACY_TERMINAL_TASK_CONTRACT_STATES = frozenset({"completed"})
 CONTROL_STATE_TRANSITIONS: dict[str | None, frozenset[str]] = {
     None: frozenset({"queued", "in_progress", "human_required", "blocked"}),
     "queued": frozenset({"in_progress", "human_required", "blocked"}),
@@ -567,6 +568,32 @@ def render_task_contract(contract: Mapping[str, Any]) -> str:
     return f"{TASK_CONTRACT_MARKER}\n{serialized}\n{TASK_CONTRACT_MARKER}"
 
 
+def _parse_legacy_completed_task_contract(payload: Mapping[str, Any]) -> dict[str, Any]:
+    source_spec = payload.get("source_spec", "")
+    if not isinstance(source_spec, str):
+        raise IssueWorkflowError("Task contract scope and source_spec must be strings")
+    task_id = payload.get("task_id", "")
+    normalized_source_spec = source_spec.strip() or f"legacy:github-issue/{task_id}"
+    normalized = task_contract_payload(
+        task_id=task_id,
+        scope=payload.get("scope", ""),
+        acceptance=payload.get("acceptance", []),
+        dependencies=payload.get("dependencies", []),
+        owner_gate=payload.get("owner_gate", ""),
+        risk_lane=payload.get("risk_lane", ""),
+        # Historical completed contracts predate source_spec.  Use a private validation
+        # placeholder, then preserve the missing field explicitly in the inventory result.
+        # Keep the normalized mapping renderable while marking that this is not a real
+        # source path when the historical contract omitted source_spec.
+        source_spec=normalized_source_spec,
+        issue_state="production_verified",
+    )
+    normalized["legacy_issue_state"] = "completed"
+    normalized["legacy_normalization"] = "completed->production_verified"
+    normalized["legacy_source_spec_missing"] = not bool(source_spec.strip())
+    return normalized
+
+
 def parse_task_contract(body: str) -> dict[str, Any] | None:
     if TASK_CONTRACT_MARKER not in body:
         return None
@@ -581,6 +608,12 @@ def parse_task_contract(body: str) -> dict[str, Any] | None:
         raise IssueWorkflowError("Task-contract payload must be an object")
     if payload.get("version") != TASK_CONTRACT_VERSION:
         raise IssueWorkflowError("Unsupported task-contract version")
+    raw_issue_state = payload.get("issue_state", "queued")
+    normalized_raw_issue_state = (
+        raw_issue_state.strip().lower() if isinstance(raw_issue_state, str) else raw_issue_state
+    )
+    if normalized_raw_issue_state in LEGACY_TERMINAL_TASK_CONTRACT_STATES:
+        return _parse_legacy_completed_task_contract(payload)
     return task_contract_payload(
         task_id=payload.get("task_id", ""),
         scope=payload.get("scope", ""),
@@ -589,5 +622,5 @@ def parse_task_contract(body: str) -> dict[str, Any] | None:
         owner_gate=payload.get("owner_gate", ""),
         risk_lane=payload.get("risk_lane", ""),
         source_spec=payload.get("source_spec", ""),
-        issue_state=payload.get("issue_state", "queued"),
+        issue_state=raw_issue_state,
     )
