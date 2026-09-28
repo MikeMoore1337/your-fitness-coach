@@ -130,37 +130,35 @@ describe('ProgressionGuidance', () => {
     render(
       <ProgressionGuidance
         exerciseKey={103}
-        guidance={
-          guidance({
-            suggested_weight: 42.5,
-            proposal: proposal(
-              'double_progression',
-              {
-                kind: 'double_progression',
-                scope: 'program',
-                rep_target: { kind: 'range', min_reps: 8, max_reps: 10 },
-                increment_value: 5,
-                increment_unit: 'kg',
-              },
-              {
-                proposed_weight: 45,
-                proposed_action: 'set_load',
-                eligibility_status: 'eligible',
-                target_set_updates: [
-                  {
-                    set_id: 21,
-                    set_number: 1,
-                    planned_role: 'working',
-                    current_weight: null,
-                    set_version: 1,
-                    relative_to_top: null,
-                    proposed_weight: 45,
-                  },
-                ],
-              },
-            ),
-          })
-        }
+        guidance={guidance({
+          suggested_weight: 42.5,
+          proposal: proposal(
+            'double_progression',
+            {
+              kind: 'double_progression',
+              scope: 'program',
+              rep_target: { kind: 'range', min_reps: 8, max_reps: 10 },
+              increment_value: 5,
+              increment_unit: 'kg',
+            },
+            {
+              proposed_weight: 45,
+              proposed_action: 'set_load',
+              eligibility_status: 'eligible',
+              target_set_updates: [
+                {
+                  set_id: 21,
+                  set_number: 1,
+                  planned_role: 'working',
+                  current_weight: null,
+                  set_version: 1,
+                  relative_to_top: null,
+                  proposed_weight: 45,
+                },
+              ],
+            },
+          ),
+        })}
         onApply={onApply}
         onDismiss={() => undefined}
       />,

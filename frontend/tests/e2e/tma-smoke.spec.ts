@@ -1794,7 +1794,7 @@ test('progression guidance applies a configured step once, stays optional and ma
 
   api.setOffline(true);
   await setNetworkOffline(tmaPage, true);
-  await tmaGuidance.getByRole('button', { name: 'Подставить 42,5 кг' }).dblclick();
+  await tmaGuidance.getByRole('button', { name: 'Применить 42,5 кг' }).dblclick();
   const weight = tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
   await expect(weight).toHaveValue('42.5');
   await expect(tmaPage.getByText('Сохранено на устройстве')).toBeVisible();
@@ -1816,7 +1816,7 @@ test('progression guidance applies a configured step once, stays optional and ma
   await expect(tmaPage.getByRole('button', { name: 'Вес подставлен' })).toBeDisabled();
   expect(api.setPatchCalls()).toBe(1);
 
-  await tmaPage.getByRole('button', { name: 'Скрыть подсказку' }).click();
+  await tmaPage.getByRole('button', { name: 'Оставить текущую нагрузку' }).click();
   await expect(
     tmaPage.getByRole('region', { name: 'Рекомендация по следующей нагрузке' }),
   ).not.toBeAttached();

@@ -124,7 +124,9 @@ function ruleSummary(guidance: Guidance): string | null {
 
   if (typeof increment === 'number') {
     facts.push(
-      unit ? `шаг ${formatNumber(increment)} ${unit}` : `шаг ${formatNumber(increment)}, единица не задана`,
+      unit
+        ? `шаг ${formatNumber(increment)} ${unit}`
+        : `шаг ${formatNumber(increment)}, единица не задана`,
     );
   }
 
@@ -170,7 +172,9 @@ function ruleSummary(guidance: Guidance): string | null {
   }
 
   const details = facts.join(' · ');
-  return details ? `${ruleLabels[proposal.rule_kind]} · ${details}` : ruleLabels[proposal.rule_kind];
+  return details
+    ? `${ruleLabels[proposal.rule_kind]} · ${details}`
+    : ruleLabels[proposal.rule_kind];
 }
 
 export function ProgressionGuidance({

@@ -1275,7 +1275,10 @@ export function TodayWorkout({
               targetSetUpdates.every((update) => {
                 const set = exercise.sets.find((item) => item.id === update.set_id);
                 const pending = set ? activeSync.pendingBySet.get(set.id)?.values : undefined;
-                return set != null && (pending?.actual_weight ?? set.actual_weight) === update.proposed_weight;
+                return (
+                  set != null &&
+                  (pending?.actual_weight ?? set.actual_weight) === update.proposed_weight
+                );
               });
 
             return (
@@ -1383,7 +1386,9 @@ export function TodayWorkout({
                           started && suggestedWeight != null && targetSetUpdates.length > 0
                             ? () => {
                                 for (const update of targetSetUpdates) {
-                                  const set = exercise.sets.find((item) => item.id === update.set_id);
+                                  const set = exercise.sets.find(
+                                    (item) => item.id === update.set_id,
+                                  );
                                   if (!set) continue;
                                   const pending = activeSync.pendingBySet.get(set.id)?.values;
                                   if (pending?.is_completed ?? set.is_completed) continue;
