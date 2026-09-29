@@ -13,7 +13,7 @@ from typing import Literal
 TAXONOMY_VERSION = "news-taxonomy-v1"
 RISK_POLICY_VERSION = "news-risk-v1"
 VOICE_PROFILE_VERSION = "yfc-news-voice-v1"
-RELEVANCE_VERSION = "news-relevance-v2"
+RELEVANCE_VERSION = "news-relevance-v3"
 
 OWNER_EDITORIAL_TOPICS = (
     "fitness_training",
@@ -207,7 +207,11 @@ TOPIC_MARKERS: dict[str, tuple[str, ...]] = {
         "bodybuilding",
         "bodybuilder",
         "physique competition",
-        "bodybuilding",
+        "men's physique",
+        "mens physique",
+        "mr. olympia",
+        "olympia bodybuilding",
+        "classic physique olympia",
         "бодибилд",
         "соревновательн подготовк",
     ),
@@ -483,6 +487,11 @@ _RELEVANCE_MARKERS: dict[str, tuple[str, ...]] = {
         "bodybuilder",
         "physique competition",
         "physique athlete",
+        "men's physique",
+        "mens physique",
+        "mr. olympia",
+        "olympia bodybuilding",
+        "classic physique olympia",
         "contest preparation",
         "contest prep",
         "бодибилд",
@@ -672,6 +681,11 @@ _DIRECT_RESCUE_MARKERS = (
     "bodybuilding",
     "bodybuilder",
     "physique athlete",
+    "men's physique",
+    "mens physique",
+    "mr. olympia",
+    "olympia bodybuilding",
+    "classic physique olympia",
     "training load",
     "workout",
     "sarcopenic obesity",
