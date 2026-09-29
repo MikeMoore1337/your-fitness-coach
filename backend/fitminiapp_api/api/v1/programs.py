@@ -73,6 +73,7 @@ from fitminiapp_api.services.programs import (
     assign_template_to_self,
     build_template_response,
     build_template_responses,
+    clone_template_for_coach,
     create_and_optionally_assign_program,
     delete_assigned_program_for_user,
     delete_template_for_user,
@@ -458,6 +459,29 @@ def get_template(
         if detail == "Template not found":
             raise HTTPException(status_code=404, detail=detail)
         raise HTTPException(status_code=403, detail=detail)
+
+    return build_template_response(template, db, current_user)
+
+
+@router.post(
+    "/templates/{template_id}/clone",
+    response_model=ProgramTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def clone_template(
+    template_id: int,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+):
+    try:
+        template = clone_template_for_coach(db, current_user, template_id)
+    except ProgramError as exc:
+        detail = str(exc)
+        if detail == "Template not found":
+            raise HTTPException(status_code=404, detail=detail) from exc
+        if detail in {"No permission to view template", "No permission to clone template"}:
+            raise HTTPException(status_code=403, detail=detail) from exc
+        raise HTTPException(status_code=400, detail=detail) from exc
 
     return build_template_response(template, db, current_user)
 

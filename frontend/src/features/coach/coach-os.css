@@ -116,8 +116,110 @@
 .coach-client-roster,
 .coach-os .coach-invite-panel,
 .coach-os .coach-program-row,
+.coach-program-operations,
 .coach-report-entry {
   min-width: 0;
+}
+
+.coach-program-operations__import {
+  margin-block-end: var(--v2-space-4);
+  padding-block-end: var(--v2-space-3);
+  border-bottom: 1px solid var(--coach-line);
+}
+
+.coach-program-operations__import > summary {
+  min-height: 44px;
+  padding-block: var(--v2-space-2);
+  color: var(--v2-text-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.coach-program-bulk-operations > details {
+  padding-block-start: var(--v2-space-3);
+  border-top: 1px solid var(--coach-line);
+}
+
+.coach-program-bulk-operations > details > summary {
+  min-height: 44px;
+  padding-block: var(--v2-space-2);
+  color: var(--v2-text-primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.coach-program-operations__form {
+  display: grid;
+  gap: var(--v2-space-4);
+}
+
+.coach-program-operations__client-fieldset {
+  display: grid;
+  gap: var(--v2-space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--v2-space-3);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-panel-radius);
+}
+
+.coach-program-operations__client-fieldset legend {
+  padding-inline: var(--v2-space-2);
+  color: var(--v2-text-primary);
+  font-weight: 700;
+}
+
+.coach-program-operations__clients {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: var(--v2-space-2);
+}
+
+.coach-program-operations__client {
+  display: flex;
+  align-items: start;
+  gap: var(--v2-space-2);
+  min-width: 0;
+  min-height: 52px;
+  padding: var(--v2-space-2);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-compact-radius);
+  background: var(--v2-surface);
+  cursor: pointer;
+}
+
+.coach-program-operations__client input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  margin-block-start: 2px;
+  accent-color: var(--v2-lime);
+}
+
+.coach-program-operations__client span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.coach-program-operations__client small {
+  color: var(--v2-text-secondary);
+}
+
+.coach-program-operations__note,
+.coach-program-operations__results {
+  margin: 0;
+  color: var(--v2-text-secondary);
+}
+
+.coach-program-operations__results {
+  display: grid;
+  gap: var(--v2-space-2);
+  padding-inline-start: 1.25rem;
+}
+
+.coach-program-operations__results .is-failed {
+  color: var(--v2-danger);
 }
 
 .coach-os .coach-os-header__invite {
@@ -836,6 +938,10 @@
 }
 
 @media (max-width: 640px) {
+  .app-section--programs.coach-os {
+    padding-bottom: calc(var(--yfc-mobile-dock-clearance) + var(--v2-space-4));
+  }
+
   .coach-os {
     gap: var(--v2-space-3);
   }

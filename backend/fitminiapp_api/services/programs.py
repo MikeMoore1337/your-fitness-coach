@@ -941,6 +941,84 @@ def get_template_for_user(
     return template
 
 
+def clone_template_for_coach(
+    db: Session,
+    current_user: User,
+    template_id: int,
+) -> ProgramTemplate:
+    if not current_user.is_coach:
+        raise ProgramError("No permission to clone template")
+
+    source = get_template_for_user(db, current_user, template_id)
+    clone = ProgramTemplate(
+        slug=f"custom-{uuid4().hex[:10]}",
+        title=f"{source.title[:120]} (копия)",
+        goal=source.goal,
+        level=source.level,
+        split_type=source.split_type,
+        owner_user_id=current_user.id,
+        created_by_user_id=current_user.id,
+        is_public=False,
+        default_duration_weeks=source.effective_duration_weeks,
+        provenance_type=source.provenance_type or "CUSTOM",
+        provenance={
+            "cloned_from_template_id": source.id,
+            "cloned_by_user_id": current_user.id,
+            "source_provenance_type": source.provenance_type,
+            "source_provenance": source.provenance,
+        },
+        program_metadata=source.program_metadata,
+    )
+    for source_day in source.days:
+        day = ProgramTemplateDay(
+            day_number=source_day.day_number,
+            title=source_day.title,
+        )
+        clone.days.append(day)
+        for source_exercise in source_day.exercises:
+            exercise = ProgramTemplateExercise(
+                exercise_id=source_exercise.exercise_id,
+                sort_order=source_exercise.sort_order,
+                prescribed_sets=source_exercise.prescribed_sets,
+                prescribed_reps=source_exercise.prescribed_reps,
+                prescribed_duration_minutes=source_exercise.prescribed_duration_minutes,
+                rest_seconds=source_exercise.rest_seconds,
+                notes=source_exercise.notes,
+                superset_group=source_exercise.superset_group,
+                superset_order=source_exercise.superset_order,
+                group_id=source_exercise.group_id,
+                group_kind=source_exercise.group_kind,
+                group_order=source_exercise.group_order,
+                prescription=source_exercise.prescription,
+            )
+            day.exercises.append(exercise)
+            for source_week in source_exercise.weekly_prescriptions:
+                exercise.weekly_prescriptions.append(
+                    ProgramTemplateExerciseWeekPrescription(
+                        exercise_id=source_week.exercise_id,
+                        week_number=source_week.week_number,
+                        prescribed_sets=source_week.prescribed_sets,
+                        prescribed_reps=source_week.prescribed_reps,
+                        prescribed_duration_minutes=source_week.prescribed_duration_minutes,
+                        rest_seconds=source_week.rest_seconds,
+                        prescription=source_week.prescription,
+                    )
+                )
+
+    db.add(clone)
+    db.flush()
+    record_audit_event(
+        db,
+        actor_user_id=current_user.id,
+        action="coach.program_template_cloned",
+        resource_type="program_template",
+        resource_id=clone.id,
+        details={"source_template_id": source.id},
+    )
+    db.commit()
+    return get_template_for_user(db, current_user, clone.id)
+
+
 def _update_periodized_template_preserving_structure(
     template: ProgramTemplate,
     payload: ProgramTemplateCreate,

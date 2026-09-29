@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../shared/api/client';
+import { api, ApiError } from '../../shared/api/client';
 import type { CoachAssignedProgram, Exercise } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import {
@@ -37,6 +37,7 @@ const equipmentLabels: Record<string, string> = {
 
 const weekdayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const PAGE_SIZE = 32;
+type AssignmentScope = 'next_workout' | 'current_block' | 'future_program';
 
 export function ExerciseCatalog({
   canCreate = false,
@@ -63,6 +64,8 @@ export function ExerciseCatalog({
   const [assignmentDuration, setAssignmentDuration] = useState(30);
   const [assignmentRest, setAssignmentRest] = useState(90);
   const [assignmentDay, setAssignmentDay] = useState(1);
+  const [assignmentScope, setAssignmentScope] = useState<AssignmentScope>('next_workout');
+  const [assignmentEffectiveDate, setAssignmentEffectiveDate] = useState('');
   const [assignmentNotes, setAssignmentNotes] = useState('');
   const [assignmentSupersetGroup, setAssignmentSupersetGroup] = useState<number | ''>('');
   const [assignmentSupersetOrder, setAssignmentSupersetOrder] = useState<1 | 2>(1);
@@ -160,6 +163,8 @@ export function ExerciseCatalog({
               (item.client_username
                 ? `@${item.client_username}`
                 : String(item.client_telegram_user_id)),
+            telegramUserId: item.client_telegram_user_id,
+            username: item.client_username,
           },
         ]),
       ).values(),
@@ -181,19 +186,38 @@ export function ExerciseCatalog({
   const activeAssignmentProgram = clientPrograms.find(
     (item) => item.id === activeAssignmentProgramId,
   );
+  const activeAssignmentClient = assignmentClients.find(
+    (item) => item.id === activeAssignmentClientId,
+  );
+  const activeProgramLifecycle = useQuery({
+    queryKey: ['assigned-program', activeAssignmentProgramId, 'lifecycle'],
+    queryFn: () =>
+      api<{ current_block: { title: string } | null }>(
+        `/api/v1/programs/assigned/${activeAssignmentProgramId}/lifecycle`,
+      ),
+    enabled:
+      Boolean(assignment) && assignmentScope === 'current_block' && activeAssignmentProgramId > 0,
+  });
 
   const assignmentMutation = useMutation({
     mutationFn: () => {
       if (!assignment || !activeAssignmentClientId || !activeAssignmentProgramId)
         throw new Error('Выберите клиента и программу');
+      if (!assignmentReason.trim()) throw new Error('Укажите причину изменения программы');
+      if (assignmentScope === 'future_program' && !assignmentEffectiveDate)
+        throw new Error('Выберите дату начала изменения');
+      if (assignmentScope === 'current_block' && !activeProgramLifecycle.data?.current_block)
+        throw new Error('У клиента нет активного тренировочного блока');
       return api<{ workouts_updated: number; current_revision_number: number }>(
         `/api/v1/coach/clients/${activeAssignmentClientId}/programs/${activeAssignmentProgramId}/exercises`,
         {
           method: 'POST',
           body: {
             expected_revision_number: activeAssignmentProgram?.current_revision_number ?? 0,
+            effective_scope: assignmentScope,
+            effective_date: assignmentScope === 'future_program' ? assignmentEffectiveDate : null,
             exercise_id: assignment.id,
-            day_number: assignmentDay,
+            day_number: assignmentScope === 'next_workout' ? null : assignmentDay,
             prescribed_sets: assignment.metric_type === 'cardio' ? null : assignmentSets,
             prescribed_reps: assignment.metric_type === 'cardio' ? null : assignmentReps,
             prescribed_duration_minutes:
@@ -206,20 +230,44 @@ export function ExerciseCatalog({
               assignment.metric_type === 'cardio' || !assignmentSupersetGroup
                 ? null
                 : assignmentSupersetOrder,
-            reason: assignmentReason || null,
+            reason: assignmentReason.trim() || null,
           },
         },
       );
     },
     onSuccess: async (result) => {
-      await queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] });
-      toast(`Упражнение добавлено в ${result.workouts_updated} предстоящих тренировок`);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['assigned-program', activeAssignmentProgramId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['workout'] }),
+      ]);
+      toast(
+        `Правка сохранена в версии v${result.current_revision_number}; ` +
+          `затронуто тренировок: ${result.workouts_updated}`,
+      );
       setAssignment(null);
       setAssignmentNotes('');
       setAssignmentSupersetGroup('');
       setAssignmentReason('');
     },
-    onError: (reason) => toast((reason as Error).message, 'error'),
+    onError: async (reason) => {
+      if (reason instanceof ApiError && reason.status === 409) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
+          queryClient.invalidateQueries({
+            queryKey: ['assigned-program', activeAssignmentProgramId],
+          }),
+        ]);
+        toast('Программа уже изменилась. Данные обновлены — повторите правку.', 'error');
+        return;
+      }
+      toast(
+        'Не удалось сохранить правку программы. Проверьте данные и повторите попытку.',
+        'error',
+      );
+    },
   });
 
   const resetFilters = () => {
@@ -597,6 +645,7 @@ export function ExerciseCatalog({
                     <span>День программы</span>
                     <select
                       value={assignmentDay}
+                      disabled={assignmentScope === 'next_workout'}
                       onChange={(event) => setAssignmentDay(Number(event.target.value))}
                     >
                       {(activeAssignmentProgram?.schedule_weekdays ?? []).map((weekday, index) => (
@@ -608,9 +657,77 @@ export function ExerciseCatalog({
                     </select>
                   </label>
                 </div>
+                {activeAssignmentClient && activeAssignmentProgram && (
+                  <dl
+                    className="assignment-modal__identifiers"
+                    aria-label="Идентификаторы назначения"
+                  >
+                    <div>
+                      <dt>Клиент</dt>
+                      <dd>
+                        {activeAssignmentClient.name} · ID #{activeAssignmentClient.id}
+                        {activeAssignmentClient.username
+                          ? ` · @${activeAssignmentClient.username}`
+                          : ''}{' '}
+                        · Telegram ID {activeAssignmentClient.telegramUserId}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Программа</dt>
+                      <dd>
+                        {activeAssignmentProgram.title} · ID #{activeAssignmentProgram.id} · шаблон
+                        #{activeAssignmentProgram.template_id}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
+                <label className="field">
+                  <span>Когда применить</span>
+                  <select
+                    value={assignmentScope}
+                    onChange={(event) => setAssignmentScope(event.target.value as AssignmentScope)}
+                  >
+                    <option value="next_workout">Только следующая тренировка</option>
+                    <option value="current_block">Будущие тренировки активного блока</option>
+                    <option value="future_program">По программе, начиная с даты</option>
+                  </select>
+                </label>
+                {assignmentScope === 'future_program' && (
+                  <label className="field">
+                    <span>Начать с даты клиента</span>
+                    <input
+                      type="date"
+                      required
+                      value={assignmentEffectiveDate}
+                      onChange={(event) => setAssignmentEffectiveDate(event.target.value)}
+                    />
+                  </label>
+                )}
+                {assignmentScope === 'current_block' && (
+                  <div className="stack" role="status">
+                    <p className="muted">
+                      {activeProgramLifecycle.isLoading
+                        ? 'Проверяем активный этап…'
+                        : activeProgramLifecycle.error
+                          ? 'Не удалось проверить активный этап. Повторите проверку.'
+                          : activeProgramLifecycle.data?.current_block
+                            ? `Изменение действует в блоке «${activeProgramLifecycle.data.current_block.title}».`
+                            : 'У клиента нет активного тренировочного блока.'}
+                    </p>
+                    {activeProgramLifecycle.error && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => void activeProgramLifecycle.refetch()}
+                      >
+                        Повторить проверку
+                      </button>
+                    )}
+                  </div>
+                )}
                 <p className="muted assignment-modal__hint">
-                  Изменение попадёт только в будущие тренировки выбранного дня. Завершённые и уже
-                  начатые тренировки не изменятся.
+                  Изменение попадёт только в программу этого клиента. Шаблон останется прежним;
+                  начатые и завершённые тренировки не изменятся.
                 </p>
                 {assignment.metric_type === 'cardio' ? (
                   <div className="form-grid assignment-prescription">
@@ -668,14 +785,21 @@ export function ExerciseCatalog({
                     onChange={(event) => setAssignmentNotes(event.target.value)}
                   />
                 </label>
+                <label className="field">
+                  <span>Причина изменения</span>
+                  <input
+                    required
+                    value={assignmentReason}
+                    maxLength={500}
+                    onChange={(event) => setAssignmentReason(event.target.value)}
+                  />
+                </label>
                 <details className="compact-disclosure assignment-advanced">
                   <summary>
                     <span>
                       <strong>Дополнительные настройки</strong>
                       <small>
-                        {assignment.metric_type === 'cardio'
-                          ? 'Причина изменения'
-                          : 'Суперсет и причина изменения'}
+                        {assignment.metric_type === 'cardio' ? 'Параметры правки' : 'Суперсет'}
                       </small>
                     </span>
                     <DisclosureIcon />
@@ -717,18 +841,19 @@ export function ExerciseCatalog({
                         Суперсет — два упражнения подряд. Используйте номер уже существующей пары.
                       </small>
                     )}
-                    <label className="field">
-                      <span>Причина изменения (необязательно)</span>
-                      <input
-                        value={assignmentReason}
-                        maxLength={500}
-                        onChange={(event) => setAssignmentReason(event.target.value)}
-                      />
-                    </label>
                   </div>
                 </details>
-                <button disabled={assignmentMutation.isPending || !activeAssignmentProgramId}>
-                  {assignmentMutation.isPending ? 'Сохраняем…' : 'Добавить в будущий план'}
+                <button
+                  disabled={
+                    assignmentMutation.isPending ||
+                    !activeAssignmentProgramId ||
+                    (assignmentScope === 'future_program' && !assignmentEffectiveDate) ||
+                    (assignmentScope === 'current_block' &&
+                      (activeProgramLifecycle.isLoading ||
+                        !activeProgramLifecycle.data?.current_block))
+                  }
+                >
+                  {assignmentMutation.isPending ? 'Сохраняем…' : 'Сохранить правку программы'}
                 </button>
               </form>
             )}
