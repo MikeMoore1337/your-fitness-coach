@@ -181,6 +181,17 @@ anchor и ordered PR/deployment evidence в task history, переводит lea
 исторический ancestor проверенного master snapshot, а новые commits после snapshot по-прежнему
 должны быть controller-only и затрагивать только allowlist controller paths.
 
+Если task осталась в `ready-for-delivery`, но её единственный ready head уже вошёл в закрытый
+same-repository PR и этот точный merge SHA успешно deployed, используется отдельная owner-authorized
+команда `reconcile-ready-production-success <ID> --pr <number> --production-run <id>
+--deployed-sha <sha> --owner-authorize`. Она принимает только чистые однозначные branch/worktree,
+неизменённые ready anchors и provenance, отсутствие delivery owner/history/активного deployment,
+текущий protected `origin/master`, merged PR с успешным exact-head `checks` и успешный production
+run/deployment для того же SHA. Успех атомарно записывает `ready_production_reconciliation`,
+`production-success` lease/history и `closeout_required`; ready fields, task branch/worktree,
+delivery ownership и обычные `complete-production`/`reconcile-production-success` semantics не
+изменяются. После этого применяется только штатный `finish`.
+
 Для уже завершённой task, чей production SHA позже стал ancestor master, существует отдельная
 terminal-only команда `reconcile-subsequent-production <ID> --owner-authorize`. Она требует
 `production-success`, неизменённую clean task branch/worktree без unique commits, пустой delivery
