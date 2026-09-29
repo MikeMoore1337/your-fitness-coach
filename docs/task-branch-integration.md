@@ -186,11 +186,19 @@ same-repository PR и этот точный merge SHA успешно deployed, �
 команда `reconcile-ready-production-success <ID> --pr <number> --production-run <id>
 --deployed-sha <sha> --owner-authorize`. Она принимает только чистые однозначные branch/worktree,
 неизменённые ready anchors и provenance, отсутствие delivery owner/history/активного deployment,
-текущий protected `origin/master`, merged PR с успешным exact-head `checks` и успешный production
-run/deployment для того же SHA. Успех атомарно записывает `ready_production_reconciliation`,
+merged PR с успешным exact-head `checks` и успешный production run/deployment для того же SHA.
+PR base может быть более новым protected-master commit только если preserved ready base является
+его ancestor, этот base является ancestor ready head, а task branch содержит ровно один
+разрешённый `origin/master` integration merge, связывающий новый PR base с ready history.
+Если после deployed SHA master уже содержит commits, каждый из них повторно классифицируется
+через verified controller-only chain: same-repository controller PR, exact-head checks,
+allowlisted paths и успешный Release production с skipped application-deploy job; product drift,
+неполная provenance или deployment controller SHA блокируют reconciliation. Успех атомарно
+записывает anchor classification, verified controller drift, `ready_production_reconciliation`,
 `production-success` lease/history и `closeout_required`; ready fields, task branch/worktree,
 delivery ownership и обычные `complete-production`/`reconcile-production-success` semantics не
-изменяются. После этого применяется только штатный `finish`.
+изменяются. После этого применяется только штатный `finish`, который повторно проверяет сохранённый
+anchor и drift evidence.
 
 Для уже завершённой task, чей production SHA позже стал ancestor master, существует отдельная
 terminal-only команда `reconcile-subsequent-production <ID> --owner-authorize`. Она требует

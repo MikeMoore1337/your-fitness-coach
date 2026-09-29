@@ -6624,6 +6624,86 @@ class TaskController:
             },
         }
 
+    def _verified_ready_anchor(
+        self,
+        task_id: str,
+        *,
+        ready_base_sha: str,
+        ready_head_sha: str,
+        branch: str,
+        master_sha: str,
+        pull_request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Verify a preserved ready anchor against an advanced PR base when needed."""
+
+        effective_base_sha = str(pull_request.get("base_sha", ""))
+        if not self.repository.is_ancestor(
+            ready_base_sha, effective_base_sha
+        ) or not self.repository.is_ancestor(effective_base_sha, ready_head_sha):
+            raise TaskSessionError(
+                "PR base must descend from the preserved ready base and precede the ready head"
+            )
+
+        protected_first_parent = set(
+            self.repository.git("rev-list", "--first-parent", master_sha).splitlines()
+        )
+        if effective_base_sha not in protected_first_parent:
+            raise TaskSessionError("PR base is not a protected-master commit")
+
+        task_messages = self.repository.commits(f"{effective_base_sha}..{ready_head_sha}")
+        validate_task_commit_messages(task_id, task_messages, dependency_ids=None)
+
+        integration_merge: dict[str, Any] | None = None
+        if effective_base_sha == ready_base_sha:
+            classification = "exact_ready_base"
+        else:
+            records: list[dict[str, Any]] = []
+            output = self.repository.git(
+                "log",
+                "--merges",
+                "--format=%H%x09%P%x09%s",
+                f"{ready_base_sha}..{ready_head_sha}",
+            )
+            for line in output.splitlines():
+                commit_sha, separator, remainder = line.partition("\t")
+                if not separator:
+                    continue
+                parents_text, separator, subject = remainder.partition("\t")
+                if not separator:
+                    continue
+                parents = parents_text.split()
+                if (
+                    _is_origin_master_integration_merge(subject)
+                    and len(parents) >= 2
+                    and parents[1] == effective_base_sha
+                    and self.repository.is_ancestor(ready_base_sha, parents[0])
+                    and self.repository.is_ancestor(parents[0], ready_head_sha)
+                    and self.repository.is_ancestor(commit_sha, ready_head_sha)
+                ):
+                    records.append(
+                        {
+                            "commit_sha": commit_sha,
+                            "first_parent_sha": parents[0],
+                            "second_parent_sha": parents[1],
+                            "subject": subject,
+                        }
+                    )
+            if len(records) != 1:
+                raise TaskSessionError(
+                    "Advanced PR base requires one valid origin/master integration merge"
+                )
+            classification = "integrated_current_base"
+            integration_merge = records[0]
+
+        return {
+            "anchor_classification": classification,
+            "original_ready_base_sha": ready_base_sha,
+            "effective_pr_base_sha": effective_base_sha,
+            "ready_head_sha": ready_head_sha,
+            "branch": branch,
+            "integration_merge": integration_merge,
+        }
+
     def _verified_post_merge_anchor(
         self,
         task_id: str,
@@ -6914,33 +6994,9 @@ class TaskController:
             raise TaskSessionError(
                 "origin/master changed non-fast-forward during ready production reconciliation"
             )
-        if deployed_sha != master_sha:
-            raise TaskSessionError(
-                "Ready production reconciliation deployed SHA must equal current protected origin/master"
-            )
         self._verify_live_master(master_sha)
 
         github = self._github()
-
-        def successful_production_run() -> Mapping[str, Any]:
-            try:
-                run = github.api(f"actions/runs/{production_run_id}")
-            except (KeyError, OSError, TaskSessionError) as error:
-                raise TaskSessionError(
-                    f"Production run {production_run_id} is unavailable for reconciliation"
-                ) from error
-            if (
-                not isinstance(run, Mapping)
-                or run.get("id") != production_run_id
-                or run.get("name") != "Release production"
-                or run.get("head_sha") != deployed_sha
-                or run.get("status") != "completed"
-                or str(run.get("conclusion", "")).lower() != "success"
-            ):
-                raise TaskSessionError(
-                    "Production run is not successful for the exact deployed SHA"
-                )
-            return run
 
         def verified_pr() -> dict[str, Any]:
             try:
@@ -6955,31 +7011,37 @@ class TaskController:
             head = pull_request.get("head")
             if not isinstance(base, Mapping) or not isinstance(head, Mapping):
                 raise TaskSessionError(f"PR #{pr_number} has incomplete base/head provenance")
-            if base.get("sha") != ready_base_sha:
-                raise TaskSessionError("PR base does not match ready base")
             if head.get("sha") != ready_head_sha:
                 raise TaskSessionError("PR head does not match ready head")
             if head.get("ref") != branch:
                 raise TaskSessionError("PR branch does not match leased task branch")
+            effective_base_sha = str(base.get("sha", ""))
+            if not self.repository.is_ancestor(
+                ready_base_sha, effective_base_sha
+            ) or not self.repository.is_ancestor(effective_base_sha, ready_head_sha):
+                raise TaskSessionError("PR base does not match the preserved ready base ancestry")
             evidence = self._verified_reconciliation_pr(pr_number, expected, master_sha)
             if evidence["branch"] != branch:
                 raise TaskSessionError("PR branch does not match leased task branch")
-            if evidence["base_sha"] != ready_base_sha or evidence["head_sha"] != ready_head_sha:
-                raise TaskSessionError("PR provenance does not match ready base and head")
+            if evidence["head_sha"] != ready_head_sha:
+                raise TaskSessionError("PR provenance does not match ready head")
             if evidence["merge_sha"] != deployed_sha:
                 raise TaskSessionError("PR merge SHA does not match deployed SHA")
+            evidence["ready_anchor"] = self._verified_ready_anchor(
+                expected,
+                ready_base_sha=ready_base_sha,
+                ready_head_sha=ready_head_sha,
+                branch=branch,
+                master_sha=master_sha,
+                pull_request=evidence,
+            )
             return evidence
 
         pull_request_evidence = verified_pr()
-        if self._active_production_deployment():
-            raise TaskSessionError(
-                "Ready production reconciliation refuses while a production deployment is active"
-            )
-        run = successful_production_run()
-        if not github.has_successful_deployment(deployed_sha, "production"):
-            raise TaskSessionError(
-                "No successful production deployment exists for the exact deployed SHA"
-            )
+        master_evidence = self._verified_ready_production_master(
+            deployed_sha, master_sha, production_run_id
+        )
+        production = master_evidence["current_production"]
 
         now = utc_now()
         reconciliation = {
@@ -6993,15 +7055,15 @@ class TaskController:
             "ready_base_origin_master_sha": ready_base_sha,
             "ready_head_sha": ready_head_sha,
             "reconciled_against_master_sha": master_sha,
+            "anchor_classification": pull_request_evidence["ready_anchor"]["anchor_classification"],
+            "original_ready_base_sha": pull_request_evidence["ready_anchor"][
+                "original_ready_base_sha"
+            ],
+            "effective_pr_base_sha": pull_request_evidence["ready_anchor"]["effective_pr_base_sha"],
+            "integration_merge": pull_request_evidence["ready_anchor"]["integration_merge"],
+            "verified_master_evidence": master_evidence,
             "pull_request": pull_request_evidence,
-            "production": {
-                "run_id": production_run_id,
-                "run_url": run.get("html_url"),
-                "run_conclusion": "success",
-                "environment": "production",
-                "deployed_sha": deployed_sha,
-                "deployment_success_verified": True,
-            },
+            "production": production,
         }
         history = {
             "version": TASK_STATE_VERSION,
@@ -7058,10 +7120,10 @@ class TaskController:
                 raise TaskSessionError("A production deployment started during reconciliation")
             if verified_pr() != pull_request_evidence:
                 raise TaskSessionError("PR evidence changed during ready production reconciliation")
-            latest_run = successful_production_run()
-            if latest_run != run or not github.has_successful_deployment(
-                deployed_sha, "production"
-            ):
+            latest_master_evidence = self._verified_ready_production_master(
+                deployed_sha, master_sha, production_run_id
+            )
+            if latest_master_evidence != master_evidence:
                 raise TaskSessionError(
                     "Production deployment evidence changed during reconciliation"
                 )
@@ -7391,6 +7453,75 @@ class TaskController:
             "run_conclusion": "success",
             "environment": "production",
             "deployment_success_verified": True,
+        }
+
+    def _verified_ready_production_master(
+        self, deployed_sha: str, master_sha: str, production_run_id: int
+    ) -> dict[str, Any]:
+        """Verify the named deployment and any controller-only drift after it."""
+
+        if not self.repository.is_ancestor(deployed_sha, master_sha):
+            raise TaskSessionError(
+                "Ready production reconciliation deployed SHA is not an ancestor of protected master"
+            )
+        if self._active_production_deployment():
+            raise TaskSessionError(
+                "Ready production reconciliation refuses while a production deployment is active"
+            )
+
+        github = self._github()
+        try:
+            run = github.api(f"actions/runs/{production_run_id}")
+        except (KeyError, OSError, TaskSessionError) as error:
+            raise TaskSessionError(
+                f"Production run {production_run_id} is unavailable for reconciliation"
+            ) from error
+        if (
+            not isinstance(run, Mapping)
+            or run.get("id") != production_run_id
+            or run.get("name") != "Release production"
+            or run.get("head_sha") != deployed_sha
+            or run.get("status") != "completed"
+            or str(run.get("conclusion", "")).lower() != "success"
+        ):
+            raise TaskSessionError("Production run is not successful for the exact deployed SHA")
+        if not github.has_successful_deployment(deployed_sha, "production"):
+            raise TaskSessionError(
+                "No successful production deployment exists for the exact deployed SHA"
+            )
+
+        if master_sha == deployed_sha:
+            production = {
+                "run_id": production_run_id,
+                "run_url": run.get("html_url"),
+                "head_sha": deployed_sha,
+                "run_conclusion": "success",
+                "environment": "production",
+                "deployed_sha": deployed_sha,
+                "deployment_success_verified": True,
+            }
+            return {
+                "classification": "exact_deployed_master",
+                "original_deployed_sha": deployed_sha,
+                "current_master_sha": master_sha,
+                "intervening_commits": [],
+                "current_production": production,
+            }
+
+        evidence = self._verified_subsequent_production_chain(deployed_sha, master_sha)
+        current_production = evidence.get("current_production")
+        if (
+            not isinstance(current_production, Mapping)
+            or current_production.get("deployed_sha") != deployed_sha
+            or current_production.get("run_id") != production_run_id
+        ):
+            raise TaskSessionError(
+                "Current production deployment is not the supplied deployed SHA and run"
+            )
+        return {
+            "classification": "verified_controller_only_drift",
+            "original_deployed_sha": deployed_sha,
+            **evidence,
         }
 
     def _verified_subsequent_production_chain(
@@ -8115,9 +8246,115 @@ class TaskController:
             raise TaskSessionError(invalid)
         return master_sha
 
+    def _ready_production_reconciliation_master_snapshot(
+        self, expected: str, lease: Mapping[str, Any], history: Mapping[str, Any]
+    ) -> str | None:
+        key = "ready_production_reconciliation"
+        if key not in history:
+            if key in lease:
+                raise TaskSessionError("finish refuses unmatched ready production reconciliation")
+            return None
+
+        audit = history.get(key)
+        invalid = "finish refuses malformed ready production reconciliation history"
+        if not isinstance(audit, Mapping):
+            raise TaskSessionError(invalid)
+        deployed_sha = str(history.get("deployed_sha", ""))
+        master_sha = str(audit.get("reconciled_against_master_sha", ""))
+        ready_base_sha = str(audit.get("original_ready_base_sha", ""))
+        ready_head_sha = str(audit.get("ready_head_sha", ""))
+        branch = str(audit.get("branch", ""))
+        pull_request = audit.get("pull_request")
+        production = audit.get("production")
+        master_evidence = audit.get("verified_master_evidence")
+        if (
+            audit.get("version") != 1
+            or audit.get("owner_authorized") is not True
+            or audit.get("authorization") != "explicit --owner-authorize"
+            or not isinstance(audit.get("authorized_at"), str)
+            or not isinstance(audit.get("reconciled_at"), str)
+            or audit.get("original_state") != "ready-for-delivery"
+            or audit.get("ready_base_origin_master_sha") != ready_base_sha
+            or audit.get("ready_head_sha") != ready_head_sha
+        ):
+            raise TaskSessionError(invalid)
+        if not isinstance(pull_request, Mapping) or audit.get(
+            "effective_pr_base_sha"
+        ) != pull_request.get("base_sha"):
+            raise TaskSessionError(invalid)
+        if (
+            lease.get(key) != audit
+            or history.get("closeout_required") is not True
+            or history.get("merge_sha") != deployed_sha
+            or lease.get("merge_sha") != deployed_sha
+            or lease.get("deployed_sha") != deployed_sha
+            or history.get("pr_number")
+            != (pull_request.get("pr_number") if isinstance(pull_request, Mapping) else None)
+            or history.get("base_sha") != ready_base_sha
+            or history.get("head_sha") != ready_head_sha
+            or lease.get("branch") != branch
+            or lease.get("ready_base_origin_master_sha") != ready_base_sha
+            or lease.get("ready_head_sha") != ready_head_sha
+            or re.fullmatch(r"[0-9a-f]{40}", deployed_sha) is None
+            or re.fullmatch(r"[0-9a-f]{40}", master_sha) is None
+            or re.fullmatch(r"[0-9a-f]{40}", ready_base_sha) is None
+            or re.fullmatch(r"[0-9a-f]{40}", ready_head_sha) is None
+            or not isinstance(production, Mapping)
+            or not isinstance(master_evidence, Mapping)
+            or not self.repository.is_ancestor(deployed_sha, master_sha)
+        ):
+            raise TaskSessionError(invalid)
+
+        origin_master_sha = self.repository.ref("origin/master")
+        if origin_master_sha != master_sha:
+            raise TaskSessionError(
+                "finish requires master to remain at the reconciled protected-master SHA"
+            )
+        self._verify_live_master(master_sha)
+
+        pr_number = pull_request.get("pr_number")
+        if type(pr_number) is not int or pr_number <= 0:
+            raise TaskSessionError(invalid)
+        current_pr = self._verified_reconciliation_pr(pr_number, expected, master_sha)
+        if current_pr.get("branch") != branch or current_pr.get("head_sha") != ready_head_sha:
+            raise TaskSessionError(invalid)
+        current_pr["ready_anchor"] = self._verified_ready_anchor(
+            expected,
+            ready_base_sha=ready_base_sha,
+            ready_head_sha=ready_head_sha,
+            branch=branch,
+            master_sha=master_sha,
+            pull_request=current_pr,
+        )
+        if current_pr != pull_request:
+            raise TaskSessionError("finish refuses stale ready production PR evidence")
+        if (
+            audit.get("anchor_classification")
+            != current_pr["ready_anchor"]["anchor_classification"]
+            or audit.get("integration_merge") != current_pr["ready_anchor"]["integration_merge"]
+            or audit.get("effective_pr_base_sha")
+            != current_pr["ready_anchor"]["effective_pr_base_sha"]
+        ):
+            raise TaskSessionError(invalid)
+
+        production_run_id = production.get("run_id")
+        if type(production_run_id) is not int or production_run_id <= 0:
+            raise TaskSessionError(invalid)
+        current_master_evidence = self._verified_ready_production_master(
+            deployed_sha, master_sha, production_run_id
+        )
+        if current_master_evidence != master_evidence:
+            raise TaskSessionError("finish refuses stale ready production evidence")
+        if production != current_master_evidence.get("current_production"):
+            raise TaskSessionError(invalid)
+        return master_sha
+
     def _reconciliation_master_snapshot(
         self, expected: str, lease: Mapping[str, Any], history: Mapping[str, Any]
     ) -> str | None:
+        ready_sha = self._ready_production_reconciliation_master_snapshot(expected, lease, history)
+        if ready_sha is not None:
+            return ready_sha
         superseding_sha = self._superseding_reconciliation_master_snapshot(expected, lease, history)
         key = "subsequent_production_reconciliation"
         if key not in history:
