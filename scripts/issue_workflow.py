@@ -473,8 +473,25 @@ def queue_authorization(
     }
 
 
+def normalize_owner_gate(owner_gate: str) -> str:
+    """Return the canonical comparison form of a task owner gate.
+
+    Historical task metadata used both hyphenated and underscored labels.  Only
+    the gate label is normalized; a concrete requirement after ``:`` remains
+    owner-authored text.
+    """
+
+    if not isinstance(owner_gate, str):
+        raise IssueWorkflowError("Task contract owner_gate must be a string")
+    label, separator, requirement = owner_gate.strip().partition(":")
+    normalized = label.strip().lower().replace("-", "_")
+    if separator:
+        return f"{normalized}:{requirement.strip()}"
+    return normalized
+
+
 def task_risk_lane(owner_gate: str, *, forbidden: bool = False) -> str:
-    gate = owner_gate.strip().lower().replace("-", "_")
+    gate = normalize_owner_gate(owner_gate).partition(":")[0]
     if forbidden or gate in {
         "human_evidence",
         "manual_visual_approval",

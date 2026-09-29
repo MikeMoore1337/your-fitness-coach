@@ -5287,6 +5287,20 @@ def test_owner_selected_launch_requires_only_explicit_launch_unless_concrete_gat
         controller.start("239", owner_launch=True, session_label="gate", offline=True)
 
 
+def test_owner_launch_gate_accepts_underscore_spelling(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "239A", "owner-launch", owner_gate="owner_launch")
+    controller = task_session.TaskController(git_repository)
+
+    started = controller.start(
+        "239A", owner_launch=True, session_label="owner-launch", offline=True
+    )
+
+    assert started["lease"]["task_id"] == "239A"
+
+
 def test_mark_ready_records_local_verdicts_without_evidence_file(
     repository: tuple[Path, Any],
 ) -> None:

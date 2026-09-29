@@ -17,6 +17,7 @@ import queue
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -1035,6 +1036,212 @@ def _controller_state_for_interrupted_claim(claim_path: Path, task_id: str) -> s
     return state if isinstance(state, str) and state else "missing"
 
 
+def _open_task_pull_requests(task_id: str) -> list[dict[str, Any]]:
+    payload = _github_json("pulls?state=open&per_page=100")
+    if not isinstance(payload, list) or any(not isinstance(item, Mapping) for item in payload):
+        raise DeliveryError("HUMAN_REQUIRED: open pull-request inventory is malformed")
+    prefix = f"task/{task_id.lower()}-"
+    matches: list[dict[str, Any]] = []
+    for item in payload:
+        head = item.get("head")
+        branch = head.get("ref") if isinstance(head, Mapping) else None
+        if isinstance(branch, str) and branch.lower().startswith(prefix):
+            matches.append(dict(item))
+    return matches
+
+
+def _task_worker_state_evidence(task_id: str) -> list[str]:
+    task_root = REPOSITORY_ROOT / ".artifacts" / "tasks" / task_id
+    try:
+        root_stat = task_root.stat()
+    except FileNotFoundError:
+        return []
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot inspect Task {task_id} worker-state evidence"
+        ) from error
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return []
+    try:
+        paths = sorted(path for path in task_root.rglob("worker-state.json") if path.is_file())
+    except OSError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot inspect Task {task_id} worker-state evidence"
+        ) from error
+    return [str(path) for path in paths]
+
+
+def _task_worktree_evidence(repository: GitRepository, task_id: str) -> dict[str, list[str]]:
+    prefix = f"task/{task_id.lower()}-"
+    branches = [
+        str(item.get("branch"))
+        for item in repository.local_branches()
+        if isinstance(item.get("branch"), str) and str(item["branch"]).lower().startswith(prefix)
+    ]
+    try:
+        remote_output = repository.git(
+            "ls-remote", "--heads", "origin", f"refs/heads/task/{task_id.lower()}-*"
+        )
+    except TaskSessionError as error:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: cannot inspect remote Task {task_id} branches"
+        ) from error
+    remote_branches = [
+        ref.removeprefix("refs/heads/")
+        for line in remote_output.splitlines()
+        if (ref := line.rsplit("\t", maxsplit=1)[-1]).startswith("refs/heads/")
+    ]
+    worktrees: list[str] = []
+    operation_issues = list(repository.operation_issues(repository.current_worktree))
+    for worktree in repository.worktrees():
+        branch = worktree.branch.lower() if isinstance(worktree.branch, str) else ""
+        path_parts = {part.lower() for part in worktree.path.parts}
+        path_match = any(
+            part.startswith(f"task-{task_id.lower()}") or part.startswith(f"{task_id.lower()}-")
+            for part in path_parts
+        )
+        if branch.startswith(prefix) or path_match:
+            worktrees.append(str(worktree.path))
+            operation_issues.extend(repository.operation_issues(worktree.path))
+    return {
+        "branches": sorted(set(branches)),
+        "remote_branches": sorted(set(remote_branches)),
+        "worktrees": sorted(set(worktrees)),
+        "operation_issues": sorted(set(operation_issues)),
+    }
+
+
+def _pre_lease_start_failure_evidence(
+    *,
+    expected_task_id: str,
+    control_issue: int,
+    claim_path: Path,
+    claim: Mapping[str, Any],
+    controller: TaskController,
+    repository: GitRepository,
+) -> dict[str, Any]:
+    """Validate the narrowly recoverable failure before a task lease existed."""
+
+    if expected_task_id != "507":
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: interrupted queue reconciliation requires exactly one task lease for Task {expected_task_id}"
+        )
+    if claim.get("task_issue") != 507:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: pre-lease recovery requires the exact Task #507 Issue identity"
+        )
+    if claim.get("worker_state") != QUEUE_CLAIM_RUNNING_WORKER_STATE:
+        raise DeliveryError("HUMAN_REQUIRED: pre-lease recovery requires worker_state=running")
+    if "worker_state_path" not in claim or claim.get("worker_state_path") is not None:
+        raise DeliveryError("HUMAN_REQUIRED: pre-lease recovery requires worker_state_path=null")
+    pid = int(claim["pid"])
+    process_instance = _queue_claim_process_instance(claim.get("process_instance"), claim_path)
+    if _queue_owner_is_alive(pid, process_instance):
+        raise DeliveryError(f"HUMAN_REQUIRED: continuous queue owner PID {pid} is still live")
+    supervisors = _live_continuous_queue_supervisors()
+    if supervisors:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: another CONTINUE_QUEUE supervisor is live: "
+            + "; ".join(str(item[0]) for item in supervisors)
+        )
+    workers = _live_task_workers()
+    if workers:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: another task worker is live: "
+            + "; ".join(str(item[0]) for item in workers)
+        )
+    try:
+        leases = controller.store.all_leases()
+    except TaskSessionError as error:
+        raise DeliveryError("HUMAN_REQUIRED: cannot inspect Task 507 leases") from error
+    lease_count = sum(
+        1 for item in leases if str(item.get("task_id", "")).strip().upper() == expected_task_id
+    )
+    if lease_count:
+        raise DeliveryError(
+            f"HUMAN_REQUIRED: Task 507 acquired {lease_count} lease(s) before pre-lease recovery"
+        )
+
+    history_path = controller.store.history / "task-507.json"
+    try:
+        history_present = history_path.exists()
+    except OSError as error:
+        raise DeliveryError("HUMAN_REQUIRED: cannot inspect Task 507 production/history") from error
+    if history_present:
+        raise DeliveryError("HUMAN_REQUIRED: Task 507 has controller production/history evidence")
+    try:
+        delivery = controller.store.delivery_state()
+    except TaskSessionError as error:
+        raise DeliveryError("HUMAN_REQUIRED: cannot inspect delivery ownership") from error
+    if delivery.get("owner") is not None:
+        raise DeliveryError("HUMAN_REQUIRED: delivery lane has another live owner")
+
+    try:
+        worktree_evidence = _task_worktree_evidence(repository, expected_task_id)
+    except TaskSessionError as error:
+        raise DeliveryError("HUMAN_REQUIRED: cannot inspect Task 507 Git evidence") from error
+    if any(worktree_evidence.values()):
+        raise DeliveryError(
+            "HUMAN_REQUIRED: Task 507 has local branch, worktree or interrupted Git evidence"
+        )
+    worker_state_paths = _task_worker_state_evidence(expected_task_id)
+    if worker_state_paths:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: Task 507 has worker-state evidence: " + ", ".join(worker_state_paths)
+        )
+    pull_requests = _open_task_pull_requests(expected_task_id)
+    if pull_requests:
+        numbers = ", ".join(str(item.get("number", "unknown")) for item in pull_requests)
+        raise DeliveryError(f"HUMAN_REQUIRED: Task 507 has an open task pull request: {numbers}")
+
+    task_issue_snapshot, comments = _control_issue_snapshot(507)
+    if not _issue_authorized(task_issue_snapshot):
+        raise DeliveryError(
+            "HUMAN_REQUIRED: Task 507 control Issue must be authored by the repository owner"
+        )
+    task_match = CONTROL_ISSUE_RE.match(str(task_issue_snapshot.get("title", "")))
+    if task_match is None or task_match.group("task_id").upper() != "507":
+        raise DeliveryError("HUMAN_REQUIRED: Task 507 control Issue identity is ambiguous")
+    latest = latest_control_state(
+        comments,
+        task_id="507",
+        authorized_logins=_trusted_issue_logins(task_issue_snapshot),
+    )
+    if (
+        str(task_issue_snapshot.get("state", "")).upper() != "OPEN"
+        or not isinstance(latest, Mapping)
+        or latest.get("state") != "queued"
+    ):
+        raise DeliveryError(
+            "HUMAN_REQUIRED: Task 507 control Issue must remain OPEN with latest state queued"
+        )
+    _, _, authorization = _queue_authorization_snapshot(control_issue)
+    if not authorization.get("active") or authorization.get("queue_stop") is not None:
+        raise DeliveryError(
+            "HUMAN_REQUIRED: CONTINUE_QUEUE control Issue is not active for reconciliation"
+        )
+    return {
+        "classification": "pre_lease_start_failure",
+        "task_id": expected_task_id,
+        "task_issue": 507,
+        "control_issue": control_issue,
+        "worker_state": claim.get("worker_state"),
+        "worker_state_path": None,
+        "lease_count": lease_count,
+        "history_present": False,
+        "delivery_owner_present": False,
+        "branches": [],
+        "remote_branches": [],
+        "worktrees": [],
+        "interrupted_git_operations": [],
+        "worker_state_evidence": [],
+        "open_task_pull_requests": [],
+        "task_issue_state": str(task_issue_snapshot.get("state", "")).lower(),
+        "latest_task_control_state": "queued",
+        "claim_sha256": hashlib.sha256(_serialize_queue_claim(claim).encode("utf-8")).hexdigest(),
+    }
+
+
 def _reject_interrupted_queue_claim(claim_path: Path, claim: Mapping[str, Any]) -> None:
     if claim.get("queue_phase") == QUEUE_CLAIM_IDLE_PHASE:
         return
@@ -1156,6 +1363,8 @@ def _record_queue_reconciliation_evidence(
     reason: str,
     claim: Mapping[str, Any],
     claim_bytes: bytes,
+    classification: str = "active_task_lease",
+    reconciliation: Mapping[str, Any] | None = None,
 ) -> str:
     manager = ArtifactManager(REPOSITORY_ROOT / ".artifacts", repo_root=REPOSITORY_ROOT)
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
@@ -1177,7 +1386,10 @@ def _record_queue_reconciliation_evidence(
         "reclaimed_at": datetime.now(UTC).isoformat(timespec="microseconds"),
         "claim_sha256": hashlib.sha256(claim_bytes).hexdigest(),
         "claim": dict(claim),
+        "classification": classification,
     }
+    if reconciliation is not None:
+        payload["reconciliation"] = dict(reconciliation)
     try:
         path.write_text(
             json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
@@ -1263,6 +1475,70 @@ def _reconcile_interrupted_queue_claim(
             for item in leases
             if str(item.get("task_id", "")).strip().upper() == expected_task_id
         ]
+        if not matches:
+            reconciliation = _pre_lease_start_failure_evidence(
+                expected_task_id=expected_task_id,
+                control_issue=control_issue,
+                claim_path=claim_path,
+                claim=claim,
+                controller=controller,
+                repository=repository,
+            )
+            current = _read_queue_claim(claim_path)
+            if current is None or current[0] != content:
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: continuous queue claim changed before owner-authorized recovery"
+                )
+            try:
+                current_bytes = claim_path.read_bytes()
+            except OSError as error:
+                raise DeliveryError(
+                    f"HUMAN_REQUIRED: cannot inspect continuous queue claim {claim_path}"
+                ) from error
+            if current_bytes != claim_bytes:
+                raise DeliveryError(
+                    "HUMAN_REQUIRED: continuous queue claim changed before owner-authorized recovery"
+                )
+            reconciliation = _pre_lease_start_failure_evidence(
+                expected_task_id=expected_task_id,
+                control_issue=control_issue,
+                claim_path=claim_path,
+                claim=claim,
+                controller=controller,
+                repository=repository,
+            )
+            reconciliation["claim_sha256"] = hashlib.sha256(claim_bytes).hexdigest()
+            _reclaim_queue_claim_atomically(
+                claim_path,
+                content=content,
+                claim=claim,
+                expected_bytes=claim_bytes,
+                event_stage="OWNER_AUTHORIZED_PRE_LEASE_QUEUE_CLAIM_RECLAIMED",
+            )
+            evidence_path = _record_queue_reconciliation_evidence(
+                task_id=expected_task_id,
+                control_issue=control_issue,
+                reason=reason.strip(),
+                claim=claim,
+                claim_bytes=claim_bytes,
+                classification="pre_lease_start_failure",
+                reconciliation=reconciliation,
+            )
+            _event(
+                "OWNER_AUTHORIZED_INTERRUPTED_QUEUE_CLAIM_RECONCILED",
+                task_id=expected_task_id,
+                control_issue=control_issue,
+                reason=reason.strip(),
+                classification="pre_lease_start_failure",
+                evidence_path=evidence_path,
+            )
+            return {
+                "task_id": expected_task_id,
+                "control_issue": control_issue,
+                "classification": "pre_lease_start_failure",
+                "evidence_path": evidence_path,
+                "status": "reconciled",
+            }
         if len(matches) != 1:
             raise DeliveryError(
                 f"HUMAN_REQUIRED: interrupted queue reconciliation requires exactly one task lease for Task {expected_task_id}"

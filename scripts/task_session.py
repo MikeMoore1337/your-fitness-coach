@@ -36,6 +36,7 @@ try:
         IssueWorkflowError,
         latest_control_state,
         normalize_github_login,
+        normalize_owner_gate,
         parse_task_contract,
         task_risk_lane,
     )
@@ -49,6 +50,7 @@ except ModuleNotFoundError:
         IssueWorkflowError,
         latest_control_state,
         normalize_github_login,
+        normalize_owner_gate,
         parse_task_contract,
         task_risk_lane,
     )
@@ -2710,10 +2712,10 @@ class TaskController:
             raise TaskSessionError(f"Task {expected} is umbrella/non-executable")
         if "blocked" in document.status.lower() or "заблок" in document.status.lower():
             raise TaskSessionError(f"Task {expected} status is blocked: {document.status}")
-        owner_gate = document.owner_gate.strip()
-        if owner_gate.lower() not in {"", "explicit-launch", "owner-launch", "none"}:
-            label, _, requirement = owner_gate.partition(":")
-            gate_name = label.strip().upper().replace("-", "_")
+        owner_gate = normalize_owner_gate(document.owner_gate)
+        gate_label, _, requirement = owner_gate.partition(":")
+        if gate_label not in {"", "explicit_launch", "owner_launch", "none"}:
+            gate_name = gate_label.upper()
             concrete_requirement = requirement.strip() or "the task-declared evidence"
             raise TaskSessionError(
                 f"Task {expected} blocked: {gate_name} is missing: {concrete_requirement}"
@@ -5412,10 +5414,10 @@ class TaskController:
             raise TaskSessionError(f"Task {expected} is umbrella/non-executable")
         if "blocked" in document.status.lower() or "заблок" in document.status.lower():
             raise TaskSessionError(f"Task {expected} status is blocked: {document.status}")
-        owner_gate = document.owner_gate.strip()
-        if owner_gate.lower() not in {"", "explicit-launch", "owner-launch", "none"}:
-            label, _, requirement = owner_gate.partition(":")
-            gate_name = label.strip().upper().replace("-", "_")
+        owner_gate = normalize_owner_gate(document.owner_gate)
+        gate_label, _, requirement = owner_gate.partition(":")
+        if gate_label not in {"", "explicit_launch", "owner_launch", "none"}:
+            gate_name = gate_label.upper()
             concrete_requirement = requirement.strip() or "the task-declared evidence"
             raise TaskSessionError(
                 f"Task {expected} blocked: {gate_name} is missing: {concrete_requirement}"
