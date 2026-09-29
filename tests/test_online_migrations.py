@@ -89,8 +89,8 @@ def test_nutrition_label_migration_satisfies_production_online_contract() -> Non
     "name",
     [
         "0098_program_lifecycle.py",
-        "0099_user_program_lifecycle_status_constraint.py",
-        "0100_program_revision_lifecycle_kind_constraint.py",
+        "0099_user_program_status_ck.py",
+        "0100_program_revision_kind_ck.py",
     ],
 )
 def test_program_lifecycle_migrations_satisfy_production_online_contract(name: str) -> None:

@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0099_user_program_lifecycle_status_constraint"
+revision: str = "0099_user_program_status_ck"
 down_revision: str | None = "0098_program_lifecycle"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
