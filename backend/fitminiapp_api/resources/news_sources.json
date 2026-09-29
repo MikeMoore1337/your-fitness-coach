@@ -390,7 +390,7 @@
     "fetch_kind": "rss",
     "url": "https://www.sciencedaily.com/rss/health_medicine/nutrition.xml",
     "language": "en",
-    "enabled": true,
+    "enabled": false,
     "fetch_interval_minutes": 60,
     "topics": [
       "nutrition",
@@ -423,7 +423,7 @@
     "fetch_kind": "rss",
     "url": "https://www.sciencedaily.com/rss/health_medicine/sports_medicine.xml",
     "language": "en",
-    "enabled": true,
+    "enabled": false,
     "fetch_interval_minutes": 60,
     "topics": [
       "fitness_training",
@@ -456,7 +456,7 @@
     "fetch_kind": "rss",
     "url": "https://medicalxpress.com/rss-feed/fitness-news/",
     "language": "en",
-    "enabled": true,
+    "enabled": false,
     "fetch_interval_minutes": 60,
     "topics": [
       "fitness_training",
@@ -700,6 +700,71 @@
     "allowed_item_hosts": [
       "menshealth.com",
       "www.menshealth.com"
+    ]
+  },
+  {
+    "id": "breaking-muscle-fitness",
+    "name": "Breaking Muscle Fitness",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://breakingmuscle.com/feed/fitness.xml",
+    "language": "en",
+    "enabled": false,
+    "fetch_interval_minutes": 360,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "nutrition"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Fitness journalism is secondary evidence; training, nutrition and health claims require independent verification before publication.",
+    "trust_notes": "Documented Breaking Muscle fitness RSS endpoint registered as a bounded reserve source; keep disabled until a live Hermes probe confirms a current reachable feed.",
+    "licensing_notes": "Store metadata and short paraphrases only; do not reproduce full articles or publisher media.",
+    "allowed_redirect_hosts": [
+      "breakingmuscle.com",
+      "www.breakingmuscle.com"
+    ],
+    "allowed_item_hosts": [
+      "breakingmuscle.com",
+      "www.breakingmuscle.com"
+    ]
+  },
+  {
+    "id": "fitness-volt",
+    "name": "Fitness Volt",
+    "type": "reputable_secondary",
+    "fetch_kind": "rss",
+    "url": "https://fitnessvolt.com/feed/",
+    "language": "en",
+    "enabled": true,
+    "fetch_interval_minutes": 60,
+    "topics": [
+      "fitness_training",
+      "bodybuilding",
+      "sports_nutrition",
+      "nutrition",
+      "dietary_supplements"
+    ],
+    "authoritative": false,
+    "freshness_policy": "current_month",
+    "jurisdiction": [
+      "international"
+    ],
+    "health_claim_limitations": "Fitness and strength-sports journalism is secondary evidence; health, supplement and performance claims require primary-source verification.",
+    "trust_notes": "High-cadence fitness, strength-sports and bodybuilding feed. Strict deterministic relevance and evidence gates remain mandatory.",
+    "licensing_notes": "Store metadata and short paraphrases only; do not reproduce full articles or publisher media.",
+    "allowed_redirect_hosts": [
+      "fitnessvolt.com",
+      "www.fitnessvolt.com"
+    ],
+    "allowed_item_hosts": [
+      "fitnessvolt.com",
+      "www.fitnessvolt.com"
     ]
   }
 ]
