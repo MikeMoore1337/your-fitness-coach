@@ -251,6 +251,37 @@ def _prepare_started(
     return root, git_repository, controller, worktree, branch, base_sha + ":" + head_sha
 
 
+def _prepare_ready_production_reconciliation(
+    repository: tuple[Path, Any], task_id: str = "506"
+) -> tuple[Path, Any, Any, Path, str, str, str, FakeGitHub]:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, task_id
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready(task_id, head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    merge_sha = _publish_task_squash_without_advancing_local_master(root, branch)
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    pull_request = _task_pr(570, task_id, base_sha, head_sha, merge_sha=merge_sha)
+    pull_request["state"] = "closed"
+    pull_request["head"]["ref"] = branch
+    github.pulls[570] = pull_request
+    github.commits[570] = [_task_commit(task_id)]
+    github.files[570] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.runs[36522345602] = {
+        "id": 36522345602,
+        "name": "Release production",
+        "head_sha": merge_sha,
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://example.invalid/actions/runs/36522345602",
+    }
+    github.successful_deployments.add((merge_sha, "production"))
+    return root, git_repository, controller, worktree, branch, base_sha, head_sha, github
+
+
 def _prepare_preimplementation_resume(
     repository: tuple[Path, Any],
     task_id: str = "241",
@@ -5698,6 +5729,196 @@ def test_finish_accepts_verified_squash_merge(
     assert result["cleanup_performed"] is True
     assert not worktree.exists()
     assert not git_repository.ref_exists(branch)
+
+
+def test_task_session_exposes_ready_production_reconciliation_command() -> None:
+    args = task_session._parser().parse_args(
+        [
+            "reconcile-ready-production-success",
+            "506",
+            "--pr",
+            "570",
+            "--production-run",
+            "36522345602",
+            "--deployed-sha",
+            "a" * 40,
+            "--owner-authorize",
+        ]
+    )
+
+    assert args.command == "reconcile-ready-production-success"
+    assert args.pr == 570
+    assert args.production_run == 36522345602
+    assert args.owner_authorize is True
+
+
+def test_reconcile_ready_production_success_accepts_exact_squash_and_finishes(
+    repository: tuple[Path, Any],
+) -> None:
+    (
+        _root,
+        git_repository,
+        controller,
+        worktree,
+        branch,
+        base_sha,
+        head_sha,
+        _github,
+    ) = _prepare_ready_production_reconciliation(repository)
+    lease_path = controller.store.task_lease_path("506")
+    lease_before = controller.store.read_json(lease_path)
+    assert isinstance(lease_before, dict)
+    worktree_head_before = git_repository.head(cwd=worktree)
+    branch_head_before = git_repository.ref(branch)
+    status_before = git_repository.status(worktree)
+
+    history = controller.reconcile_ready_production_success(
+        "506",
+        pr_number=570,
+        deployed_sha=git_repository.ref("origin/master"),
+        production_run_id=36522345602,
+        owner_authorize=True,
+    )
+
+    deployed_sha = git_repository.ref("origin/master")
+    assert history["state"] == "production-success"
+    assert history["head_sha"] == head_sha
+    assert history["base_sha"] == base_sha
+    assert history["merge_sha"] == deployed_sha
+    assert history["deployed_sha"] == deployed_sha
+    assert history["pr_number"] == 570
+    assert history["closeout_required"] is True
+    audit = history["ready_production_reconciliation"]
+    assert audit["owner_authorized"] is True
+    assert audit["authorization"] == "explicit --owner-authorize"
+    assert audit["ready_head_sha"] == head_sha
+    assert audit["ready_base_origin_master_sha"] == base_sha
+    assert audit["production"]["run_id"] == 36522345602
+
+    lease_after = controller.store.read_json(lease_path)
+    assert isinstance(lease_after, dict)
+    assert lease_after["lifecycle_state"] == "production-success"
+    assert lease_after["ready_head_sha"] == lease_before["ready_head_sha"]
+    assert (
+        lease_after["ready_base_origin_master_sha"] == lease_before["ready_base_origin_master_sha"]
+    )
+    assert lease_after["task_provenance"] == lease_before["task_provenance"]
+    assert controller.store.delivery_state()["owner"] is None
+    assert git_repository.head(cwd=worktree) == worktree_head_before
+    assert git_repository.ref(branch) == branch_head_before
+    assert git_repository.status(worktree) == status_before
+
+    result = controller.finish("506")
+
+    assert result["cleanup_performed"] is True
+    assert result["deleted_local_branch"] == branch
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
+    finished = controller.store.read_json(controller.store.history / "task-506.json")
+    assert finished["state"] == "finished"
+    assert finished["ready_production_reconciliation"] == audit
+
+
+@pytest.mark.parametrize(
+    ("invalid_case", "expected_error"),
+    [
+        ("owner_authorization", "explicit owner authorization"),
+        ("lease_state", "ready-for-delivery"),
+        ("delivery_owner", "active delivery owner"),
+        ("history", "Production history already exists"),
+        ("dirty_worktree", "dirty or interrupted task worktree"),
+        ("branch", "leased task branch"),
+        ("base", "ready base"),
+        ("head", "ready head"),
+        ("deployed", "deployed SHA"),
+        ("run", "successful for the exact deployed SHA"),
+        ("deployment", "successful production deployment"),
+        ("active_deployment", "production deployment is active"),
+        ("worker_state", "unreconciled worker state"),
+        ("missing_run", "unavailable for reconciliation"),
+    ],
+)
+def test_reconcile_ready_production_success_rejects_unsafe_evidence(
+    repository: tuple[Path, Any], invalid_case: str, expected_error: str
+) -> None:
+    (
+        _root,
+        git_repository,
+        controller,
+        worktree,
+        _branch,
+        base_sha,
+        _head_sha,
+        github,
+    ) = _prepare_ready_production_reconciliation(repository)
+    owner_authorize = True
+    deployed_sha = git_repository.ref("origin/master")
+    lease_path = controller.store.task_lease_path("506")
+
+    if invalid_case == "owner_authorization":
+        owner_authorize = False
+    elif invalid_case == "lease_state":
+        lease = controller.store.read_json(lease_path)
+        assert isinstance(lease, dict)
+        lease["lifecycle_state"] = "review"
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif invalid_case == "delivery_owner":
+        delivery = controller.store.delivery_state()
+        delivery["owner"] = {"task_id": "999", "acquired_at": task_session.utc_now()}
+        task_session.StateStore.replace_json(controller.store.delivery_path, delivery)
+    elif invalid_case == "history":
+        task_session.StateStore.replace_json(
+            controller.store.history / "task-506.json",
+            {"task_id": "506", "state": "production-success"},
+        )
+    elif invalid_case == "dirty_worktree":
+        (worktree / "untracked.txt").write_text("preserve\n", encoding="utf-8")
+    elif invalid_case == "branch":
+        github.pulls[570]["head"]["ref"] = "task/506-other-slug"
+    elif invalid_case == "base":
+        github.pulls[570]["base"]["sha"] = "1" * 40
+    elif invalid_case == "head":
+        github.pulls[570]["head"]["sha"] = "2" * 40
+    elif invalid_case == "deployed":
+        deployed_sha = base_sha
+    elif invalid_case == "run":
+        github.runs[36522345602]["head_sha"] = base_sha
+    elif invalid_case == "deployment":
+        github.successful_deployments.clear()
+    elif invalid_case == "active_deployment":
+        github.active_runs = [{"name": "Release production", "status": "in_progress"}]
+    elif invalid_case == "worker_state":
+        worker_state = (
+            _root
+            / ".artifacts"
+            / "tasks"
+            / "506"
+            / "temporary"
+            / "delivery"
+            / "run"
+            / "worker-state.json"
+        )
+        worker_state.parent.mkdir(parents=True)
+        worker_state.write_text("{}\n", encoding="utf-8")
+    elif invalid_case == "missing_run":
+        github.runs.pop(36522345602)
+
+    with pytest.raises(task_session.TaskSessionError, match=expected_error):
+        controller.reconcile_ready_production_success(
+            "506",
+            pr_number=570,
+            deployed_sha=deployed_sha,
+            production_run_id=36522345602,
+            owner_authorize=owner_authorize,
+        )
+
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    assert lease["lifecycle_state"] == (
+        "review" if invalid_case == "lease_state" else "ready-for-delivery"
+    )
+    if invalid_case != "history":
+        assert not (controller.store.history / "task-506.json").exists()
 
 
 @pytest.mark.parametrize(
