@@ -3232,7 +3232,7 @@ test('тренер быстро переходит между программо
     .getByRole('link', { name: 'Программы', exact: true })
     .click();
   await openCard(page, 'Программы клиентов');
-  await expect(page.getByText('План клиента на четыре недели')).toBeVisible();
+  await expect(page.getByText('План клиента на четыре недели', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Открыть клиента' }).click();
 
   await expect(page.getByText('Текущая программа клиента')).toBeVisible();
