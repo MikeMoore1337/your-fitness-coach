@@ -257,9 +257,9 @@ class UserProgram(Base):
     current_revision_number: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
-    restarted_from_program_id: Mapped[int | None] = mapped_column(
-        ForeignKey("user_programs.id", ondelete="SET NULL"), nullable=True, index=True
-    )
+    # Server-owned lineage is validated by the lifecycle service. It is deliberately a
+    # nullable scalar so the online expand migration does not add a lock-prone FK or index.
+    restarted_from_program_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     template: Mapped[ProgramTemplate | None] = relationship("ProgramTemplate")
     workouts: Mapped[list[UserWorkout]] = relationship(

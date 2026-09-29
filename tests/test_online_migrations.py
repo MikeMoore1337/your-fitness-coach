@@ -85,6 +85,20 @@ def test_nutrition_label_migration_satisfies_production_online_contract() -> Non
         validate_added_migration(root / "backend" / "alembic" / "versions" / name)
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "0098_program_lifecycle.py",
+        "0099_user_program_status_ck.py",
+        "0100_program_revision_kind_ck.py",
+    ],
+)
+def test_program_lifecycle_migrations_satisfy_production_online_contract(name: str) -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(root / "backend" / "alembic" / "versions" / name)
+
+
 def test_first_touch_attribution_migration_satisfies_production_online_contract() -> None:
     root = Path(__file__).resolve().parents[1]
 
