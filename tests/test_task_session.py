@@ -2720,6 +2720,21 @@ def _publish_task_squash_without_advancing_local_master(root: Path, branch: str)
     return merge_sha
 
 
+def _publish_task_squash_from_origin_master(root: Path, branch: str, task_id: str) -> str:
+    base_sha = _git(root, "rev-parse", "origin/master")
+    remote_worktree = root.parent / f"remote-task-squash-origin-{uuid.uuid4().hex[:8]}"
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), base_sha)
+    try:
+        _git(remote_worktree, "merge", "--squash", branch)
+        _git(remote_worktree, "commit", "-m", f"[Task {task_id}] Squash task {branch}")
+        merge_sha = _git(remote_worktree, "rev-parse", "HEAD")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    _git(root, "fetch", "origin", "master")
+    return merge_sha
+
+
 def _prepare_delivery(controller: Any, task_id: str, *, branch: str) -> dict[str, Any]:
     del branch
     acquired = controller.acquire_delivery(task_id)
@@ -5919,6 +5934,232 @@ def test_reconcile_ready_production_success_rejects_unsafe_evidence(
     )
     if invalid_case != "history":
         assert not (controller.store.history / "task-506.json").exists()
+
+
+def _prepare_ready_production_reconciliation_with_advanced_base(
+    repository: tuple[Path, Any],
+    *,
+    integration_subject: str = "Merge remote-tracking branch 'origin/master' into task/506-synthetic-task",
+) -> tuple[Path, Any, Any, Path, str, str, str, str, str, FakeGitHub]:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "506"
+    )
+    ready_base_sha, _initial_head_sha = sha_pair.split(":")
+    _advance_remote_master(root, 1)
+    effective_base_sha = _git(root, "rev-parse", "origin/master")
+    _git(worktree, "merge", "--no-ff", "origin/master", "-m", integration_subject)
+    ready_head_sha = _git(worktree, "rev-parse", "HEAD")
+    controller.mark_ready("506", head_sha=ready_head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    merge_sha = _publish_task_squash_from_origin_master(root, branch, "506")
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    pull_request = _task_pr(570, "506", effective_base_sha, ready_head_sha, merge_sha=merge_sha)
+    pull_request["state"] = "closed"
+    pull_request["head"]["ref"] = branch
+    github.pulls[570] = pull_request
+    github.commits[570] = [_task_commit("506")]
+    github.files[570] = [{"filename": "change.txt"}]
+    github.checks[ready_head_sha] = [_success_check(ready_head_sha)]
+    github.runs[36522345602] = {
+        "id": 36522345602,
+        "name": "Release production",
+        "head_sha": merge_sha,
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://example.invalid/actions/runs/36522345602",
+    }
+    github.successful_deployments.add((merge_sha, "production"))
+    return (
+        root,
+        git_repository,
+        controller,
+        worktree,
+        branch,
+        ready_base_sha,
+        effective_base_sha,
+        ready_head_sha,
+        merge_sha,
+        github,
+    )
+
+
+def test_reconcile_ready_production_success_accepts_integrated_current_pr_base(
+    repository: tuple[Path, Any],
+) -> None:
+    (
+        _root,
+        git_repository,
+        controller,
+        worktree,
+        branch,
+        ready_base_sha,
+        effective_base_sha,
+        ready_head_sha,
+        merge_sha,
+        _github,
+    ) = _prepare_ready_production_reconciliation_with_advanced_base(repository)
+    branch_before = git_repository.ref(branch)
+
+    history = controller.reconcile_ready_production_success(
+        "506",
+        pr_number=570,
+        deployed_sha=merge_sha,
+        production_run_id=36522345602,
+        owner_authorize=True,
+    )
+
+    audit = history["ready_production_reconciliation"]
+    assert audit["anchor_classification"] == "integrated_current_base"
+    assert audit["original_ready_base_sha"] == ready_base_sha
+    assert audit["effective_pr_base_sha"] == effective_base_sha
+    assert audit["ready_head_sha"] == ready_head_sha
+    assert audit["integration_merge"]["second_parent_sha"] == effective_base_sha
+    assert audit["verified_master_evidence"]["classification"] == "exact_deployed_master"
+    assert git_repository.ref(branch) == branch_before
+    assert worktree.exists()
+
+    result = controller.finish("506")
+
+    assert result["cleanup_performed"] is True
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
+
+
+def test_reconcile_ready_production_rejects_advanced_base_without_integration_merge(
+    repository: tuple[Path, Any],
+) -> None:
+    (
+        _root,
+        _git_repository,
+        controller,
+        _worktree,
+        _branch,
+        _ready_base_sha,
+        _effective_base_sha,
+        _ready_head_sha,
+        merge_sha,
+        _github,
+    ) = _prepare_ready_production_reconciliation_with_advanced_base(
+        repository,
+        integration_subject="Merge arbitrary branch into task/506-synthetic-task [Task 506]",
+    )
+
+    with pytest.raises(
+        task_session.TaskSessionError,
+        match="requires one valid origin/master integration merge",
+    ):
+        controller.reconcile_ready_production_success(
+            "506",
+            pr_number=570,
+            deployed_sha=merge_sha,
+            production_run_id=36522345602,
+            owner_authorize=True,
+        )
+
+    assert not (controller.store.history / "task-506.json").exists()
+
+
+def test_reconcile_ready_production_success_records_verified_controller_drift(
+    repository: tuple[Path, Any],
+) -> None:
+    (
+        root,
+        git_repository,
+        controller,
+        worktree,
+        branch,
+        _base_sha,
+        ready_head_sha,
+        _github,
+    ) = _prepare_ready_production_reconciliation(repository)
+    deployed_sha = git_repository.ref("origin/master")
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.workflow_runs_by_sha[deployed_sha] = [
+        {
+            "id": 36522345602,
+            "name": "Release production",
+            "head_sha": deployed_sha,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.invalid/actions/runs/36522345602",
+        }
+    ]
+
+    remote_worktree = root.parent / f"remote-controller-drift-{uuid.uuid4().hex[:8]}"
+    _git(root, "worktree", "add", "--detach", str(remote_worktree), deployed_sha)
+    try:
+        (remote_worktree / "AGENTS.md").write_text("controller drift\\n", encoding="utf-8")
+        _git(remote_worktree, "add", "AGENTS.md")
+        _git(remote_worktree, "commit", "-m", "[Controller] Record governance drift")
+        drift_sha = _git(remote_worktree, "rev-parse", "HEAD")
+        _git(remote_worktree, "push", "origin", "HEAD:master")
+    finally:
+        _git(root, "worktree", "remove", "--force", str(remote_worktree))
+    _git(root, "fetch", "origin", "master")
+
+    controller_pr = _controller_pr(deployed_sha, drift_sha)
+    controller_pr.update(
+        {
+            "number": 572,
+            "state": "closed",
+            "merged_at": "2026-09-03T11:00:00Z",
+            "merge_commit_sha": drift_sha,
+            "commits": 1,
+            "changed_files": 1,
+        }
+    )
+    github.master_sha = drift_sha
+    github.pulls[572] = controller_pr
+    github.commits[572] = [
+        {"sha": drift_sha, "commit": {"message": "[Controller] Record governance drift"}}
+    ]
+    github.files[572] = [{"filename": "AGENTS.md"}]
+    github.checks[drift_sha] = [_success_check(drift_sha)]
+    github.associated_pulls_by_commit[drift_sha] = [{"number": 572, "merge_commit_sha": drift_sha}]
+    controller_run = {
+        "id": 36539698782,
+        "name": "Release production",
+        "head_sha": drift_sha,
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://example.invalid/actions/runs/36539698782",
+    }
+    github.workflow_runs_by_sha[drift_sha] = [controller_run]
+    github.workflow_jobs_by_run[36539698782] = [
+        {"name": "Authorize exact merged master revision", "conclusion": "success"},
+        {"name": "Deploy immutable tested bundle", "conclusion": "skipped"},
+    ]
+    github.current_production_deployment = {
+        "environment": "production",
+        "state": "success",
+        "sha": deployed_sha,
+        "deployment_id": 1,
+    }
+
+    history = controller.reconcile_ready_production_success(
+        "506",
+        pr_number=570,
+        deployed_sha=deployed_sha,
+        production_run_id=36522345602,
+        owner_authorize=True,
+    )
+
+    evidence = history["ready_production_reconciliation"]["verified_master_evidence"]
+    assert evidence["classification"] == "verified_controller_only_drift"
+    assert evidence["current_master_sha"] == drift_sha
+    assert evidence["current_production"]["deployed_sha"] == deployed_sha
+    assert evidence["intervening_commits"][0]["classification"] == "controller"
+    assert history["ready_production_reconciliation"]["production"]["run_id"] == 36522345602
+    assert git_repository.ref(branch) == ready_head_sha
+    assert worktree.exists()
+
+    result = controller.finish("506")
+
+    assert result["cleanup_performed"] is True
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
 
 
 @pytest.mark.parametrize(
