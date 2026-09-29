@@ -266,18 +266,16 @@ def test_default_source_registry_reconciles_canonical_rows_and_preserves_runtime
         "frontiers-pharmacology",
         "pubmed-fitness-health",
         "sciencedaily-fitness",
-        "sciencedaily-nutrition",
-        "sciencedaily-sports-medicine",
-        "medicalxpress-fitness",
         "medicalxpress-sports-medicine",
         "acsm-news",
         "muscle-and-fitness",
         "bjsm",
         "bmj-open-sport-exercise-medicine",
         "mens-health",
+        "fitness-volt",
     }
     all_definitions = load_source_allowlist(include_disabled=True)
-    assert len(all_definitions) == 24
+    assert len(all_definitions) == 26
     pubmed = next(item for item in all_definitions if item.id == "pubmed-fitness-health")
     assert pubmed.enabled is True
     assert pubmed.fetch_kind == "json_feed"
@@ -296,7 +294,7 @@ def test_default_source_registry_reconciles_canonical_rows_and_preserves_runtime
     )
     with get_session_context() as db:
         seed_demo_data(db)
-        assert db.query(NewsSource).count() == 24
+        assert db.query(NewsSource).count() == 26
         apply_source_allowlist(db, operator_definition)
 
         db.delete(db.get(NewsSource, "frontiers-physiology"))
