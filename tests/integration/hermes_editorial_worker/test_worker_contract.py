@@ -124,12 +124,12 @@ def valid_job() -> editorial_worker.EditorialJob:
 
 @pytest.mark.parametrize(
     "version",
-    ["hermes-relevance-v1", "hermes-relevance-v2"],
+    ["hermes-relevance-v1", "hermes-relevance-v2", "hermes-relevance-v3"],
 )
 def test_worker_accepts_supported_relevance_versions(version: str) -> None:
     payload = valid_job().model_dump()
     payload["relevance"]["version"] = version
-    if version == "hermes-relevance-v2":
+    if version in {"hermes-relevance-v2", "hermes-relevance-v3"}:
         payload["relevance"]["reason_code"] = "topic_allowed:fitness_training"
         payload["relevance"]["topics"] = ["fitness_training"]
 
@@ -140,7 +140,7 @@ def test_worker_accepts_supported_relevance_versions(version: str) -> None:
 
 def test_worker_rejects_unknown_relevance_version() -> None:
     payload = valid_job().model_dump()
-    payload["relevance"]["version"] = "hermes-relevance-v3"
+    payload["relevance"]["version"] = "hermes-relevance-v4"
 
     with pytest.raises(ValidationError):
         editorial_worker.EditorialJob.model_validate(payload)
