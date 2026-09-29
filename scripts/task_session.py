@@ -5706,6 +5706,80 @@ class TaskController:
                 StateStore.replace_json(self.store.delivery_path, delivery)
                 self._promote_next_delivery_locked(delivery)
 
+    def _refuse_merged_delivery_refresh(
+        self, task_id: str, lease: Mapping[str, Any], ready_head: str
+    ) -> None:
+        """Keep a merged task PR on the production reconciliation path."""
+
+        expected = normalize_task_id(task_id)
+        branch = str(lease.get("branch", ""))
+        github = self._github()
+        try:
+            associated = github.pull_requests_for_commit(ready_head)
+        except (OSError, TaskSessionError) as error:
+            raise TaskSessionError(
+                f"Task {expected} cannot verify GitHub PR state before delivery refresh"
+            ) from error
+        if not isinstance(associated, list):
+            raise TaskSessionError(
+                f"Task {expected} cannot verify GitHub PR state before delivery refresh"
+            )
+
+        repository_slug = getattr(github, "repo_slug", None)
+        matching: list[Mapping[str, Any]] = []
+        for pull_request in associated:
+            if not isinstance(pull_request, Mapping):
+                raise TaskSessionError(
+                    f"Task {expected} received ambiguous GitHub PR evidence before delivery refresh"
+                )
+            base = pull_request.get("base")
+            head = pull_request.get("head")
+            if not isinstance(base, Mapping) or not isinstance(head, Mapping):
+                continue
+            base_repo = base.get("repo")
+            head_repo = head.get("repo")
+            if (
+                head.get("ref") != branch
+                or head.get("sha") != ready_head
+                or base.get("ref") != TARGET_BASE_BRANCH
+                or not isinstance(base_repo, Mapping)
+                or not isinstance(head_repo, Mapping)
+                or not repository_slug
+                or base_repo.get("full_name") != repository_slug
+                or head_repo.get("full_name") != repository_slug
+            ):
+                continue
+            matching.append(pull_request)
+
+        if len(matching) > 1:
+            raise TaskSessionError(
+                f"Task {expected} received ambiguous merged PR evidence before delivery refresh"
+            )
+        if not matching:
+            return
+
+        pull_request = matching[0]
+        if not str(pull_request.get("title", "")).startswith(f"[Task {expected}]"):
+            raise TaskSessionError(
+                f"Task {expected} received an unrelated PR on its leased branch before delivery refresh"
+            )
+        state = str(pull_request.get("state", "")).lower()
+        merged_at = pull_request.get("merged_at")
+        merge_sha = pull_request.get("merge_commit_sha")
+        if state not in {"open", "closed"}:
+            raise TaskSessionError(
+                f"Task {expected} received ambiguous GitHub PR state before delivery refresh"
+            )
+        if state == "closed":
+            if not (isinstance(merged_at, str) and merged_at and merge_sha):
+                raise TaskSessionError(
+                    f"Task {expected} received incomplete GitHub merge evidence before delivery refresh"
+                )
+            raise TaskSessionError(
+                f"Task {expected} PR is already merged; refresh-delivery is not valid after merge. "
+                "Use production completion/reconciliation."
+            )
+
     def refresh_for_delivery(self, task_id: str, *, offline: bool = False) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
         lease, _ = self._require_delivery_owner(expected)
@@ -5713,6 +5787,29 @@ class TaskController:
             raise TaskSessionError(
                 f"Task {expected} cannot refresh for delivery from {lease.get('lifecycle_state')}"
             )
+        worktree = Path(str(lease.get("worktree", ""))).resolve()
+        if self.repository.status(worktree):
+            raise TaskSessionError(f"Task {expected} delivery refresh refuses dirty worktree")
+        operations = self.repository.operation_issues(worktree)
+        if operations:
+            raise TaskSessionError(
+                f"Task {expected} delivery refresh refuses interrupted Git operation: {operations}"
+            )
+        head_before = self.repository.head(cwd=worktree)
+        old_base = str(lease.get("base_origin_master_sha", ""))
+        if not old_base:
+            raise TaskSessionError(f"Task {expected} lease has no base SHA")
+        ready_head = str(lease.get("ready_head_sha", ""))
+        if not ready_head or head_before != ready_head:
+            reason = (
+                "Task branch HEAD changed after PR readiness; rerun targeted checks and applicable QA "
+                "before delivery refresh"
+            )
+            self._mark_delivery_refresh_failure(expected, reason)
+            raise TaskSessionError(
+                f"Task {expected} delivery refresh failed and was preserved for recovery: {reason}"
+            )
+        self._refuse_merged_delivery_refresh(expected, lease, ready_head)
         canonical_refresh = self.refresh_canonical_master(
             offline=offline, delivery_task_id=expected
         )
@@ -5728,18 +5825,6 @@ class TaskController:
                 f"Task {expected} canonical master refresh is waiting: "
                 f"{canonical_refresh['reason']}; {canonical_refresh['recovery_hint']}"
             )
-        worktree = Path(str(lease.get("worktree", ""))).resolve()
-        if self.repository.status(worktree):
-            raise TaskSessionError(f"Task {expected} delivery refresh refuses dirty worktree")
-        operations = self.repository.operation_issues(worktree)
-        if operations:
-            raise TaskSessionError(
-                f"Task {expected} delivery refresh refuses interrupted Git operation: {operations}"
-            )
-        head_before = self.repository.head(cwd=worktree)
-        old_base = str(lease.get("base_origin_master_sha", ""))
-        if not old_base:
-            raise TaskSessionError(f"Task {expected} lease has no base SHA")
         try:
             with self.store.lock():
                 lease_path = self.store.task_lease_path(expected)
@@ -7153,8 +7238,8 @@ class TaskController:
             raise TaskSessionError(
                 "Production reconciliation requires explicit owner authorization"
             )
-        if not superseding_pr_numbers or any(number <= 0 for number in superseding_pr_numbers):
-            raise TaskSessionError("Production reconciliation requires one or more superseding PRs")
+        if any(number <= 0 for number in superseding_pr_numbers):
+            raise TaskSessionError("Production reconciliation PR numbers must be positive")
         pr_numbers = [original_pr_number, *superseding_pr_numbers]
         if original_pr_number <= 0 or len(set(pr_numbers)) != len(pr_numbers):
             raise TaskSessionError(
@@ -7304,6 +7389,10 @@ class TaskController:
                 raise TaskSessionError(
                     "Original PR does not match the preserved delivery anchor and no verified post-merge anchor exists"
                 )
+        elif not superseding_pr_numbers:
+            raise TaskSessionError(
+                "Single-PR production reconciliation requires a verified post-merge collapsed anchor"
+            )
         if self._active_production_deployment():
             raise TaskSessionError(
                 "Production reconciliation refuses while a production deployment is active"
@@ -8156,7 +8245,7 @@ class TaskController:
             or anchor_classification not in {"exact_delivery_anchor", "post_merge_collapsed_anchor"}
             or not isinstance(original, Mapping)
             or not isinstance(superseding, list)
-            or not superseding
+            or (not superseding and anchor_classification != "post_merge_collapsed_anchor")
             or not isinstance(production, Mapping)
             or (
                 anchor_classification == "post_merge_collapsed_anchor"
@@ -8788,7 +8877,7 @@ def _parser() -> argparse.ArgumentParser:
     reconcile_production = subparsers.add_parser("reconcile-production-success")
     reconcile_production.add_argument("task_id")
     reconcile_production.add_argument("--original-pr", type=int, required=True)
-    reconcile_production.add_argument("--superseding-pr", type=int, action="append", required=True)
+    reconcile_production.add_argument("--superseding-pr", type=int, action="append", default=[])
     reconcile_production.add_argument("--deployed-sha", required=True)
     reconcile_production.add_argument("--production-run", type=int, required=True)
     reconcile_production.add_argument("--owner-authorize", action="store_true")
