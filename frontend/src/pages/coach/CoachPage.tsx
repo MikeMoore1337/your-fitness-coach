@@ -15,6 +15,7 @@ import {
 import { CoachToolsHub, type CoachTool } from '../../features/coach/CoachToolsHub';
 import { CoachClientTimeline } from '../../features/coach/CoachClientTimeline';
 import { CoachReportHandoffEntry } from '../../features/coach/CoachReportHandoffEntry';
+import { CoachProgramOperations } from '../../features/coach/CoachProgramOperations';
 import { TrainerModeSwitch } from '../../features/trainer/TrainerModeSwitch';
 import { ExerciseCatalog } from '../../features/exercises/ExerciseCatalog';
 import { NutritionForm } from '../../features/nutrition/NutritionForm';
@@ -1551,6 +1552,9 @@ export default function CoachPage({
               )}
             </div>
           </>
+        )}
+        {tab === 'programs' && (
+          <CoachProgramOperations clients={clients.data ?? []} programs={programs.data ?? []} />
         )}
         {tab === 'programs' && (
           <Card className="coach-programs-card" title="Программы клиентов">
