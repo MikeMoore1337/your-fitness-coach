@@ -44,7 +44,7 @@ GENERATOR_VERSION = "task403-yfc-source-registry-renderer-v1"
 SOURCE_REGISTRY_PATH = "backend/fitminiapp_api/resources/news_sources.json"
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
 STATE_SCHEMA_VERSION = "hermes-discovery-state-v1"
-RELEVANCE_VERSION = "hermes-relevance-v2"
+RELEVANCE_VERSION = "hermes-relevance-v3"
 LOCAL_MOCK_MODE = "local_mock"
 EXTERNAL_MODE = "external"
 DISCOVERY_MODES = frozenset({LOCAL_MOCK_MODE, EXTERNAL_MODE})
@@ -89,6 +89,7 @@ DEFAULT_TIMEOUT_SECONDS = 10.0
 DEFAULT_MAX_CONCURRENCY = 4
 DEFAULT_MAX_ITEMS_PER_SOURCE = 20
 DEFAULT_FRESHNESS_MAX_AGE_HOURS = 7 * 24
+DEFAULT_COLD_START_MAX_AGE_HOURS = 120
 DEFAULT_LOCK_STALE_SECONDS = 900.0
 USER_AGENT = "YourFitnessCoach-HermesDiscovery/1.0"
 TRACKING_PARAMS = frozenset({"fbclid", "gclid", "mc_cid", "mc_eid", "ref", "ref_src"})
@@ -138,6 +139,11 @@ RELEVANCE_MARKERS = {
         "bodybuilder",
         "physique competition",
         "physique athlete",
+        "men's physique",
+        "mens physique",
+        "mr. olympia",
+        "olympia bodybuilding",
+        "classic physique olympia",
         "contest preparation",
         "contest prep",
         "бодибилд",
@@ -346,6 +352,11 @@ DIRECT_RESCUE_MARKERS = (
     "bodybuilding",
     "bodybuilder",
     "physique athlete",
+    "men's physique",
+    "mens physique",
+    "mr. olympia",
+    "olympia bodybuilding",
+    "classic physique olympia",
     "training load",
     "workout",
     "sarcopenic obesity",
@@ -1730,6 +1741,13 @@ def _candidate_is_fresh(
     return current - timedelta(hours=max_age_hours) <= published <= current
 
 
+def _source_is_cold_start(state_entry: Mapping[str, Any] | None) -> bool:
+    if not state_entry:
+        return True
+    last_success_at = state_entry.get("last_success_at")
+    return not isinstance(last_success_at, str) or not last_success_at.strip()
+
+
 def _candidate_content_hash(candidate: ParsedCandidate) -> str:
     return hashlib.sha256(candidate.content.encode("utf-8")).hexdigest()
 
@@ -1899,6 +1917,12 @@ def run_once(
         minimum=24,
         maximum=31 * 24,
     )
+    cold_start_max_age_hours = _bounded_float(
+        "HERMES_DISCOVERY_COLD_START_MAX_AGE_HOURS",
+        DEFAULT_COLD_START_MAX_AGE_HOURS,
+        minimum=24,
+        maximum=31 * 24,
+    )
     stale_seconds = _bounded_float(
         "HERMES_DISCOVERY_LOCK_STALE_SECONDS",
         DEFAULT_LOCK_STALE_SECONDS,
@@ -1919,6 +1943,11 @@ def run_once(
         state["source_definitions_version"] = definitions["definitions_version"]
         state["source_registry_sha256"] = definitions["source_registry_sha256"]
         state["last_run_at"] = run_at.isoformat()
+        cold_start_source_ids = {
+            source.source_id
+            for source in sources
+            if _source_is_cold_start(state["sources"].get(source.source_id))
+        }
         outcomes: list[SourceFetchOutcome] = []
         with ThreadPoolExecutor(
             max_workers=max_concurrency, thread_name_prefix="hermes-discovery"
@@ -1944,8 +1973,10 @@ def run_once(
         fetched_sources = 0
         relevance_rejected = 0
         freshness_rejected = 0
+        cold_start_stale = 0
         for outcome in outcomes:
             source = outcome.source
+            is_cold_start = source.source_id in cold_start_source_ids
             source_state = state["sources"].setdefault(source.source_id, {})
             source_state["last_attempt_at"] = state["last_run_at"]
             if outcome.error_code:
@@ -2011,6 +2042,22 @@ def run_once(
                 ):
                     duplicates += 1
                     continue
+                if is_cold_start and not _candidate_is_fresh(
+                    normalized_candidate,
+                    now=run_at,
+                    max_age_hours=cold_start_max_age_hours,
+                ):
+                    cold_start_stale += 1
+                    state["candidates"][key] = {
+                        "status": "rejected",
+                        "error_code": "cold_start_stale",
+                        "source_id": source.source_id,
+                        "canonical_url": normalized_url,
+                        "content_hash": _candidate_content_hash(normalized_candidate),
+                        "event_date": _event_date(normalized_candidate),
+                        "created_at": state["last_run_at"],
+                    }
+                    continue
                 if not _candidate_is_fresh(
                     normalized_candidate,
                     now=run_at,
@@ -2070,6 +2117,7 @@ def run_once(
                 "duplicate": duplicates,
                 "relevance_rejected": relevance_rejected,
                 "freshness_rejected": freshness_rejected,
+                "cold_start_stale": cold_start_stale,
                 "source_errors": len(source_errors),
             },
             pending_jobs=pending_jobs,
@@ -2089,6 +2137,7 @@ def run_once(
         "duplicates": duplicates,
         "relevance_rejected": relevance_rejected,
         "freshness_rejected": freshness_rejected,
+        "cold_start_stale": cold_start_stale,
         "outbox_pending": len(list(outbox_dir.glob("*.json"))),
         "health": health,
         "publication": "not evaluated by discovery; YFC intake owns taxonomy/risk/publication",

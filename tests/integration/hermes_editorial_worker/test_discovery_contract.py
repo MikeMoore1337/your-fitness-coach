@@ -8,7 +8,7 @@ import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from subprocess import CompletedProcess
-from urllib.parse import parse_qs, unquote
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
 
@@ -451,6 +451,41 @@ def test_discovery_relevance_matches_yfc_relevance(title: str, summary: str) -> 
     assert tuple(discovery["topics"]) == yfc.topics
 
 
+def test_olympia_and_mens_physique_markers_are_narrow_and_versioned() -> None:
+    relevant = discovery_runner.ParsedCandidate(
+        external_id="olympia-1",
+        canonical_url="https://source.example/olympia-1",
+        title="Ryan Terry wins Men's Physique at Mr. Olympia",
+        summary="Results from the men's physique division were announced.",
+        content="Results from the men's physique division were announced.",
+    )
+    broad = discovery_runner.ParsedCandidate(
+        external_id="olympia-city",
+        canonical_url="https://source.example/olympia-city",
+        title="Olympia city council announces autumn schedule",
+        summary="The municipal calendar was published for residents.",
+        content="The municipal calendar was published for residents.",
+    )
+
+    discovery_relevant = discovery_runner._evaluate_relevance(relevant)
+    yfc_relevant = news_taxonomy.evaluate_editorial_relevance(
+        relevant.title, relevant.summary, relevant.content
+    )
+    discovery_broad = discovery_runner._evaluate_relevance(broad)
+    yfc_broad = news_taxonomy.evaluate_editorial_relevance(
+        broad.title, broad.summary, broad.content
+    )
+
+    assert discovery_runner.RELEVANCE_VERSION == "hermes-relevance-v3"
+    assert news_taxonomy.RELEVANCE_VERSION == "news-relevance-v3"
+    assert discovery_relevant["allowed"] is True
+    assert "bodybuilding" in discovery_relevant["topics"]
+    assert yfc_relevant.allowed is True
+    assert "bodybuilding" in yfc_relevant.topics
+    assert discovery_broad["allowed"] is False
+    assert yfc_broad.allowed is False
+
+
 def test_only_old_relevance_rejections_are_reconsidered() -> None:
     old_rejection = {
         "status": "rejected",
@@ -485,15 +520,13 @@ def test_production_registry_uses_expanded_working_news_sources() -> None:
         "frontiers-pharmacology",
         "pubmed-fitness-health",
         "sciencedaily-fitness",
-        "sciencedaily-nutrition",
-        "sciencedaily-sports-medicine",
-        "medicalxpress-fitness",
         "medicalxpress-sports-medicine",
         "acsm-news",
         "muscle-and-fitness",
         "bjsm",
         "bmj-open-sport-exercise-medicine",
         "mens-health",
+        "fitness-volt",
     }
 
     frontiers = [source for source in enabled.values() if source["id"].startswith("frontiers-")]
@@ -511,20 +544,26 @@ def test_production_registry_uses_expanded_working_news_sources() -> None:
     sciencedaily = [
         source for source in enabled.values() if source["id"].startswith("sciencedaily-")
     ]
-    assert len(sciencedaily) == 3
-    assert all(source["fetch_kind"] == "rss" for source in sciencedaily)
-    assert all(
-        source["url"].startswith("https://www.sciencedaily.com/rss/") for source in sciencedaily
-    )
+    assert [source["id"] for source in sciencedaily] == ["sciencedaily-fitness"]
+    sciencedaily_reserve = {
+        source["id"]: source
+        for source in rendered["sources"]
+        if source["id"] in {"sciencedaily-nutrition", "sciencedaily-sports-medicine"}
+    }
+    assert set(sciencedaily_reserve) == {
+        "sciencedaily-nutrition",
+        "sciencedaily-sports-medicine",
+    }
+    assert all(source["enabled"] is False for source in sciencedaily_reserve.values())
 
     medicalxpress = [
         source for source in enabled.values() if source["id"].startswith("medicalxpress-")
     ]
-    assert len(medicalxpress) == 2
-    assert all(source["fetch_kind"] == "rss" for source in medicalxpress)
-    assert all(
-        source["url"].startswith("https://medicalxpress.com/rss-feed/") for source in medicalxpress
+    assert [source["id"] for source in medicalxpress] == ["medicalxpress-sports-medicine"]
+    medicalxpress_reserve = next(
+        source for source in rendered["sources"] if source["id"] == "medicalxpress-fitness"
     )
+    assert medicalxpress_reserve["enabled"] is False
 
     assert enabled["acsm-news"]["authoritative"] is True
     assert enabled["bjsm"]["authoritative"] is True
@@ -536,6 +575,13 @@ def test_production_registry_uses_expanded_working_news_sources() -> None:
     assert stronger_by_science["authoritative"] is False
     assert enabled["muscle-and-fitness"]["authoritative"] is False
     assert enabled["mens-health"]["authoritative"] is False
+    assert enabled["fitness-volt"]["url"] == "https://fitnessvolt.com/feed/"
+    breaking_muscle = next(
+        source for source in rendered["sources"] if source["id"] == "breaking-muscle-fitness"
+    )
+    assert breaking_muscle["enabled"] is False
+    assert breaking_muscle["url"] == "https://breakingmuscle.com/feed/fitness.xml"
+    assert len({urlsplit(source["url"]).hostname for source in enabled.values()}) >= 10
 
 
 def test_canonical_registry_is_lf_only() -> None:
@@ -593,8 +639,8 @@ def test_canonical_registry_renders_versioned_allowlist() -> None:
     assert document["schema_version"] == discovery_runner.SCHEMA_VERSION
     assert document["source_registry_sha256"] == hashlib.sha256(registry.read_bytes()).hexdigest()
     assert document["definitions_version"].endswith(document["source_registry_sha256"])
-    assert len(document["sources"]) == 24
-    assert len({source["id"] for source in document["sources"]}) == 24
+    assert len(document["sources"]) == 26
+    assert len({source["id"] for source in document["sources"]}) == 26
     pubmed = next(
         source for source in document["sources"] if source["id"] == "pubmed-fitness-health"
     )
@@ -648,7 +694,7 @@ def test_generated_definitions_load_without_live_fetch(monkeypatch: pytest.Monke
     )
 
     assert loaded_document["definitions_version"] == document["definitions_version"]
-    assert len(sources) == 24
+    assert len(sources) == 26
     assert sources[0].source_id == "frontiers-nutrition"
     loaded_pubmed = next(
         source for source in loaded_document["sources"] if source["id"] == "pubmed-fitness-health"
@@ -930,6 +976,98 @@ def test_relevance_gate_rejects_before_outbox_and_records_bounded_state(
     assert next(iter(state["candidates"].values()))["error_code"] == "relevance_gate_rejected"
 
 
+def test_cold_start_rejects_old_or_undated_once_and_preserves_existing_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = discovery_runner.SourceDefinition(
+        source_id="source-one",
+        name="Source One",
+        source_type="reputable_secondary",
+        fetch_kind="rss",
+        url="https://source.example/feed",
+        language="en",
+        enabled=True,
+        topics=("fitness_training",),
+        authoritative=False,
+        allowed_redirect_hosts=("source.example",),
+        allowed_item_hosts=("source.example",),
+    )
+    current = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+
+    def candidate(external_id: str, *, age_hours: int | None) -> discovery_runner.ParsedCandidate:
+        return discovery_runner.ParsedCandidate(
+            external_id=external_id,
+            canonical_url=f"https://source.example/{external_id}",
+            title="Resistance training study reports strength gains",
+            summary="Resistance training and muscle strength outcomes.",
+            content=f"Resistance training and muscle strength outcomes: {external_id}.",
+            published_at=None if age_hours is None else current - timedelta(hours=age_hours),
+        )
+
+    fresh = candidate("fresh", age_hours=96)
+    stale = candidate("stale", age_hours=144)
+    undated = candidate("undated", age_hours=None)
+    later = candidate("later", age_hours=144)
+    monkeypatch.setattr(
+        discovery_runner,
+        "load_source_definitions",
+        lambda *_args, **_kwargs: (
+            {"definitions_version": "v1", "source_registry_sha256": "a" * 64},
+            (source,),
+        ),
+    )
+    monkeypatch.setattr(
+        discovery_runner,
+        "_source_outcome",
+        lambda *_args, **_kwargs: discovery_runner.SourceFetchOutcome(
+            source=source,
+            result=discovery_runner.FetchResult(status="fetched", items=(fresh, stale, undated)),
+        ),
+    )
+    monkeypatch.setenv("HERMES_DISCOVERY_COLD_START_MAX_AGE_HOURS", "120")
+    monkeypatch.setenv("HERMES_DISCOVERY_FRESHNESS_MAX_AGE_HOURS", "168")
+
+    state_dir = tmp_path / "state"
+    outbox_dir = state_dir / "outbox"
+    first = discovery_runner.run_once(
+        definitions_path=tmp_path / "definitions.json",
+        state_dir=state_dir,
+        outbox_dir=outbox_dir,
+        mode=discovery_runner.EXTERNAL_MODE,
+    )
+
+    assert first["candidates_created"] == 1
+    assert first["cold_start_stale"] == 2
+    assert first["freshness_rejected"] == 0
+    assert first["health"]["counters"]["cold_start_stale"] == 2
+    state = json.loads((state_dir / "state.json").read_text(encoding="utf-8"))
+    cold_rejects = [
+        row for row in state["candidates"].values() if row.get("error_code") == "cold_start_stale"
+    ]
+    assert len(cold_rejects) == 2
+    assert state["sources"]["source-one"]["last_success_at"]
+
+    monkeypatch.setattr(
+        discovery_runner,
+        "_source_outcome",
+        lambda *_args, **_kwargs: discovery_runner.SourceFetchOutcome(
+            source=source,
+            result=discovery_runner.FetchResult(status="fetched", items=(stale, later)),
+        ),
+    )
+    second = discovery_runner.run_once(
+        definitions_path=tmp_path / "definitions.json",
+        state_dir=state_dir,
+        outbox_dir=outbox_dir,
+        mode=discovery_runner.EXTERNAL_MODE,
+    )
+
+    assert second["candidates_created"] == 1
+    assert second["duplicates"] == 1
+    assert second["cold_start_stale"] == 0
+    assert second["freshness_rejected"] == 0
+
+
 def test_discovery_freshness_gate_rejects_stale_missing_and_future_items(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1000,6 +1138,19 @@ def test_discovery_freshness_gate_rejects_stale_missing_and_future_items(
     monkeypatch.setenv("HERMES_DISCOVERY_FRESHNESS_MAX_AGE_HOURS", "168")
 
     state_dir = tmp_path / "state"
+    state_dir.mkdir(parents=True)
+    (state_dir / "state.json").write_text(
+        json.dumps(
+            {
+                "schema_version": discovery_runner.STATE_SCHEMA_VERSION,
+                "sources": {
+                    "source-one": {"last_success_at": (current - timedelta(hours=1)).isoformat()}
+                },
+                "candidates": {},
+            }
+        ),
+        encoding="utf-8",
+    )
     outbox_dir = state_dir / "outbox"
     result = discovery_runner.run_once(
         definitions_path=tmp_path / "definitions.json",
@@ -1022,10 +1173,12 @@ def test_discovery_freshness_gate_rejects_stale_missing_and_future_items(
 
 def test_discovery_freshness_contract_is_seven_days() -> None:
     assert discovery_runner.DEFAULT_FRESHNESS_MAX_AGE_HOURS == 7 * 24
+    assert discovery_runner.DEFAULT_COLD_START_MAX_AGE_HOURS == 120
     service = (DISCOVERY_ROOT / "systemd" / "hermes-discovery.service.template").read_text(
         encoding="utf-8"
     )
     assert "HERMES_DISCOVERY_FRESHNESS_MAX_AGE_HOURS=168" in service
+    assert "HERMES_DISCOVERY_COLD_START_MAX_AGE_HOURS=120" in service
 
 
 def test_json_feed_and_html_metadata_paths_normalize_bounded_candidates() -> None:
