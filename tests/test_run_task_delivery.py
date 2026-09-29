@@ -232,6 +232,44 @@ def test_resume_launcher_uses_owner_authorized_controller_command(
     assert "start" not in command
 
 
+def test_noop_retry_launcher_uses_dedicated_controller_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = delivery._parser().parse_args(
+        [
+            "508",
+            "--control-issue",
+            "508",
+            "--retry-noop-worker",
+            "--resume-reason",
+            "retry after corrected Agent Flow routing",
+        ]
+    )
+    observed: dict[str, Any] = {}
+
+    def fake_run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        observed["command"] = command
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"lease": {"branch": "task/508-test"}}), stderr=""
+        )
+
+    monkeypatch.setattr(delivery, "_run", fake_run)
+    delivery._start(
+        args.task_id,
+        session_label="test",
+        poll_seconds=10,
+        max_wait_minutes=1,
+        offline=args.offline,
+        resume_control_issue=args.control_issue,
+        resume_reason=args.resume_reason,
+        retry_noop_worker=args.retry_noop_worker,
+    )
+    command = observed["command"]
+    assert command[command.index("retry-noop-worker") + 1] == "508"
+    assert "--owner-authorize" in command
+    assert "resume-preimplementation" not in command
+
+
 def test_guard_resume_launcher_uses_dedicated_controller_command(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

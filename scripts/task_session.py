@@ -28,6 +28,7 @@ from typing import Any
 from uuid import uuid4
 
 try:
+    from scripts.agent_flow import AgentFlowError, build_agent_flow_from_path
     from scripts.artifact_manager import ArtifactError, ArtifactManager
     from scripts.issue_workflow import (
         CONTROL_STATES,
@@ -42,6 +43,7 @@ try:
     )
     from scripts.worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 except ModuleNotFoundError:
+    from agent_flow import AgentFlowError, build_agent_flow_from_path
     from artifact_manager import ArtifactError, ArtifactManager
     from issue_workflow import (
         CONTROL_STATES,
@@ -129,6 +131,8 @@ TRUSTED_DEPENDENCY_BOT_BRANCH_PREFIXES = {
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
 UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
 STATE_LOCK_STALE_SECONDS = 300
+NOOP_WORKER_RETRY_CLASSIFICATION = "verified_noop_routing_retry"
+NOOP_WORKER_RETRY_MAX = 1
 
 # A task lease and delivery ownership are separate controller concerns.  Every task owns only its
 # own worktree/branch and task-state record.  ``exclusive-write`` remains a legacy metadata value
@@ -629,6 +633,12 @@ def _extract_bold_field(text: str, name: str) -> str:
 
 def _legacy_dependencies(text: str, current_task_id: str) -> tuple[str, ...]:
     value = _extract_bold_field(text, "Зависимости")
+    if not value:
+        # Older executable task documents used a plain English heading.  Keep this
+        # deliberately line-bounded so ordinary prose mentioning another task does
+        # not become a dependency.
+        match = re.search(r"(?im)^\s*Depends\s+on:\s*(?P<value>.+?)\s*$", text)
+        value = match.group("value").strip() if match else ""
     if not value:
         return ()
     candidates = {
@@ -2830,6 +2840,7 @@ class TaskController:
         allow_cli_preflight_failure: bool = False,
         allow_guard_budget_failure: bool = False,
         allow_transport_failure: bool = False,
+        allow_verified_noop_retry: bool = False,
     ) -> dict[str, Any]:
         github = self._github()
         owner = normalize_github_login(github.repo_slug.split("/", maxsplit=1)[0])
@@ -2900,6 +2911,30 @@ class TaskController:
             )
         except IssueWorkflowError as error:
             raise TaskSessionError(f"Task control state is malformed: {error}") from error
+        if allow_verified_noop_retry and state is None:
+            return {}
+        if allow_verified_noop_retry and isinstance(state, Mapping):
+            if state.get("state") not in {"in_progress", "human_required"}:
+                raise TaskSessionError(
+                    "Verified no-op retry requires no prior control state, in_progress, or human_required"
+                )
+            if state.get("issue_number") != issue_number or state.get("branch") != branch:
+                raise TaskSessionError(
+                    "Latest control state does not match the verified no-op retry lease"
+                )
+            if state.get("pr_number") is not None or state.get("head_sha") is not None:
+                raise TaskSessionError("Verified no-op retry requires no delivery state")
+            if state.get("state") == "human_required":
+                blocker = state.get("blocker")
+                blocker_text = blocker.lower() if isinstance(blocker, str) else ""
+                if not any(
+                    token in blocker_text
+                    for token in ("no-op", "no op", "routing", "read-only", "read only")
+                ):
+                    raise TaskSessionError(
+                        "Latest human_required state is unrelated to the verified no-op retry"
+                    )
+            return dict(state)
         if state is None or state.get("state") not in {"human_required", "blocked"}:
             raise TaskSessionError(
                 "Resume requires the latest owner-authorized human_required or verified CLI failure state"
@@ -4109,6 +4144,465 @@ class TaskController:
             )
         return worktree, branch, head
 
+    def _verified_noop_worker_evidence(
+        self, task_id: str, worktree: Path, base_sha: str
+    ) -> dict[str, Any]:
+        """Verify the prior worker was a terminal, read-only routing mistake."""
+
+        expected = normalize_task_id(task_id)
+        evidence_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / expected / "evidence" / "agent-flow"
+        ).resolve()
+        plans: list[tuple[float, Path, dict[str, Any]]] = []
+        if evidence_root.is_dir():
+            for path in sorted(evidence_root.glob("*.json")):
+                if path.is_symlink() or not path.is_file():
+                    continue
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError) as error:
+                    raise TaskSessionError(
+                        f"Prior Agent Flow evidence is unreadable: {path}"
+                    ) from error
+                if not isinstance(payload, dict):
+                    continue
+                roles = payload.get("worker_role_passes")
+                execution = payload.get("execution")
+                routing = payload.get("routing")
+                role_names = (
+                    [item.get("name") for item in roles if isinstance(item, Mapping)]
+                    if isinstance(roles, list)
+                    else []
+                )
+                if (
+                    payload.get("classification") == "yfc-agent-flow-plan"
+                    and payload.get("task_id") == expected
+                    and role_names == ["researcher"]
+                    and isinstance(execution, Mapping)
+                    and execution.get("production_writer") is None
+                    and isinstance(routing, Mapping)
+                    and routing.get("explicit_role_contract") is False
+                ):
+                    plans.append((path.stat().st_mtime_ns, path, payload))
+        if not plans:
+            raise TaskSessionError(
+                "HUMAN_REQUIRED: verified no-op retry requires durable researcher-only Agent Flow evidence"
+            )
+        _, plan_path, _prior_plan = max(plans, key=lambda item: item[0])
+
+        delivery_root = (
+            self._canonical_root() / ".artifacts" / "tasks" / expected / "temporary" / "delivery"
+        ).resolve()
+        attempts: list[tuple[float, Path, dict[str, Any]]] = []
+        if delivery_root.is_dir():
+            for attempt_root in sorted(delivery_root.iterdir()):
+                if not attempt_root.is_dir() or attempt_root.is_symlink():
+                    continue
+                final_path = attempt_root / "final.md"
+                events_path = attempt_root / "events.jsonl"
+                guard_path = attempt_root / "worker-guard.json"
+                worker_state_path = attempt_root / "worker-state.json"
+                if not (final_path.is_file() and events_path.is_file() and guard_path.is_file()):
+                    continue
+                if worker_state_path.exists():
+                    raise TaskSessionError(
+                        f"HUMAN_REQUIRED: prior worker state is not reconciled: {worker_state_path}"
+                    )
+                try:
+                    guard = json.loads(guard_path.read_text(encoding="utf-8"))
+                    lines = events_path.read_text(encoding="utf-8").splitlines()
+                except (OSError, UnicodeError, json.JSONDecodeError) as error:
+                    raise TaskSessionError(
+                        f"Prior worker terminal evidence is unreadable: {attempt_root}"
+                    ) from error
+                if not isinstance(guard, Mapping):
+                    raise TaskSessionError("Prior worker guard evidence is malformed")
+                privacy = guard.get("privacy")
+                if (
+                    guard.get("schema_version") != 1
+                    or guard.get("classification") != "yfc-worker-guard-report"
+                    or guard.get("blocked") is not False
+                    or not isinstance(privacy, Mapping)
+                    or any(
+                        privacy.get(key) is not False
+                        for key in (
+                            "raw_prompts_stored",
+                            "raw_commands_stored",
+                            "raw_tool_arguments_stored",
+                            "raw_tool_results_stored",
+                        )
+                    )
+                ):
+                    raise TaskSessionError(
+                        "Prior worker guard evidence is not a clean terminal run"
+                    )
+                terminal = False
+                for line in lines:
+                    try:
+                        event = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(event, Mapping) and event.get("type") == "turn.completed":
+                        terminal = True
+                if not terminal:
+                    continue
+                attempts.append(
+                    (
+                        attempt_root.stat().st_mtime_ns,
+                        attempt_root,
+                        {
+                            "final_path": str(final_path.resolve()),
+                            "events_path": str(events_path.resolve()),
+                            "events_sha256": hashlib.sha256(events_path.read_bytes()).hexdigest(),
+                            "guard_path": str(guard_path.resolve()),
+                            "guard_sha256": hashlib.sha256(guard_path.read_bytes()).hexdigest(),
+                            "terminal_event": "turn.completed",
+                            "guard_blocked": False,
+                        },
+                    )
+                )
+        if not attempts:
+            raise TaskSessionError(
+                "HUMAN_REQUIRED: prior worker has no reconciled terminal events and guard evidence"
+            )
+        if self.repository.status(worktree) or self._guard_ignored_paths(worktree):
+            raise TaskSessionError("Verified no-op retry refuses product worktree mutation")
+        if self.repository.unique_commits(
+            str(self.repository.current_branch(cwd=worktree) or ""), base=base_sha
+        ):
+            raise TaskSessionError("Verified no-op retry refuses unique task commits")
+        attempt = max(attempts, key=lambda item: item[0])
+        return {
+            "agent_flow_path": str(plan_path.resolve()),
+            "agent_flow_hash": hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+            "roles": ["researcher"],
+            "terminal_result": "completed",
+            "source_mutation": False,
+            "unique_commits": 0,
+            "delivery_attempt": attempt[2],
+        }
+
+    def retry_noop_worker(
+        self,
+        task_id: str,
+        *,
+        control_issue_number: int,
+        reason: str,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        """Prepare the one owner-authorized retry for a verified read-only worker run."""
+
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError("Verified no-op retry requires explicit owner authorization")
+        if type(control_issue_number) is not int or control_issue_number < 1:
+            raise TaskSessionError("Verified no-op retry requires a valid control Issue number")
+        normalized_reason = reason.strip() if isinstance(reason, str) else ""
+        if not normalized_reason or len(normalized_reason) > 1024:
+            raise TaskSessionError("Verified no-op retry reason must be bounded and non-empty")
+        if self.github is None:
+            raise TaskSessionError("Verified no-op retry requires online GitHub state")
+        self.store.initialize()
+        lease_path = self.store.task_lease_path(expected)
+        with self.store.lock():
+            leases = self.store.all_leases()
+            matching = [
+                item
+                for item in leases
+                if isinstance(item.get("task_id"), str)
+                and item.get("task_id", "").upper() == expected
+            ]
+            lease = self.store.read_json(lease_path)
+            if len(matching) != 1 or matching[0] != lease or not isinstance(lease, dict):
+                raise TaskSessionError(f"Task {expected} has an ambiguous task lease")
+            if (
+                lease.get("mode") != "write"
+                or lease.get("owner_launch") is not True
+                or self._lease_state(lease) != "implementation"
+                or lease.get("queue_mode") is True
+            ):
+                raise TaskSessionError(
+                    "Verified no-op retry requires one active implementation write lease"
+                )
+            existing_retry = lease.get("worker_retry")
+            if isinstance(existing_retry, Mapping):
+                retry_attempts = existing_retry.get("launch_attempts")
+                retry_count = (
+                    len(retry_attempts)
+                    if isinstance(retry_attempts, list)
+                    else NOOP_WORKER_RETRY_MAX
+                )
+                if (
+                    retry_count >= NOOP_WORKER_RETRY_MAX
+                    or existing_retry.get("classification") == NOOP_WORKER_RETRY_CLASSIFICATION
+                ):
+                    raise TaskSessionError(
+                        "HUMAN_REQUIRED: verified no-op routing retry budget was already used"
+                    )
+                raise TaskSessionError(
+                    "HUMAN_REQUIRED: task has an unreconciled worker retry audit"
+                )
+            if lease.get("preimplementation_resume") is not None:
+                raise TaskSessionError(
+                    "HUMAN_REQUIRED: task has an unreconciled pre-implementation resume"
+                )
+            self._reject_shared_task_lease_identity(expected, lease, leases)
+            document = find_task_document(self._canonical_root(), expected)
+            if (
+                not document.executable
+                or "blocked" in document.status.lower()
+                or "заблок" in document.status.lower()
+                or Path(str(lease.get("canonical_task_path", ""))).resolve()
+                != document.path.resolve()
+                or lease.get("target_base_branch") != TARGET_BASE_BRANCH
+                or self._validated_lease_concurrency_class(lease) != document.concurrency_class
+                or lease.get("integration_policy") != document.integration_policy
+            ):
+                raise TaskSessionError(
+                    "Task document or metadata no longer matches the active lease"
+                )
+            branch = str(lease.get("branch", ""))
+            worktree = Path(str(lease.get("worktree", ""))).resolve()
+            if task_id_from_branch(branch) != expected:
+                raise TaskSessionError("Task lease branch does not match its task ID")
+            matches = [item for item in self.repository.worktrees() if item.path == worktree]
+            if len(matches) != 1 or matches[0].branch != branch:
+                raise TaskSessionError("Task branch/worktree identity is ambiguous")
+            local_branches = [
+                str(item["branch"])
+                for item in self.repository.local_branches()
+                if isinstance(item.get("branch"), str)
+                and str(item["branch"]).startswith(f"task/{expected}-")
+            ]
+            if local_branches != [branch]:
+                raise TaskSessionError("Task has duplicate or ambiguous local task branches")
+            if self.repository.current_branch(cwd=worktree) != branch:
+                raise TaskSessionError("Task worktree is not on its registered branch")
+            if self.repository.operation_issues(worktree):
+                raise TaskSessionError("Task worktree has an interrupted Git operation")
+            if self.repository.status(worktree) or self._guard_ignored_paths(worktree):
+                raise TaskSessionError("Verified no-op retry requires a clean task worktree")
+            head = self.repository.head(cwd=worktree)
+            branch_head = self.repository.ref(f"refs/heads/{branch}")
+            if head != branch_head:
+                raise TaskSessionError("Task worktree HEAD does not match its branch ref")
+            history_path = self.store.history / f"task-{expected}.json"
+            if self.store.read_json(history_path) is not None:
+                raise TaskSessionError(
+                    "Verified no-op retry refuses a task with production history"
+                )
+            if any(
+                lease.get(field) is not None
+                for field in ("ready_head_sha", "pr_number", "merge_sha", "deployed_sha")
+            ):
+                raise TaskSessionError("Verified no-op retry refuses delivery or merge provenance")
+            if self.store.delivery_state().get("owner") is not None:
+                raise TaskSessionError("Verified no-op retry requires no delivery ownership")
+            if self._preimplementation_worker_state_paths(expected):
+                raise TaskSessionError("Verified no-op retry refuses unreconciled worker state")
+            open_prs = [
+                item
+                for item in self._github().open_pull_requests()
+                if isinstance(item.get("head"), Mapping) and item["head"].get("ref") == branch
+            ]
+            if open_prs:
+                raise TaskSessionError("Verified no-op retry refuses an open task pull request")
+
+            issue = self._github().api(f"issues/{control_issue_number}")
+            if (
+                not isinstance(issue, Mapping)
+                or issue.get("number") != control_issue_number
+                or "pull_request" in issue
+                or str(issue.get("state", "")).lower() != "open"
+            ):
+                raise TaskSessionError("Verified no-op retry requires the matching open task Issue")
+            owner = normalize_github_login(self._github().repo_slug.split("/", maxsplit=1)[0])
+            author = issue.get("user")
+            if (
+                not isinstance(author, Mapping)
+                or normalize_github_login(str(author.get("login", ""))) != owner
+            ):
+                raise TaskSessionError("Task Issue must be authored by the repository owner")
+            try:
+                contract = parse_task_contract(str(issue.get("body", "")))
+            except IssueWorkflowError as error:
+                raise TaskSessionError(f"Task Issue contract is malformed: {error}") from error
+            if not isinstance(contract, Mapping) or contract.get("task_id") != expected:
+                raise TaskSessionError("Task Issue has no matching machine-readable contract")
+            expected_source = document.path.resolve().relative_to(self._canonical_root()).as_posix()
+            if contract.get("source_spec") != expected_source:
+                raise TaskSessionError(
+                    "Task Issue source does not match the registered task document"
+                )
+            issue_dependencies = _resolved_dependency_ids(
+                contract.get("dependencies"), document.dependencies
+            )
+            document_dependencies = tuple(dict.fromkeys(document.dependencies))
+            if issue_dependencies != document_dependencies:
+                raise TaskSessionError("Issue and task document dependencies do not match")
+            lease_dependencies = lease.get("dependency_ids")
+            if not isinstance(lease_dependencies, list):
+                raise TaskSessionError("Active lease dependency metadata is malformed")
+            if tuple(lease_dependencies) not in {document_dependencies, ()}:
+                raise TaskSessionError(
+                    "Active lease dependency metadata conflicts with the task contract"
+                )
+            missing = sorted(set(issue_dependencies) - self._completed_dependency_ids())
+            if missing:
+                raise TaskSessionError("Task has incomplete dependencies: " + ", ".join(missing))
+            owner_gate = normalize_owner_gate(str(contract.get("owner_gate", "")))
+            if contract.get("risk_lane") == "RED" or task_risk_lane(owner_gate) == "RED":
+                raise TaskSessionError(
+                    "Task Issue owner gate requires a separate human or external gate"
+                )
+            if str(contract.get("issue_state", "queued")).lower() not in {"queued", "in_progress"}:
+                raise TaskSessionError("Task Issue contract is not runnable")
+            try:
+                control_state = latest_control_state(
+                    self._github().issue_comments(control_issue_number),
+                    task_id=expected,
+                    authorized_logins=(owner,),
+                )
+            except IssueWorkflowError as error:
+                raise TaskSessionError(f"Task control state is malformed: {error}") from error
+            if control_state is not None:
+                if control_state.get("state") not in {"in_progress", "human_required"}:
+                    raise TaskSessionError(
+                        "Verified no-op retry requires an executable control state"
+                    )
+                if (
+                    control_state.get("issue_number") != control_issue_number
+                    or control_state.get("branch") != branch
+                    or control_state.get("pr_number") is not None
+                    or control_state.get("head_sha") is not None
+                ):
+                    raise TaskSessionError("Latest control state does not match the retry lease")
+                if control_state.get("state") == "human_required":
+                    blocker = str(control_state.get("blocker", "")).lower()
+                    if not any(
+                        token in blocker
+                        for token in ("no-op", "no op", "routing", "read-only", "read only")
+                    ):
+                        raise TaskSessionError(
+                            "Latest human_required state is unrelated to this retry"
+                        )
+
+            self.repository.fetch_origin_master(cwd=self._canonical_root(), prune=False)
+            current_origin = self.repository.ref("origin/master")
+            if self._github().branch_head(TARGET_BASE_BRANCH) != current_origin:
+                raise TaskSessionError("origin/master is not synchronized with protected master")
+            if not self.repository.is_ancestor(
+                head, current_origin
+            ) and not self.repository.is_ancestor(current_origin, head):
+                raise TaskSessionError(
+                    "Task HEAD is not in a safe ancestry relation with origin/master"
+                )
+            if head != current_origin:
+                self.repository.fast_forward_current(current_origin, cwd=worktree)
+                if self.repository.ref(f"refs/heads/{branch}") != current_origin:
+                    raise TaskSessionError("Task branch did not fast-forward to origin/master")
+                head = current_origin
+            base_sha = str(lease.get("base_origin_master_sha", current_origin))
+            if re.fullmatch(r"[0-9a-f]{40}", base_sha) is None:
+                raise TaskSessionError("Active lease base SHA is malformed")
+            prior = self._verified_noop_worker_evidence(expected, worktree, base_sha)
+            try:
+                current_plan = build_agent_flow_from_path(
+                    expected, document.path, issue_contract=contract
+                )
+            except AgentFlowError as error:
+                raise TaskSessionError(f"Current Agent Flow routing failed: {error}") from error
+            roles = [
+                item.get("name")
+                for item in current_plan.get("worker_role_passes", [])
+                if isinstance(item, Mapping)
+            ]
+            if (
+                "implementer" not in roles
+                or current_plan.get("execution", {}).get("production_writer") != "implementer"
+            ):
+                raise TaskSessionError(
+                    "HUMAN_REQUIRED: corrected Agent Flow is not implementation-capable"
+                )
+            current_plan_bytes = json.dumps(
+                current_plan, ensure_ascii=False, indent=2, sort_keys=True
+            ).encode("utf-8")
+            current_plan_hash = hashlib.sha256(current_plan_bytes).hexdigest()
+            if current_plan_hash == prior["agent_flow_hash"]:
+                raise TaskSessionError(
+                    "Corrected Agent Flow did not differ from the prior read-only plan"
+                )
+            retry_evidence_path = ArtifactManager(
+                self._canonical_root() / ".artifacts", repo_root=self._canonical_root()
+            ).allocate(
+                expected,
+                "evidence",
+                Path("evidence")
+                / "agent-flow"
+                / f"retry-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.json",
+                purpose="recomputed Agent Flow for verified no-op worker retry",
+                command="scripts/task_session.py retry-noop-worker",
+                owner="task_session",
+                create=False,
+            )
+            retry_evidence_path.write_bytes(current_plan_bytes + b"\n")
+            dependency_reconciliation = None
+            if tuple(lease_dependencies) == () and document_dependencies:
+                dependency_reconciliation = {
+                    "previous": [],
+                    "authoritative": list(document_dependencies),
+                    "classification": "omitted_at_initial_queue_start",
+                    "verified_completed": list(document_dependencies),
+                    "owner_authorized": True,
+                    "reconciled_at": utc_now(),
+                }
+                lease["dependency_ids"] = list(document_dependencies)
+                lease["dependency_source"] = "github-issue-reconciled"
+            timestamp = utc_now()
+            worker_retry = {
+                "version": 1,
+                "classification": NOOP_WORKER_RETRY_CLASSIFICATION,
+                "owner_authorized": True,
+                "reason": normalized_reason,
+                "prior_attempt": prior,
+                "corrected_plan": {
+                    "path": str(retry_evidence_path.resolve()),
+                    "roles": roles,
+                    "agent_flow_hash": current_plan_hash,
+                },
+                "dependency_reconciliation": dependency_reconciliation,
+                "prepared_at": timestamp,
+                "launch_attempts": [],
+            }
+            resume_event = {
+                "version": 1,
+                "state": "prepared",
+                "classification": NOOP_WORKER_RETRY_CLASSIFICATION,
+                "owner_authorized": True,
+                "control_issue_number": control_issue_number,
+                "reason": normalized_reason,
+                "previous_control_state": control_state,
+                "base_sha": current_origin,
+                "head_sha": head,
+                "prepared_at": timestamp,
+                "launch_attempts": [],
+            }
+            lease["worker_retry"] = worker_retry
+            lease["preimplementation_resume"] = resume_event
+            lease["base_origin_master_sha"] = current_origin
+            lease["updated_at"] = timestamp
+            StateStore.replace_json(lease_path, lease)
+            return {
+                "task_id": expected,
+                "lease": dict(lease),
+                "preimplementation_resume": dict(resume_event),
+                "control_state": control_state,
+                "agent_flow": current_plan,
+                "agent_flow_evidence": str(retry_evidence_path),
+                "dependency_reconciliation": dependency_reconciliation,
+                "mutation_performed": True,
+            }
+
     def resume_preimplementation(
         self,
         task_id: str,
@@ -5093,6 +5587,9 @@ class TaskController:
                 allow_transport_failure=isinstance(
                     resume_event.get("transport_interruption_recovery"), Mapping
                 ),
+                allow_verified_noop_retry=(
+                    resume_event.get("classification") == NOOP_WORKER_RETRY_CLASSIFICATION
+                ),
             )
             recovery = resume_event.get("guard_budget_recovery")
             transport_recovery = resume_event.get("transport_interruption_recovery")
@@ -5122,16 +5619,29 @@ class TaskController:
             attempts = resume_event.get("launch_attempts", [])
             if not isinstance(attempts, list) or "launch_id" in resume_event:
                 raise TaskSessionError("Prepared resume has unreconciled launch-attempt state")
+            if resume_event.get("classification") == NOOP_WORKER_RETRY_CLASSIFICATION:
+                retry = lease.get("worker_retry")
+                if (
+                    not isinstance(retry, Mapping)
+                    or retry.get("classification") != NOOP_WORKER_RETRY_CLASSIFICATION
+                ):
+                    raise TaskSessionError("Verified no-op retry audit is missing")
+                if attempts or retry.get("launch_attempts"):
+                    raise TaskSessionError("Verified no-op retry budget was already consumed")
             launch_id = uuid4().hex
             claimed_at = utc_now()
-            attempts.append(
-                {
-                    "launch_id": launch_id,
-                    "state": "launching",
-                    "claimed_at": claimed_at,
-                    "prelaunch_snapshot": self._guard_worktree_snapshot(expected, worktree, head),
-                }
-            )
+            attempt = {
+                "launch_id": launch_id,
+                "state": "launching",
+                "claimed_at": claimed_at,
+                "prelaunch_snapshot": self._guard_worktree_snapshot(expected, worktree, head),
+            }
+            attempts.append(attempt)
+            if resume_event.get("classification") == NOOP_WORKER_RETRY_CLASSIFICATION:
+                retry_attempts = retry.get("launch_attempts")
+                if not isinstance(retry_attempts, list):
+                    raise TaskSessionError("Verified no-op retry launch audit is malformed")
+                retry_attempts.append(dict(attempt))
             resume_event["launch_attempts"] = attempts
             resume_event.update(
                 {
@@ -5200,6 +5710,18 @@ class TaskController:
                     "worker_state_path": str(path),
                 }
             )
+            retry = lease.get("worker_retry")
+            if (
+                isinstance(retry, Mapping)
+                and resume_event.get("classification") == NOOP_WORKER_RETRY_CLASSIFICATION
+            ):
+                retry_attempts = retry.get("launch_attempts")
+                if (
+                    isinstance(retry_attempts, list)
+                    and retry_attempts
+                    and isinstance(retry_attempts[-1], dict)
+                ):
+                    retry_attempts[-1].update(attempts[-1])
             resume_event.pop("launch_id")
             resume_event.pop("launch_claimed_at", None)
             resume_event["state"] = "prepared"
@@ -5286,6 +5808,18 @@ class TaskController:
                     "worker_state_path": str(path),
                 }
             )
+            retry = lease.get("worker_retry")
+            if (
+                isinstance(retry, Mapping)
+                and resume_event.get("classification") == NOOP_WORKER_RETRY_CLASSIFICATION
+            ):
+                retry_attempts = retry.get("launch_attempts")
+                if (
+                    isinstance(retry_attempts, list)
+                    and retry_attempts
+                    and isinstance(retry_attempts[-1], dict)
+                ):
+                    retry_attempts[-1].update(attempts[-1])
             resume_event.update(
                 {
                     "state": "worker-started",
@@ -8798,6 +9332,11 @@ def _parser() -> argparse.ArgumentParser:
     resume.add_argument("--control-issue", type=int, required=True)
     resume.add_argument("--reason", required=True)
     resume.add_argument("--owner-authorize", action="store_true")
+    retry_noop = subparsers.add_parser("retry-noop-worker")
+    retry_noop.add_argument("task_id")
+    retry_noop.add_argument("--control-issue", type=int, required=True)
+    retry_noop.add_argument("--reason", required=True)
+    retry_noop.add_argument("--owner-authorize", action="store_true")
     guard_resume = subparsers.add_parser("resume-guard-interrupted")
     guard_resume.add_argument("task_id")
     guard_resume.add_argument("--control-issue", type=int, required=True)
@@ -8939,6 +9478,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "resume-preimplementation":
             _print(
                 controller.resume_preimplementation(
+                    args.task_id,
+                    control_issue_number=args.control_issue,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            )
+            return 0
+        if args.command == "retry-noop-worker":
+            _print(
+                controller.retry_noop_worker(
                     args.task_id,
                     control_issue_number=args.control_issue,
                     reason=args.reason,

@@ -349,6 +349,120 @@ def _prepare_preimplementation_resume(
     )
 
 
+def test_verified_noop_retry_reconciles_omitted_dependency_and_preserves_lease(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    task_path = _write_task(root, "508", "synthetic-task")
+    task_path.write_text(
+        task_path.read_text(encoding="utf-8")
+        + "\n- **Основная роль:** `implementer`\n"
+        + "- **Дополнительные роли lifecycle:** `qa-verifier`\n"
+        + "Depends on: #507\n",
+        encoding="utf-8",
+    )
+    done = root / "codex-backlog" / "tasks" / "done"
+    done.mkdir(parents=True, exist_ok=True)
+    (done / "507-terminal.md").write_text("terminal\n", encoding="utf-8")
+    github = FakeGitHub(git_repository.ref("origin/master"))
+    controller = task_session.TaskController(git_repository, github=github)
+    started = controller.start("508", owner_launch=True, session_label="retry-test", offline=True)
+    assert started["lease"]["dependency_ids"] == ["507"]
+    lease_path = controller.store.task_lease_path("508")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["dependency_ids"] = []
+    controller.store.replace_json(lease_path, lease)
+    attempt = (
+        root
+        / ".artifacts"
+        / "tasks"
+        / "508"
+        / "temporary"
+        / "delivery"
+        / "20260930T000000000000Z-delivery"
+    )
+    attempt.mkdir(parents=True)
+    (attempt / "final.md").write_text("read-only worker\n", encoding="utf-8")
+    (attempt / "events.jsonl").write_text('{"type":"turn.completed"}\n', encoding="utf-8")
+    (attempt / "worker-guard.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "classification": "yfc-worker-guard-report",
+                "blocked": False,
+                "privacy": {
+                    "raw_prompts_stored": False,
+                    "raw_commands_stored": False,
+                    "raw_tool_arguments_stored": False,
+                    "raw_tool_results_stored": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    flow = root / ".artifacts" / "tasks" / "508" / "evidence" / "agent-flow"
+    flow.mkdir(parents=True, exist_ok=True)
+    (flow / "old.json").write_text(
+        json.dumps(
+            {
+                "classification": "yfc-agent-flow-plan",
+                "task_id": "508",
+                "routing": {"explicit_role_contract": False},
+                "execution": {"production_writer": None},
+                "worker_role_passes": [{"name": "researcher"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    issue_number = 508
+    github.issues[issue_number] = {
+        "number": issue_number,
+        "state": "open",
+        "user": {"login": "owner"},
+        "body": render_task_contract(
+            {
+                "version": 1,
+                "task_id": "508",
+                "scope": "synthetic implementation",
+                "acceptance": ["works"],
+                "dependencies": ["507"],
+                "owner_gate": "owner_launch",
+                "risk_lane": "GREEN",
+                "source_spec": "codex-backlog/tasks/508-synthetic-task.md",
+                "issue_state": "queued",
+            }
+        ),
+    }
+    github.issue_comment_map[issue_number] = []
+    result = controller.retry_noop_worker(
+        "508",
+        control_issue_number=issue_number,
+        reason="retry after corrected Agent Flow routing; previous worker completed read-only with zero product mutation",
+        owner_authorize=True,
+    )
+    assert result["dependency_reconciliation"]["previous"] == []
+    assert result["dependency_reconciliation"]["authoritative"] == ["507"]
+    assert [item["name"] for item in result["agent_flow"]["worker_role_passes"]] == [
+        "implementer",
+        "qa-verifier",
+    ]
+    preserved = controller.store.read_json(lease_path)
+    assert preserved["dependency_ids"] == ["507"]
+    assert (
+        preserved["worker_retry"]["classification"] == task_session.NOOP_WORKER_RETRY_CLASSIFICATION
+    )
+    claimed = controller.claim_preimplementation_worker_launch("508")
+    assert claimed["preimplementation_resume"]["state"] == "launching"
+    with pytest.raises(task_session.TaskSessionError, match="retry budget"):
+        controller.retry_noop_worker(
+            "508",
+            control_issue_number=issue_number,
+            reason="second retry",
+            owner_authorize=True,
+        )
+
+
 def _record_codex_cli_argument_failure(
     controller: Any,
     root: Path,

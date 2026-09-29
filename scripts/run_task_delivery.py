@@ -2117,6 +2117,7 @@ def _start(
     resume_reason: str | None = None,
     resume_guard_interrupted: bool = False,
     resume_transport_interrupted: bool = False,
+    retry_noop_worker: bool = False,
 ) -> dict[str, Any]:
     deadline = time.monotonic() + max_wait_minutes * 60
     if resume_control_issue is not None:
@@ -2130,12 +2131,16 @@ def _start(
             "--repo",
             str(REPOSITORY_ROOT),
             (
-                "resume-transport-interrupted"
-                if resume_transport_interrupted
+                "retry-noop-worker"
+                if retry_noop_worker
                 else (
-                    "resume-guard-interrupted"
-                    if resume_guard_interrupted
-                    else "resume-preimplementation"
+                    "resume-transport-interrupted"
+                    if resume_transport_interrupted
+                    else (
+                        "resume-guard-interrupted"
+                        if resume_guard_interrupted
+                        else "resume-preimplementation"
+                    )
                 )
             ),
             task_id,
@@ -3693,6 +3698,7 @@ def _deliver_one(
     resume_reason: str | None = None,
     resume_guard_interrupted: bool = False,
     resume_transport_interrupted: bool = False,
+    retry_noop_worker: bool = False,
 ) -> dict[str, Any]:
     if (resume_guard_interrupted or resume_transport_interrupted) and (
         resume_reason is None or control_issue is None
@@ -3700,8 +3706,10 @@ def _deliver_one(
         raise DeliveryError(
             "HUMAN_REQUIRED: interrupted-worker resume requires --control-issue and --resume-reason"
         )
-    if resume_reason is not None and control_issue is None:
+    if (resume_reason is not None or retry_noop_worker) and control_issue is None:
         raise DeliveryError("HUMAN_REQUIRED: pre-implementation resume requires --control-issue")
+    if retry_noop_worker and (resume_guard_interrupted or resume_transport_interrupted):
+        raise DeliveryError("Verified no-op retry cannot combine with another recovery mode")
     started = _start(
         task_id,
         session_label=session_label,
@@ -3714,14 +3722,24 @@ def _deliver_one(
             else None
         ),
         queue_mode=issue_contract is not None,
-        resume_control_issue=control_issue if resume_reason is not None else None,
+        resume_control_issue=control_issue
+        if (resume_reason is not None or retry_noop_worker)
+        else None,
         resume_reason=resume_reason,
         resume_guard_interrupted=resume_guard_interrupted,
         resume_transport_interrupted=resume_transport_interrupted,
+        retry_noop_worker=retry_noop_worker,
     )
     status_issue = state_issue or control_issue
-    resumed_worker = resume_reason is not None
-    if resumed_worker:
+    resumed_worker = resume_reason is not None or retry_noop_worker
+    if resumed_worker and retry_noop_worker:
+        if started.get("control_state") is not None and not isinstance(
+            started.get("control_state"), Mapping
+        ):
+            raise DeliveryError(
+                "HUMAN_REQUIRED: verified no-op retry has no verified control state"
+            )
+    elif resumed_worker:
         control_state = started.get("control_state")
         if not isinstance(control_state, Mapping):
             raise DeliveryError("HUMAN_REQUIRED: resumed task has no verified control state")
@@ -4251,6 +4269,7 @@ def _parser() -> argparse.ArgumentParser:
     resume_group.add_argument("--resume-preimplementation", action="store_true")
     resume_group.add_argument("--resume-guard-interrupted", action="store_true")
     resume_group.add_argument("--resume-transport-interrupted", action="store_true")
+    resume_group.add_argument("--retry-noop-worker", action="store_true")
     parser.add_argument("--resume-reason")
     parser.add_argument("--max-tasks", type=int, default=4)
     parser.add_argument("--offline", action="store_true", help=argparse.SUPPRESS)
@@ -4318,6 +4337,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.resume_preimplementation
                 or args.resume_guard_interrupted
                 or args.resume_transport_interrupted
+                or args.retry_noop_worker
                 or args.resume_reason is not None
             ):
                 raise DeliveryError("continuous queue mode does not support task resume")
@@ -4333,22 +4353,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         if args.task_id is None:
             raise DeliveryError("a task ID is required unless --continue-queue is selected")
-        if (
+        recovery_mode = (
             args.resume_preimplementation
             or args.resume_guard_interrupted
             or args.resume_transport_interrupted
-        ) and (args.control_issue is None or not args.resume_reason or args.offline):
+            or args.retry_noop_worker
+        )
+        if args.retry_noop_worker and not args.owner_authorize:
+            raise DeliveryError("Verified no-op retry requires --owner-authorize")
+        if recovery_mode and (args.control_issue is None or not args.resume_reason or args.offline):
             raise DeliveryError(
                 "pre-implementation resume requires --control-issue, --resume-reason and online mode"
             )
-        if (
-            not (
-                args.resume_preimplementation
-                or args.resume_guard_interrupted
-                or args.resume_transport_interrupted
-            )
-            and args.resume_reason is not None
-        ):
+        if not recovery_mode and args.resume_reason is not None:
             raise DeliveryError("--resume-reason requires a resume mode")
         task_id = _normalize_task_id(args.task_id)
         session_label = args.session_label or f"delivery-task-{task_id.lower()}"
@@ -4360,17 +4377,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             offline=args.offline,
             control_issue=args.control_issue,
             state_issue=args.control_issue,
-            resume_reason=(
-                args.resume_reason
-                if (
-                    args.resume_preimplementation
-                    or args.resume_guard_interrupted
-                    or args.resume_transport_interrupted
-                )
-                else None
-            ),
+            resume_reason=(args.resume_reason if recovery_mode else None),
             resume_guard_interrupted=args.resume_guard_interrupted,
             resume_transport_interrupted=args.resume_transport_interrupted,
+            retry_noop_worker=args.retry_noop_worker,
         )
         return 0
     except (DeliveryError, IssueWorkflowError, OSError) as error:
