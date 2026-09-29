@@ -10,6 +10,7 @@ from scripts.issue_workflow import (
     control_state_payload,
     latest_control_state,
     normalize_github_login,
+    normalize_owner_gate,
     parse_control_state_comment,
     parse_queue_budget_report,
     parse_task_contract,
@@ -159,6 +160,19 @@ def test_severity_and_risk_mapping_preserve_stricter_gates() -> None:
     assert task_risk_lane("none") == "GREEN"
     assert task_risk_lane("manual-visual-approval") == "RED"
     assert task_risk_lane("owner-checkpoint") == "YELLOW"
+
+
+@pytest.mark.parametrize(
+    ("raw", "normalized"),
+    (
+        ("owner-launch", "owner_launch"),
+        (" OWNER_LAUNCH ", "owner_launch"),
+        ("owner-launch: Browser approval", "owner_launch:Browser approval"),
+    ),
+)
+def test_owner_gate_normalization_unifies_historical_spellings(raw: str, normalized: str) -> None:
+    assert normalize_owner_gate(raw) == normalized
+    assert task_risk_lane(raw) == "GREEN"
 
 
 def test_task_issue_contract_round_trip_preserves_dependencies_and_acceptance() -> None:

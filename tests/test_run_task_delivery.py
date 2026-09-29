@@ -3697,6 +3697,107 @@ def _configure_owner_reconcile(
     return claim_path, worktree, lease
 
 
+def _configure_prelease_reconcile(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    leases: list[dict[str, Any]] | None = None,
+    process_lines: list[tuple[int, str]] | None = None,
+) -> tuple[Path, Any, dict[str, Any]]:
+    common_root = tmp_path / "git-common"
+    current_leases = leases if leases is not None else []
+    history_root = common_root / "codex-task-sessions-v1" / "history"
+
+    class FakeRepository:
+        def __init__(self, root: Path) -> None:
+            del root
+
+        def worktrees(self) -> list[SimpleNamespace]:
+            return []
+
+        def local_branches(self) -> list[dict[str, str]]:
+            return []
+
+        def operation_issues(self, path: Path) -> list[str]:
+            del path
+            return []
+
+        def git(self, *args: str, **kwargs: Any) -> str:
+            del args, kwargs
+            return ""
+
+    FakeRepository.common_dir = common_root
+    FakeRepository.repository_root = tmp_path
+    FakeRepository.current_worktree = tmp_path
+
+    class FakeStore:
+        history = history_root
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return current_leases
+
+        def delivery_state(self) -> dict[str, Any]:
+            return {"owner": None}
+
+        def lock(self) -> Any:
+            return nullcontext()
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+    task_issue = {
+        "number": 507,
+        "state": "OPEN",
+        "title": "[Task 507] Product v4",
+        "user": {"login": "MikeMoore1337"},
+    }
+    task_state = delivery.control_state_payload(task_id="507", state="queued", issue_number=507)
+    comments = [
+        {
+            "id": 1,
+            "created_at": "2026-09-29T10:03:00Z",
+            "user": {"login": "MikeMoore1337"},
+            "body": delivery.render_control_state_comment(task_state),
+        }
+    ]
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_root)
+    monkeypatch.setattr(delivery, "GitRepository", FakeRepository)
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("MikeMoore1337",))
+    monkeypatch.setattr(
+        delivery,
+        "_queue_authorization_snapshot",
+        lambda issue: ({"number": issue, "state": "OPEN"}, [], {"active": True}),
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_control_issue_snapshot",
+        lambda issue: (task_issue, comments) if issue == 507 else ({"number": issue}, []),
+    )
+    monkeypatch.setattr(delivery, "_open_task_pull_requests", lambda task_id: [])
+    monkeypatch.setattr(delivery, "_queue_owner_is_alive", lambda pid, identity: False)
+    monkeypatch.setattr(
+        delivery,
+        "_running_process_command_lines",
+        lambda: process_lines or [],
+        raising=False,
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_record_queue_reconciliation_evidence",
+        lambda **kwargs: kwargs,
+        raising=False,
+    )
+    claim_path, _ = _owner_reconcile_claim(
+        common_root, task_id="507", task_issue=507, control_issue=567
+    )
+    return claim_path, FakeStore(), current_leases
+
+
 def test_owner_reconcile_cli_contract_is_explicit() -> None:
     args = delivery._parser().parse_args(
         [
@@ -3917,3 +4018,172 @@ def test_owner_reconcile_allows_fresh_queue_claim_after_reclaim(
         assert json.loads(claim_path.read_text(encoding="utf-8"))["queue_phase"] == "idle"
 
     assert not claim_path.exists()
+
+
+def test_owner_reconcile_recovers_verified_prelease_start_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, _, leases = _configure_prelease_reconcile(monkeypatch, tmp_path)
+    evidence: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        delivery,
+        "_record_queue_reconciliation_evidence",
+        lambda **kwargs: evidence.append(kwargs) or "prelease-evidence.json",
+    )
+
+    result = delivery._reconcile_interrupted_queue_claim(
+        "507",
+        control_issue=567,
+        reason="reconcile verified pre-lease start failure",
+        owner_authorize=True,
+    )
+
+    assert result["classification"] == "pre_lease_start_failure"
+    assert not claim_path.exists()
+    assert leases == []
+    assert evidence[0]["classification"] == "pre_lease_start_failure"
+    assert evidence[0]["reconciliation"]["lease_count"] == 0
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    (
+        ("lease", "acquired"),
+        ("history", "production/history"),
+        ("worker_state", "worker-state"),
+        ("branch", "local branch"),
+        ("delivery", "delivery lane"),
+    ),
+)
+def test_owner_reconcile_prelease_rereads_all_safety_evidence_before_reclaim(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    claim_path, store, leases = _configure_prelease_reconcile(monkeypatch, tmp_path)
+    original_all_leases = store.all_leases
+    calls = 0
+
+    if mutation == "lease":
+        lease = {
+            "task_id": "507",
+            "mode": "write",
+            "lifecycle_state": "implementation",
+            "queue_mode": True,
+        }
+
+        def lease_after_first() -> list[dict[str, Any]]:
+            nonlocal calls
+            calls += 1
+            return [] if calls == 1 else [lease]
+
+        monkeypatch.setattr(type(store), "all_leases", lambda self: lease_after_first())
+    elif mutation == "history":
+        history_path = (
+            tmp_path / "git-common" / "codex-task-sessions-v1" / "history" / "task-507.json"
+        )
+        history_path.parent.mkdir(parents=True)
+        history_path.write_text("{}", encoding="utf-8")
+    elif mutation == "worker_state":
+        monkeypatch.setattr(
+            delivery,
+            "_task_worker_state_evidence",
+            lambda task_id: [str(tmp_path / "worker-state.json")],
+        )
+    elif mutation == "branch":
+        fake_branch = {"branch": "task/507-product-v4"}
+        monkeypatch.setattr(
+            delivery.GitRepository,
+            "local_branches",
+            lambda self: [fake_branch],
+        )
+    elif mutation == "delivery":
+        monkeypatch.setattr(
+            type(store),
+            "delivery_state",
+            lambda self: {"owner": {"task_id": "507"}},
+        )
+    else:
+        raise AssertionError(mutation)
+
+    with pytest.raises(delivery.DeliveryError, match=message):
+        delivery._reconcile_interrupted_queue_claim(
+            "507",
+            control_issue=567,
+            reason="reconcile verified pre-lease start failure",
+            owner_authorize=True,
+        )
+
+    assert claim_path.exists()
+    assert original_all_leases() == leases
+
+
+def test_owner_reconcile_prelease_refuses_live_worker_and_nonqueued_task(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, _, _ = _configure_prelease_reconcile(
+        monkeypatch,
+        tmp_path,
+        process_lines=[
+            (3102, "python scripts/run_task_delivery.py --worker-supervisor --task 507")
+        ],
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="live"):
+        delivery._reconcile_interrupted_queue_claim(
+            "507", control_issue=567, reason="resume stale queue", owner_authorize=True
+        )
+    assert claim_path.exists()
+
+    claim_path.unlink()
+    claim_path, _, _ = _configure_prelease_reconcile(monkeypatch, tmp_path)
+    task_issue, comments = delivery._control_issue_snapshot(507)
+    in_progress = delivery.control_state_payload(
+        task_id="507", state="in_progress", issue_number=507
+    )
+    comments[:] = [
+        {
+            "id": 2,
+            "created_at": "2026-09-29T10:04:00Z",
+            "user": {"login": "MikeMoore1337"},
+            "body": delivery.render_control_state_comment(in_progress),
+        }
+    ]
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: (task_issue, comments))
+
+    with pytest.raises(delivery.DeliveryError, match="latest state queued"):
+        delivery._reconcile_interrupted_queue_claim(
+            "507", control_issue=567, reason="resume stale queue", owner_authorize=True
+        )
+    assert claim_path.exists()
+
+
+def test_owner_reconcile_prelease_refuses_live_queue_owner(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, _, _ = _configure_prelease_reconcile(monkeypatch, tmp_path)
+    monkeypatch.setattr(delivery, "_queue_owner_is_alive", lambda pid, identity: True)
+
+    with pytest.raises(delivery.DeliveryError, match="owner PID 424242 is still live"):
+        delivery._reconcile_interrupted_queue_claim(
+            "507", control_issue=567, reason="resume stale queue", owner_authorize=True
+        )
+    assert claim_path.exists()
+
+
+def test_owner_reconcile_prelease_refuses_open_task_pull_request(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    claim_path, _, _ = _configure_prelease_reconcile(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        delivery,
+        "_open_task_pull_requests",
+        lambda task_id: [{"number": 577, "head": {"ref": "task/507-product-v4"}}],
+    )
+
+    with pytest.raises(delivery.DeliveryError, match="open task pull request"):
+        delivery._reconcile_interrupted_queue_claim(
+            "507", control_issue=567, reason="resume stale queue", owner_authorize=True
+        )
+    assert claim_path.exists()
