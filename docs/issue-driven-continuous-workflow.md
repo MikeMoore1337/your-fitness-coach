@@ -100,6 +100,23 @@ quarantine, повторно сверяется и удаляется, посл�
 повреждённый, изменившийся во время recovery или непроверяемый claim остаётся `HUMAN_REQUIRED`
 и не удаляется автоматически.
 
+### Повтор verified no-op worker
+
+Если worker завершился штатно после read-only Agent Flow и не оставил ни изменений, ни
+уникальных task-коммитов, controller допускает ровно один owner-authorized retry на том же
+implementation lease:
+
+```powershell
+& .\.venv\Scripts\python.exe scripts/task_session.py retry-noop-worker <TASK_ID> `
+  --control-issue <TASK_ID> --reason "corrected Agent Flow routing" --owner-authorize
+```
+
+Операция заново вычисляет Agent Flow из текущей task metadata, проверяет terminal worker evidence,
+clean worktree, отсутствие PR/history/delivery owner и exact dependencies. Она может только
+аудированно восстановить пропущенный список зависимостей, если Issue и task spec совпадают и все
+зависимости уже terminal. Новый `in_progress` публикуется guarded launcher только после durable
+worker-start marker; второй такой retry и любая неоднозначность остаются `HUMAN_REQUIRED`.
+
 Для queue-mode authoritative-счётчики review-fix и CI-fix хранятся в durable controller ledger.
 Перед каждым фактическим fix cycle worker обязан выполнить `record-queue-cycle`; `final.md`
 содержит только проверяемый worker cross-check и не может занизить ledger. Повторная публикация
