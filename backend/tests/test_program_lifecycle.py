@@ -373,6 +373,7 @@ def test_pause_resume_terminate_and_restart_keep_completed_history(client):
             "expected_revision_number": terminated.json()["current_revision_number"],
             "action": "restart",
             "reason": "Начать новый цикл",
+            "restarted_from_program_id": 999999,
         },
     )
     assert restarted.status_code == 200, restarted.text
@@ -399,6 +400,11 @@ def test_pause_resume_terminate_and_restart_keep_completed_history(client):
         assert source_workouts[0].completed_at.isoformat() == completed_at
         assert all(workout.status == "cancelled" for workout in source_workouts[1:])
         assert new_program.restarted_from_program_id == source.id
+        assert new_program.user_id == source.user_id
+        assert db.query(UserProgram.id).filter(
+            UserProgram.id == new_program.restarted_from_program_id,
+            UserProgram.user_id == new_program.user_id,
+        ).one() == (source.id,)
         assert new_program.status == "scheduled"
         assert len(new_workouts) == len(source_workouts)
         assert all(workout.status == "planned" for workout in new_workouts)

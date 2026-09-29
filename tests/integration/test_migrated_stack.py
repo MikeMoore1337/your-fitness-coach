@@ -346,6 +346,25 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
             assert "source_template_exercise_id" not in source_foreign_keys
             assert "source_weekly_prescription_id" not in source_foreign_keys
 
+            lineage_column = next(
+                column
+                for column in inspector.get_columns("user_programs")
+                if column["name"] == "restarted_from_program_id"
+            )
+            assert lineage_column["nullable"] is True
+            lineage_foreign_keys = {
+                column
+                for foreign_key in inspector.get_foreign_keys("user_programs")
+                for column in foreign_key["constrained_columns"]
+            }
+            assert "restarted_from_program_id" not in lineage_foreign_keys
+            lineage_indexes = {
+                column
+                for index in inspector.get_indexes("user_programs")
+                for column in index["column_names"]
+            }
+            assert "restarted_from_program_id" not in lineage_indexes
+
             migration_context = connection.execute(
                 text(
                     "SELECT current_schema(), current_setting('search_path'), "
@@ -380,14 +399,23 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
             )
             revision_check = connection.execute(
                 text(
-                    "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                    "SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint "
                     "WHERE conrelid = 'program_revisions'::regclass "
                     "AND conname = 'ck_program_revisions_change_kind'"
                 )
-            ).scalar_one()
+            ).one()
+            status_check = connection.execute(
+                text(
+                    "SELECT pg_get_constraintdef(oid), convalidated FROM pg_constraint "
+                    "WHERE conrelid = 'user_programs'::regclass "
+                    "AND conname = 'ck_user_programs_status'"
+                )
+            ).one()
             assert migration_context[0] == schema_name, migration_context
             assert migration_context[1].split(",")[0].strip('"') == schema_name, migration_context
-            assert migration_context[2] == "0098_program_lifecycle", migration_context
+            assert migration_context[2] == "0100_program_revision_lifecycle_kind_constraint", (
+                migration_context
+            )
             assert template_schema == schema_name, template_schema
             assert provenance == {
                 "stronglifts-5x5": "SOURCE_ADAPTATION",
@@ -398,8 +426,14 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
                 f"template_count={template_count}; backfill_batch={backfill_batch!r}; "
                 f"provenance={provenance!r}"
             )
-            assert "exercise_replaced" not in revision_check
-            assert "prescription_updated" not in revision_check
+            assert "paused" in status_check[0]
+            assert "terminated" in status_check[0]
+            assert status_check[1] is True
+            assert "program_lifecycle" in revision_check[0]
+            assert "program_restarted" in revision_check[0]
+            assert revision_check[1] is True
+            assert "exercise_replaced" not in revision_check[0]
+            assert "prescription_updated" not in revision_check[0]
     finally:
         schema_engine.dispose()
         with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
@@ -469,7 +503,7 @@ def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -
             ).scalar_one()
             assert "community_unverified" in corrected_constraint
             assert validated is True
-            assert revision == "0098_program_lifecycle"
+            assert revision == "0100_program_revision_lifecycle_kind_constraint"
             connection.commit()
 
         with Session(schema_engine) as session:

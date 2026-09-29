@@ -588,6 +588,7 @@ def apply_program_lifecycle_action(
     now = now_msk_naive()
 
     if payload.action == "restart":
+        _validate_restart_source_owner(program, owner)
         active_other = (
             db.query(UserProgram.id)
             .filter(
@@ -806,6 +807,11 @@ def apply_program_lifecycle_action(
 def _ensure_expected_revision(program: UserProgram, expected_revision_number: int) -> None:
     if program.current_revision_number != expected_revision_number:
         raise ProgramError("Program revision conflict")
+
+
+def _validate_restart_source_owner(program: UserProgram, owner: User) -> None:
+    if program.user_id != owner.id:
+        raise ProgramError("Restart source program must belong to its owner")
 
 
 def _ensure_program_mutable(program: UserProgram) -> None:

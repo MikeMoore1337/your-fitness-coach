@@ -125,6 +125,23 @@ def test_sqlite_stage7_upgrade_from_0092_preserves_expand_contract(
                 if column["name"] in added
             )
 
+        program_columns = {
+            column["name"]: column for column in inspector.get_columns("user_programs")
+        }
+        assert program_columns["restarted_from_program_id"]["nullable"] is True
+        lineage_foreign_keys = {
+            column
+            for foreign_key in inspector.get_foreign_keys("user_programs")
+            for column in foreign_key["constrained_columns"]
+        }
+        assert "restarted_from_program_id" not in lineage_foreign_keys
+        lineage_indexes = {
+            column
+            for index in inspector.get_indexes("user_programs")
+            for column in index["column_names"]
+        }
+        assert "restarted_from_program_id" not in lineage_indexes
+
         source_foreign_keys = {
             column
             for foreign_key in inspector.get_foreign_keys("user_workout_exercises")
