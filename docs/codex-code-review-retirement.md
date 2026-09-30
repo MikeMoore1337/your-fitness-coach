@@ -29,17 +29,17 @@ round state, request/validation commands и comment parser не являются
 Единственное исключение — прямое указание владельца в отдельном сообщении для конкретного PR. Такое
 действие не запускается controller и не меняет normal lifecycle.
 
-## Repository-native Security Review
+## Security Review после retirement
 
-Внешний Codex Security Review остаётся выключен вместе с Codex Code Review. Вместо него каждый PR
-автоматически проходит собственный repository-native Codex Security Review в `diff` mode через
-официальный GitHub Action и YFC threat model. Review read-only, не создаёт отдельного reviewer-agent
-и не вызывает `@codex security review`.
+Внешний Codex Security Review остаётся выключен вместе с Codex Code Review. Автоматический LLM
+review не используется. Каждый PR вместо этого проходит deterministic security jobs: CodeQL,
+runtime dependency audit и Trivy filesystem scan. Они входят в aggregate `checks`, не требуют
+`OPENAI_API_KEY` и не расходуют OpenAI API quota.
 
-Validated `CRITICAL`/`HIGH` findings блокируют aggregate `checks`; `MEDIUM`/`LOW` и
-unvalidated concerns advisory. Missing credential, action failure или malformed structured result
-fail-closed. Dedicated `full` audit остаётся owner-requested. Deterministic security scanners
-остаются отдельным источником evidence.
+Repository-native semantic Security Review через `$security-engineer` сохраняется как
+manual/conditional gate для фактических security-sensitive surfaces и как owner-requested `full`
+audit. Scanner finding является candidate evidence, а не автоматически подтверждённой
+эксплуатируемой уязвимостью.
 
 ## Внешняя настройка
 
