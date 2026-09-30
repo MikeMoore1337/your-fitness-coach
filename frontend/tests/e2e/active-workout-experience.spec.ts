@@ -324,6 +324,35 @@ async function mockActiveWorkout(
         },
       });
     }
+    if (path.endsWith('/programs/exercises/11/history')) {
+      return route.fulfill({
+        json: {
+          exercise_id: 11,
+          exercise_title: 'Жим штанги лёжа',
+          metric_type: 'strength',
+          load_unit: 'kg',
+          last_performed: null,
+          best_authoritative_load: null,
+          estimated_1rm: null,
+          rep_prs: [],
+          windows: [7, 30, 90].map((days) => ({
+            days,
+            period_start: today,
+            period_end: today,
+            performed_session_count: 0,
+            completed_set_count: 0,
+            authoritative_set_count: 0,
+            reps_total: 0,
+            best_authoritative_load_kg: null,
+            estimated_1rm_kg: null,
+          })),
+          recent_sessions: [],
+          progression: [],
+          progression_events: [],
+          history_truncated: false,
+        },
+      });
+    }
     const setMatch = path.match(/\/workouts\/sets\/(\d+)$/);
     if (setMatch) {
       if (failSetPatch) {

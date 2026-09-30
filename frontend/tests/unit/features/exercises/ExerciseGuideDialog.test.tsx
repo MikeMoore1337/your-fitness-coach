@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExerciseGuideDialog } from '../../../../src/features/exercises/ExerciseGuideDialog';
-import type { Exercise } from '../../../../src/shared/api/types';
+import { NavigationProvider } from '../../../../src/shared/navigation/router';
+import type { Exercise, ExerciseHistory } from '../../../../src/shared/api/types';
 
 const fullExercise: Exercise = {
   id: 1,
@@ -130,17 +131,194 @@ const customExercise: Exercise = {
   guide: null,
 };
 
+const history: ExerciseHistory = {
+  exercise_id: 1,
+  exercise_title: fullExercise.title,
+  metric_type: 'strength',
+  load_unit: 'kg',
+  last_performed: {
+    workout_id: 44,
+    workout_title: 'Тренировка спины',
+    performed_on: '2026-09-30',
+    completed_at: '2026-09-30T08:00:00Z',
+  },
+  best_authoritative_load: {
+    value_kg: 80,
+    workout: {
+      workout_id: 44,
+      workout_title: 'Тренировка спины',
+      performed_on: '2026-09-30',
+      completed_at: '2026-09-30T08:00:00Z',
+    },
+    reps: 8,
+  },
+  estimated_1rm: {
+    kind: 'estimated',
+    formula: 'brzycki',
+    value_kg: 99.5,
+    workout: {
+      workout_id: 44,
+      workout_title: 'Тренировка спины',
+      performed_on: '2026-09-30',
+      completed_at: '2026-09-30T08:00:00Z',
+    },
+    reps: 8,
+    load_kg: 80,
+  },
+  rep_prs: [
+    {
+      range_key: '6-10',
+      range_label: '6–10 повторений',
+      min_reps: 6,
+      max_reps: 10,
+      best_reps: 8,
+      best_reps_workout: {
+        workout_id: 44,
+        workout_title: 'Тренировка спины',
+        performed_on: '2026-09-30',
+        completed_at: '2026-09-30T08:00:00Z',
+      },
+      best_load_kg: 80,
+      best_load_workout: {
+        workout_id: 44,
+        workout_title: 'Тренировка спины',
+        performed_on: '2026-09-30',
+        completed_at: '2026-09-30T08:00:00Z',
+      },
+    },
+  ],
+  windows: [
+    {
+      days: 7,
+      period_start: '2026-09-24',
+      period_end: '2026-09-30',
+      performed_session_count: 1,
+      completed_set_count: 2,
+      authoritative_set_count: 2,
+      reps_total: 16,
+      best_authoritative_load_kg: 80,
+      estimated_1rm_kg: 99.5,
+    },
+    {
+      days: 30,
+      period_start: '2026-09-01',
+      period_end: '2026-09-30',
+      performed_session_count: 2,
+      completed_set_count: 4,
+      authoritative_set_count: 4,
+      reps_total: 32,
+      best_authoritative_load_kg: 80,
+      estimated_1rm_kg: 99.5,
+    },
+    {
+      days: 90,
+      period_start: '2026-07-03',
+      period_end: '2026-09-30',
+      performed_session_count: 3,
+      completed_set_count: 6,
+      authoritative_set_count: 6,
+      reps_total: 48,
+      best_authoritative_load_kg: 80,
+      estimated_1rm_kg: 99.5,
+    },
+  ],
+  recent_sessions: [
+    {
+      workout: {
+        workout_id: 44,
+        workout_title: 'Тренировка спины',
+        performed_on: '2026-09-30',
+        completed_at: '2026-09-30T08:00:00Z',
+      },
+      workout_exercise_id: 144,
+      prescribed_reps: '6–10',
+      completed_set_count: 2,
+      authoritative_set_count: 2,
+      reps_total: 16,
+      max_authoritative_load_kg: 80,
+      best_set_volume_kg: 640,
+      estimated_1rm_kg: 99.5,
+      sets: [
+        {
+          set_number: 1,
+          reps: 8,
+          load_kg: 80,
+          volume_kg: 640,
+          rir: '2',
+          set_kind: 'working',
+          planned_role: 'top',
+          analytics_bucket: 'working',
+          pr_eligible: true,
+        },
+      ],
+    },
+  ],
+  progression: [
+    {
+      performed_on: '2026-09-30',
+      workout_id: 44,
+      max_reps: 8,
+      max_authoritative_load_kg: 80,
+      estimated_1rm_kg: 99.5,
+      authoritative_set_count: 2,
+    },
+  ],
+  progression_events: [
+    {
+      event_id: 7,
+      event_kind: 'confirm',
+      proposal_id: 'proposal-44',
+      target_workout_id: 44,
+      exercise_id: 1,
+      rule_id: 'double_progression',
+      rule_kind: 'rep_range',
+      rule_snapshot: { min_reps: 6, max_reps: 10 },
+      source_evidence_ids: ['workout:44'],
+      reason_codes: ['top_range_repeated'],
+      proposed_weight_kg: 82.5,
+      adjusted_weight_kg: null,
+      result: { action: 'confirmed' },
+      created_at: '2026-09-30T08:30:00Z',
+    },
+  ],
+  history_truncated: false,
+};
+
+const customHistory: ExerciseHistory = {
+  ...history,
+  exercise_id: customExercise.id,
+  exercise_title: customExercise.title,
+  last_performed: null,
+  best_authoritative_load: null,
+  estimated_1rm: null,
+  rep_prs: [],
+  windows: history.windows.map((window) => ({
+    ...window,
+    performed_session_count: 0,
+    completed_set_count: 0,
+    authoritative_set_count: 0,
+    reps_total: null,
+    best_authoritative_load_kg: null,
+    estimated_1rm_kg: null,
+  })),
+  recent_sessions: [],
+  progression: [],
+  progression_events: [],
+};
+
 function renderGuide() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <ExerciseGuideDialog
-        exerciseId={fullExercise.id}
-        exerciseTitle={fullExercise.title}
-        onClose={vi.fn()}
-      />
+      <NavigationProvider>
+        <ExerciseGuideDialog
+          exerciseId={fullExercise.id}
+          exerciseTitle={fullExercise.title}
+          onClose={vi.fn()}
+        />
+      </NavigationProvider>
     </QueryClientProvider>,
   );
 }
@@ -154,6 +332,11 @@ describe('ExerciseGuideDialog', () => {
   it('shows reviewed guide metadata and opens an alternative in the same dialog', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const path = String(input);
+      if (path.endsWith('/history')) {
+        return new Response(JSON.stringify(path.includes('/2/history') ? customHistory : history), {
+          status: 200,
+        });
+      }
       const exercise = path.endsWith('/2') ? customExercise : fullExercise;
       return new Response(JSON.stringify(exercise), { status: 200 });
     });
@@ -169,6 +352,15 @@ describe('ExerciseGuideDialog', () => {
     expect(screen.getByRole('link', { name: 'Разрешённая лицензия' })).toHaveAttribute(
       'href',
       'https://example.com/license',
+    );
+    expect(screen.getByText('Лучший авторитетный вес')).toBeVisible();
+    expect(screen.getByText('80 кг')).toBeVisible();
+    expect(screen.getByText('Оценка по формуле Бжицки')).toBeVisible();
+    expect(screen.getByText('6–10 повторений')).toBeVisible();
+    expect(screen.getByText(/Предложено: 82\.5 кг/)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Открыть тренировку' })).toHaveAttribute(
+      'href',
+      '/app?section=progress&workout_id=44',
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Тяга резиновой ленты' }));

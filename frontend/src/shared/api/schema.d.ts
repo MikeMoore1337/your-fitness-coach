@@ -1073,6 +1073,23 @@ export interface paths {
         patch: operations["edit_exercise_api_v1_programs_exercises__exercise_id__patch"];
         trace?: never;
     };
+    "/api/v1/programs/exercises/{exercise_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Exercise History */
+        get: operations["get_exercise_history_api_v1_programs_exercises__exercise_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/templates": {
         parameters: {
             query?: never;
@@ -7784,6 +7801,28 @@ export interface components {
             media_animation_url?: string | null;
             guide?: components["schemas"]["ExerciseGuide"] | null;
         };
+        /** ExerciseEstimated1RM */
+        ExerciseEstimated1RM: {
+            /**
+             * Kind
+             * @default estimated
+             * @constant
+             */
+            kind: "estimated";
+            /**
+             * Formula
+             * @default brzycki
+             * @constant
+             */
+            formula: "brzycki";
+            /** Value Kg */
+            value_kg: number;
+            workout: components["schemas"]["ExerciseHistoryWorkout"];
+            /** Reps */
+            reps: number;
+            /** Load Kg */
+            load_kg: number;
+        };
         /** ExerciseGuide */
         ExerciseGuide: {
             /** Technique Steps */
@@ -7895,6 +7934,133 @@ export interface components {
             /** Function */
             function: string;
         };
+        /** ExerciseHistoryMetric */
+        ExerciseHistoryMetric: {
+            /** Value Kg */
+            value_kg: number;
+            workout: components["schemas"]["ExerciseHistoryWorkout"];
+            /** Reps */
+            reps?: number | null;
+        };
+        /** ExerciseHistoryResponse */
+        ExerciseHistoryResponse: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string;
+            /** Metric Type */
+            metric_type: string;
+            /** Load Unit */
+            load_unit?: "kg" | null;
+            last_performed?: components["schemas"]["ExerciseHistoryWorkout"] | null;
+            best_authoritative_load?: components["schemas"]["ExerciseHistoryMetric"] | null;
+            estimated_1rm?: components["schemas"]["ExerciseEstimated1RM"] | null;
+            /** Rep Prs */
+            rep_prs: components["schemas"]["ExerciseRepPR"][];
+            /** Windows */
+            windows: components["schemas"]["ExerciseHistoryWindow"][];
+            /** Recent Sessions */
+            recent_sessions: components["schemas"]["ExerciseHistorySession"][];
+            /** Progression */
+            progression: components["schemas"]["ExerciseProgressionPoint"][];
+            /** Progression Events */
+            progression_events: components["schemas"]["ExerciseProgressionEvent"][];
+            /** History Truncated */
+            history_truncated: boolean;
+        };
+        /** ExerciseHistorySession */
+        ExerciseHistorySession: {
+            workout: components["schemas"]["ExerciseHistoryWorkout"];
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Authoritative Set Count */
+            authoritative_set_count: number;
+            /** Reps Total */
+            reps_total?: number | null;
+            /** Max Authoritative Load Kg */
+            max_authoritative_load_kg?: number | null;
+            /** Best Set Volume Kg */
+            best_set_volume_kg?: number | null;
+            /** Estimated 1Rm Kg */
+            estimated_1rm_kg?: number | null;
+            /** Sets */
+            sets: components["schemas"]["ExerciseHistorySet"][];
+        };
+        /** ExerciseHistorySet */
+        ExerciseHistorySet: {
+            /** Set Number */
+            set_number: number;
+            /** Reps */
+            reps?: number | null;
+            /** Load Kg */
+            load_kg?: number | null;
+            /** Volume Kg */
+            volume_kg?: number | null;
+            /**
+             * Rir
+             * @description Optional repetitions-in-reserve category after the set; 4+ means many repetitions remained, not an exact value of four
+             */
+            rir?: ("0" | "1" | "2" | "3" | "4+") | null;
+            /** Set Kind */
+            set_kind?: ("warmup" | "working" | "drop") | null;
+            /** Planned Role */
+            planned_role?: ("warmup" | "working" | "top" | "backoff" | "drop" | "activation" | "mini_set" | "cluster_member") | null;
+            /**
+             * Analytics Bucket
+             * @enum {string}
+             */
+            analytics_bucket: "working" | "preparation" | "intensifier";
+            /** Pr Eligible */
+            pr_eligible: boolean;
+        };
+        /** ExerciseHistoryWindow */
+        ExerciseHistoryWindow: {
+            /**
+             * Days
+             * @enum {integer}
+             */
+            days: 7 | 30 | 90;
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Performed Session Count */
+            performed_session_count: number;
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Authoritative Set Count */
+            authoritative_set_count: number;
+            /** Reps Total */
+            reps_total?: number | null;
+            /** Best Authoritative Load Kg */
+            best_authoritative_load_kg?: number | null;
+            /** Estimated 1Rm Kg */
+            estimated_1rm_kg?: number | null;
+        };
+        /** ExerciseHistoryWorkout */
+        ExerciseHistoryWorkout: {
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Title */
+            workout_title: string;
+            /**
+             * Performed On
+             * Format: date
+             */
+            performed_on: string;
+            /** Completed At */
+            completed_at?: string | null;
+        };
         /** ExercisePrescriptionPlan */
         ExercisePrescriptionPlan: {
             /**
@@ -7928,6 +8094,85 @@ export interface components {
              * Format: date
              */
             last_performed_on: string;
+        };
+        /** ExerciseProgressionEvent */
+        ExerciseProgressionEvent: {
+            /** Event Id */
+            event_id: number;
+            /**
+             * Event Kind
+             * @enum {string}
+             */
+            event_kind: "confirm" | "adjust" | "reject";
+            /** Proposal Id */
+            proposal_id: string;
+            /** Target Workout Id */
+            target_workout_id?: number | null;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Rule Id */
+            rule_id?: string | null;
+            /** Rule Kind */
+            rule_kind?: string | null;
+            /** Rule Snapshot */
+            rule_snapshot?: {
+                [key: string]: unknown;
+            };
+            /** Source Evidence Ids */
+            source_evidence_ids?: string[];
+            /** Reason Codes */
+            reason_codes?: string[];
+            /** Proposed Weight Kg */
+            proposed_weight_kg?: number | null;
+            /** Adjusted Weight Kg */
+            adjusted_weight_kg?: number | null;
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ExerciseProgressionPoint */
+        ExerciseProgressionPoint: {
+            /**
+             * Performed On
+             * Format: date
+             */
+            performed_on: string;
+            /** Workout Id */
+            workout_id: number;
+            /** Max Reps */
+            max_reps?: number | null;
+            /** Max Authoritative Load Kg */
+            max_authoritative_load_kg?: number | null;
+            /** Estimated 1Rm Kg */
+            estimated_1rm_kg?: number | null;
+            /** Authoritative Set Count */
+            authoritative_set_count: number;
+        };
+        /** ExerciseRepPR */
+        ExerciseRepPR: {
+            /**
+             * Range Key
+             * @enum {string}
+             */
+            range_key: "1-5" | "6-10" | "11-15" | "16+";
+            /** Range Label */
+            range_label: string;
+            /** Min Reps */
+            min_reps: number;
+            /** Max Reps */
+            max_reps?: number | null;
+            /** Best Reps */
+            best_reps: number;
+            best_reps_workout: components["schemas"]["ExerciseHistoryWorkout"];
+            /** Best Load Kg */
+            best_load_kg?: number | null;
+            best_load_workout?: components["schemas"]["ExerciseHistoryWorkout"] | null;
         };
         /** ExerciseTaxonomyItem */
         ExerciseTaxonomyItem: {
@@ -16094,6 +16339,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExerciseCatalogItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_exercise_history_api_v1_programs_exercises__exercise_id__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseHistoryResponse"];
                 };
             };
             /** @description Validation Error */

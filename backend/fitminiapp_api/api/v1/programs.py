@@ -39,6 +39,7 @@ from fitminiapp_api.schemas.program_generator import (
     ProgramGeneratorRequest,
 )
 from fitminiapp_api.schemas.workout import (
+    ExerciseHistoryResponse,
     ProgramProgressionProposalList,
     ProgressionProposalReviewRequest,
     ProgressionProposalReviewResponse,
@@ -62,6 +63,10 @@ from fitminiapp_api.services.exercise_domain import (
 )
 from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
+from fitminiapp_api.services.exercise_history import (
+    ExerciseHistoryNotFound,
+    build_exercise_history,
+)
 from fitminiapp_api.services.program_common import ProgramError, assignment_error_status
 from fitminiapp_api.services.program_generator import (
     ProgramGeneratorError,
@@ -266,6 +271,18 @@ def get_exercise_details(
         include_guide=True,
         alternatives=alternatives.get(_effective_exercise_id(exercise), []),
     )
+
+
+@router.get("/exercises/{exercise_id}/history", response_model=ExerciseHistoryResponse)
+def get_exercise_history(
+    exercise_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return build_exercise_history(db, current_user, exercise_id)
+    except ExerciseHistoryNotFound as exc:
+        raise HTTPException(status_code=404, detail="Упражнение не найдено") from exc
 
 
 @router.post(

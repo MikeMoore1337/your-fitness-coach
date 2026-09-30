@@ -2079,6 +2079,121 @@ details:not([open]) > :not(summary) {
   margin: 5px 0 0;
   line-height: 1.5;
 }
+.exercise-progress {
+  min-width: 0;
+}
+.exercise-progress .card-disclosure {
+  margin: 0;
+}
+.exercise-progress__body {
+  display: grid;
+  gap: 20px;
+  padding: 16px 2px 2px;
+}
+.exercise-progress__body > section {
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.exercise-progress__body h3 {
+  margin: 0 0 11px;
+  font-size: 1rem;
+}
+.exercise-progress__metrics,
+.exercise-progress__windows,
+.exercise-progress__prs {
+  display: grid;
+  gap: 10px;
+}
+.exercise-progress__metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.exercise-progress__metrics .metric {
+  min-width: 0;
+}
+.exercise-progress__metrics .metric strong,
+.exercise-progress__metrics .metric small {
+  overflow-wrap: anywhere;
+}
+.exercise-progress__metrics .metric a,
+.exercise-progress__session a,
+.exercise-progress__pr a,
+.exercise-progress__timeline a,
+.exercise-progress__events a {
+  overflow-wrap: anywhere;
+}
+.exercise-progress__windows {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.exercise-progress__window,
+.exercise-progress__pr,
+.exercise-progress__session,
+.exercise-progress__events li {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-soft);
+}
+.exercise-progress__window span,
+.exercise-progress__window small,
+.exercise-progress__pr span,
+.exercise-progress__session small,
+.exercise-progress__events span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.exercise-progress__prs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.exercise-progress__sessions,
+.exercise-progress__events {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.exercise-progress__session > div {
+  display: grid;
+  gap: 4px;
+}
+.exercise-progress__session ul {
+  display: grid;
+  gap: 3px;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+.exercise-progress__timeline {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+}
+.exercise-progress__timeline li {
+  display: grid;
+  gap: 2px;
+  padding-left: 3px;
+}
+.exercise-progress__timeline span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.exercise-progress__events li {
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 9px;
+}
+.exercise-progress__events li > a {
+  grid-column: 2;
+}
 .workout-history__exercises {
   display: flex;
   flex-wrap: wrap;
@@ -2121,6 +2236,21 @@ details:not([open]) > :not(summary) {
   .exercise-guide-facts .exercise-guide-section--safety {
     padding: 15px;
     border-radius: var(--radius-sm);
+  }
+  .exercise-progress__body {
+    padding-inline: 0;
+  }
+  .exercise-progress__metrics,
+  .exercise-progress__windows,
+  .exercise-progress__prs {
+    grid-template-columns: 1fr;
+  }
+  .exercise-progress__events li {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .exercise-progress__events li > a {
+    grid-column: auto;
   }
   .exercise-guide-alternative {
     width: 100%;
