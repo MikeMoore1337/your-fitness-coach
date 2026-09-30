@@ -41,6 +41,30 @@ data/privacy/logging, AI/provider boundaries, secrets/dependencies и CI/deploy.
 Deterministic checks, Residual risk и итоговым audit status.
 ```
 
+## Automatic PR Security Review
+
+Каждый pull request автоматически запускает repository-native Codex review в режиме `diff` внутри
+основного `CI` workflow. Это обычный Codex через официальный `openai/codex-action`, а не внешний
+Codex Security Review service.
+
+Контракт:
+
+- read-only permission profile и `drop-sudo`;
+- exact PR base/head diff;
+- structured JSON по `.github/security-review-output-schema.json`;
+- идемпотентный PR comment с последним результатом;
+- validated `CRITICAL`/`HIGH` -> job FAIL -> aggregate `checks` FAIL;
+- `MEDIUM`/`LOW` и unvalidated concerns -> comment, но gate PASS;
+- action failure/malformed result/missing credential -> fail-closed.
+
+Для запуска нужен GitHub Actions secret `OPENAI_API_KEY`. Для Dependabot-authored PR GitHub
+использует отдельный secret scope, поэтому тот же secret должен быть добавлен туда отдельно, если
+такие PR должны проходить semantic review автоматически. Fork PR секрет не получает и блокируется
+fail-closed вместо небезопасной передачи credential недоверенному checkout.
+
+Automation использует обычный API credential и его API usage/billing, а не отдельный
+`@codex security review` command.
+
 ## Deterministic Security Audit
 
 GitHub Actions workflow `Security Audit` запускается:
@@ -75,5 +99,6 @@ python scripts/skill_safety.py scan-all
 Не коммить токены, реальные персональные данные, raw production dumps и exploit payload, если
 безопасного минимального evidence достаточно.
 
-Repository-native Security Review не заменяет deterministic CI и не становится обязательным
-LLM-verdict для обычной доставки.
+Repository-native Security Review не заменяет deterministic CI. В automatic PR mode он является
+обязательным semantic job внутри aggregate `checks`, но блокирует merge только на validated
+`CRITICAL`/`HIGH` либо при невозможности надёжно выполнить сам review.
