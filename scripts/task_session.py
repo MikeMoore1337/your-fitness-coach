@@ -1311,7 +1311,12 @@ def classify_controller_release(
             )
         try:
             files = github.pull_request_files(int(number))
-        except OSError, TaskSessionError:
+        except OSError:
+            return _controller_release_deploy_fallback(
+                "changed-file inventory lookup failed; defaulting to application deployment",
+                facts,
+            )
+        except TaskSessionError:
             return _controller_release_deploy_fallback(
                 "changed-file inventory lookup failed; defaulting to application deployment",
                 facts,
@@ -8068,7 +8073,9 @@ class TaskController:
             reflog = self.repository.git(
                 "reflog", "show", "--format=%H%x09%gs", branch
             ).splitlines()
-        except TaskSessionError, OSError:
+        except TaskSessionError:
+            return None
+        except OSError:
             return None
         if len(reflog) < 2:
             return None
