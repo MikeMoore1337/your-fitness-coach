@@ -1,4 +1,4 @@
-# Skill routing guide v8
+# Skill routing guide v9
 
 ## Принцип
 
@@ -26,6 +26,8 @@ Task = scope и результат.
 | Юридический риск РФ | `$ru-legal-risk` | privacy/security/data/AI/billing/Telegram/technical writing только по фактической поверхности |
 | Product discovery | `$product-discovery` | `$ux-researcher` только для real-user evidence |
 | Release | `$release-manager` + `$platform-engineer` по необходимости | observability/security/privacy только по реальному release risk |
+| Security-sensitive diff | `$security-engineer` в режиме `diff` | `$privacy-engineer`, `$platform-engineer`, `$llm-engineer` только по затронутой boundary |
+| Dedicated full security audit | `$security-engineer` в режиме `full` | профильные skills последовательно, без отдельного reviewer role/subagent |
 | QA strategy | `$qa-engineer` | обычно 1-2 QA/domain skills по фактическому риску |
 | Playwright/Web/TMA tests | `$qa-engineer` + `$playwright-testing` | `$e2e-review` для critical/new/AI-generated E2E trust review |
 | pytest tests | `$qa-engineer` + `$pytest-test-design` | test-data/API/DB/Pydantic по boundary |
