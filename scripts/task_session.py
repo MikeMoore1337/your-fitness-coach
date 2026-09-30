@@ -24,7 +24,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, NoReturn
 from uuid import uuid4
 
 try:
@@ -133,6 +133,7 @@ UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
 STATE_LOCK_STALE_SECONDS = 300
 NOOP_WORKER_RETRY_CLASSIFICATION = "verified_noop_routing_retry"
 NOOP_WORKER_RETRY_MAX = 1
+PREPARED_HEAD_RECONCILIATION_CLASSIFICATION = "stale_pre_refresh_head_after_verified_base_refresh"
 
 # A task lease and delivery ownership are separate controller concerns.  Every task owns only its
 # own worktree/branch and task-state record.  ``exclusive-write`` remains a legacy metadata value
@@ -4655,8 +4656,9 @@ class TaskController:
                 "control_issue_number": control_issue_number,
                 "reason": normalized_reason,
                 "previous_control_state": control_state,
+                "original_base_sha": lease.get("original_base_origin_master_sha"),
                 "base_sha": current_origin,
-                "head_sha": head,
+                "head_sha": refreshed_head,
                 "prepared_at": timestamp,
                 "launch_attempts": [],
             }
@@ -5628,6 +5630,155 @@ class TaskController:
                 "mutation_performed": True,
             }
 
+    def _reconcile_verified_noop_prepared_head(
+        self,
+        task_id: str,
+        lease: dict[str, Any],
+        resume_event: dict[str, Any],
+        lease_path: Path,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Reconcile the one stale prepared head produced by the prior retry bug."""
+
+        base_sha = str(lease.get("base_origin_master_sha", ""))
+        stale_head = str(resume_event.get("head_sha", ""))
+        if stale_head == base_sha:
+            return lease, resume_event
+
+        def refuse(reason: str) -> NoReturn:
+            raise TaskSessionError(
+                "HUMAN_REQUIRED: prepared retry head reconciliation refused: " + reason
+            )
+
+        if (
+            re.fullmatch(r"[0-9a-f]{40}", base_sha) is None
+            or re.fullmatch(r"[0-9a-f]{40}", stale_head) is None
+        ):
+            refuse("lease or prepared-event SHA is malformed")
+        if isinstance(resume_event.get("prepared_head_reconciliation"), Mapping):
+            refuse("a prior reconciliation audit already exists")
+        if (
+            resume_event.get("classification") != NOOP_WORKER_RETRY_CLASSIFICATION
+            or resume_event.get("state") != "prepared"
+            or resume_event.get("owner_authorized") is not True
+            or resume_event.get("base_sha") != base_sha
+            or resume_event.get("launch_attempts") != []
+            or "launch_id" in resume_event
+        ):
+            refuse("prepared event does not match the verified no-op retry contract")
+
+        retry = lease.get("worker_retry")
+        if (
+            not isinstance(retry, Mapping)
+            or retry.get("classification") != NOOP_WORKER_RETRY_CLASSIFICATION
+            or retry.get("owner_authorized") is not True
+            or retry.get("launch_attempts") != []
+        ):
+            refuse("worker retry audit is missing or already consumed")
+        prior = retry.get("prior_attempt")
+        if (
+            not isinstance(prior, Mapping)
+            or prior.get("roles") != ["researcher"]
+            or prior.get("terminal_result") != "completed"
+            or prior.get("source_mutation") is not False
+            or prior.get("unique_commits") != 0
+            or prior.get("pre_refresh_head") != stale_head
+        ):
+            refuse("prior worker no-op evidence does not match the stale prepared head")
+        corrected_plan = retry.get("corrected_plan")
+        if not isinstance(corrected_plan, Mapping) or corrected_plan.get("roles") != [
+            "implementer",
+            "qa-verifier",
+        ]:
+            refuse("corrected Agent Flow is not implementation-capable")
+        base_refresh = retry.get("base_refresh")
+        if (
+            not isinstance(base_refresh, Mapping)
+            or base_refresh.get("classification") != "controller_induced_pre_retry_fast_forward"
+            or base_refresh.get("observed_head_before_operation") != stale_head
+            or base_refresh.get("refreshed_head") != base_sha
+            or base_refresh.get("protected_master") != base_sha
+            or base_refresh.get("owner_authorized") is not True
+        ):
+            refuse("audited base refresh does not match the stale prepared head")
+
+        original_base = str(lease.get("original_base_origin_master_sha", ""))
+        if re.fullmatch(r"[0-9a-f]{40}", original_base) is None:
+            refuse("original lease base SHA is malformed")
+        branch = lease.get("branch")
+        worktree_value = lease.get("worktree")
+        if not isinstance(branch, str) or not isinstance(worktree_value, str):
+            refuse("lease branch/worktree identity is incomplete")
+        worktree = Path(worktree_value).resolve()
+        try:
+            actual_head = self.repository.head(cwd=worktree)
+            branch_head = self.repository.ref(f"refs/heads/{branch}")
+            origin_head = self.repository.ref("origin/master")
+        except (OSError, TaskSessionError) as error:
+            refuse(f"repository refs are unreadable: {error}")
+        if actual_head != base_sha or branch_head != base_sha:
+            refuse("task HEAD or branch ref differs from the lease base")
+        if origin_head != base_sha or self._github().branch_head(TARGET_BASE_BRANCH) != base_sha:
+            refuse("protected master is not exactly the lease base")
+
+        normalized_event = dict(resume_event)
+        normalized_event["original_base_sha"] = original_base
+        normalized_event["head_sha"] = base_sha
+        candidate_lease = dict(lease)
+        candidate_lease["preimplementation_resume"] = normalized_event
+        try:
+            validated_worktree, validated_branch, validated_head = (
+                self._validate_preimplementation_worktree(
+                    task_id,
+                    candidate_lease,
+                    prepared_event=normalized_event,
+                )
+            )
+        except TaskSessionError as error:
+            refuse(str(error))
+        if (
+            validated_worktree != worktree
+            or validated_branch != branch
+            or validated_head != base_sha
+            or self.repository.unique_commits(branch, base=base_sha)
+        ):
+            refuse("task worktree contains a unique task commit")
+        if self.store.read_json(self.store.history / f"task-{task_id}.json") is not None:
+            refuse("task history already exists")
+        if any(
+            lease.get(field) is not None
+            for field in (
+                "delivery_owner",
+                "delivery_owner_id",
+                "ready_head_sha",
+                "pr_number",
+                "merge_sha",
+                "deployed_sha",
+            )
+        ):
+            refuse("delivery ownership or delivery provenance exists")
+        if self.store.delivery_state().get("owner") is not None:
+            refuse("delivery ownership exists")
+        if self._preimplementation_worker_state_paths(task_id):
+            refuse("a worker state is still present")
+        if any(
+            isinstance(item.get("head"), Mapping) and str(item["head"].get("ref", "")) == branch
+            for item in self._github().open_pull_requests()
+        ):
+            refuse("the task branch has an open pull request")
+
+        timestamp = utc_now()
+        normalized_event["prepared_head_reconciliation"] = {
+            "classification": PREPARED_HEAD_RECONCILIATION_CLASSIFICATION,
+            "previous_head_sha": stale_head,
+            "reconciled_head_sha": base_sha,
+            "owner_authorized": True,
+            "reconciled_at": timestamp,
+        }
+        lease["preimplementation_resume"] = normalized_event
+        lease["updated_at"] = timestamp
+        StateStore.replace_json(lease_path, lease)
+        return lease, normalized_event
+
     def claim_preimplementation_worker_launch(self, task_id: str) -> dict[str, Any]:
         expected = normalize_task_id(task_id)
         lease_path = self.store.task_lease_path(expected)
@@ -5642,6 +5793,9 @@ class TaskController:
                 or resume_event.get("state") != "prepared"
             ):
                 raise TaskSessionError("Task has no unclaimed prepared resume")
+            lease, resume_event = self._reconcile_verified_noop_prepared_head(
+                expected, lease, resume_event, lease_path
+            )
             worktree, branch, head = self._validate_preimplementation_worktree(
                 expected, lease, prepared_event=resume_event
             )
