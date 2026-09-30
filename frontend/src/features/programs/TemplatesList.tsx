@@ -20,6 +20,7 @@ import { ProgramBuilder } from './ProgramBuilder';
 import { shouldSaveTemplateAsCopy } from './templateEditing';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { ProgramRecommendation } from './ProgramRecommendation';
+import { LegacyProgramRecommendation } from './LegacyProgramRecommendation';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { AssignedProgramDetails } from './AssignedProgramDetails';
 import { ProgramImportPanel } from './ProgramImportPanel';
@@ -100,6 +101,7 @@ export function TemplatesList({
   const [saveAsCopy, setSaveAsCopy] = useState(false);
   const [assignmentTemplate, setAssignmentTemplate] = useState<ProgramTemplate | null>(null);
   const [recommendationOpen, setRecommendationOpen] = useState(false);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
   const defaultStartDate = dateInputValue(
     new Date(),
     user?.profile?.timezone || detectedTimeZone(),
@@ -242,6 +244,11 @@ export function TemplatesList({
     );
     setAssignmentWeekdays(defaultWeekdays(template, defaultStartDate));
     setAssignmentTemplate(template);
+  };
+
+  const editCopy = (template: ProgramTemplate) => {
+    setSaveAsCopy(true);
+    setEditingTemplate(template);
   };
 
   const activeTemplate = templates.data?.find((item) => item.is_active_for_current_user) ?? null;
@@ -420,6 +427,9 @@ export function TemplatesList({
                   >
                     Подобрать другую
                   </button>
+                  <button type="button" onClick={() => setGeneratorOpen(true)}>
+                    Подобрать программу
+                  </button>
                   <button
                     type="button"
                     className="program-active__edit-action"
@@ -478,6 +488,16 @@ export function TemplatesList({
                 </>
               ) : (
                 <>
+                  <AppLink
+                    className="button-link program-wizard__anchor"
+                    to="/app?section=programs&view=manage&start=generator"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setGeneratorOpen(true);
+                    }}
+                  >
+                    Подобрать программу
+                  </AppLink>
                   <a className="button-link program-wizard__anchor" href="#program-builder">
                     Создать свою программу
                   </a>
@@ -494,9 +514,15 @@ export function TemplatesList({
         <>
           {children}
           <ProgramImportPanel />
-          <ProgramRecommendation
+          <LegacyProgramRecommendation
             open={recommendationOpen}
             onOpenChange={setRecommendationOpen}
+            onPreview={setSelectedExample}
+            onEditCopy={editCopy}
+          />
+          <ProgramRecommendation
+            open={generatorOpen}
+            onOpenChange={setGeneratorOpen}
             onConfirmed={refreshProgramState}
           />
           <Card

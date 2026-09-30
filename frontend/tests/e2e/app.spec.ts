@@ -2983,7 +2983,7 @@ test('детерминированный подбор проходит preview, 
   await planManagementLink.click();
   await expect(page).toHaveURL('/app?section=programs&view=manage');
 
-  const launcher = page.getByRole('button', { name: 'Подобрать другую' });
+  const launcher = page.getByRole('button', { name: 'Подобрать программу' });
   await launcher.click();
   const wizard = page.getByRole('dialog', { name: 'Цель' });
   await expect(wizard).toBeVisible();
