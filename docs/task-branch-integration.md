@@ -151,16 +151,34 @@ controller PR, deployed SHA должен оставаться ancestor акту�
 commits, divergence refs, changed head и artifact cleanup error останавливают closeout с
 сохранением данных.
 
-Состояния `implementation`, `review`, `qa`, `ready-for-delivery`, `waiting-for-delivery`,
-`delivering`, `delivery-gate`, `production-success` и `recovery-required` различаются явно.
+### Durable lease model (#583)
+
+Новые lease используют только четыре durable lifecycle state:
+
+- `working` — реализация, готовность к delivery и текущая delivery ownership;
+- `human-required` — неоднозначность или owner-required recovery; такая задача не
+  репромоутится в delivery автоматически;
+- `deployed` — exact merge/deployment уже подтверждены, но `finish` ещё не завершил closeout;
+- `done` — owner-authorized supersede с сохранённым Git anchor.
+
+`queued`, `pr-open`, `ci-green` и `merged` — derived labels из `ready_head_sha`, `delivery.json`,
+GitHub PR/checks и Git merge/deployment evidence. Они не записываются как lease state и не
+подменяют Git/GitHub как source of truth. В lease хранится только bounded `attempts` audit для
+повторных запусков; общий owner-authorized `resume-worker` выбирает legacy evidence-specific
+механику и допускает не более одной попытки.
+
+Старые значения (`implementation`, `review`, `qa`, `ready-for-delivery`, `waiting-for-delivery`,
+`delivering`, `delivery-refreshing`, `delivery-gate`, `production-success`, `superseded` и
+`recovery-required`) читаются через compatibility map, но новые записи их не создают. Legacy
+history не переписывается и destructive migration не выполняется.
 `recover` не удаляет stale lease, dirty/interrupted worktree или unique commits автоматически.
 
 `recover` — read-only диагностика. Он сохраняет dirty files, unique commits и interrupted Git
 operations для owner-safe решения. Ни `recover`, ни `finish` не выполняют `reset --hard`, force
 delete или несанкционированное восстановление.
 
-Если recovery lease возник из-за прерванного delivery, а его единственный task worktree чист,
-не имеет Git-операций и однозначно совпадает с lease, владелец может явно вернуть его в `review`:
+Если `human-required` lease возник из-за прерванного delivery, а его единственный task worktree чист,
+не имеет Git-операций и однозначно совпадает с lease, владелец может явно вернуть его в `working`:
 `resolve-recovery <ID> --owner-authorize --reason <...>`. Команда проверяет branch/worktree,
 base ancestry и отсутствие delivery owner, затем атомарно инвалидирует старый readiness snapshot;
 она не удаляет файлы, ветки или lease и не выполняет `reset`/`stash`.
@@ -169,13 +187,13 @@ base ancestry и отсутствие delivery owner, затем атомарн�
 exact SHA текущего `origin/master` и по текущему delivery anchor. Для редкого случая, когда
 начальная delivery-задача уже была superseded несколькими PR той же Task и более поздний SHA уже
 успешно deployed, есть отдельная owner-authorized команда `reconcile-production-success`. Она
-принимает только clean и однозначный `recovery-required` lease без владельца delivery lane,
+принимает только clean и однозначный `human-required` lease без владельца delivery lane,
 проверяет исходный PR против сохранённого anchor, каждый последующий PR против Task ID, same-repo
 provenance, `master`, exact-head `checks` и chronological merge ancestry, затем сверяет успешный
 `Release production` run и deployment для точного финального SHA. Финальный SHA должен быть
 ancestor текущего live protected `master`; активный production deployment, race, неполная цепочка,
 неверный owner flag или уже существующая history блокируют запись. Команда сохраняет original
-anchor и ordered PR/deployment evidence в task history, переводит lease в `production-success` и
+anchor и ordered PR/deployment evidence в task history, переводит lease в `deployed` и
 оставляет обычный `finish` единственным путём terminal closeout. Она не заменяет и не ослабляет
 `complete-production`, `refresh-canonical-master`, `resolve-recovery` или проверки `finish`.
 Она обновляет только tracking ref через fast-forward fetch; локальный canonical `master` не
@@ -183,7 +201,7 @@ anchor и ordered PR/deployment evidence в task history, переводит lea
 исторический ancestor проверенного master snapshot, а новые commits после snapshot по-прежнему
 должны быть controller-only и затрагивать только allowlist controller paths.
 
-Если task осталась в `ready-for-delivery`, но её единственный ready head уже вошёл в закрытый
+Если task осталась в derived `queued`, но её единственный ready head уже вошёл в закрытый
 same-repository PR и этот точный merge SHA успешно deployed, используется отдельная owner-authorized
 команда `reconcile-ready-production-success <ID> --pr <number> --production-run <id>
 --deployed-sha <sha> --owner-authorize`. Она принимает только чистые однозначные branch/worktree,
@@ -197,14 +215,14 @@ PR base может быть более новым protected-master commit тол
 allowlisted paths и успешный Release production с skipped application-deploy job; product drift,
 неполная provenance или deployment controller SHA блокируют reconciliation. Успех атомарно
 записывает anchor classification, verified controller drift, `ready_production_reconciliation`,
-`production-success` lease/history и `closeout_required`; ready fields, task branch/worktree,
+`deployed` lease, совместимую `production-success` history и `closeout_required`; ready fields, task branch/worktree,
 delivery ownership и обычные `complete-production`/`reconcile-production-success` semantics не
 изменяются. После этого применяется только штатный `finish`, который повторно проверяет сохранённый
 anchor и drift evidence.
 
 Для уже завершённой task, чей production SHA позже стал ancestor master, существует отдельная
 terminal-only команда `reconcile-subsequent-production <ID> --owner-authorize`. Она требует
-`production-success`, неизменённую clean task branch/worktree без unique commits, пустой delivery
+`deployed` lease с совместимой `production-success` history, неизменённую clean task branch/worktree без unique commits, пустой delivery
 owner и отсутствие активного production deployment. Команда классифицирует каждый commit между
 исходным deployed SHA и защищённым master, связывает его с точным merged PR/task и успешным
 exact-head `checks`, проверяет release/deployment evidence для каждого product commit и
@@ -253,9 +271,16 @@ human/legal/external/destructive/task-specific gate. Следующая product 
 batch существующих Issue-backed GREEN tasks; лимиты и точные правила описаны в
 [`docs/issue-driven-continuous-workflow.md`](issue-driven-continuous-workflow.md).
 
-Если Windows launcher остановился до запуска worker, но task осталась в активном
-`implementation` lease, используйте поддерживаемое восстановление только для подтверждённого
-pre-implementation blocker:
+Если Windows launcher остановился до запуска worker, но task осталась в активном `working` lease,
+используйте общий bounded worker resume только для подтверждённого evidence:
+
+```powershell
+./.venv/Scripts/python.exe scripts/task_session.py resume-worker 504 `
+    --control-issue 504 --reason "resume after verified worker interruption" --owner-authorize
+```
+
+Старый вызов `run_task_delivery.py --resume-preimplementation` ниже сохранён как legacy
+compatibility entry point для уже существующих записей; новые запуски используют команду выше.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\run_task_delivery.py 504 `
@@ -268,7 +293,9 @@ contract/dependencies, owner gate, lease, branch/worktree и актуальны�
 измениться только fast-forward. Resume отказывает при worker state, PR, unique commit, изменённой
 зависимости, очередном claim или любом неоднозначном состоянии. Issue переводится в `in_progress`
 только после записи durable identity фактически запущенной Codex-команды. Обычный повторный запуск
-разрешён только когда supervisor не стартовал и worker state ещё не создан.
+разрешён только когда supervisor не стартовал и worker state ещё не создан. Evidence-specific
+низкоуровневые resume-команды остаются для чтения старых записей и ручной reconciliation, но
+новый путь использует `resume-worker`.
 Есть одно дополнительное узкое восстановление для уже запущенного Codex CLI, который завершился
 с кодом 2 из-за точной ошибки несовместимых `--approve-for-me` и `--sandbox` аргументов: controller
 сверяет эту строку в `events.jsonl`, проверяет отчёт guard с нулём tool/progress/subagent действий,
@@ -280,7 +307,7 @@ contract/dependencies, owner gate, lease, branch/worktree и актуальны�
 Если Windows shim завершился до запуска Codex с точной ошибкой `The command line is too long.`,
 guard recovery также может один раз reconcile-ить только этот zero-action startup failure при
 отсутствующем `worker-state.json`, завершённом процессе и полном evidence. Попытка сохраняется в
-lease как `failed-before-implementation`; произвольный текст, live process, неполные evidence или
+bounded `attempts` audit с результатом `failed-before-implementation`; произвольный текст, live process, неполные evidence или
 повторный такой failure остаются `HUMAN_REQUIRED`.
 
 Если запущенный worker был остановлен именно лимитом `TOOL_ACTION_BUDGET_EXCEEDED`, владелец может
