@@ -228,7 +228,9 @@ def _is_canonical_managed_ignored_path(path: str, *, root: Path) -> bool:
             continue
         try:
             managed_root = root.joinpath(*managed.split("/"))
-        except OSError, ValueError:
+        except OSError:
+            return False
+        except ValueError:
             return False
         return managed_root.is_dir()
     return False
