@@ -29,16 +29,15 @@ product-task deploy/closeout.
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved до merge. LLM review не запускается в lifecycle.
+нужно фактически исправить и resolved до merge. Внешний Codex Code Review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-отсутствие Codex Code Review их не заменяет. Automatic Security Review не является частью normal path обычного PR:
-он не запускается при PR opened, push, mark-ready или каждом Code Review. Security Review остаётся
-отдельным manual/conditional gate для фактических security-sensitive surfaces; Code Review и Security
-Review не сцепляются автоматически, а deterministic security scanners остаются в CI. Отсутствие
-Security Review не блокирует ordinary task без security trigger. Automatic external Codex/GitHub
-settings не меняются repository changes; если настройка недоступна, финальный отчёт фиксирует
-`MANUAL_EXTERNAL_SETTING_REQUIRED`.
+отсутствие Codex Code Review их не заменяет. Каждый PR проходит repository-native Codex Security
+Review в `diff` mode как обязательный CI job. Он работает read-only, не создаёт reviewer-agent/
+subagent и не вызывает внешний `@codex security review`. Validated `CRITICAL`/`HIGH` findings
+блокируют aggregate `checks`; `MEDIUM`/`LOW` и unvalidated concerns advisory. Missing credential,
+action failure или malformed structured result работают fail-closed. Dedicated `full` Security Review
+остаётся отдельным owner-requested audit. Deterministic security scanners остаются в CI.
 Следующую product task автоматически не запускать.
 
 ## 0. Coordination lanes
@@ -377,8 +376,9 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 3. после GREEN exact-head checks выполнить обычный PR merge только для ожидаемого head SHA;
    Codex Code Review не запрашивать, не валидировать и не ожидать; исторические review comments
    не влияют на решение;
-4. не включать автоматические LLM review-триггеры в normal lifecycle; профильные security,
-   legal, human, external и destructive gates проходят только по фактическому trigger;
+4. не включать внешний Codex Code Review; repository-native Codex Security Review `diff`
+   автоматически проходит на каждом PR как часть required `checks`, а профильные legal, human,
+   external и destructive gates проходят только по фактическому trigger;
 5. проверить post-merge CI exact merged `master` SHA и затем автоматически запущенный production
    deploy того же SHA до terminal success. Deploy обязан передать immutable bundle, image refs и
    migration manifest, а host не должен требовать Git checkout. Failure/rollback/manual-intervention
