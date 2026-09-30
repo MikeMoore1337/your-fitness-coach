@@ -19,12 +19,14 @@ self-review → commit/push → PR → exact-head CI GREEN → merge → post-me
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved до merge. LLM review не запускается в lifecycle.
+нужно фактически исправить и resolved до merge. Внешний Codex Code Review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-отсутствие Codex Code Review их не заменяет. Automatic Security Review не запускается для обычного PR и не
-сцепляется с Code Review; это отдельный manual/conditional gate только при фактическом security
-trigger. Deterministic security scanners остаются в CI.
+отсутствие Codex Code Review их не заменяет. Каждый PR проходит repository-native Codex Security
+Review в `diff` mode внутри required CI. Validated `CRITICAL`/`HIGH` блокируют merge;
+`MEDIUM`/`LOW` и unvalidated concerns advisory, а execution/configuration failure работает
+fail-closed. Внешний `@codex security review` не вызывается. Deterministic security scanners
+остаются в CI.
 Следующую product task автоматически не запускать.
 
 
@@ -113,10 +115,12 @@ run остаётся добровольной диагностикой и не �
 `reopen-for-review --reason <...>`, который освобождает delivery lane и удаляет старый readiness
 snapshot.
 
-PR CI не выполняет отдельный LLM review job и не запускается на `pull_request_review` event.
-Merge-ready определяется exact-head `checks`, deterministic quality/policy checks, актуальной
-provenance, mergeability и resolved threads. Codex review request не создаётся controller; любые
-исторические review comments не меняют merge decision.
+PR CI не запускается на `pull_request_review` event и не вызывает внешний Codex Code Review.
+Внутри обычного `pull_request` CI обязательный job `codex-security-review` выполняет только
+repository-native security `diff` review. Merge-ready определяется exact-head `checks`,
+deterministic quality/policy checks, security gate, актуальной provenance, mergeability и resolved
+threads. Codex review request не создаётся controller; исторические external review comments не
+меняют merge decision.
 
 ## Leases и безопасный closeout
 
