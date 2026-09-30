@@ -25,10 +25,10 @@ Skills задают профессиональный способ выполне
     `diff` для security-sensitive изменений и `full` только для отдельного аудита.
 16. Канонический threat model находится в `../security/THREAT_MODEL.md`; процедура и стандарт
     доказательств - в `skills/security-engineer/references/SECURITY_REVIEW_PLAYBOOK.md`.
-17. Каждый PR автоматически проходит repository-native `$security-engineer` в режиме `diff`
-    через официальный `openai/codex-action` с read-only permissions.
-18. Gate блокирует merge только при validated `CRITICAL`/`HIGH` finding либо при невозможности
-    выполнить/разобрать review; `MEDIUM`/`LOW` и concerns остаются advisory.
+17. Каждый PR автоматически проходит бесплатный deterministic security audit: CodeQL,
+    dependency audit и Trivy filesystem scan.
+18. Repository-native `$security-engineer` остаётся manual/conditional semantic review для
+    security-sensitive diff и отдельного `full` audit; автоматический OpenAI API вызов не нужен.
 
 ## QA v8
 
