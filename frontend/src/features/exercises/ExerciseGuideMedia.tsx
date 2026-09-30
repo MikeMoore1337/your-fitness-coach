@@ -26,6 +26,7 @@ export function ExerciseGuideMedia({
   onExpandedChange?: (expanded: boolean) => void;
 }) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [posterFallbackUrls, setPosterFallbackUrls] = useState<Set<string>>(() => new Set());
   const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
   const reducedMotion = usePrefersReducedMotion();
   const close = () => {
@@ -34,6 +35,16 @@ export function ExerciseGuideMedia({
   };
   const lightboxRef = useModalA11y<HTMLDivElement>(expandedIndex !== null, close);
   const activeItem = expandedIndex === null ? null : items[expandedIndex];
+  const activeItemUsesPoster = Boolean(
+    activeItem?.type === 'animation' && (reducedMotion || posterFallbackUrls.has(activeItem.url)),
+  );
+  const activeItemDisplayUrl = activeItem
+    ? activeItemUsesPoster
+      ? activeItem.poster
+      : activeItem.type === 'animation'
+        ? activeItem.url
+        : (activeItem.sources.at(-1)?.url ?? activeItem.url)
+    : null;
   const availableItemsCount = items.filter((item) => !failedUrls.has(item.url)).length;
   const hasStrengthPhases = items.some(
     (item) => item.phase_id === 'concentric_end' || item.phase_id === 'eccentric_end',
@@ -52,7 +63,12 @@ export function ExerciseGuideMedia({
     close();
   };
 
-  const markFailed = (url: string) => {
+  const markImageError = (item: GuideMediaItem, sourceUrl: string) => {
+    if (item.type === 'animation' && sourceUrl !== item.poster) {
+      setPosterFallbackUrls((current) => new Set(current).add(item.url));
+      return;
+    }
+    const url = item.url;
     setFailedUrls((current) => new Set(current).add(url));
     if (activeItem?.url === url) close();
   };
@@ -69,7 +85,8 @@ export function ExerciseGuideMedia({
       <div className="exercise-guide-images" aria-label="Положения упражнения">
         {items.map((item, index) => {
           const failed = failedUrls.has(item.url);
-          const showPoster = reducedMotion && item.type === 'animation';
+          const showPoster =
+            item.type === 'animation' && (reducedMotion || posterFallbackUrls.has(item.url));
           const displayUrl = showPoster ? item.poster : item.url;
           return (
             <figure className="exercise-guide-image" key={item.asset_id ?? item.url}>
@@ -105,7 +122,7 @@ export function ExerciseGuideMedia({
                     loading="lazy"
                     decoding="async"
                     data-media-mode={showPoster ? 'static-poster' : item.type}
-                    onError={() => markFailed(item.url)}
+                    onError={() => markImageError(item, displayUrl)}
                   />
                   <span className="exercise-guide-image__zoom" aria-hidden="true">
                     <Icon name="maximize" size={16} />
@@ -152,15 +169,9 @@ export function ExerciseGuideMedia({
           )}
           <figure>
             <img
-              src={
-                reducedMotion
-                  ? activeItem.poster
-                  : activeItem.type === 'animation'
-                    ? activeItem.url
-                    : (activeItem.sources.at(-1)?.url ?? activeItem.url)
-              }
+              src={activeItemDisplayUrl ?? ''}
               srcSet={
-                reducedMotion || activeItem.type === 'animation'
+                activeItemUsesPoster || activeItem.type === 'animation'
                   ? undefined
                   : responsiveSources(activeItem)
               }
@@ -169,8 +180,8 @@ export function ExerciseGuideMedia({
               width={activeItem.width}
               height={activeItem.height}
               decoding="async"
-              data-media-mode={reducedMotion ? 'static-poster' : activeItem.type}
-              onError={() => markFailed(activeItem.url)}
+              data-media-mode={activeItemUsesPoster ? 'static-poster' : activeItem.type}
+              onError={() => markImageError(activeItem, activeItemDisplayUrl ?? '')}
             />
             <figcaption>{activeItem.phase}</figcaption>
           </figure>

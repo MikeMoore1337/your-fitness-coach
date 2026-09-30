@@ -37,8 +37,9 @@ export function ExerciseMediaAsset({
 }) {
   const reducedMotion = usePrefersReducedMotion();
   const [failed, setFailed] = useState(false);
+  const [usePosterFallback, setUsePosterFallback] = useState(false);
   const animated = variant === 'animation' && !reducedMotion && Boolean(animationUrl);
-  const src = animated ? animationUrl : thumbnailUrl;
+  const src = animated && !usePosterFallback ? animationUrl : thumbnailUrl;
 
   if (!src || failed) {
     return (
@@ -63,8 +64,14 @@ export function ExerciseMediaAsset({
       height={height}
       loading={variant === 'thumbnail' ? 'lazy' : undefined}
       decoding="async"
-      data-media-mode={animated ? 'animated' : 'static-poster'}
-      onError={() => setFailed(true)}
+      data-media-mode={animated && !usePosterFallback ? 'animated' : 'static-poster'}
+      onError={() => {
+        if (animated && !usePosterFallback && thumbnailUrl) {
+          setUsePosterFallback(true);
+          return;
+        }
+        setFailed(true);
+      }}
     />
   );
 }
