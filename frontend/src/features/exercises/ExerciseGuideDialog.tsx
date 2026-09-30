@@ -2,10 +2,11 @@ import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
-import type { Exercise } from '../../shared/api/types';
+import type { Exercise, ExerciseHistory } from '../../shared/api/types';
 import { Badge, CloseIcon, ErrorState, LoadingState } from '../../shared/ui/common';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideMedia } from './ExerciseGuideMedia';
+import { ExerciseProgressPanel } from './ExerciseProgressPanel';
 
 const difficultyLabels: Record<Exercise['difficulty_level'], string> = {
   beginner: 'Начальный уровень',
@@ -37,6 +38,10 @@ export function ExerciseGuideDialog({
   const details = useQuery({
     queryKey: ['exercises', currentExercise.id, 'details'],
     queryFn: () => api<Exercise>(`/api/v1/programs/exercises/${currentExercise.id}`),
+  });
+  const history = useQuery({
+    queryKey: ['exercises', currentExercise.id, 'history'],
+    queryFn: () => api<ExerciseHistory>(`/api/v1/programs/exercises/${currentExercise.id}/history`),
   });
   const guide = details.data?.guide;
   const primaryMuscles = useMemo(
@@ -222,6 +227,12 @@ export function ExerciseGuideDialog({
                   </section>
                 )}
               </div>
+
+              <ExerciseProgressPanel
+                data={history.data}
+                error={history.error instanceof Error ? history.error : null}
+                isLoading={history.isLoading}
+              />
 
               {!!alternatives.length && (
                 <section className="exercise-guide-section exercise-guide-alternatives">

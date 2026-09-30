@@ -28,6 +28,8 @@ WorkoutCompletionFeedback = Literal["easier_than_expected", "as_expected", "hard
 WorkoutPersonalRecordKind = Literal["max_load", "best_set_volume"]
 MuscleContributionRole = Literal["primary", "secondary"]
 MuscleWorkloadTrend = Literal["increased", "decreased", "unchanged", "no_comparable_data"]
+ExerciseRepRange = Literal["1-5", "6-10", "11-15", "16+"]
+ExerciseProgressionEventKind = Literal["confirm", "adjust", "reject"]
 WORKOUT_COMPLETION_NOTE_MAX_LENGTH = 500
 
 
@@ -553,6 +555,118 @@ class ExerciseTrainingProgression(BaseModel):
     volume_recorded_sets: int
     history_truncated: bool
     sessions: list[ExerciseTrainingSession]
+
+
+class ExerciseHistoryWorkout(BaseModel):
+    workout_id: int = Field(ge=1)
+    workout_title: str
+    performed_on: date
+    completed_at: datetime | None = None
+
+
+class ExerciseHistorySet(BaseModel):
+    set_number: int = Field(ge=1)
+    reps: int | None = Field(default=None, ge=0)
+    load_kg: float | None = Field(default=None, ge=0)
+    volume_kg: float | None = Field(default=None, ge=0)
+    rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
+    set_kind: SetKind | None = None
+    planned_role: PrescriptionRole | None = None
+    analytics_bucket: Literal["working", "preparation", "intensifier"]
+    pr_eligible: bool
+
+
+class ExerciseHistorySession(BaseModel):
+    workout: ExerciseHistoryWorkout
+    workout_exercise_id: int = Field(ge=1)
+    prescribed_reps: str
+    completed_set_count: int = Field(ge=0)
+    authoritative_set_count: int = Field(ge=0)
+    reps_total: int | None = Field(default=None, ge=0)
+    max_authoritative_load_kg: float | None = Field(default=None, ge=0)
+    best_set_volume_kg: float | None = Field(default=None, ge=0)
+    estimated_1rm_kg: float | None = Field(default=None, ge=0)
+    sets: list[ExerciseHistorySet]
+
+
+class ExerciseHistoryMetric(BaseModel):
+    value_kg: float = Field(gt=0)
+    workout: ExerciseHistoryWorkout
+    reps: int | None = Field(default=None, ge=0)
+
+
+class ExerciseRepPR(BaseModel):
+    range_key: ExerciseRepRange
+    range_label: str
+    min_reps: int = Field(ge=1)
+    max_reps: int | None = Field(default=None, ge=1)
+    best_reps: int = Field(ge=1)
+    best_reps_workout: ExerciseHistoryWorkout
+    best_load_kg: float | None = Field(default=None, gt=0)
+    best_load_workout: ExerciseHistoryWorkout | None = None
+
+
+class ExerciseEstimated1RM(BaseModel):
+    kind: Literal["estimated"] = "estimated"
+    formula: Literal["brzycki"] = "brzycki"
+    value_kg: float = Field(gt=0)
+    workout: ExerciseHistoryWorkout
+    reps: int = Field(ge=1, le=10)
+    load_kg: float = Field(gt=0)
+
+
+class ExerciseProgressionPoint(BaseModel):
+    performed_on: date
+    workout_id: int = Field(ge=1)
+    max_reps: int | None = Field(default=None, ge=0)
+    max_authoritative_load_kg: float | None = Field(default=None, ge=0)
+    estimated_1rm_kg: float | None = Field(default=None, ge=0)
+    authoritative_set_count: int = Field(ge=0)
+
+
+class ExerciseProgressionEvent(BaseModel):
+    event_id: int = Field(ge=1)
+    event_kind: ExerciseProgressionEventKind
+    proposal_id: str
+    target_workout_id: int | None = Field(default=None, ge=1)
+    exercise_id: int = Field(ge=1)
+    rule_id: str | None = None
+    rule_kind: str | None = None
+    rule_snapshot: dict[str, object] = Field(default_factory=dict)
+    source_evidence_ids: list[str] = Field(default_factory=list)
+    reason_codes: list[str] = Field(default_factory=list)
+    proposed_weight_kg: float | None = Field(default=None, ge=0)
+    adjusted_weight_kg: float | None = Field(default=None, ge=0)
+    result: dict[str, object] | None = None
+    created_at: datetime
+
+
+class ExerciseHistoryWindow(BaseModel):
+    days: Literal[7, 30, 90]
+    period_start: date
+    period_end: date
+    performed_session_count: int = Field(ge=0)
+    completed_set_count: int = Field(ge=0)
+    authoritative_set_count: int = Field(ge=0)
+    reps_total: int | None = Field(default=None, ge=0)
+    best_authoritative_load_kg: float | None = Field(default=None, ge=0)
+    estimated_1rm_kg: float | None = Field(default=None, ge=0)
+
+
+class ExerciseHistoryResponse(BaseModel):
+    exercise_id: int = Field(ge=1)
+    exercise_title: str
+    metric_type: str
+    load_unit: Literal["kg"] | None = None
+    last_performed: ExerciseHistoryWorkout | None = None
+    best_authoritative_load: ExerciseHistoryMetric | None = None
+    estimated_1rm: ExerciseEstimated1RM | None = None
+    rep_prs: list[ExerciseRepPR]
+    windows: list[ExerciseHistoryWindow]
+    recent_sessions: list[ExerciseHistorySession]
+    progression: list[ExerciseProgressionPoint]
+    progression_events: list[ExerciseProgressionEvent]
+    history_truncated: bool
 
 
 class RirDistributionBucket(BaseModel):

@@ -928,6 +928,34 @@ async function mockApi(
           },
         },
       });
+    if (path.endsWith('/programs/exercises/1/history'))
+      return route.fulfill({
+        json: {
+          exercise_id: 1,
+          exercise_title: 'Тяга блока',
+          metric_type: 'strength',
+          load_unit: 'kg',
+          last_performed: null,
+          best_authoritative_load: null,
+          estimated_1rm: null,
+          rep_prs: [],
+          windows: [7, 30, 90].map((days) => ({
+            days,
+            period_start: '2030-01-01',
+            period_end: '2030-01-10',
+            performed_session_count: 0,
+            completed_set_count: 0,
+            authoritative_set_count: 0,
+            reps_total: 0,
+            best_authoritative_load_kg: null,
+            estimated_1rm_kg: null,
+          })),
+          recent_sessions: [],
+          progression: [],
+          progression_events: [],
+          history_truncated: false,
+        },
+      });
     if (path.endsWith('/programs/exercises'))
       return route.fulfill({
         json: [

@@ -5,6 +5,7 @@ export type User = ApiSchemas['UserResponse'];
 export type UserProfile = ApiSchemas['UserProfileResponse'];
 export type UserProfileUpdate = ApiSchemas['UserProfileUpdate'];
 export type Exercise = ApiSchemas['ExerciseCatalogItem'];
+export type ExerciseHistory = ApiSchemas['ExerciseHistoryResponse'];
 export type ExerciseGuide = ApiSchemas['ExerciseGuide'];
 export type PublicExerciseSummary = ApiSchemas['PublicExerciseSummary'];
 export type PublicExerciseDetail = ApiSchemas['PublicExerciseDetail'];
