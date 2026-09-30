@@ -312,7 +312,10 @@ class WorkerEventGuard:
             text = line
         try:
             raw = json.loads(text)
-        except json.JSONDecodeError, TypeError:
+        except json.JSONDecodeError:
+            self.malformed_lines += 1
+            return GuardDecision()
+        except TypeError:
             self.malformed_lines += 1
             return GuardDecision()
         if not isinstance(raw, Mapping):

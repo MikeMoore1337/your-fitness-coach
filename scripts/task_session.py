@@ -87,6 +87,7 @@ CONTROLLER_ALLOWED_PATHS = frozenset(
         "scripts/issue_workflow.py",
         "scripts/run_task_delivery.py",
         "scripts/task_session.py",
+        "scripts/worker_guard.py",
         "tests/test_archive_backlog_task.py",
         "tests/test_artifact_manager.py",
         "tests/test_deployment_contract.py",
