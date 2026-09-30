@@ -115,11 +115,10 @@ run остаётся добровольной диагностикой и не �
 snapshot.
 
 PR CI не запускается на `pull_request_review` event и не вызывает внешний Codex Code Review.
-Внутри обычного `pull_request` CI обязательный job `codex-security-review` выполняет только
-repository-native security `diff` review. Merge-ready определяется exact-head `checks`,
-deterministic quality/policy checks, security gate, актуальной provenance, mergeability и resolved
-threads. Codex review request не создаётся controller; исторические external review comments не
-меняют merge decision.
+Внутри обычного `pull_request` CI обязательны `codeql-security` и `security-audit`. Merge-ready
+определяется exact-head `checks`, deterministic quality/policy/security checks, актуальной
+provenance, mergeability и resolved threads. Codex review request не создаётся controller;
+исторические external review comments не меняют merge decision.
 
 ## Leases и безопасный closeout
 
