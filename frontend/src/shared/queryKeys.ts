@@ -22,6 +22,8 @@ export const queryKeys = {
     agenda: (dateFrom: string, dateTo: string) => ['coach', 'agenda', dateFrom, dateTo] as const,
     clients: ['coach', 'clients'] as const,
     clientAnalytics: (clientId: number) => ['coach', 'client', clientId, 'analytics'] as const,
+    clientTrainingAnalytics: (clientId: number) =>
+      ['coach', 'client', clientId, 'training-analytics'] as const,
     clientSummary: (clientId: number) => ['coach', 'client', clientId, 'summary'] as const,
     clientSummaries: ['coach', 'client-summaries'] as const,
     clientWorkouts: (clientId: number) => ['coach', 'client', clientId, 'workouts'] as const,

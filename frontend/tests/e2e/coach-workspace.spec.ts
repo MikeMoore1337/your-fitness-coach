@@ -576,6 +576,29 @@ async function mockCoachWorkspace(
           personal_records: [],
         },
       });
+    if (path.endsWith('/coach/clients/11/training-analytics'))
+      return route.fulfill({
+        json: {
+          muscle_group_workload: [
+            {
+              muscle_id: 'chest',
+              muscle_name: 'Грудные',
+              current: {
+                completed_set_count: 12,
+                primary_completed_set_count: 12,
+                secondary_completed_set_count: 0,
+                completed_session_count: 3,
+                frequency_per_week: 0.7,
+              },
+              previous: null,
+              completed_set_count_change: null,
+              frequency_per_week_change: null,
+              trend: 'no_comparable_data',
+              contributing_exercises: [],
+            },
+          ],
+        },
+      });
     if (path.endsWith('/coach/clients/11/weekly-check-ins'))
       return route.fulfill({
         json: {
@@ -925,6 +948,24 @@ test('операционный roster даёт факты и не загружа
     'https://example.test/join/test',
   );
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1440);
+});
+
+test('trainer loads the canonical workload contract only on request', async ({ page }) => {
+  const trainingRequests: string[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname.endsWith('/coach/clients/11/training-analytics')) {
+      trainingRequests.push(request.url());
+    }
+  });
+  await openCoach(page);
+
+  await page.locator('#coach-client-progress > summary').click();
+  await expect(page.getByRole('button', { name: 'Показать данные' })).toBeVisible();
+  expect(trainingRequests).toEqual([]);
+  await page.getByRole('button', { name: 'Показать данные' }).click();
+  await expect(page.getByText('Грудные', { exact: true })).toBeVisible();
+  expect(trainingRequests).toHaveLength(1);
+  expect(trainingRequests[0]).toContain('/coach/clients/11/training-analytics?period_days=30');
 });
 
 test('Task 291 показывает action-first Today и ленивый контекст клиента', async ({ page }) => {

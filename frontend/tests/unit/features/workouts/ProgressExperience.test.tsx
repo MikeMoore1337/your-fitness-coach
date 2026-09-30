@@ -150,8 +150,14 @@ function makeAnalytics(): TrainingAnalytics {
     period_days: 30,
     period_start: '2030-01-01',
     period_end: '2030-01-30',
+    previous_period_start: '2029-12-02',
+    previous_period_end: '2029-12-31',
     exercise_history_limit: 20,
     completed_set_count: 28,
+    completed_workout_count: 7,
+    frequency_per_week: 1.63,
+    previous_completed_workout_count: 6,
+    previous_frequency_per_week: 1.4,
     reps_total: 226,
     reps_recorded_sets: 28,
     external_load_volume_kg: 12400,
@@ -218,6 +224,30 @@ function makeAnalytics(): TrainingAnalytics {
     ],
     secondary_muscle_exposure: [
       { muscle_id: 'triceps', muscle_name: 'Трицепс', completed_set_count: 18 },
+    ],
+    muscle_group_workload: [
+      {
+        muscle_id: 'chest',
+        muscle_name: 'Грудные',
+        current: {
+          completed_set_count: 18,
+          primary_completed_set_count: 18,
+          secondary_completed_set_count: 0,
+          completed_session_count: 6,
+          frequency_per_week: 1.4,
+        },
+        previous: {
+          completed_set_count: 12,
+          primary_completed_set_count: 12,
+          secondary_completed_set_count: 0,
+          completed_session_count: 4,
+          frequency_per_week: 0.93,
+        },
+        completed_set_count_change: 6,
+        frequency_per_week_change: 0.47,
+        trend: 'increased',
+        contributing_exercises: [],
+      },
     ],
     completed_sets_without_muscle_metadata: 0,
     data_sufficiency: {
@@ -544,7 +574,11 @@ describe('ProgressExperience', () => {
     renderExperience('?section=progress&progress_view=training');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Сводка временно недоступна');
-    expect(await screen.findByText('Жим штанги лёжа')).toBeVisible();
+    const history = screen
+      .getByRole('heading', { name: 'История упражнений' })
+      .closest('.progress-subsection');
+    expect(history).not.toBeNull();
+    expect(await within(history as HTMLElement).findByText('Жим штанги лёжа')).toBeVisible();
     expect(screen.getByText('28')).toBeVisible();
   });
 });

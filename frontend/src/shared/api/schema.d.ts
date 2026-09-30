@@ -9111,6 +9111,56 @@ export interface components {
             /** Completed Set Count */
             completed_set_count: number;
         };
+        /** MuscleWorkloadExercise */
+        MuscleWorkloadExercise: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string;
+            /** Contribution Roles */
+            contribution_roles: ("primary" | "secondary")[];
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Performed Session Count */
+            performed_session_count: number;
+            /** History Truncated */
+            history_truncated: boolean;
+            /** Sessions */
+            sessions: components["schemas"]["ExerciseTrainingSession"][];
+        };
+        /** MuscleWorkloadItem */
+        MuscleWorkloadItem: {
+            /** Muscle Id */
+            muscle_id: string;
+            /** Muscle Name */
+            muscle_name: string;
+            current: components["schemas"]["MuscleWorkloadPeriod"] | null;
+            previous: components["schemas"]["MuscleWorkloadPeriod"] | null;
+            /** Completed Set Count Change */
+            completed_set_count_change?: number | null;
+            /** Frequency Per Week Change */
+            frequency_per_week_change?: number | null;
+            /**
+             * Trend
+             * @enum {string}
+             */
+            trend: "increased" | "decreased" | "unchanged" | "no_comparable_data";
+            /** Contributing Exercises */
+            contributing_exercises: components["schemas"]["MuscleWorkloadExercise"][];
+        };
+        /** MuscleWorkloadPeriod */
+        MuscleWorkloadPeriod: {
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Primary Completed Set Count */
+            primary_completed_set_count: number;
+            /** Secondary Completed Set Count */
+            secondary_completed_set_count: number;
+            /** Completed Session Count */
+            completed_session_count: number;
+            /** Frequency Per Week */
+            frequency_per_week: number;
+        };
         /** NaturalFoodCandidate */
         NaturalFoodCandidate: {
             food: components["schemas"]["FoodResponse"];
@@ -12298,10 +12348,28 @@ export interface components {
              * Format: date
              */
             period_end: string;
+            /**
+             * Previous Period Start
+             * Format: date
+             */
+            previous_period_start: string;
+            /**
+             * Previous Period End
+             * Format: date
+             */
+            previous_period_end: string;
             /** Exercise History Limit */
             exercise_history_limit: number;
             /** Completed Set Count */
             completed_set_count: number;
+            /** Completed Workout Count */
+            completed_workout_count: number;
+            /** Frequency Per Week */
+            frequency_per_week: number;
+            /** Previous Completed Workout Count */
+            previous_completed_workout_count: number;
+            /** Previous Frequency Per Week */
+            previous_frequency_per_week: number;
             /** Reps Total */
             reps_total?: number | null;
             /** Reps Recorded Sets */
@@ -12317,6 +12385,8 @@ export interface components {
             primary_muscle_exposure: components["schemas"]["MuscleSetExposure"][];
             /** Secondary Muscle Exposure */
             secondary_muscle_exposure: components["schemas"]["MuscleSetExposure"][];
+            /** Muscle Group Workload */
+            muscle_group_workload: components["schemas"]["MuscleWorkloadItem"][];
             /** Completed Sets Without Muscle Metadata */
             completed_sets_without_muscle_metadata: number;
             data_sufficiency: components["schemas"]["TrainingDataSufficiency"];

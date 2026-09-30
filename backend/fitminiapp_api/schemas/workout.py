@@ -26,6 +26,8 @@ WorkoutAdaptationReason = Literal[
 ]
 WorkoutCompletionFeedback = Literal["easier_than_expected", "as_expected", "harder_than_expected"]
 WorkoutPersonalRecordKind = Literal["max_load", "best_set_volume"]
+MuscleContributionRole = Literal["primary", "secondary"]
+MuscleWorkloadTrend = Literal["increased", "decreased", "unchanged", "no_comparable_data"]
 WORKOUT_COMPLETION_NOTE_MAX_LENGTH = 500
 
 
@@ -571,12 +573,47 @@ class MuscleSetExposure(BaseModel):
     completed_set_count: int
 
 
+class MuscleWorkloadPeriod(BaseModel):
+    completed_set_count: int
+    primary_completed_set_count: int
+    secondary_completed_set_count: int
+    completed_session_count: int
+    frequency_per_week: float
+
+
+class MuscleWorkloadExercise(BaseModel):
+    exercise_id: int
+    exercise_title: str
+    contribution_roles: list[MuscleContributionRole]
+    completed_set_count: int
+    performed_session_count: int
+    history_truncated: bool
+    sessions: list[ExerciseTrainingSession]
+
+
+class MuscleWorkloadItem(BaseModel):
+    muscle_id: str
+    muscle_name: str
+    current: MuscleWorkloadPeriod | None
+    previous: MuscleWorkloadPeriod | None
+    completed_set_count_change: int | None = None
+    frequency_per_week_change: float | None = None
+    trend: MuscleWorkloadTrend
+    contributing_exercises: list[MuscleWorkloadExercise]
+
+
 class TrainingAnalyticsResponse(BaseModel):
     period_days: int
     period_start: date
     period_end: date
+    previous_period_start: date
+    previous_period_end: date
     exercise_history_limit: int
     completed_set_count: int
+    completed_workout_count: int
+    frequency_per_week: float
+    previous_completed_workout_count: int
+    previous_frequency_per_week: float
     reps_total: int | None = None
     reps_recorded_sets: int
     external_load_volume_kg: float | None = None
@@ -585,6 +622,7 @@ class TrainingAnalyticsResponse(BaseModel):
     rir: RirTrainingAnalytics
     primary_muscle_exposure: list[MuscleSetExposure]
     secondary_muscle_exposure: list[MuscleSetExposure]
+    muscle_group_workload: list[MuscleWorkloadItem]
     completed_sets_without_muscle_metadata: int
     data_sufficiency: TrainingDataSufficiency
 

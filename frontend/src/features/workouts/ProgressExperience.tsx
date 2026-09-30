@@ -6,7 +6,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
 import { DataConfidence } from '../../shared/ui/DataConfidence';
-import { QuantitativeProgress, RankedBars, TimeSeriesChart } from '../../shared/ui/DataViz';
+import { QuantitativeProgress, TimeSeriesChart } from '../../shared/ui/DataViz';
 import { dateInputValue, detectedTimeZone, formatCalendarDate } from '../../shared/dateTime';
 import {
   Badge,
@@ -22,6 +22,7 @@ import { NutritionPeriodReport, type ControlledNutritionPeriod } from './Nutriti
 import { Icon } from '../../shared/ui/Icon';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
+import { MuscleWorkloadList as SharedMuscleWorkloadList } from './MuscleWorkload';
 import {
   nutritionPeriodForProgress,
   parseProgressSelection,
@@ -487,7 +488,11 @@ function TrainingFacts({
       <div>
         <dt>Частота</dt>
         <dd>
-          {summary ? `${formatNumber(summary.training.frequency_per_week, 2)} в неделю` : '—'}
+          {formatNumber(
+            analytics.frequency_per_week ?? summary?.training.frequency_per_week ?? 0,
+            2,
+          )}{' '}
+          в неделю
         </dd>
       </div>
       <div>
@@ -609,33 +614,6 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
   );
 }
 
-function ExposureList({
-  items,
-  title,
-}: {
-  items: TrainingAnalytics['primary_muscle_exposure'];
-  title: string;
-}) {
-  const visible = items.slice(0, 8);
-  return (
-    <div className="progress-exposure">
-      <h3>{title}</h3>
-      {!visible.length ? (
-        <p className="progress-note">Нет структурированных данных по мышечным группам.</p>
-      ) : (
-        <RankedBars
-          items={visible.map((item) => ({
-            label: item.muscle_name,
-            unit: 'подх.',
-            value: item.completed_set_count,
-          }))}
-          label={title}
-        />
-      )}
-    </div>
-  );
-}
-
 function TrainingSection({
   analytics,
   summary,
@@ -687,22 +665,21 @@ function TrainingSection({
           <div className="progress-subsection">
             <div className="progress-subsection__head">
               <div>
+                <h3>Распределение по мышечным группам</h3>
+                <p>Текущий период, предыдущий равный период и упражнения-источники.</p>
+              </div>
+            </div>
+            <SharedMuscleWorkloadList analytics={analytics.data} />
+          </div>
+          <div className="progress-subsection">
+            <div className="progress-subsection__head">
+              <div>
                 <h3>История упражнений</h3>
                 <p>Раскройте упражнение, чтобы увидеть тренировки и записанные подходы.</p>
               </div>
               <a href="#progress-methodology">Как читать данные</a>
             </div>
             <ExerciseHistory analytics={analytics.data} />
-          </div>
-          <div className="progress-training-details">
-            <ExposureList
-              title="Основные мышечные группы"
-              items={analytics.data.primary_muscle_exposure}
-            />
-            <ExposureList
-              title="Дополнительные мышечные группы"
-              items={analytics.data.secondary_muscle_exposure}
-            />
           </div>
           <details className="progress-methodology" id="progress-methodology">
             <summary>Как читать тренировочные показатели</summary>
@@ -713,7 +690,8 @@ function TrainingSection({
               </p>
               <p>
                 Подход отдельно учитывается для каждой явно связанной основной и дополнительной
-                мышечной группы. Эти значения не складываются в «эффективные подходы».
+                мышечной группы. Эти значения не складываются в «эффективные подходы», а роль
+                указана рядом с упражнением.
               </p>
               <p>
                 Повторы в запасе необязательны и не используются для вывода об усталости или
