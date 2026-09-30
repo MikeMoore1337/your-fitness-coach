@@ -535,6 +535,173 @@ test('program history keeps current block, readable revisions and workout return
   await expect(mobilePage.locator('#program-revision-77-4')).toHaveJSProperty('open', true);
 });
 
+test('AI adaptation stays bounded across confirm, reject and disabled core states', async ({
+  browser,
+  mobilePage,
+  tma,
+  tmaPage,
+}) => {
+  await installPlatformApi(mobilePage, {
+    browserSession: true,
+    programHistory: 'many',
+    aiAdaptation: 'available',
+  });
+  await installPlatformApi(tmaPage, { programHistory: 'many', aiAdaptation: 'available' });
+  await Promise.all([
+    mobilePage.goto('/app?section=programs&view=manage'),
+    tmaPage.goto('/app?section=programs&view=manage'),
+  ]);
+  await tma.setTheme('dark');
+
+  const mobileAdaptation = mobilePage.getByTestId('ai-adaptation');
+  await expect(
+    mobileAdaptation.getByRole('button', { name: 'Предложить адаптацию с AI' }),
+  ).toBeVisible();
+  await mobileAdaptation.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
+  const mobileGenerate = mobilePage.waitForRequest(
+    (request) =>
+      request.method() === 'POST' &&
+      request.url().endsWith('/api/v1/ai-coach/adaptations/proposals'),
+  );
+  await mobileAdaptation.getByRole('button', { name: 'Сформировать предложение' }).click();
+  expect((await mobileGenerate).postDataJSON()).toEqual({
+    program_id: 77,
+    expected_revision_number: 4,
+    target_workout_id: 943,
+    message: 'Предложи безопасную адаптацию текущей программы с учётом ближайшей тренировки.',
+    locale: 'ru',
+  });
+  await expect(mobileAdaptation.getByText(/Текущая прогрессия допускает/)).toBeVisible();
+  await expect(mobileAdaptation.getByText(/результаты прогрессии/)).toBeVisible();
+  await expect(mobileAdaptation).not.toContainText('evidence:progression');
+  const mobileConfirm = mobileAdaptation.getByRole('button', { name: 'Подтвердить адаптацию' });
+  const mobileReject = mobileAdaptation.getByRole('button', { name: 'Отклонить' });
+  await mobileConfirm.scrollIntoViewIfNeeded();
+  await expectNoOverlap(mobileConfirm, mobilePage.locator('#appBottomNav'));
+  await expectNoOverlap(mobileReject, mobilePage.locator('#appBottomNav'));
+  await waitForVisualStability(mobilePage);
+  await mobileAdaptation.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/mobile-light-review.png',
+  });
+
+  const mobileReview = mobilePage.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/review'),
+  );
+  await mobileConfirm.click();
+  expect((await mobileReview).postDataJSON()).toEqual({
+    proposal_id: 'task-509-proposal',
+    proposal_token: 'task-509-proposal-token',
+    expected_revision_number: 4,
+    decision: 'confirm',
+  });
+  await expect(mobileAdaptation).toHaveAttribute('data-state', 'confirmed');
+  await expectNoHorizontalOverflow(mobilePage);
+  await mobileAdaptation.scrollIntoViewIfNeeded();
+  await expectNoOverlap(mobileAdaptation, mobilePage.locator('#appBottomNav'));
+  await waitForVisualStability(mobilePage);
+  await mobilePage.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/mobile-light-confirmed.png',
+  });
+
+  const tmaAdaptation = tmaPage.getByTestId('ai-adaptation');
+  await expect(
+    tmaAdaptation.getByRole('button', { name: 'Предложить адаптацию с AI' }),
+  ).toBeVisible();
+  await tmaAdaptation.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
+  const tmaGenerate = tmaPage.waitForRequest(
+    (request) =>
+      request.method() === 'POST' &&
+      request.url().endsWith('/api/v1/ai-coach/adaptations/proposals'),
+  );
+  await tmaAdaptation.getByRole('button', { name: 'Сформировать предложение' }).click();
+  expect((await tmaGenerate).postDataJSON()).toMatchObject({
+    program_id: 77,
+    expected_revision_number: 4,
+    target_workout_id: 943,
+    locale: 'ru',
+  });
+  await expect(tmaAdaptation.getByRole('button', { name: 'Отклонить' })).toBeVisible();
+  const tmaConfirm = tmaAdaptation.getByRole('button', { name: 'Подтвердить адаптацию' });
+  const tmaReject = tmaAdaptation.getByRole('button', { name: 'Отклонить' });
+  await tmaConfirm.scrollIntoViewIfNeeded();
+  await expectNoOverlap(tmaConfirm, tmaPage.locator('#appBottomNav'));
+  await expectNoOverlap(tmaReject, tmaPage.locator('#appBottomNav'));
+  await waitForVisualStability(tmaPage);
+  await tmaAdaptation.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/tma-dark-review.png',
+  });
+  const tmaReview = tmaPage.waitForRequest(
+    (request) => request.method() === 'POST' && request.url().endsWith('/review'),
+  );
+  await tmaReject.click();
+  expect((await tmaReview).postDataJSON()).toEqual({
+    proposal_id: 'task-509-proposal',
+    proposal_token: 'task-509-proposal-token',
+    expected_revision_number: 4,
+    decision: 'reject',
+  });
+  await expect(tmaAdaptation).toHaveAttribute('data-state', 'rejected');
+  await expectNoHorizontalOverflow(tmaPage);
+  await tmaAdaptation.scrollIntoViewIfNeeded();
+  await expectNoOverlap(tmaAdaptation, tmaPage.locator('#appBottomNav'));
+  await waitForVisualStability(tmaPage);
+  await tmaPage.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/tma-dark-rejected.png',
+  });
+
+  const desktopReviewPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await installPlatformApi(desktopReviewPage, {
+    browserSession: true,
+    programHistory: 'many',
+    aiAdaptation: 'available',
+  });
+  await desktopReviewPage.goto('/app?section=programs&view=manage');
+  const desktopReview = desktopReviewPage.getByTestId('ai-adaptation');
+  await desktopReview.getByRole('button', { name: 'Предложить адаптацию с AI' }).click();
+  const desktopGenerate = desktopReviewPage.waitForRequest(
+    (request) =>
+      request.method() === 'POST' &&
+      request.url().endsWith('/api/v1/ai-coach/adaptations/proposals'),
+  );
+  await desktopReview.getByRole('button', { name: 'Сформировать предложение' }).click();
+  expect((await desktopGenerate).postDataJSON()).toMatchObject({
+    program_id: 77,
+    expected_revision_number: 4,
+    target_workout_id: 943,
+    locale: 'ru',
+  });
+  await expect(desktopReview.getByRole('button', { name: 'Подтвердить адаптацию' })).toBeVisible();
+  await desktopReview.scrollIntoViewIfNeeded();
+  await waitForVisualStability(desktopReviewPage);
+  await desktopReviewPage.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/desktop-light-review.png',
+  });
+  await desktopReviewPage.close();
+
+  const desktop = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const desktopProposalRequests: string[] = [];
+  desktop.on('request', (request) => {
+    if (request.url().includes('/api/v1/ai-coach/adaptations/proposals')) {
+      desktopProposalRequests.push(request.url());
+    }
+  });
+  await installPlatformApi(desktop, { browserSession: true, programHistory: 'many' });
+  await desktop.goto('/app?section=programs&view=manage');
+  const desktopAdaptation = desktop.getByTestId('ai-adaptation');
+  await expect(desktopAdaptation).toHaveAttribute('data-state', 'disabled');
+  await expect(
+    desktopAdaptation.getByRole('button', { name: 'AI-адаптация недоступна' }),
+  ).toBeDisabled();
+  await expect(desktop.getByText('Текущий тренировочный блок')).toBeVisible();
+  expect(desktopProposalRequests).toEqual([]);
+  await desktopAdaptation.scrollIntoViewIfNeeded();
+  await waitForVisualStability(desktop);
+  await desktop.screenshot({
+    path: '../.artifacts/tasks/509/evidence/screenshots/desktop-light-disabled.png',
+  });
+  await desktop.close();
+});
+
 test('program history renders empty, one-block and full lifecycle states honestly', async ({
   browser,
 }) => {

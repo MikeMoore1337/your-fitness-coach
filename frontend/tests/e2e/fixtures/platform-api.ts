@@ -18,6 +18,7 @@ export interface PlatformApiOptions {
   longExerciseName?: boolean;
   notificationState?: 'empty' | 'populated' | 'unlinked' | 'stale';
   accountExportState?: 'none' | 'ready' | 'expired' | 'error';
+  aiAdaptation?: 'disabled' | 'available';
   authProviders?: string[];
   trainerActive?: boolean;
   measurementHistory?: 'none' | 'many';
@@ -649,6 +650,7 @@ export async function installPlatformApi(
     return value.toISOString().slice(0, 10);
   };
   const programHistory = options.programHistory ?? null;
+  const aiAdaptation = options.aiAdaptation ?? 'disabled';
   const archivedBlock = {
     id: 300,
     user_program_id: 77,
@@ -1300,7 +1302,90 @@ export async function installPlatformApi(
     }
     if (path.endsWith('/ai-coach/status')) {
       return route.fulfill({
-        json: { ui_enabled: false, generic_available: false, personal_available: false },
+        json:
+          aiAdaptation === 'available'
+            ? { ui_enabled: true, generic_available: true, personal_available: true }
+            : { ui_enabled: false, generic_available: false, personal_available: false },
+      });
+    }
+    if (aiAdaptation === 'available' && path.endsWith('/ai-coach/consent')) {
+      return route.fulfill({
+        json: {
+          status: 'granted',
+          scope: 'personal_ai_coach',
+          consent_version: 'v1',
+          categories: ['workout'],
+          purpose: 'bounded adaptation',
+          provider_name: 'controlled provider',
+          provider_policy_revision: 'v1',
+          retention_notice: 'short lived',
+          consent_source: 'settings',
+          granted_at: '2026-09-30T10:00:00Z',
+          revoked_at: null,
+        },
+      });
+    }
+    if (
+      aiAdaptation === 'available' &&
+      request.method() === 'POST' &&
+      path.endsWith('/ai-coach/adaptations/proposals')
+    ) {
+      return route.fulfill({
+        json: {
+          outcome: 'answer',
+          proposal: {
+            proposal_id: 'task-509-proposal',
+            proposal_type: 'volume_or_frequency_adjustment',
+            target_program_id: 77,
+            target_revision_id: 14,
+            target_revision_number: currentRevisionNumber,
+            target_block_id: 302,
+            target_exercise_id: 11,
+            explanation:
+              'Текущая прогрессия допускает аккуратное снижение объёма на ближайшей тренировке.',
+            suggested_change: {
+              operation: 'update_prescription',
+              replacement_candidate_ref: null,
+              prescribed_sets: 3,
+              prescribed_reps: '8–10',
+              rest_seconds: 90,
+              effective_scope: 'next_workout',
+            },
+            evidence_ids: ['evidence:progression', 'evidence:revision'],
+            deterministic_rule_relationship: 'supports_deterministic_rule',
+            limitations: ['Подтверждение пользователя обязательно.'],
+            requires_confirmation: true,
+          },
+          proposal_token: 'task-509-proposal-token',
+          limitations: [],
+          safety_category: 'clear',
+          prompt_version: 'ai-coach-adaptation-v1',
+          schema_version: 'ai-coach-adaptation-output-v1',
+          policy_version: 'ai-coach-adaptation-policy-v1',
+          request_id: 'task-509-request',
+          quota: null,
+        },
+      });
+    }
+    if (
+      aiAdaptation === 'available' &&
+      request.method() === 'POST' &&
+      path.endsWith('/ai-coach/adaptations/proposals/task-509-proposal/review')
+    ) {
+      const body = request.postDataJSON() as { decision?: string; proposal_id?: string };
+      const decision = body.decision === 'confirm' ? 'confirm' : 'reject';
+      return route.fulfill({
+        json: {
+          outcome: 'answer',
+          proposal_id: body.proposal_id ?? 'task-509-proposal',
+          decision,
+          applied: decision === 'confirm',
+          idempotent: false,
+          current_revision_number:
+            decision === 'confirm' ? currentRevisionNumber + 1 : currentRevisionNumber,
+          limitations: [],
+          quota: null,
+        },
       });
     }
     if (path.endsWith('/me/acquisition') && request.method() === 'POST') {
