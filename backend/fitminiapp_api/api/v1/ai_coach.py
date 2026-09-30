@@ -8,6 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from fitminiapp_api.ai_coach.adaptation import (
+    AdaptationError,
+    ai_coach_adaptation_service,
+)
 from fitminiapp_api.ai_coach.chat_service import (
     CHAT_FAILURE_CONTEXT,
     CHAT_FAILURE_INTERNAL_ERROR,
@@ -67,6 +71,10 @@ from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.ai_coach import AiCoachConversation
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.ai_coach import (
+    AiCoachAdaptationGenerateRequest,
+    AiCoachAdaptationProposalResponse,
+    AiCoachAdaptationReviewRequest,
+    AiCoachAdaptationReviewResponse,
     AiCoachConsentResponse,
     AiCoachConsentUpdateRequest,
     AiCoachContextAttachment,
@@ -1161,6 +1169,62 @@ def generate_ai_coach_answer(
             request_id=_request_key(request),
         ),
     )
+
+
+@router.post(
+    "/adaptations/proposals",
+    response_model=AiCoachAdaptationProposalResponse,
+)
+@limiter.limit("10/minute")
+def generate_ai_coach_adaptation_proposal(
+    payload: AiCoachAdaptationGenerateRequest,
+    request: Request,
+    current_user: User = Depends(require_ai_coach_user),
+    db: Session = Depends(get_db),
+) -> AiCoachAdaptationProposalResponse:
+    try:
+        return ai_coach_adaptation_service.generate(
+            db=db,
+            actor=current_user,
+            payload=payload,
+            request_id=_request_key(request),
+        )
+    except AdaptationError as exc:
+        detail = str(exc)
+        status_code = (
+            404
+            if detail in {"Assigned program not found", "Target exercise is not available"}
+            else 409
+        )
+        raise HTTPException(status_code=status_code, detail=detail) from exc
+
+
+@router.post(
+    "/adaptations/proposals/{proposal_id}/review",
+    response_model=AiCoachAdaptationReviewResponse,
+)
+@limiter.limit("20/minute")
+def review_ai_coach_adaptation_proposal(
+    proposal_id: str,
+    payload: AiCoachAdaptationReviewRequest,
+    request: Request,
+    current_user: User = Depends(require_ai_coach_user),
+    db: Session = Depends(get_db),
+) -> AiCoachAdaptationReviewResponse:
+    del request
+    if payload.proposal_id != proposal_id:
+        raise HTTPException(status_code=409, detail="AI proposal id mismatch")
+    try:
+        return ai_coach_adaptation_service.review(
+            db=db,
+            actor=current_user,
+            program_id=None,
+            payload=payload,
+        )
+    except AdaptationError as exc:
+        detail = str(exc)
+        status_code = 404 if detail == "Assigned program not found" else 409
+        raise HTTPException(status_code=status_code, detail=detail) from exc
 
 
 @router.get("/consent", response_model=AiCoachConsentResponse)
