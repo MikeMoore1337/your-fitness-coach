@@ -41,29 +41,22 @@ data/privacy/logging, AI/provider boundaries, secrets/dependencies и CI/deploy.
 Deterministic checks, Residual risk и итоговым audit status.
 ```
 
-## Automatic PR Security Review
+## Automatic PR Security Audit
 
-Каждый pull request автоматически запускает repository-native Codex review в режиме `diff` внутри
-основного `CI` workflow. Это обычный Codex через официальный `openai/codex-action`, а не внешний
-Codex Security Review service.
+Каждый pull request автоматически проходит бесплатный deterministic security audit внутри
+основного `CI` workflow. Он не вызывает OpenAI/Codex API и не требует `OPENAI_API_KEY`.
 
-Контракт:
+На каждом PR выполняются:
 
-- read-only permission profile и `drop-sudo`;
-- exact PR base/head diff;
-- structured JSON по `.github/security-review-output-schema.json`;
-- идемпотентный PR comment с последним результатом;
-- validated `CRITICAL`/`HIGH` -> job FAIL -> aggregate `checks` FAIL;
-- `MEDIUM`/`LOW` и unvalidated concerns -> comment, но gate PASS;
-- action failure/malformed result/missing credential -> fail-closed.
+- CodeQL `security-extended` для Python и JavaScript/TypeScript;
+- runtime dependency audit: `npm audit --omit=dev --audit-level=high` и `uv audit --locked`;
+- Trivy filesystem scan для vulnerabilities, misconfiguration и secrets с блокировкой на
+  `CRITICAL`/`HIGH`.
 
-Для запуска нужен GitHub Actions secret `OPENAI_API_KEY`. Для Dependabot-authored PR GitHub
-использует отдельный secret scope, поэтому тот же secret должен быть добавлен туда отдельно, если
-такие PR должны проходить semantic review автоматически. Fork PR секрет не получает и блокируется
-fail-closed вместо небезопасной передачи credential недоверенному checkout.
-
-Automation использует обычный API credential и его API usage/billing, а не отдельный
-`@codex security review` command.
+Jobs `codeql-security` и `security-audit` входят в aggregate `checks`, поэтому их failure
+блокирует merge. Это static/deterministic gate: scanner finding является candidate evidence,
+а не автоматически доказанной exploitability. Для проверки реального attack path используй
+repository-native Security Review вручную/условно через `$security-engineer`.
 
 ## Deterministic Security Audit
 
@@ -99,6 +92,5 @@ python scripts/skill_safety.py scan-all
 Не коммить токены, реальные персональные данные, raw production dumps и exploit payload, если
 безопасного минимального evidence достаточно.
 
-Repository-native Security Review не заменяет deterministic CI. В automatic PR mode он является
-обязательным semantic job внутри aggregate `checks`, но блокирует merge только на validated
-`CRITICAL`/`HIGH` либо при невозможности надёжно выполнить сам review.
+Repository-native Security Review не заменяет deterministic CI и не является обязательным
+платным LLM gate. Автоматический PR gate полностью deterministic и не расходует OpenAI API quota.
