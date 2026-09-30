@@ -218,6 +218,37 @@ def _controller_commit() -> dict[str, Any]:
     return {"commit": {"message": "[Controller] synthetic maintenance"}}
 
 
+def _merged_release_pr(
+    number: int,
+    merge_sha: str,
+    *,
+    branch: str,
+    title: str,
+    paths: list[str],
+    declared_count: int | None = None,
+) -> dict[str, Any]:
+    pull_request = _task_pr(number, str(number), "a" * 40, "b" * 40, merge_sha=merge_sha)
+    pull_request["title"] = title
+    pull_request["head"]["ref"] = branch
+    pull_request["changed_files"] = len(paths) if declared_count is None else declared_count
+    return pull_request
+
+
+def _release_github(
+    pull_requests: list[dict[str, Any]], files_by_pr: dict[int, list[str]]
+) -> FakeGitHub:
+    github = FakeGitHub("a" * 40)
+    github.associated_pulls = pull_requests
+    if pull_requests:
+        merge_sha = str(pull_requests[0]["merge_commit_sha"])
+        github.associated_pulls_by_commit[merge_sha] = pull_requests
+    for pull_request in pull_requests:
+        number = int(pull_request["number"])
+        github.pulls[number] = pull_request
+        github.files[number] = [{"filename": path} for path in files_by_pr[number]]
+    return github
+
+
 def _success_check(sha: str) -> dict[str, Any]:
     return {"name": "checks", "head_sha": sha, "status": "completed", "conclusion": "SUCCESS"}
 
@@ -4435,6 +4466,181 @@ def test_controller_pr_accepts_issue_workflow_contract_paths() -> None:
             {"filename": "tests/test_issue_workflow.py"},
         ]
     )
+
+
+@pytest.mark.parametrize("branch", ["codex/controller-foo", "task/999-controller-foo"])
+def test_controller_release_skips_allowlisted_diff_for_controller_and_task_branches(
+    branch: str,
+) -> None:
+    merge_sha = "c" * 40
+    pull_request = _merged_release_pr(
+        999,
+        merge_sha,
+        branch=branch,
+        title="[Controller] Foo",
+        paths=["scripts/task_session.py"],
+    )
+    result = task_session.classify_controller_release(
+        _release_github([pull_request], {999: ["scripts/task_session.py"]}),
+        deploy_sha=merge_sha,
+        repository="owner/repository",
+    )
+
+    assert result["controller_only"] is True
+    assert result["deploy"] is False
+
+
+@pytest.mark.parametrize(
+    ("branch", "title", "paths"),
+    [
+        ("task/999-product-change", "[Task 999] Product", ["backend/app.py"]),
+        ("task/999-product-change", "[Controller] Fake", ["backend/app.py"]),
+        ("codex/controller-foo", "[Controller] Fake", ["backend/app.py"]),
+        (
+            "task/999-mixed-change",
+            "[Controller] Mixed",
+            ["scripts/task_session.py", "backend/app.py"],
+        ),
+        ("task/999-unknown-change", "[Controller] Unknown", ["new/unknown.txt"]),
+    ],
+)
+def test_controller_release_defaults_to_application_deploy_for_non_controller_scope(
+    branch: str, title: str, paths: list[str]
+) -> None:
+    merge_sha = "c" * 40
+    pull_request = _merged_release_pr(
+        999,
+        merge_sha,
+        branch=branch,
+        title=title,
+        paths=paths,
+    )
+    result = task_session.classify_controller_release(
+        _release_github([pull_request], {999: paths}),
+        deploy_sha=merge_sha,
+        repository="owner/repository",
+    )
+
+    assert result["controller_only"] is False
+    assert result["deploy"] is True
+
+
+def test_controller_release_does_not_skip_mixed_pull_requests_sharing_merge_sha() -> None:
+    merge_sha = "c" * 40
+    controller_pr = _merged_release_pr(
+        999,
+        merge_sha,
+        branch="codex/controller-foo",
+        title="[Controller] Foo",
+        paths=["scripts/task_session.py"],
+    )
+    product_pr = _merged_release_pr(
+        1000,
+        merge_sha,
+        branch="task/1000-product-change",
+        title="[Task 1000] Product",
+        paths=["frontend/src/App.tsx"],
+    )
+
+    result = task_session.classify_controller_release(
+        _release_github(
+            [controller_pr, product_pr],
+            {999: ["scripts/task_session.py"], 1000: ["frontend/src/App.tsx"]},
+        ),
+        deploy_sha=merge_sha,
+        repository="owner/repository",
+    )
+
+    assert result["deploy"] is True
+
+
+def test_controller_release_defaults_to_application_deploy_for_incomplete_file_inventory() -> None:
+    merge_sha = "c" * 40
+    pull_request = _merged_release_pr(
+        999,
+        merge_sha,
+        branch="task/999-controller-foo",
+        title="[Controller] Foo",
+        paths=["scripts/task_session.py", "tests/test_task_session.py"],
+        declared_count=2,
+    )
+    result = task_session.classify_controller_release(
+        _release_github([pull_request], {999: ["scripts/task_session.py"]}),
+        deploy_sha=merge_sha,
+        repository="owner/repository",
+    )
+
+    assert result["deploy"] is True
+
+
+def test_controller_release_defaults_to_application_deploy_when_file_lookup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    merge_sha = "c" * 40
+    pull_request = _merged_release_pr(
+        999,
+        merge_sha,
+        branch="task/999-controller-foo",
+        title="[Controller] Foo",
+        paths=["scripts/task_session.py"],
+    )
+    github = _release_github([pull_request], {999: ["scripts/task_session.py"]})
+
+    def fail(_number: int) -> list[dict[str, Any]]:
+        raise task_session.TaskSessionError("changed files unavailable")
+
+    monkeypatch.setattr(github, "pull_request_files", fail)
+    result = task_session.classify_controller_release(
+        github,
+        deploy_sha=merge_sha,
+        repository="owner/repository",
+    )
+
+    assert result["deploy"] is True
+
+
+def test_controller_release_preserves_exact_merge_provenance_refusal() -> None:
+    pull_request = _merged_release_pr(
+        999,
+        "d" * 40,
+        branch="task/999-controller-foo",
+        title="[Controller] Foo",
+        paths=["scripts/task_session.py"],
+    )
+    github = _release_github([pull_request], {999: ["scripts/task_session.py"]})
+    github.associated_pulls_by_commit["c" * 40] = [{**pull_request, "merge_commit_sha": "c" * 40}]
+
+    with pytest.raises(
+        task_session.TaskSessionError, match="does not prove the exact merge provenance"
+    ):
+        task_session.classify_controller_release(
+            github,
+            deploy_sha="c" * 40,
+            repository="owner/repository",
+        )
+
+
+def test_pull_request_changed_file_lookup_reads_every_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = object.__new__(task_session.GitHubClient)
+    requests: list[str] = []
+
+    def api(endpoint: str) -> list[dict[str, str]]:
+        requests.append(endpoint)
+        if endpoint.endswith("page=1"):
+            return [{"filename": "scripts/task_session.py"}] * 100
+        if endpoint.endswith("page=2"):
+            return [{"filename": "tests/test_task_session.py"}]
+        raise AssertionError(f"Unexpected endpoint: {endpoint}")
+
+    monkeypatch.setattr(client, "api", api)
+
+    assert len(client.pull_request_files(999)) == 101
+    assert requests == [
+        "pulls/999/files?per_page=100&page=1",
+        "pulls/999/files?per_page=100&page=2",
+    ]
 
 
 def test_validate_pr_event_rejects_dependabot_branch_for_regular_user(

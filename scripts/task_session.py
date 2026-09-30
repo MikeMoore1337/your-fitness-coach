@@ -1065,7 +1065,10 @@ class GitHubClient:
             page += 1
 
     def pull_request(self, number: int) -> dict[str, Any]:
-        return dict(self.api(f"pulls/{number}"))
+        payload = self.api(f"pulls/{number}")
+        if not isinstance(payload, Mapping):
+            raise TaskSessionError(f"GitHub pull request #{number} is not an object")
+        return dict(payload)
 
     def pull_request_commits(self, number: int) -> list[dict[str, Any]]:
         commits: list[dict[str, Any]] = []
@@ -1081,9 +1084,16 @@ class GitHubClient:
         files: list[dict[str, Any]] = []
         page = 1
         while True:
-            batch = list(self.api(f"pulls/{number}/files?per_page=100&page={page}"))
+            payload = self.api(f"pulls/{number}/files?per_page=100&page={page}")
+            if not isinstance(payload, list) or any(
+                not isinstance(item, Mapping) for item in payload
+            ):
+                raise TaskSessionError(
+                    f"GitHub changed-file inventory for PR #{number} is not a list of objects"
+                )
+            batch = [dict(item) for item in payload]
             files.extend(batch)
-            if len(batch) < 100:
+            if len(payload) < 100:
                 return files
             page += 1
 
@@ -1107,7 +1117,21 @@ class GitHubClient:
             page += 1
 
     def pull_requests_for_commit(self, sha: str) -> list[dict[str, Any]]:
-        return list(self.api(f"commits/{sha}/pulls?per_page=100"))
+        pull_requests: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            payload = self.api(f"commits/{sha}/pulls?per_page=100&page={page}")
+            if not isinstance(payload, list) or any(
+                not isinstance(item, Mapping) for item in payload
+            ):
+                raise TaskSessionError(
+                    f"GitHub pull-request provenance for {sha} is not a list of objects"
+                )
+            batch = [dict(item) for item in payload]
+            pull_requests.extend(batch)
+            if len(payload) < 100:
+                return pull_requests
+            page += 1
 
     def latest_deployment_status(self, environment: str) -> dict[str, Any] | None:
         deployments = [
@@ -1164,6 +1188,151 @@ class GitHubClient:
             if statuses and statuses[0].get("state") == "success":
                 return True
         return False
+
+
+def _release_repository_name(value: object) -> str:
+    return value.strip().casefold() if isinstance(value, str) and value.strip() else ""
+
+
+def _release_pull_request_repository(pull_request: Mapping[str, Any], side: str) -> str:
+    container = pull_request.get(side)
+    if not isinstance(container, Mapping):
+        return ""
+    repository = container.get("repo")
+    if not isinstance(repository, Mapping):
+        return ""
+    return _release_repository_name(repository.get("full_name"))
+
+
+def _controller_release_deploy_fallback(
+    reason: str, facts: Sequence[Mapping[str, Any]]
+) -> dict[str, Any]:
+    return {
+        "controller_only": False,
+        "deploy": True,
+        "reason": reason,
+        "pull_requests": [dict(fact) for fact in facts],
+    }
+
+
+def classify_controller_release(
+    github: GitHubClient,
+    *,
+    deploy_sha: str,
+    repository: str | None = None,
+) -> dict[str, Any]:
+    """Classify a merged revision without allowing an unproven deploy skip."""
+
+    if re.fullmatch(r"[0-9a-f]{40}", deploy_sha) is None:
+        raise TaskSessionError("Deployment revision must be a full lowercase Git SHA")
+    expected_repository = _release_repository_name(repository or github.repo_slug)
+    if not expected_repository:
+        raise TaskSessionError("Deployment repository provenance is missing")
+
+    associated = github.pull_requests_for_commit(deploy_sha)
+    if not associated:
+        raise TaskSessionError(
+            f"Refusing production deployment: {deploy_sha} has no associated pull request"
+        )
+
+    exact_numbers: list[int] = []
+    for row in associated:
+        base = row.get("base")
+        if not isinstance(base, Mapping):
+            raise TaskSessionError("GitHub returned malformed pull-request provenance")
+        if not (
+            row.get("merged_at")
+            and base.get("ref") == TARGET_BASE_BRANCH
+            and row.get("merge_commit_sha") == deploy_sha
+        ):
+            continue
+        number = row.get("number")
+        if type(number) is not int or number <= 0:
+            raise TaskSessionError("GitHub returned an invalid merged pull-request number")
+        exact_numbers.append(number)
+
+    if not exact_numbers:
+        raise TaskSessionError(
+            f"Refusing production deployment: {deploy_sha} is not the merge result of a pull request into master"
+        )
+
+    pull_requests: list[dict[str, Any]] = []
+    seen_numbers: set[int] = set()
+    for number in exact_numbers:
+        if number in seen_numbers:
+            continue
+        seen_numbers.add(number)
+        pull_request = github.pull_request(number)
+        base = pull_request.get("base")
+        if not isinstance(base, Mapping) or not (
+            pull_request.get("merged_at")
+            and base.get("ref") == TARGET_BASE_BRANCH
+            and pull_request.get("merge_commit_sha") == deploy_sha
+        ):
+            raise TaskSessionError(
+                f"GitHub pull request #{number} does not prove the exact merge provenance"
+            )
+        if (
+            _release_pull_request_repository(pull_request, "base") != expected_repository
+            or _release_pull_request_repository(pull_request, "head") != expected_repository
+        ):
+            raise TaskSessionError(
+                f"GitHub pull request #{number} does not originate from the same repository"
+            )
+        pull_requests.append(pull_request)
+
+    facts: list[dict[str, Any]] = []
+    for pull_request in pull_requests:
+        number = pull_request.get("number")
+        head = pull_request.get("head")
+        branch = head.get("ref") if isinstance(head, Mapping) else None
+        title = pull_request.get("title")
+        fact = {
+            "number": number,
+            "head_branch": branch,
+            "title": title,
+            "changed_files": pull_request.get("changed_files"),
+        }
+        facts.append(fact)
+        declared_count = pull_request.get("changed_files")
+        if (
+            not isinstance(branch, str)
+            or not branch
+            or not isinstance(title, str)
+            or not title
+            or type(declared_count) is not int
+            or declared_count <= 0
+        ):
+            return _controller_release_deploy_fallback(
+                "controller-only classification is missing complete pull-request metadata; defaulting to application deployment",
+                facts,
+            )
+        try:
+            files = github.pull_request_files(int(number))
+        except OSError, TaskSessionError:
+            return _controller_release_deploy_fallback(
+                "changed-file inventory lookup failed; defaulting to application deployment",
+                facts,
+            )
+        if len(files) != declared_count or any(not isinstance(item, Mapping) for item in files):
+            return _controller_release_deploy_fallback(
+                "changed-file inventory is incomplete; defaulting to application deployment",
+                facts,
+            )
+        try:
+            validate_controller_pull_request_files(files, expected_count=declared_count)
+        except TaskSessionError:
+            return _controller_release_deploy_fallback(
+                "changed paths are not proven controller-only; defaulting to application deployment",
+                facts,
+            )
+
+    return {
+        "controller_only": True,
+        "deploy": False,
+        "reason": "controller-only governance merge; verified provenance and exhaustive controller allowlist",
+        "pull_requests": facts,
+    }
 
 
 def _successful_exact_check(checks: Sequence[Mapping[str, Any]], name: str, sha: str) -> bool:
@@ -9925,6 +10094,8 @@ def _parser() -> argparse.ArgumentParser:
     finish.add_argument("task_id")
     validate_pr = subparsers.add_parser("validate-pr")
     validate_pr.add_argument("--event", type=Path, required=True)
+    classify_release = subparsers.add_parser("classify-controller-release")
+    classify_release.add_argument("--sha", required=True)
     merge = subparsers.add_parser("verify-master-merge")
     merge.add_argument("--sha", required=True)
     return parser
@@ -10172,6 +10343,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "validate-pr":
             _print(validate_pr_event(repository, github, args.event))
+            return 0
+        if args.command == "classify-controller-release":
+            if github is None:
+                raise TaskSessionError("GitHub client is required for release classification")
+            _print(
+                classify_controller_release(
+                    github,
+                    deploy_sha=args.sha,
+                    repository=args.github_repository,
+                )
+            )
             return 0
         if args.command == "verify-master-merge":
             _print(verify_master_merge(repository, github, sha=args.sha))

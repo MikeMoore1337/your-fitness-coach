@@ -158,6 +158,26 @@ def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() 
     assert "scripts/zero_downtime_deploy.py" in deploy_script
 
 
+def test_controller_release_skip_uses_exact_provenance_and_full_changed_file_inventory() -> None:
+    sources = _sources()
+    deploy = sources["deploy"]
+    controller = sources["controller"]
+    docs = Path(__file__).resolve().parents[1] / "docs" / "task-branch-integration.md"
+
+    assert "workflow_run.head_sha" in deploy
+    assert "actions/checkout@v4" in deploy
+    assert "ref: ${{ env.DEPLOY_SHA }}" in deploy
+    assert "classify-controller-release" in deploy
+    assert "CONTROLLER_ROWS" not in deploy
+    assert "codex/controller-[a-z0-9-]+" not in deploy
+    assert "CONTROLLER_ALLOWED_PATHS" in controller
+    assert "pulls/{number}/files?per_page=100&page={page}" in controller
+    assert "len(files) != declared_count" in controller
+    assert "defaulting to application deployment" in controller
+    assert "verified provenance + exact changed-file allowlist" in docs.read_text(encoding="utf-8")
+    assert "Task-bound controller change" in docs.read_text(encoding="utf-8")
+
+
 def test_deploy_recovers_legacy_revision_before_migration_and_rollout() -> None:
     deploy = _sources()["deploy"]
 

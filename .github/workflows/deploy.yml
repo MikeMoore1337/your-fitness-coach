@@ -31,6 +31,13 @@ jobs:
     env:
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
+      - name: Check out exact merge revision for release classification
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Verify merged pull request provenance and deployment scope
         id: provenance
         env:
@@ -38,30 +45,35 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -Eeuo pipefail
-          PR_ROWS="$(gh api \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "repos/$REPOSITORY/commits/$DEPLOY_SHA/pulls" \
-            --jq ".[] | select(.merged_at != null and .base.ref == \"master\" and .merge_commit_sha == \"$DEPLOY_SHA\") | [(.number|tostring), .head.ref] | @tsv")"
-          if [ -z "$PR_ROWS" ]; then
-            echo "Refusing production deployment: $DEPLOY_SHA is not the merge result of a pull request into master" >&2
+          classification="$(python scripts/task_session.py \
+            --github-repository "$REPOSITORY" \
+            classify-controller-release \
+            --sha "$DEPLOY_SHA")"
+          printf '%s\n' "$classification"
+          deploy="$(printf '%s' "$classification" | jq -r \
+            'if (.deploy | type) == "boolean" then .deploy else empty end')"
+          reason="$(printf '%s' "$classification" | jq -r \
+            'if (.reason | type) == "string" and (.reason | length) > 0 then .reason else empty end')"
+          if [ -z "$deploy" ] || [ -z "$reason" ]; then
+            echo "Refusing production deployment: malformed controller classification for $DEPLOY_SHA" >&2
             exit 1
           fi
-          CONTROLLER_ROWS="$(printf '%s\n' "$PR_ROWS" | awk -F '\t' '$2 ~ /^codex\/controller-[a-z0-9-]+$/')"
-          NON_CONTROLLER_ROWS="$(printf '%s\n' "$PR_ROWS" | awk -F '\t' '$2 !~ /^codex\/controller-[a-z0-9-]+$/')"
-          if [ -n "$CONTROLLER_ROWS" ]; then
-            if [ -n "$NON_CONTROLLER_ROWS" ]; then
-              echo "Refusing deployment: controller and product pull requests share merge SHA $DEPLOY_SHA" >&2
+          case "$deploy" in
+            false)
+              echo "deploy=false" >> "$GITHUB_OUTPUT"
+              echo "reason=controller-only governance merge; application deploy is not required" >> "$GITHUB_OUTPUT"
+              echo "Skipping application deployment for controller revision $DEPLOY_SHA: $reason"
+              ;;
+            true)
+              echo "deploy=true" >> "$GITHUB_OUTPUT"
+              echo "reason=$reason" >> "$GITHUB_OUTPUT"
+              echo "Authorized production revision $DEPLOY_SHA: $reason"
+              ;;
+            *)
+              echo "Refusing production deployment: invalid controller classification for $DEPLOY_SHA" >&2
               exit 1
-            fi
-            echo "deploy=false" >> "$GITHUB_OUTPUT"
-            echo "reason=controller-only governance merge; application deploy is not required" >> "$GITHUB_OUTPUT"
-            echo "Skipping application deployment for controller revision $DEPLOY_SHA: $CONTROLLER_ROWS"
-            exit 0
-          fi
-          echo "deploy=true" >> "$GITHUB_OUTPUT"
-          echo "reason=product pull request merge" >> "$GITHUB_OUTPUT"
-          echo "Authorized production revision $DEPLOY_SHA from pull request(s): $PR_ROWS"
+              ;;
+          esac
 
   deploy:
     name: Deploy immutable tested bundle
