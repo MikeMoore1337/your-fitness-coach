@@ -29,14 +29,17 @@ round state, request/validation commands и comment parser не являются
 Единственное исключение — прямое указание владельца в отдельном сообщении для конкретного PR. Такое
 действие не запускается controller и не меняет normal lifecycle.
 
-## Отдельный Security Review
+## Repository-native Security Review
 
-Security Review остаётся manual/conditional gate только для фактических security-sensitive surfaces:
-auth/authz, secrets, untrusted network, uploads/parsers, user-controlled URLs, sensitive data,
-payments, admin actions, cryptography/headers, webhook verification, privilege escalation,
-dependency-security task или dedicated security audit. Он не сцепляется автоматически с обычным PR,
-а deterministic security scanners остаются в CI. Отсутствие Security Review не блокирует ordinary
-task без security trigger.
+Внешний Codex Security Review остаётся выключен вместе с Codex Code Review. Вместо него каждый PR
+автоматически проходит собственный repository-native Codex Security Review в `diff` mode через
+официальный GitHub Action и YFC threat model. Review read-only, не создаёт отдельного reviewer-agent
+и не вызывает `@codex security review`.
+
+Validated `CRITICAL`/`HIGH` findings блокируют aggregate `checks`; `MEDIUM`/`LOW` и
+unvalidated concerns advisory. Missing credential, action failure или malformed structured result
+fail-closed. Dedicated `full` audit остаётся owner-requested. Deterministic security scanners
+остаются отдельным источником evidence.
 
 ## Внешняя настройка
 
