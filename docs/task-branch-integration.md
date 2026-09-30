@@ -62,6 +62,29 @@ non-fast-forward protection, strict current-base required checks и aggregate ch
 Direct/force push и удаление ветки запрещены. Merge PR — release authorization; отдельный generic
 approval между merge и normal deploy не создаётся.
 
+## Controller-only application-release classification
+
+Controller-only classification определяется не branch name, а verified provenance + exact changed-file allowlist; application-deploy skip разрешается только после проверки полного diff:
+
+1. `Release production` использует exact `workflow_run.head_sha` и находит все merged PR rows,
+   которые имеют тот же `merge_commit_sha`, base `master` и same-repository provenance.
+2. Для каждого такого PR helper `scripts/task_session.py classify-controller-release` получает
+   полный `pulls/{number}/files` inventory с pagination и сверяет его с declared `changed_files`.
+3. `deploy=false` разрешён только когда каждый PR и каждый changed path проходит authoritative
+   `CONTROLLER_ALLOWED_PATHS` из `scripts/task_session.py`. Этот allowlist является единым
+   источником истины для controller/governance paths; backend/frontend/bot runtime, migrations,
+   application configuration, dependencies и неизвестные paths в него не входят.
+
+`codex/controller-*` остаётся canonical branch naming convention для controller governance
+changes, но branch и PR title не являются security boundary для application-deploy skip.
+Task-bound controller change из `task/*` может получить `deploy=false` только если exact
+provenance и полный allowlisted diff доказывают controller-only scope. `[Controller]` title сам
+по себе не даёт skip; runtime path в таком PR сохраняет обычный deploy.
+
+Missing/incomplete changed-file inventory, pagination mismatch, mixed or unknown scope и иная
+неоднозначность используют fail-closed safety default `deploy=true`. Если exact merged PR
+provenance нельзя доказать, сохраняется существующий authorization refusal.
+
 ## Shared gate
 
 `scripts/ci_contract.py` — единственный registry команд CI. Он содержит детерминированные профили:
