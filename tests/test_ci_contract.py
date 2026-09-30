@@ -206,17 +206,23 @@ def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> Non
     assert "scripts/run_pytest.py backend/tests" not in workflow
 
 
-def test_pr_ci_uses_deterministic_checks_without_llm_review_gate() -> None:
+def test_pr_ci_requires_repository_native_security_review_without_external_review() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     required = ci_contract.expected_jobs_for_groups(("quality",), event="pull_request")
     assert "task-provenance" in required
+    assert "codex-security-review" in required
     assert "review-contract" not in required
     assert "pull_request_review:" not in workflow
     assert "review-contract:" not in workflow
     assert 'validate-pr-review --event "$GITHUB_EVENT_PATH"' not in workflow
-    assert "review-contract" not in workflow[workflow.index("  checks:") :]
+    assert "openai/codex-action@86365089eb2b84e0a8fb0717b304f8bdcb13b20e" in workflow
+    assert 'permission-profile: ":read-only"' in workflow
+    assert "scripts/security_review_gate.py evaluate" in workflow
+    assert "CODEX_SECURITY_REVIEW_RESULT: ${{ needs.codex-security-review.result }}" in workflow
+    assert "@codex security review" in workflow
+    assert "Do not invoke" in workflow
 
 
 def test_workflow_uses_lockfile_download_cache_without_audit_installation() -> None:
