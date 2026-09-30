@@ -11,13 +11,12 @@ gate. Единственное исключение — прямое указа�
 subagent или adversarial audit не создаётся; implementer делает один bounded local self-review до
 commit и после fix запускает только affected checks. PR-only master, required checks,
 non-fast-forward protection и thread resolution сохраняются.
-Внешний Codex Security Review (`@codex security review`) остаётся отключён. Вместо него каждый PR
-обязательно проходит repository-native Codex Security Review в `diff` mode внутри GitHub CI,
-read-only и без reviewer-agent/subagent. Он валидирует findings по YFC threat model и публикует
-идемпотентный PR comment. Только validated `CRITICAL`/`HIGH` findings блокируют merge;
-`MEDIUM`/`LOW` и unvalidated concerns advisory. Missing credential, action failure или malformed
-structured result блокируют fail-closed. Deterministic security scanners остаются обязательной частью
-применимого CI. Для automatic review требуется `OPENAI_API_KEY` в доступном GitHub secret scope.
+Внешний Codex Security Review (`@codex security review`) остаётся отключён. Автоматический LLM
+review не используется и не требует `OPENAI_API_KEY`. Каждый PR вместо этого обязательно проходит
+deterministic security jobs внутри GitHub CI: CodeQL, runtime dependency audit и Trivy filesystem
+scan для vulnerabilities/misconfiguration/secrets. Эти jobs входят в aggregate `checks` и блокируют
+merge при scanner/audit failure. Repository-native semantic Security Review через `$security-engineer`
+остаётся manual/conditional для фактического security trigger или отдельного full audit.
 
 Этот файл действует для завершённых и архивированных release tasks `75-80`, включая буквенные
 подзадачи, owner-approved Pulse concepts pilot `75C`, завершённую UX-reset gate `115A` и
