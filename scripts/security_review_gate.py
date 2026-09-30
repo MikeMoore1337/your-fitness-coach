@@ -108,8 +108,7 @@ def _render_success(
 ) -> GateDecision:
     findings = _require_list(payload, "confirmed_findings")
     blocking = any(
-        isinstance(item, dict) and item.get("severity") in BLOCKING_SEVERITIES
-        for item in findings
+        isinstance(item, dict) and item.get("severity") in BLOCKING_SEVERITIES for item in findings
     )
     status = _require_string(payload, "status")
     relevance = _require_string(payload, "security_relevance")
@@ -195,21 +194,24 @@ def _render_success(
 
 
 def _render_failure(reason: str, *, base_sha: str, head_sha: str) -> GateDecision:
-    comment = "\n".join(
-        [
-            MARKER,
-            "## Repository Security Review",
-            "",
-            "**Status:** `REVIEW_FAILED`",
-            "**Gate:** BLOCK",
-            f"**Range:** `{base_sha[:12]}` -> `{head_sha[:12]}`",
-            "",
-            _short(reason, 1800),
-            "",
-            "The semantic security gate is fail-closed. Fix the review execution/configuration "
-            "and rerun the exact PR head.",
-        ]
-    ) + "\n"
+    comment = (
+        "\n".join(
+            [
+                MARKER,
+                "## Repository Security Review",
+                "",
+                "**Status:** `REVIEW_FAILED`",
+                "**Gate:** BLOCK",
+                f"**Range:** `{base_sha[:12]}` -> `{head_sha[:12]}`",
+                "",
+                _short(reason, 1800),
+                "",
+                "The semantic security gate is fail-closed. Fix the review execution/configuration "
+                "and rerun the exact PR head.",
+            ]
+        )
+        + "\n"
+    )
     return GateDecision(
         status="REVIEW_FAILED",
         blocking=True,
