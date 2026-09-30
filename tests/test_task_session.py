@@ -533,6 +533,147 @@ def test_verified_noop_retry_reconciles_already_fast_forwarded_controller_state(
     assert result["lease"]["original_base_origin_master_sha"] == base_sha
 
 
+def test_verified_noop_retry_records_post_refresh_preimplementation_head(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository, controller, worktree, _, base_sha, github = (
+        _prepare_verified_noop_retry_fixture(repository, advance_master=True)
+    )
+
+    result = controller.retry_noop_worker(
+        "508",
+        control_issue_number=508,
+        reason="retry after corrected Agent Flow routing; previous worker completed read-only with zero product mutation",
+        owner_authorize=True,
+    )
+
+    current_origin = github.master_sha
+    event = result["preimplementation_resume"]
+    assert base_sha != current_origin
+    assert git_repository.head(cwd=worktree) == current_origin
+    assert event["base_sha"] == current_origin
+    assert event["head_sha"] == current_origin
+    assert event["original_base_sha"] == base_sha
+
+
+def _prepare_stale_verified_noop_resume(
+    repository: tuple[Path, Any],
+) -> tuple[Path, Any, Any, Path, str, str, str]:
+    root, git_repository, controller, worktree, branch, base_sha, github = (
+        _prepare_verified_noop_retry_fixture(repository, advance_master=True)
+    )
+    result = controller.retry_noop_worker(
+        "508",
+        control_issue_number=508,
+        reason="retry after corrected Agent Flow routing; previous worker completed read-only with zero product mutation",
+        owner_authorize=True,
+    )
+    lease_path = controller.store.task_lease_path("508")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    stale_head = base_sha
+    event = lease["preimplementation_resume"]
+    event["head_sha"] = stale_head
+    lease["worker_retry"]["prior_attempt"]["pre_refresh_head"] = stale_head
+    lease["worker_retry"]["base_refresh"]["observed_head_before_operation"] = stale_head
+    task_session.StateStore.replace_json(lease_path, lease)
+    assert result["base_refresh"]["refreshed_head"] == github.master_sha
+    return root, git_repository, controller, worktree, branch, stale_head, github.master_sha
+
+
+def test_claim_reconciles_exact_stale_verified_noop_prepared_head(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository, controller, worktree, branch, stale_head, current_origin = (
+        _prepare_stale_verified_noop_resume(repository)
+    )
+
+    claimed = controller.claim_preimplementation_worker_launch("508")
+    event = claimed["preimplementation_resume"]
+    lease = controller.store.read_json(controller.store.task_lease_path("508"))
+    assert event["state"] == "launching"
+    assert event["head_sha"] == current_origin
+    assert event["prepared_head_reconciliation"]["previous_head_sha"] == stale_head
+    assert event["prepared_head_reconciliation"]["reconciled_head_sha"] == current_origin
+    assert git_repository.head(cwd=worktree) == current_origin
+    assert git_repository.ref(f"refs/heads/{branch}") == current_origin
+    assert lease["preimplementation_resume"]["head_sha"] == current_origin
+
+
+def test_claim_refuses_stale_prepared_head_without_matching_base_refresh(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, stale_head, _ = _prepare_stale_verified_noop_resume(repository)
+    lease_path = controller.store.task_lease_path("508")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["worker_retry"].pop("base_refresh")
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    with pytest.raises(task_session.TaskSessionError, match="HUMAN_REQUIRED"):
+        controller.claim_preimplementation_worker_launch("508")
+
+    unchanged = controller.store.read_json(lease_path)
+    assert unchanged["preimplementation_resume"]["head_sha"] == stale_head
+    assert "prepared_head_reconciliation" not in unchanged["preimplementation_resume"]
+
+
+def test_claim_refuses_stale_prepared_head_with_existing_launch_attempt(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, stale_head, _ = _prepare_stale_verified_noop_resume(repository)
+    lease_path = controller.store.task_lease_path("508")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["preimplementation_resume"]["launch_attempts"] = [
+        {"launch_id": "already-claimed", "state": "launching"}
+    ]
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    with pytest.raises(task_session.TaskSessionError, match="HUMAN_REQUIRED"):
+        controller.claim_preimplementation_worker_launch("508")
+
+    unchanged = controller.store.read_json(lease_path)
+    assert unchanged["preimplementation_resume"]["head_sha"] == stale_head
+    assert "prepared_head_reconciliation" not in unchanged["preimplementation_resume"]
+
+
+def test_claim_refuses_stale_prepared_head_when_branch_ref_differs(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, _, branch, stale_head, current_origin = (
+        _prepare_stale_verified_noop_resume(repository)
+    )
+    _git(root, "update-ref", f"refs/heads/{branch}", stale_head, current_origin)
+
+    with pytest.raises(task_session.TaskSessionError, match="HUMAN_REQUIRED"):
+        controller.claim_preimplementation_worker_launch("508")
+
+    lease = controller.store.read_json(controller.store.task_lease_path("508"))
+    assert lease["preimplementation_resume"]["head_sha"] == stale_head
+    assert git_repository.ref(f"refs/heads/{branch}") == stale_head
+
+
+def test_claim_refuses_stale_prepared_head_with_genuine_unique_task_commit(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository, controller, worktree, _, stale_head, current_origin = (
+        _prepare_stale_verified_noop_resume(repository)
+    )
+    (worktree / "task-only.txt").write_text("product WIP\n", encoding="utf-8")
+    _git(worktree, "add", "task-only.txt")
+    _git(worktree, "commit", "-m", "feat: [Task 508] genuine product change")
+    unique_head = git_repository.head(cwd=worktree)
+    assert unique_head not in {stale_head, current_origin}
+
+    with pytest.raises(task_session.TaskSessionError, match="HUMAN_REQUIRED"):
+        controller.claim_preimplementation_worker_launch("508")
+
+    lease = controller.store.read_json(controller.store.task_lease_path("508"))
+    assert lease["preimplementation_resume"]["head_sha"] == stale_head
+    assert "prepared_head_reconciliation" not in lease["preimplementation_resume"]
+
+
 def test_verified_noop_retry_refuses_genuine_unique_task_commit_before_refresh(
     repository: tuple[Path, Any],
 ) -> None:
