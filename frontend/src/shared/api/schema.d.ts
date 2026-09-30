@@ -1107,6 +1107,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/programs/generator/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Program Generator Preview */
+        post: operations["generate_program_generator_preview_api_v1_programs_generator_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/programs/generator/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Program Generator Preview */
+        post: operations["confirm_program_generator_preview_api_v1_programs_generator_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs/templates/recommendation": {
         parameters: {
             query?: never;
@@ -10110,6 +10144,231 @@ export interface components {
             /** Deload Intensity Percent */
             deload_intensity_percent?: number | null;
         };
+        /** ProgramGeneratorActiveProgram */
+        ProgramGeneratorActiveProgram: {
+            /** Program Id */
+            program_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /** Assigned By User Id */
+            assigned_by_user_id?: number | null;
+            /**
+             * Trainer Owned
+             * @default false
+             */
+            trainer_owned: boolean;
+        };
+        /** ProgramGeneratorAdaptation */
+        ProgramGeneratorAdaptation: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "equipment_substitution" | "duration_accessory_reduction" | "schedule_representation";
+            /** Message */
+            message: string;
+            /** Day Number */
+            day_number?: number | null;
+            /** Source Exercise Id */
+            source_exercise_id?: number | null;
+            /** Replacement Exercise Id */
+            replacement_exercise_id?: number | null;
+        };
+        /** ProgramGeneratorConfirmRequest */
+        ProgramGeneratorConfirmRequest: {
+            /** Draft Token */
+            draft_token: string;
+            /** Start Date */
+            start_date?: string | null;
+            /** Duration Weeks */
+            duration_weeks?: number | null;
+            /**
+             * Replace Active
+             * @default false
+             */
+            replace_active: boolean;
+        };
+        /** ProgramGeneratorConfirmResponse */
+        ProgramGeneratorConfirmResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "confirmed";
+            /**
+             * Idempotent
+             * @default false
+             */
+            idempotent: boolean;
+            /** Assigned Program Id */
+            assigned_program_id: number;
+            /** Workouts Created */
+            workouts_created: number;
+            template: components["schemas"]["ProgramTemplateResponse"];
+        };
+        /** ProgramGeneratorDay */
+        ProgramGeneratorDay: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Estimated Duration Minutes */
+            estimated_duration_minutes: number;
+            /** Exercises */
+            exercises: components["schemas"]["ProgramGeneratorExercise"][];
+        };
+        /** ProgramGeneratorExercise */
+        ProgramGeneratorExercise: {
+            /** Exercise Id */
+            exercise_id: number;
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /** Movement Pattern */
+            movement_pattern?: ("anti_extension" | "anti_rotation" | "arm_curl" | "calf" | "cardio_row" | "carry" | "chest_fly" | "chest_press" | "conditioning" | "cycling" | "glute" | "grip" | "hinge" | "leg_isolation" | "lunge" | "pullover" | "row" | "running" | "olympic_lift" | "shoulder_raise" | "shoulder_press" | "shoulder_rotation" | "squat" | "trunk_flexion" | "trunk_rotation" | "triceps" | "vertical_pull" | "wrist") | null;
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds: number;
+            /** Notes */
+            notes?: string | null;
+            /** Superset Group */
+            superset_group?: number | null;
+            /** Superset Order */
+            superset_order?: number | null;
+            /** Prescription */
+            prescription?: {
+                [key: string]: unknown;
+            } | null;
+            /** Group Id */
+            group_id?: number | null;
+            /** Group Kind */
+            group_kind?: ("sequence" | "superset" | "rest_pause" | "myo_reps" | "cluster" | "drop_chain" | "circuit") | null;
+            /** Group Order */
+            group_order?: number | null;
+            /** Source Exercise Id */
+            source_exercise_id?: number | null;
+        };
+        /** ProgramGeneratorPreviewResponse */
+        ProgramGeneratorPreviewResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "preview" | "no_compatible";
+            /** Selection Policy Version */
+            selection_policy_version: string;
+            /** Input Fingerprint */
+            input_fingerprint: string;
+            /** Message */
+            message: string;
+            /** Draft Token */
+            draft_token?: string | null;
+            source?: components["schemas"]["ProgramGeneratorSource"] | null;
+            program?: components["schemas"]["ProgramGeneratorProgram"] | null;
+            /** Fit Reasons */
+            fit_reasons?: string[];
+            /** Tradeoffs */
+            tradeoffs?: string[];
+            /** Adaptations */
+            adaptations?: components["schemas"]["ProgramGeneratorAdaptation"][];
+            /** Unresolved Constraints */
+            unresolved_constraints?: string[];
+            /** Reason Codes */
+            reason_codes?: string[];
+            active_program?: components["schemas"]["ProgramGeneratorActiveProgram"] | null;
+        };
+        /** ProgramGeneratorProgram */
+        ProgramGeneratorProgram: {
+            /** Title */
+            title: string;
+            /**
+             * Goal
+             * @enum {string}
+             */
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "beginner" | "intermediate" | "advanced";
+            /** Split Type */
+            split_type?: ("full_body" | "upper_lower" | "push_pull_legs" | "body_part" | "hybrid") | null;
+            /** Days */
+            days: components["schemas"]["ProgramGeneratorDay"][];
+            /** Estimated Duration Minutes */
+            estimated_duration_minutes: number;
+        };
+        /** ProgramGeneratorRequest */
+        ProgramGeneratorRequest: {
+            /**
+             * Goal
+             * @enum {string}
+             */
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
+            /**
+             * Experience
+             * @enum {string}
+             */
+            experience: "beginner" | "intermediate" | "advanced";
+            /** Days Per Week */
+            days_per_week: number;
+            /** Preferred Session Duration Minutes */
+            preferred_session_duration_minutes: number;
+            /**
+             * Training Location
+             * @enum {string}
+             */
+            training_location: "gym" | "home" | "other";
+            /** Available Equipment Ids */
+            available_equipment_ids?: ("bodyweight" | "dumbbell" | "barbell" | "bench" | "cable" | "machine" | "kettlebell" | "cardio" | "other")[];
+            /** Priority Muscle Ids */
+            priority_muscle_ids?: string[];
+            /** Preferred Exercise Ids */
+            preferred_exercise_ids?: number[];
+            /** Excluded Exercise Ids */
+            excluded_exercise_ids?: number[];
+        };
+        /** ProgramGeneratorSource */
+        ProgramGeneratorSource: {
+            /** Template Id */
+            template_id: number;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Goal
+             * @enum {string}
+             */
+            goal: "fat_loss" | "recomposition" | "maintenance" | "muscle_gain" | "strength";
+            /**
+             * Level
+             * @enum {string}
+             */
+            level: "beginner" | "intermediate" | "advanced";
+            /** Split Type */
+            split_type?: ("full_body" | "upper_lower" | "push_pull_legs" | "body_part" | "hybrid") | null;
+            /**
+             * Provenance Type
+             * @default CUSTOM
+             * @enum {string}
+             */
+            provenance_type: "YFC_GENERIC" | "SOURCE_ADAPTATION" | "CUSTOM";
+        };
         /** ProgramImportAiInfo */
         ProgramImportAiInfo: {
             /** Contract Version */
@@ -15827,6 +16086,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProgramTemplateResponse"][];
+                };
+            };
+        };
+    };
+    generate_program_generator_preview_api_v1_programs_generator_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramGeneratorRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramGeneratorPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_program_generator_preview_api_v1_programs_generator_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramGeneratorConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramGeneratorConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -1,73 +1,129 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProgramRecommendation } from '../../../../src/features/programs/ProgramRecommendation';
 
-const authState = vi.hoisted(() => ({
-  profile: null as {
-    goal?: string | null;
-    level?: string | null;
-    workouts_per_week?: number | null;
-    training_preferences?: {
-      location_profiles?: Array<{
-        location: 'gym' | 'home' | 'other';
-        equipment_ids?: Array<'bodyweight' | 'dumbbell' | 'barbell'>;
-      }>;
-    };
-  } | null,
-}));
+const authState = vi.hoisted(() => ({ profile: null as Record<string, unknown> | null }));
+const feedback = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
 
 vi.mock('../../../../src/app/AuthProvider', () => ({
   useAuth: () => ({ user: { profile: authState.profile } }),
 }));
+vi.mock('../../../../src/shared/ui/FeedbackProvider', () => ({
+  useFeedback: () => feedback,
+}));
 
-const template = {
-  id: 20,
-  title: 'Программа на всё тело',
-  slug: 'full-body',
-  goal: 'recomposition',
-  level: 'beginner',
-  split_type: 'full_body',
-  owner_user_id: null,
-  owner_telegram_user_id: null,
-  owner_full_name: null,
-  created_by_user_id: null,
-  is_public: true,
-  is_example: true,
-  is_assigned_to_current_user: false,
-  is_active_for_current_user: false,
-  can_edit: false,
-  assigned_by_user_id: null,
-  assigned_by_full_name: null,
-  days: [
-    {
-      id: 1,
-      day_number: 1,
-      title: 'Всё тело',
-      exercises: [],
-    },
-  ],
+const preview = {
+  status: 'preview',
+  selection_policy_version: 'program_generator_v1',
+  input_fingerprint: 'fingerprint',
+  message: 'Предпросмотр готов.',
+  draft_token: 'signed-draft',
+  source: {
+    template_id: 20,
+    slug: 'full-body',
+    title: 'Каноническая программа',
+    goal: 'recomposition',
+    level: 'beginner',
+    split_type: 'full_body',
+    provenance_type: 'YFC_GENERIC',
+  },
+  program: {
+    title: 'Каноническая программа',
+    goal: 'recomposition',
+    level: 'beginner',
+    split_type: 'full_body',
+    estimated_duration_minutes: 52,
+    days: [
+      {
+        day_number: 1,
+        title: 'Всё тело',
+        estimated_duration_minutes: 52,
+        exercises: [
+          {
+            exercise_id: 11,
+            source_exercise_id: 11,
+            exercise_title: 'Приседание',
+            metric_type: 'strength',
+            prescribed_sets: 3,
+            prescribed_reps: '8-10',
+            rest_seconds: 90,
+            prescription: null,
+            group_kind: null,
+          },
+        ],
+      },
+    ],
+  },
+  fit_reasons: ['Цель и опыт совместимы.'],
+  tradeoffs: ['Длительность — ориентир.'],
+  adaptations: [],
+  reason_codes: [],
+  active_program: null,
 };
 
-function renderWizard(onPreview = vi.fn(), onEditCopy = vi.fn()) {
+const confirmed = {
+  status: 'confirmed',
+  idempotent: false,
+  assigned_program_id: 44,
+  workouts_created: 1,
+  template: {
+    id: 45,
+    title: 'Каноническая программа',
+    provenance_type: 'SOURCE_ADAPTATION',
+    days: [],
+  },
+};
+
+function renderWizard() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  const onConfirmed = vi.fn();
   render(
     <QueryClientProvider client={queryClient}>
-      <ProgramRecommendation
-        open
-        onEditCopy={onEditCopy}
-        onOpenChange={vi.fn()}
-        onPreview={onPreview}
-      />
+      <ProgramRecommendation open onConfirmed={onConfirmed} onOpenChange={vi.fn()} />
     </QueryClientProvider>,
   );
+  return { onConfirmed };
 }
 
-describe('ProgramRecommendation wizard', () => {
+function installFetch(response: unknown = preview) {
+  const calls: RequestInit[] = [];
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (url.includes('body-priority-options')) {
+      return new Response(JSON.stringify({ items: [{ id: 'back', name: 'Спина' }] }), {
+        status: 200,
+      });
+    }
+    if (url.includes('/programs/exercises')) {
+      return new Response(JSON.stringify([{ id: 11, title: 'Приседание' }]), { status: 200 });
+    }
+    calls.push(init ?? {});
+    if (url.includes('/generator/confirm'))
+      return new Response(JSON.stringify(confirmed), { status: 200 });
+    return new Response(JSON.stringify(response), { status: 200 });
+  });
+  return calls;
+}
+
+async function reachFinalStep() {
+  fireEvent.click(screen.getByRole('radio', { name: /Рекомпозиция/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
+  fireEvent.click(screen.getByRole('radio', { name: /Начинаю/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
+  fireEvent.click(screen.getByRole('radio', { name: /^3тренировки/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
+  fireEvent.click(screen.getByRole('radio', { name: /60 минут/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
+  fireEvent.click(screen.getByRole('radio', { name: /Дома/ }));
+}
+
+describe('ProgramRecommendation deterministic generator flow', () => {
   beforeEach(() => {
     authState.profile = null;
+    feedback.confirm.mockClear();
   });
 
   afterEach(() => {
@@ -75,185 +131,121 @@ describe('ProgramRecommendation wizard', () => {
     vi.restoreAllMocks();
   });
 
-  it('collects every criterion, keeps answers on back navigation and sends canonical enums', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          status: 'recommended',
-          criteria: {
-            goal: 'muscle_gain',
-            experience: 'advanced',
-            workouts_per_week: 5,
-            training_location: 'home',
-            available_equipment_ids: ['dumbbell', 'barbell'],
-            profile_fields_used: [],
-          },
-          missing_fields: [],
-          message: 'Сначала посмотрите состав программы.',
-          recommendation: {
-            template,
-            reason: 'Подходит по выбранным параметрам.',
-            fit_facts: ['Оборудование подходит: гантели, штанга.'],
-            limitations: [],
-          },
-          alternatives: [],
-          requires_explicit_start: true,
-        }),
-        { status: 200 },
-      ),
-    );
-    const onPreview = vi.fn();
-    renderWizard(onPreview);
+  it('collects required inputs and sends canonical preview payload', async () => {
+    const calls = installFetch();
+    renderWizard();
 
     expect(screen.getByRole('button', { name: 'Далее' })).toBeDisabled();
-    expect(screen.getAllByRole('radio')).toHaveLength(5);
-    fireEvent.click(screen.getByRole('radio', { name: /Набор мышц/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
+    await reachFinalStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
 
-    fireEvent.click(screen.getByRole('radio', { name: /Тренируюсь давно/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    expect(screen.getAllByRole('radio')).toHaveLength(8);
-    fireEvent.click(screen.getByRole('radio', { name: /^5тренировки/ }));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Назад' }));
-    expect(screen.getByRole('radio', { name: /Тренируюсь давно/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    expect(screen.getByRole('radio', { name: /^5тренировки/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-
-    fireEvent.click(screen.getByRole('radio', { name: /Дома/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    fireEvent.click(screen.getByRole('radio', { name: /Учесть только доступное/ }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Гантели' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Штанга' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Показать рекомендацию' }));
-
-    expect(await screen.findByText('Программа на всё тело')).toBeInTheDocument();
-    const [, request] = vi.mocked(globalThis.fetch).mock.calls[0]!;
-    expect(JSON.parse(String(request?.body))).toEqual({
-      goal: 'muscle_gain',
-      experience: 'advanced',
-      workouts_per_week: 5,
-      training_location: 'home',
-      available_equipment_ids: ['dumbbell', 'barbell'],
-    });
-    expect(screen.queryByRole('button', { name: /запустить/i })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Посмотреть план' }));
-    expect(onPreview).toHaveBeenCalledWith(expect.objectContaining({ id: 20 }));
-  });
-
-  it('prefills trustworthy profile fields and offers all manual exits for no match', async () => {
-    authState.profile = {
-      goal: 'strength',
-      level: 'intermediate',
-      workouts_per_week: 4,
-      training_preferences: {
-        location_profiles: [
-          { location: 'gym', equipment_ids: ['bodyweight', 'dumbbell', 'barbell'] },
-        ],
-      },
-    };
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          status: 'no_match',
-          criteria: {
-            goal: 'strength',
-            experience: 'intermediate',
-            workouts_per_week: 4,
-            training_location: null,
-            available_equipment_ids: null,
-            profile_fields_used: [],
-          },
-          missing_fields: [],
-          message: 'Проверенного силового шаблона пока нет.',
-          recommendation: null,
-          alternatives: [],
-          requires_explicit_start: true,
-        }),
-        { status: 200 },
-      ),
-    );
-    renderWizard();
-
-    expect(screen.getByText(/подставили достоверные ответы из профиля/i)).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: /Увеличение силы/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    expect(screen.getByRole('radio', { name: /Тренируюсь регулярно/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    expect(screen.getByRole('radio', { name: /^4тренировки/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    expect(screen.getByRole('radio', { name: /Тренажёрный зал/ })).toBeChecked();
-    fireEvent.click(screen.getByRole('radio', { name: /Место не важно/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    fireEvent.click(screen.getByRole('radio', { name: /Не проверять оборудование/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Показать рекомендацию' }));
-
-    expect(await screen.findByRole('heading', { name: 'Совпадений нет' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Изменить параметры' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Выбрать из шаблонов' })).toHaveAttribute(
-      'href',
-      '#program-library',
-    );
-    expect(screen.getByRole('link', { name: 'Создать свою' })).toHaveAttribute(
-      'href',
-      '#program-builder',
-    );
-  });
-
-  it('requires a location choice for multiple profiles and switches to its equipment', async () => {
-    authState.profile = {
-      goal: 'recomposition',
-      level: 'beginner',
-      workouts_per_week: 3,
-      training_preferences: {
-        location_profiles: [
-          { location: 'gym', equipment_ids: ['bodyweight', 'dumbbell', 'barbell'] },
-          { location: 'home', equipment_ids: ['bodyweight'] },
-        ],
-      },
-    };
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          status: 'no_match',
-          criteria: {
-            goal: 'recomposition',
-            experience: 'beginner',
-            workouts_per_week: 3,
-            training_location: 'home',
-            available_equipment_ids: ['bodyweight'],
-            profile_fields_used: [],
-          },
-          missing_fields: [],
-          message: 'Совместимого шаблона нет.',
-          recommendation: null,
-          alternatives: [],
-          requires_explicit_start: true,
-        }),
-        { status: 200 },
-      ),
-    );
-    renderWizard();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-    expect(screen.getByRole('radio', { name: /Тренажёрный зал/ })).not.toBeChecked();
-    expect(screen.getByRole('radio', { name: /Дома/ })).not.toBeChecked();
-    fireEvent.click(screen.getByRole('radio', { name: /Дома/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Далее' }));
-
-    expect(screen.getByRole('radio', { name: /Учесть только доступное/ })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Только собственный вес' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Гантели' })).not.toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Показать рекомендацию' }));
-    await screen.findByRole('heading', { name: 'Совпадений нет' });
-
-    const [, request] = vi.mocked(globalThis.fetch).mock.calls[0]!;
+    expect(
+      await screen.findByRole('heading', { level: 3, name: 'Каноническая программа' }),
+    ).toBeInTheDocument();
+    const request = calls.find((item) => String(item.method) === 'POST');
     expect(JSON.parse(String(request?.body))).toMatchObject({
+      goal: 'recomposition',
+      experience: 'beginner',
+      days_per_week: 3,
+      preferred_session_duration_minutes: 60,
       training_location: 'home',
-      available_equipment_ids: ['bodyweight'],
+      available_equipment_ids: [],
     });
+  });
+
+  it('keeps answers when returning from preview and renders reasons, trade-offs and adaptations', async () => {
+    const result = {
+      ...preview,
+      adaptations: [
+        {
+          code: 'equipment_substitution',
+          message: 'Упражнение заменено канонически.',
+          day_number: 1,
+          source_exercise_id: 11,
+          replacement_exercise_id: 12,
+        },
+      ],
+    };
+    installFetch(result);
+    renderWizard();
+    await reachFinalStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    expect(await screen.findByText('Упражнение заменено канонически.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить параметры' }));
+    expect(screen.getByRole('radio', { name: /Дома/ })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Назад' }));
+    expect(screen.getByRole('radio', { name: /60 минут/ })).toBeChecked();
+  });
+
+  it('shows a bounded no-compatible state with actionable reason', async () => {
+    installFetch({
+      ...preview,
+      status: 'no_compatible',
+      draft_token: null,
+      program: null,
+      source: null,
+      reason_codes: ['duration_incompatible'],
+      fit_reasons: [],
+      tradeoffs: [],
+      adaptations: [],
+      message: 'Не удалось подобрать программу.',
+    });
+    renderWizard();
+    await reachFinalStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Не удалось подобрать программу' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/длительность несовместима/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Изменить параметры' })).toBeInTheDocument();
+  });
+
+  it('confirms once and shows the persisted state', async () => {
+    installFetch();
+    const { onConfirmed } = renderWizard();
+    await reachFinalStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    await screen.findByRole('heading', { level: 3, name: 'Каноническая программа' });
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить программу' }));
+
+    expect(
+      await screen.findByText(
+        'Программа подтверждена и назначена через существующий lifecycle Product v4.',
+      ),
+    ).toBeInTheDocument();
+    expect(onConfirmed).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables confirmation for trainer-owned active programs', async () => {
+    installFetch({
+      ...preview,
+      active_program: {
+        program_id: 3,
+        revision_number: 2,
+        status: 'active',
+        assigned_by_user_id: 9,
+        trainer_owned: true,
+      },
+    });
+    renderWizard();
+    await reachFinalStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+
+    expect(await screen.findByText(/назначенная тренером/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Подтвердить программу' })).toBeDisabled();
+  });
+
+  it('protects confirm from duplicate clicks while the request is pending', async () => {
+    const calls = installFetch();
+    const fetchMock = vi.mocked(globalThis.fetch);
+    renderWizard();
+    await reachFinalStep();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать preview' }));
+    await screen.findByRole('heading', { level: 3, name: 'Каноническая программа' });
+    fetchMock.mockImplementationOnce(() => new Promise<Response>(() => undefined));
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить программу' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Сохраняем…' })).toBeDisabled());
+    expect(calls.length).toBeGreaterThan(0);
   });
 });

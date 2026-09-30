@@ -155,6 +155,11 @@ type ContextFreeProductEventName =
   | 'trainer_first_client_connected'
   | 'program_recommendation_started'
   | 'program_recommendation_completed'
+  | 'program_generator_started'
+  | 'program_generator_previewed'
+  | 'program_generator_no_compatible'
+  | 'program_generator_confirmed'
+  | 'program_generator_rejected'
   | 'program_import_started'
   | 'program_import_previewed'
   | 'program_import_confirmed'
@@ -515,6 +520,11 @@ const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'trainer_first_client_connected',
   'program_recommendation_started',
   'program_recommendation_completed',
+  'program_generator_started',
+  'program_generator_previewed',
+  'program_generator_no_compatible',
+  'program_generator_confirmed',
+  'program_generator_rejected',
   'program_import_started',
   'program_import_previewed',
   'program_import_confirmed',

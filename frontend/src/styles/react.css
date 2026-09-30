@@ -1350,6 +1350,10 @@ details:not([open]) > :not(summary) {
   border-color: var(--accent-line);
   background: var(--accent-soft);
 }
+.app-section--programs .program-wizard,
+.app-section--programs .program-wizard__panel {
+  color: var(--v2-text-primary);
+}
 .program-wizard__panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1687,6 +1691,80 @@ details:not([open]) > :not(summary) {
 }
 .program-wizard__disclaimer {
   color: var(--muted);
+  line-height: 1.45;
+}
+.program-generator__selects {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 16px;
+}
+.program-generator__selects .field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.program-generator__selects select {
+  width: 100%;
+  max-width: 100%;
+}
+.program-generator__days {
+  display: grid;
+  gap: 12px;
+}
+.program-generator__day {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-subtle);
+}
+.program-generator__day-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.program-generator__day-header h4 {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+}
+.program-generator__day-header > small {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.program-generator__day ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 22px;
+}
+.program-generator__day li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding-left: 3px;
+}
+.program-generator__day li > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.program-generator__day li strong,
+.program-generator__day li small {
+  overflow-wrap: anywhere;
+}
+.program-generator__day li small {
+  color: var(--muted);
+}
+.program-generator__reasons {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 20px;
   line-height: 1.45;
 }
 .program-example-modal__actions {
@@ -5964,6 +6042,9 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   .program-wizard__equipment > div {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .program-wizard__equipment {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
@@ -6014,6 +6095,9 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     min-height: 76px;
   }
   .program-wizard__equipment > div {
+    grid-template-columns: 1fr;
+  }
+  .program-wizard__equipment {
     grid-template-columns: 1fr;
   }
   .program-wizard__form > .program-wizard__footer {
