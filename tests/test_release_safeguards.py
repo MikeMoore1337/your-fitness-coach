@@ -33,6 +33,9 @@ def test_ci_runs_full_regression_on_task_pr_and_only_provenance_on_master_push()
     assert "merge-provenance:" in ci
     assert "Validate task provenance or trusted dependency bot identity" in ci
     assert "TASK_PROVENANCE_RESULT: ${{ needs.task-provenance.result }}" in ci
+    assert "CODEX_SECURITY_REVIEW_RESULT: ${{ needs.codex-security-review.result }}" in ci
+    assert "codex-security-review:" in ci
+    assert "openai/codex-action@86365089eb2b84e0a8fb0717b304f8bdcb13b20e" in ci
     assert "python scripts/ci_contract.py run-group" in ci
     assert "frontend-checks" in ci
     assert "frontend-e2e" in ci
