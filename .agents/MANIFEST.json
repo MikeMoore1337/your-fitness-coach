@@ -1,6 +1,6 @@
 {
   "package": "your-fitness-coach-agents",
-  "version": "8",
+  "version": "9",
   "root": ".agents",
   "skill_count": 43,
   "skills": [
@@ -81,6 +81,7 @@
     "role contracts slimmed; lifecycle policy remains canonical in TASK_EXECUTION_LIFECYCLE.md",
     "product-lawyer and ru-legal-risk provide read-only Russian legal-risk audit and owner decision routing",
     "QA v8 keeps qa-engineer as strategy/router and adds focused testing, E2E review, triage, flakiness and coverage skills",
-    "QA work profiles are modes, not additional lifecycle roles"
+    "QA work profiles are modes, not additional lifecycle roles",
+    "Security v9 adds repository-native diff/full review, YFC threat model and a separate deterministic Security Audit workflow"
   ]
 }

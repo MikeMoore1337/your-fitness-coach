@@ -179,6 +179,16 @@ dedicated security audit. Code Review и Security Review не сцепляютс
 security scanners остаются в CI, а отсутствие Security Review не блокирует ordinary task без
 security trigger. Automatic external Codex/GitHub settings не меняются repository changes; если
 настройка недоступна, фиксируй `MANUAL_EXTERNAL_SETTING_REQUIRED`.
+
+Repository-native Security Review выполняется обычной Codex-сессией через
+`$security-engineer`, `security/THREAT_MODEL.md` и
+`.agents/skills/security-engineer/references/SECURITY_REVIEW_PLAYBOOK.md`. Он не вызывает внешний
+`@codex security review`, не добавляет reviewer role/subagent и не становится обязательным
+LLM-gate normal lifecycle. Для security-sensitive task используй режим `diff`; для отдельного
+аудита всего продукта - `full`. Подтверждённым finding считается только проблема с конкретным
+attack path и воспроизводимым evidence; неподтверждённые гипотезы остаются concerns. Отдельный
+workflow `Security Audit` даёт deterministic CodeQL/dependency/Trivy signal вручную и по
+расписанию, но его findings сами по себе не заменяют валидацию exploitability.
 Следующую product task автоматически не запускать.
 
 # Skills

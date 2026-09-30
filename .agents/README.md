@@ -1,4 +1,4 @@
-# YFC Codex skills v8 - focused contracts
+# YFC Codex skills v9 - focused contracts
 
 Skills задают профессиональный способ выполнения работы. Role задаёт ответственность прохода, task - scope и результат.
 
@@ -21,6 +21,10 @@ Skills задают профессиональный способ выполне
 13. Dedicated legal-risk audit использует primary role `product-lawyer`; remediation после owner
     decision возвращается в отдельную task с обычной implementation-ролью.
 14. QA work profiles описаны в `references/QA_AUTOMATION_ARCHITECTURE.md`; это modes существующих roles, а не отдельный lifecycle.
+15. Repository-native Security Review использует существующий `$security-engineer`, а не новый reviewer role:
+    `diff` для security-sensitive изменений и `full` только для отдельного аудита.
+16. Канонический threat model находится в `../security/THREAT_MODEL.md`; процедура и стандарт
+    доказательств - в `skills/security-engineer/references/SECURITY_REVIEW_PLAYBOOK.md`.
 
 ## QA v8
 
