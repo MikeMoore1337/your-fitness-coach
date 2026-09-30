@@ -167,7 +167,7 @@ deploy/production closeout только по contract product task.
 required integration/e2e PASS, exact-head CI GREEN и aggregate GitHub status `checks` GREEN.
 Известные unresolved BLOCKER/HIGH текущей реализации/QA блокируют завершение.
 PR должен быть mergeable и соответствовать branch/ruleset policy; уже существующие review threads
-нужно фактически исправить и resolved до merge. LLM review не запускается в lifecycle.
+нужно фактически исправить и resolved до merge. Внешний Codex Code Review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
 отсутствие Codex Code Review их не заменяет. Внешний Codex Security Review (`@codex security review`)
