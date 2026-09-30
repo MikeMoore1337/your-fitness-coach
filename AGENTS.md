@@ -170,25 +170,30 @@ PR должен быть mergeable и соответствовать branch/rule
 нужно фактически исправить и resolved до merge. LLM review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-отсутствие Codex Code Review их не заменяет. Automatic Security Review не является частью normal path обычного PR и
-не должен запускаться при PR opened, push, mark-ready или каждом Code Review. Security Review -
-отдельный manual/conditional gate для фактических security-sensitive surfaces: auth/authz, secrets,
-untrusted network, uploads/parsers, user-controlled URLs, sensitive data, payments, admin actions,
-cryptography/headers, webhook verification, privilege escalation, dependency-security task или
-dedicated security audit. Code Review и Security Review не сцепляются автоматически; deterministic
-security scanners остаются в CI, а отсутствие Security Review не блокирует ordinary task без
-security trigger. Automatic external Codex/GitHub settings не меняются repository changes; если
-настройка недоступна, фиксируй `MANUAL_EXTERNAL_SETTING_REQUIRED`.
+отсутствие Codex Code Review их не заменяет. Внешний Codex Security Review (`@codex security review`)
+не используется автоматически и не является частью delivery lifecycle.
 
-Repository-native Security Review выполняется обычной Codex-сессией через
+Repository-native Security Review выполняется обычным Codex через официальный GitHub Action,
 `$security-engineer`, `security/THREAT_MODEL.md` и
-`.agents/skills/security-engineer/references/SECURITY_REVIEW_PLAYBOOK.md`. Он не вызывает внешний
-`@codex security review`, не добавляет reviewer role/subagent и не становится обязательным
-LLM-gate normal lifecycle. Для security-sensitive task используй режим `diff`; для отдельного
-аудита всего продукта - `full`. Подтверждённым finding считается только проблема с конкретным
-attack path и воспроизводимым evidence; неподтверждённые гипотезы остаются concerns. Отдельный
-workflow `Security Audit` даёт deterministic CodeQL/dependency/Trivy signal вручную и по
-расписанию, но его findings сами по себе не заменяют валидацию exploitability.
+`.agents/skills/security-engineer/references/SECURITY_REVIEW_PLAYBOOK.md`. Каждый pull request
+обязательно проходит автоматический `diff` review в read-only sandbox. Review начинает с exact
+base/head diff и расширяет чтение только до реально затронутых trust boundaries/call paths.
+Подтверждённым finding считается только проблема с конкретным attack path и воспроизводимым
+evidence; неподтверждённые гипотезы остаются concerns.
+
+Automatic repository-native review не создаёт reviewer role/subagent, не исправляет код и не
+вызывает внешний `@codex security review`. Подтверждённые `CRITICAL`/`HIGH` findings блокируют
+aggregate `checks`; `MEDIUM`/`LOW` и unvalidated concerns публикуются в PR без автоматической
+блокировки. Ошибка запуска, отсутствие credential или невалидный structured result работают
+fail-closed и блокируют `checks`, чтобы semantic gate нельзя было молча пропустить. Dedicated
+`full` audit остаётся отдельным owner-requested режимом. Workflow `Security Audit` продолжает
+давать deterministic CodeQL/dependency/Trivy signal вручную и по расписанию; scanner finding сам по
+себе не считается подтверждённой exploitability.
+
+Для GitHub Actions требуется repository secret `OPENAI_API_KEY`; для bot-authored dependency PR,
+которым GitHub не выдаёт обычные Actions secrets, тот же secret должен быть отдельно доступен в
+соответствующем bot/Dependabot secret scope. Untrusted fork PR не получает секрет и поэтому
+останавливается fail-closed вместо запуска модели с privileged credential.
 Следующую product task автоматически не запускать.
 
 # Skills
