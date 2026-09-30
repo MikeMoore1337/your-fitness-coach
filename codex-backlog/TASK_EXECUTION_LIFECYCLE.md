@@ -32,12 +32,11 @@ PR должен быть mergeable и соответствовать branch/rule
 нужно фактически исправить и resolved до merge. Внешний Codex Code Review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-отсутствие Codex Code Review их не заменяет. Каждый PR проходит repository-native Codex Security
-Review в `diff` mode как обязательный CI job. Он работает read-only, не создаёт reviewer-agent/
-subagent и не вызывает внешний `@codex security review`. Validated `CRITICAL`/`HIGH` findings
-блокируют aggregate `checks`; `MEDIUM`/`LOW` и unvalidated concerns advisory. Missing credential,
-action failure или malformed structured result работают fail-closed. Dedicated `full` Security Review
-остаётся отдельным owner-requested audit. Deterministic security scanners остаются в CI.
+отсутствие Codex Code Review их не заменяет. Каждый PR проходит обязательный deterministic security
+audit внутри CI: CodeQL для Python/JavaScript-TypeScript, runtime dependency audit и Trivy filesystem
+scan для vulnerabilities/misconfiguration/secrets. Эти jobs входят в aggregate `checks` и не требуют
+платного API credential. Repository-native semantic Security Review остаётся manual/conditional для
+фактического security trigger или отдельного owner-requested `full` audit.
 Следующую product task автоматически не запускать.
 
 ## 0. Coordination lanes
