@@ -16,6 +16,7 @@ import {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { Icon } from '../../shared/ui/Icon';
+import { AiAdaptationProposal } from '../ai/AiAdaptationProposal';
 import { ProgressionGuidance } from '../workouts/ProgressionGuidance';
 import {
   blockStatusLabel,
@@ -274,12 +275,14 @@ export function AssignedProgramDetails({
   currentRevisionNumber,
   startDate,
   durationWeeks,
+  showAiAdaptation = false,
   workoutHistoryReturnPath,
 }: {
   programId: number;
   currentRevisionNumber: number;
   startDate: string;
   durationWeeks: number;
+  showAiAdaptation?: boolean;
   workoutHistoryReturnPath?: string;
 }) {
   const { toast } = useFeedback();
@@ -803,6 +806,18 @@ export function AssignedProgramDetails({
         <EmptyState
           title="Тренировочные блоки ещё не настроены"
           text="Программа продолжает работать. Добавьте первый этап, чтобы зафиксировать его цель и период."
+        />
+      )}
+
+      {showAiAdaptation && canManageProgram && (
+        <AiAdaptationProposal
+          programId={programId}
+          revisionNumber={revisionNumber}
+          targetWorkoutId={lifecycle.data?.next_workout?.id}
+          onApplied={(nextRevisionNumber) => {
+            setMutationRevisionNumber(nextRevisionNumber);
+            void invalidateProgramContext();
+          }}
         />
       )}
 

@@ -67,6 +67,163 @@
   white-space: nowrap;
 }
 
+.ai-adaptation {
+  display: grid;
+  gap: var(--v2-space-3);
+  min-width: 0;
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-left: 3px solid var(--v2-lime);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.ai-adaptation--disabled,
+.ai-adaptation--unavailable {
+  border-left-color: var(--v2-border-strong);
+}
+
+.ai-adaptation__header,
+.ai-adaptation__facts,
+.ai-adaptation__actions {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+}
+
+.ai-adaptation__header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.ai-adaptation__copy {
+  display: grid;
+  gap: var(--v2-space-1);
+  min-width: 0;
+}
+
+.ai-adaptation__copy strong,
+.ai-adaptation__copy p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ai-adaptation__copy p,
+.ai-adaptation__scope,
+.ai-adaptation__facts span,
+.ai-adaptation__facts small,
+.ai-adaptation__progress,
+.ai-adaptation__confirmation {
+  color: var(--v2-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.ai-adaptation__scope {
+  justify-self: end;
+  text-align: right;
+}
+
+.ai-adaptation__form,
+.ai-adaptation__review {
+  display: grid;
+  gap: var(--v2-space-3);
+  min-width: 0;
+}
+
+.ai-adaptation__message {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.ai-adaptation__actions {
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  justify-content: start;
+}
+
+.ai-adaptation__facts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ai-adaptation__facts > div {
+  display: grid;
+  gap: var(--v2-space-1);
+  min-width: 0;
+  padding: var(--v2-space-3);
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface);
+}
+
+.ai-adaptation__facts span {
+  font-weight: 700;
+}
+
+.ai-adaptation__facts strong,
+.ai-adaptation__facts li,
+.ai-adaptation__explanation,
+.ai-adaptation__confirmation {
+  overflow-wrap: anywhere;
+}
+
+.ai-adaptation__facts ul,
+.ai-adaptation__limitations,
+.ai-adaptation__notice ul {
+  display: grid;
+  gap: var(--v2-space-1);
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.ai-adaptation__explanation,
+.ai-adaptation__confirmation,
+.ai-adaptation__progress {
+  margin: 0;
+}
+
+.ai-adaptation__explanation {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.ai-adaptation__confirmation {
+  padding-top: var(--v2-space-2);
+  border-top: 1px solid var(--v2-border);
+}
+
+.ai-adaptation__notice {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+  padding: var(--v2-space-3);
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface);
+}
+
+.ai-adaptation__notice p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ai-adaptation__notice a {
+  justify-self: start;
+  color: var(--v2-accent-text);
+  font-weight: 700;
+}
+
+.ai-adaptation__notice--error,
+.ai-adaptation__notice--invalid,
+.ai-adaptation__notice--stale {
+  border-color: var(--v2-danger);
+}
+
+.ai-adaptation__notice--confirmed {
+  border-color: var(--v2-lime);
+}
+
+.ai-adaptation__notice--rejected {
+  border-color: var(--v2-border-strong);
+}
+
 .ai-coach-experience {
   display: grid;
   gap: var(--v2-space-4);
@@ -2200,6 +2357,21 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
 
   .ai-coach-settings-section__header {
     flex-direction: row;
+  }
+
+  .ai-adaptation__header,
+  .ai-adaptation__facts,
+  .ai-adaptation__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-adaptation__scope {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .ai-adaptation__actions .ui-button {
+    width: 100%;
   }
 }
 

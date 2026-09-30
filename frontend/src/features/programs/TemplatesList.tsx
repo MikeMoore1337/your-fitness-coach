@@ -406,6 +406,7 @@ export function TemplatesList({
                       currentRevisionNumber={activeTemplate.current_revision_number}
                       startDate={activeTemplate.assigned_program_start_date}
                       durationWeeks={activeTemplate.assigned_program_duration_weeks}
+                      showAiAdaptation
                       workoutHistoryReturnPath="/app?section=programs"
                     />
                   )}
