@@ -375,9 +375,9 @@ Task является `AUTO_RELEASE_ELIGIBLE`, только если однов�
 3. после GREEN exact-head checks выполнить обычный PR merge только для ожидаемого head SHA;
    Codex Code Review не запрашивать, не валидировать и не ожидать; исторические review comments
    не влияют на решение;
-4. не включать внешний Codex Code Review; repository-native Codex Security Review `diff`
-   автоматически проходит на каждом PR как часть required `checks`, а профильные legal, human,
-   external и destructive gates проходят только по фактическому trigger;
+4. не включать автоматический LLM/Codex review; каждый PR обязан пройти deterministic security jobs
+   (CodeQL, dependency audit, Trivy) как часть required `checks`, а semantic Security Review и
+   профильные legal, human, external/destructive gates проходят только по фактическому trigger;
 5. проверить post-merge CI exact merged `master` SHA и затем автоматически запущенный production
    deploy того же SHA до terminal success. Deploy обязан передать immutable bundle, image refs и
    migration manifest, а host не должен требовать Git checkout. Failure/rollback/manual-intervention
