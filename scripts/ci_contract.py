@@ -335,6 +335,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "tests/test_agent_flow.py",
                 "tests/test_worker_guard.py",
                 "tests/test_skill_safety.py",
+                "tests/test_security_review_gate.py",
                 "tests/test_skillspector_guard.py",
                 "tests/test_run_task_delivery.py",
                 "tests/test_scheduled_regression.py",
