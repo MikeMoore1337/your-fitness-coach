@@ -9,7 +9,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.ai_coach.contracts import (
+    AI_COACH_ADAPTATION_POLICY_VERSION,
+    AI_COACH_ADAPTATION_PROMPT_VERSION,
+    AI_COACH_ADAPTATION_SCHEMA_VERSION,
     AI_COACH_CHAT_MAX_MESSAGE_LENGTH,
+    AdaptationProposal,
     AiCoachCitation,
     AiCoachDataClass,
     AiCoachJob,
@@ -19,6 +23,70 @@ from fitminiapp_api.ai_coach.contracts import (
     AiCoachRateLimitScope,
     AiCoachResponse,
 )
+
+
+class AiCoachAdaptationGenerateRequest(BaseModel):
+    """A server-authorized program selector for one bounded adaptation draft."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    program_id: int = Field(..., ge=1)
+    expected_revision_number: int = Field(..., ge=0)
+    target_workout_id: int | None = Field(default=None, ge=1)
+    target_exercise_id: int | None = Field(default=None, ge=1)
+    message: str = Field(..., min_length=1, max_length=600)
+    locale: Literal["ru", "en"] = "ru"
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t\n" for char in normalized):
+            raise ValueError("message must be a single safe text value")
+        return normalized
+
+
+class AiCoachAdaptationProposalResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: AiCoachOutcome
+    proposal: AdaptationProposal | None = None
+    proposal_token: str | None = Field(default=None, min_length=1, max_length=8_192)
+    limitations: tuple[str, ...] = Field(default=(), max_length=6)
+    safety_category: str = Field(..., min_length=1, max_length=48)
+    prompt_version: str = AI_COACH_ADAPTATION_PROMPT_VERSION
+    schema_version: str = AI_COACH_ADAPTATION_SCHEMA_VERSION
+    policy_version: str = AI_COACH_ADAPTATION_POLICY_VERSION
+    request_id: str | None = Field(default=None, max_length=128)
+    quota: AiCoachQuotaSnapshot | None = None
+
+    @model_validator(mode="after")
+    def validate_proposal_token(self) -> AiCoachAdaptationProposalResponse:
+        if (self.proposal is None) != (self.proposal_token is None):
+            raise ValueError("proposal and proposal_token must be returned together")
+        return self
+
+
+class AiCoachAdaptationReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(..., min_length=64, max_length=64)
+    proposal_token: str = Field(..., min_length=1, max_length=8_192)
+    expected_revision_number: int = Field(..., ge=0)
+    decision: Literal["confirm", "reject"]
+
+
+class AiCoachAdaptationReviewResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: AiCoachOutcome
+    proposal_id: str = Field(..., min_length=64, max_length=64)
+    decision: Literal["confirm", "reject"]
+    applied: bool
+    idempotent: bool = False
+    current_revision_number: int = Field(..., ge=0)
+    limitations: tuple[str, ...] = Field(default=(), max_length=6)
+    quota: AiCoachQuotaSnapshot | None = None
 
 
 class AiCoachGenerateRequest(BaseModel):
@@ -337,6 +405,10 @@ class AiCoachConversationSendResponse(BaseModel):
 
 
 __all__ = [
+    "AiCoachAdaptationGenerateRequest",
+    "AiCoachAdaptationProposalResponse",
+    "AiCoachAdaptationReviewRequest",
+    "AiCoachAdaptationReviewResponse",
     "AiCoachConsentResponse",
     "AiCoachConsentUpdateRequest",
     "AiCoachContextAttachment",

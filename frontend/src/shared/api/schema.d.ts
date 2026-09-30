@@ -552,6 +552,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ai-coach/adaptations/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Ai Coach Adaptation Proposal */
+        post: operations["generate_ai_coach_adaptation_proposal_api_v1_ai_coach_adaptations_proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ai-coach/adaptations/proposals/{proposal_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Ai Coach Adaptation Proposal */
+        post: operations["review_ai_coach_adaptation_proposal_api_v1_ai_coach_adaptations_proposals__proposal_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ai-coach/consent": {
         parameters: {
             query?: never;
@@ -4490,6 +4524,67 @@ export interface components {
             /** Error Code */
             error_code?: string | null;
         };
+        /**
+         * AdaptationPatch
+         * @description The only bounded change shape that can reach the domain service.
+         */
+        AdaptationPatch: {
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "replace_exercise" | "update_prescription" | "explanation_only";
+            /** Replacement Candidate Ref */
+            replacement_candidate_ref?: string | null;
+            /** Prescribed Sets */
+            prescribed_sets?: number | null;
+            /** Prescribed Reps */
+            prescribed_reps?: string | null;
+            /** Rest Seconds */
+            rest_seconds?: number | null;
+            /**
+             * Effective Scope
+             * @default next_workout
+             * @enum {string}
+             */
+            effective_scope: "next_workout" | "current_block" | "future_program";
+        };
+        /**
+         * AdaptationProposal
+         * @description Server-resolved proposal shown to the authenticated owner or trainer.
+         */
+        AdaptationProposal: {
+            /** Proposal Id */
+            proposal_id: string;
+            proposal_type: components["schemas"]["AiCoachAdaptationProposalType"];
+            /** Target Program Id */
+            target_program_id: number;
+            /** Target Revision Id */
+            target_revision_id: number;
+            /** Target Revision Number */
+            target_revision_number: number;
+            /** Target Block Id */
+            target_block_id?: number | null;
+            /** Target Exercise Id */
+            target_exercise_id?: number | null;
+            /** Explanation */
+            explanation: string;
+            suggested_change: components["schemas"]["AdaptationPatch"];
+            /** Evidence Ids */
+            evidence_ids: string[];
+            deterministic_rule_relationship: components["schemas"]["AiCoachDeterministicRelationship"];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /**
+             * Requires Confirmation
+             * @default true
+             * @constant
+             */
+            requires_confirmation: true;
+        };
         /** AdherenceComponent */
         AdherenceComponent: {
             /**
@@ -4736,6 +4831,105 @@ export interface components {
             /** Is Active */
             is_active: boolean;
         };
+        /**
+         * AiCoachAdaptationGenerateRequest
+         * @description A server-authorized program selector for one bounded adaptation draft.
+         */
+        AiCoachAdaptationGenerateRequest: {
+            /** Program Id */
+            program_id: number;
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /** Target Workout Id */
+            target_workout_id?: number | null;
+            /** Target Exercise Id */
+            target_exercise_id?: number | null;
+            /** Message */
+            message: string;
+            /**
+             * Locale
+             * @default ru
+             * @enum {string}
+             */
+            locale: "ru" | "en";
+        };
+        /** AiCoachAdaptationProposalResponse */
+        AiCoachAdaptationProposalResponse: {
+            outcome: components["schemas"]["AiCoachOutcome"];
+            proposal?: components["schemas"]["AdaptationProposal"] | null;
+            /** Proposal Token */
+            proposal_token?: string | null;
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /** Safety Category */
+            safety_category: string;
+            /**
+             * Prompt Version
+             * @default ai-coach-adaptation-v1
+             */
+            prompt_version: string;
+            /**
+             * Schema Version
+             * @default ai-coach-adaptation-output-v1
+             */
+            schema_version: string;
+            /**
+             * Policy Version
+             * @default ai-coach-adaptation-policy-v1
+             */
+            policy_version: string;
+            /** Request Id */
+            request_id?: string | null;
+            quota?: components["schemas"]["AiCoachQuotaSnapshot"] | null;
+        };
+        /**
+         * AiCoachAdaptationProposalType
+         * @enum {string}
+         */
+        AiCoachAdaptationProposalType: "progression_explanation" | "exercise_substitution" | "volume_or_frequency_adjustment" | "block_or_revision_edit" | "adherence_performance_summary";
+        /** AiCoachAdaptationReviewRequest */
+        AiCoachAdaptationReviewRequest: {
+            /** Proposal Id */
+            proposal_id: string;
+            /** Proposal Token */
+            proposal_token: string;
+            /** Expected Revision Number */
+            expected_revision_number: number;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "reject";
+        };
+        /** AiCoachAdaptationReviewResponse */
+        AiCoachAdaptationReviewResponse: {
+            outcome: components["schemas"]["AiCoachOutcome"];
+            /** Proposal Id */
+            proposal_id: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirm" | "reject";
+            /** Applied */
+            applied: boolean;
+            /**
+             * Idempotent
+             * @default false
+             */
+            idempotent: boolean;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            quota?: components["schemas"]["AiCoachQuotaSnapshot"] | null;
+        };
         /** AiCoachCitation */
         AiCoachCitation: {
             /** Title */
@@ -4959,6 +5153,11 @@ export interface components {
          * @enum {string}
          */
         AiCoachDataClass: "generic" | "personalized" | "unknown";
+        /**
+         * AiCoachDeterministicRelationship
+         * @enum {string}
+         */
+        AiCoachDeterministicRelationship: "supports_deterministic_rule" | "supplements_no_rule" | "conflicts_with_deterministic_rule";
         /**
          * AiCoachGenerateRequest
          * @description A bounded intent plus a server-known public context id.
@@ -14428,6 +14627,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiCoachResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_ai_coach_adaptation_proposal_api_v1_ai_coach_adaptations_proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachAdaptationGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachAdaptationProposalResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_ai_coach_adaptation_proposal_api_v1_ai_coach_adaptations_proposals__proposal_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCoachAdaptationReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCoachAdaptationReviewResponse"];
                 };
             };
             /** @description Validation Error */

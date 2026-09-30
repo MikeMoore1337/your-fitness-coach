@@ -209,6 +209,9 @@ class Settings(BaseSettings):
     # AI Coach is a separate authenticated product capability. Local defaults remain safe-off.
     ai_coach_enabled: bool = False
     ai_coach_kill_switch: bool = False
+    # Stage 4 is independently fail-closed so deterministic programming remains available.
+    ai_coach_adaptation_enabled: bool = False
+    ai_coach_adaptation_kill_switch: bool = False
     # Deprecated compatibility settings for older bundles. Current AI Coach access is
     # authenticated-user scoped; these values no longer gate the UI or API routes.
     ai_coach_ui_enabled: bool = False
@@ -547,8 +550,12 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_ai_coach(self) -> Settings:
         if not self.ai_coach_enabled:
+            if self.ai_coach_adaptation_enabled and not self.ai_coach_adaptation_kill_switch:
+                raise ValueError("AI_COACH_ENABLED is required when adaptation is enabled")
             return self
         if self.ai_coach_kill_switch:
+            if self.ai_coach_adaptation_enabled and not self.ai_coach_adaptation_kill_switch:
+                raise ValueError("AI_COACH_KILL_SWITCH must be false when adaptation is enabled")
             return self
         if self.ai_coach_provider != "groq":
             raise ValueError("AI_COACH_PROVIDER must be groq when AI_COACH_ENABLED is true")
@@ -575,6 +582,12 @@ class Settings(BaseSettings):
             raise ValueError(
                 "AI_COACH_ENDPOINT must be the credential-free Groq HTTPS chat completions URL"
             )
+        if (
+            self.ai_coach_adaptation_enabled
+            and not self.ai_coach_adaptation_kill_switch
+            and not self.ai_coach_structured_output
+        ):
+            raise ValueError("AI_COACH_STRUCTURED_OUTPUT must remain true for adaptation")
         return self
 
     @field_validator("ai_coach_proxy_url")
