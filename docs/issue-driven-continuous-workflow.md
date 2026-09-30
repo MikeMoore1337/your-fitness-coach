@@ -111,11 +111,17 @@ implementation lease:
   --control-issue <TASK_ID> --reason "corrected Agent Flow routing" --owner-authorize
 ```
 
-Операция заново вычисляет Agent Flow из текущей task metadata, проверяет terminal worker evidence,
-clean worktree, отсутствие PR/history/delivery owner и exact dependencies. Она может только
-аудированно восстановить пропущенный список зависимостей, если Issue и task spec совпадают и все
-зависимости уже terminal. Новый `in_progress` публикуется guarded launcher только после durable
-worker-start marker; второй такой retry и любая неоднозначность остаются `HUMAN_REQUIRED`.
+Операция сначала доказывает terminal no-op на исходном task HEAD/base и только после этого может
+выполнить fast-forward к текущему protected `origin/master`. Controller/master commits,
+появившиеся при таком refresh, не считаются Task commits; любой commit, уникальный для task branch,
+остаётся fail-closed. Если предыдущий запуск уже успел сделать такой fast-forward до записи ledger,
+разрешается только точное состояние branch без уникальных commits относительно protected master,
+с audited `controller_induced_pre_retry_fast_forward`. Она заново вычисляет Agent Flow из текущей
+task metadata, проверяет terminal worker evidence, clean worktree, отсутствие PR/history/delivery
+owner и exact dependencies. Операция может только аудированно восстановить пропущенный список
+зависимостей, если Issue и task spec совпадают и все зависимости уже terminal. Новый `in_progress`
+публикуется guarded launcher только после durable worker-start marker; второй такой retry и любая
+неоднозначность остаются `HUMAN_REQUIRED`.
 
 Для queue-mode authoritative-счётчики review-fix и CI-fix хранятся в durable controller ledger.
 Перед каждым фактическим fix cycle worker обязан выполнить `record-queue-cycle`; `final.md`

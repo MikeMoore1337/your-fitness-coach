@@ -4145,11 +4145,45 @@ class TaskController:
         return worktree, branch, head
 
     def _verified_noop_worker_evidence(
-        self, task_id: str, worktree: Path, base_sha: str
+        self,
+        task_id: str,
+        worktree: Path,
+        base_sha: str,
+        *,
+        original_head: str | None = None,
+        current_origin: str | None = None,
     ) -> dict[str, Any]:
         """Verify the prior worker was a terminal, read-only routing mistake."""
 
         expected = normalize_task_id(task_id)
+        observed_head = self.repository.head(cwd=worktree)
+        branch = str(self.repository.current_branch(cwd=worktree) or "")
+        branch_head = self.repository.ref(f"refs/heads/{branch}") if branch else ""
+        original_head = original_head or observed_head
+        if observed_head != original_head or branch_head != original_head:
+            raise TaskSessionError(
+                "Verified no-op retry worktree changed before pre-refresh evidence verification"
+            )
+        if current_origin is not None:
+            if not self.repository.is_ancestor(base_sha, current_origin):
+                raise TaskSessionError(
+                    "Verified no-op retry lease base is not an ancestor of protected master"
+                )
+            if original_head != base_sha and self.repository.is_ancestor(
+                original_head, current_origin
+            ):
+                # A previous controller-owned fast-forward may have completed before
+                # the ledger write.  Accept only a branch already contained in
+                # protected master and therefore with no commits unique to the task.
+                if self.repository.unique_commits(branch, base=current_origin):
+                    raise TaskSessionError(
+                        "Verified no-op retry refuses task commits after controller refresh"
+                    )
+                refresh_classification = "controller_induced_pre_retry_fast_forward"
+            else:
+                refresh_classification = None
+        else:
+            refresh_classification = None
         evidence_root = (
             self._canonical_root() / ".artifacts" / "tasks" / expected / "evidence" / "agent-flow"
         ).resolve()
@@ -4267,9 +4301,7 @@ class TaskController:
             )
         if self.repository.status(worktree) or self._guard_ignored_paths(worktree):
             raise TaskSessionError("Verified no-op retry refuses product worktree mutation")
-        if self.repository.unique_commits(
-            str(self.repository.current_branch(cwd=worktree) or ""), base=base_sha
-        ):
+        if refresh_classification is None and self.repository.unique_commits(branch, base=base_sha):
             raise TaskSessionError("Verified no-op retry refuses unique task commits")
         attempt = max(attempts, key=lambda item: item[0])
         return {
@@ -4280,6 +4312,8 @@ class TaskController:
             "source_mutation": False,
             "unique_commits": 0,
             "delivery_attempt": attempt[2],
+            "pre_refresh_head": original_head,
+            "refresh_classification": refresh_classification,
         }
 
     def retry_noop_worker(
@@ -4487,25 +4521,27 @@ class TaskController:
                             "Latest human_required state is unrelated to this retry"
                         )
 
+            base_sha = str(lease.get("base_origin_master_sha", ""))
+            if re.fullmatch(r"[0-9a-f]{40}", base_sha) is None:
+                raise TaskSessionError("Active lease base SHA is malformed")
+            original_head = head
             self.repository.fetch_origin_master(cwd=self._canonical_root(), prune=False)
             current_origin = self.repository.ref("origin/master")
             if self._github().branch_head(TARGET_BASE_BRANCH) != current_origin:
                 raise TaskSessionError("origin/master is not synchronized with protected master")
-            if not self.repository.is_ancestor(
-                head, current_origin
-            ) and not self.repository.is_ancestor(current_origin, head):
+            if not self.repository.is_ancestor(base_sha, current_origin):
                 raise TaskSessionError(
-                    "Task HEAD is not in a safe ancestry relation with origin/master"
+                    "Task lease base is not an ancestor of synchronized origin/master"
                 )
-            if head != current_origin:
-                self.repository.fast_forward_current(current_origin, cwd=worktree)
-                if self.repository.ref(f"refs/heads/{branch}") != current_origin:
-                    raise TaskSessionError("Task branch did not fast-forward to origin/master")
-                head = current_origin
-            base_sha = str(lease.get("base_origin_master_sha", current_origin))
-            if re.fullmatch(r"[0-9a-f]{40}", base_sha) is None:
-                raise TaskSessionError("Active lease base SHA is malformed")
-            prior = self._verified_noop_worker_evidence(expected, worktree, base_sha)
+            if not self.repository.is_ancestor(original_head, current_origin):
+                raise TaskSessionError("Task HEAD is not an ancestor of synchronized origin/master")
+            prior = self._verified_noop_worker_evidence(
+                expected,
+                worktree,
+                base_sha,
+                original_head=original_head,
+                current_origin=current_origin,
+            )
             try:
                 current_plan = build_agent_flow_from_path(
                     expected, document.path, issue_contract=contract
@@ -4532,6 +4568,42 @@ class TaskController:
                 raise TaskSessionError(
                     "Corrected Agent Flow did not differ from the prior read-only plan"
                 )
+            refresh_required = original_head != current_origin
+            if refresh_required:
+                self.repository.fast_forward_current(current_origin, cwd=worktree)
+            self.repository.fetch_origin_master(cwd=self._canonical_root(), prune=False)
+            refreshed_origin = self.repository.ref("origin/master")
+            if refreshed_origin != current_origin:
+                raise TaskSessionError(
+                    "Protected master changed during verified no-op retry preparation"
+                )
+            if self._github().branch_head(TARGET_BASE_BRANCH) != current_origin:
+                raise TaskSessionError(
+                    "Protected master changed during verified no-op retry preparation"
+                )
+            refreshed_head = self.repository.head(cwd=worktree)
+            if (
+                refreshed_head != current_origin
+                or self.repository.ref(f"refs/heads/{branch}") != current_origin
+                or self.repository.unique_commits(branch, base=current_origin)
+            ):
+                raise TaskSessionError(
+                    "Task branch is not an exact protected-master fast-forward after retry preparation"
+                )
+            refresh_classification = prior.get("refresh_classification")
+            base_refresh = None
+            if refresh_required or refresh_classification:
+                base_refresh = {
+                    "classification": refresh_classification
+                    or "controller_induced_pre_retry_fast_forward",
+                    "previous_lease_base": base_sha,
+                    "previous_task_head": (base_sha if refresh_classification else original_head),
+                    "observed_head_before_operation": original_head,
+                    "refreshed_head": current_origin,
+                    "protected_master": current_origin,
+                    "owner_authorized": True,
+                    "recorded_at": utc_now(),
+                }
             retry_evidence_path = ArtifactManager(
                 self._canonical_root() / ".artifacts", repo_root=self._canonical_root()
             ).allocate(
@@ -4565,6 +4637,7 @@ class TaskController:
                 "owner_authorized": True,
                 "reason": normalized_reason,
                 "prior_attempt": prior,
+                "base_refresh": base_refresh,
                 "corrected_plan": {
                     "path": str(retry_evidence_path.resolve()),
                     "roles": roles,
@@ -4589,6 +4662,8 @@ class TaskController:
             }
             lease["worker_retry"] = worker_retry
             lease["preimplementation_resume"] = resume_event
+            if base_refresh is not None:
+                lease["base_refresh"] = base_refresh
             lease["base_origin_master_sha"] = current_origin
             lease["updated_at"] = timestamp
             StateStore.replace_json(lease_path, lease)
@@ -4599,6 +4674,7 @@ class TaskController:
                 "control_state": control_state,
                 "agent_flow": current_plan,
                 "agent_flow_evidence": str(retry_evidence_path),
+                "base_refresh": base_refresh,
                 "dependency_reconciliation": dependency_reconciliation,
                 "mutation_performed": True,
             }
