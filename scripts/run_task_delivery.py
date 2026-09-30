@@ -58,6 +58,7 @@ try:
     from scripts.task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
         CLOSED_LEASE_STATES,
+        DONE_STATE,
         IMPLEMENTATION_STATES,
         KNOWN_LEASE_STATES,
         POST_START_TRANSPORT_FAILURE_KIND,
@@ -66,6 +67,7 @@ try:
         GitRepository,
         TaskController,
         TaskSessionError,
+        canonical_lifecycle_state,
         find_task_document,
         task_id_from_branch,
     )
@@ -94,6 +96,7 @@ except ModuleNotFoundError:
     from task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
         CLOSED_LEASE_STATES,
+        DONE_STATE,
         IMPLEMENTATION_STATES,
         KNOWN_LEASE_STATES,
         POST_START_TRANSPORT_FAILURE_KIND,
@@ -102,6 +105,7 @@ except ModuleNotFoundError:
         GitRepository,
         TaskController,
         TaskSessionError,
+        canonical_lifecycle_state,
         find_task_document,
         task_id_from_branch,
     )
@@ -1544,10 +1548,11 @@ def _reconcile_interrupted_queue_claim(
                 f"HUMAN_REQUIRED: interrupted queue reconciliation requires exactly one task lease for Task {expected_task_id}"
             )
         lease = matches[0]
-        lifecycle_state = str(lease.get("lifecycle_state", "")).strip().lower()
-        if lifecycle_state not in KNOWN_LEASE_STATES:
+        raw_lifecycle_state = str(lease.get("lifecycle_state", "")).strip().lower()
+        lifecycle_state = canonical_lifecycle_state(raw_lifecycle_state)
+        if raw_lifecycle_state not in KNOWN_LEASE_STATES:
             raise DeliveryError(
-                f"HUMAN_REQUIRED: Task {expected_task_id} lease has ambiguous lifecycle state {lifecycle_state or '<missing>'}"
+                f"HUMAN_REQUIRED: Task {expected_task_id} lease has ambiguous lifecycle state {raw_lifecycle_state or '<missing>'}"
             )
         if lifecycle_state not in IMPLEMENTATION_STATES:
             raise DeliveryError(
@@ -1912,16 +1917,16 @@ def _read_task_order(root: Path) -> dict[str, int]:
 
 
 def _is_superseded_lease(lease: Mapping[str, Any]) -> bool:
-    return (
-        lease.get("mode") == "write"
-        and str(lease.get("lifecycle_state", "")).strip().lower() == "superseded"
+    return lease.get("mode") == "write" and (
+        canonical_lifecycle_state(lease.get("lifecycle_state")) == DONE_STATE
+        or lease.get("terminal_result") == "superseded"
     )
 
 
 def _is_implementation_blocking_lease(lease: Mapping[str, Any]) -> bool:
     return (
         lease.get("mode") == "write"
-        and str(lease.get("lifecycle_state", "")).strip().lower() not in CLOSED_LEASE_STATES
+        and canonical_lifecycle_state(lease.get("lifecycle_state")) not in CLOSED_LEASE_STATES
     )
 
 
@@ -2118,6 +2123,7 @@ def _start(
     resume_guard_interrupted: bool = False,
     resume_transport_interrupted: bool = False,
     retry_noop_worker: bool = False,
+    resume_worker: bool = False,
 ) -> dict[str, Any]:
     deadline = time.monotonic() + max_wait_minutes * 60
     if resume_control_issue is not None:
@@ -2131,15 +2137,19 @@ def _start(
             "--repo",
             str(REPOSITORY_ROOT),
             (
-                "retry-noop-worker"
-                if retry_noop_worker
+                "resume-worker"
+                if resume_worker
                 else (
-                    "resume-transport-interrupted"
-                    if resume_transport_interrupted
+                    "retry-noop-worker"
+                    if retry_noop_worker
                     else (
-                        "resume-guard-interrupted"
-                        if resume_guard_interrupted
-                        else "resume-preimplementation"
+                        "resume-transport-interrupted"
+                        if resume_transport_interrupted
+                        else (
+                            "resume-guard-interrupted"
+                            if resume_guard_interrupted
+                            else "resume-preimplementation"
+                        )
                     )
                 )
             ),
@@ -2178,9 +2188,9 @@ def _start(
                 raise DeliveryError("Controller returned invalid start JSON") from error
         detail = completed.stderr.strip() or completed.stdout.strip() or "unknown start error"
         if not _is_transient_start_error(detail):
-            if (resume_guard_interrupted or resume_transport_interrupted) and not detail.startswith(
-                "HUMAN_REQUIRED:"
-            ):
+            if (
+                resume_guard_interrupted or resume_transport_interrupted or resume_worker
+            ) and not detail.startswith("HUMAN_REQUIRED:"):
                 detail = f"HUMAN_REQUIRED: {detail}"
             raise DeliveryError(detail)
         if time.monotonic() >= deadline:
@@ -3699,6 +3709,7 @@ def _deliver_one(
     resume_guard_interrupted: bool = False,
     resume_transport_interrupted: bool = False,
     retry_noop_worker: bool = False,
+    resume_worker: bool = False,
 ) -> dict[str, Any]:
     if (resume_guard_interrupted or resume_transport_interrupted) and (
         resume_reason is None or control_issue is None
@@ -3706,9 +3717,11 @@ def _deliver_one(
         raise DeliveryError(
             "HUMAN_REQUIRED: interrupted-worker resume requires --control-issue and --resume-reason"
         )
-    if (resume_reason is not None or retry_noop_worker) and control_issue is None:
+    if (resume_reason is not None or retry_noop_worker or resume_worker) and control_issue is None:
         raise DeliveryError("HUMAN_REQUIRED: pre-implementation resume requires --control-issue")
-    if retry_noop_worker and (resume_guard_interrupted or resume_transport_interrupted):
+    if (retry_noop_worker or resume_worker) and (
+        resume_guard_interrupted or resume_transport_interrupted
+    ):
         raise DeliveryError("Verified no-op retry cannot combine with another recovery mode")
     started = _start(
         task_id,
@@ -3723,16 +3736,19 @@ def _deliver_one(
         ),
         queue_mode=issue_contract is not None,
         resume_control_issue=control_issue
-        if (resume_reason is not None or retry_noop_worker)
+        if (resume_reason is not None or retry_noop_worker or resume_worker)
         else None,
         resume_reason=resume_reason,
         resume_guard_interrupted=resume_guard_interrupted,
         resume_transport_interrupted=resume_transport_interrupted,
         retry_noop_worker=retry_noop_worker,
+        resume_worker=resume_worker,
     )
     status_issue = state_issue or control_issue
-    resumed_worker = resume_reason is not None or retry_noop_worker
-    if resumed_worker and retry_noop_worker:
+    resumed_worker = resume_reason is not None or retry_noop_worker or resume_worker
+    generic_retry_kind = started.get("retry_kind")
+    generic_noop_retry = retry_noop_worker or (resume_worker and generic_retry_kind == "no_changes")
+    if resumed_worker and generic_noop_retry:
         if started.get("control_state") is not None and not isinstance(
             started.get("control_state"), Mapping
         ):
@@ -3769,8 +3785,9 @@ def _deliver_one(
             valid_transport_retry = resume_transport_interrupted and isinstance(
                 transport_recovery, Mapping
             )
+            valid_generic_retry = resume_worker and generic_retry_kind == "interrupted"
             if status_issue is None or not (
-                valid_cli_retry or valid_guard_retry or valid_transport_retry
+                valid_cli_retry or valid_guard_retry or valid_transport_retry or valid_generic_retry
             ):
                 raise DeliveryError(
                     "HUMAN_REQUIRED: blocked resume has no reconciled startup failure"
@@ -3814,6 +3831,17 @@ def _deliver_one(
                         issue_number=status_issue,
                         branch=started["lease"]["branch"],
                         blocker=POST_START_TRANSPORT_HANDOFF_BLOCKER,
+                    ),
+                )
+            elif valid_generic_retry:
+                _post_control_state(
+                    status_issue,
+                    control_state_payload(
+                        task_id=task_id,
+                        state="human_required",
+                        issue_number=status_issue,
+                        branch=started["lease"]["branch"],
+                        blocker="Owner-authorized bounded worker resume is launching the preserved WIP.",
                     ),
                 )
         elif control_state.get("state") != "human_required":
@@ -3882,9 +3910,9 @@ def _deliver_one(
         try:
             result = _controller_payload("claim-preimplementation-worker-launch", task_id)
         except DeliveryError as error:
-            if (resume_guard_interrupted or resume_transport_interrupted) and not str(
-                error
-            ).startswith("HUMAN_REQUIRED:"):
+            if (
+                resume_guard_interrupted or resume_transport_interrupted or resume_worker
+            ) and not str(error).startswith("HUMAN_REQUIRED:"):
                 raise DeliveryError(f"HUMAN_REQUIRED: {error}") from error
             raise
         event = result.get("preimplementation_resume")
@@ -4270,6 +4298,9 @@ def _parser() -> argparse.ArgumentParser:
     resume_group.add_argument("--resume-guard-interrupted", action="store_true")
     resume_group.add_argument("--resume-transport-interrupted", action="store_true")
     resume_group.add_argument("--retry-noop-worker", action="store_true")
+    resume_group.add_argument(
+        "--resume-worker", "--retry-worker", dest="resume_worker", action="store_true"
+    )
     parser.add_argument("--resume-reason")
     parser.add_argument("--max-tasks", type=int, default=4)
     parser.add_argument("--offline", action="store_true", help=argparse.SUPPRESS)
@@ -4338,6 +4369,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 or args.resume_guard_interrupted
                 or args.resume_transport_interrupted
                 or args.retry_noop_worker
+                or args.resume_worker
                 or args.resume_reason is not None
             ):
                 raise DeliveryError("continuous queue mode does not support task resume")
@@ -4358,8 +4390,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             or args.resume_guard_interrupted
             or args.resume_transport_interrupted
             or args.retry_noop_worker
+            or args.resume_worker
         )
-        if args.retry_noop_worker and not args.owner_authorize:
+        if (args.retry_noop_worker or args.resume_worker) and not args.owner_authorize:
             raise DeliveryError("Verified no-op retry requires --owner-authorize")
         if recovery_mode and (args.control_issue is None or not args.resume_reason or args.offline):
             raise DeliveryError(
@@ -4381,6 +4414,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             resume_guard_interrupted=args.resume_guard_interrupted,
             resume_transport_interrupted=args.resume_transport_interrupted,
             retry_noop_worker=args.retry_noop_worker,
+            resume_worker=args.resume_worker,
         )
         return 0
     except (DeliveryError, IssueWorkflowError, OSError) as error:

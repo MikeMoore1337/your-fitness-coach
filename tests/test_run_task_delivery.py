@@ -270,6 +270,16 @@ def test_noop_retry_launcher_uses_dedicated_controller_command(
     assert "resume-preimplementation" not in command
 
 
+def test_parser_exposes_generic_worker_resume() -> None:
+    args = delivery._parser().parse_args(
+        ["508", "--control-issue", "508", "--resume-worker", "--resume-reason", "retry"]
+    )
+
+    assert args.resume_worker is True
+    assert args.control_issue == 508
+    assert args.resume_reason == "retry"
+
+
 def test_guard_resume_launcher_uses_dedicated_controller_command(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

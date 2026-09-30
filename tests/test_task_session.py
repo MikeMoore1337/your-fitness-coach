@@ -1052,6 +1052,24 @@ def _record_post_start_transport_failure(
     return worker_state_path, guard_path, events_path, attempt_id
 
 
+def test_task_session_exposes_generic_worker_resume_alias() -> None:
+    args = task_session._parser().parse_args(
+        [
+            "retry-worker",
+            "241",
+            "--control-issue",
+            "241",
+            "--reason",
+            "owner-authorized generic worker retry",
+            "--owner-authorize",
+        ]
+    )
+
+    assert args.command == "retry-worker"
+    assert args.control_issue == 241
+    assert args.owner_authorize is True
+
+
 def test_task_session_exposes_guard_interrupted_resume_command() -> None:
     args = task_session._parser().parse_args(
         [
@@ -1966,7 +1984,7 @@ def test_resume_preimplementation_fast_forwards_and_preserves_attempt_audit(
     event = resumed["preimplementation_resume"]
     assert resumed["lease"]["original_base_origin_master_sha"] == original_base
     assert resumed["lease"]["base_origin_master_sha"] == current_master
-    assert resumed["lease"]["lifecycle_state"] == "implementation"
+    assert resumed["lease"]["lifecycle_state"] == "working"
     assert git_repository.head(cwd=worktree) == current_master
     assert git_repository.ref(branch) == current_master
     assert event["state"] == "prepared"
@@ -3602,7 +3620,7 @@ def test_reconcile_verified_post_merge_anchor_rejects_unsafe_recovery(
             owner_authorize=owner_authorize,
         )
 
-    assert controller.store.read_json(lease_path)["lifecycle_state"] == "recovery-required"
+    assert controller.store.read_json(lease_path)["lifecycle_state"] == "human-required"
     assert not (controller.store.history / "task-415.json").exists()
 
 
@@ -3648,7 +3666,7 @@ def test_reconcile_superseding_production_preserves_anchor_and_all_evidence(
     assert reconciliation["production"]["deployed_sha"] == deployed_sha
     reconciled_lease = controller.store.read_json(lease_path)
     assert isinstance(reconciled_lease, dict)
-    assert reconciled_lease["lifecycle_state"] == "production-success"
+    assert reconciled_lease["lifecycle_state"] == "deployed"
     assert reconciled_lease["delivery_anchor"] == original_anchor
     assert controller.store.delivery_state()["owner"] is None
 
@@ -3819,7 +3837,7 @@ def test_reconcile_single_pr_collapsed_anchor_rejects_unsafe_evidence(
             owner_authorize=True,
         )
 
-    assert controller.store.read_json(lease_path)["lifecycle_state"] == "recovery-required"
+    assert controller.store.read_json(lease_path)["lifecycle_state"] == "human-required"
     assert not (controller.store.history / "task-507.json").exists()
 
 
@@ -3926,7 +3944,7 @@ def test_finish_rejects_non_controller_drift_after_reconciliation_snapshot(
     assert git_repository.ref_exists(branch)
     assert (
         controller.store.read_json(controller.store.task_lease_path("415"))["lifecycle_state"]
-        == "production-success"
+        == "deployed"
     )
 
 
@@ -3949,7 +3967,7 @@ def test_reconcile_superseding_production_requires_owner_authorization(
 
     assert (
         controller.store.read_json(controller.store.task_lease_path("415"))["lifecycle_state"]
-        == "recovery-required"
+        == task_session.HUMAN_REQUIRED_STATE
     )
     assert not (controller.store.history / "task-415.json").exists()
 
@@ -3981,7 +3999,7 @@ def test_reconcile_superseding_production_rejects_missing_or_duplicate_pr_number
 
     assert (
         controller.store.read_json(controller.store.task_lease_path("415"))["lifecycle_state"]
-        == "recovery-required"
+        == task_session.HUMAN_REQUIRED_STATE
     )
 
 
@@ -4102,7 +4120,7 @@ def test_reconcile_superseding_production_rejects_ambiguous_or_invalid_evidence(
         )
 
     lease = controller.store.read_json(controller.store.task_lease_path("415"))
-    assert lease["lifecycle_state"] == "recovery-required"
+    assert lease["lifecycle_state"] == "human-required"
     if invalid_case != "duplicate_history":
         assert not (controller.store.history / "task-415.json").exists()
     if invalid_case != "active_delivery_owner":
@@ -4141,7 +4159,7 @@ def test_reconcile_superseding_production_rechecks_live_master_before_write(
     assert calls == 2
     assert (
         controller.store.read_json(controller.store.task_lease_path("415"))["lifecycle_state"]
-        == "recovery-required"
+        == task_session.HUMAN_REQUIRED_STATE
     )
     assert not (controller.store.history / "task-415.json").exists()
 
@@ -4585,7 +4603,7 @@ def test_three_independent_write_tasks_can_run_at_once(
     ]
 
     assert len({item["lease"]["worktree"] for item in started}) == 3
-    assert all(item["lease"]["lifecycle_state"] == "implementation" for item in started)
+    assert all(item["lease"]["lifecycle_state"] == "working" for item in started)
 
 
 @pytest.mark.parametrize(
@@ -4606,7 +4624,7 @@ def test_legacy_exclusive_metadata_does_not_block_distinct_worktrees(
     controller.start("225", owner_launch=True, session_label="existing", offline=True)
 
     started = controller.start("226", owner_launch=True, session_label="candidate", offline=True)
-    assert started["lease"]["lifecycle_state"] == "implementation"
+    assert started["lease"]["lifecycle_state"] == "working"
 
 
 def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
@@ -4624,7 +4642,7 @@ def test_ready_or_delivery_exclusive_lease_releases_implementation_exclusion(
     candidate = controller.start("226B", owner_launch=True, session_label="candidate", offline=True)
 
     snapshots = {item["task_id"]: item for item in controller.status()["leases"]}
-    assert candidate["lease"]["lifecycle_state"] == "implementation"
+    assert candidate["lease"]["lifecycle_state"] == "working"
     assert snapshots["226A"]["ownership"] == {
         "task_session_active": True,
         "implementation_exclusion_active": False,
@@ -4772,7 +4790,7 @@ def test_unrelated_dirty_task_worktree_does_not_block_new_writer(
 
     started = controller.start("226I", owner_launch=True, session_label="candidate", offline=True)
 
-    assert started["lease"]["lifecycle_state"] == "implementation"
+    assert started["lease"]["lifecycle_state"] == "working"
     assert (worktree / "uncommitted.txt").read_text(encoding="utf-8") == "preserve\n"
 
 
@@ -4803,7 +4821,7 @@ def test_unrelated_interrupted_task_worktree_does_not_block_new_writer(
             "226M", owner_launch=True, session_label="candidate", offline=True
         )
 
-        assert started["lease"]["lifecycle_state"] == "implementation"
+        assert started["lease"]["lifecycle_state"] == "working"
         assert marker.read_text(encoding="utf-8") == "synthetic\n"
     finally:
         marker.unlink(missing_ok=True)
@@ -4886,14 +4904,15 @@ def test_active_production_deploy_blocks_only_delivery_acquisition(
     assert first["lease"]["worktree"] != second_lease["worktree"]
     assert waiting["acquired"] is False
     assert waiting["delivery_blocker"] == "active production deployment"
-    assert controller.store.read_json(controller.store.task_lease_path("231"))[
-        "lifecycle_state"
-    ] == ("waiting-for-delivery")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("231"))["lifecycle_state"]
+        == "working"
+    )
 
     github.active_runs = []
     acquired = controller.acquire_delivery("231")
     assert acquired["acquired"] is True
-    assert acquired["lifecycle_state"] == "delivering"
+    assert acquired["lifecycle_state"] == "working"
 
 
 def test_delivery_lane_is_serial_and_handoff_is_deterministic(
@@ -4918,19 +4937,21 @@ def test_delivery_lane_is_serial_and_handoff_is_deterministic(
     assert first["acquired"] is True
     assert second["acquired"] is False
     assert second["delivery_owner"] == "232"
-    assert controller.store.read_json(controller.store.task_lease_path("233"))[
-        "lifecycle_state"
-    ] == ("waiting-for-delivery")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("233"))["lifecycle_state"]
+        == "working"
+    )
 
     released = controller.release_delivery(
         "232", reason="synthetic delivery interruption", offline=True
     )
 
-    assert released["lifecycle_state"] == "recovery-required"
+    assert released["lifecycle_state"] == "human-required"
     assert controller.store.delivery_state()["owner"]["task_id"] == "233"
-    assert controller.store.read_json(controller.store.task_lease_path("233"))[
-        "lifecycle_state"
-    ] == ("delivering")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("233"))["lifecycle_state"]
+        == "working"
+    )
 
 
 def test_owner_priority_promotes_current_task_and_preserves_fifo_handoff(
@@ -4964,14 +4985,14 @@ def test_owner_priority_promotes_current_task_and_preserves_fifo_handoff(
     assert controller.store.delivery_state()["priority_override"]["skipped_task_ids"] == ["246"]
     assert (
         controller.store.read_json(controller.store.task_lease_path("246"))["lifecycle_state"]
-        == "ready-for-delivery"
+        == "working"
     )
 
     released = controller.release_delivery(
         "247", reason="synthetic priority delivery interruption", offline=True
     )
 
-    assert released["lifecycle_state"] == "recovery-required"
+    assert released["lifecycle_state"] == "human-required"
     assert controller.store.delivery_state()["owner"]["task_id"] == "246"
     assert "priority_override" not in controller.store.delivery_state()
 
@@ -5016,9 +5037,10 @@ def test_release_delivery_does_not_handoff_during_active_production(
     assert released["delivery_next_owner"] is None
     assert released["delivery_handoff_blocker"] == "active production deployment"
     assert controller.store.delivery_state()["owner"] is None
-    assert controller.store.read_json(controller.store.task_lease_path("233B"))[
-        "lifecycle_state"
-    ] == ("ready-for-delivery")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("233B"))["lifecycle_state"]
+        == "working"
+    )
 
     github.active_runs = []
     reacquired = controller.acquire_delivery("233B", offline=True)
@@ -5039,7 +5061,7 @@ def test_reopen_for_review_clears_delivery_snapshot_and_requires_new_readiness(
 
     reopened = controller.reopen_for_review("234A", reason="address review findings")
 
-    assert reopened["lifecycle_state"] == "review"
+    assert reopened["lifecycle_state"] == "working"
     assert "delivery_anchor" not in reopened
     assert "delivery_head_sha" not in reopened
     assert "ready_head_sha" not in reopened
@@ -5049,7 +5071,7 @@ def test_reopen_for_review_clears_delivery_snapshot_and_requires_new_readiness(
     ready = controller.mark_ready(
         "234A", head_sha=new_head, quality_verdict="PASS", qa_verdict="PASS"
     )
-    assert ready["lifecycle_state"] == "ready-for-delivery"
+    assert ready["lifecycle_state"] == "working"
     assert ready["ready_head_sha"] == new_head
 
 
@@ -5080,7 +5102,7 @@ def test_resolve_recovery_requires_owner_authorization_and_clean_unique_anchor(
         "234B", reason="resume after inspection", owner_authorize=True
     )
 
-    assert resolved["lifecycle_state"] == "review"
+    assert resolved["lifecycle_state"] == "working"
     assert resolved["recovery_resolution_reason"] == "resume after inspection"
     assert "delivery_anchor" not in resolved
     assert "delivery_head_sha" not in resolved
@@ -5118,8 +5140,8 @@ def test_supersede_releases_exclusion_and_preserves_clean_anchor(
 
     superseded = controller.supersede("234D", reason="Task 229 is canonical", owner_authorize=True)
 
-    assert superseded["lifecycle_state"] == "superseded"
-    assert superseded["superseded_from_state"] == "implementation"
+    assert superseded["lifecycle_state"] == "done"
+    assert superseded["superseded_from_state"] == "working"
     assert superseded["superseded_reason"] == "Task 229 is canonical"
     assert worktree.exists()
     assert not _git(worktree, "status", "--short")
@@ -5139,7 +5161,7 @@ def test_supersede_releases_exclusion_and_preserves_clean_anchor(
 
     _write_task(root, "234E", "after-supersede", concurrency="exclusive-write")
     started = controller.start("234E", owner_launch=True, session_label="after", offline=True)
-    assert started["lease"]["lifecycle_state"] == "implementation"
+    assert started["lease"]["lifecycle_state"] == "working"
 
 
 def test_supersede_refuses_dirty_anchor_without_mutation(repository: tuple[Path, Any]) -> None:
@@ -5153,7 +5175,7 @@ def test_supersede_refuses_dirty_anchor_without_mutation(repository: tuple[Path,
 
     lease = controller.store.read_json(controller.store.task_lease_path("234F"))
     assert isinstance(lease, dict)
-    assert lease["lifecycle_state"] == "implementation"
+    assert lease["lifecycle_state"] == "working"
 
 
 def test_supersede_refuses_open_task_pr_without_mutation(
@@ -5168,7 +5190,7 @@ def test_supersede_refuses_open_task_pr_without_mutation(
 
     lease = controller.store.read_json(controller.store.task_lease_path("234G"))
     assert isinstance(lease, dict)
-    assert lease["lifecycle_state"] == "implementation"
+    assert lease["lifecycle_state"] == "working"
 
 
 def test_busy_delivery_lane_does_not_block_compatible_implementation(
@@ -5188,8 +5210,8 @@ def test_busy_delivery_lane_does_not_block_compatible_implementation(
     third = controller.start("242", owner_launch=True, session_label="busy-c", offline=True)
 
     assert acquired["acquired"] is True
-    assert second["lease"]["lifecycle_state"] == "implementation"
-    assert third["lease"]["lifecycle_state"] == "implementation"
+    assert second["lease"]["lifecycle_state"] == "working"
+    assert third["lease"]["lifecycle_state"] == "working"
 
 
 def test_refresh_refuses_merged_task_pr_before_mutating_worktree(
@@ -5220,9 +5242,10 @@ def test_refresh_refuses_merged_task_pr_before_mutating_worktree(
 
     assert git_repository.head(cwd=worktree) == before_head
     assert git_repository.ref("master") == before_master
-    assert controller.store.read_json(controller.store.task_lease_path("245"))[
-        "lifecycle_state"
-    ] == ("delivering")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("245"))["lifecycle_state"]
+        == task_session.WORKING_STATE
+    )
     assert controller.store.delivery_state()["owner"]["task_id"] == "245"
 
 
@@ -5278,9 +5301,10 @@ def test_refresh_fails_closed_for_unavailable_or_ambiguous_pr_evidence(
         controller.refresh_for_delivery("245B", offline=True)
 
     assert git_repository.head(cwd=worktree) == head_sha
-    assert controller.store.read_json(controller.store.task_lease_path("245B"))[
-        "lifecycle_state"
-    ] == ("delivering")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("245B"))["lifecycle_state"]
+        == task_session.WORKING_STATE
+    )
 
 
 def test_refresh_fails_closed_for_incomplete_closed_pr_evidence(
@@ -5306,9 +5330,10 @@ def test_refresh_fails_closed_for_incomplete_closed_pr_evidence(
         controller.refresh_for_delivery("245C", offline=True)
 
     assert git_repository.head(cwd=worktree) == head_sha
-    assert controller.store.read_json(controller.store.task_lease_path("245C"))[
-        "lifecycle_state"
-    ] == ("delivering")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("245C"))["lifecycle_state"]
+        == task_session.WORKING_STATE
+    )
 
 
 def test_refresh_delivery_parser_accepts_optional_superseding_prs() -> None:
@@ -5352,7 +5377,7 @@ def test_refresh_updates_stale_task_base_and_rebuilds_exact_delivery_anchor(
     assert refreshed["base_origin_master_sha"] != old_base
     assert new_head != old_head
     validated = controller.validate_delivery("234")
-    assert validated["lifecycle_state"] == "delivery-gate"
+    assert validated["lifecycle_state"] == "working"
     assert validated["delivery_anchor"]["head_sha"] == new_head
 
 
@@ -5391,7 +5416,7 @@ def test_refresh_preserves_published_master_integration_merge(
     assert refreshed["delivery_head_sha"] == integrated_head
     assert git_repository.head(cwd=worktree) == integrated_head
     assert len(_git(worktree, "rev-list", "--parents", "-n", "1", "HEAD").split()) == 3
-    assert controller.validate_delivery("244B", offline=True)["lifecycle_state"] == "delivery-gate"
+    assert controller.validate_delivery("244B", offline=True)["lifecycle_state"] == "working"
 
 
 def test_refresh_delivery_waits_for_active_production_before_touching_task_branch(
@@ -5413,7 +5438,7 @@ def test_refresh_delivery_waits_for_active_production_before_touching_task_branc
 
     lease = controller.store.read_json(controller.store.task_lease_path("244"))
     assert isinstance(lease, dict)
-    assert lease["lifecycle_state"] == "delivering"
+    assert lease["lifecycle_state"] == "working"
     assert controller.store.delivery_state()["owner"]["task_id"] == "244"
     assert git_repository.head(cwd=worktree) == before_head
 
@@ -5456,7 +5481,7 @@ def test_refresh_refuses_post_ready_commit_until_review_and_qa_repeat(
 
     lease = controller.store.read_json(controller.store.task_lease_path("243A"))
     assert isinstance(lease, dict)
-    assert lease["lifecycle_state"] == "recovery-required"
+    assert lease["lifecycle_state"] == "human-required"
     assert controller.store.delivery_state()["owner"] is None
     assert lease["ready_head_sha"] == head_sha
     assert base_sha == lease["base_origin_master_sha"]
@@ -6093,7 +6118,7 @@ def test_mark_ready_records_local_verdicts_without_evidence_file(
     ready = controller.mark_ready(
         "202", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS"
     )
-    assert ready["lifecycle_state"] == "ready-for-delivery"
+    assert ready["lifecycle_state"] == "working"
     assert ready["quality_verdict"] == "PASS"
     assert ready["qa_verdict"] == "PASS"
     assert "local_evidence" not in ready
@@ -6129,9 +6154,10 @@ def test_record_production_success_requires_exact_merged_master_deployment(
     )
     assert history["state"] == "production-success"
     assert history["deployed_sha"] == merge_sha
-    assert controller.store.read_json(controller.store.task_lease_path("203"))[
-        "lifecycle_state"
-    ] == ("production-success")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("203"))["lifecycle_state"]
+        == "deployed"
+    )
 
 
 def test_reopen_after_production_preserves_prior_evidence_and_releases_lane(
@@ -6181,7 +6207,7 @@ def test_reopen_after_production_preserves_prior_evidence_and_releases_lane(
         "205", reason="Task 403 post-production remediation", owner_authorize=True
     )
 
-    assert reopened["lifecycle_state"] == "review"
+    assert reopened["lifecycle_state"] == "working"
     assert reopened["continuation_of_production_success"] == {
         "merge_sha": "c" * 40,
         "deployed_sha": "c" * 40,
@@ -6207,9 +6233,10 @@ def test_record_production_success_rejects_sha_mismatch_without_mutation(
         controller.record_production_success(
             "204", pr_number=204, merge_sha="a" * 40, deployed_sha=head_sha
         )
-    assert controller.store.read_json(controller.store.task_lease_path("204"))[
-        "lifecycle_state"
-    ] == ("delivery-gate")
+    assert (
+        controller.store.read_json(controller.store.task_lease_path("204"))["lifecycle_state"]
+        == "working"
+    )
 
 
 def test_record_production_success_rejects_anchor_changed_during_finalization(
@@ -6610,7 +6637,7 @@ def test_reconcile_ready_production_success_accepts_exact_squash_and_finishes(
 
     lease_after = controller.store.read_json(lease_path)
     assert isinstance(lease_after, dict)
-    assert lease_after["lifecycle_state"] == "production-success"
+    assert lease_after["lifecycle_state"] == "deployed"
     assert lease_after["ready_head_sha"] == lease_before["ready_head_sha"]
     assert (
         lease_after["ready_base_origin_master_sha"] == lease_before["ready_base_origin_master_sha"]
@@ -6636,7 +6663,7 @@ def test_reconcile_ready_production_success_accepts_exact_squash_and_finishes(
     ("invalid_case", "expected_error"),
     [
         ("owner_authorization", "explicit owner authorization"),
-        ("lease_state", "ready-for-delivery"),
+        ("missing_ready_provenance", "ready base and head provenance"),
         ("delivery_owner", "active delivery owner"),
         ("history", "Production history already exists"),
         ("dirty_worktree", "dirty or interrupted task worktree"),
@@ -6670,10 +6697,10 @@ def test_reconcile_ready_production_success_rejects_unsafe_evidence(
 
     if invalid_case == "owner_authorization":
         owner_authorize = False
-    elif invalid_case == "lease_state":
+    elif invalid_case == "missing_ready_provenance":
         lease = controller.store.read_json(lease_path)
         assert isinstance(lease, dict)
-        lease["lifecycle_state"] = "review"
+        lease["ready_head_sha"] = ""
         task_session.StateStore.replace_json(lease_path, lease)
     elif invalid_case == "delivery_owner":
         delivery = controller.store.delivery_state()
@@ -6727,9 +6754,7 @@ def test_reconcile_ready_production_success_rejects_unsafe_evidence(
 
     lease = controller.store.read_json(lease_path)
     assert isinstance(lease, dict)
-    assert lease["lifecycle_state"] == (
-        "review" if invalid_case == "lease_state" else "ready-for-delivery"
-    )
+    assert lease["lifecycle_state"] == "working"
     if invalid_case != "history":
         assert not (controller.store.history / "task-506.json").exists()
 
@@ -7274,3 +7299,95 @@ def test_readiness_allows_task_without_qa_role(repository: tuple[Path, Any]) -> 
 
     assert ready["quality_verdict"] == "PASS"
     assert ready["qa_verdict"] == "NOT_REQUIRED"
+
+
+def test_new_lease_preserves_exact_resolved_dependencies(repository: tuple[Path, Any]) -> None:
+    root, git_repository = repository
+    _write_task(root, "583A", "dependency-propagation", dependencies="507, 508")
+    done = root / "codex-backlog" / "tasks" / "done"
+    done.mkdir(parents=True, exist_ok=True)
+    (done / "507-terminal.md").write_text("done\n", encoding="utf-8")
+    (done / "508-terminal.md").write_text("done\n", encoding="utf-8")
+    controller = task_session.TaskController(git_repository)
+
+    started = controller.start(
+        "583A",
+        owner_launch=True,
+        session_label="dependency-propagation",
+        offline=True,
+        dependency_ids=["507", "508"],
+    )
+
+    assert started["lease"]["dependency_ids"] == ["507", "508"]
+    persisted = controller.store.read_json(controller.store.task_lease_path("583A"))
+    assert persisted["dependency_ids"] == ["507", "508"]
+    assert persisted["lifecycle_state"] == task_session.WORKING_STATE
+
+
+def test_generic_worker_retry_records_bounded_attempt_and_uses_legacy_evidence(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, _ = _prepare_verified_noop_retry_fixture(repository)
+
+    result = controller.retry_worker(
+        "508",
+        control_issue_number=508,
+        reason="owner-authorized generic retry after a clean no-op worker attempt",
+        owner_authorize=True,
+    )
+
+    assert result["retry_kind"] == "no_changes"
+    lease = controller.store.read_json(controller.store.task_lease_path("508"))
+    assert lease["lifecycle_state"] == task_session.WORKING_STATE
+    assert lease["attempts"][0]["result"] == "no_changes"
+    assert lease["attempts"][0]["evidence"]["mechanism"] == "generic-worker-retry"
+    with pytest.raises(task_session.TaskSessionError, match="retry budget"):
+        controller.retry_worker(
+            "508",
+            control_issue_number=508,
+            reason="second generic retry",
+            owner_authorize=True,
+        )
+
+
+def test_generic_worker_retry_resumes_preserved_wip(repository: tuple[Path, Any]) -> None:
+    root, git_repository, controller, worktree, branch, _, github = (
+        _prepare_preimplementation_resume(repository)
+    )
+    worker_state_path, _guard_path, _events_path, _attempt_id = _record_guard_budget_failure(
+        controller, root, github, branch, worktree
+    )
+
+    result = controller.retry_worker(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized generic retry after a bounded guard interruption",
+        owner_authorize=True,
+    )
+
+    assert result["retry_kind"] == "interrupted"
+    assert result["preimplementation_resume"]["state"] == "prepared"
+    assert result["lease"]["lifecycle_state"] == task_session.WORKING_STATE
+    assert result["lease"]["attempts"][0]["result"] == "interrupted"
+    assert not worker_state_path.exists()
+    assert (
+        git_repository.head(cwd=worktree)
+        == result["preimplementation_resume"]["guard_budget_recovery"]["base_sha"]
+    )
+
+
+def test_legacy_lifecycle_is_read_as_working_without_history_rewrite(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _ = _prepare_started(repository, "583B")
+    lease_path = controller.store.task_lease_path("583B")
+    lease = controller.store.read_json(lease_path)
+    lease["lifecycle_state"] = "implementation"
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    snapshot = controller.status()["leases"][0]
+
+    assert snapshot["lifecycle_state"] == task_session.WORKING_STATE
+    assert snapshot["raw_lifecycle_state"] == "implementation"
+    assert snapshot["derived_lifecycle_state"] == task_session.WORKING_STATE
+    assert controller.store.read_json(lease_path)["lifecycle_state"] == "implementation"

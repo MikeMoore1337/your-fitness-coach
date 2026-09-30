@@ -76,9 +76,10 @@ DEFAULT_RETENTION = {
     "logs": "limited-retention; delete-after-closeout-when-not-needed",
 }
 TERMINAL_STATES = {"dev-ci-success", "finished", "terminal-success", "success"}
-# A production-success lease is still owned by the controller until ``finish`` records the
-# final history state.  It is nevertheless safe for task-scoped temporary-artifact cleanup.
-CONTROLLER_TERMINAL_LEASE_STATES = TERMINAL_STATES | {"production-success"}
+# A deployed lease is still owned by the controller until ``finish`` records the final history
+# state.  It is nevertheless safe for task-scoped temporary-artifact cleanup.  Keep the old
+# production-success value readable for leases written before the lifecycle simplification.
+CONTROLLER_TERMINAL_LEASE_STATES = TERMINAL_STATES | {"production-success", "deployed", "done"}
 CONTROLLER_STATE_NAME = "codex-task-sessions-v1"
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 FILE_ATTRIBUTE_DIRECTORY = 0x10

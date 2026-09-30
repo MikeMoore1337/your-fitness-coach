@@ -6,6 +6,14 @@ checkpoint'ы, risk lane, PR, exact head и итоговый production verdict.
 spec остаётся источником требований, но не может молча переопределять Issue, GitHub PR или
 controller state.
 
+### Controller state и source of truth
+
+Lease сохраняет только `working`, `human-required`, `deployed` или `done`. `queued`, `pr-open`,
+`ci-green` и `merged` выводятся из ready anchors, `delivery.json`, GitHub PR/checks и Git
+merge/deployment evidence; controller не дублирует эти факты отдельными durable state. Старые
+lease state читаются через compatibility map без переписывания history. Retry/resume хранится
+в bounded `attempts` audit и ограничен одной owner-authorized попыткой.
+
 ## Обычная разовая задача
 
 ```text
@@ -100,15 +108,15 @@ quarantine, повторно сверяется и удаляется, посл�
 повреждённый, изменившийся во время recovery или непроверяемый claim остаётся `HUMAN_REQUIRED`
 и не удаляется автоматически.
 
-### Повтор verified no-op worker
+### Bounded worker retry/resume
 
 Если worker завершился штатно после read-only Agent Flow и не оставил ни изменений, ни
-уникальных task-коммитов, controller допускает ровно один owner-authorized retry на том же
-implementation lease:
+уникальных task-коммитов, либо сохранил проверенное startup/guard/transport interruption evidence,
+controller допускает ровно один owner-authorized retry на том же `working` lease:
 
 ```powershell
-& .\.venv\Scripts\python.exe scripts/task_session.py retry-noop-worker <TASK_ID> `
-  --control-issue <TASK_ID> --reason "corrected Agent Flow routing" --owner-authorize
+./.venv/Scripts/python.exe scripts/task_session.py resume-worker <TASK_ID> `
+  --control-issue <CONTROL_ISSUE> --reason "owner-authorized bounded worker retry" --owner-authorize
 ```
 
 Операция сначала доказывает terminal no-op на исходном task HEAD/base и только после этого может

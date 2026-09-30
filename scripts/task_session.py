@@ -134,29 +134,50 @@ STATE_LOCK_STALE_SECONDS = 300
 NOOP_WORKER_RETRY_CLASSIFICATION = "verified_noop_routing_retry"
 NOOP_WORKER_RETRY_MAX = 1
 PREPARED_HEAD_RECONCILIATION_CLASSIFICATION = "stale_pre_refresh_head_after_verified_base_refresh"
+MAX_ATTEMPT_HISTORY = 12
+MAX_WORKER_RETRIES = 1
+
+# GitHub and Git already own PR, CI, merge and deployment facts.  A lease only keeps
+# the controller-owned coordination boundary and the terminal result.  The old values
+# remain readable below, but new writes must use this compact set.
+WORKING_STATE = "working"
+HUMAN_REQUIRED_STATE = "human-required"
+DEPLOYED_STATE = "deployed"
+DONE_STATE = "done"
+DURABLE_LEASE_STATES = frozenset({WORKING_STATE, HUMAN_REQUIRED_STATE, DEPLOYED_STATE, DONE_STATE})
+DERIVED_LIFECYCLE_STATES = frozenset({"queued", "pr-open", "ci-green", "merged"})
+LEGACY_LIFECYCLE_STATE_MAP = {
+    "starting": WORKING_STATE,
+    "implementation": WORKING_STATE,
+    "review": WORKING_STATE,
+    "qa": WORKING_STATE,
+    "ready-for-delivery": WORKING_STATE,
+    "ready-for-pr": WORKING_STATE,
+    "waiting-for-delivery": WORKING_STATE,
+    "delivering": WORKING_STATE,
+    "delivery-refreshing": WORKING_STATE,
+    "delivery-gate": WORKING_STATE,
+    "recovery-required": HUMAN_REQUIRED_STATE,
+    "start-failed-recovery-required": HUMAN_REQUIRED_STATE,
+    "production-success": DEPLOYED_STATE,
+    "superseded": DONE_STATE,
+}
 
 # A task lease and delivery ownership are separate controller concerns.  Every task owns only its
 # own worktree/branch and task-state record.  ``exclusive-write`` remains a legacy metadata value
 # for compatibility, but never creates a repository-wide implementation barrier; genuinely shared
 # mutations are serialized by the narrower state/delivery mutexes below.  A superseded lease is a
 # non-release terminal record whose clean Git anchor is retained for audit/recovery.
-IMPLEMENTATION_STATES = frozenset({"starting", "implementation", "review", "qa"})
-READY_STATES = frozenset({"ready-for-delivery", "ready-for-pr"})
-WAITING_STATES = frozenset({"waiting-for-delivery"})
-DELIVERY_STATES = frozenset({"delivering", "delivery-refreshing", "delivery-gate"})
-TERMINAL_LEASE_STATES = frozenset({"production-success"})
-SUPERSEDED_LEASE_STATES = frozenset({"superseded"})
+IMPLEMENTATION_STATES = frozenset({WORKING_STATE})
+READY_STATES = frozenset({WORKING_STATE})
+WAITING_STATES = frozenset({WORKING_STATE})
+DELIVERY_STATES = frozenset({WORKING_STATE})
+TERMINAL_LEASE_STATES = frozenset({DEPLOYED_STATE})
+SUPERSEDED_LEASE_STATES = frozenset({DONE_STATE})
 CLOSED_LEASE_STATES = TERMINAL_LEASE_STATES | SUPERSEDED_LEASE_STATES
-RECOVERY_STATES = frozenset({"recovery-required", "start-failed-recovery-required"})
-KNOWN_LEASE_STATES = (
-    IMPLEMENTATION_STATES
-    | READY_STATES
-    | WAITING_STATES
-    | DELIVERY_STATES
-    | CLOSED_LEASE_STATES
-    | RECOVERY_STATES
-)
-DELIVERY_OWNER_STATES = DELIVERY_STATES | TERMINAL_LEASE_STATES
+RECOVERY_STATES = frozenset({HUMAN_REQUIRED_STATE})
+KNOWN_LEASE_STATES = DURABLE_LEASE_STATES | set(LEGACY_LIFECYCLE_STATE_MAP)
+DELIVERY_OWNER_STATES = frozenset({WORKING_STATE, DEPLOYED_STATE})
 DELIVERY_STATE_VERSION = 1
 DELIVERY_PRIORITY_REASON_MAX_LENGTH = 1024
 CANONICAL_REFRESH_RESULTS = frozenset({"ALIGNED", "REFRESHED", "WAITING", "BLOCKED"})
@@ -226,6 +247,58 @@ def normalize_task_id(value: str) -> str:
     if not TASK_ID_RE.fullmatch(task_id):
         raise TaskSessionError(f"Invalid task ID: {value!r}")
     return task_id
+
+
+def canonical_lifecycle_state(value: Any) -> str:
+    """Map legacy lease states to the small current lifecycle without rewriting history."""
+
+    raw = str(value or "").strip().lower()
+    return raw if raw in DURABLE_LEASE_STATES else LEGACY_LIFECYCLE_STATE_MAP.get(raw, raw)
+
+
+def append_attempt(
+    lease: dict[str, Any],
+    *,
+    result: str,
+    reason: str,
+    worker: str | None = None,
+    evidence: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Append compact retry/audit evidence without creating another lifecycle state."""
+
+    if not isinstance(result, str) or not result.strip():
+        raise TaskSessionError("Attempt result must be a bounded non-empty string")
+    normalized_reason = reason.strip() if isinstance(reason, str) else ""
+    if not normalized_reason or len(normalized_reason) > 1024:
+        raise TaskSessionError("Attempt reason must be bounded and non-empty")
+    raw_attempts = lease.setdefault("attempts", [])
+    if not isinstance(raw_attempts, list) or len(raw_attempts) >= MAX_ATTEMPT_HISTORY:
+        raise TaskSessionError(
+            "HUMAN_REQUIRED: bounded attempt history is exhausted; preserve the lease for review"
+        )
+    timestamp = utc_now()
+    attempt: dict[str, Any] = {
+        "attempt": len(raw_attempts) + 1,
+        "started_at": timestamp,
+        "ended_at": timestamp,
+        "result": result.strip(),
+        "reason": normalized_reason,
+    }
+    if worker is not None:
+        if not isinstance(worker, str) or not worker.strip() or len(worker.strip()) > 256:
+            raise TaskSessionError("Attempt worker must be bounded and non-empty")
+        attempt["worker"] = worker.strip()
+    if evidence is not None:
+        compact: dict[str, Any] = {}
+        for key, value in list(evidence.items())[:8]:
+            if not isinstance(key, str) or not key.strip():
+                continue
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                compact[key] = value
+        if compact:
+            attempt["evidence"] = compact
+    raw_attempts.append(attempt)
+    return attempt
 
 
 def normalize_delivery_priority_reason(value: str | None) -> str | None:
@@ -1545,7 +1618,7 @@ class TaskController:
             except TaskSessionError as error:
                 return ("BLOCKED", str(error))
             owner_state = self._lease_state(owner_lease)
-            if owner_state == "production-success":
+            if owner_state == DEPLOYED_STATE:
                 delivery_waiting_reason = f"Task {owner_id} is in terminal production closeout"
             elif owner_state not in DELIVERY_STATES:
                 return (
@@ -1629,29 +1702,30 @@ class TaskController:
                     f"Task {raw_task_id} lease worktree branch does not match {branch}",
                 )
             state = self._lease_state(lease)
+            raw_state = self._raw_lease_state(lease)
+            has_delivery_claim = lease.get("delivery_owner") == raw_task_id or raw_state in {
+                "delivering",
+                "delivery-refreshing",
+                "delivery-gate",
+            }
             if state in SUPERSEDED_LEASE_STATES:
                 continue
             if state in RECOVERY_STATES:
                 return ("BLOCKED", f"Task {raw_task_id} requires controller recovery")
-            if state in DELIVERY_STATES:
+            if has_delivery_claim:
                 if raw_task_id == owner_id:
                     continue
                 return (
                     "BLOCKED",
                     f"Task {raw_task_id} is in delivery state without matching delivery ownership",
                 )
-            if state == "production-success":
+            if state == DEPLOYED_STATE:
                 if raw_task_id == owner_id:
                     continue
                 return (
                     "BLOCKED",
                     f"Task {raw_task_id} has terminal success without delivery ownership",
                 )
-            if state == "starting":
-                waiting_reason = waiting_reason or (
-                    f"Task {raw_task_id} is in an active controller start transition"
-                )
-                continue
             if state not in known_states:
                 return (
                     "BLOCKED",
@@ -1661,7 +1735,11 @@ class TaskController:
         if owner_id and owner_id not in task_ids:
             return ("BLOCKED", f"delivery lane owner Task {owner_id} is not represented by a lease")
         if not owner_id and any(
-            self._lease_state(lease) in DELIVERY_STATES | TERMINAL_LEASE_STATES for lease in leases
+            self._lease_state(lease) in TERMINAL_LEASE_STATES
+            or lease.get("delivery_owner")
+            or self._raw_lease_state(lease)
+            in {"delivering", "delivery-refreshing", "delivery-gate"}
+            for lease in leases
         ):
             return (
                 "BLOCKED",
@@ -2189,6 +2267,10 @@ class TaskController:
 
     @staticmethod
     def _lease_state(lease: Mapping[str, Any]) -> str:
+        return canonical_lifecycle_state(lease.get("lifecycle_state"))
+
+    @staticmethod
+    def _raw_lease_state(lease: Mapping[str, Any]) -> str:
         return str(lease.get("lifecycle_state", "")).strip().lower()
 
     @classmethod
@@ -2247,6 +2329,23 @@ class TaskController:
         }
 
     @classmethod
+    def _derived_lifecycle_state(cls, lease: Mapping[str, Any], *, delivery_owner_id: str) -> str:
+        """Describe repository/delivery progress without persisting another lease state."""
+
+        state = cls._lease_state(lease)
+        if state in DURABLE_LEASE_STATES - {WORKING_STATE}:
+            return state
+        if lease.get("deployed_sha"):
+            return "deployed"
+        if lease.get("merge_sha"):
+            return "merged"
+        if delivery_owner_id and str(lease.get("task_id", "")).upper() == delivery_owner_id:
+            return "pr-open"
+        if lease.get("ready_head_sha"):
+            return "queued"
+        return WORKING_STATE
+
+    @classmethod
     def _lease_snapshots(
         cls, leases: Sequence[Mapping[str, Any]], delivery: Mapping[str, Any]
     ) -> list[dict[str, Any]]:
@@ -2257,6 +2356,14 @@ class TaskController:
         return [
             {
                 **dict(lease),
+                "lifecycle_state": cls._lease_state(lease),
+                "raw_lifecycle_state": cls._raw_lease_state(lease),
+                "derived_lifecycle_state": cls._derived_lifecycle_state(
+                    lease, delivery_owner_id=delivery_owner_id
+                ),
+                "attempt_count": len(lease.get("attempts", []))
+                if isinstance(lease.get("attempts"), list)
+                else None,
                 "ownership": cls._lease_ownership_snapshot(
                     lease, delivery_owner_id=delivery_owner_id
                 ),
@@ -2304,7 +2411,13 @@ class TaskController:
             dict(lease)
             for lease in leases
             if lease.get("mode") == "write"
-            and cls._lease_state(lease) in READY_STATES | WAITING_STATES
+            and cls._lease_state(lease) not in CLOSED_LEASE_STATES
+            and cls._lease_state(lease) not in RECOVERY_STATES
+            and (
+                (isinstance(lease.get("ready_head_sha"), str) and bool(lease.get("ready_head_sha")))
+                or str(lease.get("lifecycle_state", "")).strip().lower()
+                in {"ready-for-delivery", "ready-for-pr", "waiting-for-delivery"}
+            )
         ]
 
         def queue_key(lease: Mapping[str, Any]) -> tuple[int, str, str]:
@@ -2366,7 +2479,7 @@ class TaskController:
         }
         lease.update(
             {
-                "lifecycle_state": "delivering",
+                "lifecycle_state": WORKING_STATE,
                 "delivery_acquired_at": now,
                 "delivery_owner": task_id,
                 "updated_at": now,
@@ -2478,7 +2591,11 @@ class TaskController:
         delivery_owner_id = str(owner.get("task_id", "")).upper() if isinstance(owner, dict) else ""
         for item in leases:
             item_id = str(item.get("task_id", "")).upper()
-            if self._lease_state(item) in DELIVERY_OWNER_STATES and item_id != delivery_owner_id:
+            raw_state = self._raw_lease_state(item)
+            if item_id != delivery_owner_id and (
+                item.get("delivery_owner") == item_id
+                or raw_state in {"delivering", "delivery-refreshing", "delivery-gate"}
+            ):
                 recovery_findings.append(
                     f"Task {item_id} is in delivery state without matching delivery ownership; "
                     "recovery is required"
@@ -2778,7 +2895,7 @@ class TaskController:
                 "mode": "write",
                 "created_at": utc_now(),
                 "updated_at": utc_now(),
-                "lifecycle_state": "starting",
+                "lifecycle_state": WORKING_STATE,
                 "session_label": session_label,
                 "concurrency_class": document.concurrency_class,
                 "integration_policy": "task-pr-to-master",
@@ -2786,6 +2903,7 @@ class TaskController:
                 "dependency_source": "github-issue" if dependency_ids is not None else "task-spec",
                 "owner_launch": True,
                 "canonical_master_refresh": canonical_refresh,
+                "attempts": [],
             }
             if queue_mode:
                 lease["queue_mode"] = True
@@ -2798,12 +2916,17 @@ class TaskController:
             self.store.create_json(lease_path, lease)
         try:
             self.repository.create_task_worktree(branch, target, base_sha)
-        except Exception:
-            lease["lifecycle_state"] = "start-failed-recovery-required"
+        except Exception as error:
+            append_attempt(
+                lease,
+                result="failed",
+                reason="task worktree creation failed; retry requires fresh Git evidence",
+                evidence={"error_type": type(error).__name__},
+            )
             lease["updated_at"] = utc_now()
             StateStore.replace_json(lease_path, lease)
             raise
-        lease["lifecycle_state"] = "implementation"
+        lease["lifecycle_state"] = WORKING_STATE
         lease["updated_at"] = utc_now()
         StateStore.replace_json(lease_path, lease)
         return {
@@ -4317,6 +4440,137 @@ class TaskController:
             "refresh_classification": refresh_classification,
         }
 
+    def retry_worker(
+        self,
+        task_id: str,
+        *,
+        control_issue_number: int,
+        reason: str,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        """Prepare one bounded worker retry from verified repository evidence.
+
+        The legacy recovery commands remain readable for old worker records, but new callers
+        use this evidence-driven entry point.  The lease stays ``working``; the reason and
+        bounded result are recorded as an attempt instead of becoming another lifecycle state.
+        """
+
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError("Worker retry requires explicit owner authorization")
+        if self.github is None:
+            raise TaskSessionError("Worker retry requires online GitHub state")
+        lease = self.store.read_json(self.store.task_lease_path(expected))
+        if not isinstance(lease, dict) or lease.get("task_id") != expected:
+            raise TaskSessionError(f"Task {expected} has no active worker lease")
+        if self._lease_state(lease) != WORKING_STATE:
+            raise TaskSessionError(
+                f"Task {expected} worker retry requires {WORKING_STATE}, found "
+                f"{lease.get('lifecycle_state')}"
+            )
+        attempts = lease.get("attempts", [])
+        if not isinstance(attempts, list):
+            raise TaskSessionError("HUMAN_REQUIRED: worker attempt audit is malformed")
+        if len(attempts) >= MAX_WORKER_RETRIES:
+            raise TaskSessionError(
+                "HUMAN_REQUIRED: bounded worker retry budget is exhausted; preserve the lease for review"
+            )
+        if self.store.delivery_state().get("owner") is not None:
+            raise TaskSessionError("Worker retry refuses a conflicting delivery owner")
+        resume_event = lease.get("preimplementation_resume")
+        if isinstance(resume_event, Mapping):
+            resume_reason = reason
+            retry_path = "preimplementation"
+            if isinstance(resume_event.get("transport_interruption_recovery"), Mapping):
+                retry_path = "transport"
+                resume_reason = str(
+                    resume_event.get("transport_interruption_recovery_reason") or reason
+                )
+            elif isinstance(resume_event.get("guard_budget_recovery"), Mapping):
+                retry_path = "guard"
+                resume_reason = str(resume_event.get("guard_budget_recovery_reason") or reason)
+            elif resume_event.get("state") in {"worker-started", "prepared"}:
+                document = find_task_document(self._canonical_root(), expected)
+                branch = str(lease.get("branch", ""))
+                control_state = self._preimplementation_issue_state(
+                    expected,
+                    control_issue_number,
+                    branch,
+                    document,
+                    lease,
+                    allow_guard_budget_failure=True,
+                    allow_transport_failure=True,
+                )
+                blocker = control_state.get("blocker")
+                blocker_text = blocker.lower() if isinstance(blocker, str) else ""
+                if isinstance(blocker, str) and re.fullmatch(
+                    r"worker guard blocked execution \(TOOL_ACTION_BUDGET_EXCEEDED\); inspect .+",
+                    blocker,
+                    flags=re.IGNORECASE,
+                ):
+                    retry_path = "guard"
+                elif POST_START_TRANSPORT_FAILURE_KIND.lower() in blocker_text or (
+                    "codex worker turn failed while reconnecting to the api" in blocker_text
+                    and "os error" in blocker_text
+                ):
+                    retry_path = "transport"
+                else:
+                    resume_reason = str(resume_event.get("reason") or reason)
+            if retry_path == "transport":
+                prepared = self.resume_transport_interrupted(
+                    expected,
+                    control_issue_number=control_issue_number,
+                    reason=resume_reason,
+                    owner_authorize=owner_authorize,
+                )
+                result = "interrupted"
+            elif retry_path == "guard":
+                prepared = self.resume_guard_interrupted(
+                    expected,
+                    control_issue_number=control_issue_number,
+                    reason=resume_reason,
+                    owner_authorize=owner_authorize,
+                )
+                result = "interrupted"
+            else:
+                prepared = self.resume_preimplementation(
+                    expected,
+                    control_issue_number=control_issue_number,
+                    reason=resume_reason,
+                    owner_authorize=owner_authorize,
+                )
+                result = "interrupted"
+        else:
+            prepared = self.retry_noop_worker(
+                expected,
+                control_issue_number=control_issue_number,
+                reason=reason,
+                owner_authorize=owner_authorize,
+            )
+            result = "no_changes"
+
+        with self.store.lock():
+            lease_path = self.store.task_lease_path(expected)
+            current = self.store.read_json(lease_path)
+            if not isinstance(current, dict) or current.get("task_id") != expected:
+                raise TaskSessionError("Worker retry lease disappeared before audit recording")
+            current["lifecycle_state"] = WORKING_STATE
+            append_attempt(
+                current,
+                result=result,
+                reason=reason,
+                evidence={"mechanism": "generic-worker-retry"},
+            )
+            current["updated_at"] = utc_now()
+            StateStore.replace_json(lease_path, current)
+            if isinstance(prepared, dict):
+                prepared = dict(prepared)
+                prepared["lease"] = dict(current)
+                prepared["retry_kind"] = result
+        return prepared
+
+    resume_worker = retry_worker
+
     def retry_noop_worker(
         self,
         task_id: str,
@@ -4353,7 +4607,7 @@ class TaskController:
             if (
                 lease.get("mode") != "write"
                 or lease.get("owner_launch") is not True
-                or self._lease_state(lease) != "implementation"
+                or self._lease_state(lease) != WORKING_STATE
                 or lease.get("queue_mode") is True
             ):
                 raise TaskSessionError(
@@ -4724,7 +4978,7 @@ class TaskController:
                 lease.get("mode") != "write"
                 or lease.get("owner_launch") is not True
                 or lease.get("queue_mode") is True
-                or self._lease_state(lease) != "implementation"
+                or self._lease_state(lease) != WORKING_STATE
             ):
                 raise TaskSessionError(
                     f"Task {expected} is not in a compatible active implementation state"
@@ -5014,7 +5268,7 @@ class TaskController:
                 or lease.get("mode") != "write"
                 or lease.get("owner_launch") is not True
                 or lease.get("queue_mode") is True
-                or self._lease_state(lease) != "implementation"
+                or self._lease_state(lease) != WORKING_STATE
             ):
                 raise TaskSessionError(f"Task {expected} has no active implementation lease")
             self._reject_shared_task_lease_identity(expected, lease, leases)
@@ -5376,7 +5630,7 @@ class TaskController:
                 or lease.get("mode") != "write"
                 or lease.get("owner_launch") is not True
                 or lease.get("queue_mode") is True
-                or self._lease_state(lease) != "implementation"
+                or self._lease_state(lease) != WORKING_STATE
             ):
                 raise TaskSessionError(f"Task {expected} has no active implementation lease")
             self._reject_shared_task_lease_identity(expected, lease, leases)
@@ -5788,7 +6042,7 @@ class TaskController:
                 raise TaskSessionError(f"No active task lease exists for Task {expected}")
             resume_event = lease.get("preimplementation_resume")
             if (
-                self._lease_state(lease) != "implementation"
+                self._lease_state(lease) != WORKING_STATE
                 or not isinstance(resume_event, dict)
                 or resume_event.get("state") != "prepared"
             ):
@@ -6012,7 +6266,7 @@ class TaskController:
             if (
                 not isinstance(lease, dict)
                 or lease.get("task_id") != expected
-                or self._lease_state(lease) != "implementation"
+                or self._lease_state(lease) != WORKING_STATE
                 or not isinstance(resume_event, dict)
                 or resume_event.get("state") != "launching"
             ):
@@ -6204,13 +6458,14 @@ class TaskController:
             "mode": "write",
             "created_at": utc_now(),
             "updated_at": utc_now(),
-            "lifecycle_state": "implementation",
+            "lifecycle_state": WORKING_STATE,
             "session_label": session_label,
             "concurrency_class": document.concurrency_class,
             "integration_policy": "task-pr-to-master",
             "owner_launch": True,
             "adopted_existing_session": True,
             "canonical_master_refresh": canonical_refresh,
+            "attempts": [],
         }
         with self.store.lock():
             existing = self.store.all_leases()
@@ -6321,7 +6576,7 @@ class TaskController:
             current.pop("review_verdict", None)
             current.update(
                 {
-                    "lifecycle_state": "ready-for-delivery",
+                    "lifecycle_state": WORKING_STATE,
                     "ready_head_sha": head_sha,
                     "ready_base_origin_master_sha": base_sha,
                     "ready_for_delivery_at": now,
@@ -6380,14 +6635,14 @@ class TaskController:
             candidates = self._delivery_candidates(self.store.all_leases())
             candidate_ids = [normalize_task_id(str(item["task_id"])) for item in candidates]
             if owner_id or production_active:
-                lease["lifecycle_state"] = "waiting-for-delivery"
+                lease["lifecycle_state"] = WORKING_STATE
                 lease["delivery_waiting_since"] = lease.get("delivery_waiting_since") or utc_now()
                 lease["updated_at"] = utc_now()
                 StateStore.replace_json(lease_path, lease)
                 return {
                     "acquired": False,
                     "task_id": expected,
-                    "lifecycle_state": "waiting-for-delivery",
+                    "lifecycle_state": WORKING_STATE,
                     "delivery_owner": owner_id,
                     "delivery_blocker": (
                         "active production deployment" if production_active else None
@@ -6399,14 +6654,14 @@ class TaskController:
             if not candidate_ids:
                 raise TaskSessionError("Delivery queue is empty while acquiring a task")
             if candidate_ids[0] != expected and priority_reason is None:
-                lease["lifecycle_state"] = "waiting-for-delivery"
+                lease["lifecycle_state"] = WORKING_STATE
                 lease["delivery_waiting_since"] = lease.get("delivery_waiting_since") or utc_now()
                 lease["updated_at"] = utc_now()
                 StateStore.replace_json(lease_path, lease)
                 return {
                     "acquired": False,
                     "task_id": expected,
-                    "lifecycle_state": "waiting-for-delivery",
+                    "lifecycle_state": WORKING_STATE,
                     "delivery_owner": None,
                     "queue_position": candidate_ids.index(expected) + 1,
                     "queue_head": candidate_ids[0],
@@ -6457,11 +6712,17 @@ class TaskController:
                 now = utc_now()
                 lease.update(
                     {
-                        "lifecycle_state": "recovery-required",
+                        "lifecycle_state": HUMAN_REQUIRED_STATE,
                         "recovery_reason": reason,
                         "delivery_failed_at": now,
                         "updated_at": now,
                     }
+                )
+                append_attempt(
+                    lease,
+                    result="failed",
+                    reason=reason,
+                    evidence={"operation": "delivery-refresh"},
                 )
                 lease.pop("delivery_owner", None)
                 delivery["owner"] = None
@@ -6607,8 +6868,6 @@ class TaskController:
                         "Task branch HEAD changed after PR readiness; rerun targeted checks and applicable QA "
                         "before delivery refresh"
                     )
-                current.update({"lifecycle_state": "delivery-refreshing", "updated_at": utc_now()})
-                StateStore.replace_json(lease_path, current)
             self.repository.fetch_origin_master(cwd=worktree)
             current_base = self.repository.ref("origin/master")
             if not offline:
@@ -6662,7 +6921,7 @@ class TaskController:
                         "head_sha": head_after,
                     },
                     "canonical_master_refresh": canonical_refresh,
-                    "lifecycle_state": "delivering",
+                    "lifecycle_state": WORKING_STATE,
                     "updated_at": now,
                 }
             )
@@ -6673,7 +6932,7 @@ class TaskController:
         expected = normalize_task_id(task_id)
         lease, _ = self._require_delivery_owner(expected)
         worktree = Path(str(lease.get("worktree", ""))).resolve()
-        if self._lease_state(lease) not in {"delivering", "delivery-gate"}:
+        if self._lease_state(lease) not in DELIVERY_STATES:
             raise TaskSessionError(f"Task {expected} is not ready for final delivery validation")
         if self.repository.status(worktree):
             raise TaskSessionError(f"Task {expected} delivery worktree is dirty")
@@ -6727,7 +6986,7 @@ class TaskController:
                 )
             current.update(
                 {
-                    "lifecycle_state": "delivery-gate",
+                    "lifecycle_state": WORKING_STATE,
                     "delivery_anchor": {
                         "task_id": expected,
                         "branch": current.get("branch"),
@@ -6760,11 +7019,17 @@ class TaskController:
             now = utc_now()
             current.update(
                 {
-                    "lifecycle_state": "recovery-required",
+                    "lifecycle_state": HUMAN_REQUIRED_STATE,
                     "recovery_reason": reason,
                     "delivery_released_at": now,
                     "updated_at": now,
                 }
+            )
+            append_attempt(
+                current,
+                result="failed",
+                reason=reason,
+                evidence={"operation": "delivery-release"},
             )
             current.pop("delivery_owner", None)
             latest_delivery["owner"] = None
@@ -6828,7 +7093,7 @@ class TaskController:
                 current.pop(key, None)
             current.update(
                 {
-                    "lifecycle_state": "review",
+                    "lifecycle_state": WORKING_STATE,
                     "review_reopened_at": now,
                     "review_reopen_reason": reason,
                     "updated_at": now,
@@ -6856,7 +7121,7 @@ class TaskController:
         if not reason.strip():
             raise TaskSessionError("reopen-after-production requires a non-empty reason")
         lease, _delivery = self._require_delivery_owner(expected)
-        if self._lease_state(lease) != "production-success":
+        if self._lease_state(lease) != DEPLOYED_STATE:
             raise TaskSessionError(
                 f"Task {expected} cannot continue from {lease.get('lifecycle_state')}"
             )
@@ -6884,7 +7149,7 @@ class TaskController:
             owner = current_delivery.get("owner")
             if (
                 not isinstance(current, dict)
-                or self._lease_state(current) != "production-success"
+                or self._lease_state(current) != DEPLOYED_STATE
                 or not isinstance(owner, dict)
                 or str(owner.get("task_id", "")).upper() != expected
             ):
@@ -6914,7 +7179,7 @@ class TaskController:
                 current.pop(key, None)
             current.update(
                 {
-                    "lifecycle_state": "review",
+                    "lifecycle_state": WORKING_STATE,
                     "review_reopened_at": now,
                     "review_reopen_reason": reason,
                     "continuation_of_production_success": {
@@ -7058,7 +7323,7 @@ class TaskController:
                 current.pop(key, None)
             current.update(
                 {
-                    "lifecycle_state": "review",
+                    "lifecycle_state": WORKING_STATE,
                     "recovery_resolved_at": now,
                     "recovery_resolution_reason": reason,
                     "updated_at": now,
@@ -7255,7 +7520,8 @@ class TaskController:
                 current.pop(key, None)
             current.update(
                 {
-                    "lifecycle_state": "superseded",
+                    "lifecycle_state": DONE_STATE,
+                    "terminal_result": "superseded",
                     "superseded_from_state": previous_state,
                     "superseded_at": now,
                     "superseded_reason": normalized_reason,
@@ -7277,7 +7543,7 @@ class TaskController:
         expected = normalize_task_id(task_id)
         lease, _ = self._require_delivery_owner(expected)
         lease_path = self.store.task_lease_path(expected)
-        if self._lease_state(lease) != "delivery-gate":
+        if self._lease_state(lease) not in DELIVERY_STATES:
             raise TaskSessionError(
                 "Production completion requires a validated final delivery gate, found "
                 f"{lease.get('lifecycle_state')}"
@@ -7368,7 +7634,7 @@ class TaskController:
                 or str(owner.get("task_id", "")).upper() != expected
             ):
                 raise TaskSessionError("Delivery ownership changed before production completion")
-            if self._lease_state(current) != "delivery-gate":
+            if self._lease_state(current) not in DELIVERY_STATES:
                 raise TaskSessionError(
                     "Task is no longer in the validated final delivery-gate state"
                 )
@@ -7390,7 +7656,7 @@ class TaskController:
                     "Task production history changed before production completion"
                 )
             now = utc_now()
-            current["lifecycle_state"] = "production-success"
+            current["lifecycle_state"] = DEPLOYED_STATE
             current["merge_sha"] = merge_sha
             current["deployed_sha"] = deployed_sha
             current["updated_at"] = now
@@ -7732,7 +7998,7 @@ class TaskController:
         lease = self.store.read_json(lease_path)
         if not isinstance(lease, dict) or lease.get("task_id") != expected:
             raise TaskSessionError(f"Task {expected} has no valid ready-for-delivery lease")
-        if lease.get("mode") != "write" or self._lease_state(lease) != "ready-for-delivery":
+        if lease.get("mode") != "write" or self._lease_state(lease) != WORKING_STATE:
             raise TaskSessionError(
                 f"Task {expected} ready production reconciliation requires a ready-for-delivery lease"
             )
@@ -7978,7 +8244,7 @@ class TaskController:
                 raise TaskSessionError(
                     "Production deployment evidence changed during reconciliation"
                 )
-            current["lifecycle_state"] = "production-success"
+            current["lifecycle_state"] = DEPLOYED_STATE
             current["merge_sha"] = deployed_sha
             current["deployed_sha"] = deployed_sha
             current["ready_production_reconciliation"] = reconciliation
@@ -8020,7 +8286,7 @@ class TaskController:
         lease = self.store.read_json(lease_path)
         if not isinstance(lease, dict) or lease.get("task_id") != expected:
             raise TaskSessionError(f"Task {expected} has no valid recovery lease")
-        if self._lease_state(lease) != "recovery-required":
+        if self._lease_state(lease) != HUMAN_REQUIRED_STATE:
             raise TaskSessionError(
                 "Production reconciliation only accepts a recovery-required lease"
             )
@@ -8276,7 +8542,7 @@ class TaskController:
                 raise TaskSessionError(
                     "Production deployment evidence changed during reconciliation"
                 )
-            current["lifecycle_state"] = "production-success"
+            current["lifecycle_state"] = DEPLOYED_STATE
             current["merge_sha"] = deployed_sha
             current["deployed_sha"] = deployed_sha
             current["superseding_production_reconciliation"] = reconciliation
@@ -8751,7 +9017,7 @@ class TaskController:
         if (
             lease.get("task_id") != expected
             or history.get("task_id") != expected
-            or lease.get("lifecycle_state") != "production-success"
+            or self._lease_state(lease) != DEPLOYED_STATE
             or history.get("state") != "production-success"
             or lease.get("deployed_sha") != original_sha
             or lease.get("merge_sha") != history.get("merge_sha")
@@ -8934,34 +9200,30 @@ class TaskController:
         # Unique commits are expected for a leased implementation/ready candidate.  They
         # remain visible in the report, but only an orphan/recovery worktree turns them into
         # an automatic-cleanup blocker.
-        if (
-            lease is None or state in {"recovery-required", "start-failed-recovery-required"}
-        ) and any(item["unique_commits"] for item in details):
+        if (lease is None or state == HUMAN_REQUIRED_STATE) and any(
+            item["unique_commits"] for item in details
+        ):
             issues.append("unique commits make automatic cleanup unsafe")
         owner = delivery.get("owner")
         owner_id = str(owner.get("task_id", "")).upper() if isinstance(owner, dict) else ""
         if owner_id == expected and state not in DELIVERY_OWNER_STATES:
             issues.append("delivery owner does not match task lifecycle state")
-        if owner_id and owner_id != expected and state in DELIVERY_OWNER_STATES:
+        if owner_id and owner_id != expected and lease.get("delivery_owner") == expected:
             issues.append(f"task is delivering while delivery owner is Task {owner_id}")
         if issues:
             classification = (
                 "STALE_OR_INTERRUPTED"
-                if stale_or_interrupted
-                and len(issues) == 1
-                and state not in {"recovery-required", "start-failed-recovery-required"}
+                if stale_or_interrupted and len(issues) == 1 and state != HUMAN_REQUIRED_STATE
                 else "RECOVERY_REQUIRED"
             )
-        elif state in READY_STATES:
-            classification = "READY_FOR_DELIVERY"
-        elif state in WAITING_STATES:
-            classification = "WAITING_FOR_DELIVERY"
         elif state in SUPERSEDED_LEASE_STATES:
             classification = "SUPERSEDED"
         elif state in TERMINAL_LEASE_STATES:
             classification = "TERMINAL_SUCCESS"
-        elif state in DELIVERY_STATES:
+        elif owner_id == expected or lease.get("delivery_owner") == expected:
             classification = "DELIVERING"
+        elif lease.get("ready_head_sha"):
+            classification = "READY_FOR_DELIVERY"
         elif state in IMPLEMENTATION_STATES:
             classification = "ACTIVE"
         else:
@@ -9275,22 +9537,18 @@ class TaskController:
         if lease.get("task_id") != expected or history.get("task_id") != expected:
             raise TaskSessionError("finish task lease/history does not match requested task ID")
         if (
-            lease.get("lifecycle_state") != "production-success"
+            self._lease_state(lease) != DEPLOYED_STATE
             or history.get("state") != "production-success"
         ):
             raise TaskSessionError("finish requires terminal production-success state")
         delivery = self.store.delivery_state()
         owner = delivery.get("owner")
         owner_id = str(owner.get("task_id", "")).upper() if isinstance(owner, dict) else ""
-        if owner_id == expected and lease.get("lifecycle_state") != "production-success":
+        if owner_id == expected and self._lease_state(lease) != DEPLOYED_STATE:
             raise TaskSessionError(
                 "finish requires terminal production success before releasing delivery"
             )
-        if (
-            owner_id
-            and owner_id != expected
-            and lease.get("lifecycle_state") == "production-success"
-        ):
+        if owner_id and owner_id != expected and self._lease_state(lease) == DEPLOYED_STATE:
             raise TaskSessionError(
                 "finish refuses cleanup while another task owns the delivery lane"
             )
@@ -9456,10 +9714,7 @@ class TaskController:
                 if isinstance(current_owner, dict)
                 else ""
             )
-            if (
-                not isinstance(current, dict)
-                or current.get("lifecycle_state") != "production-success"
-            ):
+            if not isinstance(current, dict) or self._lease_state(current) != DEPLOYED_STATE:
                 raise TaskSessionError("finish task lease changed before terminal closeout")
             if current_owner_id not in {"", expected}:
                 raise TaskSessionError(
@@ -9523,7 +9778,7 @@ def archive_guard(backlog_root: Path, task_id: str) -> None:
         and lease.get("task_id") == expected
         and lease.get("mode") == "write"
         and lease.get("owner_authorized") is True
-        and lease.get("lifecycle_state") in SUPERSEDED_LEASE_STATES
+        and canonical_lifecycle_state(lease.get("lifecycle_state")) in SUPERSEDED_LEASE_STATES
     ):
         reason = lease.get("superseded_reason")
         timestamp = lease.get("superseded_at")
@@ -9567,6 +9822,11 @@ def _parser() -> argparse.ArgumentParser:
     retry_noop.add_argument("--control-issue", type=int, required=True)
     retry_noop.add_argument("--reason", required=True)
     retry_noop.add_argument("--owner-authorize", action="store_true")
+    worker_resume = subparsers.add_parser("resume-worker", aliases=("retry-worker",))
+    worker_resume.add_argument("task_id")
+    worker_resume.add_argument("--control-issue", type=int, required=True)
+    worker_resume.add_argument("--reason", required=True)
+    worker_resume.add_argument("--owner-authorize", action="store_true")
     guard_resume = subparsers.add_parser("resume-guard-interrupted")
     guard_resume.add_argument("task_id")
     guard_resume.add_argument("--control-issue", type=int, required=True)
@@ -9718,6 +9978,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "retry-noop-worker":
             _print(
                 controller.retry_noop_worker(
+                    args.task_id,
+                    control_issue_number=args.control_issue,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            )
+            return 0
+        if args.command in {"resume-worker", "retry-worker"}:
+            _print(
+                controller.retry_worker(
                     args.task_id,
                     control_issue_number=args.control_issue,
                     reason=args.reason,
