@@ -2403,7 +2403,7 @@ test('training preferences сохраняют Mobile Web/TMA композици�
     await page.getByRole('button', { name: 'Подобрать другую' }).click();
     const wizard = page.getByRole('dialog', { name: 'Цель' });
     await expect(wizard).toBeVisible();
-    await expect(wizard.getByText(/подставили явные значения из профиля/i)).toBeVisible();
+    await expect(wizard.getByText(/подставили достоверные ответы из профиля/i)).toBeVisible();
     expect(
       await wizard
         .locator('.program-wizard__panel')
