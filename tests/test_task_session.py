@@ -352,6 +352,45 @@ def _prepare_preimplementation_resume(
 def test_verified_noop_retry_reconciles_omitted_dependency_and_preserves_lease(
     repository: tuple[Path, Any],
 ) -> None:
+    _, _, controller, _, _, _, _ = _prepare_verified_noop_retry_fixture(repository)
+    lease_path = controller.store.task_lease_path("508")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    assert lease["dependency_ids"] == []
+    result = controller.retry_noop_worker(
+        "508",
+        control_issue_number=508,
+        reason="retry after corrected Agent Flow routing; previous worker completed read-only with zero product mutation",
+        owner_authorize=True,
+    )
+    assert result["dependency_reconciliation"]["previous"] == []
+    assert result["dependency_reconciliation"]["authoritative"] == ["507"]
+    assert [item["name"] for item in result["agent_flow"]["worker_role_passes"]] == [
+        "implementer",
+        "qa-verifier",
+    ]
+    preserved = controller.store.read_json(lease_path)
+    assert preserved["dependency_ids"] == ["507"]
+    assert (
+        preserved["worker_retry"]["classification"] == task_session.NOOP_WORKER_RETRY_CLASSIFICATION
+    )
+    claimed = controller.claim_preimplementation_worker_launch("508")
+    assert claimed["preimplementation_resume"]["state"] == "launching"
+    with pytest.raises(task_session.TaskSessionError, match="retry budget"):
+        controller.retry_noop_worker(
+            "508",
+            control_issue_number=508,
+            reason="second retry",
+            owner_authorize=True,
+        )
+
+
+def _prepare_verified_noop_retry_fixture(
+    repository: tuple[Path, Any],
+    *,
+    advance_master: bool = False,
+    already_fast_forwarded: bool = False,
+) -> tuple[Path, Any, Any, Path, str, str, FakeGitHub]:
     root, git_repository = repository
     task_path = _write_task(root, "508", "synthetic-task")
     task_path.write_text(
@@ -366,11 +405,14 @@ def test_verified_noop_retry_reconciles_omitted_dependency_and_preserves_lease(
     (done / "507-terminal.md").write_text("terminal\n", encoding="utf-8")
     github = FakeGitHub(git_repository.ref("origin/master"))
     controller = task_session.TaskController(git_repository, github=github)
-    started = controller.start("508", owner_launch=True, session_label="retry-test", offline=True)
-    assert started["lease"]["dependency_ids"] == ["507"]
+    controller.start("508", owner_launch=True, session_label="retry-test", offline=True)
     lease_path = controller.store.task_lease_path("508")
     lease = controller.store.read_json(lease_path)
     assert isinstance(lease, dict)
+    assert lease["dependency_ids"] == ["507"]
+    base_sha = str(lease["base_origin_master_sha"])
+    branch = str(lease["branch"])
+    worktree = Path(str(lease["worktree"]))
     lease["dependency_ids"] = []
     controller.store.replace_json(lease_path, lease)
     attempt = (
@@ -435,32 +477,83 @@ def test_verified_noop_retry_reconciles_omitted_dependency_and_preserves_lease(
         ),
     }
     github.issue_comment_map[issue_number] = []
+    if advance_master:
+        (root / "README.md").write_text("controller refresh\n", encoding="utf-8")
+        _git(root, "add", "README.md")
+        _git(root, "commit", "-m", "[Controller] advance protected master")
+        _git(root, "push", "origin", "master")
+        git_repository.fetch_origin_master(cwd=root, prune=False)
+        github.master_sha = git_repository.ref("origin/master")
+        if already_fast_forwarded:
+            git_repository.fast_forward_current(github.master_sha, cwd=worktree)
+    return root, git_repository, controller, worktree, branch, base_sha, github
+
+
+def test_verified_noop_retry_proves_evidence_before_fast_forward(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, _, base_sha, _ = (
+        _prepare_verified_noop_retry_fixture(repository, advance_master=True)
+    )
+    flow_root = root / ".artifacts" / "tasks" / "508" / "evidence" / "agent-flow"
+    (flow_root / "old.json").unlink()
+    before_head = git_repository.head(cwd=worktree)
+    with pytest.raises(task_session.TaskSessionError, match="researcher-only Agent Flow"):
+        controller.retry_noop_worker(
+            "508",
+            control_issue_number=508,
+            reason="retry after corrected Agent Flow routing; previous worker completed read-only with zero product mutation",
+            owner_authorize=True,
+        )
+    assert before_head == base_sha
+    assert git_repository.head(cwd=worktree) == base_sha
+
+
+def test_verified_noop_retry_reconciles_already_fast_forwarded_controller_state(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository, controller, worktree, branch, base_sha, github = (
+        _prepare_verified_noop_retry_fixture(
+            repository, advance_master=True, already_fast_forwarded=True
+        )
+    )
+    current_origin = github.master_sha
+    assert git_repository.head(cwd=worktree) == current_origin
     result = controller.retry_noop_worker(
         "508",
-        control_issue_number=issue_number,
+        control_issue_number=508,
         reason="retry after corrected Agent Flow routing; previous worker completed read-only with zero product mutation",
         owner_authorize=True,
     )
-    assert result["dependency_reconciliation"]["previous"] == []
-    assert result["dependency_reconciliation"]["authoritative"] == ["507"]
-    assert [item["name"] for item in result["agent_flow"]["worker_role_passes"]] == [
-        "implementer",
-        "qa-verifier",
-    ]
-    preserved = controller.store.read_json(lease_path)
-    assert preserved["dependency_ids"] == ["507"]
-    assert (
-        preserved["worker_retry"]["classification"] == task_session.NOOP_WORKER_RETRY_CLASSIFICATION
+    assert result["base_refresh"]["classification"] == ("controller_induced_pre_retry_fast_forward")
+    assert result["base_refresh"]["previous_task_head"] == base_sha
+    assert result["lease"]["dependency_ids"] == ["507"]
+    assert git_repository.head(cwd=worktree) == current_origin
+    assert git_repository.unique_commits(branch, base=current_origin) == []
+    assert result["lease"]["original_base_origin_master_sha"] == base_sha
+
+
+def test_verified_noop_retry_refuses_genuine_unique_task_commit_before_refresh(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository, controller, worktree, _, base_sha, _ = _prepare_verified_noop_retry_fixture(
+        repository, advance_master=True
     )
-    claimed = controller.claim_preimplementation_worker_launch("508")
-    assert claimed["preimplementation_resume"]["state"] == "launching"
-    with pytest.raises(task_session.TaskSessionError, match="retry budget"):
+    (worktree / "task-only.txt").write_text("product WIP\n", encoding="utf-8")
+    _git(worktree, "add", "task-only.txt")
+    _git(worktree, "commit", "-m", "feat: [Task 508] genuine product change")
+    before_head = git_repository.head(cwd=worktree)
+    with pytest.raises(
+        task_session.TaskSessionError, match="ancestor of synchronized origin/master"
+    ):
         controller.retry_noop_worker(
             "508",
-            control_issue_number=issue_number,
-            reason="second retry",
+            control_issue_number=508,
+            reason="retry after corrected Agent Flow routing; previous worker completed read-only with zero product mutation",
             owner_authorize=True,
         )
+    assert before_head != base_sha
+    assert git_repository.head(cwd=worktree) == before_head
 
 
 def _record_codex_cli_argument_failure(
