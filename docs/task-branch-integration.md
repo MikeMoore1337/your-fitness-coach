@@ -22,11 +22,10 @@ PR должен быть mergeable и соответствовать branch/rule
 нужно фактически исправить и resolved до merge. Внешний Codex Code Review не запускается в lifecycle.
 PR-only master, required checks, non-fast-forward protection, thread resolution и CI сохраняются.
 Профильные security/legal/destructive/owner/human/external gates сохраняются по фактическому риску;
-отсутствие Codex Code Review их не заменяет. Каждый PR проходит repository-native Codex Security
-Review в `diff` mode внутри required CI. Validated `CRITICAL`/`HIGH` блокируют merge;
-`MEDIUM`/`LOW` и unvalidated concerns advisory, а execution/configuration failure работает
-fail-closed. Внешний `@codex security review` не вызывается. Deterministic security scanners
-остаются в CI.
+отсутствие Codex Code Review их не заменяет. Каждый PR проходит бесплатные deterministic security
+jobs внутри required CI: CodeQL, runtime dependency audit и Trivy filesystem scan. Они входят в
+aggregate `checks` и блокируют merge при scanner/audit failure. Автоматический LLM review и
+`OPENAI_API_KEY` не используются; semantic Security Review остаётся manual/conditional.
 Следующую product task автоматически не запускать.
 
 
