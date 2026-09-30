@@ -6541,6 +6541,112 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   font-size: 0.88rem;
 }
 
+.progress-muscle-workload {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+
+.progress-muscle-workload .progress-exercise {
+  border-bottom: 1px solid var(--border);
+}
+
+.progress-workload__body {
+  display: grid;
+  gap: 12px;
+  padding: 0 4px 16px;
+}
+
+.progress-workload__comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.progress-workload__comparison > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-subtle);
+}
+
+.progress-workload__comparison small,
+.progress-workload__contributors > strong {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.progress-workload__comparison strong {
+  font-size: 0.84rem;
+}
+
+.progress-workload__comparison span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.progress-workload__contributors {
+  display: grid;
+  gap: 6px;
+}
+
+.progress-workload__contributors ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress-workload__contributors li {
+  padding-left: 10px;
+  border-left: 2px solid var(--accent);
+  font-size: 0.75rem;
+}
+
+.progress-workload__exercise > summary {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.progress-workload__exercise > summary::-webkit-details-marker {
+  display: none;
+}
+
+.progress-workload__exercise > summary > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.progress-workload__exercise > div {
+  display: grid;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+
+.progress-workload__exercise > div ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 16px;
+  color: var(--muted);
+  list-style: none;
+}
+
+.progress-workload__exercise small,
+.progress-workload__exercise > div > span,
+.progress-workload__exercise > div li {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
 .progress-exposure ul {
   display: grid;
   gap: 8px;
@@ -7050,6 +7156,10 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
   .progress-training-details,
   .progress-body-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-workload__comparison {
     grid-template-columns: 1fr;
   }
 }

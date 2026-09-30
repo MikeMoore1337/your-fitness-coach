@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
+  TrainingAnalytics,
   WeeklyCheckInHistory,
   WorkoutProgress,
   WorkoutTimelineItem,
@@ -10,6 +11,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import {
   Badge,
+  Button,
   DisclosureIcon,
   EmptyState,
   ErrorState,
@@ -19,6 +21,7 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DateInput, TimeInput } from '../../shared/ui/PickerInput';
 import { WorkoutFeedbackDisclosure } from '../workouts/WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from '../workouts/WorkoutCompletionSummary';
+import { MuscleWorkloadList } from '../workouts/MuscleWorkload';
 
 function formatDate(value: string): string {
   return new Date(`${value}T12:00:00`).toLocaleDateString('ru-RU', {
@@ -91,6 +94,7 @@ export function ClientAnalytics({
 }) {
   const { toast } = useFeedback();
   const queryClient = useQueryClient();
+  const [showTrainingWorkload, setShowTrainingWorkload] = useState(false);
   const progress = useQuery({
     queryKey: queryKeys.trainer.clientAnalytics(clientId),
     queryFn: () => api<WorkoutProgress>(`/api/v1/coach/clients/${clientId}/analytics`),
@@ -99,6 +103,13 @@ export function ClientAnalytics({
     queryKey: queryKeys.trainer.clientWorkouts(clientId),
     queryFn: () =>
       api<WorkoutTimelineItem[]>(`/api/v1/coach/clients/${clientId}/workouts?limit=30`),
+  });
+  const trainingAnalytics = useQuery({
+    queryKey: queryKeys.trainer.clientTrainingAnalytics(clientId),
+    queryFn: () =>
+      api<TrainingAnalytics>(`/api/v1/coach/clients/${clientId}/training-analytics?period_days=30`),
+    enabled: showTrainingWorkload,
+    retry: false,
   });
   const checkIns = useQuery({
     queryKey: queryKeys.trainer.clientCheckIns(clientId),
@@ -211,6 +222,36 @@ export function ClientAnalytics({
               {progress.data.workouts_missed}.
             </p>
           )}
+          <section
+            className="coach-client-training-workload"
+            aria-labelledby="coach-training-workload-title"
+          >
+            <div className="measurement-diary__header">
+              <div>
+                <h3 id="coach-training-workload-title">Распределение нагрузки</h3>
+                <p>Факты за 30 дней и сравнение с предыдущим равным периодом.</p>
+              </div>
+              {!showTrainingWorkload && (
+                <Button variant="secondary" onClick={() => setShowTrainingWorkload(true)}>
+                  Показать данные
+                </Button>
+              )}
+            </div>
+            {showTrainingWorkload && (
+              <>
+                {trainingAnalytics.isLoading ? (
+                  <LoadingState label="Загружаем распределение нагрузки…" />
+                ) : trainingAnalytics.error ? (
+                  <ErrorState
+                    message="Не удалось загрузить распределение нагрузки. Остальные данные клиента доступны."
+                    retry={() => void trainingAnalytics.refetch()}
+                  />
+                ) : trainingAnalytics.data ? (
+                  <MuscleWorkloadList analytics={trainingAnalytics.data} />
+                ) : null}
+              </>
+            )}
+          </section>
           {!!progress.data.personal_records.length && (
             <div>
               <h3>Лучшие результаты</h3>

@@ -491,8 +491,14 @@ async function mockProgress(page: Page, reportState: NutritionReportState = 'par
           period_days: period,
           period_start: '2030-01-01',
           period_end: '2030-01-30',
+          previous_period_start: '2029-12-02',
+          previous_period_end: '2029-12-31',
           exercise_history_limit: 20,
           completed_set_count: 28,
+          completed_workout_count: 7,
+          frequency_per_week: 1.63,
+          previous_completed_workout_count: 6,
+          previous_frequency_per_week: 1.4,
           reps_total: 226,
           reps_recorded_sets: 28,
           external_load_volume_kg: 12400,
@@ -559,6 +565,30 @@ async function mockProgress(page: Page, reportState: NutritionReportState = 'par
           ],
           secondary_muscle_exposure: [
             { muscle_id: 'triceps', muscle_name: 'Трицепс', completed_set_count: 18 },
+          ],
+          muscle_group_workload: [
+            {
+              muscle_id: 'chest',
+              muscle_name: 'Грудные',
+              current: {
+                completed_set_count: 18,
+                primary_completed_set_count: 18,
+                secondary_completed_set_count: 0,
+                completed_session_count: 6,
+                frequency_per_week: 1.4,
+              },
+              previous: {
+                completed_set_count: 12,
+                primary_completed_set_count: 12,
+                secondary_completed_set_count: 0,
+                completed_session_count: 4,
+                frequency_per_week: 0.93,
+              },
+              completed_set_count_change: 6,
+              frequency_per_week_change: 0.47,
+              trend: 'increased',
+              contributing_exercises: [],
+            },
           ],
           completed_sets_without_muscle_metadata: 0,
           data_sufficiency: {
@@ -803,6 +833,8 @@ test('progress remains clear and free of horizontal overflow at supported widths
     .getByRole('link', { name: /^Тренировки/ })
     .click();
   await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+  await expect(page.getByText('Грудные')).toBeVisible();
+  await expect(page.getByText('+6 подх.')).toBeVisible();
   await page.getByText('Жим штанги лёжа').click();
   await expect(page.getByText('Детали тренировки')).toBeVisible();
   await page.locator('.progress-hero').getByRole('tab', { name: '7 дней' }).click();
@@ -875,7 +907,7 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
   await expect(trainingConfidence).toContainText('28 рабочих подходов в 7 тренировках');
   const trainingRegion = page.locator('#progress-training');
   const confidenceBox = await trainingRegion.locator('.data-confidence').boundingBox();
-  const nextBox = await trainingRegion.locator('.progress-subsection').boundingBox();
+  const nextBox = await trainingRegion.locator('.progress-subsection').first().boundingBox();
   expect(confidenceBox).not.toBeNull();
   expect(nextBox).not.toBeNull();
   expect(confidenceBox!.y + confidenceBox!.height).toBeLessThanOrEqual(nextBox!.y);

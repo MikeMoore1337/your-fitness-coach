@@ -958,8 +958,14 @@ def _training_analytics(session: _DemoSession) -> dict[str, Any]:
         "period_days": 30,
         "period_start": _iso(start),
         "period_end": _iso(end),
+        "previous_period_start": _iso(start - timedelta(days=30)),
+        "previous_period_end": _iso(start - timedelta(days=1)),
         "exercise_history_limit": 20,
         "completed_set_count": 54,
+        "completed_workout_count": 12,
+        "frequency_per_week": 2.8,
+        "previous_completed_workout_count": 9,
+        "previous_frequency_per_week": 2.1,
         "reps_total": 620,
         "reps_recorded_sets": 54,
         "external_load_volume_kg": 24_680,
@@ -978,6 +984,30 @@ def _training_analytics(session: _DemoSession) -> dict[str, Any]:
             {"muscle_id": "legs", "muscle_name": "Ноги", "completed_set_count": 18}
         ],
         "secondary_muscle_exposure": [],
+        "muscle_group_workload": [
+            {
+                "muscle_id": "legs",
+                "muscle_name": "Ноги",
+                "current": {
+                    "completed_set_count": 18,
+                    "primary_completed_set_count": 18,
+                    "secondary_completed_set_count": 0,
+                    "completed_session_count": 6,
+                    "frequency_per_week": 1.4,
+                },
+                "previous": {
+                    "completed_set_count": 12,
+                    "primary_completed_set_count": 12,
+                    "secondary_completed_set_count": 0,
+                    "completed_session_count": 4,
+                    "frequency_per_week": 0.93,
+                },
+                "completed_set_count_change": 6,
+                "frequency_per_week_change": 0.47,
+                "trend": "increased",
+                "contributing_exercises": [],
+            }
+        ],
         "completed_sets_without_muscle_metadata": 0,
         "data_sufficiency": {
             "ruleset_version": "data-sufficiency-v1",
