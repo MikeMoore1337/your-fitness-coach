@@ -15,7 +15,7 @@ from enum import StrEnum
 from typing import Annotated, Literal, Protocol
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 AI_COACH_DATA_CLASS = "generic"
 AI_COACH_PROMPT_VERSION = "ai-coach-production-v1"
@@ -26,6 +26,9 @@ AI_COACH_PERIOD_REPORT_INPUT_VERSION = "ai-coach-period-report-input-v1"
 AI_COACH_PERIOD_REPORT_OUTPUT_VERSION = "ai-coach-period-report-output-v1"
 AI_COACH_CHAT_PROMPT_VERSION = "ai-coach-chat-v2"
 AI_COACH_CHAT_OUTPUT_VERSION = "ai-coach-chat-text-v1"
+AI_COACH_ADAPTATION_PROMPT_VERSION = "ai-coach-adaptation-v1"
+AI_COACH_ADAPTATION_SCHEMA_VERSION = "ai-coach-adaptation-output-v1"
+AI_COACH_ADAPTATION_POLICY_VERSION = "ai-coach-adaptation-policy-v1"
 AI_COACH_CHAT_MAX_MESSAGE_LENGTH = 2_000
 AI_COACH_CHAT_PROVIDER_MAX_ANSWER_LENGTH = 8_000
 _BoundedLimitation = Annotated[str, Field(max_length=240)]
@@ -103,6 +106,20 @@ class AiCoachOutcome(StrEnum):
     INSUFFICIENT_DATA = "insufficient_data"
     INVALID_OUTPUT = "invalid_output"
     CONSENT_REQUIRED = "consent_required"
+
+
+class AiCoachAdaptationProposalType(StrEnum):
+    PROGRESSION_EXPLANATION = "progression_explanation"
+    EXERCISE_SUBSTITUTION = "exercise_substitution"
+    VOLUME_OR_FREQUENCY_ADJUSTMENT = "volume_or_frequency_adjustment"
+    BLOCK_OR_REVISION_EDIT = "block_or_revision_edit"
+    ADHERENCE_PERFORMANCE_SUMMARY = "adherence_performance_summary"
+
+
+class AiCoachDeterministicRelationship(StrEnum):
+    SUPPORTS_DETERMINISTIC_RULE = "supports_deterministic_rule"
+    SUPPLEMENTS_NO_RULE = "supplements_no_rule"
+    CONFLICTS_WITH_DETERMINISTIC_RULE = "conflicts_with_deterministic_rule"
 
 
 class AiCoachRateLimitScope(StrEnum):
@@ -214,6 +231,135 @@ class AiCoachRequest(BaseModel):
         ):
             raise ValueError("message must be a single safe text value")
         return normalized
+
+
+class AdaptationContextRef(BaseModel):
+    """Server-selected, privacy-bounded context for one adaptation request."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ref_id: str = Field(..., min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:/-]+$")
+    kind: Literal["program", "revision", "workout", "exercise", "evidence", "candidates"]
+    content: str = Field(..., min_length=1, max_length=6_000)
+
+
+class AdaptationPatch(BaseModel):
+    """The only bounded change shape that can reach the domain service."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation: Literal["replace_exercise", "update_prescription", "explanation_only"]
+    replacement_candidate_ref: str | None = Field(
+        default=None,
+        max_length=64,
+        pattern=r"^candidate:[0-9]+$",
+    )
+    prescribed_sets: int | None = Field(default=None, ge=1, le=10)
+    prescribed_reps: str | None = Field(default=None, min_length=1, max_length=32)
+    rest_seconds: int | None = Field(default=None, ge=15, le=600)
+    effective_scope: Literal["next_workout", "current_block", "future_program"] = "next_workout"
+
+    @model_validator(mode="after")
+    def validate_operation(self) -> AdaptationPatch:
+        has_prescription_change = any(
+            value is not None
+            for value in (self.prescribed_sets, self.prescribed_reps, self.rest_seconds)
+        )
+        if self.operation == "replace_exercise" and (
+            self.replacement_candidate_ref is None or has_prescription_change
+        ):
+            raise ValueError("exercise replacement requires only a candidate reference")
+        if self.operation == "update_prescription" and (
+            self.replacement_candidate_ref is not None or not has_prescription_change
+        ):
+            raise ValueError("prescription update requires at least one bounded field")
+        if self.operation == "explanation_only" and (
+            self.replacement_candidate_ref is not None or has_prescription_change
+        ):
+            raise ValueError("explanation-only proposals cannot contain a patch")
+        return self
+
+
+class AdaptationProviderRequest(BaseModel):
+    """Provider-neutral adaptation request; IDs stay in server context refs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(..., min_length=1, max_length=600)
+    data_class: AiCoachDataClass
+    locale: Literal["ru", "en"] = "ru"
+
+    @field_validator("message")
+    @classmethod
+    def normalize_message(cls, value: str) -> str:
+        normalized = unicodedata.normalize("NFKC", value).strip()
+        if not normalized or any(ord(char) < 0x20 and char not in "\t\n" for char in normalized):
+            raise ValueError("adaptation message must be a single safe text value")
+        return normalized
+
+
+class ProviderAdaptationResponse(BaseModel):
+    """Strict model output for the Stage 4 proposal layer."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    explanation: str = Field(..., min_length=1, max_length=1_200)
+    proposal_type: AiCoachAdaptationProposalType
+    target_program_ref: Literal["program:current"]
+    target_revision_ref: Literal["revision:current"]
+    target_block_ref: str | None = Field(
+        default=None,
+        max_length=64,
+        pattern=r"^block:(?:current|none)$",
+    )
+    target_exercise_ref: Literal["exercise:target"] | None = None
+    suggested_change: AdaptationPatch
+    evidence_ids: tuple[_BoundedAnchor, ...] = Field(..., min_length=1, max_length=6)
+    deterministic_rule_relationship: AiCoachDeterministicRelationship
+    limitations: tuple[_BoundedLimitation, ...] = Field(default=(), max_length=6)
+    requires_confirmation: Literal[True] = True
+
+
+class ProviderAdaptationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(..., min_length=1, max_length=64)
+    configured_model: str = Field(..., min_length=1, max_length=128)
+    actual_model: str | None = Field(default=None, max_length=128)
+    response: ProviderAdaptationResponse
+    usage: ProviderUsage | None = None
+    latency_ms: int = Field(..., ge=0)
+    http_status: int | None = Field(default=None, ge=100, le=599)
+
+
+class AdaptationProposal(BaseModel):
+    """Server-resolved proposal shown to the authenticated owner or trainer."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(..., min_length=64, max_length=64)
+    proposal_type: AiCoachAdaptationProposalType
+    target_program_id: int = Field(..., ge=1)
+    target_revision_id: int = Field(..., ge=1)
+    target_revision_number: int = Field(..., ge=0)
+    target_block_id: int | None = Field(default=None, ge=1)
+    target_exercise_id: int | None = Field(default=None, ge=1)
+    explanation: str = Field(..., min_length=1, max_length=1_200)
+    suggested_change: AdaptationPatch
+    evidence_ids: tuple[_BoundedAnchor, ...] = Field(..., min_length=1, max_length=6)
+    deterministic_rule_relationship: AiCoachDeterministicRelationship
+    limitations: tuple[_BoundedLimitation, ...] = Field(default=(), max_length=6)
+    requires_confirmation: Literal[True] = True
+
+
+class AdaptationLlmPort(Protocol):
+    provider_name: str
+
+    def generate_adaptation(
+        self,
+        request: AdaptationProviderRequest,
+        context_refs: tuple[AdaptationContextRef, ...],
+    ) -> ProviderAdaptationResult: ...
 
 
 class AiCoachConversationTurn(BaseModel):
