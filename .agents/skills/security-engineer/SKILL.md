@@ -102,8 +102,10 @@ Confirmed finding обязан содержать:
 - `CONFIRMED_FINDINGS`;
 - `NEEDS_MANUAL_VALIDATION`.
 
-Это результат аудита, а не lifecycle gate. Normal delivery по-прежнему определяется deterministic CI
-и правилами `AGENTS.md`.
+Это результат аудита, а не lifecycle gate. Normal delivery определяется deterministic CI
+и правилами `AGENTS.md`. Каждый PR отдельно проходит бесплатные CodeQL/dependency/Trivy checks;
+semantic review через этот skill запускается только по фактическому security trigger или явному
+запросу на full audit.
 
 ## Verification baseline
 

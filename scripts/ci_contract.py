@@ -531,6 +531,8 @@ GROUP_TO_JOB: dict[str, str] = {
 ROUTER_JOB_NAMES: tuple[str, ...] = (
     "scope-router",
     "task-provenance",
+    "codeql-security",
+    "security-audit",
     "quality",
     "policy",
     "frontend",
@@ -782,6 +784,8 @@ def expected_jobs_for_groups(groups: Sequence[str], *, event: str = "pull_reques
     jobs = {"scope-router"}
     if event == "pull_request":
         jobs.add("task-provenance")
+        jobs.add("codeql-security")
+        jobs.add("security-audit")
     elif event == "push":
         jobs.add("merge-provenance")
     elif event in {"schedule", "workflow_dispatch"}:

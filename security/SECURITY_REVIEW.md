@@ -41,6 +41,23 @@ data/privacy/logging, AI/provider boundaries, secrets/dependencies и CI/deploy.
 Deterministic checks, Residual risk и итоговым audit status.
 ```
 
+## Automatic PR Security Audit
+
+Каждый pull request автоматически проходит бесплатный deterministic security audit внутри
+основного `CI` workflow. Он не вызывает OpenAI/Codex API и не требует `OPENAI_API_KEY`.
+
+На каждом PR выполняются:
+
+- CodeQL `security-extended` для Python и JavaScript/TypeScript;
+- runtime dependency audit: `npm audit --omit=dev --audit-level=high` и `uv audit --locked`;
+- Trivy filesystem scan для vulnerabilities, misconfiguration и secrets с блокировкой на
+  `CRITICAL`/`HIGH`.
+
+Jobs `codeql-security` и `security-audit` входят в aggregate `checks`, поэтому их failure
+блокирует merge. Это static/deterministic gate: scanner finding является candidate evidence,
+а не автоматически доказанной exploitability. Для проверки реального attack path используй
+repository-native Security Review вручную/условно через `$security-engineer`.
+
 ## Deterministic Security Audit
 
 GitHub Actions workflow `Security Audit` запускается:
@@ -75,5 +92,5 @@ python scripts/skill_safety.py scan-all
 Не коммить токены, реальные персональные данные, raw production dumps и exploit payload, если
 безопасного минимального evidence достаточно.
 
-Repository-native Security Review не заменяет deterministic CI и не становится обязательным
-LLM-verdict для обычной доставки.
+Repository-native Security Review не заменяет deterministic CI и не является обязательным
+платным LLM gate. Автоматический PR gate полностью deterministic и не расходует OpenAI API quota.

@@ -1,4 +1,4 @@
-# YFC Codex skills v9 - focused contracts
+# YFC Codex skills v10 - focused contracts
 
 Skills задают профессиональный способ выполнения работы. Role задаёт ответственность прохода, task - scope и результат.
 
@@ -25,6 +25,10 @@ Skills задают профессиональный способ выполне
     `diff` для security-sensitive изменений и `full` только для отдельного аудита.
 16. Канонический threat model находится в `../security/THREAT_MODEL.md`; процедура и стандарт
     доказательств - в `skills/security-engineer/references/SECURITY_REVIEW_PLAYBOOK.md`.
+17. Каждый PR автоматически проходит бесплатный deterministic security audit: CodeQL,
+    dependency audit и Trivy filesystem scan.
+18. Repository-native `$security-engineer` остаётся manual/conditional semantic review для
+    security-sensitive diff и отдельного `full` audit; автоматический OpenAI API вызов не нужен.
 
 ## QA v8
 

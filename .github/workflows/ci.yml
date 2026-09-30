@@ -1133,11 +1133,80 @@ jobs:
         if: always()
         run: python scripts/allure_report.py finalize --metadata "$REPORT_METADATA" --publication "$PUBLICATION_METADATA"
 
+  codeql-security:
+    name: CodeQL security (${{ matrix.language }})
+    needs: scope-router
+    if: github.event_name == 'pull_request' && needs.scope-router.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:${{ matrix.language }}
+
+  security-audit:
+    name: Free PR security audit
+    needs: scope-router
+    if: github.event_name == 'pull_request' && needs.scope-router.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-local-path: ${{ env.UV_CACHE_DIR }}
+          cache-suffix: pr-security-audit
+      - name: Audit runtime dependencies
+        run: python scripts/ci_contract.py run-group dependency-audit
+      - name: Scan repository vulnerabilities, misconfiguration and secrets
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: v0.73.0
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,misconfig,secret
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
+
   checks:
     name: ${{ github.event_name == 'pull_request' && 'checks' || 'branch-checks' }}
     if: always()
     needs:
-      [scope-router, task-provenance, merge-provenance, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts, scheduled-report]
+      [scope-router, task-provenance, codeql-security, security-audit, merge-provenance, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts, scheduled-report]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -1154,6 +1223,8 @@ jobs:
           SKIPPED_GROUPS: ${{ needs.scope-router.outputs.skipped_groups }}
           SCOPE_ROUTER_RESULT: ${{ needs.scope-router.result }}
           TASK_PROVENANCE_RESULT: ${{ needs.task-provenance.result }}
+          CODEQL_SECURITY_RESULT: ${{ needs.codeql-security.result }}
+          SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}
           MERGE_PROVENANCE_RESULT: ${{ needs.merge-provenance.result }}
           QUALITY_RESULT: ${{ needs.quality.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
@@ -1183,6 +1254,8 @@ jobs:
           result_names = (
               "scope-router",
               "task-provenance",
+              "codeql-security",
+              "security-audit",
               "merge-provenance",
               "quality",
               "policy",

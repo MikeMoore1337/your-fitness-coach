@@ -206,17 +206,26 @@ def test_workflow_calls_group_entrypoint_instead_of_inline_command_copy() -> Non
     assert "scripts/run_pytest.py backend/tests" not in workflow
 
 
-def test_pr_ci_uses_deterministic_checks_without_llm_review_gate() -> None:
+def test_pr_ci_requires_free_deterministic_security_audit_without_llm_api() -> None:
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     required = ci_contract.expected_jobs_for_groups(("quality",), event="pull_request")
     assert "task-provenance" in required
+    assert "codeql-security" in required
+    assert "security-audit" in required
     assert "review-contract" not in required
     assert "pull_request_review:" not in workflow
     assert "review-contract:" not in workflow
     assert 'validate-pr-review --event "$GITHUB_EVENT_PATH"' not in workflow
-    assert "review-contract" not in workflow[workflow.index("  checks:") :]
+    assert "github/codeql-action/init@v3" in workflow
+    assert "queries: security-extended" in workflow
+    assert "python scripts/ci_contract.py run-group dependency-audit" in workflow
+    assert "scanners: vuln,misconfig,secret" in workflow
+    assert "CODEQL_SECURITY_RESULT: ${{ needs.codeql-security.result }}" in workflow
+    assert "SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}" in workflow
+    assert "openai/codex-action" not in workflow
+    assert "OPENAI_API_KEY" not in workflow
 
 
 def test_workflow_uses_lockfile_download_cache_without_audit_installation() -> None:

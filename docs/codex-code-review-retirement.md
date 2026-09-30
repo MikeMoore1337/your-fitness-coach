@@ -29,14 +29,17 @@ round state, request/validation commands и comment parser не являются
 Единственное исключение — прямое указание владельца в отдельном сообщении для конкретного PR. Такое
 действие не запускается controller и не меняет normal lifecycle.
 
-## Отдельный Security Review
+## Security Review после retirement
 
-Security Review остаётся manual/conditional gate только для фактических security-sensitive surfaces:
-auth/authz, secrets, untrusted network, uploads/parsers, user-controlled URLs, sensitive data,
-payments, admin actions, cryptography/headers, webhook verification, privilege escalation,
-dependency-security task или dedicated security audit. Он не сцепляется автоматически с обычным PR,
-а deterministic security scanners остаются в CI. Отсутствие Security Review не блокирует ordinary
-task без security trigger.
+Внешний Codex Security Review остаётся выключен вместе с Codex Code Review. Автоматический LLM
+review не используется. Каждый PR вместо этого проходит deterministic security jobs: CodeQL,
+runtime dependency audit и Trivy filesystem scan. Они входят в aggregate `checks`, не требуют
+`OPENAI_API_KEY` и не расходуют OpenAI API quota.
+
+Repository-native semantic Security Review через `$security-engineer` сохраняется как
+manual/conditional gate для фактических security-sensitive surfaces и как owner-requested `full`
+audit. Scanner finding является candidate evidence, а не автоматически подтверждённой
+эксплуатируемой уязвимостью.
 
 ## Внешняя настройка
 

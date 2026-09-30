@@ -95,8 +95,9 @@ python scripts/skill_safety.py scan-all
 Запускай только применимые группы. Docker/container checks - по реальному container scope и доступности
 Docker.
 
-Отдельный GitHub workflow `Security Audit` запускает CodeQL, dependency audit и Trivy filesystem
-scan. Он работает независимо от normal PR lane.
+Каждый PR автоматически запускает бесплатные deterministic jobs CodeQL, dependency audit и Trivy
+filesystem scan внутри основного CI. Отдельный workflow `Security Audit` сохраняет manual/weekly
+полный deterministic прогон. Эти scanners не заменяют validation exploitability.
 
 ## 7. Report contract
 
