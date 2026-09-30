@@ -244,11 +244,6 @@ export function TemplatesList({
     setAssignmentTemplate(template);
   };
 
-  const editCopy = (template: ProgramTemplate) => {
-    setSaveAsCopy(true);
-    setEditingTemplate(template);
-  };
-
   const activeTemplate = templates.data?.find((item) => item.is_active_for_current_user) ?? null;
   const deleteActiveProgram = async () => {
     const assignedProgramId = activeTemplate?.assigned_program_id;
@@ -502,8 +497,7 @@ export function TemplatesList({
           <ProgramRecommendation
             open={recommendationOpen}
             onOpenChange={setRecommendationOpen}
-            onPreview={setSelectedExample}
-            onEditCopy={editCopy}
+            onConfirmed={refreshProgramState}
           />
           <Card
             defaultOpen={defaultLibraryOpen}

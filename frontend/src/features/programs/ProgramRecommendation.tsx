@@ -1,32 +1,31 @@
 import { FormEvent, useId, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
-import { api } from '../../shared/api/client';
+import { api, ApiError } from '../../shared/api/client';
 import type {
-  ProgramRecommendationRequest,
-  ProgramRecommendationResponse,
-  ProgramTemplate,
+  ApiSchemas,
+  Exercise,
+  ProgramGeneratorConfirmResponse,
+  ProgramGeneratorPreviewResponse,
+  ProgramGeneratorRequest,
 } from '../../shared/api/types';
 import { Badge, CloseIcon, ErrorState } from '../../shared/ui/common';
+import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { StepProgress } from '../../shared/ui/DataViz';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 
-type RecommendationGoal = NonNullable<ProgramRecommendationRequest['goal']>;
-type RecommendationExperience = NonNullable<ProgramRecommendationRequest['experience']>;
-type TrainingLocation = NonNullable<ProgramRecommendationRequest['training_location']>;
-type EquipmentId = NonNullable<ProgramRecommendationRequest['available_equipment_ids']>[number];
-type EquipmentMode = 'skip' | 'exact';
+type GeneratorGoal = ProgramGeneratorRequest['goal'];
+type GeneratorExperience = ProgramGeneratorRequest['experience'];
+type TrainingLocation = ProgramGeneratorRequest['training_location'];
+type EquipmentId = NonNullable<ProgramGeneratorRequest['available_equipment_ids']>[number];
+type PriorityOption = ApiSchemas['BodyPriorityMuscleOption'];
 
-const goals: ReadonlyArray<{
-  value: RecommendationGoal;
-  label: string;
-  description: string;
-}> = [
+const goals: ReadonlyArray<{ value: GeneratorGoal; label: string; description: string }> = [
   {
     value: 'fat_loss',
     label: 'Снижение жира',
-    description: 'Сделать тренировки частью постепенного снижения жировой массы.',
+    description: 'Сделать тренировки частью постепенного снижения веса.',
   },
   {
     value: 'recomposition',
@@ -51,7 +50,7 @@ const goals: ReadonlyArray<{
 ];
 
 const experiences: ReadonlyArray<{
-  value: RecommendationExperience;
+  value: GeneratorExperience;
   label: string;
   description: string;
 }> = [
@@ -72,11 +71,7 @@ const experiences: ReadonlyArray<{
   },
 ];
 
-const locations: ReadonlyArray<{
-  value: TrainingLocation | 'not_set';
-  label: string;
-  description: string;
-}> = [
+const locations: ReadonlyArray<{ value: TrainingLocation; label: string; description: string }> = [
   { value: 'gym', label: 'Тренажёрный зал', description: 'Есть доступ к залу и его инвентарю.' },
   { value: 'home', label: 'Дома', description: 'Тренируюсь дома или в небольшом пространстве.' },
   {
@@ -84,15 +79,10 @@ const locations: ReadonlyArray<{
     label: 'Другое место',
     description: 'Например, улица или спортивная площадка.',
   },
-  {
-    value: 'not_set',
-    label: 'Место не важно',
-    description: 'Не использовать место как пояснение к подбору.',
-  },
 ];
 
 const equipment: ReadonlyArray<{ value: EquipmentId; label: string }> = [
-  { value: 'bodyweight', label: 'Только собственный вес' },
+  { value: 'bodyweight', label: 'Собственный вес' },
   { value: 'dumbbell', label: 'Гантели' },
   { value: 'barbell', label: 'Штанга' },
   { value: 'bench', label: 'Скамья' },
@@ -103,33 +93,24 @@ const equipment: ReadonlyArray<{ value: EquipmentId; label: string }> = [
   { value: 'other', label: 'Другой инвентарь' },
 ];
 
-const splitDescriptions: Record<NonNullable<ProgramTemplate['split_type']>, string> = {
-  full_body: 'Всё тело — основные мышечные группы в каждой тренировке',
-  upper_lower: 'Верх / низ — отдельные тренировки для верхней и нижней частей тела',
-  push_pull_legs: 'Толкающие / тянущие / ноги — движения разделены по типу нагрузки',
-  body_part: 'По группам мышц — разные части тела в разные тренировочные дни',
-  hybrid: 'Комбинированный формат — сочетает несколько простых схем',
+const stepTitles = ['Цель', 'Опыт', 'Частота', 'Длительность', 'Место и инвентарь'] as const;
+
+const noCompatibleReasonLabels: Record<string, string> = {
+  duration_incompatible: 'Запрошенная длительность несовместима со структурой программы.',
+  equipment_no_canonical_substitution:
+    'Для обязательного упражнения нет безопасной канонической замены.',
+  excluded_exercise_no_substitution: 'Исключение упражнения не оставляет канонической замены.',
+  experience_incompatible: 'Доступные source-backed структуры требуют другого уровня опыта.',
+  frequency_not_supported: 'Подходящая source-backed структура не поддерживает эту частоту.',
+  goal_not_supported: 'Для выбранной цели нет совместимой source-backed структуры.',
+  exercise_not_canonical: 'Выбранное упражнение отсутствует в каноническом каталоге.',
+  no_compatible_program: 'Все доступные структуры нарушают хотя бы одно жёсткое ограничение.',
 };
-
-const stepTitles = ['Цель', 'Опыт', 'Частота', 'Место', 'Оборудование'] as const;
-
-function workoutCountLabel(value: number): string {
-  const suffix =
-    value === 1 ? 'тренировка' : value >= 2 && value <= 4 ? 'тренировки' : 'тренировок';
-  return `${value} ${suffix}`;
-}
-
-function frequencyLabel(value: number | null | undefined): string {
-  if (!value) return 'Не указана';
-  if (value === 8) return '8 тренировок в последовательном цикле';
-  return `${workoutCountLabel(value)} в неделю`;
-}
 
 interface ProgramRecommendationProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onPreview: (template: ProgramTemplate) => void;
-  onEditCopy: (template: ProgramTemplate) => void;
+  onConfirmed?: () => void | Promise<void>;
 }
 
 function Choice({
@@ -159,116 +140,208 @@ function Choice({
   );
 }
 
-function AnchorAction({
-  children,
-  href,
-  onClick,
-}: {
-  children: string;
-  href: string;
-  onClick?: () => void;
-}) {
+function durationLabel(value: number): string {
+  return `${value} минут`;
+}
+function reasonLabel(code: string): string {
   return (
-    <a className="secondary program-wizard__anchor" href={href} onClick={onClick}>
-      {children}
-    </a>
+    noCompatibleReasonLabels[code] ?? 'Ограничение не позволило подтвердить совместимый вариант.'
+  );
+}
+
+function PreviewDays({ preview }: { preview: ProgramGeneratorPreviewResponse }) {
+  if (!preview.program) return null;
+  return (
+    <div className="program-generator__days">
+      {preview.program.days.map((day) => (
+        <article className="program-generator__day" key={day.day_number}>
+          <div className="program-generator__day-header">
+            <div>
+              <span className="eyebrow">День {day.day_number}</span>
+              <h4>{day.title}</h4>
+            </div>
+            <small>{day.estimated_duration_minutes} мин</small>
+          </div>
+          <ol>
+            {day.exercises.map((exercise) => (
+              <li key={`${day.day_number}-${exercise.exercise_id}-${exercise.source_exercise_id}`}>
+                <span>
+                  <strong>{exercise.exercise_title}</strong>
+                  <small>
+                    {exercise.prescribed_sets} подхода · {exercise.prescribed_reps}
+                    {exercise.group_kind ? ` · ${exercise.group_kind}` : ''}
+                  </small>
+                </span>
+                {exercise.exercise_id !== exercise.source_exercise_id && (
+                  <Badge tone="neutral">Замена</Badge>
+                )}
+              </li>
+            ))}
+          </ol>
+        </article>
+      ))}
+    </div>
   );
 }
 
 export function ProgramRecommendation({
   open,
   onOpenChange,
-  onPreview,
-  onEditCopy,
+  onConfirmed,
 }: ProgramRecommendationProps) {
   const { user } = useAuth();
+  const { confirm } = useFeedback();
   const titleId = useId();
-  const profileGoal = user?.profile?.goal;
-  const profileExperience = user?.profile?.level;
-  const profileWorkouts = user?.profile?.workouts_per_week;
-  const profileLocations = user?.profile?.training_preferences?.location_profiles ?? [];
+  const profile = user?.profile;
+  const profileGoal = goals.some((item) => item.value === profile?.goal)
+    ? (profile?.goal as GeneratorGoal)
+    : '';
+  const profileExperience = experiences.some((item) => item.value === profile?.level)
+    ? (profile?.level as GeneratorExperience)
+    : '';
+  const profileDays = profile?.workouts_per_week;
+  const initialDays = profileDays && profileDays >= 2 && profileDays <= 6 ? profileDays : '';
+  const profileLocations = profile?.training_preferences?.location_profiles ?? [];
   const profileLocation = profileLocations.length === 1 ? profileLocations[0] : undefined;
-  const initialGoal = goals.some((item) => item.value === profileGoal)
-    ? (profileGoal as RecommendationGoal)
-    : '';
-  const initialExperience = experiences.some((item) => item.value === profileExperience)
-    ? (profileExperience as RecommendationExperience)
-    : '';
-  const initialWorkouts =
-    profileWorkouts && profileWorkouts >= 1 && profileWorkouts <= 8 ? profileWorkouts : '';
-  const initialLocation = profileLocation?.location ?? '';
-  const initialEquipment = (profileLocation?.equipment_ids ?? []) as EquipmentId[];
-  const [step, setStep] = useState(0);
-  const [showResult, setShowResult] = useState(false);
-  const [goal, setGoal] = useState<RecommendationGoal | ''>(initialGoal);
-  const [experience, setExperience] = useState<RecommendationExperience | ''>(initialExperience);
-  const [workoutsPerWeek, setWorkoutsPerWeek] = useState<number | ''>(initialWorkouts);
-  const [location, setLocation] = useState<TrainingLocation | 'not_set' | ''>(initialLocation);
-  const [equipmentMode, setEquipmentMode] = useState<EquipmentMode | ''>(
-    initialLocation ? 'exact' : '',
+  const panelRef = useModalA11y<HTMLDivElement>(
+    open,
+    () => onOpenChange(false),
+    '.program-wizard__close',
   );
-  const [equipmentIds, setEquipmentIds] = useState<EquipmentId[]>(initialEquipment);
-  const close = () => onOpenChange(false);
-  const panelRef = useModalA11y<HTMLDivElement>(open, close, '.program-wizard__close');
-  const hasProfilePrefill = Boolean(
-    initialGoal || initialExperience || initialWorkouts || initialLocation,
-  );
+  const priorityOptions = useQuery({
+    queryKey: ['body-priority-options'],
+    queryFn: () =>
+      api<ApiSchemas['BodyPriorityOptionsResponse']>('/api/v1/me/profile/body-priority-options'),
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled: open,
+  });
+  const exerciseCatalog = useQuery({
+    queryKey: ['program-generator-exercises'],
+    queryFn: () => api<Exercise[]>('/api/v1/programs/exercises'),
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled: open,
+  });
+  const canonicalExercises = (exerciseCatalog.data ?? []).filter((exercise) => !exercise.is_custom);
 
-  const recommendation = useMutation({
-    mutationFn: (payload: ProgramRecommendationRequest) =>
-      api<ProgramRecommendationResponse>('/api/v1/programs/templates/recommendation', {
+  const [step, setStep] = useState(0);
+  const [goal, setGoal] = useState<GeneratorGoal | ''>(profileGoal);
+  const [experience, setExperience] = useState<GeneratorExperience | ''>(profileExperience);
+  const [daysPerWeek, setDaysPerWeek] = useState<number | ''>(initialDays);
+  const [duration, setDuration] = useState<number | ''>('');
+  const [location, setLocation] = useState<TrainingLocation | ''>(profileLocation?.location ?? '');
+  const [equipmentIds, setEquipmentIds] = useState<EquipmentId[]>(
+    (profileLocation?.equipment_ids ?? []) as EquipmentId[],
+  );
+  const [priorityIds, setPriorityIds] = useState<string[]>(
+    profile?.body_priority?.mode === 'muscle_groups'
+      ? (profile.body_priority.muscle_group_ids ?? [])
+      : [],
+  );
+  const [preferredIds, setPreferredIds] = useState<number[]>([]);
+  const [excludedIds, setExcludedIds] = useState<number[]>([]);
+  const [preview, setPreview] = useState<ProgramGeneratorPreviewResponse | null>(null);
+  const [confirmed, setConfirmed] = useState<ProgramGeneratorConfirmResponse | null>(null);
+
+  const previewMutation = useMutation({
+    mutationFn: (payload: ProgramGeneratorRequest) =>
+      api<ProgramGeneratorPreviewResponse>('/api/v1/programs/generator/preview', {
         method: 'POST',
         body: payload,
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setPreview(data);
       trackProductEvent({
-        name: 'program_recommendation_completed',
+        name:
+          data.status === 'preview'
+            ? 'program_generator_previewed'
+            : 'program_generator_no_compatible',
         surface: productEventSurface(),
       });
-      setShowResult(true);
+    },
+  });
+  const confirmMutation = useMutation({
+    mutationFn: ({ replaceActive }: { replaceActive: boolean }) =>
+      api<ProgramGeneratorConfirmResponse>('/api/v1/programs/generator/confirm', {
+        method: 'POST',
+        body: { draft_token: preview?.draft_token, replace_active: replaceActive },
+      }),
+    onSuccess: async (data) => {
+      setConfirmed(data);
+      trackProductEvent({ name: 'program_generator_confirmed', surface: productEventSurface() });
+      await onConfirmed?.();
     },
   });
 
+  const hasProfilePrefill = Boolean(
+    profileGoal || profileExperience || initialDays || profileLocation,
+  );
   const canContinue =
     (step === 0 && Boolean(goal)) ||
     (step === 1 && Boolean(experience)) ||
-    (step === 2 && Boolean(workoutsPerWeek)) ||
-    (step === 3 && Boolean(location)) ||
-    (step === 4 && Boolean(equipmentMode));
+    (step === 2 && Boolean(daysPerWeek)) ||
+    (step === 3 && Boolean(duration)) ||
+    (step === 4 && Boolean(location));
+  const resetResult = () => {
+    setPreview(null);
+    setConfirmed(null);
+    previewMutation.reset();
+    confirmMutation.reset();
+  };
+  const close = () => {
+    if (preview && !confirmed) {
+      trackProductEvent({ name: 'program_generator_rejected', surface: productEventSurface() });
+    }
+    onOpenChange(false);
+    resetResult();
+  };
+  const updateLocation = (value: TrainingLocation) => {
+    setLocation(value);
+    const saved = profileLocations.find((item) => item.location === value);
+    setEquipmentIds((saved?.equipment_ids ?? []) as EquipmentId[]);
+  };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canContinue) return;
-    if (step === 0) {
-      trackProductEvent({
-        name: 'program_recommendation_started',
-        surface: productEventSurface(),
-      });
-    }
     if (step < stepTitles.length - 1) {
       setStep((current) => current + 1);
       return;
     }
-    recommendation.mutate({
-      goal: goal || null,
-      experience: experience || null,
-      workouts_per_week: workoutsPerWeek || null,
-      training_location: location && location !== 'not_set' ? location : null,
-      available_equipment_ids: equipmentMode === 'exact' ? equipmentIds : null,
+    if (!goal || !experience || !daysPerWeek || !duration || !location) return;
+    trackProductEvent({ name: 'program_generator_started', surface: productEventSurface() });
+    previewMutation.mutate({
+      goal,
+      experience,
+      days_per_week: daysPerWeek,
+      preferred_session_duration_minutes: duration,
+      training_location: location,
+      available_equipment_ids: equipmentIds,
+      priority_muscle_ids: priorityIds,
+      preferred_exercise_ids: preferredIds,
+      excluded_exercise_ids: excludedIds,
     });
   };
 
-  const leaveWizard = () => {
-    close();
-    setShowResult(false);
-    recommendation.reset();
+  const confirmPreview = async () => {
+    if (!preview?.draft_token || preview.active_program?.trainer_owned) return;
+    confirmMutation.reset();
+    try {
+      await confirmMutation.mutateAsync({ replaceActive: false });
+    } catch (reason) {
+      if (
+        reason instanceof ApiError &&
+        reason.status === 409 &&
+        reason.message.toLowerCase().includes('архив')
+      ) {
+        const accepted = await confirm({
+          title: 'Заменить активную программу?',
+          message: 'Текущая программа будет отправлена в архив. История тренировок сохранится.',
+          confirmText: 'Заменить программу',
+        });
+        if (accepted) await confirmMutation.mutateAsync({ replaceActive: true });
+      }
+    }
   };
-
-  const result = recommendation.data;
-  const resultGoal = goals.find((item) => item.value === result?.criteria.goal)?.label;
-  const resultExperience = experiences.find(
-    (item) => item.value === result?.criteria.experience,
-  )?.label;
 
   return (
     <>
@@ -288,8 +361,14 @@ export function ProgramRecommendation({
           <div className="modal__panel card program-wizard__panel" ref={panelRef} tabIndex={-1}>
             <header className="program-wizard__header">
               <div>
-                <span className="eyebrow">Мастер подбора программы</span>
-                <h2 id={titleId}>{showResult ? 'Ваш результат' : stepTitles[step]}</h2>
+                <span className="eyebrow">Детерминированный подбор</span>
+                <h2 id={titleId}>
+                  {confirmed
+                    ? 'Программа подтверждена'
+                    : preview
+                      ? 'Предпросмотр программы'
+                      : stepTitles[step]}
+                </h2>
               </div>
               <button
                 type="button"
@@ -301,7 +380,7 @@ export function ProgramRecommendation({
               </button>
             </header>
 
-            {!showResult && (
+            {!preview && !confirmed && (
               <>
                 <div className="program-wizard__progress">
                   <strong>{stepTitles[step]}</strong>
@@ -309,15 +388,17 @@ export function ProgramRecommendation({
                 </div>
                 {hasProfilePrefill && step === 0 && (
                   <p className="program-wizard__prefill">
-                    Мы подставили достоверные ответы из профиля. Здесь их можно изменить — профиль
-                    от этого не обновится.
+                    Мы подставили явные значения из профиля. Здесь их можно изменить — профиль не
+                    обновится.
                   </p>
                 )}
                 <form className="program-wizard__form" onSubmit={submit}>
                   {step === 0 && (
                     <fieldset>
-                      <legend>Какой результат для вас сейчас главный?</legend>
-                      <p>Выберите один приоритет — его всегда можно поменять при новом подборе.</p>
+                      <legend>Какая цель главная сейчас?</legend>
+                      <p>
+                        Цель влияет на порядок source-backed структур, но не создаёт новую методику.
+                      </p>
                       <div className="program-wizard__choices">
                         {goals.map((item) => (
                           <Choice
@@ -325,7 +406,7 @@ export function ProgramRecommendation({
                             description={item.description}
                             key={item.value}
                             label={item.label}
-                            name="recommendation-goal"
+                            name="generator-goal"
                             onChange={() => setGoal(item.value)}
                             value={item.value}
                           />
@@ -336,7 +417,10 @@ export function ProgramRecommendation({
                   {step === 1 && (
                     <fieldset>
                       <legend>Какой у вас опыт силовых тренировок?</legend>
-                      <p>Оценивайте регулярный опыт, а не разовый лучший результат.</p>
+                      <p>
+                        Выберите явный уровень — генератор не выводит его из возраста, веса или
+                        пола.
+                      </p>
                       <div className="program-wizard__choices">
                         {experiences.map((item) => (
                           <Choice
@@ -344,7 +428,7 @@ export function ProgramRecommendation({
                             description={item.description}
                             key={item.value}
                             label={item.label}
-                            name="recommendation-experience"
+                            name="generator-experience"
                             onChange={() => setExperience(item.value)}
                             value={item.value}
                           />
@@ -354,60 +438,41 @@ export function ProgramRecommendation({
                   )}
                   {step === 2 && (
                     <fieldset>
-                      <legend>Сколько силовых тренировок реально выполнять?</legend>
+                      <legend>Сколько тренировок в неделю?</legend>
                       <p>
-                        Выбирайте устойчивый ритм, который сможете повторять из недели в неделю.
+                        В v1 поддерживаются только 2–6 дней. Значение не округляется автоматически.
                       </p>
                       <div className="program-wizard__frequency">
-                        {[1, 2, 3, 4, 5, 6, 7].map((value) => (
+                        {[2, 3, 4, 5, 6].map((value) => (
                           <Choice
-                            checked={workoutsPerWeek === value}
-                            description={
-                              value === 1 ? 'тренировка в неделю' : 'тренировки в неделю'
-                            }
+                            checked={daysPerWeek === value}
+                            description="тренировки в неделю"
                             key={value}
                             label={String(value)}
-                            name="recommendation-frequency"
-                            onChange={() => setWorkoutsPerWeek(value)}
+                            name="generator-frequency"
+                            onChange={() => setDaysPerWeek(value)}
                             value={value}
                           />
                         ))}
-                        <Choice
-                          checked={workoutsPerWeek === 8}
-                          description="Последовательный цикл, не восемь тренировок за неделю"
-                          label="8 тренировок в цикле"
-                          name="recommendation-frequency"
-                          onChange={() => setWorkoutsPerWeek(8)}
-                          value={8}
-                        />
                       </div>
                     </fieldset>
                   )}
                   {step === 3 && (
                     <fieldset>
-                      <legend>Где вы обычно тренируетесь?</legend>
+                      <legend>Сколько времени обычно есть на занятие?</legend>
                       <p>
-                        Место помогает понятнее объяснить результат. Инвентарь проверим отдельно.
+                        Это планировочный ориентир, а не обещание точной длительности тренировки.
                       </p>
-                      <div className="program-wizard__choices">
-                        {locations.map((item) => (
+                      <div className="program-wizard__frequency">
+                        {[30, 45, 60, 75, 90].map((value) => (
                           <Choice
-                            checked={location === item.value}
-                            description={item.description}
-                            key={item.value}
-                            label={item.label}
-                            name="recommendation-location"
-                            onChange={() => {
-                              setLocation(item.value);
-                              const savedLocation = profileLocations.find(
-                                (profile) => profile.location === item.value,
-                              );
-                              setEquipmentMode(savedLocation ? 'exact' : '');
-                              setEquipmentIds(
-                                (savedLocation?.equipment_ids ?? []) as EquipmentId[],
-                              );
-                            }}
-                            value={item.value}
+                            checked={duration === value}
+                            description={value <= 45 ? 'короткая сессия' : 'обычная сессия'}
+                            key={value}
+                            label={durationLabel(value)}
+                            name="generator-duration"
+                            onChange={() => setDuration(value)}
+                            value={value}
                           />
                         ))}
                       </div>
@@ -415,66 +480,119 @@ export function ProgramRecommendation({
                   )}
                   {step === 4 && (
                     <fieldset>
-                      <legend>Нужно проверить доступное оборудование?</legend>
-                      <p>
-                        Это единственное дополнительное ограничение, которое текущий подбор умеет
-                        проверять по составу упражнений.
-                      </p>
+                      <legend>Где и с чем вы будете тренироваться?</legend>
                       <div className="program-wizard__choices program-wizard__choices--compact">
-                        <Choice
-                          checked={equipmentMode === 'skip'}
-                          description="Показать подходящий план, даже если инвентарь придётся уточнить позже."
-                          label="Не проверять оборудование"
-                          name="recommendation-equipment-mode"
-                          onChange={() => setEquipmentMode('skip')}
-                          value="skip"
-                        />
-                        <Choice
-                          checked={equipmentMode === 'exact'}
-                          description="Исключить шаблоны, которым нужен недоступный инвентарь."
-                          label="Учесть только доступное"
-                          name="recommendation-equipment-mode"
-                          onChange={() => setEquipmentMode('exact')}
-                          value="exact"
-                        />
+                        {locations.map((item) => (
+                          <Choice
+                            checked={location === item.value}
+                            description={item.description}
+                            key={item.value}
+                            label={item.label}
+                            name="generator-location"
+                            onChange={() => updateLocation(item.value)}
+                            value={item.value}
+                          />
+                        ))}
                       </div>
-                      {equipmentMode === 'exact' && (
+                      <div className="program-generator__selects">
+                        <strong>Отметьте только доступное оборудование</strong>
                         <div className="program-wizard__equipment">
-                          <strong>Отметьте всё, что точно есть</strong>
-                          <div>
-                            {equipment.map((item) => (
-                              <label className="checkbox-row" key={item.value}>
-                                <input
-                                  type="checkbox"
-                                  checked={equipmentIds.includes(item.value)}
-                                  onChange={(event) =>
-                                    setEquipmentIds((current) =>
-                                      event.target.checked
-                                        ? [...current, item.value]
-                                        : current.filter((value) => value !== item.value),
-                                    )
-                                  }
-                                />
-                                <span>{item.label}</span>
-                              </label>
-                            ))}
-                          </div>
-                          <small>
-                            Если ничего не отметить, подбор будет искать варианты без отдельного
-                            инвентаря.
-                          </small>
+                          {equipment.map((item) => (
+                            <label className="checkbox-row" key={item.value}>
+                              <input
+                                type="checkbox"
+                                checked={equipmentIds.includes(item.value)}
+                                onChange={(event) =>
+                                  setEquipmentIds((current) =>
+                                    event.target.checked
+                                      ? [...current, item.value]
+                                      : current.filter((value) => value !== item.value),
+                                  )
+                                }
+                              />
+                              <span>{item.label}</span>
+                            </label>
+                          ))}
                         </div>
-                      )}
+                        <small>
+                          Собственный вес можно оставить отмеченным вместе с любым другим
+                          инвентарём.
+                        </small>
+                        <label className="field">
+                          <span>Приоритетные группы — необязательно</span>
+                          <select
+                            multiple
+                            size={4}
+                            value={priorityIds}
+                            onChange={(event) =>
+                              setPriorityIds(
+                                Array.from(event.target.selectedOptions, (option) => option.value),
+                              )
+                            }
+                          >
+                            {(priorityOptions.data?.items ?? []).map((option: PriorityOption) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </select>
+                          <small className="field-hint">
+                            Это мягкий приоритет, а не произвольный оптимизатор объёма.
+                          </small>
+                        </label>
+                        <label className="field">
+                          <span>Предпочитаемые упражнения — необязательно</span>
+                          <select
+                            multiple
+                            size={4}
+                            value={preferredIds.map(String)}
+                            onChange={(event) =>
+                              setPreferredIds(
+                                Array.from(event.target.selectedOptions, (option) =>
+                                  Number(option.value),
+                                ),
+                              )
+                            }
+                          >
+                            {canonicalExercises.map((exercise) => (
+                              <option key={exercise.id} value={exercise.id}>
+                                {exercise.title}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="field">
+                          <span>Исключить упражнения — необязательно</span>
+                          <select
+                            multiple
+                            size={4}
+                            value={excludedIds.map(String)}
+                            onChange={(event) =>
+                              setExcludedIds(
+                                Array.from(event.target.selectedOptions, (option) =>
+                                  Number(option.value),
+                                ).filter((id) => !preferredIds.includes(id)),
+                              )
+                            }
+                          >
+                            {canonicalExercises
+                              .filter((exercise) => !preferredIds.includes(exercise.id))
+                              .map((exercise) => (
+                                <option key={exercise.id} value={exercise.id}>
+                                  {exercise.title}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                      </div>
                       <p className="program-wizard__safety-note">
-                        Подбор не оценивает травмы, боль или медицинские ограничения. При боли или
-                        ограничениях по здоровью обсудите тренировки с квалифицированным
-                        специалистом.
+                        Подбор использует канонические упражнения и source-backed структуры. Это не
+                        медицинская рекомендация.
                       </p>
                     </fieldset>
                   )}
-
-                  {recommendation.error && (
-                    <ErrorState message={(recommendation.error as Error).message} />
+                  {previewMutation.error && (
+                    <ErrorState message={(previewMutation.error as Error).message} />
                   )}
                   <footer className="program-wizard__footer">
                     <button
@@ -484,11 +602,11 @@ export function ProgramRecommendation({
                     >
                       {step === 0 ? 'Отмена' : 'Назад'}
                     </button>
-                    <button disabled={!canContinue || recommendation.isPending}>
-                      {recommendation.isPending
-                        ? 'Подбираем…'
+                    <button disabled={!canContinue || previewMutation.isPending}>
+                      {previewMutation.isPending
+                        ? 'Рассчитываем…'
                         : step === stepTitles.length - 1
-                          ? 'Показать рекомендацию'
+                          ? 'Показать preview'
                           : 'Далее'}
                     </button>
                   </footer>
@@ -496,167 +614,137 @@ export function ProgramRecommendation({
               </>
             )}
 
-            {showResult && result && (
+            {preview && !confirmed && (
               <div className="program-wizard-result" aria-live="polite">
-                {result.recommendation ? (
+                {preview.status === 'preview' && preview.program ? (
                   <>
                     <div className="program-wizard-result__lead">
-                      <Badge tone="success">Рекомендованный шаблон</Badge>
-                      <h3>{result.recommendation.template.title}</h3>
-                      <p>{result.recommendation.reason}</p>
+                      <Badge tone="success">Проверенный draft</Badge>
+                      <h3>{preview.program.title}</h3>
+                      <p>{preview.message}</p>
                     </div>
                     <dl className="program-wizard-result__summary">
                       <div>
-                        <dt>Цель</dt>
-                        <dd>{resultGoal ?? 'Не указана'}</dd>
+                        <dt>Источник</dt>
+                        <dd>{preview.source?.title ?? 'Каноническая структура'}</dd>
                       </div>
                       <div>
-                        <dt>Опыт</dt>
-                        <dd>{resultExperience ?? 'Не указан'}</dd>
+                        <dt>График</dt>
+                        <dd>{preview.program.days.length} тренировок</dd>
                       </div>
                       <div>
-                        <dt>Частота</dt>
-                        <dd>
-                          {frequencyLabel(result.criteria.workouts_per_week)}
-                          <small>
-                            В программе:{' '}
-                            {workoutCountLabel(result.recommendation.template.days.length)} в цикле
-                          </small>
-                        </dd>
+                        <dt>Длительность</dt>
+                        <dd>до {preview.program.estimated_duration_minutes} мин</dd>
                       </div>
                     </dl>
-                    {result.recommendation.template.split_type && (
-                      <p className="program-wizard-result__format">
-                        <strong>Как устроен план</strong>
-                        <span>{splitDescriptions[result.recommendation.template.split_type]}</span>
-                      </p>
-                    )}
                     <div className="program-wizard-result__facts">
                       <div>
-                        <strong>Почему подходит</strong>
+                        <strong>Почему выбрано</strong>
                         <ul>
-                          {result.recommendation.fit_facts.map((fact) => (
-                            <li key={fact}>{fact}</li>
+                          {(preview.fit_reasons ?? []).map((reason) => (
+                            <li key={reason}>{reason}</li>
                           ))}
                         </ul>
                       </div>
-                      {result.recommendation.limitations.length > 0 && (
+                      {!!preview.tradeoffs?.length && (
                         <div>
-                          <strong>Что учесть</strong>
+                          <strong>Компромиссы</strong>
                           <ul>
-                            {result.recommendation.limitations.map((limitation) => (
-                              <li key={limitation}>{limitation}</li>
+                            {(preview.tradeoffs ?? []).map((tradeoff) => (
+                              <li key={tradeoff}>{tradeoff}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {!!preview.adaptations?.length && (
+                        <div>
+                          <strong>Адаптации</strong>
+                          <ul>
+                            {(preview.adaptations ?? []).map((item) => (
+                              <li
+                                key={`${item.code}-${item.day_number}-${item.source_exercise_id}`}
+                              >
+                                {item.message}
+                              </li>
                             ))}
                           </ul>
                         </div>
                       )}
                     </div>
-                    <p className="program-wizard-result__next">
-                      Сначала посмотрите дни и упражнения. После просмотра можно настроить личную
-                      копию или отдельно выбрать расписание и запустить исходный шаблон.
-                    </p>
-                    <div className="program-wizard__result-actions">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          close();
-                          onPreview(result.recommendation!.template);
-                        }}
-                      >
-                        Посмотреть план
-                      </button>
+                    <PreviewDays preview={preview} />
+                    {preview.active_program?.trainer_owned && (
+                      <ErrorState message="Сейчас активна программа, назначенная тренером. Личная подборка не может её заменить." />
+                    )}
+                    {confirmMutation.error && (
+                      <ErrorState message={(confirmMutation.error as Error).message} />
+                    )}
+                    <footer className="program-wizard__footer program-wizard__footer--result">
                       <button
                         type="button"
                         className="secondary"
                         onClick={() => {
-                          close();
-                          onEditCopy(result.recommendation!.template);
-                        }}
-                      >
-                        Настроить личную копию
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="program-wizard-result__empty">
-                    <span className="eyebrow">Подходящего шаблона пока нет</span>
-                    <h3>
-                      {result.status === 'needs_input'
-                        ? 'Нужны дополнительные данные'
-                        : 'Совпадений нет'}
-                    </h3>
-                    <p>{result.message}</p>
-                    <div className="program-wizard__result-actions">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowResult(false);
-                          recommendation.reset();
-                          setStep(0);
+                          setPreview(null);
+                          previewMutation.reset();
+                          confirmMutation.reset();
+                          setStep(stepTitles.length - 1);
                         }}
                       >
                         Изменить параметры
                       </button>
-                      <AnchorAction href="#program-library" onClick={leaveWizard}>
-                        Выбрать из шаблонов
-                      </AnchorAction>
-                      <AnchorAction href="#program-builder" onClick={leaveWizard}>
-                        Создать свою
-                      </AnchorAction>
+                      <button
+                        type="button"
+                        disabled={
+                          confirmMutation.isPending ||
+                          Boolean(preview.active_program?.trainer_owned)
+                        }
+                        onClick={() => void confirmPreview()}
+                      >
+                        {confirmMutation.isPending ? 'Сохраняем…' : 'Подтвердить программу'}
+                      </button>
+                    </footer>
+                  </>
+                ) : (
+                  <div className="program-wizard-result__empty">
+                    <span className="eyebrow">Совместимый вариант не найден</span>
+                    <h3>Не удалось подобрать программу</h3>
+                    <p>{preview.message}</p>
+                    <ul className="program-generator__reasons">
+                      {(preview.reason_codes ?? []).map((code) => (
+                        <li key={code}>{reasonLabel(code)}</li>
+                      ))}
+                    </ul>
+                    <div className="program-wizard__result-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreview(null);
+                          previewMutation.reset();
+                          setStep(stepTitles.length - 1);
+                        }}
+                      >
+                        Изменить параметры
+                      </button>
+                      <button type="button" className="secondary" onClick={close}>
+                        Закрыть
+                      </button>
                     </div>
                   </div>
                 )}
+              </div>
+            )}
 
-                {!!result.alternatives?.length && (
-                  <section
-                    className="program-wizard-result__alternatives"
-                    aria-labelledby="program-alternatives-title"
-                  >
-                    <div>
-                      <span className="eyebrow">Другие варианты</span>
-                      <h3 id="program-alternatives-title">Можно сравнить</h3>
-                    </div>
-                    {result.alternatives.map((alternative) => (
-                      <article key={alternative.template.id}>
-                        <div>
-                          <strong>{alternative.template.title}</strong>
-                          <p>{alternative.reason}</p>
-                        </div>
-                        <button
-                          type="button"
-                          className="secondary"
-                          onClick={() => {
-                            close();
-                            onPreview(alternative.template);
-                          }}
-                        >
-                          Посмотреть
-                        </button>
-                      </article>
-                    ))}
-                  </section>
-                )}
-
-                <footer className="program-wizard__footer program-wizard__footer--result">
-                  <button
-                    type="button"
-                    className="text-button"
-                    onClick={() => {
-                      setShowResult(false);
-                      recommendation.reset();
-                      setStep(stepTitles.length - 1);
-                    }}
-                  >
-                    Вернуться к ответам
+            {confirmed && (
+              <div className="program-wizard-result" aria-live="polite">
+                <div className="program-wizard-result__lead">
+                  <Badge tone="success">Сохранено</Badge>
+                  <h3>{confirmed.template.title}</h3>
+                  <p>Программа подтверждена и назначена через существующий lifecycle Product v4.</p>
+                </div>
+                <div className="program-wizard__result-actions">
+                  <button type="button" onClick={close}>
+                    Перейти к программам
                   </button>
-                  <button type="button" className="secondary" onClick={close}>
-                    Закрыть
-                  </button>
-                </footer>
-                <small className="program-wizard__disclaimer">
-                  Результат рассчитан по фиксированным правилам и не является медицинской
-                  рекомендацией.
-                </small>
+                </div>
               </div>
             )}
           </div>

@@ -32,6 +32,12 @@ from fitminiapp_api.schemas.program import (
     TrainingBlockResponse,
     TrainingBlockUpdate,
 )
+from fitminiapp_api.schemas.program_generator import (
+    ProgramGeneratorConfirmRequest,
+    ProgramGeneratorConfirmResponse,
+    ProgramGeneratorPreviewResponse,
+    ProgramGeneratorRequest,
+)
 from fitminiapp_api.schemas.workout import (
     ProgramProgressionProposalList,
     ProgressionProposalReviewRequest,
@@ -57,6 +63,11 @@ from fitminiapp_api.services.exercise_domain import (
 from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
 from fitminiapp_api.services.program_common import ProgramError, assignment_error_status
+from fitminiapp_api.services.program_generator import (
+    ProgramGeneratorError,
+    confirm_generated_program,
+    generate_program_preview,
+)
 from fitminiapp_api.services.program_recommendation import recommend_program_templates
 from fitminiapp_api.services.program_versioning import (
     advance_training_block,
@@ -375,6 +386,44 @@ def my_templates(
 ):
     items = list_user_templates(db, current_user)
     return build_template_responses(items, db, current_user)
+
+
+@router.post(
+    "/generator/preview",
+    response_model=ProgramGeneratorPreviewResponse,
+)
+def generate_program_generator_preview(
+    payload: ProgramGeneratorRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return generate_program_preview(db, current_user, payload)
+    except ProgramGeneratorError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except ProgramError as exc:
+        db.rollback()
+        raise HTTPException(status_code=assignment_error_status(str(exc)), detail=str(exc)) from exc
+
+
+@router.post(
+    "/generator/confirm",
+    response_model=ProgramGeneratorConfirmResponse,
+)
+def confirm_program_generator_preview(
+    payload: ProgramGeneratorConfirmRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return confirm_generated_program(db, current_user, payload)
+    except ProgramGeneratorError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except ProgramError as exc:
+        db.rollback()
+        raise HTTPException(status_code=assignment_error_status(str(exc)), detail=str(exc)) from exc
 
 
 @router.post(

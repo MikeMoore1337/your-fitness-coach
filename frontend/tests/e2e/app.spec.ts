@@ -2403,7 +2403,7 @@ test('training preferences сохраняют Mobile Web/TMA композици�
     await page.getByRole('button', { name: 'Подобрать другую' }).click();
     const wizard = page.getByRole('dialog', { name: 'Цель' });
     await expect(wizard).toBeVisible();
-    await expect(wizard.getByText(/подставили достоверные ответы из профиля/i)).toBeVisible();
+    await expect(wizard.getByText(/подставили явные значения из профиля/i)).toBeVisible();
     expect(
       await wizard
         .locator('.program-wizard__panel')
@@ -2858,12 +2858,119 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(page.locator('.exercise-lightbox')).toHaveCount(0);
 });
 
-test('мастер подбора сохраняет ответы и ведёт к явному запуску на mobile и desktop', async ({
+test('детерминированный подбор проходит preview, no-compatible и explicit confirm', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockApi(page);
+  let noCompatiblePreview = false;
+  let confirmPayload: Record<string, unknown> | null = null;
+  await page.route('**/api/v1/programs/generator/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/preview')) {
+      if (noCompatiblePreview) {
+        return route.fulfill({
+          json: {
+            status: 'no_compatible',
+            selection_policy_version: 'program_generator_v1',
+            input_fingerprint: 'preview-no-compatible',
+            message: 'Не удалось подобрать программу под все выбранные ограничения.',
+            reason_codes: ['duration_incompatible', 'equipment_no_canonical_substitution'],
+            fit_reasons: [],
+            tradeoffs: [],
+            adaptations: [],
+            unresolved_constraints: [],
+            active_program: null,
+          },
+        });
+      }
+      return route.fulfill({
+        json: {
+          status: 'preview',
+          selection_policy_version: 'program_generator_v1',
+          input_fingerprint: 'preview-1',
+          message:
+            'Предпросмотр готов. Программа будет сохранена только после явного подтверждения.',
+          draft_token: 'signed-draft-token',
+          source: {
+            template_id: 10,
+            slug: 'full-body-3-days',
+            title: 'Каноническая программа на всё тело',
+            goal: 'recomposition',
+            level: 'beginner',
+            split_type: 'full_body',
+            provenance_type: 'YFC_GENERIC',
+          },
+          program: {
+            title: 'Подобранная программа · Каноническая программа на всё тело',
+            goal: 'recomposition',
+            level: 'beginner',
+            split_type: 'full_body',
+            estimated_duration_minutes: 52,
+            days: [
+              {
+                day_number: 1,
+                title: 'Всё тело',
+                estimated_duration_minutes: 52,
+                exercises: [
+                  {
+                    exercise_id: 1,
+                    source_exercise_id: 2,
+                    exercise_title: 'Тяга блока',
+                    metric_type: 'strength',
+                    movement_pattern: 'horizontal_pull',
+                    prescribed_sets: 3,
+                    prescribed_reps: '10–12',
+                    prescribed_duration_minutes: null,
+                    rest_seconds: 90,
+                    notes: null,
+                    superset_group: null,
+                    superset_order: null,
+                    prescription: { segments: [{ sets: 3, reps: '10–12' }] },
+                    group_id: null,
+                    group_kind: null,
+                    group_order: null,
+                  },
+                ],
+              },
+            ],
+          },
+          fit_reasons: [
+            'Цель и явный уровень опыта совпадают с source-backed структурой.',
+            'Оборудование проверено по каноническим упражнениям.',
+          ],
+          tradeoffs: ['Предпочтительная длительность остаётся планировочным ориентиром.'],
+          adaptations: [
+            {
+              code: 'equipment_substitution',
+              message: 'Упражнение заменено на каноническую вариацию.',
+              day_number: 1,
+              source_exercise_id: 2,
+              replacement_exercise_id: 1,
+            },
+          ],
+          unresolved_constraints: [],
+          reason_codes: [],
+          active_program: null,
+        },
+      });
+    }
+    if (path.endsWith('/confirm')) {
+      confirmPayload = request.postDataJSON() as Record<string, unknown>;
+      return route.fulfill({
+        json: {
+          status: 'confirmed',
+          idempotent: false,
+          assigned_program_id: 88,
+          workouts_created: 3,
+          template: { title: 'Подобранная программа · Каноническая программа на всё тело' },
+        },
+      });
+    }
+    return route.continue();
+  });
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'План');
@@ -2880,7 +2987,7 @@ test('мастер подбора сохраняет ответы и ведёт 
   await launcher.click();
   const wizard = page.getByRole('dialog', { name: 'Цель' });
   await expect(wizard).toBeVisible();
-  await expect(wizard.getByText(/профиль от этого не обновится/i)).toBeVisible();
+  await expect(wizard.getByText(/профиль не обновится/i)).toBeVisible();
   const progressBounds = await wizard.locator('.program-wizard__progress').boundingBox();
   const prefillBounds = await wizard.locator('.program-wizard__prefill').boundingBox();
   expect(progressBounds).not.toBeNull();
@@ -2893,70 +3000,90 @@ test('мастер подбора сохраняет ответы и ведёт 
     })),
   ).toEqual({ client: 360, scroll: 360 });
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-113A/program-stepper-360x800-light.png',
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-input-mobile-light.png',
   });
+
+  await page.evaluate(() => {
+    localStorage.setItem('app-theme', 'dark');
+    window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+  });
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await expect(wizard.locator('.program-wizard__panel')).toHaveCSS('color', 'rgb(245, 245, 245)');
+  await expect(wizard.locator('.program-wizard-choice').first()).toHaveCSS(
+    'color',
+    'rgb(245, 245, 245)',
+  );
+  await page.screenshot({
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-input-mobile-dark.png',
+  });
+  await page.evaluate(() => {
+    localStorage.setItem('app-theme', 'light');
+    window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+  });
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
 
   await wizard.getByRole('radio', { name: /Рекомпозиция/ }).check();
   await wizard.getByRole('button', { name: 'Далее' }).click();
   await page.getByRole('radio', { name: /Начинаю или возвращаюсь/ }).check();
   await page.getByRole('button', { name: 'Далее' }).click();
-  const threeWorkouts = page.locator('input[name="recommendation-frequency"][value="3"]');
+  const threeWorkouts = page.locator('input[name="generator-frequency"][value="3"]');
   await threeWorkouts.check();
   await page.getByRole('button', { name: 'Назад' }).click();
   await expect(page.getByRole('radio', { name: /Начинаю или возвращаюсь/ })).toBeChecked();
   await page.getByRole('button', { name: 'Далее' }).click();
   await expect(threeWorkouts).toBeChecked();
   await page.getByRole('button', { name: 'Далее' }).click();
-  await page.getByRole('radio', { name: /Тренажёрный зал/ }).check();
+  await page.getByRole('radio', { name: /60 минут/ }).check();
   await page.getByRole('button', { name: 'Далее' }).click();
-  await page.getByRole('radio', { name: /Учесть только доступное/ }).check();
-  await page.getByRole('checkbox', { name: 'Только собственный вес' }).check();
-  await page.getByRole('button', { name: 'Показать рекомендацию' }).click();
+  await page.getByRole('radio', { name: /Тренажёрный зал/ }).check();
+  await page.getByRole('checkbox', { name: 'Гантели' }).check();
+  await page.getByRole('button', { name: 'Показать preview' }).click();
 
-  const result = page.getByRole('dialog', { name: 'Ваш результат' });
-  await expect(
-    result.getByRole('heading', { name: 'Программа на всё тело — 3 дня' }),
-  ).toBeVisible();
-  await expect(result.getByText(/Всё тело — основные мышечные группы/)).toBeVisible();
-  await expect(result.getByText(/не является медицинской рекомендацией/i)).toBeVisible();
+  const result = page.getByRole('dialog', { name: 'Предпросмотр программы' });
+  await expect(result.getByRole('heading', { name: /Подобранная программа/ })).toBeVisible();
+  await expect(result.getByText('Почему выбрано')).toBeVisible();
+  await expect(result.getByText('Адаптации')).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await result
       .locator('.program-wizard__panel')
       .evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
-  await expect(result.getByText('Рекомпозиция', { exact: true })).toBeVisible();
-  const frequencySummary = result
-    .getByText('Частота', { exact: true })
-    .locator('xpath=following-sibling::dd');
-  await expect(frequencySummary).toContainText('3 тренировки в неделю');
-  await expect(frequencySummary).toContainText('В программе: 3 тренировки в цикле');
-  const mobileSummary = await result.locator('.program-wizard-result__summary').boundingBox();
-  expect(mobileSummary).not.toBeNull();
-  expect(mobileSummary!.height).toBeGreaterThan(150);
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-113A/program-result-390x844-light.png',
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-preview-mobile-light.png',
   });
 
-  await result.getByRole('button', { name: 'Посмотреть план' }).click();
-  const preview = page.getByRole('dialog', { name: /Программа на всё тело — 3 дня/ });
-  await expect(
-    preview.getByRole('button', { name: 'Настроить расписание и запустить' }),
-  ).toBeVisible();
-  await preview.locator('.program-example-modal__close').click();
-
   await page.setViewportSize({ width: 1440, height: 900 });
-  await launcher.click();
-  const desktopPanel = page
-    .getByRole('dialog', { name: 'Ваш результат' })
-    .locator('.program-wizard__panel');
+  const desktopPanel = result.locator('.program-wizard__panel');
   const desktopBox = await desktopPanel.boundingBox();
   expect(desktopBox).not.toBeNull();
   expect(desktopBox!.width).toBeLessThanOrEqual(760);
   expect(Math.abs(desktopBox!.x + desktopBox!.width / 2 - 720)).toBeLessThanOrEqual(1);
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Ваш результат' })).toHaveCount(0);
-  await expect(launcher).toBeFocused();
+  await page.screenshot({
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-preview-desktop.png',
+  });
+
+  await result.getByRole('button', { name: 'Изменить параметры' }).click();
+  noCompatiblePreview = true;
+  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await expect(page.getByText('Совместимый вариант не найден')).toBeVisible();
+  await expect(page.getByText(/длительность несовместима/i)).toBeVisible();
+  await page.screenshot({
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-no-compatible.png',
+  });
+
+  noCompatiblePreview = false;
+  await page.getByRole('button', { name: 'Изменить параметры' }).click();
+  await page.getByRole('button', { name: 'Показать preview' }).click();
+  await page.getByRole('button', { name: 'Подтвердить программу' }).click();
+  await expect(page.getByRole('heading', { name: 'Программа подтверждена' })).toBeVisible();
+  expect(confirmPayload).toMatchObject({
+    draft_token: 'signed-draft-token',
+    replace_active: false,
+  });
+  await page.screenshot({
+    path: '../.artifacts/tasks/510/evidence/screenshots/program-generator-confirmed.png',
+  });
 });
 
 test('клиент собирает и переупорядочивает личную программу', async ({ page }) => {
