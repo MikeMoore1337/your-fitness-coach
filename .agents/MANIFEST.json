@@ -83,6 +83,6 @@
     "QA v8 keeps qa-engineer as strategy/router and adds focused testing, E2E review, triage, flakiness and coverage skills",
     "QA work profiles are modes, not additional lifecycle roles",
     "Security v9 adds repository-native diff/full review, YFC threat model and a separate deterministic Security Audit workflow",
-    "Security v10 makes repository-native Codex diff review mandatory on every PR and blocks only validated CRITICAL/HIGH findings or review failures"
+    "Security v10 adds free mandatory PR security jobs (CodeQL, dependency audit, Trivy) while semantic Security Review remains manual/conditional"
   ]
 }
