@@ -203,6 +203,9 @@ class AiCoachConversationMessage(Base):
     prompt_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     processing_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     citations: Mapped[list[dict[str, str]]] = mapped_column(JSON, nullable=False, default=list)
+    exercise_references: Mapped[list[dict[str, str | None]]] = mapped_column(
+        JSON, nullable=False, default=list
+    )
     limitations: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
 

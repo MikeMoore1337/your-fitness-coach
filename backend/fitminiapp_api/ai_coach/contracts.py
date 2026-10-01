@@ -26,6 +26,8 @@ AI_COACH_PERIOD_REPORT_INPUT_VERSION = "ai-coach-period-report-input-v1"
 AI_COACH_PERIOD_REPORT_OUTPUT_VERSION = "ai-coach-period-report-output-v1"
 AI_COACH_CHAT_PROMPT_VERSION = "ai-coach-chat-v2"
 AI_COACH_CHAT_OUTPUT_VERSION = "ai-coach-chat-text-v1"
+AI_COACH_EXERCISE_PROMPT_VERSION = "ai-coach-exercise-v1"
+AI_COACH_EXERCISE_SCHEMA_VERSION = "ai-coach-exercise-output-v1"
 AI_COACH_ADAPTATION_PROMPT_VERSION = "ai-coach-adaptation-v1"
 AI_COACH_ADAPTATION_SCHEMA_VERSION = "ai-coach-adaptation-output-v1"
 AI_COACH_ADAPTATION_POLICY_VERSION = "ai-coach-adaptation-policy-v1"
@@ -456,6 +458,64 @@ class ContextRef(BaseModel):
     _require_https = field_validator("canonical_url")(_validate_https_url)
 
 
+class ProviderExerciseReference(BaseModel):
+    """Opaque exercise/media refs that still require server-side resolution."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    exercise_ref: str = Field(
+        ...,
+        min_length=10,
+        max_length=128,
+        pattern=r"^exercise:[a-z0-9]+(?:-[a-z0-9]+)+$",
+    )
+    section: Literal["technique", "media"]
+    media_ref: str | None = Field(
+        default=None,
+        max_length=160,
+        pattern=r"^media:[A-Za-z0-9_.:/-]+$",
+    )
+
+    @model_validator(mode="after")
+    def validate_section_reference(self) -> ProviderExerciseReference:
+        if self.section == "media" and self.media_ref is None:
+            raise ValueError("media references require an approved media ref")
+        if self.section == "technique" and self.media_ref is not None:
+            raise ValueError("technique references cannot carry a media ref")
+        return self
+
+
+class AiCoachExerciseReference(BaseModel):
+    """Server-resolved canonical exercise reference safe for the client UI."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    exercise_slug: str = Field(
+        ...,
+        min_length=3,
+        max_length=96,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)+$",
+    )
+    exercise_title: str = Field(..., min_length=1, max_length=240)
+    section: Literal["technique", "media"]
+    deep_link: str = Field(..., min_length=1, max_length=160)
+    media_reference: str | None = Field(
+        default=None,
+        max_length=160,
+        pattern=r"^media:[A-Za-z0-9_.:/-]+$",
+    )
+
+    @field_validator("deep_link")
+    @classmethod
+    def validate_deep_link(cls, value: str) -> str:
+        if not re.fullmatch(
+            r"/app\?section=catalog&exercise_slug=[a-z0-9]+(?:-[a-z0-9]+)+",
+            value,
+        ):
+            raise ValueError("exercise deep links must target the canonical catalog")
+        return value
+
+
 class ProviderInsight(BaseModel):
     """One bounded, evidence-linked claim in a period-report response."""
 
@@ -554,6 +614,7 @@ class ProviderTextResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     answer: str = Field(..., min_length=1, max_length=AI_COACH_CHAT_PROVIDER_MAX_ANSWER_LENGTH)
+    exercise_references: tuple[ProviderExerciseReference, ...] = Field(default=(), max_length=4)
 
 
 class ProviderTextResult(BaseModel):

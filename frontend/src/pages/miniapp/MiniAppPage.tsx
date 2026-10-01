@@ -116,6 +116,11 @@ function requestedSection(search: string): AppSection | null {
   return requestedWorkoutFeedback(search) ? 'progress' : null;
 }
 
+function requestedExerciseSlug(search: string): string | null {
+  const value = new URLSearchParams(search).get('exercise_slug');
+  return value && /^[a-z0-9]+(?:-[a-z0-9]+)+$/.test(value) ? value : null;
+}
+
 function requestedNutritionDate(search: string): string | undefined {
   const value = new URLSearchParams(search).get('date');
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
@@ -237,6 +242,7 @@ export default function MiniAppPage({
       : 'today';
   });
   const section = sectionOverride ?? requestedSection(search) ?? fallbackSection;
+  const exerciseSlug = section === 'catalog' ? requestedExerciseSlug(search) : null;
   const aiCoachStatus = useAiCoachStatus(section === 'profile');
   const nutritionDate = requestedNutritionDate(search);
   const nutritionMeal = requestedNutritionMeal(search);
@@ -540,7 +546,12 @@ export default function MiniAppPage({
               <AiCoachContextualEntry context={{ surface: 'program' }} entryPoint="program" />
             </>
           )}
-          {section === 'catalog' && <ExerciseCatalog canCreate={capabilities.canCreateCatalog} />}
+          {section === 'catalog' && (
+            <ExerciseCatalog
+              canCreate={capabilities.canCreateCatalog}
+              initialExerciseSlug={exerciseSlug}
+            />
+          )}
           {section === 'nutrition' && (
             <NutritionPage
               key={JSON.stringify([

@@ -424,9 +424,48 @@
 }
 
 .ai-coach-message__sources,
+.ai-coach-message__exercise-references,
 .ai-coach-message__feedback {
   padding-top: var(--v2-space-2);
   border-top: 1px solid var(--v2-border);
+}
+
+.ai-coach-message__exercise-references {
+  display: grid;
+  gap: var(--v2-space-1);
+}
+
+.ai-coach-message__exercise-references strong {
+  color: var(--v2-accent-text);
+  font-size: 0.8125rem;
+}
+
+.ai-coach-message__exercise-references ul {
+  display: grid;
+  gap: var(--v2-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-coach-message__exercise-references a {
+  display: flex;
+  min-height: var(--touch-target);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  color: var(--v2-text-primary);
+  font-weight: 700;
+}
+
+.ai-coach-message__exercise-references a span {
+  color: var(--v2-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: right;
 }
 
 .ai-coach-message__sources summary {

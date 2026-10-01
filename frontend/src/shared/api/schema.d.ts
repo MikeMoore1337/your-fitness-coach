@@ -5104,6 +5104,11 @@ export interface components {
              */
             citations: components["schemas"]["AiCoachCitation"][];
             /**
+             * Exercise References
+             * @default []
+             */
+            exercise_references: components["schemas"]["AiCoachExerciseReference"][];
+            /**
              * Limitations
              * @default []
              */
@@ -5162,6 +5167,11 @@ export interface components {
              */
             citations: components["schemas"]["AiCoachCitation"][];
             /**
+             * Exercise References
+             * @default []
+             */
+            exercise_references: components["schemas"]["AiCoachExerciseReference"][];
+            /**
              * Limitations
              * @default []
              */
@@ -5209,6 +5219,25 @@ export interface components {
          * @enum {string}
          */
         AiCoachDeterministicRelationship: "supports_deterministic_rule" | "supplements_no_rule" | "conflicts_with_deterministic_rule";
+        /**
+         * AiCoachExerciseReference
+         * @description Server-resolved canonical exercise reference safe for the client UI.
+         */
+        AiCoachExerciseReference: {
+            /** Exercise Slug */
+            exercise_slug: string;
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Section
+             * @enum {string}
+             */
+            section: "technique" | "media";
+            /** Deep Link */
+            deep_link: string;
+            /** Media Reference */
+            media_reference?: string | null;
+        };
         /**
          * AiCoachGenerateRequest
          * @description A bounded intent plus a server-known public context id.

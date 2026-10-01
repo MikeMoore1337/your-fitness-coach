@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from fitminiapp_api.ai_coach.contracts import (
+    AI_COACH_EXERCISE_SCHEMA_VERSION,
     AdaptationContextRef,
     AdaptationProviderRequest,
     AiCoachChatRequest,
@@ -34,6 +35,7 @@ from fitminiapp_api.ai_coach.prompts import (
     build_chat_messages,
     build_chat_repair_messages,
     build_messages,
+    exercise_output_json_schema,
     provider_output_json_schema,
 )
 from fitminiapp_api.core.config import settings
@@ -213,7 +215,12 @@ def _usage_from_payload(payload: dict[str, Any]) -> ProviderUsage | None:
     )
 
 
-def _parse_plain_text_response(response: Any, *, started: float) -> ProviderTextResult:
+def _parse_plain_text_response(
+    response: Any,
+    *,
+    started: float,
+    structured_exercise: bool = False,
+) -> ProviderTextResult:
     retry_after = _safe_retry_after(response.headers.get("retry-after"))
     response_bytes = _response_bytes(response)
     if response.status_code != 200:
@@ -365,7 +372,13 @@ def _parse_plain_text_response(response: Any, *, started: float) -> ProviderText
             usage=_usage_from_payload(raw_payload),
         )
     try:
-        text_response = ProviderTextResponse(answer=content.strip())
+        if structured_exercise:
+            decoded = json.loads(content)
+            if not isinstance(decoded, dict) or "exercise_references" not in decoded:
+                raise ValueError("exercise response does not satisfy the complete output schema")
+            text_response = ProviderTextResponse.model_validate(decoded)
+        else:
+            text_response = ProviderTextResponse(answer=content.strip())
     except (ValueError, TypeError) as exc:
         raise _invalid_plain_response(
             ProviderFailureReason.INVALID_CONTENT,
@@ -678,6 +691,7 @@ class GroqDirectAdapter:
         messages: list[dict[str, str]],
         *,
         retry_hint: bool = False,
+        structured_exercise: bool = False,
     ) -> ProviderTextResult:
         api_key = settings.groq_api_key.get_secret_value().strip()
         if not api_key or settings.ai_coach_provider != "groq":
@@ -699,6 +713,15 @@ class GroqDirectAdapter:
             "reasoning_effort": "low",
             "include_reasoning": False,
         }
+        if structured_exercise:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": AI_COACH_EXERCISE_SCHEMA_VERSION.replace("-", "_"),
+                    "strict": True,
+                    "schema": exercise_output_json_schema(),
+                },
+            }
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -725,18 +748,25 @@ class GroqDirectAdapter:
                 provider_failure_reason=ProviderFailureReason.NETWORK_ERROR,
             ) from exc
 
-        return _parse_plain_text_response(response, started=started)
+        return _parse_plain_text_response(
+            response,
+            started=started,
+            structured_exercise=structured_exercise,
+        )
 
     def generate_text(
         self,
         request: AiCoachChatRequest,
         context_refs: tuple[ContextRef, ...],
     ) -> ProviderTextResult:
-        """Generate ordinary chat text without response_format or report JSON."""
+        """Generate ordinary chat, or strict exercise references when grounded."""
+
+        structured_exercise = any(ref.ref_id.startswith("exercise:") for ref in context_refs)
 
         return self._generate_plain_text(
             build_chat_messages(request, context_refs),
             retry_hint=request.retry_hint,
+            structured_exercise=structured_exercise,
         )
 
     def repair_text(

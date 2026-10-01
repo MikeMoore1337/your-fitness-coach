@@ -26,6 +26,7 @@ from fitminiapp_api.ai_coach.contracts import (
     ContextRef,
     NormalizedProviderError,
     ProviderErrorCode,
+    ProviderExerciseReference,
     ProviderFailureReason,
     ProviderResult,
     ProviderStructuredResponse,
@@ -34,7 +35,7 @@ from fitminiapp_api.ai_coach.contracts import (
 )
 from fitminiapp_api.ai_coach.prompts import build_chat_messages
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
-from fitminiapp_api.ai_coach.retrieval import _article_ref, _page_ref
+from fitminiapp_api.ai_coach.retrieval import _article_ref, _exercise_ref, _page_ref
 from fitminiapp_api.ai_coach.safety import validate_provider_output
 from fitminiapp_api.ai_coach.service import ai_coach_service
 from fitminiapp_api.core.config import Settings, settings
@@ -944,6 +945,58 @@ def test_groq_adapter_sends_plain_text_chat_without_report_json(monkeypatch) -> 
     assert "reasoning_format" not in payload
     assert "tools" not in payload
     assert "без JSON" in payload["messages"][0]["content"]
+
+
+def test_groq_adapter_uses_strict_exercise_reference_schema(monkeypatch) -> None:
+    _enable_provider(monkeypatch)
+    response_content = json.dumps(
+        {
+            "answer": "Сохраняйте устойчивую опору и двигайтесь подконтрольно.",
+            "exercise_references": [
+                {
+                    "exercise_ref": "exercise:bench-press",
+                    "section": "technique",
+                    "media_ref": None,
+                },
+                {
+                    "exercise_ref": "exercise:bench-press",
+                    "section": "media",
+                    "media_ref": "media:bench-press:movement",
+                },
+            ],
+        },
+        ensure_ascii=False,
+    )
+    captured_payloads = _patch_plain_responses(
+        monkeypatch,
+        [{"payload": _plain_payload(content=response_content)}],
+    )
+    exercise_ref = _exercise_ref("bench-press")
+    assert exercise_ref is not None
+    request = AiCoachChatRequest(
+        job=AiCoachJob.FITNESS_KNOWLEDGE,
+        context_id="exercise:bench-press",
+        message="Как выполнять bench press и где посмотреть медиа?",
+        data_class=AiCoachDataClass.GENERIC,
+    )
+
+    result = GroqDirectAdapter().generate_text(request, (exercise_ref,))
+
+    assert result.response.exercise_references == (
+        ProviderExerciseReference(exercise_ref="exercise:bench-press", section="technique"),
+        ProviderExerciseReference(
+            exercise_ref="exercise:bench-press",
+            section="media",
+            media_ref="media:bench-press:movement",
+        ),
+    )
+    payload = captured_payloads[0]
+    assert payload["response_format"]["json_schema"]["strict"] is True
+    assert payload["response_format"]["json_schema"]["schema"]["required"] == [
+        "answer",
+        "exercise_references",
+    ]
+    assert "изменить" in payload["messages"][0]["content"]
 
 
 @pytest.mark.parametrize(

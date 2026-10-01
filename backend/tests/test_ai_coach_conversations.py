@@ -18,12 +18,13 @@ from fitminiapp_api.ai_coach.contracts import (
     ContextRef,
     NormalizedProviderError,
     ProviderErrorCode,
+    ProviderExerciseReference,
     ProviderFailureReason,
     ProviderTextResponse,
     ProviderTextResult,
 )
 from fitminiapp_api.ai_coach.personal_tools import PersonalToolResult
-from fitminiapp_api.ai_coach.retrieval import ContextUnavailable
+from fitminiapp_api.ai_coach.retrieval import ContextUnavailable, _exercise_ref
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.ai_coach import AiCoachConversationMessageRequest
@@ -81,6 +82,7 @@ class StubTextProvider:
     answer: str = "Короткий проверенный ответ на русском языке."
     error: NormalizedProviderError | None = None
     repair_answer: str | None = None
+    exercise_references: tuple[ProviderExerciseReference, ...] = ()
     repair_error: NormalizedProviderError | None = None
     repair_calls: list[tuple[object, str, ChatOutputValidationReason]] | None = None
 
@@ -94,7 +96,10 @@ class StubTextProvider:
             provider="groq",
             configured_model="openai/gpt-oss-120b",
             actual_model="openai/gpt-oss-120b",
-            response=ProviderTextResponse(answer=self.answer),
+            response=ProviderTextResponse(
+                answer=self.answer,
+                exercise_references=self.exercise_references,
+            ),
             latency_ms=2,
         )
 
@@ -160,6 +165,94 @@ def test_chat_accepts_arbitrary_question_without_period_report_json(
     history = client.get("/api/v1/ai-coach/conversations", headers=headers)
     assert history.status_code == 200
     assert history.json()["items"][0]["title"] == "Сколько отдыхать между подходами?"
+
+
+def test_chat_resolves_and_persists_canonical_exercise_references(client, monkeypatch) -> None:
+    _enable_chat(monkeypatch)
+    provider = StubTextProvider(
+        calls=[],
+        exercise_references=(
+            ProviderExerciseReference(exercise_ref="exercise:bench-press", section="technique"),
+            ProviderExerciseReference(
+                exercise_ref="exercise:bench-press",
+                section="media",
+                media_ref="media:bench-press:movement",
+            ),
+        ),
+    )
+    monkeypatch.setattr(ai_coach_chat_service, "provider", provider)
+    monkeypatch.setattr(
+        "fitminiapp_api.ai_coach.context_selection.retrieve_context_for_message",
+        lambda db, *, message, job: (_exercise_ref("bench-press"),),
+    )
+    headers = _login(client, 987_118)
+    conversation_id = _create_conversation(client, headers)
+
+    response = client.post(
+        f"/api/v1/ai-coach/conversations/{conversation_id}/messages",
+        headers=headers,
+        json={"message": "Покажи технику bench press и проверенное медиа"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["outcome"] == "answer"
+    assert [item["section"] for item in payload["exercise_references"]] == [
+        "technique",
+        "media",
+    ]
+    assert payload["exercise_references"][0]["deep_link"] == (
+        "/app?section=catalog&exercise_slug=bench-press"
+    )
+    assert payload["assistant_message"]["exercise_references"] == payload["exercise_references"]
+
+    detail = client.get(
+        f"/api/v1/ai-coach/conversations/{conversation_id}",
+        headers=headers,
+    )
+    assert detail.status_code == 200
+    assistant = detail.json()["messages"][1]
+    assert assistant["exercise_references"] == payload["exercise_references"]
+
+
+@pytest.mark.parametrize(
+    "exercise_reference",
+    [
+        ProviderExerciseReference(exercise_ref="exercise:invented-exercise", section="technique"),
+        ProviderExerciseReference(
+            exercise_ref="exercise:bench-press",
+            section="media",
+            media_ref="media:bench-press:not-approved",
+        ),
+    ],
+)
+def test_chat_rejects_unknown_or_unapproved_exercise_reference_fail_closed(
+    client,
+    monkeypatch,
+    exercise_reference,
+) -> None:
+    _enable_chat(monkeypatch)
+    provider = StubTextProvider(calls=[], exercise_references=(exercise_reference,))
+    monkeypatch.setattr(ai_coach_chat_service, "provider", provider)
+    monkeypatch.setattr(
+        "fitminiapp_api.ai_coach.context_selection.retrieve_context_for_message",
+        lambda db, *, message, job: (_exercise_ref("bench-press"),),
+    )
+    headers = _login(client, 987_119)
+    conversation_id = _create_conversation(client, headers)
+
+    response = client.post(
+        f"/api/v1/ai-coach/conversations/{conversation_id}/messages",
+        headers=headers,
+        json={"message": "Покажи технику bench press"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["outcome"] == "invalid_output"
+    assert payload["answer"] is None
+    assert payload["exercise_references"] == []
+    assert payload["assistant_message"] is None
 
 
 def test_chat_calls_provider_for_general_question_without_app_context(client, monkeypatch) -> None:
