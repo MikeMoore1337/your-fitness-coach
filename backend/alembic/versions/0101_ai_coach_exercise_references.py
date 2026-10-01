@@ -10,6 +10,11 @@ revision: str = "0101_ai_coach_exercise_refs"
 down_revision: str | None = "0100_program_revision_kind_ck"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
+online_rollout_phase = "expand"
+online_rollout_notes = (
+    "Adds one nullable JSON column with no default; metadata lock is bounded and existing messages "
+    "are not rewritten or backfilled."
+)
 
 
 def upgrade() -> None:
@@ -18,8 +23,7 @@ def upgrade() -> None:
         sa.Column(
             "exercise_references",
             sa.JSON(),
-            nullable=False,
-            server_default=sa.text("'[]'"),
+            nullable=True,
         ),
     )
 
