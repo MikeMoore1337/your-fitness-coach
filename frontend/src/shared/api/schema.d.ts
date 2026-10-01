@@ -2930,6 +2930,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/photo-meals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recognize Photo Meal */
+        post: operations["recognize_photo_meal_api_v1_nutrition_photo_meals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/photo-meals/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Photo Meal Draft */
+        get: operations["read_photo_meal_draft_api_v1_nutrition_photo_meals__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/photo-meals/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Photo Meal */
+        post: operations["confirm_photo_meal_api_v1_nutrition_photo_meals__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/photo-meals/{draft_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Photo Meal */
+        post: operations["cancel_photo_meal_api_v1_nutrition_photo_meals__draft_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/hydration": {
         parameters: {
             query?: never;
@@ -5874,6 +5942,11 @@ export interface components {
             /** Image */
             image: string;
         };
+        /** Body_recognize_photo_meal_api_v1_nutrition_photo_meals_post */
+        Body_recognize_photo_meal_api_v1_nutrition_photo_meals_post: {
+            /** Image */
+            image: string;
+        };
         /** Body_replace_avatar_api_v1_me_avatar_put */
         Body_replace_avatar_api_v1_me_avatar_put: {
             /** File */
@@ -8701,7 +8774,7 @@ export interface components {
              */
             entry_kind: "food" | "recipe" | "quick_add";
             /** Nutrition Source */
-            nutrition_source?: ("catalog" | "recipe" | "manual" | "restaurant") | null;
+            nutrition_source?: ("catalog" | "recipe" | "manual" | "restaurant" | "photo") | null;
             /** Nutrition Confidence */
             nutrition_confidence?: ("exact" | "approximate" | "partial") | null;
             /** Logged At */
@@ -8793,7 +8866,7 @@ export interface components {
              * @default manual
              * @enum {string}
              */
-            nutrition_source: "manual" | "restaurant";
+            nutrition_source: "manual" | "restaurant" | "photo";
             /** Energy Kcal */
             energy_kcal: number | string;
             /** Protein G */
@@ -10344,6 +10417,123 @@ export interface components {
             token: string;
             /** Password */
             password: string;
+        };
+        /** PhotoMealCandidate */
+        PhotoMealCandidate: {
+            /** Candidate Id */
+            candidate_id: string;
+            /** Name */
+            name: string;
+            /** Portion Amount */
+            portion_amount?: string | null;
+            /** Portion Unit */
+            portion_unit?: ("g" | "ml" | "serving") | null;
+            /**
+             * Portion Confidence
+             * @enum {string}
+             */
+            portion_confidence: "high" | "medium" | "low" | "unknown";
+            /**
+             * Identity Confidence
+             * @enum {string}
+             */
+            identity_confidence: "high" | "medium" | "low" | "unknown";
+            /**
+             * Nutrition Confidence
+             * @enum {string}
+             */
+            nutrition_confidence: "high" | "medium" | "low" | "unknown";
+            /** Uncertainty Codes */
+            uncertainty_codes?: ("identity_uncertain" | "portion_uncertain" | "nutrition_uncertain")[];
+            /** Energy Kcal */
+            energy_kcal?: string | null;
+            /** Protein G */
+            protein_g?: string | null;
+            /** Fat G */
+            fat_g?: string | null;
+            /** Carbs G */
+            carbs_g?: string | null;
+        };
+        /** PhotoMealConfirmItem */
+        PhotoMealConfirmItem: {
+            /** Candidate Id */
+            candidate_id: string;
+            /** Name */
+            name: string;
+            /** Portion Amount */
+            portion_amount?: number | string | null;
+            /** Portion Unit */
+            portion_unit?: ("g" | "ml" | "serving") | null;
+            /** Energy Kcal */
+            energy_kcal: number | string;
+            /** Protein G */
+            protein_g?: number | string | null;
+            /** Fat G */
+            fat_g?: number | string | null;
+            /** Carbs G */
+            carbs_g?: number | string | null;
+        };
+        /** PhotoMealConfirmRequest */
+        PhotoMealConfirmRequest: {
+            /** Revision */
+            revision: number;
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["PhotoMealConfirmItem"][];
+        };
+        /** PhotoMealConfirmResponse */
+        PhotoMealConfirmResponse: {
+            /** Draft Id */
+            draft_id: string;
+            entry: components["schemas"]["FoodDiaryEntryResponse"];
+            /**
+             * Replayed
+             * @default false
+             * @constant
+             */
+            replayed: false;
+        };
+        /** PhotoMealDraftResponse */
+        PhotoMealDraftResponse: {
+            /** Draft Id */
+            draft_id: string;
+            /** Revision */
+            revision: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed" | "cancelled" | "expired";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Candidates */
+            candidates: components["schemas"]["PhotoMealCandidate"][];
+            /** Warnings */
+            warnings?: ("identity_uncertain" | "portion_uncertain" | "nutrition_uncertain" | "unsupported_image" | "manual_review_required")[];
+            /**
+             * Requires User Review
+             * @default true
+             * @constant
+             */
+            requires_user_review: true;
+            /**
+             * Source Photo Retained
+             * @default false
+             * @constant
+             */
+            source_photo_retained: false;
         };
         /** PrescriptionDurationTarget */
         PrescriptionDurationTarget: {
@@ -20353,6 +20543,138 @@ export interface operations {
         };
     };
     cancel_nutrition_label_draft_api_v1_nutrition_label_scans__draft_id__cancel_post: {
+        parameters: {
+            query: {
+                revision: number;
+            };
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recognize_photo_meal_api_v1_nutrition_photo_meals_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_recognize_photo_meal_api_v1_nutrition_photo_meals_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoMealDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_photo_meal_draft_api_v1_nutrition_photo_meals__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoMealDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_photo_meal_api_v1_nutrition_photo_meals__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhotoMealConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhotoMealConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_photo_meal_api_v1_nutrition_photo_meals__draft_id__cancel_post: {
         parameters: {
             query: {
                 revision: number;

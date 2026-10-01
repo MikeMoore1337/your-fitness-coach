@@ -80,7 +80,7 @@ def _sum_tracked(
 
 
 def diary_entry_source(entry: FoodDiaryEntry) -> str:
-    if entry.nutrition_source in {"catalog", "recipe", "manual", "restaurant"}:
+    if entry.nutrition_source in {"catalog", "recipe", "manual", "restaurant", "photo"}:
         return entry.nutrition_source
     return {"food": "catalog", "recipe": "recipe"}.get(entry.entry_kind, "manual")
 

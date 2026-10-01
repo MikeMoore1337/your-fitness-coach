@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 MealType = Literal["breakfast", "lunch", "dinner", "snacks"]
 DiaryAmountUnit = Literal["g", "ml", "serving"]
 DiaryDayStatus = Literal["complete", "incomplete", "unlogged", "fasted"]
-NutritionSource = Literal["catalog", "recipe", "manual", "restaurant"]
+NutritionSource = Literal["catalog", "recipe", "manual", "restaurant", "photo"]
 NutritionConfidence = Literal["exact", "approximate", "partial"]
 
 
 class FoodDiaryQuickAdd(BaseModel):
     name: str | None = Field(default=None, max_length=256)
-    nutrition_source: Literal["manual", "restaurant"] = "manual"
+    nutrition_source: Literal["manual", "restaurant", "photo"] = "manual"
     energy_kcal: Decimal = Field(
         gt=0,
         le=10000,
