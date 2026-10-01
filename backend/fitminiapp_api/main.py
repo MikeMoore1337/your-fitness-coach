@@ -236,6 +236,7 @@ def robots_txt() -> PlainTextResponse:
         (
             "User-agent: *",
             "Allow: /",
+            "Allow: /api/v1/public/",
             "Disallow: /api/",
             f"Sitemap: {origin}/sitemap.xml",
             "",

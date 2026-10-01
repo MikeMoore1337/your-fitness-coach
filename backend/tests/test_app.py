@@ -3749,6 +3749,7 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
     assert robots.status_code == 200
     assert "User-agent: *" in robots.text
     assert "Allow: /" in robots.text
+    assert "Allow: /api/v1/public/" in robots.text
     assert "Disallow: /api/" in robots.text
     assert "Disallow: /app" not in robots.text
     assert "Sitemap: https://your-fitness-coach.ru/sitemap.xml" in robots.text
@@ -3785,6 +3786,23 @@ def test_robots_and_sitemap_publish_only_canonical_public_urls(client, monkeypat
     assert all(
         segment not in sitemap.text for segment in ("/app", "/admin", "/coach", "/join", "/login")
     )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/public/config",
+        "/api/v1/public/exercises",
+        "/api/v1/public/exercises/deadlift",
+        "/api/v1/public/programs/full-body-3-days",
+        "/api/v1/public/articles",
+    ],
+)
+def test_public_api_resources_are_fetchable_but_not_indexable(client, path):
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "noindex, follow"
 
 
 @pytest.mark.parametrize(
