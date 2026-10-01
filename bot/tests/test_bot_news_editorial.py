@@ -140,7 +140,9 @@ def test_remove_image_action_is_direct(monkeypatch) -> None:
     callback.message.answer.assert_not_awaited()
     callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
     state.clear.assert_awaited_once_with()
-    callback.answer.assert_awaited_once_with("Новая revision поставлена в очередь", show_alert=False)
+    callback.answer.assert_awaited_once_with(
+        "Новая revision поставлена в очередь", show_alert=False
+    )
 
 
 def test_schedule_parser_accepts_nested_iana_timezone() -> None:
