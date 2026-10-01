@@ -13,9 +13,12 @@ from sqlalchemy.orm import Session
 from fitminiapp_api.ai_coach.contracts import (
     AI_COACH_CHAT_OUTPUT_VERSION,
     AI_COACH_CHAT_PROMPT_VERSION,
+    AI_COACH_EXERCISE_PROMPT_VERSION,
+    AI_COACH_EXERCISE_SCHEMA_VERSION,
     AiCoachChatRequest,
     AiCoachCitation,
     AiCoachDataClass,
+    AiCoachExerciseReference,
     AiCoachOutcome,
     AiCoachRateLimitScope,
     ChatLlmPort,
@@ -28,6 +31,7 @@ from fitminiapp_api.ai_coach.contracts import (
 )
 from fitminiapp_api.ai_coach.providers import GroqDirectAdapter
 from fitminiapp_api.ai_coach.quota import PersistentAiCoachQuota, ai_coach_quota
+from fitminiapp_api.ai_coach.retrieval import resolve_exercise_references
 from fitminiapp_api.ai_coach.safety import (
     SafetyCategory,
     bound_safe_chat_output,
@@ -164,6 +168,7 @@ class AiCoachChatGeneration:
     provider_failure_reason: ProviderFailureReason | None = None
     rate_limit_scope: AiCoachRateLimitScope | None = None
     rate_limit_retry_after_seconds: int | None = None
+    exercise_references: tuple[AiCoachExerciseReference, ...] = ()
 
 
 def _safe_groq_route() -> bool:
@@ -210,6 +215,13 @@ class AiCoachChatService:
         if (db is None) != (user_id is None):
             raise ValueError("Persistent AI Coach quota requires both db and user_id")
         started = time.monotonic()
+        is_exercise_context = any(ref.ref_id.startswith("exercise:") for ref in context_refs)
+        prompt_version = (
+            AI_COACH_EXERCISE_PROMPT_VERSION
+            if is_exercise_context
+            else AI_COACH_CHAT_PROMPT_VERSION
+        )
+        exercise_references: tuple[AiCoachExerciseReference, ...] = ()
         safety = classify_message(request.message)
         if (
             request.data_class == AiCoachDataClass.PERSONALIZED
@@ -259,7 +271,7 @@ class AiCoachChatService:
                     limitations=(),
                     safety_category=safety,
                     failure_category=failure_category,
-                    prompt_version=AI_COACH_CHAT_PROMPT_VERSION,
+                    prompt_version=prompt_version,
                     data_class=request.data_class,
                 )
             if request.data_class not in {
@@ -461,6 +473,18 @@ class AiCoachChatService:
                     validation_failure_reason=inspection.reason,
                 )
             elif inspection.reason is not None:
+                if is_exercise_context:
+                    error_code = ProviderErrorCode.INVALID_OUTPUT.value
+                    outcome = AiCoachOutcome.INVALID_OUTPUT
+                    failure_category = CHAT_FAILURE_STRUCTURED_VALIDATION
+                    return self._failure(
+                        request,
+                        outcome=outcome,
+                        safety=safety,
+                        failure_category=failure_category,
+                        prompt_version=prompt_version,
+                        validation_failure_reason=inspection.reason,
+                    )
                 error_code = ProviderErrorCode.INVALID_OUTPUT.value
                 answer = sanitize_chat_output(
                     result.response.answer,
@@ -560,6 +584,23 @@ class AiCoachChatService:
                     else:
                         answer = repaired_inspection.normalized
                     repair_success = True
+            try:
+                exercise_references = resolve_exercise_references(
+                    result.response.exercise_references,
+                    context_refs,
+                )
+            except ValueError:
+                error_code = ProviderErrorCode.INVALID_OUTPUT.value
+                outcome = AiCoachOutcome.INVALID_OUTPUT
+                failure_category = CHAT_FAILURE_STRUCTURED_VALIDATION
+                return self._failure(
+                    request,
+                    outcome=outcome,
+                    safety=safety,
+                    failure_category=failure_category,
+                    prompt_version=prompt_version,
+                    validation_failure_reason=ChatOutputValidationReason.OTHER,
+                )
             if reservation_active and db is not None and reservation_key is not None:
                 if not self.quota.consume(db, request_key=reservation_key):
                     reservation_active = False
@@ -592,7 +633,7 @@ class AiCoachChatService:
                 limitations=limitations,
                 safety_category=safety,
                 failure_category=None,
-                prompt_version=AI_COACH_CHAT_PROMPT_VERSION,
+                prompt_version=prompt_version,
                 data_class=request.data_class,
                 repair_attempted=repair_attempted,
                 repair_success=repair_success,
@@ -600,6 +641,7 @@ class AiCoachChatService:
                 provider_failure_reason=provider_failure_reason,
                 rate_limit_scope=rate_limit_scope,
                 rate_limit_retry_after_seconds=rate_limit_retry_after_seconds,
+                exercise_references=exercise_references,
             )
         finally:
             if reservation_active and db is not None and reservation_key is not None:
@@ -612,8 +654,12 @@ class AiCoachChatService:
                     "request_type": request.job.value,
                     "data_class": request.data_class.value,
                     "context_kind": request.context_kind.value,
-                    "prompt_version": AI_COACH_CHAT_PROMPT_VERSION,
-                    "schema_version": AI_COACH_CHAT_OUTPUT_VERSION,
+                    "prompt_version": prompt_version,
+                    "schema_version": (
+                        AI_COACH_EXERCISE_SCHEMA_VERSION
+                        if is_exercise_context
+                        else AI_COACH_CHAT_OUTPUT_VERSION
+                    ),
                     "policy_revision": settings.ai_coach_policy_revision,
                     "provider": provider_name,
                     "configured_model": configured_model,
@@ -797,6 +843,7 @@ class AiCoachChatService:
         provider_failure_reason: ProviderFailureReason | None = None,
         rate_limit_scope: AiCoachRateLimitScope | None = None,
         rate_limit_retry_after_seconds: int | None = None,
+        prompt_version: str = AI_COACH_CHAT_PROMPT_VERSION,
     ) -> AiCoachChatGeneration:
         copy = (
             {
@@ -832,7 +879,7 @@ class AiCoachChatService:
             limitations=(copy[failure_category],),
             safety_category=safety,
             failure_category=failure_category,
-            prompt_version=AI_COACH_CHAT_PROMPT_VERSION,
+            prompt_version=prompt_version,
             data_class=request.data_class,
             repair_attempted=repair_attempted,
             repair_success=repair_success,

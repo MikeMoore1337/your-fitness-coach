@@ -413,7 +413,7 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
             ).one()
             assert migration_context[0] == schema_name, migration_context
             assert migration_context[1].split(",")[0].strip('"') == schema_name, migration_context
-            assert migration_context[2] == "0100_program_revision_kind_ck", migration_context
+            assert migration_context[2] == "0101_ai_coach_exercise_refs", migration_context
             assert template_schema == schema_name, template_schema
             assert provenance == {
                 "stronglifts-5x5": "SOURCE_ADAPTATION",
@@ -501,7 +501,7 @@ def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -
             ).scalar_one()
             assert "community_unverified" in corrected_constraint
             assert validated is True
-            assert revision == "0100_program_revision_kind_ck"
+            assert revision == "0101_ai_coach_exercise_refs"
             connection.commit()
 
         with Session(schema_engine) as session:

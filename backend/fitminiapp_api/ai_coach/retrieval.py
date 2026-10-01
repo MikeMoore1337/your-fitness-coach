@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import UTC, date, datetime, timedelta
 
@@ -9,15 +10,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.ai_coach.contracts import (
+    AiCoachExerciseReference,
     AiCoachJob,
     AiCoachRequest,
     ContextCitation,
     ContextRef,
+    ProviderExerciseReference,
 )
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.models.news import WebArticle
 from fitminiapp_api.seo import public_origin, public_pages
-from fitminiapp_api.services.public_exercises import public_exercise
+from fitminiapp_api.services.public_exercises import public_exercise, public_exercises
 
 _PROMPT_INJECTION_PATTERN = re.compile(
     r"(?:ignore\s+(?:all\s+)?(?:previous|earlier)\s+instructions|"
@@ -151,6 +154,35 @@ def _exercise_content(exercise: dict[str, object]) -> str:
     parts.extend(_as_string_list(exercise.get("common_mistakes"), max_items=12))
     parts.extend(_as_string_list(exercise.get("safety_notes"), max_items=8))
     return "\n".join(part for part in parts if part)[: settings.ai_coach_max_context_chars]
+
+
+def _exercise_media_refs(slug: str, exercise: dict[str, object]) -> tuple[str, ...]:
+    raw_media = exercise.get("media")
+    if not isinstance(raw_media, list):
+        return ()
+    refs: list[str] = []
+    for item in raw_media:
+        if not isinstance(item, dict):
+            continue
+        phase_id = _as_text(item.get("phase_id"), max_length=64)
+        if phase_id:
+            refs.append(f"media:{slug}:{phase_id}")
+    return tuple(refs)
+
+
+def _exercise_context_content(slug: str, exercise: dict[str, object]) -> str:
+    return json.dumps(
+        {
+            "facts": _exercise_content(exercise),
+            "references": {
+                "exercise_ref": f"exercise:{slug}",
+                "supported_sections": ["technique", "media"],
+                "media_refs": list(_exercise_media_refs(slug, exercise)),
+            },
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
 
 
 def _article_ref(
@@ -304,7 +336,7 @@ def _exercise_ref(slug: str) -> ContextRef | None:
     source_url = _safe_source(exercise.get("source_url"))
     title = _as_text(exercise.get("title"), max_length=240)
     source_name = _as_text(exercise.get("source_name"), max_length=160)
-    content = _exercise_content(exercise)
+    content = _exercise_context_content(slug, exercise)
     if canonical is None or not title or not content:
         return None
     if _PROMPT_INJECTION_PATTERN.search(content):
@@ -336,6 +368,48 @@ def _exercise_ref(slug: str) -> ContextRef | None:
         content=content,
         citations=tuple(citations),
     )
+
+
+def resolve_exercise_references(
+    provider_refs: tuple[ProviderExerciseReference, ...],
+    context_refs: tuple[ContextRef, ...],
+) -> tuple[AiCoachExerciseReference, ...]:
+    """Resolve provider refs only against the exact server-selected exercises."""
+
+    allowed = {ref.ref_id: ref for ref in context_refs if ref.ref_id.startswith("exercise:")}
+    if provider_refs and not allowed:
+        raise ValueError("exercise reference has no selected canonical context")
+
+    resolved: list[AiCoachExerciseReference] = []
+    seen: set[tuple[str, str, str | None]] = set()
+    for provider_ref in provider_refs:
+        context_ref = allowed.get(provider_ref.exercise_ref)
+        if context_ref is None:
+            raise ValueError("exercise reference is not in the selected canonical context")
+        slug = provider_ref.exercise_ref.removeprefix("exercise:")
+        exercise = public_exercise(slug)
+        if exercise is None or context_ref.category != "exercises":
+            raise ValueError("exercise reference is not a published canonical exercise")
+        media_refs = set(_exercise_media_refs(slug, exercise))
+        if provider_ref.section == "media" and provider_ref.media_ref not in media_refs:
+            raise ValueError("exercise media reference is not approved for the exercise")
+        if provider_ref.media_ref is not None and provider_ref.media_ref not in media_refs:
+            raise ValueError("exercise media reference is not approved for the exercise")
+        key = (slug, provider_ref.section, provider_ref.media_ref)
+        if key in seen:
+            continue
+        seen.add(key)
+        title = _as_text(exercise.get("title"), max_length=240) or context_ref.title
+        resolved.append(
+            AiCoachExerciseReference(
+                exercise_slug=slug,
+                exercise_title=title,
+                section=provider_ref.section,
+                deep_link=f"/app?section=catalog&exercise_slug={slug}",
+                media_reference=provider_ref.media_ref,
+            )
+        )
+    return tuple(resolved)
 
 
 def retrieve_context(db: Session, request: AiCoachRequest) -> tuple[ContextRef, ...]:
@@ -437,6 +511,28 @@ def retrieve_context_for_message(
     words = _search_words(message)
     allowed_categories = _JOB_CATEGORIES[job]
     candidates: list[tuple[int, str, ContextRef]] = []
+    if "exercises" in allowed_categories:
+        for exercise in public_exercises():
+            slug = exercise.get("slug")
+            if not isinstance(slug, str):
+                continue
+            ref = _exercise_ref(slug)
+            if ref is None or ref.category not in allowed_categories:
+                continue
+            search_text = " ".join(
+                [
+                    slug.replace("-", " "),
+                    _as_text(exercise.get("title")),
+                    _exercise_content(exercise),
+                ]
+            ).lower()
+            score = sum(
+                (8 if word in search_text else 0)
+                + (3 if len(word) >= 5 and word[:5] in search_text else 0)
+                for word in words
+            )
+            if score:
+                candidates.append((score, ref.ref_id, ref))
     for raw_page in public_pages():
         if not isinstance(raw_page, dict):
             continue

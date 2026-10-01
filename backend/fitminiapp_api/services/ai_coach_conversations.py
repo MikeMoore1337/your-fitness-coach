@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from fitminiapp_api.ai_coach.contracts import (
     AiCoachCitation,
+    AiCoachExerciseReference,
     AiCoachOutcome,
     AiCoachRateLimitScope,
 )
@@ -407,6 +408,7 @@ def add_assistant_message(
     data_class: str | None = None,
     prompt_version: str | None = None,
     citations: Iterable[AiCoachCitation] = (),
+    exercise_references: Iterable[AiCoachExerciseReference] = (),
     limitations: Iterable[str] = (),
 ) -> AiCoachConversationMessage:
     message = AiCoachConversationMessage(
@@ -422,6 +424,9 @@ def add_assistant_message(
         data_class=data_class,
         prompt_version=prompt_version,
         citations=[citation.model_dump(mode="json") for citation in citations],
+        exercise_references=[
+            reference.model_dump(mode="json") for reference in exercise_references
+        ],
         limitations=list(limitations),
     )
     db.add(message)
@@ -478,6 +483,16 @@ def serialize_message(
         if isinstance(message.limitations, list)
         else ()
     )
+    exercise_references: list[AiCoachExerciseReference] = []
+    for raw_reference in (
+        message.exercise_references if isinstance(message.exercise_references, list) else []
+    ):
+        if not isinstance(raw_reference, dict):
+            continue
+        try:
+            exercise_references.append(AiCoachExerciseReference.model_validate(raw_reference))
+        except TypeError, ValueError:
+            continue
     outcome = None
     if message.outcome:
         try:
@@ -516,6 +531,7 @@ def serialize_message(
         ),
         rate_limit_retry_after_seconds=message.rate_limit_retry_after_seconds,
         citations=tuple(citations),
+        exercise_references=tuple(exercise_references),
         limitations=limitations,
         created_at=message.created_at,
     )

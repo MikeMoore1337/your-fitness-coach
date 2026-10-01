@@ -112,6 +112,7 @@ const chatMessage = (
   safety_category: 'clear',
   failure_category: null,
   citations: [],
+  exercise_references: [],
   limitations: [],
   created_at: '2026-09-14T12:00:00Z',
   ...overrides,

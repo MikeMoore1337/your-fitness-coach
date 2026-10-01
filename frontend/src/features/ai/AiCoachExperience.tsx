@@ -461,6 +461,38 @@ function MessageSources({ message }: { message: AiCoachConversationMessage }) {
   );
 }
 
+function canonicalExerciseDeepLink(
+  reference: AiCoachConversationMessage['exercise_references'][number],
+): string | null {
+  const expected = `/app?section=catalog&exercise_slug=${reference.exercise_slug}`;
+  return reference.deep_link === expected ? reference.deep_link : null;
+}
+
+function ExerciseReferences({ message }: { message: AiCoachConversationMessage }) {
+  const references = (message.exercise_references ?? []).flatMap((reference) => {
+    const link = canonicalExerciseDeepLink(reference);
+    return link ? [{ reference, link }] : [];
+  });
+  if (!references.length) return null;
+  return (
+    <section className="ai-coach-message__exercise-references" aria-label="Материалы упражнения">
+      <strong>Проверенные материалы упражнения</strong>
+      <ul>
+        {references.map(({ reference, link }) => (
+          <li
+            key={`${reference.exercise_slug}-${reference.section}-${reference.media_reference ?? 'none'}`}
+          >
+            <AppLink to={link}>
+              {reference.section === 'media' ? 'Открыть проверенное медиа' : 'Открыть технику'}
+              <span>{reference.exercise_title}</span>
+            </AppLink>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ChatMessage({
   feedback,
   message,
@@ -485,7 +517,10 @@ function ChatMessage({
     >
       <div className="ai-coach-message__author">{isAssistant ? 'AI Coach' : 'Вы'}</div>
       {isAssistant ? (
-        <SafeCoachAnswer answer={message.content} citations={message.citations} />
+        <>
+          <SafeCoachAnswer answer={message.content} citations={message.citations} />
+          <ExerciseReferences message={message} />
+        </>
       ) : (
         <p className="ai-coach-message__text">{message.content}</p>
       )}

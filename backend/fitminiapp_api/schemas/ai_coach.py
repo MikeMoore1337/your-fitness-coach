@@ -16,6 +16,7 @@ from fitminiapp_api.ai_coach.contracts import (
     AdaptationProposal,
     AiCoachCitation,
     AiCoachDataClass,
+    AiCoachExerciseReference,
     AiCoachJob,
     AiCoachOutcome,
     AiCoachPersonalTool,
@@ -330,6 +331,7 @@ class AiCoachConversationMessageResponse(BaseModel):
     rate_limit_scope: AiCoachRateLimitScope | None = None
     rate_limit_retry_after_seconds: int | None = Field(default=None, ge=0)
     citations: tuple[AiCoachCitation, ...] = ()
+    exercise_references: tuple[AiCoachExerciseReference, ...] = Field(default=(), max_length=4)
     limitations: tuple[str, ...] = ()
     created_at: datetime
 
@@ -393,6 +395,7 @@ class AiCoachConversationSendResponse(BaseModel):
     data_class: AiCoachDataClass
     answer: str | None = Field(default=None, max_length=1_600)
     citations: tuple[AiCoachCitation, ...] = ()
+    exercise_references: tuple[AiCoachExerciseReference, ...] = Field(default=(), max_length=4)
     limitations: tuple[str, ...] = ()
     safety_category: str = Field(..., min_length=1, max_length=48)
     failure_category: ChatFailureCategory | None = None

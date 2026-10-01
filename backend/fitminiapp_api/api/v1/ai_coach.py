@@ -493,6 +493,7 @@ def _persist_conversation_generation(
             data_class=generation.data_class.value,
             prompt_version=generation.prompt_version,
             citations=generation.citations,
+            exercise_references=generation.exercise_references,
             limitations=generation.limitations,
         )
     quota_snapshot = ai_coach_quota.snapshot(db, user_id=conversation.user_id)
@@ -507,6 +508,7 @@ def _persist_conversation_generation(
         data_class=generation.data_class,
         answer=generation.answer,
         citations=generation.citations,
+        exercise_references=generation.exercise_references,
         limitations=generation.limitations,
         safety_category=generation.safety_category.value,
         failure_category=cast(ChatFailureCategory | None, generation.failure_category),
@@ -574,6 +576,7 @@ def _reset_message_for_processing(message, *, request_id: str) -> None:
     message.rate_limit_retry_after_seconds = None
     message.processing_started_at = now_msk_naive()
     message.citations = []
+    message.exercise_references = []
     message.limitations = []
 
 
@@ -623,6 +626,9 @@ def _persisted_conversation_response(
         data_class=data_class,
         answer=serialized_assistant.content if serialized_assistant is not None else None,
         citations=serialized_assistant.citations if serialized_assistant is not None else (),
+        exercise_references=(
+            serialized_assistant.exercise_references if serialized_assistant is not None else ()
+        ),
         limitations=(
             serialized_assistant.limitations
             if serialized_assistant is not None

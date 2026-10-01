@@ -43,10 +43,12 @@ export function ExerciseCatalog({
   canCreate = false,
   canAssign = false,
   targetTelegramId,
+  initialExerciseSlug,
 }: {
   canCreate?: boolean;
   canAssign?: boolean;
   targetTelegramId?: number | null;
+  initialExerciseSlug?: string | null;
 }) {
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
@@ -56,6 +58,7 @@ export function ExerciseCatalog({
   const [difficulty, setDifficulty] = useState<Exercise['difficulty_level'] | ''>('');
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
   const [guide, setGuide] = useState<Exercise | null>(null);
+  const [dismissedInitialGuide, setDismissedInitialGuide] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<Exercise | null>(null);
   const [assignmentClientId, setAssignmentClientId] = useState(0);
   const [assignmentProgramId, setAssignmentProgramId] = useState(0);
@@ -82,6 +85,16 @@ export function ExerciseCatalog({
     queryKey: ['exercises'],
     queryFn: () => api<Exercise[]>('/api/v1/programs/exercises'),
   });
+  const initialGuide = useMemo(() => {
+    if (!initialExerciseSlug || initialExerciseSlug === dismissedInitialGuide) return null;
+    return (
+      rows.data?.find(
+        (item) =>
+          !item.is_custom && (item.canonical_slug ?? item.slug ?? null) === initialExerciseSlug,
+      ) ?? null
+    );
+  }, [dismissedInitialGuide, initialExerciseSlug, rows.data]);
+  const visibleGuide = guide ?? initialGuide;
   const coachPrograms = useQuery({
     queryKey: ['coach', 'programs'],
     queryFn: () => api<CoachAssignedProgram[]>('/api/v1/coach/assigned-programs'),
@@ -551,11 +564,14 @@ export function ExerciseCatalog({
           </>
         )}
       </Card>
-      {guide && (
+      {visibleGuide && (
         <ExerciseGuideDialog
-          exerciseId={guide.id}
-          exerciseTitle={guide.title}
-          onClose={() => setGuide(null)}
+          exerciseId={visibleGuide.id}
+          exerciseTitle={visibleGuide.title}
+          onClose={() => {
+            setGuide(null);
+            if (initialExerciseSlug) setDismissedInitialGuide(initialExerciseSlug);
+          }}
         />
       )}
       {assignment && (
