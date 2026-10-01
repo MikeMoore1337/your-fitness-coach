@@ -886,6 +886,65 @@ def test_no_image_snapshot_and_daily_cap_are_checked_when_claimed(monkeypatch) -
         assert second.publication_local_date.isoformat() == "2026-09-26"
 
 
+def test_urgent_manual_publication_bypasses_daily_cap(monkeypatch) -> None:
+    fixed_now = datetime(2026, 10, 1, 10, 10, 0)
+    monkeypatch.setattr(settings, "news_publication_enabled", True)
+    monkeypatch.setattr(settings, "news_channel_id", -1001234567890)
+    monkeypatch.setattr(settings, "news_channel_username", "yfc_test_news")
+    monkeypatch.setattr(settings, "news_daily_publication_limit", 1)
+    monkeypatch.setattr(news_publication, "utcnow", lambda: fixed_now)
+
+    first_cluster_id = _source_and_candidate(
+        external_id="daily-cap-existing",
+        published_at=fixed_now,
+    )
+    first_draft_id, _ = _draft(first_cluster_id)
+    with get_session_context() as db:
+        first_draft = db.get(NewsDraftRevision, first_draft_id)
+        assert first_draft is not None
+        first_draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        first = approve_publication(
+            db,
+            draft_id=first_draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            expected_artifact_hash=_artifact_hash(db, first_draft),
+        )
+        assert first.snapshot_id is not None
+        assert claim_due_publications(db, limit=1) == [first.snapshot_id]
+
+    urgent_cluster_id = _source_and_candidate(
+        external_id="manual-publish-now",
+        published_at=fixed_now,
+    )
+    urgent_draft_id, _ = _draft(urgent_cluster_id)
+    with get_session_context() as db:
+        urgent_draft = db.get(NewsDraftRevision, urgent_draft_id)
+        assert urgent_draft is not None
+        urgent_draft.warnings = []
+        enqueue_review_deliveries(db, {7001})
+        urgent = approve_publication(
+            db,
+            draft_id=urgent_draft.id,
+            expected_image_revision=0,
+            admin_telegram_user_id=7001,
+            mode="immediate",
+            urgent_override=True,
+            expected_artifact_hash=_artifact_hash(db, urgent_draft),
+        )
+        assert urgent.status == "queued"
+        assert urgent.snapshot_id is not None
+        snapshot = db.get(NewsPublicationSnapshot, urgent.snapshot_id)
+        assert snapshot is not None
+        assert snapshot.urgent_override is True
+
+        assert claim_due_publications(db, limit=5) == [urgent.snapshot_id]
+        assert snapshot.status == "processing"
+        assert snapshot.last_error_code is None
+
+
 def test_publisher_rejects_tampered_stored_snapshot(monkeypatch) -> None:
     cluster_id = _source_and_candidate(external_id="snapshot-tamper")
     draft_id, _ = _draft(cluster_id)
