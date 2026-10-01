@@ -96,6 +96,7 @@ async def revision_action(
     artifact_hash: str | None = None,
     scheduled_local: str | None = None,
     timezone: str | None = None,
+    urgent_override: bool = False,
 ) -> tuple[str, list[str]]:
     body: dict[str, object] = {
         "admin_telegram_user_id": admin_telegram_user_id,
@@ -108,6 +109,8 @@ async def revision_action(
         body["scheduled_local"] = scheduled_local
     if timezone is not None:
         body["timezone"] = timezone
+    if urgent_override:
+        body["urgent_override"] = True
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             response = await client.post(
@@ -344,32 +347,28 @@ async def news_publishing_callback(callback: CallbackQuery, state: FSMContext) -
 
     if action == "p":
         assert artifact_hash is not None
-        markup = _publish_confirmation_markup(
+        status, blockers = await revision_action(
             draft_id=draft_id,
+            admin_telegram_user_id=callback.from_user.id,
+            action="publish",
             image_revision=image_revision,
             artifact_hash=artifact_hash,
+            urgent_override=True,
         )
-        await state.set_state(NewsEditorialStates.awaiting_publish_confirmation)
-        await state.set_data(
-            {
-                "mode": "publish_confirmation",
-                "draft_id": draft_id,
-                "image_revision": image_revision,
-                "artifact_hash": artifact_hash,
-                "channel_line": _control_channel_line(callback.message),
-                "revision_line": _control_revision_line(
-                    callback.message,
-                    draft_id=draft_id,
-                    image_revision=image_revision,
-                ),
-                "started_at": time.monotonic(),
-            }
+        message = (
+            "Публикация поставлена в очередь"
+            if status == "queued"
+            else STATUS_TEXT.get(status, STATUS_TEXT["unavailable"])
         )
-        # The preview text/caption is deliberately untouched. Only the original card's markup
-        # changes, so Telegram keeps the same message_id and exact artifact preview.
-        await callback.message.edit_reply_markup(reply_markup=markup)
-        await callback.answer()
+        if blockers:
+            message += ": " + ", ".join(blockers[:5])
+        if status in {"queued", "already_queued"}:
+            await callback.message.edit_reply_markup(reply_markup=None)
+            await state.clear()
+            await _edit_card_status(callback.message, message)
+        await callback.answer(message, show_alert=status in {"unavailable", "quality_blocked"})
         return
+
     if action in {"s", "e", "u"}:
         target_state = {
             "s": NewsEditorialStates.awaiting_schedule,
@@ -399,6 +398,8 @@ async def news_publishing_callback(callback: CallbackQuery, state: FSMContext) -
         await callback.message.answer(prompt)
         await callback.answer()
         return
+
+    # Legacy callbacks from already-delivered cards remain supported after rollout.
     if action == "z":
         data = await state.get_data()
         if (
@@ -427,6 +428,7 @@ async def news_publishing_callback(callback: CallbackQuery, state: FSMContext) -
             await callback.message.edit_reply_markup(reply_markup=None)
         await callback.answer(message, show_alert=status in {"unavailable", "quality_blocked"})
         return
+
     if action == "c":
         data = await state.get_data()
         if not (
@@ -439,6 +441,7 @@ async def news_publishing_callback(callback: CallbackQuery, state: FSMContext) -
         ):
             await callback.answer("Подтверждение устарело", show_alert=True)
             return
+
     if action == "n" and artifact_hash is not None:
         data = await state.get_data()
         if (
@@ -460,47 +463,41 @@ async def news_publishing_callback(callback: CallbackQuery, state: FSMContext) -
             return
         await callback.answer("Подтверждение устарело", show_alert=True)
         return
+
     if action == "n" and image_revision == 99999:
         await state.clear()
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.answer("Отменено")
         return
-    if action in {"n", "x"}:
-        confirmation_action = "v" if action == "n" else "q"
-        label = "Подтвердить удаление изображения" if action == "n" else "Подтвердить отклонение"
-        await callback.message.answer(
-            "Это действие изменит редакционную карточку. Подтвердить?",
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=label,
-                            callback_data=(
-                                f"newsp:{confirmation_action}:{draft_id}:{image_revision}"
-                            ),
-                        )
-                    ]
-                ]
-            ),
-        )
-        await callback.answer()
-        return
-    if action == "q":
+
+    if action in {"x", "q"}:
         status = await moderate_news_draft(
             draft_id=draft_id,
             admin_telegram_user_id=callback.from_user.id,
             action="skip",
         )
-        await callback.message.edit_reply_markup(reply_markup=None)
-        await callback.answer(STATUS_TEXT.get(status, STATUS_TEXT["unavailable"]))
+        if status in {"accepted", "already_processed", "stale"}:
+            await callback.message.edit_reply_markup(reply_markup=None)
+            await state.clear()
+        await callback.answer(
+            STATUS_TEXT.get(status, STATUS_TEXT["unavailable"]),
+            show_alert=status == "unavailable",
+        )
         return
-    api_action = {"c": "publish", "i": "regenerate_image", "v": "remove_image"}[action]
+
+    api_action = {
+        "c": "publish",
+        "i": "regenerate_image",
+        "n": "remove_image",
+        "v": "remove_image",
+    }[action]
     status, blockers = await revision_action(
         draft_id=draft_id,
         admin_telegram_user_id=callback.from_user.id,
         action=api_action,
         image_revision=image_revision,
         artifact_hash=artifact_hash,
+        urgent_override=action == "c",
     )
     message = (
         "Публикация поставлена в очередь"
@@ -620,39 +617,20 @@ async def news_schedule_input(message: Message, state: FSMContext) -> None:
         await message.answer("Preview устарел: откройте новую карточку")
         return
     timezone = match.group(3)
-    await state.set_state(NewsEditorialStates.awaiting_schedule_confirmation)
-    await state.set_data(
-        {
-            **data,
-            "scheduled_local": local_value,
-            "timezone": timezone,
-            "started_at": time.monotonic(),
-        }
+    status, blockers = await revision_action(
+        draft_id=str(data["draft_id"]),
+        admin_telegram_user_id=user.id,
+        action="schedule",
+        image_revision=int(data["image_revision"]),
+        artifact_hash=artifact_hash,
+        scheduled_local=local_value,
+        timezone=timezone,
     )
-    revision_line = data.get("revision_line")
-    if not isinstance(revision_line, str):
-        revision_line = f"Материал {str(data['draft_id'])[:8]} · image r{data['image_revision']}"
-
-    await message.answer(
-        "Подтвердите публикацию точного preview по расписанию.\n"
-        f"{data.get('channel_line', 'Канал: server-side config')}\n"
-        f"Время: {match.group(1)} {match.group(2)}\n"
-        f"Timezone: {timezone}\n"
-        f"{revision_line}\n"
-        f"Artifact: {artifact_hash}",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text="Подтвердить расписание",
-                        callback_data=(
-                            f"newsp:z:{data['draft_id']}:{data['image_revision']}:{artifact_hash}"
-                        ),
-                    )
-                ]
-            ]
-        ),
-    )
+    await state.clear()
+    response = STATUS_TEXT.get(status, STATUS_TEXT["unavailable"])
+    if blockers:
+        response += ": " + ", ".join(blockers[:5])
+    await message.answer(response)
 
 
 @router.message(NewsEditorialStates.awaiting_text, F.text, ~F.text.startswith("/"))
