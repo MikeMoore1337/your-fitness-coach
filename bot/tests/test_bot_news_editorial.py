@@ -76,38 +76,71 @@ def test_malformed_news_callback_never_calls_backend(monkeypatch) -> None:
     callback.answer.assert_awaited_once_with("Некорректное действие", show_alert=True)
 
 
-def test_destructive_news_action_requires_confirmation(monkeypatch) -> None:
+def test_reject_draft_action_is_direct(monkeypatch) -> None:
     callback = _callback(user_id=7001, data=f"newsp:x:{'a' * 32}:2")
-    backend_call = AsyncMock()
+    backend_call = AsyncMock(return_value="accepted")
     state = AsyncMock()
     monkeypatch.setattr(news_editorial, "moderate_news_draft", backend_call)
     monkeypatch.setattr(news_editorial, "Message", FakeMessage)
 
     asyncio.run(news_editorial.news_publishing_callback(callback, state))
 
-    backend_call.assert_not_awaited()
-    callback.message.answer.assert_awaited_once()
-    callback.answer.assert_awaited_once_with()
+    backend_call.assert_awaited_once_with(
+        draft_id="a" * 32,
+        admin_telegram_user_id=7001,
+        action="skip",
+    )
+    callback.message.answer.assert_not_awaited()
+    callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
+    state.clear.assert_awaited_once_with()
+    callback.answer.assert_awaited_once_with("Решение сохранено", show_alert=False)
 
 
-def test_publish_confirmation_stays_on_same_card_and_keeps_exact_preview(monkeypatch) -> None:
+def test_publish_now_is_direct_and_urgent(monkeypatch) -> None:
     artifact_hash = "f" * 16
     callback = _callback(user_id=7001, data=f"newsp:p:{'a' * 32}:2:{artifact_hash}")
     state = AsyncMock()
+    backend_call = AsyncMock(return_value=("queued", []))
     monkeypatch.setattr(news_editorial, "Message", FakeMessage)
+    monkeypatch.setattr(news_editorial, "revision_action", backend_call)
 
     asyncio.run(news_editorial.news_publishing_callback(callback, state))
 
-    callback.message.answer.assert_not_awaited()
-    state.set_state.assert_awaited_once_with(
-        news_editorial.NewsEditorialStates.awaiting_publish_confirmation
+    backend_call.assert_awaited_once_with(
+        draft_id="a" * 32,
+        admin_telegram_user_id=7001,
+        action="publish",
+        image_revision=2,
+        artifact_hash=artifact_hash,
+        urgent_override=True,
     )
-    markup = callback.message.edit_reply_markup.await_args.kwargs["reply_markup"]
-    callback_values = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert f"newsp:c:{'a' * 32}:2:{artifact_hash}" in callback_values
-    assert f"newsp:n:{'a' * 32}:2:{artifact_hash}" in callback_values
-    assert all(value is not None and len(value.encode()) <= 64 for value in callback_values)
-    callback.answer.assert_awaited_once_with()
+    callback.message.answer.assert_not_awaited()
+    state.set_state.assert_not_awaited()
+    callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
+    state.clear.assert_awaited_once_with()
+    callback.answer.assert_awaited_once_with("Публикация поставлена в очередь", show_alert=False)
+
+
+def test_remove_image_action_is_direct(monkeypatch) -> None:
+    callback = _callback(user_id=7001, data=f"newsp:n:{'a' * 32}:2")
+    state = AsyncMock()
+    backend_call = AsyncMock(return_value=("queued", []))
+    monkeypatch.setattr(news_editorial, "Message", FakeMessage)
+    monkeypatch.setattr(news_editorial, "revision_action", backend_call)
+
+    asyncio.run(news_editorial.news_publishing_callback(callback, state))
+
+    backend_call.assert_awaited_once_with(
+        draft_id="a" * 32,
+        admin_telegram_user_id=7001,
+        action="remove_image",
+        image_revision=2,
+        artifact_hash=None,
+    )
+    callback.message.answer.assert_not_awaited()
+    callback.message.edit_reply_markup.assert_awaited_once_with(reply_markup=None)
+    state.clear.assert_awaited_once_with()
+    callback.answer.assert_awaited_once_with("Новая revision поставлена в очередь", show_alert=False)
 
 
 def test_schedule_parser_accepts_nested_iana_timezone() -> None:
@@ -156,6 +189,7 @@ def test_confirmed_publish_calls_exact_hash_bound_revision(monkeypatch) -> None:
         action="publish",
         image_revision=2,
         artifact_hash=artifact_hash,
+        urgent_override=True,
     )
     callback.answer.assert_awaited_once_with("Публикация поставлена в очередь", show_alert=False)
 
@@ -182,7 +216,7 @@ def test_publish_confirmation_cancel_restores_actions_on_same_card(monkeypatch) 
     callback.answer.assert_awaited_once_with("Отменено")
 
 
-def test_schedule_input_requires_explicit_channel_time_and_hash_confirmation(monkeypatch) -> None:
+def test_schedule_input_schedules_directly_without_confirmation_button(monkeypatch) -> None:
     artifact_hash = "e" * 16
     state = AsyncMock()
     state.get_data.return_value = {
@@ -195,26 +229,24 @@ def test_schedule_input_requires_explicit_channel_time_and_hash_confirmation(mon
     message = FakeMessage()
     message.from_user = SimpleNamespace(id=7001)
     message.text = "2026-08-27 12:30 Europe/Moscow"
-    backend_call = AsyncMock()
+    backend_call = AsyncMock(return_value=("scheduled", []))
     monkeypatch.setattr(news_editorial, "revision_action", backend_call)
 
     asyncio.run(news_editorial.news_schedule_input(message, state))
 
-    backend_call.assert_not_awaited()
-    state.set_state.assert_awaited_once_with(
-        news_editorial.NewsEditorialStates.awaiting_schedule_confirmation
+    backend_call.assert_awaited_once_with(
+        draft_id="a" * 32,
+        admin_telegram_user_id=7001,
+        action="schedule",
+        image_revision=3,
+        artifact_hash=artifact_hash,
+        scheduled_local="2026-08-27T12:30:00",
+        timezone="Europe/Moscow",
     )
-    saved = state.set_data.await_args.args[0]
-    assert saved["scheduled_local"] == "2026-08-27T12:30:00"
-    assert saved["timezone"] == "Europe/Moscow"
-    confirmation = message.answer.await_args.args[0]
-    assert "Канал: @yfc_test_news (staging)" in confirmation
-    assert "2026-08-27 12:30" in confirmation
-    assert "Europe/Moscow" in confirmation
-    assert artifact_hash in confirmation
-    markup = message.answer.await_args.kwargs["reply_markup"]
-    callback_values = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert callback_values == [f"newsp:z:{'a' * 32}:3:{artifact_hash}"]
+    state.set_state.assert_not_awaited()
+    state.set_data.assert_not_awaited()
+    state.clear.assert_awaited_once_with()
+    message.answer.assert_awaited_once_with("Публикация запланирована")
 
 
 def test_confirmed_schedule_calls_exact_hash_bound_revision(monkeypatch) -> None:
