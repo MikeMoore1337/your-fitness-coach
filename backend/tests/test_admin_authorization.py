@@ -404,6 +404,18 @@ def test_funnel_returns_only_canonical_cohort_counts_without_raw_events(client, 
     assert "user_id" not in response.text
 
 
+def test_funnel_excludes_trainer_and_admin_accounts_from_user_cohort(client, monkeypatch):
+    root = _root(client, monkeypatch, telegram_user_id=71_061)
+    before = client.get("/api/v1/admin/funnel?period_days=30", headers=root).json()
+
+    _auth(client, 71_062)
+    _auth(client, 71_063, is_coach=True)
+    _auth(client, 71_064, is_admin=True)
+
+    after = client.get("/api/v1/admin/funnel?period_days=30", headers=root).json()
+    assert after["stages"][0]["account_count"] == before["stages"][0]["account_count"] + 1
+
+
 def test_invalid_reason_is_rejected_before_operation(client, monkeypatch):
     root = _root(client, monkeypatch)
     target_headers = _auth(client, 71_070)

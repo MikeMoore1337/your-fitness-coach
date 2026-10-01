@@ -222,6 +222,14 @@ describe('product event contract', () => {
       isProductEvent({ name: 'food_logged', surface: 'mobile_web', entry_method: 'label_scan' }),
     ).toBe(true);
     expect(isProductEvent({ name: 'nutrition_label_scan_started', surface: 'tma' })).toBe(true);
+    expect(isProductEvent({ name: 'hydration_logged', surface: 'mobile_web' })).toBe(true);
+    expect(
+      isProductEvent({
+        name: 'tma_core_action_completed',
+        surface: 'tma',
+        action: 'hydration_logged',
+      }),
+    ).toBe(true);
     expect(isProductEvent({ name: 'nutrition_label_scan_result_success', surface: 'tma' })).toBe(
       true,
     );

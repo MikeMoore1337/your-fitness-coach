@@ -55,7 +55,7 @@ describe('selectNextAction', () => {
     expect(plan.secondary.map((item) => item.kind)).toEqual(['trainer_feedback']);
   });
 
-  it('promotes trainer feedback ahead of a no-program recommendation', () => {
+  it('keeps the program prerequisite ahead of optional trainer feedback', () => {
     const plan = selectNextAction({
       today,
       hasActiveProgram: false,
@@ -63,8 +63,8 @@ describe('selectNextAction', () => {
       weeklyReview: review(),
     });
 
-    expect(plan.primary.kind).toBe('trainer_feedback');
-    expect(plan.secondary.map((item) => item.kind)).toEqual(['weekly_review']);
+    expect(plan.primary.kind).toBe('ready_program');
+    expect(plan.secondary.map((item) => item.kind)).toEqual(['create_program']);
   });
 
   it('uses a planned schedule item when the detailed workout is not loaded', () => {
@@ -91,7 +91,7 @@ describe('selectNextAction', () => {
     expect(plan.secondary.map((item) => item.kind)).toEqual(['scheduled_workout', 'weekly_review']);
   });
 
-  it('puts a ready program first and the custom builder second', () => {
+  it('puts a ready program first and the custom builder second after profile readiness', () => {
     const plan = selectNextAction({ today, hasActiveProgram: false });
 
     expect(plan.primary.kind).toBe('ready_program');
@@ -99,7 +99,7 @@ describe('selectNextAction', () => {
     expect(plan.secondary.map((item) => item.kind)).toEqual(['create_program']);
   });
 
-  it('uses a profile blocker only when no ready program path remains', () => {
+  it('puts the profile prerequisite first even when a ready program exists', () => {
     const blocker = selectNextAction({
       today,
       hasActiveProgram: false,
@@ -115,7 +115,7 @@ describe('selectNextAction', () => {
       profileBlocksRecommendation: true,
       readyProgramAvailable: true,
     });
-    expect(ready.primary.kind).toBe('ready_program');
+    expect(ready.primary.kind).toBe('profile');
   });
 
   it('falls back to record-only actions on a rest day', () => {
@@ -135,16 +135,29 @@ describe('selectNextAction', () => {
       hasActiveProgram: true,
       workout: workout('completed'),
       weeklyReview: review(),
+      hasNutritionConfirmation: true,
     });
 
     expect(plan.primary.kind).toBe('weekly_review');
     expect(plan.secondary.map((item) => item.kind)).toEqual(['workout_result']);
   });
 
+  it('asks for a persisted nutrition or hydration confirmation before review', () => {
+    const plan = selectNextAction({
+      today,
+      hasActiveProgram: true,
+      workout: workout('completed'),
+      weeklyReview: review(),
+    });
+
+    expect(plan.primary.kind).toBe('nutrition');
+    expect(plan.secondary.map((item) => item.kind)).toEqual(['weekly_review', 'workout_result']);
+  });
+
   it('keeps deep links typed and bounded to existing app routes', () => {
     const plan = selectNextAction({
       today,
-      hasActiveProgram: false,
+      hasActiveProgram: true,
       trainerComment: comment(),
       weeklyReview: review(),
     });

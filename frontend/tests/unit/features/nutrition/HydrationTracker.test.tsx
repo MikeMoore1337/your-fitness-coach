@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HydrationTracker } from '../../../../src/features/nutrition/HydrationTracker';
 import type { HydrationDay } from '../../../../src/shared/api/types';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
+import {
+  PRODUCT_EVENT_NAME,
+  type ProductEventEnvelope,
+} from '../../../../src/shared/analytics/productEvents';
 
 const apiMock = vi.hoisted(() => vi.fn());
 vi.mock('../../../../src/shared/api/client', () => ({ api: apiMock }));
@@ -88,6 +92,10 @@ describe('HydrationTracker', () => {
 
   it('quick-adds once and offers explicit undo', async () => {
     renderTracker();
+    const events: ProductEventEnvelope[] = [];
+    const listener = (event: Event) =>
+      events.push((event as CustomEvent<ProductEventEnvelope>).detail);
+    window.addEventListener(PRODUCT_EVENT_NAME, listener);
     fireEvent.click(await screen.findByRole('button', { name: /Стакан.*250 мл/ }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith(
@@ -100,6 +108,8 @@ describe('HydrationTracker', () => {
     );
     expect(await screen.findByText('Добавлено 250 мл')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Отменить' })).toBeVisible();
+    expect(events.map((event) => event.name)).toContain('hydration_logged');
+    window.removeEventListener(PRODUCT_EVENT_NAME, listener);
   });
 
   it('reveals adult/reference boundaries and history without hiding edit actions', async () => {

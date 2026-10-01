@@ -31,6 +31,7 @@ export type ProductCoreAction =
   | 'workout_started'
   | 'workout_completed'
   | 'food_logged'
+  | 'hydration_logged'
   | 'measurement_logged'
   | 'weekly_review_completed';
 export type NextActionAnalyticsKind =
@@ -169,6 +170,7 @@ type ContextFreeProductEventName =
   | 'today_viewed'
   | 'workout_started'
   | 'workout_completed'
+  | 'hydration_logged'
   | 'workout_completion_summary_viewed'
   | 'measurement_logged'
   | 'check_in_logged'
@@ -534,6 +536,7 @@ const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'today_viewed',
   'workout_started',
   'workout_completed',
+  'hydration_logged',
   'workout_completion_summary_viewed',
   'measurement_logged',
   'check_in_logged',
@@ -678,6 +681,7 @@ const PRODUCT_CORE_ACTIONS = new Set<ProductCoreAction>([
   'workout_started',
   'workout_completed',
   'food_logged',
+  'hydration_logged',
   'measurement_logged',
   'weekly_review_completed',
 ]);
@@ -832,6 +836,7 @@ const USEFUL_ACTION_EVENT_NAMES = new Set<ProductEventName>([
   'workout_started',
   'workout_completed',
   'food_logged',
+  'hydration_logged',
   'measurement_logged',
   'weekly_review_completed',
   'cardio_logged',

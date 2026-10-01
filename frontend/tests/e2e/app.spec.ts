@@ -1359,8 +1359,9 @@ test('клиент входит и видит экран тренировки', 
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Неделя готова к проверке' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'С чего начнём?' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toHaveCount(0);
 });
 
 test('цветовая система сохраняет иерархию в светлой и тёмной темах', async ({ page }) => {
