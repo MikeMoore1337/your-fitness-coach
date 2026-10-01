@@ -38,7 +38,11 @@ from fitminiapp_api.schemas.food_diary import (
     MealType,
 )
 from fitminiapp_api.schemas.nutrition_power import FoodDiaryBatchItem, FoodDiaryBatchResponse
-from fitminiapp_api.services.diary_nutrition import diary_entry_nutrition
+from fitminiapp_api.services.diary_nutrition import (
+    diary_entry_confidence,
+    diary_entry_nutrition,
+    diary_entry_source,
+)
 from fitminiapp_api.services.foods import (
     FoodError,
     FoodNutrition,
@@ -150,6 +154,7 @@ def _copy_food_snapshot(entry: FoodDiaryEntry, food: Food) -> None:
     entry.fat_g_per_100g = food.fat_g_per_100g
     entry.carbs_g_per_100g = food.carbs_g_per_100g
     entry.fiber_g_per_100g = food.fiber_g_per_100g
+    entry.nutrition_source = "catalog"
     entry.nutrition_basis_kind = food.nutrition_basis_kind
     entry.nutrition_basis_amount = food.nutrition_basis_amount
     entry.nutrition_basis_unit = food.nutrition_basis_unit
@@ -175,6 +180,7 @@ def _copy_recipe_snapshot(
     entry.fat_g_per_100g = nutrients.fat_g_per_100g
     entry.carbs_g_per_100g = nutrients.carbs_g_per_100g
     entry.fiber_g_per_100g = nutrients.fiber_g_per_100g
+    entry.nutrition_source = "recipe"
     entry.serving_amount = None
     entry.serving_unit = None
     entry.serving_weight_g = None
@@ -244,6 +250,12 @@ def _serialize_entry(entry: FoodDiaryEntry) -> FoodDiaryEntryResponse:
         food_id=entry.food_id,
         recipe_id=entry.recipe_id,
         entry_kind=cast(Literal["food", "recipe", "quick_add"], entry.entry_kind),
+        nutrition_source=cast(
+            Literal["catalog", "recipe", "manual", "restaurant"], diary_entry_source(entry)
+        ),
+        nutrition_confidence=cast(
+            Literal["exact", "approximate", "partial"], diary_entry_confidence(entry)
+        ),
         logged_at=entry.logged_at,
         food_name=entry.food_name,
         food_brand=entry.food_brand,
@@ -339,6 +351,7 @@ def create_food_diary_entry(
     else:
         quick_add = cast(FoodDiaryQuickAdd, payload.quick_add)
         entry.entry_kind = "quick_add"
+        entry.nutrition_source = quick_add.nutrition_source
         entry.food_name = quick_add.name or "Быстрый ввод"
         entry.food_brand = None
         entry.weight_g = Decimal("1")
@@ -819,6 +832,7 @@ def _clone_entry(
         meal_type=target_meal_type,
         logged_at=source.logged_at,
         entry_kind=source.entry_kind,
+        nutrition_source=source.nutrition_source,
         amount=source.amount,
         amount_unit=source.amount_unit,
         weight_g=source.weight_g,

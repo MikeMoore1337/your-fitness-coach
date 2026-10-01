@@ -18,7 +18,7 @@ from fitminiapp_api.schemas.nutrition import (
     EnergyCalibrationStatus,
     EnergyCalibrationSufficiency,
 )
-from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries
+from fitminiapp_api.services.diary_nutrition import aggregate_diary_entries, diary_entry_confidence
 from fitminiapp_api.services.nutrition import (
     NutritionMacros,
     calculate_macros,
@@ -126,6 +126,7 @@ def _sufficiency(
     weights: Sequence[tuple[date, float]],
     period_start: date,
     period_end: date,
+    confidence_counts: Mapping[str, int] | None = None,
 ) -> tuple[str, dict[str, int | float], list[str], list[float], list[float]]:
     first_window_end = period_start + timedelta(days=SMOOTHING_WINDOW_DAYS - 1)
     last_window_start = period_end - timedelta(days=SMOOTHING_WINDOW_DAYS - 1)
@@ -149,6 +150,8 @@ def _sufficiency(
         "first_window_weight_range_percent": round(first_range, 1),
         "last_window_weight_range_percent": round(last_range, 1),
     }
+    if confidence_counts is not None:
+        counters.update(confidence_counts)
 
     essential_reasons: list[str] = []
     if len(day_totals) < LIMITED_LOGGED_DAYS:
@@ -182,6 +185,7 @@ def evaluate_energy_calibration(
     day_totals: Mapping[date, float],
     weights: Sequence[tuple[date, float]],
     today: date,
+    confidence_counts: Mapping[str, int] | None = None,
 ) -> CalibrationEvaluation:
     period_end = today - timedelta(days=1)
     period_start = period_end - timedelta(days=LOOKBACK_DAYS - 1)
@@ -264,6 +268,7 @@ def evaluate_energy_calibration(
         weights=filtered_weights,
         period_start=period_start,
         period_end=period_end,
+        confidence_counts=confidence_counts,
     )
     if sufficiency == "insufficient":
         return CalibrationEvaluation(
@@ -601,17 +606,49 @@ def _load_inputs(
     )
 
 
+def _load_confidence_counts(
+    db: Session,
+    user: User,
+    period_start: date,
+    period_end: date,
+) -> dict[str, int]:
+    entries = (
+        db.query(FoodDiaryEntry)
+        .join(
+            FoodDiaryDayStatus,
+            (FoodDiaryDayStatus.user_id == FoodDiaryEntry.user_id)
+            & (FoodDiaryDayStatus.diary_date == FoodDiaryEntry.diary_date),
+        )
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.diary_date.between(period_start, period_end),
+            FoodDiaryDayStatus.status == "complete",
+        )
+        .all()
+    )
+    counts = {
+        "exact_entry_count": 0,
+        "approximate_entry_count": 0,
+        "partial_entry_count": 0,
+    }
+    for entry in entries:
+        counts[f"{diary_entry_confidence(entry)}_entry_count"] += 1
+    return counts
+
+
 def preview_energy_calibration(db: Session, user: User) -> EnergyCalibrationResponse:
     today = today_for_user(user)
     period_end = today - timedelta(days=1)
     period_start = period_end - timedelta(days=LOOKBACK_DAYS - 1)
     target = get_current_nutrition_target(db, user.id)
     day_totals, weights = _load_inputs(db, user, period_start, period_end)
+    confidence_counts = _load_confidence_counts(db, user, period_start, period_end)
     evaluation = evaluate_energy_calibration(
         target=target,
         day_totals=day_totals,
         weights=weights,
         today=today,
+        confidence_counts=confidence_counts,
     )
     if evaluation.estimated_expenditure_kcal is None:
         return _response_from_evaluation(evaluation)
@@ -769,11 +806,13 @@ def inspect_energy_calibration(db: Session, user: User) -> EnergyCalibrationResp
     period_start = period_end - timedelta(days=LOOKBACK_DAYS - 1)
     target = get_current_nutrition_target(db, user.id)
     day_totals, weights = _load_inputs(db, user, period_start, period_end)
+    confidence_counts = _load_confidence_counts(db, user, period_start, period_end)
     evaluation = evaluate_energy_calibration(
         target=target,
         day_totals=day_totals,
         weights=weights,
         today=today,
+        confidence_counts=confidence_counts,
     )
     return _response_from_evaluation(evaluation)
 

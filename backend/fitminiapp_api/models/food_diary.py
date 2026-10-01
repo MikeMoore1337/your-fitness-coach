@@ -87,9 +87,7 @@ class FoodDiaryEntry(Base):
             name="ck_food_diary_entries_quick_nutrition",
         ),
         CheckConstraint(
-            "(quick_protein_g IS NULL AND quick_fat_g IS NULL AND quick_carbs_g IS NULL) OR "
-            "(quick_protein_g IS NOT NULL AND quick_fat_g IS NOT NULL AND "
-            "quick_carbs_g IS NOT NULL)",
+            "entry_kind <> 'quick_add' OR quick_energy_kcal IS NOT NULL",
             name="ck_food_diary_entries_quick_macros_complete",
         ),
         CheckConstraint(
@@ -157,6 +155,7 @@ class FoodDiaryEntry(Base):
     meal_type: Mapped[str] = mapped_column(String(16), nullable=False)
     logged_at: Mapped[time | None] = mapped_column(Time, nullable=True)
     entry_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="food")
+    nutrition_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
     amount_unit: Mapped[str] = mapped_column(String(16), nullable=False)

@@ -28,23 +28,68 @@ class DiaryDayNutrition:
     fiber_g: Decimal | None = None
     has_entries: bool = False
     missing_macros: bool = False
+    exact_entry_count: int = 0
+    approximate_entry_count: int = 0
+    partial_entry_count: int = 0
+    protein_missing: bool = False
+    fat_missing: bool = False
+    carbs_missing: bool = False
+    fiber_missing: bool = False
 
     def add(self, entry: FoodDiaryEntry) -> None:
         values = diary_entry_nutrition(entry)
         self.has_entries = True
         self.calories = _sum_optional(self.calories, values.energy_kcal)
-        self.protein_g = _sum_optional(self.protein_g, values.protein_g)
-        self.fat_g = _sum_optional(self.fat_g, values.fat_g)
-        self.carbs_g = _sum_optional(self.carbs_g, values.carbs_g)
-        self.fiber_g = _sum_optional(self.fiber_g, values.fiber_g)
-        if entry.entry_kind == "quick_add" and values.protein_g is None:
-            self.missing_macros = True
+        self.protein_g, self.protein_missing = _sum_tracked(
+            self.protein_g, values.protein_g, self.protein_missing
+        )
+        self.fat_g, self.fat_missing = _sum_tracked(self.fat_g, values.fat_g, self.fat_missing)
+        self.carbs_g, self.carbs_missing = _sum_tracked(
+            self.carbs_g, values.carbs_g, self.carbs_missing
+        )
+        self.fiber_g, self.fiber_missing = _sum_tracked(
+            self.fiber_g, values.fiber_g, self.fiber_missing
+        )
+        self.missing_macros = self.protein_missing or self.fat_missing or self.carbs_missing
+        confidence = diary_entry_confidence(entry)
+        if confidence == "exact":
+            self.exact_entry_count += 1
+        elif confidence == "approximate":
+            self.approximate_entry_count += 1
+        else:
+            self.partial_entry_count += 1
 
 
-def _sum_optional(current: Decimal | None, value: Decimal | None) -> Decimal | None:
+def _sum_optional(
+    current: Decimal | None,
+    value: Decimal | None,
+) -> Decimal | None:
     if value is None:
         return current
     return (current if current is not None else ZERO) + value
+
+
+def _sum_tracked(
+    current: Decimal | None,
+    value: Decimal | None,
+    missing: bool,
+) -> tuple[Decimal | None, bool]:
+    if missing or value is None:
+        return None, True
+    return _sum_optional(current, value), False
+
+
+def diary_entry_source(entry: FoodDiaryEntry) -> str:
+    if entry.nutrition_source in {"catalog", "recipe", "manual", "restaurant"}:
+        return entry.nutrition_source
+    return {"food": "catalog", "recipe": "recipe"}.get(entry.entry_kind, "manual")
+
+
+def diary_entry_confidence(entry: FoodDiaryEntry) -> str:
+    if entry.entry_kind != "quick_add":
+        return "exact"
+    values = (entry.quick_protein_g, entry.quick_fat_g, entry.quick_carbs_g)
+    return "approximate" if all(value is not None for value in values) else "partial"
 
 
 def _decimal(value: object) -> Decimal | None:

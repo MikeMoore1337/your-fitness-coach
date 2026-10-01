@@ -47,6 +47,9 @@ class WeeklyCheckInNutritionSummary(BaseModel):
     protein_adherence: AdherenceComponent
     current_target: WeeklyCheckInTargetSummary | None = None
     suspicious_low_days: list[WeeklyCheckInSuspiciousNutritionDay] = Field(default_factory=list)
+    exact_entry_count: int | None = Field(default=0, ge=0)
+    approximate_entry_count: int | None = Field(default=0, ge=0)
+    partial_entry_count: int | None = Field(default=0, ge=0)
 
 
 class WeeklyCheckInAdaptiveSummary(BaseModel):

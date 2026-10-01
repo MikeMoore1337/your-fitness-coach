@@ -390,6 +390,7 @@ describe('NutritionDiary', () => {
         body: expect.objectContaining({
           quick_add: {
             name: null,
+            nutrition_source: 'manual',
             energy_kcal: 530,
             protein_g: null,
             fat_g: null,
@@ -409,6 +410,70 @@ describe('NutritionDiary', () => {
     );
     expect(submissions[1]?.[1]?.headers?.['Idempotency-Key']).toBe(requestId);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('submits a restaurant estimate with partial macros without inventing zeros', async () => {
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: { method?: string; body?: unknown; headers?: Record<string, string> },
+      ) => {
+        if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay([]));
+        if (path.startsWith('/api/v1/nutrition/foods/recent'))
+          return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+        if (path.startsWith('/api/v1/nutrition/foods/favorites'))
+          return Promise.resolve({ items: [], total: 0, limit: 12, offset: 0 });
+        if (path === '/api/v1/nutrition/diary/entries' && options?.method === 'POST') {
+          return Promise.resolve({
+            ...entry,
+            entry_kind: 'quick_add',
+            food_id: null,
+            food_name: 'Ресторанная оценка',
+            nutrition_source: 'restaurant',
+            nutrition_confidence: 'partial',
+            nutrition: {
+              energy_kcal: '680.00',
+              protein_g: '24.000',
+              fat_g: null,
+              carbs_g: null,
+              fiber_g: null,
+            },
+          });
+        }
+        throw new Error(`Unexpected API call: ${path}`);
+      },
+    );
+    renderDiary();
+    await screen.findAllByText('Пока без записей');
+
+    fireEvent.click(screen.getByRole('button', { name: /Быстрый ввод/ }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Калории' }), {
+      target: { value: '680' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Источник оценки' }), {
+      target: { value: 'restaurant' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Белки' }), {
+      target: { value: '24' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить Quick Add' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const submission = apiMock.mock.calls.find(
+      ([path, request]) => path === '/api/v1/nutrition/diary/entries' && request?.method === 'POST',
+    );
+    expect(submission?.[1]?.body).toEqual(
+      expect.objectContaining({
+        quick_add: {
+          name: null,
+          nutrition_source: 'restaurant',
+          energy_kcal: 680,
+          protein_g: 24,
+          fat_g: null,
+          carbs_g: null,
+        },
+      }),
+    );
   });
 
   it('marks a populated day complete only after explicit confirmation', async () => {

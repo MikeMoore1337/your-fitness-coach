@@ -236,6 +236,9 @@ def test_preview_and_explicit_accept_update_target_and_history(client) -> None:
     assert proposal["current_target_protein_g"] == 144
     assert proposal["proposed_target_protein_g"] == 144
     assert proposal["proposed_effective_from"] is not None
+    assert proposal["sufficiency"]["counters"]["exact_entry_count"] == 28
+    assert proposal["sufficiency"]["counters"]["approximate_entry_count"] == 0
+    assert proposal["sufficiency"]["counters"]["partial_entry_count"] == 0
 
     accepted = client.post(
         f"/api/v1/nutrition/energy-calibration/{proposal['id']}/decision",

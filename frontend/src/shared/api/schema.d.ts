@@ -8700,6 +8700,10 @@ export interface components {
              * @enum {string}
              */
             entry_kind: "food" | "recipe" | "quick_add";
+            /** Nutrition Source */
+            nutrition_source?: ("catalog" | "recipe" | "manual" | "restaurant") | null;
+            /** Nutrition Confidence */
+            nutrition_confidence?: ("exact" | "approximate" | "partial") | null;
             /** Logged At */
             logged_at: string | null;
             /** Food Name */
@@ -8784,6 +8788,12 @@ export interface components {
         FoodDiaryQuickAdd: {
             /** Name */
             name?: string | null;
+            /**
+             * Nutrition Source
+             * @default manual
+             * @enum {string}
+             */
+            nutrition_source: "manual" | "restaurant";
             /** Energy Kcal */
             energy_kcal: number | string;
             /** Protein G */
@@ -9951,6 +9961,21 @@ export interface components {
             target_protein_g?: number | null;
             /** Target Effective On */
             target_effective_on?: string | null;
+            /**
+             * Exact Entry Count
+             * @default 0
+             */
+            exact_entry_count: number | null;
+            /**
+             * Approximate Entry Count
+             * @default 0
+             */
+            approximate_entry_count: number | null;
+            /**
+             * Partial Entry Count
+             * @default 0
+             */
+            partial_entry_count: number | null;
         };
         /** NutritionReportDailyPoint */
         NutritionReportDailyPoint: {
@@ -10078,6 +10103,21 @@ export interface components {
             days_meeting_protein_target: number;
             /** Protein Target Evaluated Days */
             protein_target_evaluated_days: number;
+            /**
+             * Exact Entry Count
+             * @default 0
+             */
+            exact_entry_count: number | null;
+            /**
+             * Approximate Entry Count
+             * @default 0
+             */
+            approximate_entry_count: number | null;
+            /**
+             * Partial Entry Count
+             * @default 0
+             */
+            partial_entry_count: number | null;
         };
         /** NutritionReportTargetChange */
         NutritionReportTargetChange: {
@@ -13349,6 +13389,21 @@ export interface components {
             current_target?: components["schemas"]["WeeklyCheckInTargetSummary"] | null;
             /** Suspicious Low Days */
             suspicious_low_days?: components["schemas"]["WeeklyCheckInSuspiciousNutritionDay"][];
+            /**
+             * Exact Entry Count
+             * @default 0
+             */
+            exact_entry_count: number | null;
+            /**
+             * Approximate Entry Count
+             * @default 0
+             */
+            approximate_entry_count: number | null;
+            /**
+             * Partial Entry Count
+             * @default 0
+             */
+            partial_entry_count: number | null;
         };
         /** WeeklyCheckInProgressionSummary */
         WeeklyCheckInProgressionSummary: {

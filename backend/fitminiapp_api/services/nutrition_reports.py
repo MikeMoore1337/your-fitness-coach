@@ -36,6 +36,9 @@ class AggregatedDiaryDay:
     fat_g: Decimal | None
     carbs_g: Decimal | None
     has_entries: bool
+    exact_entry_count: int = 0
+    approximate_entry_count: int = 0
+    partial_entry_count: int = 0
 
 
 def _aggregated_diary_days(
@@ -60,10 +63,13 @@ def _aggregated_diary_days(
         result[diary_date] = AggregatedDiaryDay(
             diary_date=diary_date,
             calories=totals.calories,
-            protein_g=None if totals.missing_macros else totals.protein_g,
-            fat_g=None if totals.missing_macros else totals.fat_g,
-            carbs_g=None if totals.missing_macros else totals.carbs_g,
+            protein_g=totals.protein_g,
+            fat_g=totals.fat_g,
+            carbs_g=totals.carbs_g,
             has_entries=True,
+            exact_entry_count=totals.exact_entry_count,
+            approximate_entry_count=totals.approximate_entry_count,
+            partial_entry_count=totals.partial_entry_count,
         )
     return result
 
@@ -283,6 +289,9 @@ def build_nutrition_report(
     calorie_evaluated = [point for point in daily if point["within_calorie_tolerance"] is not None]
     protein_evaluated = [point for point in daily if point["meets_protein_target"] is not None]
     current_day = next((point for point in daily if point["is_current_day"]), None)
+    exact_entry_count = sum(day.exact_entry_count for day in diary_by_date.values())
+    approximate_entry_count = sum(day.approximate_entry_count for day in diary_by_date.values())
+    partial_entry_count = sum(day.partial_entry_count for day in diary_by_date.values())
     summary = {
         "logged_days": logged_days,
         "eligible_days": len(daily),
@@ -305,6 +314,9 @@ def build_nutrition_report(
             point["meets_protein_target"] is True for point in protein_evaluated
         ),
         "protein_target_evaluated_days": len(protein_evaluated),
+        "exact_entry_count": exact_entry_count,
+        "approximate_entry_count": approximate_entry_count,
+        "partial_entry_count": partial_entry_count,
     }
     target_changes = [
         {

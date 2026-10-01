@@ -183,6 +183,10 @@ function CoverageSummary({ report }: { report: NutritionReport }) {
         {summary.incomplete_days} не завершено · {summary.missing_days} без данных ·{' '}
         {summary.fasted_days} отмечено без приёмов пищи
       </p>
+      <p className="nutrition-report-coverage__details">
+        Записи: {summary.exact_entry_count ?? 0} точных · {summary.approximate_entry_count ?? 0}{' '}
+        приблизительных · {summary.partial_entry_count ?? 0} с неполными БЖУ
+      </p>
     </div>
   );
 }

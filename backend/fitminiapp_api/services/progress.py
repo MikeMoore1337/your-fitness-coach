@@ -105,6 +105,9 @@ class NutritionDiaryDay:
     protein_g: Decimal | None
     status: NutritionDiaryStatus
     has_entries: bool
+    exact_entry_count: int = 0
+    approximate_entry_count: int = 0
+    partial_entry_count: int = 0
 
 
 def calculate_adherence_component(
@@ -685,12 +688,15 @@ def build_progress_summaries(
                 user_id=diary_user_id,
                 diary_date=diary_date,
                 calories=totals.calories,
-                protein_g=None if totals.missing_macros else totals.protein_g,
+                protein_g=totals.protein_g,
                 status=cast(
                     NutritionDiaryStatus,
                     statuses_by_key.get((diary_user_id, diary_date), "incomplete"),
                 ),
                 has_entries=True,
+                exact_entry_count=totals.exact_entry_count,
+                approximate_entry_count=totals.approximate_entry_count,
+                partial_entry_count=totals.partial_entry_count,
             )
         )
     populated_keys = set(diary_totals)
@@ -962,6 +968,9 @@ def build_progress_summaries(
         fasted_day_count = sum(row.status == "fasted" for row in diary_days)
         observed_day_count = len({row.diary_date for row in diary_days})
         unlogged_day_count = max(0, eligible_nutrition_days - observed_day_count)
+        exact_entry_count = sum(row.exact_entry_count for row in diary_days)
+        approximate_entry_count = sum(row.approximate_entry_count for row in diary_days)
+        partial_entry_count = sum(row.partial_entry_count for row in diary_days)
         body_trends = _body_trends(measurements_by_user[user.id])
         weight_trend = next(
             (trend for trend in body_trends if trend["metric"] == "weight_kg"),
@@ -1020,6 +1029,9 @@ def build_progress_summaries(
                 "target_effective_on": (
                     target.effective_from if target and nutrition_visible else None
                 ),
+                "exact_entry_count": exact_entry_count if nutrition_visible else 0,
+                "approximate_entry_count": approximate_entry_count if nutrition_visible else 0,
+                "partial_entry_count": partial_entry_count if nutrition_visible else 0,
             },
             "body": {
                 "latest_measurement": latest_measurement_by_user.get(user.id),
@@ -1039,6 +1051,9 @@ def build_progress_summaries(
                     logged_day_count=logged_day_count if nutrition_visible else 0,
                     eligible_day_count=eligible_nutrition_days,
                     visible=nutrition_visible,
+                    exact_entry_count=exact_entry_count if nutrition_visible else 0,
+                    approximate_entry_count=approximate_entry_count if nutrition_visible else 0,
+                    partial_entry_count=partial_entry_count if nutrition_visible else 0,
                 ),
                 "weight_trend": build_body_metric_signal(
                     point_count=weight_trend["point_count"] if weight_trend else 0,

@@ -151,6 +151,9 @@ function makeReport(): NutritionReport {
       calorie_tolerance_evaluated_days: 3,
       days_meeting_protein_target: 1,
       protein_target_evaluated_days: 3,
+      exact_entry_count: 0,
+      approximate_entry_count: 0,
+      partial_entry_count: 0,
     },
     daily: days,
     target_changes: [

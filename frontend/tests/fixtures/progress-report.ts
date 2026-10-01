@@ -250,6 +250,9 @@ export function makeProgressReportFixture(state: ReportState = 'full'): Progress
         calorie_tolerance_evaluated_days: populated ? 22 : 0,
         days_meeting_protein_target: populated ? 16 : 0,
         protein_target_evaluated_days: populated ? 22 : 0,
+        exact_entry_count: 0,
+        approximate_entry_count: 0,
+        partial_entry_count: 0,
       },
       daily: [],
       target_changes: populated

@@ -564,6 +564,51 @@ def test_quick_add_full_macros_remain_available_to_day_totals(client) -> None:
     assert copied.json()["entries"][0]["nutrition"] == response.json()["nutrition"]
 
 
+def test_quick_add_accepts_partial_macros_and_preserves_source_confidence(client) -> None:
+    headers = _auth(client, 16_042)
+    selected_date = timezone_module.today_in_timezone("Europe/Moscow") - timedelta(days=3)
+    response = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers={**headers, "Idempotency-Key": "quick-entry-partial-1"},
+        json={
+            "quick_add": {
+                "name": "Ужин в кафе",
+                "nutrition_source": "restaurant",
+                "energy_kcal": "680",
+                "protein_g": "24",
+            },
+            "diary_date": selected_date.isoformat(),
+            "meal_type": "dinner",
+            "amount": "1",
+            "amount_unit": "serving",
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["nutrition_source"] == "restaurant"
+    assert response.json()["nutrition_confidence"] == "partial"
+    assert response.json()["nutrition"] == {
+        "energy_kcal": "680.00",
+        "protein_g": "24.000",
+        "fat_g": None,
+        "carbs_g": None,
+        "fiber_g": None,
+    }
+
+    day = client.get(
+        "/api/v1/nutrition/diary",
+        headers=headers,
+        params={"diary_date": selected_date.isoformat()},
+    )
+    assert day.status_code == 200
+    assert day.json()["totals"] == {
+        "energy_kcal": "680.00",
+        "protein_g": "24.000",
+        "fat_g": None,
+        "carbs_g": None,
+        "fiber_g": None,
+    }
+
+
 def test_diary_day_query_count_is_constant() -> None:
     selected_date = timezone_module.today_in_timezone("Europe/Moscow")
     with get_session_context() as db:
@@ -648,6 +693,7 @@ def test_food_diary_migration_upgrades_from_food_domain_head(tmp_path: Path) -> 
             "nutrition_protein_g_per_100g",
             "nutrition_fat_g_per_100g",
             "nutrition_carbs_g_per_100g",
+            "nutrition_source",
         }
         assert {column["name"] for column in schema.get_columns("food_diary_entries")} == {
             column.name
