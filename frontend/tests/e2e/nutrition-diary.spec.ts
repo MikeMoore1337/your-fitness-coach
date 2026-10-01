@@ -1014,14 +1014,18 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   const calories = page.getByRole('spinbutton', { name: 'Калории' });
   await expect(calories).toHaveAttribute('inputmode', 'decimal');
   await expect(calories).toHaveAttribute('enterkeyhint', 'next');
-  await page.getByRole('textbox', { name: 'Название (необязательно)' }).fill('Обед вне дома');
+  await page
+    .getByRole('textbox', { name: 'Название или контекст (необязательно)' })
+    .fill('Обед вне дома');
   await calories.fill('640');
   await page.getByLabel('Время (необязательно)').fill('13:10');
   await expect(page.getByRole('button', { name: 'Сохранить Quick Add' })).toBeInViewport();
   await page.getByRole('button', { name: 'Сохранить Quick Add' }).click();
   await expect(page.getByRole('dialog')).not.toBeAttached();
   await expect(page.getByText('Обед вне дома')).toBeVisible();
-  await expect(page.getByText('Быстрый ввод · 13:10')).toBeVisible();
+  await expect(
+    page.getByText('Приблизительно · своя оценка · частичные БЖУ · 13:10'),
+  ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 
   await page.getByRole('button', { name: 'День заполнен' }).click();

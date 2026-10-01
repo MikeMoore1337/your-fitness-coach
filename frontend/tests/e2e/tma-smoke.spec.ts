@@ -2331,7 +2331,9 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   await tma.setContentSafeArea({ top: 32, right: 0, bottom: 18, left: 0 });
   const calories = tmaPage.getByRole('spinbutton', { name: 'Калории' });
   await calories.fill('510');
-  await tmaPage.getByRole('textbox', { name: 'Название (необязательно)' }).fill('TMA перекус');
+  await tmaPage
+    .getByRole('textbox', { name: 'Название или контекст (необязательно)' })
+    .fill('TMA перекус');
   const quickAddAction = tmaPage.getByRole('button', {
     name: 'Сохранить Quick Add',
     exact: true,

@@ -6,7 +6,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision: str = "0102_approximate_nutrition_source"
+revision: str = "0102_nutrition_sources"
 down_revision: str | None = "0101_ai_coach_exercise_refs"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

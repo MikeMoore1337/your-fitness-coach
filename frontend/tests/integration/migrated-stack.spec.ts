@@ -21,7 +21,7 @@ test('migrated PostgreSQL serves a real browser nutrition transaction and idempo
 
   await page.getByRole('button', { name: /Быстрый ввод/ }).click();
   const itemName = `Migrated PostgreSQL browser item ${Date.now()}`;
-  await page.getByRole('textbox', { name: 'Название (необязательно)' }).fill(itemName);
+  await page.getByRole('textbox', { name: 'Название или контекст (необязательно)' }).fill(itemName);
   await page.getByRole('spinbutton', { name: 'Калории' }).fill('321');
 
   const firstRequestPromise = page.waitForRequest(
