@@ -651,7 +651,7 @@ describe('TodayDashboard', () => {
     expect(screen.queryByRole('heading', { name: /^Кардио$/ })).not.toBeInTheDocument();
   });
 
-  it('guides a new user to a program and keeps incomplete profile secondary', async () => {
+  it('guides a new user to the profile prerequisite before a program', async () => {
     authState.user.has_active_program = false;
     authState.user.profile.level = null;
     authState.user.profile.height_cm = null;
@@ -685,26 +685,17 @@ describe('TodayDashboard', () => {
     });
     renderDashboard();
 
-    expect(await screen.findByRole('heading', { name: 'С чего начнём?' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveAttribute(
-      'href',
-      '/app?section=programs&start=templates',
-    );
-    expect(screen.getByRole('link', { name: 'Создать свою программу' })).toHaveAttribute(
-      'href',
-      '/app?section=programs&start=create',
-    );
-    expect(screen.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveClass(
-      'button-link',
-    );
-    expect(screen.getByRole('link', { name: 'Создать свою программу' })).toHaveClass(
-      'secondary-link',
-    );
-    expect(screen.getByText('Сделайте рекомендации точнее')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Дополните профиль' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Заполнить профиль' })).toHaveAttribute(
       'href',
       '/app?section=profile#profile-fitness',
     );
+    expect(screen.getByRole('link', { name: 'Заполнить профиль' })).toHaveClass('button-link');
+    expect(
+      screen.queryByRole('link', { name: 'Выбрать готовую программу' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Создать свою программу' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Сделайте рекомендации точнее')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Записать питание' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Добавить активность' })).not.toBeInTheDocument();
     expect(screen.getByText('Появится после первых тренировок и замеров')).toBeInTheDocument();

@@ -23,6 +23,7 @@ export type NextActionReason =
   | 'trainer_feedback'
   | 'scheduled_workout'
   | 'weekly_review'
+  | 'nutrition_confirmation'
   | 'no_active_program'
   | 'completed_workout'
   | 'rest_day'
@@ -65,6 +66,7 @@ export interface NextActionInputs {
   nextWorkout?: NextWorkout | null;
   profileBlocksRecommendation?: boolean;
   readyProgramAvailable?: boolean;
+  hasNutritionConfirmation?: boolean;
 }
 
 function action(
@@ -121,6 +123,16 @@ function weeklyReviewAction(): NextAction {
   );
 }
 
+function nutritionAction(nextWorkout: NextWorkout | null | undefined): NextAction {
+  return action(
+    'nutrition',
+    'Добавить питание',
+    nextWorkout ? 'Поддержать план между тренировками' : 'Записать питание или воду за сегодня',
+    'nutrition_confirmation',
+    { type: 'nutrition' },
+  );
+}
+
 function secondary(actions: Array<NextAction | null>): NextAction[] {
   return actions.filter((item): item is NextAction => item !== null).slice(0, 2);
 }
@@ -136,6 +148,7 @@ export function selectNextAction({
   nextWorkout,
   profileBlocksRecommendation = false,
   readyProgramAvailable = !hasActiveProgram,
+  hasNutritionConfirmation = false,
 }: NextActionInputs): NextActionPlan {
   const feedback = feedbackAction(
     trainerComment,
@@ -164,36 +177,17 @@ export function selectNextAction({
     };
   }
 
-  if (feedback) {
-    const completed = workout?.status === 'completed' || completedToday;
+  if (!hasActiveProgram && profileBlocksRecommendation) {
     return {
-      primary: feedback,
-      secondary: secondary([
-        completed ? review : plannedAction,
-        completed ? workoutResultAction(workout?.id ?? todayScheduleItem?.id) : review,
-      ]),
-    };
-  }
-
-  if (workout?.status === 'completed' || completedToday) {
-    if (review) {
-      return {
-        primary: review,
-        secondary: secondary([workoutResultAction(workout?.id ?? todayScheduleItem?.id)]),
-      };
-    }
-    return {
-      primary: workoutResultAction(workout?.id ?? todayScheduleItem?.id),
+      primary: action(
+        'profile',
+        'Заполнить профиль',
+        'Параметры нужны, чтобы подобрать программу',
+        'profile_blocker',
+        { type: 'profile' },
+      ),
       secondary: [],
     };
-  }
-
-  if (plannedAction) {
-    return { primary: plannedAction, secondary: secondary([review]) };
-  }
-
-  if (review) {
-    return { primary: review, secondary: [] };
   }
 
   if (!hasActiveProgram) {
@@ -217,18 +211,6 @@ export function selectNextAction({
         ],
       };
     }
-    if (profileBlocksRecommendation) {
-      return {
-        primary: action(
-          'profile',
-          'Заполнить профиль',
-          'Параметры нужны, чтобы подобрать программу',
-          'profile_blocker',
-          { type: 'profile' },
-        ),
-        secondary: [],
-      };
-    }
     return {
       primary: action(
         'create_program',
@@ -241,14 +223,52 @@ export function selectNextAction({
     };
   }
 
+  if (feedback) {
+    const completed = workout?.status === 'completed' || completedToday;
+    return {
+      primary: feedback,
+      secondary: secondary([
+        completed ? review : plannedAction,
+        completed ? workoutResultAction(workout?.id ?? todayScheduleItem?.id) : review,
+      ]),
+    };
+  }
+
+  if (workout?.status === 'completed' || completedToday) {
+    if (!hasNutritionConfirmation) {
+      return {
+        primary: nutritionAction(nextWorkout),
+        secondary: secondary([review, workoutResultAction(workout?.id ?? todayScheduleItem?.id)]),
+      };
+    }
+    if (review) {
+      return {
+        primary: review,
+        secondary: secondary([workoutResultAction(workout?.id ?? todayScheduleItem?.id)]),
+      };
+    }
+    return {
+      primary: workoutResultAction(workout?.id ?? todayScheduleItem?.id),
+      secondary: [],
+    };
+  }
+
+  if (plannedAction) {
+    return { primary: plannedAction, secondary: secondary([review]) };
+  }
+
+  if (review) {
+    if (!hasNutritionConfirmation) {
+      return {
+        primary: nutritionAction(nextWorkout),
+        secondary: secondary([review]),
+      };
+    }
+    return { primary: review, secondary: [] };
+  }
+
   return {
-    primary: action(
-      'nutrition',
-      'Добавить питание',
-      nextWorkout ? 'Поддержать план между тренировками' : 'Записать питание за сегодня',
-      'rest_day',
-      { type: 'nutrition' },
-    ),
+    primary: nutritionAction(nextWorkout),
     secondary: [
       action(
         'activity',

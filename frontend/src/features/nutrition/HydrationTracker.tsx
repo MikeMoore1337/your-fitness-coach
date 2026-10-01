@@ -14,6 +14,7 @@ import {
   Select,
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
+import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 
 const beverageLabels: Record<string, string> = {
   water: 'Вода',
@@ -237,6 +238,10 @@ export function HydrationTracker({
       setUndoEntry(entry);
       setCustomVolume('');
       await refresh();
+      trackCoreProductEvent(
+        { name: 'hydration_logged', surface: productEventSurface() },
+        'hydration_logged',
+      );
       haptic('success');
     },
     onError: (reason) => toast((reason as Error).message, 'error'),

@@ -460,7 +460,7 @@ test('started workout finishes into a factual completed state', async ({ page })
   await expect(page.getByRole('heading', { name: 'Тренировка завершена' })).toBeVisible();
 });
 
-test('new and incomplete profile states keep ready program selection primary', async ({ page }) => {
+test('new and incomplete profile states keep profile completion primary', async ({ page }) => {
   await mockDashboard(page, {
     workout: 'none',
     activeProgram: false,
@@ -468,25 +468,22 @@ test('new and incomplete profile states keep ready program selection primary', a
   });
   await openDashboard(page);
 
-  await expect(page.getByRole('heading', { name: 'С чего начнём?' })).toBeVisible();
-  await expect(page.getByText('Сделайте рекомендации точнее')).toBeVisible();
-  const chooseReady = page.getByRole('link', { name: 'Выбрать готовую программу', exact: true });
-  await expect(chooseReady).toBeVisible();
-  const createCustom = page.getByRole('link', { name: 'Создать свою программу', exact: true });
-  await expect(createCustom).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
-  await expect(chooseReady).not.toHaveClass(/secondary-link/);
-  await expect(createCustom).toHaveClass(/secondary-link/);
-  const readyPrimary = await chooseReady.evaluate((element) => ({
+  await expect(page.getByRole('heading', { name: 'Дополните профиль' })).toBeVisible();
+  await expect(page.getByText('Основа рекомендаций')).toBeVisible();
+  const profileLink = page.getByRole('link', { name: 'Заполнить профиль', exact: true });
+  await expect(profileLink).toBeVisible();
+  await expect(profileLink).not.toHaveClass(/secondary-link/);
+  const profilePrimary = await profileLink.evaluate((element) => ({
     fontWeight: window.getComputedStyle(element).fontWeight,
     height: element.getBoundingClientRect().height,
   }));
-  expect(readyPrimary.fontWeight).toBe('600');
-  expect(readyPrimary.height).toBeGreaterThanOrEqual(44);
+  expect(profilePrimary.fontWeight).toBe('600');
+  expect(profilePrimary.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).not.toBeAttached();
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).not.toBeAttached();
   await expect(page.getByRole('link', { name: 'Записать питание' })).not.toBeAttached();
   await expect(page.getByRole('button', { name: 'Добавить активность' })).not.toBeAttached();
   await expect(page.locator('.today-dashboard__facts')).toHaveCSS('border-top-style', 'none');
-  await expect(createCustom).toBeAttached();
   await expect(page.locator('.today-dashboard details details')).toHaveCount(0);
 });
 

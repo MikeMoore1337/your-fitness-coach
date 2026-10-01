@@ -13,6 +13,7 @@ from fitminiapp_api.models.account import AccountDataExport
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthIdentity
 from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.hydration import HydrationEntry
 from fitminiapp_api.models.notification import Notification
 from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import BodyMeasurement, CoachClient, User, UserProfile
@@ -524,13 +525,17 @@ def retry_account_export(
 
 def funnel_aggregates(db: Session, *, period_days: int) -> dict:
     cohort_since = now_msk_naive() - timedelta(days=period_days)
-    cohort = User.created_at >= cohort_since
-    registered = db.query(func.count(User.id)).filter(cohort).scalar() or 0
+    cohort = (
+        User.created_at >= cohort_since,
+        User.is_coach.is_(False),
+        User.is_admin.is_(False),
+    )
+    registered = db.query(func.count(User.id)).filter(*cohort).scalar() or 0
     profile_ready = (
         db.query(func.count(User.id))
         .join(UserProfile, UserProfile.user_id == User.id)
         .filter(
-            cohort,
+            *cohort,
             UserProfile.goal.is_not(None),
             UserProfile.level.is_not(None),
             UserProfile.workouts_per_week.is_not(None),
@@ -541,7 +546,7 @@ def funnel_aggregates(db: Session, *, period_days: int) -> dict:
     program_activated = (
         db.query(func.count(func.distinct(UserProgram.user_id)))
         .join(User, User.id == UserProgram.user_id)
-        .filter(cohort)
+        .filter(*cohort)
         .scalar()
         or 0
     )
@@ -549,19 +554,26 @@ def funnel_aggregates(db: Session, *, period_days: int) -> dict:
         db.query(UserProgram.user_id.label("user_id"))
         .join(User, User.id == UserProgram.user_id)
         .join(UserWorkout, UserWorkout.user_program_id == UserProgram.id)
-        .filter(cohort, UserWorkout.status == "completed")
+        .filter(*cohort, UserWorkout.status == "completed")
     )
     food_users = (
         db.query(FoodDiaryEntry.user_id.label("user_id"))
         .join(User, User.id == FoodDiaryEntry.user_id)
-        .filter(cohort)
+        .filter(*cohort)
+    )
+    hydration_users = (
+        db.query(HydrationEntry.user_id.label("user_id"))
+        .join(User, User.id == HydrationEntry.user_id)
+        .filter(*cohort)
     )
     measurement_users = (
         db.query(BodyMeasurement.user_id.label("user_id"))
         .join(User, User.id == BodyMeasurement.user_id)
-        .filter(cohort)
+        .filter(*cohort)
     )
-    core_value_users = workout_users.union(food_users, measurement_users).subquery()
+    core_value_users = workout_users.union(
+        food_users, hydration_users, measurement_users
+    ).subquery()
     core_value_reached = db.query(func.count()).select_from(core_value_users).scalar() or 0
 
     def stage(key: str, count: int) -> dict:
@@ -574,7 +586,8 @@ def funnel_aggregates(db: Session, *, period_days: int) -> dict:
         "analytics_provider_status": "not_connected",
         "coverage_note": (
             "Показаны только агрегаты подтверждённых данных аккаунта. "
-            "Анонимные landing/login/demo события не сохраняются без подключённого провайдера."
+            "Анонимные landing/login/demo события не сохраняются без подключённого провайдера; "
+            "тренерские и root-аккаунты исключены из пользовательской когорты."
         ),
         "stages": [
             stage("registered", int(registered)),

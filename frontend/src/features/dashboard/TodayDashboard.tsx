@@ -50,10 +50,12 @@ import {
 import {
   productEventSurface,
   trackCoreProductEvent,
+  trackGrowthEvent,
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
 import { isPwaStandalone } from '../../shared/pwa/pwaRuntime';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
+import { programProfileReadiness } from '../profile/programReadiness';
 
 export function formatTodayHeading(value: string): { title: string } {
   const weekday = formatCalendarDate(value, { weekday: 'long' });
@@ -274,7 +276,7 @@ export function formatNutritionDateLabel(value: string, today: string): string {
   return formatCalendarDate(value, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-function NutritionSummary({ date, today }: { date: string; today: string }) {
+function useNutritionDay(date: string) {
   const diary = useQuery({
     queryKey: ['nutrition', 'diary', date],
     queryFn: () => api<FoodDiaryDay>(`/api/v1/nutrition/diary?diary_date=${date}`),
@@ -283,6 +285,30 @@ function NutritionSummary({ date, today }: { date: string; today: string }) {
     queryKey: queryKeys.nutrition.hydrationDate(date),
     queryFn: () => api<HydrationDay>(`/api/v1/nutrition/hydration?diary_date=${date}`),
   });
+  return { diary, hydration };
+}
+
+function hasNutritionConfirmation(
+  diary: FoodDiaryDay | undefined,
+  hydration: HydrationDay | undefined,
+): boolean {
+  return Boolean(
+    diary?.status_is_explicit ||
+    diary?.meals.some((meal) => meal.entries.length > 0) ||
+    hydration?.entries.length,
+  );
+}
+
+function NutritionSummary({
+  date,
+  today,
+  nutrition,
+}: {
+  date: string;
+  today: string;
+  nutrition: ReturnType<typeof useNutritionDay>;
+}) {
+  const { diary, hydration } = nutrition;
 
   if (diary.isLoading) {
     return (
@@ -523,6 +549,7 @@ function WorkoutOverview({
   onStart,
   canMutateProgress,
   profileBlocksRecommendation,
+  hasNutritionConfirmation,
 }: {
   today: string;
   workout?: Workout;
@@ -537,6 +564,7 @@ function WorkoutOverview({
   onStart(workoutId: number): void;
   canMutateProgress: boolean;
   profileBlocksRecommendation: boolean;
+  hasNutritionConfirmation: boolean;
 }) {
   const { user } = useAuth();
   const totalSets =
@@ -558,6 +586,7 @@ function WorkoutOverview({
     lastCompletedWorkoutOn: progress.data?.training.last_completed_workout_on,
     nextWorkout,
     profileBlocksRecommendation,
+    hasNutritionConfirmation,
   });
   const primaryActionKind = plan.primary.kind;
   const secondaryActionKinds = plan.secondary.map((item) => item.kind).join('|');
@@ -936,6 +965,10 @@ export function TodayDashboard({
           }),
         };
   const progress = useProgressSummary();
+  const nutrition = useNutritionDay(selectedDate);
+  const nutritionConfirmed =
+    selectedDate === today &&
+    hasNutritionConfirmation(nutrition.diary.data, nutrition.hydration.data);
   const weekDates = calendarWeek(today);
   const weekStart = weekDates[0] ?? today;
   const weekEnd = weekDates.at(-1) ?? today;
@@ -1056,12 +1089,7 @@ export function TodayDashboard({
   const profileMissing = useMemo(
     () =>
       Boolean(
-        user &&
-        !user.has_active_program &&
-        (!user.profile ||
-          !user.profile.goal ||
-          !user.profile.level ||
-          !user.profile.workouts_per_week),
+        user && !user.has_active_program && !programProfileReadiness(user.profile).isComplete,
       ),
     [user],
   );
@@ -1073,6 +1101,9 @@ export function TodayDashboard({
         { name: 'workout_started', surface: productEventSurface() },
         'workout_started',
       );
+      if (user?.has_workout_history === false) {
+        trackGrowthEvent('first_workout_started', { dedupe: 'session' });
+      }
       trackProductEvent(
         {
           name: 'next_action_completed',
@@ -1249,6 +1280,7 @@ export function TodayDashboard({
                 onStart={(workoutId) => start.mutate(workoutId)}
                 canMutateProgress={capabilities.canMutateProgress}
                 profileBlocksRecommendation={profileMissing}
+                hasNutritionConfirmation={nutritionConfirmed}
               />
             )}
           </section>
@@ -1276,7 +1308,7 @@ export function TodayDashboard({
           />
         </div>
         <div className="today-dashboard__facts">
-          <NutritionSummary date={selectedDate} today={today} />
+          <NutritionSummary date={selectedDate} today={today} nutrition={nutrition} />
           <ActivitySummary
             cardio={cardioWeek.data}
             date={selectedDate}
@@ -1325,18 +1357,6 @@ export function TodayDashboard({
             Добавление cardio-активности доступно после входа.
           </p>
         ))}
-
-      {profileMissing && (
-        <aside className="today-profile-nudge">
-          <div>
-            <strong>Сделайте рекомендации точнее</strong>
-            <span>Дополните цель, уровень и желаемую частоту тренировок в профиле.</span>
-          </div>
-          <AppLink className="today-text-link" to="/app?section=profile#profile-fitness">
-            Заполнить профиль
-          </AppLink>
-        </aside>
-      )}
     </div>
   );
 }
