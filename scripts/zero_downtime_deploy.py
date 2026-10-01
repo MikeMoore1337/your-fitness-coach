@@ -474,6 +474,8 @@ def _deployment_lock(path: Path) -> Iterator[None]:
 
 
 def _switch_gateway(active_slot: str, fallback_slot: str) -> None:
+    gateway_config = "/tmp/yfc-current-Caddyfile.edge"
+    _compose("cp", "deploy/Caddyfile.edge", f"edge:{gateway_config}")
     gateway_env = [
         "-e",
         f"YFC_ACTIVE_UPSTREAM={_upstream(active_slot)}",
@@ -485,7 +487,7 @@ def _switch_gateway(active_slot: str, fallback_slot: str) -> None:
         *base,
         "validate",
         "--config",
-        "/etc/caddy/Caddyfile",
+        gateway_config,
         "--adapter",
         "caddyfile",
     )
@@ -494,7 +496,7 @@ def _switch_gateway(active_slot: str, fallback_slot: str) -> None:
             *base,
             "adapt",
             "--config",
-            "/etc/caddy/Caddyfile",
+            gateway_config,
             "--adapter",
             "caddyfile",
             capture=True,
@@ -539,7 +541,7 @@ def _switch_gateway(active_slot: str, fallback_slot: str) -> None:
         *base,
         "reload",
         "--config",
-        "/etc/caddy/Caddyfile",
+        gateway_config,
         "--adapter",
         "caddyfile",
     )
