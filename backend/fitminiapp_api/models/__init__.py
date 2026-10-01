@@ -75,6 +75,7 @@ from fitminiapp_api.models.nutrition_power import (
     NutritionMealTemplateItem,
 )
 from fitminiapp_api.models.oauth_transaction import OAuthTransaction
+from fitminiapp_api.models.photo_meal import PhotoMealDraft
 from fitminiapp_api.models.program import (
     HiddenProgramTemplate,
     ProgramRevision,
@@ -185,6 +186,7 @@ __all__ = [
     "NutritionTarget",
     "OAuthTransaction",
     "Payment",
+    "PhotoMealDraft",
     "Plan",
     "ProgramImport",
     "ProgramRevision",

@@ -6,7 +6,7 @@ import pytest
 from pydantic import SecretStr, ValidationError
 
 from fitminiapp_api.core.config import Settings, settings
-from fitminiapp_api.nutrition_label import vision
+from fitminiapp_api.nutrition_label import meal_vision, vision
 
 
 def _settings_base() -> dict[str, object]:
@@ -47,6 +47,26 @@ def _extraction_payload() -> dict[str, object]:
     }
     payload.update(values)
     return payload
+
+
+def _meal_extraction_payload() -> dict[str, object]:
+    return {
+        "candidates": [
+            {
+                "name": "гречка",
+                "portion_amount": 200.0,
+                "portion_unit": "g",
+                "portion_confidence": "medium",
+                "identity_confidence": "high",
+                "nutrition_confidence": "medium",
+                "energy_kcal": 220.0,
+                "protein_g": 8.0,
+                "fat_g": 2.0,
+                "carbs_g": 42.0,
+            }
+        ],
+        "warnings": [],
+    }
 
 
 class _Response:
@@ -177,6 +197,64 @@ def test_groq_vision_adapter_does_not_expose_provider_error_body(monkeypatch) ->
             timeout_seconds=8,
             max_response_bytes=vision.VISION_MAX_RESPONSE_BYTES,
         )
+
+
+def test_groq_meal_vision_adapter_reuses_strict_privacy_transport(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _Client:
+        def __init__(self, **kwargs) -> None:
+            captured["client_kwargs"] = kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, endpoint, *, headers, json):
+            captured["endpoint"] = endpoint
+            captured["headers"] = headers
+            captured["payload"] = json
+            return _Response(json_module.dumps(_meal_extraction_payload(), separators=(",", ":")))
+
+    json_module = json
+    monkeypatch.setattr(vision.httpx, "Client", _Client)
+    transport = vision.GroqVisionTransport(
+        api_key="test-key",
+        endpoint="https://api.groq.com/openai/v1/chat/completions",
+        model="qwen/qwen3.8-27b",
+        proxy_url="",
+        max_output_tokens=1536,
+    )
+    adapter = meal_vision.GroqMealVisionAdapter(transport)
+
+    proposal = adapter.recognize(
+        b"\x89PNG\r\n\x1a\nsynthetic",
+        timeout_seconds=8,
+        max_response_bytes=vision.VISION_MAX_RESPONSE_BYTES,
+    )
+    extraction = meal_vision.validate_meal_vision_proposal(
+        proposal,
+        provider_class=adapter.provider_class,
+        model_class=adapter.model_class,
+        prompt_version=adapter.prompt_version,
+    )
+
+    assert extraction.candidates[0].name == "гречка"
+    assert extraction.candidates[0].energy_kcal == 220
+
+    payload = captured["payload"]
+    assert isinstance(payload, dict)
+    assert payload["store"] is False
+    assert payload["reasoning_effort"] == "none"
+    response_format = payload["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["strict"] is True
+    assert response_format["json_schema"]["schema"]["additionalProperties"] is False
+    instruction = payload["messages"][0]["content"][0]["text"]
+    assert "body composition" in instruction
+    assert "medical conditions" in instruction
 
 
 def test_vision_settings_fail_closed_until_zdr_is_verified() -> None:

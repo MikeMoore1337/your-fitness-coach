@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from fitminiapp_api.api.dependencies.auth import require_nutrition_label_scan, require_user
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.user import User
+from fitminiapp_api.nutrition_label.meal_vision import build_meal_vision_adapter
 from fitminiapp_api.nutrition_label.vision import build_vision_fallback_adapter
 from fitminiapp_api.schemas.food import (
     FoodBarcodeLookupResponse,
@@ -76,6 +77,11 @@ from fitminiapp_api.schemas.nutrition_power import (
     NutritionMealTemplateListResponse,
     NutritionMealTemplateResponse,
     NutritionMealTemplateUpdate,
+)
+from fitminiapp_api.schemas.photo_meal import (
+    PhotoMealConfirmRequest,
+    PhotoMealConfirmResponse,
+    PhotoMealDraftResponse,
 )
 from fitminiapp_api.schemas.recipe import (
     RecipeCreate,
@@ -170,6 +176,13 @@ from fitminiapp_api.services.nutrition_power import (
     update_food_search_alias,
     update_meal_template,
 )
+from fitminiapp_api.services.photo_meal import (
+    PhotoMealError,
+    cancel_photo_meal_draft,
+    confirm_photo_meal_draft,
+    create_photo_meal_draft,
+    get_photo_meal_draft,
+)
 from fitminiapp_api.services.recipes import (
     RecipeError,
     RecipeNotFoundError,
@@ -239,6 +252,30 @@ def _raise_nutrition_label_http_error(exc: NutritionLabelError) -> None:
         detail={
             "code": exc.code,
             "message": messages.get(exc.code, "Не удалось обработать черновик"),
+        },
+    ) from exc
+
+
+def _raise_photo_meal_http_error(exc: PhotoMealError) -> None:
+    messages = {
+        "feature_disabled": "Фото блюда пока недоступно",
+        "vision_unavailable": "Распознавание фото блюда сейчас недоступно; добавьте запись приблизительно",
+        "vision_timeout": "Распознавание фото не завершилось вовремя; добавьте запись приблизительно",
+        "vision_invalid_response": "Не удалось безопасно проверить результат распознавания",
+        "vision_failed": "Распознавание фото временно недоступно; добавьте запись приблизительно",
+        "manual_fallback_required": "На фото не удалось надёжно определить блюдо; добавьте его вручную",
+        "draft_expired": "Черновик истёк; начните распознавание заново",
+        "draft_not_active": "Черновик уже закрыт",
+        "stale_draft_revision": "Черновик изменился; обновите его перед подтверждением",
+        "unknown_candidate": "Изменённый состав блюда больше не соответствует черновику",
+        "future_diary_date": "Нельзя добавить запись на будущую дату",
+        "invalid_persisted_draft": "Черновик больше недоступен; начните заново",
+    }
+    raise HTTPException(
+        status_code=exc.status_code,
+        detail={
+            "code": exc.code,
+            "message": messages.get(exc.code, "Не удалось обработать фото блюда"),
         },
     ) from exc
 
@@ -318,6 +355,73 @@ def cancel_nutrition_label_draft(
         cancel_label_draft(db, current_user, draft_id, revision)
     except NutritionLabelError as exc:
         _raise_nutrition_label_http_error(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/photo-meals",
+    response_model=PhotoMealDraftResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def recognize_photo_meal(
+    idempotency_key: IdempotencyKey,
+    image: UploadFile = File(...),
+    current_user: User = Depends(require_nutrition_label_scan),
+    db: Session = Depends(get_db),
+):
+    try:
+        return create_photo_meal_draft(
+            db,
+            current_user,
+            image_bytes=image.file.read(),
+            content_type=image.content_type,
+            idempotency_key=idempotency_key,
+            vision_adapter=build_meal_vision_adapter(),
+        )
+    except PhotoMealError as exc:
+        _raise_photo_meal_http_error(exc)
+
+
+@router.get("/photo-meals/{draft_id}", response_model=PhotoMealDraftResponse)
+def read_photo_meal_draft(
+    draft_id: str,
+    current_user: User = Depends(require_nutrition_label_scan),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_photo_meal_draft(db, current_user, draft_id)
+    except PhotoMealError as exc:
+        _raise_photo_meal_http_error(exc)
+
+
+@router.post(
+    "/photo-meals/{draft_id}/confirm",
+    response_model=PhotoMealConfirmResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def confirm_photo_meal(
+    draft_id: str,
+    payload: PhotoMealConfirmRequest,
+    current_user: User = Depends(require_nutrition_label_scan),
+    db: Session = Depends(get_db),
+):
+    try:
+        return confirm_photo_meal_draft(db, current_user, draft_id, payload)
+    except PhotoMealError as exc:
+        _raise_photo_meal_http_error(exc)
+
+
+@router.post("/photo-meals/{draft_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_photo_meal(
+    draft_id: str,
+    revision: int = Query(gt=0),
+    current_user: User = Depends(require_nutrition_label_scan),
+    db: Session = Depends(get_db),
+):
+    try:
+        cancel_photo_meal_draft(db, current_user, draft_id, revision)
+    except PhotoMealError as exc:
+        _raise_photo_meal_http_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

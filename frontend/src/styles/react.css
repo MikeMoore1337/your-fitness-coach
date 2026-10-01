@@ -8608,6 +8608,49 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 .nutrition-label-review__actions {
   justify-content: flex-end;
 }
+.photo-meal-scanner__warnings {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 11px 12px 11px 28px;
+  border: 1px solid var(--warning-line);
+  border-radius: var(--radius-control);
+  background: var(--warning-soft);
+  color: var(--warning-text);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.photo-meal-scanner__candidates {
+  display: grid;
+  gap: 12px;
+}
+.photo-meal-scanner__candidate {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-subtle);
+}
+.photo-meal-scanner__candidate-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 10px;
+}
+.photo-meal-scanner__uncertainty,
+.photo-meal-scanner__confidence {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+.photo-meal-scanner__nutrients {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
 .nutrition-label-review__summary,
 .nutrition-label-review__provenance {
   display: grid;
@@ -9637,6 +9680,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   .nutrition-label-review__nutrients,
   .nutrition-label-review__summary,
   .nutrition-label-review__provenance,
+  .photo-meal-scanner__nutrients,
   .nutrition-recipe-editor__heading,
   .nutrition-copy__target {
     grid-template-columns: 1fr;

@@ -251,7 +251,8 @@ def _serialize_entry(entry: FoodDiaryEntry) -> FoodDiaryEntryResponse:
         recipe_id=entry.recipe_id,
         entry_kind=cast(Literal["food", "recipe", "quick_add"], entry.entry_kind),
         nutrition_source=cast(
-            Literal["catalog", "recipe", "manual", "restaurant"], diary_entry_source(entry)
+            Literal["catalog", "recipe", "manual", "restaurant", "photo"],
+            diary_entry_source(entry),
         ),
         nutrition_confidence=cast(
             Literal["exact", "approximate", "partial"], diary_entry_confidence(entry)

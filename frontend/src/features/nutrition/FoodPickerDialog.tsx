@@ -11,6 +11,7 @@ import type {
   FoodList,
   FoodSearch,
   NutritionLabelConfirmResponse,
+  PhotoMealConfirmResponse,
   Recipe,
   UserFoodCreate,
 } from '../../shared/api/types';
@@ -44,6 +45,7 @@ import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { BarcodeLookup } from './BarcodeLookup';
 import { FoodEditor } from './FoodEditor';
 import { NutritionLabelScanner } from './NutritionLabelScanner';
+import { PhotoMealScanner } from './PhotoMealScanner';
 import { MealTemplateBrowser } from './MealTemplateBrowser';
 import { NaturalFoodInput } from './NaturalFoodInput';
 import { RecipeBrowser } from './RecipeBrowser';
@@ -65,7 +67,8 @@ type PickerView =
   | 'templates'
   | 'natural'
   | 'barcode'
-  | 'label-scan';
+  | 'label-scan'
+  | 'photo-meal';
 
 function nutritionFoodPath(entryMethod: FoodEntryMethod): NutritionFoodAddPath {
   if (entryMethod === 'label_scan') return 'photo';
@@ -810,6 +813,7 @@ export function FoodPickerDialog({
         natural: 'Список продуктов',
         barcode: 'Штрихкод',
         'label-scan': 'Сканирование этикетки',
+        'photo-meal': 'Фото блюда',
       } as const
     )[view];
   return (
@@ -1133,6 +1137,32 @@ export function FoodPickerDialog({
               }}
             />
           </div>
+        ) : view === 'photo-meal' ? (
+          <div className="nutrition-picker__browse">
+            <button
+              className="nutrition-picker__back"
+              type="button"
+              onClick={() => setView('browse')}
+            >
+              <Icon name="arrow-left" size={16} /> К способам добавления
+            </button>
+            <PhotoMealScanner
+              userId={user?.id ?? 'anonymous'}
+              diaryDate={diaryDate}
+              mealType={mealType}
+              onCancel={() => setView('browse')}
+              onManualFallback={() => {
+                setEntryMethod('quick_add');
+                setView('quick-add');
+              }}
+              onCompleted={async (response: PhotoMealConfirmResponse) => {
+                onAdded?.(response.entry);
+                await invalidateNutritionSummaries(queryClient);
+                toast('Приблизительная запись добавлена в дневник');
+                onClose();
+              }}
+            />
+          </div>
         ) : view === 'label-scan' ? (
           <div className="nutrition-picker__browse">
             <button
@@ -1282,6 +1312,22 @@ export function FoodPickerDialog({
                   }}
                 >
                   По фото этикетки
+                </Button>
+                <Button
+                  fullWidth
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    trackProductEvent({
+                      name: 'nutrition_food_add_path_selected',
+                      surface: productEventSurface(),
+                      path: 'photo',
+                    });
+                    setEntryMethod('label_scan');
+                    setView('photo-meal');
+                  }}
+                >
+                  По фото блюда
                 </Button>
                 <Button
                   fullWidth

@@ -171,9 +171,8 @@ def _canonical_from_extraction(
     )
 
 
-class GroqNutritionLabelVisionAdapter:
-    provider_class = "groq"
-    prompt_version = GROQ_VISION_PROMPT_VERSION
+class GroqVisionTransport:
+    """Shared, policy-bound Groq transport for every Nutrition Vision purpose."""
 
     def __init__(
         self,
@@ -190,10 +189,13 @@ class GroqNutritionLabelVisionAdapter:
         self._proxy_url = proxy_url
         self._max_output_tokens = max_output_tokens
 
-    def recognize(
+    def complete(
         self,
         normalized_png: bytes,
         *,
+        instruction: str,
+        schema_name: str,
+        schema: dict[str, object],
         timeout_seconds: float,
         max_response_bytes: int,
     ) -> bytes:
@@ -206,7 +208,7 @@ class GroqNutritionLabelVisionAdapter:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": _GROQ_VISION_INSTRUCTION},
+                        {"type": "text", "text": instruction},
                         {
                             "type": "image_url",
                             "image_url": {"url": f"data:image/png;base64,{encoded}"},
@@ -220,9 +222,9 @@ class GroqNutritionLabelVisionAdapter:
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": _GROQ_VISION_SCHEMA_NAME,
+                    "name": schema_name,
                     "strict": True,
-                    "schema": VisionExtraction.model_json_schema(),
+                    "schema": schema,
                 },
             },
         }
@@ -265,9 +267,60 @@ class GroqNutritionLabelVisionAdapter:
             content_bytes = content.encode("utf-8")
             if not content_bytes or len(content_bytes) > max_response_bytes:
                 raise VisionProposalError("response_size")
+            return content_bytes
+        except VisionProposalError:
+            raise
+        except (ValueError, TypeError, ValidationError, RecursionError) as exc:
+            raise VisionProposalError("invalid_provider_response") from exc
+
+
+class GroqNutritionLabelVisionAdapter:
+    provider_class = "groq"
+    prompt_version = GROQ_VISION_PROMPT_VERSION
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        endpoint: str,
+        model: str,
+        proxy_url: str,
+        max_output_tokens: int,
+    ) -> None:
+        self.model_class = model
+        self._transport = GroqVisionTransport(
+            api_key=api_key,
+            endpoint=endpoint,
+            model=model,
+            proxy_url=proxy_url,
+            max_output_tokens=max_output_tokens,
+        )
+
+    @classmethod
+    def from_transport(cls, transport: GroqVisionTransport) -> GroqNutritionLabelVisionAdapter:
+        adapter = cls.__new__(cls)
+        adapter.model_class = transport.model_class
+        adapter._transport = transport
+        return adapter
+
+    def recognize(
+        self,
+        normalized_png: bytes,
+        *,
+        timeout_seconds: float,
+        max_response_bytes: int,
+    ) -> bytes:
+        try:
             extraction = VisionExtraction.model_validate(
                 json.loads(
-                    content,
+                    self._transport.complete(
+                        normalized_png,
+                        instruction=_GROQ_VISION_INSTRUCTION,
+                        schema_name=_GROQ_VISION_SCHEMA_NAME,
+                        schema=VisionExtraction.model_json_schema(),
+                        timeout_seconds=timeout_seconds,
+                        max_response_bytes=max_response_bytes,
+                    ).decode("utf-8"),
                     object_pairs_hook=_unique_object,
                     parse_constant=_reject_non_finite,
                 )
@@ -281,11 +334,11 @@ class GroqNutritionLabelVisionAdapter:
             return canonical.model_dump_json().encode("utf-8")
         except VisionProposalError:
             raise
-        except (ValueError, TypeError, ValidationError, RecursionError) as exc:
+        except (UnicodeDecodeError, ValueError, TypeError, ValidationError, RecursionError) as exc:
             raise VisionProposalError("invalid_provider_response") from exc
 
 
-def build_vision_fallback_adapter() -> VisionFallbackAdapter | None:
+def build_groq_vision_transport() -> GroqVisionTransport | None:
     if (
         not settings.nutrition_label_vision_enabled
         or settings.nutrition_label_vision_kill_switch
@@ -300,13 +353,20 @@ def build_vision_fallback_adapter() -> VisionFallbackAdapter | None:
     api_key = settings.groq_api_key.get_secret_value().strip()
     if not api_key:
         return None
-    return GroqNutritionLabelVisionAdapter(
+    return GroqVisionTransport(
         api_key=api_key,
         endpoint=settings.nutrition_label_vision_endpoint,
         model=settings.nutrition_label_vision_model,
         proxy_url=settings.nutrition_label_vision_proxy_url,
         max_output_tokens=settings.nutrition_label_vision_max_output_tokens,
     )
+
+
+def build_vision_fallback_adapter() -> VisionFallbackAdapter | None:
+    transport = build_groq_vision_transport()
+    if transport is None:
+        return None
+    return GroqNutritionLabelVisionAdapter.from_transport(transport)
 
 
 def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
