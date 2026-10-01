@@ -57,9 +57,12 @@ branch policy только для `master`; production secrets остаются 
 
 - `caddy` или `cloudflared` остаётся публичным transport и всегда направляет запросы в стабильный
   service `edge`.
-- `edge` не перезапускается при обычном application rollout. Caddy сначала выполняет `validate`,
-  ждёт bounded точки без in-flight upstream requests, затем применяет config через graceful
-  `reload`; autosave хранится в volume `edge_config`. Если такой точки нет, switch не выполняется.
+- `edge` не перезапускается при обычном application rollout. Перед `validate` текущий release
+  копирует свой `deploy/Caddyfile.edge` в running edge, поэтому graceful `reload` не зависит от
+  bind mount старого release. Caddy ждёт bounded точки без in-flight upstream requests, затем
+  применяет config; autosave хранится в volume `edge_config`. Если такой точки нет, switch не выполняется.
+  `/robots.txt` обслуживается самим persistent edge и остаётся доступным во время single-slot
+  остановки backend.
 - Application revision работает в `backend-blue` или `backend-green`. У slot нет fixed IP,
   опубликованного порта или общего mutable filesystem.
 - Единственный worker и Telegram poller принадлежат активному slot: `worker-blue/green` и

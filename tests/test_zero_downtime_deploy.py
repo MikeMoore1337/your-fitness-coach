@@ -499,12 +499,17 @@ def test_gateway_switch_validates_before_atomic_reload(monkeypatch) -> None:
 
     deploy._switch_gateway("green", "blue")
 
-    assert "validate" in commands[0]
-    assert any("reload" in command for command in commands)
-    assert commands.index(
-        next(command for command in commands if "validate" in command)
-    ) < commands.index(next(command for command in commands if "reload" in command))
-    assert any("YFC_ASSET_FALLBACK_UPSTREAM=backend-blue:8000" in part for part in commands[0])
+    gateway_config = "/tmp/yfc-current-Caddyfile.edge"
+    assert commands[0] == ("cp", "deploy/Caddyfile.edge", f"edge:{gateway_config}")
+    validate_command = next(command for command in commands if "validate" in command)
+    adapt_command = next(command for command in commands if "adapt" in command)
+    reload_command = next(command for command in commands if "reload" in command)
+    assert commands.index(commands[0]) < commands.index(validate_command)
+    assert commands.index(validate_command) < commands.index(reload_command)
+    assert gateway_config in validate_command
+    assert gateway_config in adapt_command
+    assert gateway_config in reload_command
+    assert any("YFC_ASSET_FALLBACK_UPSTREAM=backend-blue:8000" in part for part in validate_command)
 
 
 def test_current_run_logs_use_the_container_start_boundary(monkeypatch) -> None:

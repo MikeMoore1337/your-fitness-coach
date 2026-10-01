@@ -278,3 +278,22 @@ def test_existing_compact_and_slot_contracts_remain_intact() -> None:
     assert "handle_response @asset_missing" in edge
     assert "lb_retries" not in edge
     assert orchestrator.index('"validate"') < orchestrator.index('"reload"')
+
+
+def test_edge_serves_canonical_robots_without_backend_dependency() -> None:
+    root = Path(__file__).resolve().parents[1]
+    edge = (root / "deploy" / "Caddyfile.edge").read_text(encoding="utf-8")
+
+    assert "@robots path /robots.txt" in edge
+    assert 'header Cache-Control "public, max-age=3600"' in edge
+    assert 'header Content-Type "text/plain; charset=utf-8"' in edge
+    for directive in (
+        "User-agent: *",
+        "Allow: /",
+        "Allow: /api/v1/public/",
+        "Disallow: /api/",
+        "Sitemap: https://your-fitness-coach.ru/sitemap.xml",
+    ):
+        assert directive in edge
+    assert "respond <<ROBOTS" in edge
+    assert "ROBOTS 200" in edge
