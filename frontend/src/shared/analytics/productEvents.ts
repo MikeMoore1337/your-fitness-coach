@@ -42,6 +42,8 @@ export type NextActionAnalyticsKind =
   | 'ready_program'
   | 'create_program'
   | 'workout_result'
+  | 'workout_recovery'
+  | 'resume_program'
   | 'nutrition'
   | 'activity'
   | 'profile';
@@ -693,6 +695,8 @@ const NEXT_ACTION_KINDS = new Set<NextActionAnalyticsKind>([
   'ready_program',
   'create_program',
   'workout_result',
+  'workout_recovery',
+  'resume_program',
   'nutrition',
   'activity',
   'profile',

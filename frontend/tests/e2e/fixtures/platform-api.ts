@@ -1655,6 +1655,17 @@ export async function installPlatformApi(
     if (path.endsWith('/workouts/schedule')) {
       return route.fulfill({ json: contextIsCompleted ? [] : [contextWorkout] });
     }
+    if (path.endsWith('/workouts/recovery')) {
+      return route.fulfill({
+        json: {
+          status: activeProgram ? 'clear' : 'no_active_program',
+          missed_workouts: [],
+          next_workout: activeProgram && workoutStatus !== 'none' ? workout() : null,
+          paused_program_id: null,
+          paused_program_title: null,
+        },
+      });
+    }
     if (path.endsWith('/workouts/history')) {
       return route.fulfill({
         json: contextIsCompleted
