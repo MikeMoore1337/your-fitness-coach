@@ -491,13 +491,16 @@ async def news_publishing_callback(callback: CallbackQuery, state: FSMContext) -
         "n": "remove_image",
         "v": "remove_image",
     }[action]
+    action_kwargs: dict[str, object] = {}
+    if action == "c":
+        action_kwargs["urgent_override"] = True
     status, blockers = await revision_action(
         draft_id=draft_id,
         admin_telegram_user_id=callback.from_user.id,
         action=api_action,
         image_revision=image_revision,
         artifact_hash=artifact_hash,
-        urgent_override=action == "c",
+        **action_kwargs,
     )
     message = (
         "Публикация поставлена в очередь"
