@@ -442,7 +442,9 @@ async function mockFirstRunApi(
   });
 }
 
-test('brand-new Web user enters Today without a mandatory profile step', async ({ page }) => {
+test('brand-new Web user sees the profile prerequisite as the Today primary action', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockFirstRunApi(page, 'required', 'missing');
 
@@ -454,9 +456,18 @@ test('brand-new Web user enters Today without a mandatory profile step', async (
   await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveCount(0);
+
+  await page.getByRole('link', { name: 'Заполнить профиль' }).click();
+  await expect(page).toHaveURL('/app?section=profile#profile-fitness');
+
+  await page.unroute('**/api/v1/**');
+  await mockFirstRunApi(page, 'complete', 'complete');
+  await page.goto('/app');
   await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Создать свою программу' }).click();
   await expect(page).toHaveURL('/app?section=programs&start=create');
@@ -540,15 +551,13 @@ test('first-run shell stays usable across required responsive surfaces', async (
     await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
     await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(current.width);
-    for (const action of [
-      'Выбрать готовую программу',
-      'Создать свою программу',
-      'Заполнить профиль',
-    ]) {
+    for (const action of ['Заполнить профиль']) {
       const box = await page.getByRole('link', { name: action }).boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(44);
     }
+    await expect(page.getByRole('link', { name: 'Создать свою программу' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveCount(0);
 
     if (captureTask117Proofs) {
       await page.screenshot({
@@ -573,6 +582,7 @@ test('Telegram Mini App uses the same first-run shell for a legacy required user
   await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Какая у вас главная цель?' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Включить .* тему/ })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Заполнить профиль' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Создать свою программу' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Выбрать готовую программу' })).toHaveCount(0);
 });
