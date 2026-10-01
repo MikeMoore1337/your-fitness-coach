@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import contextlib
 import hashlib
 import hmac
 import json
@@ -25,9 +26,13 @@ from fitminiapp_api.models.notification import (
     WebPushSubscription,
 )
 from fitminiapp_api.models.user import User
-from fitminiapp_api.services.notifications import NotificationDeliveryError
+from fitminiapp_api.services.notifications import (
+    NotificationDeliveryError,
+    validate_notification_destination,
+)
 
-WEB_PUSH_PAYLOAD = json.dumps({"version": 1}, separators=(",", ":"))
+WEB_PUSH_FALLBACK_PATH = "/app?section=profile#profile-notifications"
+WEB_PUSH_PAYLOAD_VERSION = 2
 WEB_PUSH_TTL_SECONDS = 300
 _BASE64URL_PATTERN = re.compile(r"[A-Za-z0-9_-]+={0,2}\Z")
 
@@ -257,6 +262,17 @@ def _vapid_key_for_delivery():
         raise WebPushConfigurationError from exc
 
 
+def _web_push_payload(action_url: object) -> str:
+    destination = WEB_PUSH_FALLBACK_PATH
+    if isinstance(action_url, str):
+        with contextlib.suppress(ValueError):
+            destination = validate_notification_destination(action_url)
+    return json.dumps(
+        {"version": WEB_PUSH_PAYLOAD_VERSION, "url": destination},
+        separators=(",", ":"),
+    )
+
+
 def _send_web_push_sync(subscription: Mapping[str, object]) -> None:
     if not settings.web_push_enabled:
         raise WebPushDisabledError
@@ -271,7 +287,7 @@ def _send_web_push_sync(subscription: Mapping[str, object]) -> None:
         session.max_redirects = 0
         webpush(
             subscription_info=subscription_info,
-            data=WEB_PUSH_PAYLOAD,
+            data=_web_push_payload(subscription.get("action_url")),
             vapid_private_key=_vapid_key_for_delivery(),
             vapid_claims={"sub": settings.web_push_vapid_subject},
             content_encoding="aes128gcm",

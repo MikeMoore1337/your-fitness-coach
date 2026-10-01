@@ -42,6 +42,30 @@
           "type": "image/svg+xml"
         }
       ]
+    },
+    {
+      "name": "Тренировка",
+      "short_name": "Тренировка",
+      "url": "/app?section=today&source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/assets/brand/pwa-icon.svg",
+          "sizes": "192x192 512x512",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Добавить еду",
+      "short_name": "Добавить еду",
+      "url": "/app?section=nutrition&quick_add=food&source=pwa-shortcut",
+      "icons": [
+        {
+          "src": "/assets/brand/pwa-icon.svg",
+          "sizes": "192x192 512x512",
+          "type": "image/svg+xml"
+        }
+      ]
     }
   ]
 }

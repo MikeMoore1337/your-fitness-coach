@@ -19,6 +19,22 @@ test('serves the install manifest, canonical icons and service worker contract',
     display: 'standalone',
     lang: 'ru',
   });
+  expect(manifest.shortcuts).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        name: 'Сегодня',
+        url: '/app?section=today&source=pwa-shortcut',
+      }),
+      expect.objectContaining({
+        name: 'Тренировка',
+        url: '/app?section=today&source=pwa-shortcut',
+      }),
+      expect.objectContaining({
+        name: 'Добавить еду',
+        url: '/app?section=nutrition&quick_add=food&source=pwa-shortcut',
+      }),
+    ]),
+  );
   expect(manifest.icons).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ src: '/assets/brand/pwa-icon.svg', purpose: 'any' }),

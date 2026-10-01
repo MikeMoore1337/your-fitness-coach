@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import json
 import sys
 import types
 from datetime import datetime
@@ -333,6 +334,46 @@ def test_web_push_worker_sends_each_device_and_removes_expired_capability(
     with get_session_context() as db:
         assert db.query(WebPushSubscription).count() == 0
         assert db.query(NotificationDelivery).count() == 0
+
+
+def test_web_push_worker_passes_only_the_resolved_internal_destination(monkeypatch) -> None:
+    _enable_web_push(monkeypatch)
+    send = AsyncMock()
+    monkeypatch.setattr(worker, "send_web_push", send)
+
+    _create_due_event_with_subscriptions()
+    asyncio.run(worker._run_web_push_delivery_batch())
+
+    assert send.await_count == 2
+    for call in send.await_args_list:
+        target = call.args[0]
+        assert target["action_url"] == "/app?section=programs"
+        assert "title" not in target
+        assert "body" not in target
+
+
+def test_web_push_payload_keeps_context_route_but_not_notification_content(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_webpush(**kwargs):
+        calls.append(kwargs)
+        return types.SimpleNamespace(status_code=201, text="", headers={})
+
+    monkeypatch.setitem(sys.modules, "pywebpush", types.SimpleNamespace(webpush=fake_webpush))
+    monkeypatch.setattr(
+        "fitminiapp_api.services.web_push._vapid_key_for_delivery",
+        lambda: object(),
+    )
+    monkeypatch.setattr(settings, "web_push_enabled", True)
+    payload = _valid_subscription_payload("context-route")
+    payload["action_url"] = "/app?section=nutrition&date=2026-08-24&meal=breakfast"
+
+    _send_web_push_sync(payload)
+
+    assert json.loads(calls[0]["data"]) == {
+        "version": 2,
+        "url": "/app?section=nutrition&date=2026-08-24&meal=breakfast",
+    }
 
 
 def test_account_delete_removes_push_capabilities_and_delivery_rows(client, monkeypatch) -> None:
