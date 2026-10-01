@@ -8,6 +8,19 @@ const PUSH_NOTIFICATION_TITLE = 'Your Fitness Coach';
 const PUSH_NOTIFICATION_BODY =
   'В приложении есть новое уведомление. Откройте приложение, чтобы посмотреть.';
 const PUSH_NOTIFICATION_PATH = '/app?section=profile#profile-notifications';
+const PUSH_ALLOWED_QUERY_KEYS = new Set([
+  'section',
+  'workout_id',
+  'comment_id',
+  'workout_exercise_id',
+  'report_handoff_id',
+  'weekly_review',
+  'date',
+  'meal',
+  'hydration',
+  'return_to',
+]);
+const PUSH_ALLOWED_SECTIONS = new Set(['today', 'progress', 'programs', 'nutrition', 'profile']);
 
 function sameOrigin(url) {
   return url.origin === self.location.origin;
@@ -175,27 +188,67 @@ async function deleteYfcCaches() {
   );
 }
 
-function pushNotificationUrl() {
-  const url = new URL(PUSH_NOTIFICATION_PATH, self.location.origin);
-  if (
-    url.origin !== self.location.origin ||
-    url.pathname !== '/app' ||
-    url.search !== '?section=profile' ||
-    url.hash !== '#profile-notifications'
-  ) {
-    return new URL('/app?section=profile#profile-notifications', self.location.origin);
+function isPositiveInteger(value) {
+  return /^\d+$/.test(value) && Number(value) > 0;
+}
+
+function safePushUrl(value) {
+  if (typeof value !== 'string') return null;
+  let url;
+  try {
+    url = new URL(value, self.location.origin);
+  } catch {
+    return null;
   }
+  if (url.origin !== self.location.origin || url.pathname !== '/app') return null;
+  if (url.hash && url.hash !== '#profile-notifications') return null;
+  const keys = Array.from(url.searchParams.keys());
+  if (keys.some((key) => !PUSH_ALLOWED_QUERY_KEYS.has(key))) return null;
+  for (const key of PUSH_ALLOWED_QUERY_KEYS) {
+    if (url.searchParams.getAll(key).length > 1) return null;
+  }
+  const section = url.searchParams.get('section');
+  if (section && !PUSH_ALLOWED_SECTIONS.has(section)) return null;
+  for (const key of ['workout_id', 'comment_id', 'workout_exercise_id', 'report_handoff_id']) {
+    const id = url.searchParams.get(key);
+    if (id && !isPositiveInteger(id)) return null;
+  }
+  if (url.searchParams.get('report_handoff_id') && section !== 'progress') return null;
+  if (url.searchParams.get('weekly_review') && url.searchParams.get('weekly_review') !== '1') {
+    return null;
+  }
+  const date = url.searchParams.get('date');
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const meal = url.searchParams.get('meal');
+  if (meal && !['breakfast', 'lunch', 'dinner', 'snacks'].includes(meal)) return null;
+  if (meal && section !== 'nutrition') return null;
+  const hydration = url.searchParams.get('hydration');
+  if (hydration && hydration !== 'quick') return null;
+  if (hydration && section !== 'nutrition') return null;
+  const returnTo = url.searchParams.get('return_to');
+  if (returnTo && returnTo !== PUSH_NOTIFICATION_PATH) return null;
   return url;
+}
+
+function pushNotificationUrl(payload) {
+  const requested = safePushUrl(payload?.url);
+  return requested || new URL(PUSH_NOTIFICATION_PATH, self.location.origin);
 }
 
 self.addEventListener('push', (event) => {
   // The server payload is intentionally opaque: private notification details are loaded only
   // after the application authenticates and resolves ownership in the API.
+  let payload = null;
+  try {
+    payload = event.data?.json() || null;
+  } catch {
+    payload = null;
+  }
   event.waitUntil(
     self.registration.showNotification(PUSH_NOTIFICATION_TITLE, {
       body: PUSH_NOTIFICATION_BODY,
       tag: 'yfc-notification',
-      data: { url: pushNotificationUrl().toString() },
+      data: { url: pushNotificationUrl(payload).toString() },
     }),
   );
 });
@@ -204,7 +257,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
     (async () => {
-      const destination = pushNotificationUrl().toString();
+      const destination = pushNotificationUrl(event.notification.data).toString();
       const clients = await self.clients.matchAll({
         type: 'window',
         includeUncontrolled: true,

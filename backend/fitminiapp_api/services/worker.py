@@ -580,6 +580,7 @@ def _prepare_web_push_delivery(
             delivery.next_attempt_at = retry_at
             delivery.processing_started_at = None
             return None
+    destination, _ = resolve_notification_destination(db, user, notification)
     return {
         "notification_id": notification.id,
         "category": notification.category,
@@ -587,6 +588,7 @@ def _prepare_web_push_delivery(
         "subscription": {
             "endpoint": subscription.endpoint,
             "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
+            "action_url": destination,
         },
     }
 
