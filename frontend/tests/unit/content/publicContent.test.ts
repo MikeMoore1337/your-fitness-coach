@@ -90,7 +90,7 @@ describe('public content routing', () => {
       kind: 'program',
       slug: 'full-body-3-days',
       program: { slug: 'full-body-3-days' },
-      heading: 'Программа тренировок 3 раза в неделю: Full Body на 3 дня',
+      heading: 'Программа тренировок 3 раза в неделю: всё тело (Full Body)',
     });
     expect(
       publicContent.pages.filter((page) => page.path === '/programs/full-body-3-days'),

@@ -66,9 +66,9 @@ def test_full_body_public_program_reuses_canonical_three_day_seed():
     assert program is not None
     assert public_program_quality_errors(program) == ()
     assert [day["title"] for day in program["days"]] == [
-        "Фуллбади A",
-        "Фуллбади B",
-        "Фуллбади C",
+        "Всё тело A",
+        "Всё тело B",
+        "Всё тело C",
     ]
     assert len(program["days"]) == 3
     assert program["days"][0]["exercises"][0] == {

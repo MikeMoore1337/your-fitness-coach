@@ -11,13 +11,15 @@ export const strengthTemplateRules = {
       min: 3,
       max: 4,
       recommended: 3,
-      warning: 'Для новичка Push/Pull/Legs требует уверенной техники и контроля объёма.',
+      warning:
+        'Для новичка схема «толкай/тяни/ноги» (PPL) требует уверенной техники и контроля объёма.',
     },
     split: {
       min: 3,
       max: 4,
       recommended: 4,
-      warning: 'Для новичка Full Body или Верх/Низ обычно эффективнее классического сплита.',
+      warning:
+        'Для новичка тренировки всего тела или схема «верх/низ» обычно эффективнее классического сплита.',
     },
   },
   intermediate: {
@@ -42,7 +44,7 @@ interface PresetDay {
 
 const library: Record<string, PresetDay> = {
   fullbodyA: {
-    title: 'Фуллбади A · грудь и квадрицепс',
+    title: 'Всё тело A · грудь и квадрицепс',
     exercises: [
       ['squat', 4, '6-8', 150],
       ['bench-press', 4, '6-8', 150],
@@ -52,7 +54,7 @@ const library: Record<string, PresetDay> = {
     ],
   },
   fullbodyB: {
-    title: 'Фуллбади B · спина и бёдра',
+    title: 'Всё тело B · спина и бёдра',
     exercises: [
       ['deadlift', 3, '3-5', 180],
       ['overhead-press', 4, '6-8', 150],
@@ -62,7 +64,7 @@ const library: Record<string, PresetDay> = {
     ],
   },
   fullbodyC: {
-    title: 'Фуллбади C · ягодицы и спина',
+    title: 'Всё тело C · ягодицы и спина',
     exercises: [
       ['front-squat', 4, '6-8', 150],
       ['incline-dumbbell-press', 3, '8-10', 120],
@@ -72,7 +74,7 @@ const library: Record<string, PresetDay> = {
     ],
   },
   fullbodyD: {
-    title: 'Фуллбади D · облегчённая',
+    title: 'Всё тело D · облегчённая',
     exercises: [
       ['leg-press', 3, '10-12', 120],
       ['machine-chest-press', 3, '10-12', 90],
@@ -82,7 +84,7 @@ const library: Record<string, PresetDay> = {
     ],
   },
   fullbodyE: {
-    title: 'Фуллбади E · плечи и руки',
+    title: 'Всё тело E · плечи и руки',
     exercises: [
       ['goblet-squat', 3, '10-12', 90],
       ['dumbbell-bench-press', 3, '8-10', 90],

@@ -21,13 +21,13 @@ SOURCE_TITLES = {
     "stronglifts-5x5": "StrongLifts 5x5 (силовая программа 5x5)",
     "gzclp": "GZCLP (линейная прогрессия GZCL)",
     "531-for-beginners": "5/3/1 для начинающих",
-    "phul": "PHUL (сила и гипертрофия, верх/низ)",
+    "phul": "PHUL (сила и рост мышц, верх/низ)",
     "nsuns-4d": "nSuns - 4-дневная программа",
     "metallicdpa-linear-progression-ppl": (
-        "Линейная прогрессия Metallicdpa - PPL (толкай/тяни/ноги)"
+        "Линейная прогрессия Metallicdpa - толкай/тяни/ноги (PPL)"
     ),
     "bwf-recommended-routine": ("BWF (тренировки с собственным весом) - рекомендуемая программа"),
-    "dumbbell-ppl-gregarioushermit": "Гантельная PPL (толкай/тяни/ноги)",
+    "dumbbell-ppl-gregarioushermit": "Гантельная программа «толкай/тяни/ноги» (PPL)",
 }
 
 SOURCE_DAY_TITLES = {

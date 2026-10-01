@@ -3809,7 +3809,10 @@ def test_public_api_resources_are_fetchable_but_not_indexable(client, path):
     ("path", "heading"),
     [
         ("/training", "Дневник тренировок: от программы до прогресса"),
-        ("/programs/full-body-3-days", "Программа тренировок 3 раза в неделю: Full Body на 3 дня"),
+        (
+            "/programs/full-body-3-days",
+            "Программа тренировок 3 раза в неделю: всё тело (Full Body)",
+        ),
         ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
         ("/calculators/1rm", "Калькулятор 1ПМ: оценочный одноповторный максимум"),
         ("/progress", "Прогресс, который можно проверить"),
@@ -3927,7 +3930,7 @@ def test_public_guide_has_visible_editorial_metadata_and_truthful_schema(client,
     assert "Опубликованные руководства" in knowledge.text
     assert (
         '<a href="/knowledge/training/how-to-start-strength-training">'
-        "Full Body и Split: выберите схему, которую сможете повторять</a>" in knowledge.text
+        "Всё тело или сплит: выберите схему, которую сможете повторять</a>" in knowledge.text
     )
 
 
@@ -4003,7 +4006,7 @@ def test_public_program_api_and_fallback_expose_only_canonical_schedule(client, 
         in response.text
     )
     assert response.text.count("<h1>") == 1
-    assert "Фуллбади A" in response.text
+    assert "Всё тело A" in response.text
     assert "Приседания" in response.text
     assert "4 подхода" in response.text
     assert "?section=programs" in response.text
