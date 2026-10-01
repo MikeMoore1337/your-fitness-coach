@@ -113,7 +113,9 @@ class RequestContextMiddleware:
                     headers["Cache-Control"] = (
                         "public, max-age=2592000, stale-while-revalidate=86400"
                     )
-                elif path.startswith("/api/v1/") and not path.startswith("/api/v1/public/"):
+                elif path.startswith("/api/v1/public/"):
+                    headers.setdefault("X-Robots-Tag", "noindex, follow")
+                elif path.startswith("/api/v1/"):
                     headers["Cache-Control"] = "no-store, private"
                     headers["Pragma"] = "no-cache"
             await send(message)
