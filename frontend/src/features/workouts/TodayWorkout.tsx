@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
-import type { Workout } from '../../shared/api/types';
+import type { Workout, WorkoutScheduleItem } from '../../shared/api/types';
 import { haptic } from '../../shared/telegram/useTelegram';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
@@ -29,6 +29,7 @@ import {
 import { legacyWorkoutRestStorageKey } from '../../shared/userScopedStorage';
 import { WorkoutAdaptation } from './WorkoutAdaptation';
 import { WorkoutCompletionSummary } from './WorkoutCompletionSummary';
+import { WorkoutRecovery } from './WorkoutRecovery';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
 import { useActiveWorkoutQueue } from './useActiveWorkoutQueue';
 import { useRuntimeCapabilities } from '../../shared/runtime/runtime';
@@ -989,6 +990,7 @@ export function TodayWorkout({
   const capabilities = useRuntimeCapabilities();
   const queryClient = useQueryClient();
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [dismissedGuidance, setDismissedGuidance] = useState<Set<number>>(() => new Set());
   const [expandedExercises, setExpandedExercises] = useState<Set<number>>(() => new Set());
   const workout = useQuery({
@@ -1134,6 +1136,15 @@ export function TodayWorkout({
     );
 
   const data = workout.data;
+  const recoveryWorkout: WorkoutScheduleItem = {
+    id: data.id,
+    scheduled_date: data.scheduled_date,
+    scheduled_time: data.scheduled_time,
+    title: data.title,
+    status: data.status,
+    day_number: data.day_number,
+    week_number: data.week_number,
+  };
   const started = data.status === 'in_progress';
   const hasCardio = data.exercises.some((exercise) => exercise.metric_type === 'cardio');
   const nextLabel = currentSet
@@ -1518,24 +1529,15 @@ export function TodayWorkout({
 
         {data.status !== 'in_progress' && data.status !== 'completed' && (
           <>
-            <button
-              className="active-workout-skip"
-              disabled={!capabilities.canMutatePrograms}
-              onClick={async () => {
-                if (
-                  await confirm({
-                    title: 'Пропустить тренировку?',
-                    message:
-                      'Она останется в истории как пропущенная. Если хотите выполнить её позже, перенесите дату в разделе «Прогресс».',
-                    confirmText: 'Пропустить',
-                  })
-                )
-                  mutation.mutate({ path: `/api/v1/workouts/${data.id}/skip`, method: 'POST' });
-              }}
-            >
-              Пропустить тренировку
-            </button>
-            {!capabilities.canMutatePrograms && (
+            {capabilities.canMutatePrograms ? (
+              <WorkoutRecovery
+                workout={recoveryWorkout}
+                timeZone={user?.profile?.timezone}
+                open={recoveryOpen}
+                onOpenChange={setRecoveryOpen}
+                triggerLabel="Изменить план или пропустить"
+              />
+            ) : (
               <p className="muted demo-capability-notice" role="status">
                 Пропуск тренировки доступен после входа.
               </p>

@@ -10,6 +10,7 @@ import type {
   WeeklyCheckInCurrent,
   Workout,
   WorkoutComment,
+  WorkoutRecoveryState,
   WorkoutScheduleItem,
 } from '../../shared/api/types';
 import {
@@ -28,6 +29,7 @@ import {
   saveActiveWorkoutSnapshot,
 } from '../workouts/activeWorkoutQueue';
 import { WorkoutAdaptation } from '../workouts/WorkoutAdaptation';
+import { WorkoutRecovery } from '../workouts/WorkoutRecovery';
 import { TodayWorkout } from '../workouts/TodayWorkout';
 import { Badge, Button, SemanticCard, Skeleton } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
@@ -542,11 +544,13 @@ function WorkoutOverview({
   weeklyReview,
   trainerComment,
   progress,
+  recovery,
   detailsOpen,
   startPending,
   onOpenDetails,
   onAddActivity,
   onStart,
+  onOpenRecovery,
   canMutateProgress,
   profileBlocksRecommendation,
   hasNutritionConfirmation,
@@ -557,6 +561,7 @@ function WorkoutOverview({
   weeklyReview?: WeeklyCheckInCurrent;
   trainerComment?: WorkoutComment;
   progress: ReturnType<typeof useProgressSummary>;
+  recovery?: WorkoutRecoveryState | null;
   detailsOpen: boolean;
   startPending: boolean;
   onOpenDetails(): void;
@@ -565,6 +570,7 @@ function WorkoutOverview({
   canMutateProgress: boolean;
   profileBlocksRecommendation: boolean;
   hasNutritionConfirmation: boolean;
+  onOpenRecovery(): void;
 }) {
   const { user } = useAuth();
   const totalSets =
@@ -576,15 +582,18 @@ function WorkoutOverview({
     ) ?? 0;
   const completedToday = !workout && progress.data?.training.last_completed_workout_on === today;
   const nextWorkout = progress.data?.training.next_workout;
+  const hasActiveProgram =
+    Boolean(user?.has_active_program) && recovery?.status !== 'no_active_program';
   const plan = selectNextAction({
     today,
-    hasActiveProgram: Boolean(user?.has_active_program),
+    hasActiveProgram,
     workout,
     todayScheduleItem,
     trainerComment,
     weeklyReview,
     lastCompletedWorkoutOn: progress.data?.training.last_completed_workout_on,
     nextWorkout,
+    recovery,
     profileBlocksRecommendation,
     hasNutritionConfirmation,
   });
@@ -628,11 +637,15 @@ function WorkoutOverview({
           ? 'weekly_review'
           : item.kind === 'ready_program' || item.kind === 'create_program'
             ? 'programs'
-            : item.kind === 'nutrition'
-              ? 'nutrition'
-              : item.kind === 'trainer_feedback' || item.kind === 'workout_result'
-                ? 'progress'
-                : null;
+            : item.kind === 'resume_program'
+              ? 'programs'
+              : item.kind === 'workout_recovery'
+                ? 'workout'
+                : item.kind === 'nutrition'
+                  ? 'nutrition'
+                  : item.kind === 'trainer_feedback' || item.kind === 'workout_result'
+                    ? 'progress'
+                    : null;
     if (position === 'primary' && destination) {
       trackProductEvent({
         name: 'today_primary_action_selected',
@@ -643,6 +656,22 @@ function WorkoutOverview({
   };
 
   const renderActionLink = (item: NextAction, position: 'primary' | 'secondary') => {
+    if (item.target.type === 'workout_recovery') {
+      return (
+        <Button
+          fullWidth
+          key={`${item.kind}-${position}`}
+          variant={position === 'primary' ? 'primary' : 'secondary'}
+          type="button"
+          onClick={() => {
+            trackNextActionClick(item, position);
+            onOpenRecovery();
+          }}
+        >
+          {item.title}
+        </Button>
+      );
+    }
     if (item.target.type === 'activity') {
       return (
         <Button
@@ -834,7 +863,7 @@ function WorkoutOverview({
     );
   }
 
-  if (!user?.has_active_program) {
+  if (!hasActiveProgram) {
     return (
       <>
         <div className="today-workout-copy">
@@ -933,6 +962,7 @@ export function TodayDashboard({
   const autoOpenedCompletionRef = useRef<number | null>(null);
   const previousCardioOpenRef = useRef(initialCardioOpen);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [cardioOpenRequest, setCardioOpenRequest] = useState(initialCardioOpen ? 1 : 0);
   const wellbeingRequested = Boolean(initialWellbeingOpen || initialWellbeingDate);
   const timeZone = user?.profile?.timezone || detectedTimeZone();
@@ -975,6 +1005,11 @@ export function TodayDashboard({
   const week = useQuery({
     queryKey: ['workout', 'week'],
     queryFn: () => api<WorkoutScheduleItem[]>('/api/v1/workouts/week'),
+  });
+  const recovery = useQuery({
+    queryKey: ['workout', 'recovery'],
+    queryFn: () => api<WorkoutRecoveryState>('/api/v1/workouts/recovery'),
+    enabled: Boolean(user),
   });
   const cardioWeek = useQuery({
     queryKey: queryKeys.cardio.range(weekStart, weekEnd),
@@ -1133,12 +1168,29 @@ export function TodayDashboard({
     detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   }, [detailsOpen]);
 
+  const requestedRecoveryWorkoutId = Number(new URLSearchParams(search).get('recovery_workout_id'));
+  const recoveryDeepLinkOpen = Boolean(
+    Number.isInteger(requestedRecoveryWorkoutId) &&
+    requestedRecoveryWorkoutId > 0 &&
+    recovery.data?.status === 'missed' &&
+    recovery.data.missed_workouts.some((item) => item.id === requestedRecoveryWorkoutId),
+  );
+  const setRecoveryDialogOpen = (open: boolean) => {
+    setRecoveryOpen(open);
+    if (open || !new URLSearchParams(search).has('recovery_workout_id')) return;
+    const params = new URLSearchParams(search);
+    params.delete('recovery_workout_id');
+    const nextSearch = params.toString();
+    navigate(`/app${nextSearch ? `?${nextSearch}` : ''}`, true);
+  };
+
   useEffect(() => {
     const calendarContext = `${timeZone}:${today}`;
     if (calendarContextRef.current === calendarContext) return;
     calendarContextRef.current = calendarContext;
     setSelectedDate(today);
     setDetailsOpen(false);
+    setRecoveryOpen(false);
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true }),
       queryClient.invalidateQueries({ queryKey: ['workout', 'week'], exact: true }),
@@ -1151,7 +1203,10 @@ export function TodayDashboard({
   const priorityContextLoading = Boolean(
     !visibleWorkout &&
     user?.has_active_program &&
-    (week.isLoading || weeklyReview.isLoading || (todayScheduleItem && comments.isLoading)),
+    (week.isLoading ||
+      recovery.isLoading ||
+      weeklyReview.isLoading ||
+      (todayScheduleItem && comments.isLoading)),
   );
 
   if (detailsOpen && visibleWorkout) {
@@ -1273,6 +1328,7 @@ export function TodayDashboard({
                 weeklyReview={weeklyReview.data}
                 trainerComment={trainerComment}
                 progress={progress}
+                recovery={recovery.data}
                 detailsOpen={detailsOpen}
                 startPending={start.isPending}
                 onOpenDetails={() => setDetailsOpen(true)}
@@ -1281,9 +1337,24 @@ export function TodayDashboard({
                 canMutateProgress={capabilities.canMutateProgress}
                 profileBlocksRecommendation={profileMissing}
                 hasNutritionConfirmation={nutritionConfirmed}
+                onOpenRecovery={() => setRecoveryDialogOpen(true)}
               />
             )}
           </section>
+
+          {selectedDate === today &&
+            recovery.data?.status === 'missed' &&
+            recovery.data.missed_workouts[0] && (
+              <WorkoutRecovery
+                key={`${recovery.data.missed_workouts[0].id}:${recoveryOpen || recoveryDeepLinkOpen ? 'open' : 'closed'}`}
+                workout={recovery.data.missed_workouts[0]}
+                timeZone={timeZone}
+                open={recoveryOpen || recoveryDeepLinkOpen}
+                onOpenChange={setRecoveryDialogOpen}
+                hideTrigger
+                onApplied={() => setRecoveryDialogOpen(false)}
+              />
+            )}
 
           <WeekContext
             cardio={cardioWeek.data}
@@ -1297,6 +1368,7 @@ export function TodayDashboard({
             onSelect={(date) => {
               setSelectedDate(date);
               setDetailsOpen(false);
+              setRecoveryDialogOpen(false);
               if (date !== today) {
                 trackProductEvent({
                   name: 'today_week_navigated',

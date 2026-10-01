@@ -51,6 +51,11 @@ from fitminiapp_api.schemas.workout import (
     WorkoutHistoryItem,
     WorkoutHistorySummary,
     WorkoutProgressResponse,
+    WorkoutRecoveryApplyRequest,
+    WorkoutRecoveryApplyResponse,
+    WorkoutRecoveryPreviewResponse,
+    WorkoutRecoveryRequest,
+    WorkoutRecoveryStateResponse,
     WorkoutRescheduleRequest,
     WorkoutScheduleItem,
     WorkoutSetUpdate,
@@ -128,6 +133,12 @@ from fitminiapp_api.services.workout_completion import build_workout_completion_
 from fitminiapp_api.services.workout_metrics import (
     validate_workout_set_changes,
     workout_exercise_metric_type,
+)
+from fitminiapp_api.services.workout_recovery import (
+    WorkoutRecoveryError,
+    apply_recovery,
+    build_recovery_preview,
+    recovery_state,
 )
 from fitminiapp_api.services.workout_sync import (
     WorkoutSetSyncError,
@@ -499,6 +510,14 @@ def get_today_workout(
     return _serialize_workout(workout, db, current_user)
 
 
+@router.get("/recovery", response_model=WorkoutRecoveryStateResponse)
+def get_workout_recovery_state(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return recovery_state(db, current_user)
+
+
 @router.get(
     "/{workout_id}/exercises/{workout_exercise_id}/alternatives",
     response_model=list[WorkoutAlternativeItem],
@@ -578,6 +597,43 @@ def apply_workout_adaptation(
         "applied_at": adaptation.applied_at,
         "workout": _serialize_workout(updated, db, current_user),
     }
+
+
+@router.post(
+    "/{workout_id}/recovery/preview",
+    response_model=WorkoutRecoveryPreviewResponse,
+)
+def preview_workout_recovery(
+    workout_id: int,
+    payload: WorkoutRecoveryRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    try:
+        return build_recovery_preview(db, current_user, workout, payload)
+    except WorkoutRecoveryError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/{workout_id}/recovery/apply",
+    response_model=WorkoutRecoveryApplyResponse,
+)
+def apply_workout_recovery(
+    workout_id: int,
+    payload: WorkoutRecoveryApplyRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    _lock_program(db, workout.user_program_id)
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    try:
+        return apply_recovery(db, current_user, workout, payload, payload.preview_token)
+    except WorkoutRecoveryError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("/week", response_model=list[WorkoutScheduleItem])

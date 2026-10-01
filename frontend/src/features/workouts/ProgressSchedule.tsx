@@ -1,15 +1,14 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { WorkoutScheduleItem } from '../../shared/api/types';
 import { dateInputValue, detectedTimeZone, formatCalendarDate } from '../../shared/dateTime';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
-import { useFeedback } from '../../shared/ui/FeedbackProvider';
-import { DateInput, TimeInput } from '../../shared/ui/PickerInput';
 import { ProgressExperience } from './ProgressExperience';
 import { WeeklyCheckInCard } from './WeeklyCheckInCard';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
+import { WorkoutRecovery } from './WorkoutRecovery';
 
 function formatDate(value: string): string {
   return formatCalendarDate(value, {
@@ -21,23 +20,15 @@ function formatDate(value: string): string {
 
 function ScheduleRow({
   item,
-  minDate,
-  pending,
+  timeZone,
   focusedCommentId,
   focusedExerciseId,
-  onReschedule,
-  onSkip,
 }: {
   item: WorkoutScheduleItem;
-  minDate: string;
-  pending: boolean;
+  timeZone?: string | null;
   focusedCommentId?: number | null;
   focusedExerciseId?: number | null;
-  onReschedule(date: string, time: string): void;
-  onSkip(): void;
 }) {
-  const [scheduledDate, setScheduledDate] = useState(item.scheduled_date);
-  const [scheduledTime, setScheduledTime] = useState(item.scheduled_time?.slice(0, 5) ?? '');
   return (
     <article
       className="list-row workout-context-row"
@@ -55,46 +46,17 @@ function ScheduleRow({
         <Badge>{workoutStatusLabel(item.status)}</Badge>
       </div>
       {item.status === 'planned' && (
-        <form
-          className="list-row__actions workout-schedule-actions"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onReschedule(scheduledDate, scheduledTime);
-          }}
-        >
-          <label className="field compact-field">
-            <span>Дата</span>
-            <DateInput
-              aria-label={`Новая дата для ${item.title}`}
-              min={minDate}
-              value={scheduledDate}
-              onChange={(event) => setScheduledDate(event.target.value)}
-              required
-            />
-          </label>
-          <label className="field compact-field">
-            <span>Время</span>
-            <TimeInput
-              aria-label={`Новое время для ${item.title}`}
-              value={scheduledTime}
-              onChange={(event) => setScheduledTime(event.target.value)}
-            />
-          </label>
-          <button
-            type="submit"
-            className="secondary"
-            disabled={
-              pending ||
-              (scheduledDate === item.scheduled_date &&
-                scheduledTime === (item.scheduled_time?.slice(0, 5) ?? ''))
+        <div className="list-row__actions workout-schedule-actions">
+          <WorkoutRecovery
+            workout={item}
+            timeZone={timeZone}
+            triggerLabel={
+              item.scheduled_date < dateInputValue(new Date(), timeZone || detectedTimeZone())
+                ? 'Разобраться с пропуском'
+                : 'Изменить план'
             }
-          >
-            Перенести
-          </button>
-          <button type="button" className="btn-danger" disabled={pending} onClick={onSkip}>
-            Пропустить
-          </button>
-        </form>
+          />
+        </div>
       )}
       <WorkoutFeedbackDisclosure
         workoutId={item.id}
@@ -121,43 +83,10 @@ export function SchedulePanel({
   focusedCommentId?: number | null;
   focusedExerciseId?: number | null;
 }) {
-  const { toast, confirm } = useFeedback();
-  const queryClient = useQueryClient();
   const schedule = useQuery({
     queryKey: ['workout', 'schedule'],
     queryFn: () => api<WorkoutScheduleItem[]>('/api/v1/workouts/schedule'),
   });
-  const mutation = useMutation({
-    mutationFn: ({
-      action,
-      workoutId,
-      scheduledDate,
-      scheduledTime,
-    }: {
-      action: 'reschedule' | 'skip';
-      workoutId: number;
-      scheduledDate?: string;
-      scheduledTime?: string;
-    }) =>
-      api<WorkoutScheduleItem>(
-        action === 'reschedule'
-          ? `/api/v1/workouts/${workoutId}/schedule`
-          : `/api/v1/workouts/${workoutId}/skip`,
-        action === 'reschedule'
-          ? {
-              method: 'PATCH',
-              body: { scheduled_date: scheduledDate, scheduled_time: scheduledTime || null },
-            }
-          : { method: 'POST' },
-      ),
-    onSuccess: async (_item, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ['workout'] });
-      toast(variables.action === 'reschedule' ? 'Тренировка перенесена' : 'Тренировка пропущена');
-    },
-    onError: (reason) => toast((reason as Error).message, 'error'),
-  });
-  const today = dateInputValue(new Date(), timeZone || detectedTimeZone());
-
   useEffect(() => {
     if (
       !focusedWorkoutId ||
@@ -188,8 +117,7 @@ export function SchedulePanel({
             <ScheduleRow
               key={`${item.id}-${item.scheduled_date}-${item.scheduled_time}-${item.status}`}
               item={item}
-              minDate={today}
-              pending={mutation.isPending && mutation.variables?.workoutId === item.id}
+              timeZone={timeZone}
               focusedCommentId={
                 focusedWorkoutId === item.id && item.status !== 'completed'
                   ? focusedCommentId
@@ -200,24 +128,6 @@ export function SchedulePanel({
                   ? focusedExerciseId
                   : null
               }
-              onReschedule={(scheduledDate, scheduledTime) =>
-                mutation.mutate({
-                  action: 'reschedule',
-                  workoutId: item.id,
-                  scheduledDate,
-                  scheduledTime,
-                })
-              }
-              onSkip={async () => {
-                if (
-                  await confirm({
-                    title: 'Пропустить тренировку?',
-                    message: `${item.title}, ${formatDate(item.scheduled_date)}. Её можно перенести, если вы планируете выполнить её позже.`,
-                    confirmText: 'Пропустить',
-                  })
-                )
-                  mutation.mutate({ action: 'skip', workoutId: item.id });
-              }}
             />
           ))}
         </div>

@@ -412,6 +412,66 @@ class WorkoutScheduleItem(BaseModel):
     week_number: int = 1
 
 
+WorkoutRecoveryAction = Literal["move", "skip"]
+
+
+class WorkoutRecoveryRequest(BaseModel):
+    action: WorkoutRecoveryAction
+    expected_scheduled_date: date
+    expected_scheduled_time: time | None = None
+    scheduled_date: date | None = None
+    scheduled_time: time | None = None
+
+    @model_validator(mode="after")
+    def validate_action_fields(self):
+        if self.action == "move" and self.scheduled_date is None:
+            raise ValueError("Для переноса укажите новую дату")
+        if self.action == "skip" and (
+            self.scheduled_date is not None or self.scheduled_time is not None
+        ):
+            raise ValueError("Для пропуска новая дата не нужна")
+        return self
+
+
+class WorkoutRecoveryApplyRequest(WorkoutRecoveryRequest):
+    preview_token: str = Field(min_length=64, max_length=64)
+
+
+class WorkoutRecoveryChange(BaseModel):
+    kind: Literal["moved", "skipped"]
+    from_scheduled_date: date
+    from_scheduled_time: time | None = None
+    to_scheduled_date: date | None = None
+    to_scheduled_time: time | None = None
+
+
+class WorkoutRecoveryStateResponse(BaseModel):
+    status: Literal["clear", "missed", "paused", "no_active_program"]
+    missed_workouts: list[WorkoutScheduleItem]
+    next_workout: WorkoutScheduleItem | None = None
+    paused_program_id: int | None = None
+    paused_program_title: str | None = None
+
+
+class WorkoutRecoveryPreviewResponse(BaseModel):
+    status: Literal["preview", "no_changes"]
+    workout: WorkoutScheduleItem
+    action: WorkoutRecoveryAction
+    ruleset_version: str
+    changes: list[WorkoutRecoveryChange]
+    remaining_workouts: list[WorkoutScheduleItem]
+    warnings: list[str]
+    message: str
+    preview_token: str | None = None
+
+
+class WorkoutRecoveryApplyResponse(BaseModel):
+    applied_at: datetime
+    workout: WorkoutScheduleItem
+    remaining_workouts: list[WorkoutScheduleItem]
+    next_workout: WorkoutScheduleItem | None = None
+
+
 class WorkoutRescheduleRequest(BaseModel):
     scheduled_date: date
     scheduled_time: time | None = None

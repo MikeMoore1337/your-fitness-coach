@@ -1758,6 +1758,15 @@ def handle_demo_transport(
             return _user(session)
         if path == "/api/v1/workouts/today":
             return _workout(session)
+        if path == "/api/v1/workouts/recovery":
+            schedule = _schedule(session)
+            return {
+                "status": "clear",
+                "missed_workouts": [],
+                "next_workout": schedule[0] if schedule else None,
+                "paused_program_id": None,
+                "paused_program_title": None,
+            }
         if path in {"/api/v1/workouts/week", "/api/v1/workouts/schedule"}:
             return _schedule(session)
         if path == "/api/v1/workouts/cardio":

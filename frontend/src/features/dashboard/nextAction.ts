@@ -3,6 +3,7 @@ import type {
   WeeklyCheckInCurrent,
   Workout,
   WorkoutComment,
+  WorkoutRecoveryState,
   WorkoutScheduleItem,
 } from '../../shared/api/types';
 
@@ -16,7 +17,9 @@ export type NextActionKind =
   | 'workout_result'
   | 'nutrition'
   | 'activity'
-  | 'profile';
+  | 'profile'
+  | 'workout_recovery'
+  | 'resume_program';
 
 export type NextActionReason =
   | 'resume_active_workout'
@@ -27,7 +30,9 @@ export type NextActionReason =
   | 'no_active_program'
   | 'completed_workout'
   | 'rest_day'
-  | 'profile_blocker';
+  | 'profile_blocker'
+  | 'missed_workout'
+  | 'resume_program';
 
 export type NextActionTarget =
   | { type: 'today_workout'; workoutId: number }
@@ -35,10 +40,11 @@ export type NextActionTarget =
   | { type: 'progress_workout'; workoutId: number }
   | { type: 'progress' }
   | { type: 'weekly_review' }
-  | { type: 'programs'; mode: 'templates' | 'create' }
+  | { type: 'programs'; mode: 'templates' | 'create' | 'assigned' }
   | { type: 'nutrition' }
   | { type: 'activity' }
-  | { type: 'profile' };
+  | { type: 'profile' }
+  | { type: 'workout_recovery'; workoutId: number };
 
 export interface NextAction {
   kind: NextActionKind;
@@ -67,6 +73,7 @@ export interface NextActionInputs {
   profileBlocksRecommendation?: boolean;
   readyProgramAvailable?: boolean;
   hasNutritionConfirmation?: boolean;
+  recovery?: WorkoutRecoveryState | null;
 }
 
 function action(
@@ -133,6 +140,16 @@ function nutritionAction(nextWorkout: NextWorkout | null | undefined): NextActio
   );
 }
 
+function recoveryAction(workout: WorkoutRecoveryState['missed_workouts'][number]): NextAction {
+  return action(
+    'workout_recovery',
+    'Разобраться с пропущенной',
+    `«${workout.title}» осталась в плане — выберите перенос или пропуск`,
+    'missed_workout',
+    { type: 'workout_recovery', workoutId: workout.id },
+  );
+}
+
 function secondary(actions: Array<NextAction | null>): NextAction[] {
   return actions.filter((item): item is NextAction => item !== null).slice(0, 2);
 }
@@ -149,6 +166,7 @@ export function selectNextAction({
   profileBlocksRecommendation = false,
   readyProgramAvailable = !hasActiveProgram,
   hasNutritionConfirmation = false,
+  recovery,
 }: NextActionInputs): NextActionPlan {
   const feedback = feedbackAction(
     trainerComment,
@@ -174,6 +192,21 @@ export function selectNextAction({
         { type: 'today_workout', workoutId: workout.id },
       ),
       secondary: secondary([feedback]),
+    };
+  }
+
+  if (recovery?.status === 'paused' && recovery.paused_program_id) {
+    return {
+      primary: action(
+        'resume_program',
+        'Продолжить программу',
+        recovery.paused_program_title
+          ? `Программа «${recovery.paused_program_title}» приостановлена`
+          : 'Программа приостановлена',
+        'resume_program',
+        { type: 'programs', mode: 'assigned' },
+      ),
+      secondary: [],
     };
   }
 
@@ -221,6 +254,11 @@ export function selectNextAction({
       ),
       secondary: [],
     };
+  }
+
+  const missedWorkout = recovery?.status === 'missed' ? recovery.missed_workouts[0] : undefined;
+  if (missedWorkout) {
+    return { primary: recoveryAction(missedWorkout), secondary: secondary([feedback]) };
   }
 
   if (feedback) {
@@ -294,12 +332,16 @@ export function nextActionHref(target: NextActionTarget): string {
     case 'weekly_review':
       return '/app?section=progress&weekly_review=1';
     case 'programs':
-      return `/app?section=programs&start=${target.mode}`;
+      return target.mode === 'assigned'
+        ? '/app?section=programs'
+        : `/app?section=programs&start=${target.mode}`;
     case 'nutrition':
       return '/app?section=nutrition';
     case 'activity':
       return '/app?section=today&cardio=1';
     case 'profile':
       return '/app?section=profile#profile-fitness';
+    case 'workout_recovery':
+      return `/app?section=today&recovery_workout_id=${target.workoutId}`;
   }
 }

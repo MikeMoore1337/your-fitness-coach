@@ -117,6 +117,26 @@ const schedule = [
   },
 ];
 
+const recoveryPreview = {
+  status: 'preview',
+  workout: schedule[0],
+  action: 'move',
+  ruleset_version: 'schedule-recovery-v1',
+  changes: [
+    {
+      kind: 'moved',
+      from_scheduled_date: '2030-01-10',
+      from_scheduled_time: '18:30:00',
+      to_scheduled_date: '2030-01-12',
+      to_scheduled_time: '19:15:00',
+    },
+  ],
+  remaining_workouts: [],
+  warnings: [],
+  message: 'Перенесём только эту тренировку.',
+  preview_token: 'a'.repeat(64),
+};
+
 const suspiciousLowDays: Array<{
   diary_date: string;
   calories: number;
@@ -308,10 +328,21 @@ describe('ProgressSchedule', () => {
       if (path === '/api/v1/workouts/schedule' && (!init?.method || init.method === 'GET')) {
         return new Response(JSON.stringify(schedule), { status: 200 });
       }
-      if (path === '/api/v1/workouts/42/schedule' && init?.method === 'PATCH') {
-        return new Response(JSON.stringify({ ...schedule[0], scheduled_date: '2030-01-12' }), {
-          status: 200,
-        });
+      if (path === '/api/v1/workouts/42/recovery/preview' && init?.method === 'POST') {
+        return new Response(JSON.stringify(recoveryPreview), { status: 200 });
+      }
+      if (path === '/api/v1/workouts/42/recovery/apply' && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            applied_at: '2030-01-10T12:00:00',
+            workout: { ...schedule[0], scheduled_date: '2030-01-12', scheduled_time: '19:15:00' },
+            remaining_workouts: [],
+            next_workout: null,
+          }),
+          {
+            status: 200,
+          },
+        );
       }
       return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
     });
@@ -322,7 +353,7 @@ describe('ProgressSchedule', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows progress and sends a reschedule request', async () => {
+  it('shows progress and applies a reviewed reschedule request', async () => {
     renderPanel();
 
     expect(await screen.findByText('80%', { exact: true })).toBeVisible();
@@ -337,19 +368,37 @@ describe('ProgressSchedule', () => {
     expect(screen.getByText('Запланирована')).toBeInTheDocument();
     expect(screen.queryByText('planned')).not.toBeInTheDocument();
 
-    const input = screen.getByLabelText('Новая дата для Тренировка A');
+    fireEvent.click(screen.getByRole('button', { name: 'Изменить план' }));
+    const input = screen.getByLabelText('Новая дата');
     fireEvent.change(input, { target: { value: '2030-01-12' } });
-    fireEvent.change(screen.getByLabelText('Новое время для Тренировка A'), {
+    fireEvent.change(screen.getByLabelText('Время'), {
       target: { value: '19:15' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Перенести' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Показать изменения' }));
+    expect(await screen.findByRole('heading', { name: 'Что изменится' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить' }));
 
     await waitFor(() =>
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        '/api/v1/workouts/42/schedule',
+        '/api/v1/workouts/42/recovery/preview',
         expect.objectContaining({
-          method: 'PATCH',
-          body: JSON.stringify({ scheduled_date: '2030-01-12', scheduled_time: '19:15' }),
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'move',
+            expected_scheduled_date: '2030-01-10',
+            expected_scheduled_time: '18:30:00',
+            scheduled_date: '2030-01-12',
+            scheduled_time: '19:15',
+          }),
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/v1/workouts/42/recovery/apply',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"preview_token"'),
         }),
       ),
     );

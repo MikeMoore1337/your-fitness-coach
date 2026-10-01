@@ -4,6 +4,7 @@ import type {
   WeeklyCheckInCurrent,
   Workout,
   WorkoutComment,
+  WorkoutRecoveryState,
   WorkoutScheduleItem,
 } from '../../../../src/shared/api/types';
 import { nextActionHref, selectNextAction } from '../../../../src/features/dashboard/nextAction';
@@ -40,6 +41,17 @@ function nextWorkout(): NonNullable<ProgressSummary['training']['next_workout']>
     scheduled_date: '2026-09-19',
     title: 'Тренировка B',
   } as NonNullable<ProgressSummary['training']['next_workout']>;
+}
+
+function recoveryState(status: WorkoutRecoveryState['status'] = 'missed'): WorkoutRecoveryState {
+  return {
+    status,
+    missed_workouts:
+      status === 'missed' ? [{ ...schedule('missed'), id: 99, scheduled_date: '2026-09-16' }] : [],
+    next_workout: null,
+    paused_program_id: status === 'paused' ? 12 : null,
+    paused_program_title: status === 'paused' ? 'Мой план' : null,
+  } as unknown as WorkoutRecoveryState;
 }
 
 describe('selectNextAction', () => {
@@ -89,6 +101,30 @@ describe('selectNextAction', () => {
 
     expect(plan.primary.kind).toBe('trainer_feedback');
     expect(plan.secondary.map((item) => item.kind)).toEqual(['scheduled_workout', 'weekly_review']);
+  });
+
+  it('puts missed-workout recovery ahead of optional feedback and rest actions', () => {
+    const plan = selectNextAction({
+      today,
+      hasActiveProgram: true,
+      trainerComment: comment(),
+      recovery: recoveryState(),
+    });
+
+    expect(plan.primary.kind).toBe('workout_recovery');
+    expect(plan.primary.reason).toBe('missed_workout');
+    expect(plan.primary.target).toEqual({ type: 'workout_recovery', workoutId: 99 });
+  });
+
+  it('offers resume for a paused program before creating a new plan', () => {
+    const plan = selectNextAction({
+      today,
+      hasActiveProgram: false,
+      recovery: recoveryState('paused'),
+    });
+
+    expect(plan.primary.kind).toBe('resume_program');
+    expect(plan.primary.target).toEqual({ type: 'programs', mode: 'assigned' });
   });
 
   it('puts a ready program first and the custom builder second after profile readiness', () => {
@@ -169,6 +205,9 @@ describe('selectNextAction', () => {
       '/app?section=programs&start=templates',
     );
     expect(nextActionHref({ type: 'progress' })).toBe('/app?section=progress');
+    expect(nextActionHref({ type: 'workout_recovery', workoutId: 99 })).toBe(
+      '/app?section=today&recovery_workout_id=99',
+    );
     expect(plan.secondary.length).toBeLessThanOrEqual(2);
   });
 });

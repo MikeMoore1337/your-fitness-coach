@@ -2346,6 +2346,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/recovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Workout Recovery State */
+        get: operations["get_workout_recovery_state_api_v1_workouts_recovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/exercises/{workout_exercise_id}/alternatives": {
         parameters: {
             query?: never;
@@ -2391,6 +2408,40 @@ export interface paths {
         put?: never;
         /** Apply Workout Adaptation */
         post: operations["apply_workout_adaptation_api_v1_workouts__workout_id__adaptations_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/recovery/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Workout Recovery */
+        post: operations["preview_workout_recovery_api_v1_workouts__workout_id__recovery_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/recovery/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Workout Recovery */
+        post: operations["apply_workout_recovery_api_v1_workouts__workout_id__recovery_apply_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13896,6 +13947,118 @@ export interface components {
             /** Available Equipment Ids */
             available_equipment_ids?: ("bodyweight" | "dumbbell" | "barbell" | "bench" | "cable" | "machine" | "kettlebell" | "cardio" | "other")[] | null;
         };
+        /** WorkoutRecoveryApplyRequest */
+        WorkoutRecoveryApplyRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "skip";
+            /**
+             * Expected Scheduled Date
+             * Format: date
+             */
+            expected_scheduled_date: string;
+            /** Expected Scheduled Time */
+            expected_scheduled_time?: string | null;
+            /** Scheduled Date */
+            scheduled_date?: string | null;
+            /** Scheduled Time */
+            scheduled_time?: string | null;
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** WorkoutRecoveryApplyResponse */
+        WorkoutRecoveryApplyResponse: {
+            /**
+             * Applied At
+             * Format: date-time
+             */
+            applied_at: string;
+            workout: components["schemas"]["WorkoutScheduleItem"];
+            /** Remaining Workouts */
+            remaining_workouts: components["schemas"]["WorkoutScheduleItem"][];
+            next_workout?: components["schemas"]["WorkoutScheduleItem"] | null;
+        };
+        /** WorkoutRecoveryChange */
+        WorkoutRecoveryChange: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "moved" | "skipped";
+            /**
+             * From Scheduled Date
+             * Format: date
+             */
+            from_scheduled_date: string;
+            /** From Scheduled Time */
+            from_scheduled_time?: string | null;
+            /** To Scheduled Date */
+            to_scheduled_date?: string | null;
+            /** To Scheduled Time */
+            to_scheduled_time?: string | null;
+        };
+        /** WorkoutRecoveryPreviewResponse */
+        WorkoutRecoveryPreviewResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "preview" | "no_changes";
+            workout: components["schemas"]["WorkoutScheduleItem"];
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "skip";
+            /** Ruleset Version */
+            ruleset_version: string;
+            /** Changes */
+            changes: components["schemas"]["WorkoutRecoveryChange"][];
+            /** Remaining Workouts */
+            remaining_workouts: components["schemas"]["WorkoutScheduleItem"][];
+            /** Warnings */
+            warnings: string[];
+            /** Message */
+            message: string;
+            /** Preview Token */
+            preview_token?: string | null;
+        };
+        /** WorkoutRecoveryRequest */
+        WorkoutRecoveryRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "move" | "skip";
+            /**
+             * Expected Scheduled Date
+             * Format: date
+             */
+            expected_scheduled_date: string;
+            /** Expected Scheduled Time */
+            expected_scheduled_time?: string | null;
+            /** Scheduled Date */
+            scheduled_date?: string | null;
+            /** Scheduled Time */
+            scheduled_time?: string | null;
+        };
+        /** WorkoutRecoveryStateResponse */
+        WorkoutRecoveryStateResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "clear" | "missed" | "paused" | "no_active_program";
+            /** Missed Workouts */
+            missed_workouts: components["schemas"]["WorkoutScheduleItem"][];
+            next_workout?: components["schemas"]["WorkoutScheduleItem"] | null;
+            /** Paused Program Id */
+            paused_program_id?: number | null;
+            /** Paused Program Title */
+            paused_program_title?: string | null;
+        };
         /** WorkoutAlternativeItem */
         WorkoutAlternativeItem: {
             /** Exercise Id */
@@ -19311,6 +19474,26 @@ export interface operations {
             };
         };
     };
+    get_workout_recovery_state_api_v1_workouts_recovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutRecoveryStateResponse"];
+                };
+            };
+        };
+    };
     delete_today_workout_api_v1_workouts_today_delete: {
         parameters: {
             query?: never;
@@ -19420,6 +19603,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutAdaptationApplyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_workout_recovery_api_v1_workouts__workout_id__recovery_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkoutRecoveryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutRecoveryPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_workout_recovery_api_v1_workouts__workout_id__recovery_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkoutRecoveryApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutRecoveryApplyResponse"];
                 };
             };
             /** @description Validation Error */
