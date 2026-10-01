@@ -11,6 +11,8 @@ RUN apt-get update \
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-default-groups --extra bot --no-install-project
+# The application runs from the locked venv; remove vulnerable build tooling inherited from the base image.
+RUN python -m pip uninstall --yes pip setuptools wheel
 ENV PATH="/app/.venv/bin:$PATH"
 RUN useradd --create-home --uid 10001 appuser \
     && mkdir -p /var/lock/fitminiapp-bot \
