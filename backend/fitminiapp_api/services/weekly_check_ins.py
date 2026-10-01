@@ -158,6 +158,9 @@ def build_weekly_summary(
             "target_protein_g": progress["nutrition"]["target_protein_g"],
             "calories_adherence": progress["adherence"]["calories"],
             "protein_adherence": progress["adherence"]["protein"],
+            "exact_entry_count": progress["nutrition"]["exact_entry_count"],
+            "approximate_entry_count": progress["nutrition"]["approximate_entry_count"],
+            "partial_entry_count": progress["nutrition"]["partial_entry_count"],
             "current_target": (
                 {
                     "effective_from": current_target.effective_from,

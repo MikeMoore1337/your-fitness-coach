@@ -152,6 +152,9 @@ def test_report_aggregates_only_confirmed_days_against_effective_targets(client)
     assert summary["incomplete_days"] == 1
     assert summary["missing_days"] == 4
     assert summary["current_day_status"] == "incomplete"
+    assert summary["exact_entry_count"] == 1
+    assert summary["approximate_entry_count"] == 0
+    assert summary["partial_entry_count"] == 1
     assert summary["calories"] == {
         "average": 1000.0,
         "minimum": 0.0,

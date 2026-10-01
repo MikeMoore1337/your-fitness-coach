@@ -341,6 +341,8 @@ def _nutrition_entry(session: _DemoSession, diary_date: str, meal_type: str) -> 
         "food_id": None,
         "recipe_id": None,
         "entry_kind": "quick_add",
+        "nutrition_source": "manual",
+        "nutrition_confidence": "approximate",
         "logged_at": _now(session).strftime("%H:%M:%S"),
         "food_name": item["name"],
         "food_brand": None,

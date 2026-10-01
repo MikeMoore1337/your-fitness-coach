@@ -97,6 +97,7 @@ interface QuickAddDraft {
   fat: string;
   carbs: string;
   loggedAt: string;
+  nutritionSource: 'manual' | 'restaurant';
 }
 
 type FoodDraftSelection = Pick<
@@ -133,6 +134,7 @@ const emptyQuickAdd: QuickAddDraft = {
   fat: '',
   carbs: '',
   loggedAt: '',
+  nutritionSource: 'manual',
 };
 
 function newEntryRequestId(): string {
@@ -451,10 +453,10 @@ export function FoodPickerDialog({
       requestId: newEntryRequestId(),
     },
   );
-  const quick = draft.quick ?? emptyQuickAdd;
+  const quick = useMemo(() => ({ ...emptyQuickAdd, ...(draft.quick ?? {}) }), [draft.quick]);
 
   useEffect(() => {
-    if (draft.requestId && draft.quick) return;
+    if (draft.requestId && draft.quick?.nutritionSource) return;
     setDraft({
       ...draft,
       quick,
@@ -639,23 +641,22 @@ export function FoodPickerDialog({
               if (!Number.isFinite(energy) || energy <= 0)
                 throw new Error('Введите калории больше нуля');
               const macroValues = [quick.protein, quick.fat, quick.carbs];
-              const filledMacros = macroValues.filter((value) => value.trim() !== '');
-              if (filledMacros.length > 0 && filledMacros.length < 3)
-                throw new Error('Укажите все три макронутриента или оставьте их пустыми');
-              const parsedMacros = macroValues.map((value) => Number(value.replace(',', '.')));
-              if (
-                filledMacros.length === 3 &&
-                parsedMacros.some((value) => !Number.isFinite(value) || value < 0)
-              ) {
-                throw new Error('Макронутриенты должны быть неотрицательными числами');
-              }
+              const parsedMacros = macroValues.map((value) => {
+                if (value.trim() === '') return null;
+                const parsed = Number(value.replace(',', '.'));
+                if (!Number.isFinite(parsed) || parsed < 0) {
+                  throw new Error('Макронутриенты должны быть неотрицательными числами');
+                }
+                return parsed;
+              });
               return {
                 quick_add: {
                   name: quick.name.trim() || null,
+                  nutrition_source: quick.nutritionSource,
                   energy_kcal: energy,
-                  protein_g: filledMacros.length === 3 ? parsedMacros[0] : null,
-                  fat_g: filledMacros.length === 3 ? parsedMacros[1] : null,
-                  carbs_g: filledMacros.length === 3 ? parsedMacros[2] : null,
+                  protein_g: parsedMacros[0],
+                  fat_g: parsedMacros[1],
+                  carbs_g: parsedMacros[2],
                 },
                 amount: 1,
                 amount_unit: 'serving' as const,
@@ -980,9 +981,10 @@ export function FoodPickerDialog({
               <Icon name="arrow-left" size={16} /> К продуктам
             </button>
             <p className="nutrition-quick-add__context">
-              {mealLabels[mealType]} · {diaryDate}. Название и время можно не указывать.
+              {mealLabels[mealType]} · {diaryDate}. Это приблизительная запись: неизвестные БЖУ
+              останутся без значения, а не станут нулём.
             </p>
-            <Field label="Название (необязательно)" labelFor="nutrition-quick-name">
+            <Field label="Название или контекст (необязательно)" labelFor="nutrition-quick-name">
               <Input
                 id="nutrition-quick-name"
                 value={quick.name}
@@ -1015,8 +1017,22 @@ export function FoodPickerDialog({
                 />
               </Field>
             </div>
+            <Field label="Источник оценки" labelFor="nutrition-quick-source">
+              <Select
+                id="nutrition-quick-source"
+                value={quick.nutritionSource}
+                onChange={(event) =>
+                  updateQuick({
+                    nutritionSource: event.target.value as QuickAddDraft['nutritionSource'],
+                  })
+                }
+              >
+                <option value="manual">Своя оценка</option>
+                <option value="restaurant">Ресторан или кафе</option>
+              </Select>
+            </Field>
             <fieldset className="nutrition-quick-add__macros">
-              <legend>Макронутриенты (все три или ни одного)</legend>
+              <legend>Макронутриенты (необязательно)</legend>
               {(
                 [
                   ['Белки', 'protein'],

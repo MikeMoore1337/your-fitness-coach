@@ -61,6 +61,9 @@ function summary(
       average_protein_g: 130,
       target_protein_g: 140,
       target_effective_on: '2030-01-01',
+      exact_entry_count: 0,
+      approximate_entry_count: 0,
+      partial_entry_count: 0,
     },
     body: {
       latest_measurement: measuredOn ? { measured_on: measuredOn, weight_kg: 70 } : null,

@@ -83,7 +83,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 17
+ACCOUNT_EXPORT_SCHEMA_VERSION = 18
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -1336,6 +1336,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                         "meal_type",
                         "logged_at",
                         "entry_kind",
+                        "nutrition_source",
                         "amount",
                         "amount_unit",
                         "weight_g",

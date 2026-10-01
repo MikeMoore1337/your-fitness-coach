@@ -9,10 +9,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 MealType = Literal["breakfast", "lunch", "dinner", "snacks"]
 DiaryAmountUnit = Literal["g", "ml", "serving"]
 DiaryDayStatus = Literal["complete", "incomplete", "unlogged", "fasted"]
+NutritionSource = Literal["catalog", "recipe", "manual", "restaurant"]
+NutritionConfidence = Literal["exact", "approximate", "partial"]
 
 
 class FoodDiaryQuickAdd(BaseModel):
     name: str | None = Field(default=None, max_length=256)
+    nutrition_source: Literal["manual", "restaurant"] = "manual"
     energy_kcal: Decimal = Field(
         gt=0,
         le=10000,
@@ -50,15 +53,6 @@ class FoodDiaryQuickAdd(BaseModel):
     def normalize_name(cls, value: str | None) -> str | None:
         normalized = " ".join(value.split()) if value is not None else ""
         return normalized or None
-
-    @model_validator(mode="after")
-    def require_all_or_no_macros(self) -> FoodDiaryQuickAdd:
-        macros = (self.protein_g, self.fat_g, self.carbs_g)
-        if any(value is not None for value in macros) and not all(
-            value is not None for value in macros
-        ):
-            raise ValueError("protein, fat and carbs must be provided together")
-        return self
 
 
 class FoodDiaryEntryCreate(BaseModel):
@@ -126,6 +120,9 @@ class FoodDiaryEntryResponse(BaseModel):
     food_id: int | None
     recipe_id: int | None
     entry_kind: Literal["food", "recipe", "quick_add"]
+    # Optional so older cached/demo responses remain readable during additive rollout.
+    nutrition_source: NutritionSource | None = None
+    nutrition_confidence: NutritionConfidence | None = None
     logged_at: time | None
     food_name: str
     food_brand: str | None

@@ -86,6 +86,21 @@ function amountLabel(entry: FoodDiaryEntry): string {
   return `${formatNumber(entry.weight_g, 1)} г`;
 }
 
+function nutritionEntryMeta(entry: FoodDiaryEntry): string {
+  if (entry.entry_kind === 'quick_add') {
+    const source = entry.nutrition_source === 'restaurant' ? 'ресторанная оценка' : 'своя оценка';
+    const confidence =
+      entry.nutrition_confidence ??
+      (entry.nutrition.protein_g === null ||
+      entry.nutrition.fat_g === null ||
+      entry.nutrition.carbs_g === null
+        ? 'partial'
+        : 'approximate');
+    return `Приблизительно · ${source} · ${confidence === 'partial' ? 'частичные БЖУ' : 'все БЖУ'}`;
+  }
+  return entry.nutrition_source === 'recipe' ? 'Рецепт · точный расчёт' : 'Каталог · точный расчёт';
+}
+
 function targetStatus(remaining: number, target: number, unit: string): string {
   if (remaining >= 0) return `Осталось ${formatNumber(remaining)} ${unit}`;
   const over = Math.abs(remaining);
@@ -277,7 +292,7 @@ function EntryRow({
             <strong>{entry.food_name}</strong>
             <span>
               {entry.entry_kind === 'quick_add'
-                ? `Быстрый ввод${entry.logged_at ? ` · ${entry.logged_at.slice(0, 5)}` : ''}`
+                ? `${nutritionEntryMeta(entry)}${entry.logged_at ? ` · ${entry.logged_at.slice(0, 5)}` : ''}`
                 : entry.food_brand
                   ? `${entry.food_brand} · ${amountLabel(entry)}`
                   : amountLabel(entry)}

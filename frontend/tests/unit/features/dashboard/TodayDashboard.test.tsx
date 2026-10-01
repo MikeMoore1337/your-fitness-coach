@@ -169,6 +169,9 @@ const progressSummary = {
     average_protein_g: 130,
     target_protein_g: 140,
     target_effective_on: '2029-12-01',
+    exact_entry_count: 0,
+    approximate_entry_count: 0,
+    partial_entry_count: 0,
   },
   body: {
     latest_measurement: { measured_on: '2030-01-09', weight_kg: 68.4 },

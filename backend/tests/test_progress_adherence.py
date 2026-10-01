@@ -303,6 +303,9 @@ def test_user_progress_summary_handles_periods_current_day_and_isolation(client)
         "average_protein_g": 150.0,
         "target_protein_g": 150,
         "target_effective_on": (today - timedelta(days=30)).isoformat(),
+        "exact_entry_count": 1,
+        "approximate_entry_count": 0,
+        "partial_entry_count": 0,
     }
     assert payload["adherence"]["workouts"]["percent"] == 50.0
     assert payload["adherence"]["cardio"] == {
@@ -384,6 +387,9 @@ def test_progress_counts_fasted_as_logged_and_excludes_incomplete_days(client) -
         "average_protein_g": 0.0,
         "target_protein_g": 150,
         "target_effective_on": (today - timedelta(days=30)).isoformat(),
+        "exact_entry_count": 0,
+        "approximate_entry_count": 0,
+        "partial_entry_count": 0,
     }
     coverage = response.json()["data_sufficiency"]["nutrition_coverage"]
     assert coverage["counters"]["logged_day_count"] == 1
@@ -425,6 +431,9 @@ def test_progress_uses_calories_only_quick_add_without_inventing_protein(client)
     payload = response.json()
     assert payload["nutrition"]["average_calories"] == 2000.0
     assert payload["nutrition"]["average_protein_g"] is None
+    assert payload["nutrition"]["exact_entry_count"] == 0
+    assert payload["nutrition"]["approximate_entry_count"] == 0
+    assert payload["nutrition"]["partial_entry_count"] == 1
     assert payload["adherence"]["calories"]["evaluated"] == 1
     assert payload["adherence"]["calories"]["percent"] == 100.0
     assert payload["adherence"]["protein"]["evaluated"] == 0

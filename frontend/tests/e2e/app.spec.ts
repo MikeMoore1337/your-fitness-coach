@@ -2107,7 +2107,9 @@ test('notification nutrition deep links open the intended quick entry context', 
   await page.goto('/app?section=nutrition&date=2030-01-10&meal=lunch');
   await expect(page.getByRole('dialog', { name: 'Быстрый ввод' })).toBeVisible();
   await expect(
-    page.getByText('Обед · 2030-01-10. Название и время можно не указывать.'),
+    page.getByText(
+      'Обед · 2030-01-10. Это приблизительная запись: неизвестные БЖУ останутся без значения, а не станут нулём.',
+    ),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Закрыть добавление' }).click();
 

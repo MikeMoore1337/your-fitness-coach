@@ -97,6 +97,9 @@ class NutritionPeriodSummary(BaseModel):
     average_protein_g: float | None = None
     target_protein_g: int | None = None
     target_effective_on: date | None = None
+    exact_entry_count: int | None = Field(default=0, ge=0)
+    approximate_entry_count: int | None = Field(default=0, ge=0)
+    partial_entry_count: int | None = Field(default=0, ge=0)
 
 
 class NutritionReportMetricSummary(BaseModel):
@@ -178,6 +181,9 @@ class NutritionReportSummary(BaseModel):
     calorie_tolerance_evaluated_days: int = Field(ge=0)
     days_meeting_protein_target: int = Field(ge=0)
     protein_target_evaluated_days: int = Field(ge=0)
+    exact_entry_count: int | None = Field(default=0, ge=0)
+    approximate_entry_count: int | None = Field(default=0, ge=0)
+    partial_entry_count: int | None = Field(default=0, ge=0)
 
 
 class NutritionReportResponse(BaseModel):
