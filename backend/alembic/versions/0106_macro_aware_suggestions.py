@@ -19,31 +19,22 @@ online_rollout_notes = (
     "batch ledger without changing existing rows or nutrition snapshots."
 )
 
-_CONSTRAINT = "ck_food_diary_batch_operations_kind"
-_EXPRESSION = "operation_kind IN ('meal_template', 'natural_input', 'suggestion')"
-_LEGACY_EXPRESSION = "operation_kind IN ('meal_template', 'natural_input')"
-
-
-def _postgres_constraint(expression: str) -> None:
-    op.execute(
-        f"ALTER TABLE food_diary_batch_operations DROP CONSTRAINT IF EXISTS {_CONSTRAINT}, "
-        f"ADD CONSTRAINT {_CONSTRAINT} CHECK ({expression}) NOT VALID"
-    )
-    op.execute(
-        f"ALTER TABLE food_diary_batch_operations VALIDATE CONSTRAINT {_CONSTRAINT}"
-    )
-
 
 def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         op.execute("SET LOCAL lock_timeout = '3s'")
         op.execute("SET LOCAL statement_timeout = '30s'")
-        _postgres_constraint(_EXPRESSION)
-        return
-    with op.batch_alter_table("food_diary_batch_operations") as batch_op:
-        batch_op.drop_constraint(_CONSTRAINT, type_="check")
-        batch_op.create_check_constraint(_CONSTRAINT, _EXPRESSION)
+        op.execute(
+            "ALTER TABLE food_diary_batch_operations DROP CONSTRAINT IF EXISTS "
+            "ck_food_diary_batch_operations_kind, ADD CONSTRAINT "
+            "ck_food_diary_batch_operations_kind CHECK (operation_kind IN "
+            "('meal_template', 'natural_input', 'suggestion')) NOT VALID"
+        )
+        op.execute(
+            "ALTER TABLE food_diary_batch_operations VALIDATE CONSTRAINT "
+            "ck_food_diary_batch_operations_kind"
+        )
 
 
 def downgrade() -> None:
@@ -51,8 +42,13 @@ def downgrade() -> None:
     if bind.dialect.name == "postgresql":
         op.execute("SET LOCAL lock_timeout = '3s'")
         op.execute("SET LOCAL statement_timeout = '30s'")
-        _postgres_constraint(_LEGACY_EXPRESSION)
-        return
-    with op.batch_alter_table("food_diary_batch_operations") as batch_op:
-        batch_op.drop_constraint(_CONSTRAINT, type_="check")
-        batch_op.create_check_constraint(_CONSTRAINT, _LEGACY_EXPRESSION)
+        op.execute(
+            "ALTER TABLE food_diary_batch_operations DROP CONSTRAINT IF EXISTS "
+            "ck_food_diary_batch_operations_kind, ADD CONSTRAINT "
+            "ck_food_diary_batch_operations_kind CHECK (operation_kind IN "
+            "('meal_template', 'natural_input')) NOT VALID"
+        )
+        op.execute(
+            "ALTER TABLE food_diary_batch_operations VALIDATE CONSTRAINT "
+            "ck_food_diary_batch_operations_kind"
+        )
