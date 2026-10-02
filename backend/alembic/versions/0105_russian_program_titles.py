@@ -88,33 +88,33 @@ def upgrade() -> None:
     )
     op.execute(
         """UPDATE program_template_exercises
-        SET notes = CASE notes
-            WHEN 'T1; last set AMRAP'
-                THEN 'T1 - основное тяжёлое упражнение; последний подход - максимум повторений (AMRAP)'
-            WHEN 'T2'
+        SET notes = CASE
+            WHEN notes LIKE 'T1%last set AMRAP'
+                THEN 'T1 - основное тяжёлое упражнение, последний подход - максимум повторений (AMRAP)'
+            WHEN notes = 'T2'
                 THEN 'T2 - объёмное базовое упражнение'
-            WHEN 'T3; last set AMRAP'
-                THEN 'T3 - вспомогательное упражнение; последний подход - максимум повторений (AMRAP)'
-            WHEN 'T3; selected DB row variant; last set AMRAP'
-                THEN 'T3 - вспомогательное упражнение; выбран вариант тяги гантели; последний подход - максимум повторений (AMRAP)'
-            WHEN 'Main lift; percentage basis is TRAINING_MAX'
-                THEN 'Основное упражнение; проценты от тренировочного максимума'
-            WHEN 'FSL; first-set Training Max load'
-                THEN 'Повтор первого рабочего подхода (FSL); вес от тренировочного максимума'
-            WHEN 'Assistance boundary'
+            WHEN notes LIKE 'T3%last set AMRAP' AND notes NOT LIKE '%selected DB row variant%'
+                THEN 'T3 - вспомогательное упражнение, последний подход - максимум повторений (AMRAP)'
+            WHEN notes LIKE 'T3%selected DB row variant%last set AMRAP'
+                THEN 'T3 - вспомогательное упражнение, выбран вариант тяги гантели, последний подход - максимум повторений (AMRAP)'
+            WHEN notes LIKE 'Main lift%percentage basis is TRAINING_MAX'
+                THEN 'Основное упражнение, проценты от тренировочного максимума'
+            WHEN notes LIKE 'FSL%first-set Training Max load'
+                THEN 'Повтор первого рабочего подхода (FSL), вес от тренировочного максимума'
+            WHEN notes = 'Assistance boundary'
                 THEN 'Вспомогательное упражнение'
-            WHEN 'Source range; 4 sets selected'
-                THEN 'Диапазон из источника; выбрано 4 подхода'
-            WHEN 'Source range; 3 sets selected'
-                THEN 'Диапазон из источника; выбрано 3 подхода'
-            WHEN 'T1; ordered TRAINING_MAX loads; final AMRAP'
-                THEN 'T1 - основное упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)'
-            WHEN 'T2; ordered TRAINING_MAX loads; final AMRAP'
-                THEN 'T2 - второе базовое упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)'
-            WHEN 'Main lift; final set AMRAP'
-                THEN 'Основное упражнение; последний подход - максимум повторений (AMRAP)'
-            WHEN 'Alternating main lift; final set AMRAP'
-                THEN 'Чередующееся основное упражнение; последний подход - максимум повторений (AMRAP)'
+            WHEN notes LIKE 'Source range%4 sets selected'
+                THEN 'Диапазон из источника, выбрано 4 подхода'
+            WHEN notes LIKE 'Source range%3 sets selected'
+                THEN 'Диапазон из источника, выбрано 3 подхода'
+            WHEN notes LIKE 'T1%ordered TRAINING_MAX loads%final AMRAP'
+                THEN 'T1 - основное упражнение, веса по процентам от тренировочного максимума, последний подход - максимум повторений (AMRAP)'
+            WHEN notes LIKE 'T2%ordered TRAINING_MAX loads%final AMRAP'
+                THEN 'T2 - второе базовое упражнение, веса по процентам от тренировочного максимума, последний подход - максимум повторений (AMRAP)'
+            WHEN notes LIKE 'Main lift%final set AMRAP'
+                THEN 'Основное упражнение, последний подход - максимум повторений (AMRAP)'
+            WHEN notes LIKE 'Alternating main lift%final set AMRAP'
+                THEN 'Чередующееся основное упражнение, последний подход - максимум повторений (AMRAP)'
             ELSE notes
         END
         WHERE day_id IN (
@@ -123,16 +123,19 @@ def upgrade() -> None:
             JOIN program_templates AS template ON template.id = day.program_id
             WHERE template.owner_user_id IS NULL AND template.created_by_user_id IS NULL
         )
-          AND notes IN (
-            'T1; last set AMRAP', 'T2', 'T3; last set AMRAP',
-            'T3; selected DB row variant; last set AMRAP',
-            'Main lift; percentage basis is TRAINING_MAX',
-            'FSL; first-set Training Max load', 'Assistance boundary',
-            'Source range; 4 sets selected', 'Source range; 3 sets selected',
-            'T1; ordered TRAINING_MAX loads; final AMRAP',
-            'T2; ordered TRAINING_MAX loads; final AMRAP',
-            'Main lift; final set AMRAP',
-            'Alternating main lift; final set AMRAP'
+          AND (
+            notes = 'T2'
+            OR notes = 'Assistance boundary'
+            OR notes LIKE 'T1%last set AMRAP'
+            OR notes LIKE 'T3%last set AMRAP'
+            OR notes LIKE 'Main lift%percentage basis is TRAINING_MAX'
+            OR notes LIKE 'FSL%first-set Training Max load'
+            OR notes LIKE 'Source range%4 sets selected'
+            OR notes LIKE 'Source range%3 sets selected'
+            OR notes LIKE 'T1%ordered TRAINING_MAX loads%final AMRAP'
+            OR notes LIKE 'T2%ordered TRAINING_MAX loads%final AMRAP'
+            OR notes LIKE 'Main lift%final set AMRAP'
+            OR notes LIKE 'Alternating main lift%final set AMRAP'
           )"""
     )
     op.execute(
