@@ -4237,7 +4237,9 @@ class TaskController:
                 for line in events_bytes.splitlines():
                     try:
                         payload = json.loads(line.decode("utf-8"))
-                    except UnicodeError, json.JSONDecodeError:
+                    except UnicodeError:
+                        continue
+                    except json.JSONDecodeError:
                         continue
                     item = payload.get("item") if isinstance(payload, Mapping) else None
                     if not isinstance(item, Mapping) or item.get("type") != "file_change":
