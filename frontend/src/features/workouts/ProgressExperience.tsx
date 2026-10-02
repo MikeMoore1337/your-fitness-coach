@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
-import type { ApiSchemas, ProgressSummary, TrainingAnalytics } from '../../shared/api/types';
+import type {
+  ApiSchemas,
+  ProgressSummary,
+  TrainingAnalytics,
+  WeeklyCheckInCurrent,
+} from '../../shared/api/types';
 import { queryKeys } from '../../shared/queryKeys';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
@@ -359,7 +364,125 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
   );
 }
 
-function SummaryOverview({ summary, search }: { search: string; summary: ProgressSummary }) {
+function reviewNextStep(
+  search: string,
+  summary: ProgressSummary,
+): { detail: string; label: string; to: string } {
+  if (summary.training.completed_workouts < summary.training.planned_workouts) {
+    return {
+      detail: 'Завершите следующую запланированную тренировку и отметьте фактические подходы.',
+      label: 'Открыть план недели',
+      to: '/app?section=today',
+    };
+  }
+  if (summary.nutrition.visible && summary.nutrition.unlogged_days > 0) {
+    return {
+      detail: 'Заполните пропущенные дни, чтобы следующий обзор опирался на полный контекст.',
+      label: 'Записать питание',
+      to: '/app?section=nutrition',
+    };
+  }
+  const weightSignal = summary.data_sufficiency.weight_trend;
+  if (weightSignal.status !== 'sufficient') {
+    return {
+      detail: 'Добавьте повторный замер веса: одна точка не образует тренд.',
+      label: 'Добавить замер',
+      to: progressViewPath(search, 'body'),
+    };
+  }
+  return {
+    detail: 'Сверьте факты недели и зафиксируйте, что стоит изменить дальше.',
+    label: 'Пройти недельный обзор',
+    to: progressViewPath(search, 'wellbeing'),
+  };
+}
+
+function WeeklyReviewHub({
+  current,
+  search,
+  summary,
+}: {
+  current?: WeeklyCheckInCurrent;
+  search: string;
+  summary: ProgressSummary;
+}) {
+  const nextStep = reviewNextStep(search, summary);
+  const reviewStatus = current?.existing?.status;
+  const reviewLabel =
+    reviewStatus === 'completed'
+      ? 'Обзор сохранён'
+      : reviewStatus === 'skipped'
+        ? 'Обзор пропущен'
+        : 'Обзор ещё не заполнен';
+  const reviewPath = progressViewPath(search, 'wellbeing');
+
+  return (
+    <section className="progress-review-hub" aria-labelledby="progress-review-hub-title">
+      <div className="progress-review-hub__heading">
+        <div>
+          <span className="progress-section__eyebrow">Следующий шаг</span>
+          <h2 id="progress-review-hub-title">Факты → действие</h2>
+          <p>Только записи за период, без скрытого общего балла.</p>
+        </div>
+        <Badge>{reviewLabel}</Badge>
+      </div>
+      <dl className="progress-review-hub__facts" aria-label="Факты для недельного обзора">
+        <div>
+          <dt>Тренировки</dt>
+          <dd>
+            {summary.training.completed_workouts} / {summary.training.planned_workouts}
+          </dd>
+        </div>
+        <div>
+          <dt>Питание</dt>
+          <dd>
+            {!summary.nutrition.visible
+              ? 'Недоступно'
+              : `${summary.nutrition.logged_days} дн. записано`}
+          </dd>
+        </div>
+        <div>
+          <dt>Вес</dt>
+          <dd>
+            {summary.body.trends.find((trend) => trend.metric === 'weight_kg')
+              ? 'Есть динамика'
+              : 'Мало данных'}
+          </dd>
+        </div>
+      </dl>
+      <div className="progress-review-hub__next">
+        <div>
+          <strong>{nextStep.label}</strong>
+          <p>{nextStep.detail}</p>
+        </div>
+        <div className="progress-review-hub__actions">
+          <AppLink className="button-link" to={nextStep.to}>
+            {nextStep.label}
+          </AppLink>
+          {nextStep.to !== reviewPath && (
+            <AppLink className="button-link secondary-link" to={reviewPath}>
+              {reviewStatus ? 'Посмотреть обзор' : 'Пройти недельный обзор'}
+            </AppLink>
+          )}
+        </div>
+      </div>
+      <div className="progress-review-hub__confidence">
+        <DataConfidence kind="training" signal={summary.data_sufficiency.working_sets} />
+        <DataConfidence kind="weight" signal={summary.data_sufficiency.weight_trend} />
+      </div>
+    </section>
+  );
+}
+
+function SummaryOverview({
+  current,
+  search,
+  summary,
+}: {
+  current?: WeeklyCheckInCurrent;
+  search: string;
+  summary: ProgressSummary;
+}) {
   const weight = summary.body.trends.find((trend) => trend.metric === 'weight_kg');
   const confirmedNutritionDays = summary.nutrition.complete_days + summary.nutrition.fasted_days;
   const latestWeight = weight ? `${formatNumber(weight.latest_value)} кг` : 'Мало данных';
@@ -468,6 +591,7 @@ function SummaryOverview({ summary, search }: { search: string; summary: Progres
           </section>
         </div>
       </div>
+      <WeeklyReviewHub current={current} search={search} summary={summary} />
     </section>
   );
 }
@@ -1170,6 +1294,11 @@ export function ProgressExperience({
       api<ProgressSummary>(`/api/v1/workouts/progress/summary${progressApiQuery(selection)}`),
     placeholderData: keepPreviousData,
   });
+  const weeklyReview = useQuery({
+    queryKey: ['weekly-check-ins', 'current'],
+    queryFn: () => api<WeeklyCheckInCurrent>('/api/v1/check-ins/weekly/current'),
+    enabled: view === 'overview',
+  });
   const analytics = useTrainingAnalytics(selection, view === 'training');
   const controlledNutritionPeriod = useMemo<ControlledNutritionPeriod>(
     () => nutritionPeriodForProgress(selection),
@@ -1260,7 +1389,7 @@ export function ProgressExperience({
           )}
           {view === 'overview' ? (
             <>
-              <SummaryOverview search={search} summary={summary.data} />
+              <SummaryOverview current={weeklyReview.data} search={search} summary={summary.data} />
               <ProgressCategoryNav search={search} view={view} />
             </>
           ) : (

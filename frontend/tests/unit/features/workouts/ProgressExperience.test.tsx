@@ -345,6 +345,19 @@ function installApi({
         { status: 200 },
       );
     }
+    if (path === '/api/v1/check-ins/weekly/current') {
+      return new Response(
+        JSON.stringify({
+          week_start: '2030-01-01',
+          week_end: '2030-01-07',
+          submitted_on: '2030-01-07',
+          timezone: 'UTC',
+          existing: null,
+          summary: {},
+        }),
+        { status: 200 },
+      );
+    }
     return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
   });
 }
@@ -405,6 +418,21 @@ describe('ProgressExperience', () => {
     expect(screen.getByText('Детали тренировки')).toBeVisible();
     expect(screen.getByText('Показаны последние 20 тренировок упражнения.')).toBeVisible();
     expect(screen.queryByText('too_few_points')).not.toBeInTheDocument();
+  });
+
+  it('turns progress facts into one review next action', async () => {
+    installApi();
+    renderExperience();
+
+    expect(await screen.findByRole('heading', { name: 'Факты → действие' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Открыть план недели' })).toHaveAttribute(
+      'href',
+      '/app?section=today',
+    );
+    expect(screen.getByRole('link', { name: 'Пройти недельный обзор' })).toHaveAttribute(
+      'href',
+      '/app?section=progress&progress_view=wellbeing',
+    );
   });
 
   it('shows selected priorities as preferences without treating circumference as muscle analytics', async () => {
