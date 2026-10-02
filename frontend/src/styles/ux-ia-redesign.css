@@ -341,6 +341,79 @@
   color: var(--v2-text-secondary);
 }
 
+.app-section--progress .progress-review-hub {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.app-section--progress .progress-review-hub__heading,
+.app-section--progress .progress-review-hub__next {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-section--progress .progress-review-hub__heading h2,
+.app-section--progress .progress-review-hub__next strong {
+  margin: 0;
+}
+
+.app-section--progress .progress-review-hub__heading p,
+.app-section--progress .progress-review-hub__next p {
+  margin: 4px 0 0;
+  color: var(--v2-text-secondary);
+}
+
+.app-section--progress .progress-review-hub__facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-section--progress .progress-review-hub__facts > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface);
+}
+
+.app-section--progress .progress-review-hub__facts dt {
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.app-section--progress .progress-review-hub__facts dd {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.app-section--progress .progress-review-hub__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.app-section--progress .progress-review-hub__confidence {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-section--progress .progress-review-hub__confidence .data-confidence {
+  margin: 0;
+}
+
 .app-section--progress .progress-overview__metrics {
   display: grid;
   gap: 10px;
@@ -1153,6 +1226,25 @@
 }
 
 @media (max-width: 640px) {
+  .app-section--progress .progress-review-hub__heading,
+  .app-section--progress .progress-review-hub__next {
+    display: grid;
+  }
+
+  .app-section--progress .progress-review-hub__facts,
+  .app-section--progress .progress-review-hub__confidence {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-section--progress .progress-review-hub__actions {
+    justify-content: stretch;
+  }
+
+  .app-section--progress .progress-review-hub__actions .button-link {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
   .app-section--progress .progress-overview__primary-grid {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'metrics' 'trend' 'insights';
