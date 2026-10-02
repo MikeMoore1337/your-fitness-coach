@@ -7827,3 +7827,135 @@ def test_yellow_owner_gate_allows_adopt_current(
 
     assert lease["task_id"] == "239C"
     assert lease["lifecycle_state"] == task_session.WORKING_STATE
+
+
+def test_start_reuses_exact_pristine_working_lease(repository: tuple[Path, Any]) -> None:
+    root, git_repository = repository
+    _write_task(root, "638A", "pristine-reuse", concurrency="independent-write")
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+
+    first = controller.start(
+        "638A",
+        owner_launch=True,
+        session_label="pristine-reuse",
+        offline=True,
+    )
+    second = controller.start(
+        "638A",
+        owner_launch=True,
+        session_label="pristine-reuse",
+        offline=True,
+    )
+
+    assert second["reused_existing_lease"] is True
+    assert second["lease"] == first["lease"]
+    matching_leases = [
+        lease for lease in controller.store.all_leases() if lease.get("task_id") == "638A"
+    ]
+    assert len(matching_leases) == 1
+    branch = first["lease"]["branch"]
+    worktree = Path(first["lease"]["worktree"]).resolve()
+    registrations = [
+        item
+        for item in git_repository.worktrees()
+        if item.branch == branch or item.path == worktree
+    ]
+    assert len(registrations) == 1
+    assert registrations[0].branch == branch
+    assert registrations[0].path == worktree
+
+
+def test_start_refuses_pristine_reuse_after_worker_attempt_evidence(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "638B", "attempt-evidence", concurrency="independent-write")
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    controller.start(
+        "638B",
+        owner_launch=True,
+        session_label="attempt-evidence",
+        offline=True,
+    )
+    lease_path = controller.store.task_lease_path("638B")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["attempts"] = [
+        {
+            "attempt": 1,
+            "started_at": "2026-10-02T00:00:00Z",
+            "ended_at": "2026-10-02T00:00:01Z",
+            "result": "interrupted",
+            "reason": "synthetic worker evidence",
+        }
+    ]
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    with pytest.raises(task_session.TaskSessionError, match="worker/retry evidence"):
+        controller.start(
+            "638B",
+            owner_launch=True,
+            session_label="attempt-evidence",
+            offline=True,
+        )
+
+
+def test_start_refuses_pristine_reuse_for_dirty_worktree(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "638C", "dirty-reuse", concurrency="independent-write")
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    started = controller.start(
+        "638C",
+        owner_launch=True,
+        session_label="dirty-reuse",
+        offline=True,
+    )
+    worktree = Path(started["lease"]["worktree"])
+    (worktree / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+
+    with pytest.raises(task_session.TaskSessionError, match="Ambiguous existing branch/worktree"):
+        controller.start(
+            "638C",
+            owner_launch=True,
+            session_label="dirty-reuse",
+            offline=True,
+        )
+
+
+def test_start_refuses_pristine_reuse_after_task_contract_drift(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "638D", "contract-drift", concurrency="independent-write")
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    controller.start(
+        "638D",
+        owner_launch=True,
+        session_label="contract-drift",
+        offline=True,
+    )
+    _write_task(root, "638D", "contract-drift", concurrency="exclusive-write")
+
+    with pytest.raises(
+        task_session.TaskSessionError, match="does not match the requested task contract"
+    ):
+        controller.start(
+            "638D",
+            owner_launch=True,
+            session_label="contract-drift",
+            offline=True,
+        )
