@@ -225,14 +225,14 @@ const publicBenchExerciseDetail = {
 
 const publicFullBodyProgram = {
   slug: 'full-body-3-days',
-  title: 'Фуллбади 3 дня',
+  title: 'Всё тело · 3 дня',
   goal: 'recomposition',
   level: 'beginner',
   split_type: 'full_body',
   days: [
     {
       day_number: 1,
-      title: 'Фуллбади A',
+      title: 'Всё тело A',
       exercises: [
         ['squat', 'Приседания', 'Квадрицепс', 'Штанга', 4, '6-8', 150],
         ['bench-press', 'Жим лежа', 'Грудь', 'Штанга', 4, '6-8', 150],
@@ -251,7 +251,7 @@ const publicFullBodyProgram = {
     },
     {
       day_number: 2,
-      title: 'Фуллбади B',
+      title: 'Всё тело B',
       exercises: [
         ['deadlift', 'Становая тяга', 'Ягодицы', 'Штанга', 3, '3-5', 180],
         ['overhead-press', 'Жим штанги стоя', 'Плечи', 'Штанга', 4, '6-8', 150],
@@ -262,7 +262,7 @@ const publicFullBodyProgram = {
     },
     {
       day_number: 3,
-      title: 'Фуллбади C',
+      title: 'Всё тело C',
       exercises: [
         ['front-squat', 'Фронтальные приседания', 'Квадрицепс', 'Штанга', 4, '6-8', 150],
         [
@@ -541,7 +541,7 @@ test('canonical three-day program stays useful, stateless and responsive', async
     await expect(
       page.getByRole('heading', {
         level: 1,
-        name: /программа тренировок 3 раза в неделю: full body на 3 дня/i,
+        name: /программа тренировок 3 раза в неделю: всё тело \(full body\)/i,
       }),
     ).toBeVisible();
     await expect(page.locator('.public-program-day')).toHaveCount(3);

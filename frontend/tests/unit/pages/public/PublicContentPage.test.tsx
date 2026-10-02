@@ -58,14 +58,14 @@ vi.mock('../../../../src/shared/api/client', () => ({
     if (path === '/api/v1/public/programs/full-body-3-days') {
       return Promise.resolve({
         slug: 'full-body-3-days',
-        title: 'Фуллбади 3 дня',
+        title: 'Всё тело · 3 дня',
         goal: 'recomposition',
         level: 'beginner',
         split_type: 'full_body',
         days: [
           {
             day_number: 1,
-            title: 'Фуллбади A',
+            title: 'Всё тело A',
             exercises: [
               {
                 slug: 'squat',
@@ -91,7 +91,7 @@ vi.mock('../../../../src/shared/api/client', () => ({
           },
           {
             day_number: 2,
-            title: 'Фуллбади B',
+            title: 'Всё тело B',
             exercises: [
               {
                 slug: 'deadlift',
@@ -117,7 +117,7 @@ vi.mock('../../../../src/shared/api/client', () => ({
           },
           {
             day_number: 3,
-            title: 'Фуллбади C',
+            title: 'Всё тело C',
             exercises: [
               {
                 slug: 'front-squat',
@@ -251,7 +251,7 @@ describe('PublicContentPage', () => {
 
   it.each([
     ['/training', /дневник тренировок: от программы до прогресса/i],
-    ['/programs/full-body-3-days', /программа тренировок 3 раза в неделю: full body на 3 дня/i],
+    ['/programs/full-body-3-days', /программа тренировок 3 раза в неделю: всё тело \(full body\)/i],
     ['/nutrition', /рассчитать кбжу: калории, белки, жиры и углеводы/i],
     ['/calculators/1rm', /калькулятор 1пм: оценочный одноповторный максимум/i],
     ['/progress', /прогресс, который можно проверить/i],
@@ -328,9 +328,9 @@ describe('PublicContentPage', () => {
     try {
       renderPath('/programs/full-body-3-days');
 
-      expect(await screen.findByRole('heading', { name: 'Фуллбади 3 дня' })).toBeVisible();
+      expect(await screen.findByRole('heading', { name: 'Всё тело · 3 дня' })).toBeVisible();
       expect(document.querySelectorAll('.public-program-day')).toHaveLength(3);
-      expect(screen.getAllByRole('heading', { name: /Фуллбади [ABC]/ })).toHaveLength(3);
+      expect(screen.getAllByRole('heading', { name: /Всё тело [ABC]/ })).toHaveLength(3);
       expect(screen.getByRole('link', { name: 'Приседания' })).toHaveAttribute(
         'href',
         '/exercises/squat',
@@ -459,7 +459,7 @@ describe('PublicContentPage', () => {
     expect(screen.getByText(/Опубликовано: 5/i)).toBeVisible();
     expect(screen.getByText(/Опубликовано: 6/i)).toBeVisible();
     expect(
-      screen.getByRole('link', { name: /full body и split: выберите схему/i }),
+      screen.getByRole('link', { name: /всё тело или сплит: выберите схему/i }),
     ).toHaveAttribute('href', '/knowledge/training/how-to-start-strength-training');
     expect(screen.getByRole('link', { name: /гликемический индекс/i })).toHaveAttribute(
       'href',

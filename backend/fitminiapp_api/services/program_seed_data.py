@@ -514,7 +514,7 @@ PPLF_4_DAYS: list[TemplateDaySeed] = [
         ],
     ),
     (
-        "Фуллбади",
+        "Всё тело",
         [
             ("front-squat", 3, "6-8", 150),
             ("dumbbell-bench-press", 3, "8-10", 120),
@@ -554,7 +554,7 @@ PPLF_8_DAYS: list[TemplateDaySeed] = [
         ],
     ),
     (
-        "Фуллбади B",
+        "Всё тело B",
         [
             ("goblet-squat", 3, "10-12", 90),
             ("machine-chest-press", 3, "10-12", 90),
@@ -646,7 +646,7 @@ PLPL_8_DAYS: list[TemplateDaySeed] = [
 STRENGTH_TEMPLATE_SPECS: list[dict[str, object]] = [
     {
         "slug": "strength-pplf-4d",
-        "title": "Тяни/Толкай/Ноги/Фуллбади · 4 дня",
+        "title": "Толкай/тяни/ноги/всё тело · 4 дня",
         "goal": "recomposition",
         "level": "intermediate",
         "split_type": "hybrid",
@@ -654,7 +654,7 @@ STRENGTH_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "strength-pplf-8d",
-        "title": "Тяни/Толкай/Ноги/Фуллбади · 8 дней",
+        "title": "Толкай/тяни/ноги/всё тело · 8 дней",
         "goal": "muscle_gain",
         "level": "advanced",
         "split_type": "hybrid",
@@ -737,7 +737,7 @@ STRENGTH_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "strength-push-pull-legs-6d",
-        "title": "Тяни-толкай-ноги 6 дней",
+        "title": "Толкай/тяни/ноги (PPL) · 6 дней",
         "goal": "muscle_gain",
         "level": "advanced",
         "split_type": "push_pull_legs",
@@ -806,7 +806,7 @@ STRENGTH_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "strength-upper-lower-4d",
-        "title": "Верх-низ 4 дня",
+        "title": "Верх/низ · 4 дня",
         "goal": "recomposition",
         "level": "intermediate",
         "split_type": "upper_lower",
@@ -857,13 +857,13 @@ STRENGTH_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "strength-fullbody-3d",
-        "title": "Фуллбади 3 дня",
+        "title": "Всё тело · 3 дня",
         "goal": "recomposition",
         "level": "beginner",
         "split_type": "full_body",
         "days": [
             (
-                "Фуллбади A",
+                "Всё тело A",
                 [
                     ("squat", 4, "6-8", 150),
                     ("bench-press", 4, "6-8", 150),
@@ -873,7 +873,7 @@ STRENGTH_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Фуллбади B",
+                "Всё тело B",
                 [
                     ("deadlift", 3, "3-5", 180),
                     ("overhead-press", 4, "6-8", 150),
@@ -883,7 +883,7 @@ STRENGTH_TEMPLATE_SPECS: list[dict[str, object]] = [
                 ],
             ),
             (
-                "Фуллбади C",
+                "Всё тело C",
                 [
                     ("front-squat", 4, "6-8", 150),
                     ("incline-dumbbell-press", 3, "8-10", 120),
@@ -1238,7 +1238,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "3+",
                         180,
                         plan=_amrap_last_plan(5, 3, 180),
-                        notes="T1; last set AMRAP",
+                        notes="T1 - основное тяжёлое упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "bench-press",
@@ -1246,7 +1246,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10",
                         120,
                         plan=_straight_plan(3, "10", 120),
-                        notes="T2",
+                        notes="T2 - объёмное базовое упражнение",
                     ),
                     _seed_exercise(
                         "lat-pulldown",
@@ -1254,7 +1254,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "15+",
                         75,
                         plan=_amrap_last_plan(3, 15, 75),
-                        notes="T3; last set AMRAP",
+                        notes="T3 - вспомогательное упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                 ],
             ),
@@ -1267,7 +1267,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "3+",
                         180,
                         plan=_amrap_last_plan(5, 3, 180),
-                        notes="T1; last set AMRAP",
+                        notes="T1 - основное тяжёлое упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "deadlift",
@@ -1275,7 +1275,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10",
                         150,
                         plan=_straight_plan(3, "10", 150),
-                        notes="T2",
+                        notes="T2 - объёмное базовое упражнение",
                     ),
                     _seed_exercise(
                         "one-arm-dumbbell-row",
@@ -1283,7 +1283,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "15+",
                         75,
                         plan=_amrap_last_plan(3, 15, 75),
-                        notes="T3; selected DB row variant; last set AMRAP",
+                        notes="T3 - вспомогательное упражнение; выбран вариант тяги гантели; последний подход - максимум повторений (AMRAP)",
                     ),
                 ],
             ),
@@ -1296,7 +1296,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "3+",
                         180,
                         plan=_amrap_last_plan(5, 3, 180),
-                        notes="T1; last set AMRAP",
+                        notes="T1 - основное тяжёлое упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "squat",
@@ -1304,7 +1304,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10",
                         120,
                         plan=_straight_plan(3, "10", 120),
-                        notes="T2",
+                        notes="T2 - объёмное базовое упражнение",
                     ),
                     _seed_exercise(
                         "lat-pulldown",
@@ -1312,7 +1312,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "15+",
                         75,
                         plan=_amrap_last_plan(3, 15, 75),
-                        notes="T3; last set AMRAP",
+                        notes="T3 - вспомогательное упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                 ],
             ),
@@ -1325,7 +1325,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "3+",
                         210,
                         plan=_amrap_last_plan(5, 3, 210),
-                        notes="T1; last set AMRAP",
+                        notes="T1 - основное тяжёлое упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "overhead-press",
@@ -1333,7 +1333,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10",
                         120,
                         plan=_straight_plan(3, "10", 120),
-                        notes="T2",
+                        notes="T2 - объёмное базовое упражнение",
                     ),
                     _seed_exercise(
                         "one-arm-dumbbell-row",
@@ -1341,7 +1341,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "15+",
                         75,
                         plan=_amrap_last_plan(3, 15, 75),
-                        notes="T3; selected DB row variant; last set AMRAP",
+                        notes="T3 - вспомогательное упражнение; выбран вариант тяги гантели; последний подход - максимум повторений (AMRAP)",
                     ),
                 ],
             ),
@@ -1406,7 +1406,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                             _five_three_one_week([75, 85, 95], [5, 3, None]),
                             _five_three_one_week([40, 50, 60], [5, 5, 5]),
                         ],
-                        notes="Main lift; percentage basis is TRAINING_MAX",
+                        notes="Основное упражнение; проценты от тренировочного максимума",
                     ),
                     _seed_exercise(
                         "squat",
@@ -1430,7 +1430,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                                 5, "5", 90, load_kind="percent_training_max", load_value=40
                             ),
                         ],
-                        notes="FSL; first-set Training Max load",
+                        notes="Повтор первого рабочего подхода (FSL); вес от тренировочного максимума",
                     ),
                     _seed_exercise(
                         "bench-press",
@@ -1444,7 +1444,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                             _five_three_one_week([75, 85, 95], [5, 3, None]),
                             _five_three_one_week([40, 50, 60], [5, 5, 5]),
                         ],
-                        notes="Main lift; percentage basis is TRAINING_MAX",
+                        notes="Основное упражнение; проценты от тренировочного максимума",
                     ),
                 ],
             ),
@@ -1463,7 +1463,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                             _five_three_one_week([75, 85, 95], [5, 3, None]),
                             _five_three_one_week([40, 50, 60], [5, 5, 5]),
                         ],
-                        notes="Main lift; percentage basis is TRAINING_MAX",
+                        notes="Основное упражнение; проценты от тренировочного максимума",
                     ),
                     _seed_exercise(
                         "overhead-press",
@@ -1477,7 +1477,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                             _five_three_one_week([75, 85, 95], [5, 3, None]),
                             _five_three_one_week([40, 50, 60], [5, 5, 5]),
                         ],
-                        notes="Main lift; percentage basis is TRAINING_MAX",
+                        notes="Основное упражнение; проценты от тренировочного максимума",
                     ),
                     _seed_exercise(
                         "pull-up",
@@ -1485,7 +1485,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "6-10",
                         90,
                         plan=_straight_plan(3, "6-10", 90),
-                        notes="Assistance boundary",
+                        notes="Вспомогательное упражнение",
                     ),
                 ],
             ),
@@ -1504,7 +1504,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                             _five_three_one_week([75, 85, 95], [5, 3, None]),
                             _five_three_one_week([40, 50, 60], [5, 5, 5]),
                         ],
-                        notes="Main lift; percentage basis is TRAINING_MAX",
+                        notes="Основное упражнение; проценты от тренировочного максимума",
                     ),
                     _seed_exercise(
                         "squat",
@@ -1518,7 +1518,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                             _five_three_one_week([75, 85, 95], [5, 3, None]),
                             _five_three_one_week([40, 50, 60], [5, 5, 5]),
                         ],
-                        notes="Main lift; percentage basis is TRAINING_MAX",
+                        notes="Основное упражнение; проценты от тренировочного максимума",
                     ),
                     _seed_exercise(
                         "barbell-row",
@@ -1526,7 +1526,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-12",
                         90,
                         plan=_straight_plan(3, "8-12", 90),
-                        notes="Assistance boundary",
+                        notes="Вспомогательное упражнение",
                     ),
                 ],
             ),
@@ -1534,7 +1534,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "phul",
-        "title": "PHUL (сила и гипертрофия, верх/низ)",
+        "title": "PHUL (сила и рост мышц, верх/низ)",
         "goal": "muscle_gain",
         "level": "intermediate",
         "split_type": "upper_lower",
@@ -1589,7 +1589,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "4-6",
                         150,
                         plan=_straight_plan(4, "4-6", 150),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "incline-bench-press",
@@ -1597,7 +1597,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "6-8",
                         120,
                         plan=_straight_plan(4, "6-8", 120),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "barbell-row",
@@ -1605,7 +1605,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "4-6",
                         150,
                         plan=_straight_plan(4, "4-6", 150),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "overhead-press",
@@ -1613,7 +1613,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "6-8",
                         120,
                         plan=_straight_plan(3, "6-8", 120),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                     _seed_exercise(
                         "barbell-curl",
@@ -1621,7 +1621,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-10",
                         90,
                         plan=_straight_plan(3, "8-10", 90),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                     _seed_exercise(
                         "skull-crusher",
@@ -1629,7 +1629,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-10",
                         90,
                         plan=_straight_plan(3, "8-10", 90),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                 ],
             ),
@@ -1642,7 +1642,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "4-6",
                         180,
                         plan=_straight_plan(4, "4-6", 180),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "deadlift",
@@ -1650,7 +1650,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "3-5",
                         210,
                         plan=_straight_plan(3, "3-5", 210),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                     _seed_exercise(
                         "leg-press",
@@ -1658,7 +1658,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-10",
                         120,
                         plan=_straight_plan(4, "8-10", 120),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "leg-curl",
@@ -1666,7 +1666,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-10",
                         90,
                         plan=_straight_plan(3, "8-10", 90),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                     _seed_exercise(
                         "standing-calf-raise",
@@ -1674,7 +1674,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10-15",
                         60,
                         plan=_straight_plan(4, "10-15", 60),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                 ],
             ),
@@ -1687,7 +1687,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-12",
                         120,
                         plan=_straight_plan(4, "8-12", 120),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "dumbbell-bench-press",
@@ -1695,7 +1695,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-12",
                         120,
                         plan=_straight_plan(4, "8-12", 120),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "machine-row",
@@ -1703,7 +1703,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-12",
                         90,
                         plan=_straight_plan(4, "8-12", 90),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "lat-pulldown",
@@ -1711,7 +1711,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-12",
                         90,
                         plan=_straight_plan(4, "8-12", 90),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "dumbbell-lateral-raise",
@@ -1719,7 +1719,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10-15",
                         60,
                         plan=_straight_plan(3, "10-15", 60),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                     _seed_exercise(
                         "rope-pushdown",
@@ -1727,7 +1727,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10-15",
                         75,
                         plan=_straight_plan(3, "10-15", 75),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                 ],
             ),
@@ -1740,7 +1740,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-12",
                         150,
                         plan=_straight_plan(4, "8-12", 150),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "romanian-deadlift",
@@ -1748,7 +1748,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-12",
                         120,
                         plan=_straight_plan(4, "8-12", 120),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                     _seed_exercise(
                         "bulgarian-split-squat",
@@ -1756,7 +1756,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "8-12",
                         120,
                         plan=_straight_plan(3, "8-12", 120),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                     _seed_exercise(
                         "leg-extension",
@@ -1764,7 +1764,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10-15",
                         75,
                         plan=_straight_plan(3, "10-15", 75),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                     _seed_exercise(
                         "seated-leg-curl",
@@ -1772,7 +1772,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10-15",
                         75,
                         plan=_straight_plan(3, "10-15", 75),
-                        notes="Source range; 3 sets selected",
+                        notes="Диапазон из источника; выбрано 3 подхода",
                     ),
                     _seed_exercise(
                         "seated-calf-raise",
@@ -1780,7 +1780,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "10-15",
                         60,
                         plan=_straight_plan(4, "10-15", 60),
-                        notes="Source range; 4 sets selected",
+                        notes="Диапазон из источника; выбрано 4 подхода",
                     ),
                 ],
             ),
@@ -1844,7 +1844,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         plan=_training_max_plan(
                             [75, 80, 85, 75, 80, 85, 90], [5, 5, 5, 5, 5, 5, None], 180
                         ),
-                        notes="T1; ordered TRAINING_MAX loads; final AMRAP",
+                        notes="T1 - основное упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "overhead-press",
@@ -1866,7 +1866,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                                 for value in [65, 70, 75, 65, 70, 75]
                             ],
                         ),
-                        notes="T2; ordered TRAINING_MAX loads; final AMRAP",
+                        notes="T2 - второе базовое упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)",
                     ),
                 ],
             ),
@@ -1881,7 +1881,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         plan=_training_max_plan(
                             [75, 80, 85, 75, 80, 85, 90], [5, 5, 5, 5, 5, 5, None], 180
                         ),
-                        notes="T1; ordered TRAINING_MAX loads; final AMRAP",
+                        notes="T1 - основное упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "sumo-deadlift",
@@ -1903,7 +1903,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                                 for value in [65, 70, 75, 65, 70, 75]
                             ],
                         ),
-                        notes="T2; ordered TRAINING_MAX loads; final AMRAP",
+                        notes="T2 - второе базовое упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)",
                     ),
                 ],
             ),
@@ -1918,7 +1918,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         plan=_training_max_plan(
                             [75, 80, 85, 75, 80, 85, 90], [5, 5, 5, 5, 5, 5, None], 150
                         ),
-                        notes="T1; ordered TRAINING_MAX loads; final AMRAP",
+                        notes="T1 - основное упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "bench-press",
@@ -1940,7 +1940,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                                 for value in [65, 70, 75, 65, 70, 75]
                             ],
                         ),
-                        notes="T2; ordered TRAINING_MAX loads; final AMRAP",
+                        notes="T2 - второе базовое упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)",
                     ),
                 ],
             ),
@@ -1955,7 +1955,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         plan=_training_max_plan(
                             [75, 80, 85, 75, 80, 85, 90], [5, 5, 5, 5, 5, 5, None], 210
                         ),
-                        notes="T1; ordered TRAINING_MAX loads; final AMRAP",
+                        notes="T1 - основное упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "squat",
@@ -1977,7 +1977,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                                 for value in [65, 70, 75, 65, 70, 75]
                             ],
                         ),
-                        notes="T2; ordered TRAINING_MAX loads; final AMRAP",
+                        notes="T2 - второе базовое упражнение; веса по процентам от тренировочного максимума; последний подход - максимум повторений (AMRAP)",
                     ),
                 ],
             ),
@@ -1985,7 +1985,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "metallicdpa-linear-progression-ppl",
-        "title": "Линейная прогрессия Metallicdpa - PPL (толкай/тяни/ноги)",
+        "title": "Линейная прогрессия Metallicdpa - толкай/тяни/ноги (PPL)",
         "goal": "muscle_gain",
         "level": "beginner",
         "split_type": "push_pull_legs",
@@ -2034,7 +2034,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "5+",
                         180,
                         plan=_amrap_last_plan(3, 5, 180),
-                        notes="Main lift; final set AMRAP",
+                        notes="Основное упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "barbell-row", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
@@ -2054,7 +2054,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "5+",
                         150,
                         plan=_amrap_last_plan(3, 5, 150),
-                        notes="Main lift; final set AMRAP",
+                        notes="Основное упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "overhead-press", 3, "6-10", 120, plan=_straight_plan(3, "6-10", 120)
@@ -2076,7 +2076,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "5+",
                         180,
                         plan=_amrap_last_plan(3, 5, 180),
-                        notes="Main lift; final set AMRAP",
+                        notes="Основное упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "romanian-deadlift", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
@@ -2098,7 +2098,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "5+",
                         150,
                         plan=_amrap_last_plan(3, 5, 150),
-                        notes="Alternating main lift; final set AMRAP",
+                        notes="Чередующееся основное упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "one-arm-dumbbell-row", 3, "8-12", 90, plan=_straight_plan(3, "8-12", 90)
@@ -2120,7 +2120,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "5+",
                         150,
                         plan=_amrap_last_plan(3, 5, 150),
-                        notes="Alternating main lift; final set AMRAP",
+                        notes="Чередующееся основное упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "seated-dumbbell-press", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
@@ -2146,7 +2146,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                         "5+",
                         180,
                         plan=_amrap_last_plan(3, 5, 180),
-                        notes="Alternating main lift; final set AMRAP",
+                        notes="Чередующееся основное упражнение; последний подход - максимум повторений (AMRAP)",
                     ),
                     _seed_exercise(
                         "bulgarian-split-squat", 3, "8-12", 120, plan=_straight_plan(3, "8-12", 120)
@@ -2443,7 +2443,7 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
     },
     {
         "slug": "dumbbell-ppl-gregarioushermit",
-        "title": "Гантельная PPL (толкай/тяни/ноги)",
+        "title": "Гантельная программа «толкай/тяни/ноги» (PPL)",
         "goal": "muscle_gain",
         "level": "intermediate",
         "split_type": "push_pull_legs",
@@ -2505,35 +2505,35 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                     _seed_exercise(
                         "dumbbell-bench-press",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         120,
                         plan=_capped_amrap_plan(3, 12, 120),
                     ),
                     _seed_exercise(
                         "incline-dumbbell-press",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         120,
                         plan=_capped_amrap_plan(3, 12, 120),
                     ),
                     _seed_exercise(
                         "seated-dumbbell-press",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         90,
                         plan=_capped_amrap_plan(3, 12, 90),
                     ),
                     _seed_exercise(
                         "dumbbell-lateral-raise",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         60,
                         plan=_capped_amrap_plan(3, 12, 60),
                     ),
                     _seed_exercise(
                         "dumbbell-overhead-extension",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         75,
                         plan=_capped_amrap_plan(3, 12, 75),
                     ),
@@ -2545,25 +2545,29 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                     _seed_exercise(
                         "one-arm-dumbbell-row",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         90,
                         plan=_capped_amrap_plan(3, 12, 90),
                     ),
                     _seed_exercise(
                         "chest-supported-dumbbell-row",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         90,
                         plan=_capped_amrap_plan(3, 12, 90),
                     ),
                     _seed_exercise(
-                        "rear-delt-fly", 3, "AMRAP 12", 60, plan=_capped_amrap_plan(3, 12, 60)
+                        "rear-delt-fly", 3, "максимум до 12", 60, plan=_capped_amrap_plan(3, 12, 60)
                     ),
                     _seed_exercise(
-                        "dumbbell-curl", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                        "dumbbell-curl", 3, "максимум до 12", 75, plan=_capped_amrap_plan(3, 12, 75)
                     ),
                     _seed_exercise(
-                        "dumbbell-shrug", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                        "dumbbell-shrug",
+                        3,
+                        "максимум до 12",
+                        75,
+                        plan=_capped_amrap_plan(3, 12, 75),
                     ),
                 ],
             ),
@@ -2571,19 +2575,31 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                 "Ноги A",
                 [
                     _seed_exercise(
-                        "goblet-squat", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
+                        "goblet-squat",
+                        3,
+                        "максимум до 12",
+                        120,
+                        plan=_capped_amrap_plan(3, 12, 120),
                     ),
                     _seed_exercise(
-                        "single-leg-rdl", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
+                        "single-leg-rdl",
+                        3,
+                        "максимум до 12",
+                        120,
+                        plan=_capped_amrap_plan(3, 12, 120),
                     ),
                     _seed_exercise(
-                        "walking-lunge", 3, "AMRAP 12", 90, plan=_capped_amrap_plan(3, 12, 90)
+                        "walking-lunge", 3, "максимум до 12", 90, plan=_capped_amrap_plan(3, 12, 90)
                     ),
                     _seed_exercise(
-                        "leg-curl", 3, "AMRAP 12", 90, plan=_capped_amrap_plan(3, 12, 90)
+                        "leg-curl", 3, "максимум до 12", 90, plan=_capped_amrap_plan(3, 12, 90)
                     ),
                     _seed_exercise(
-                        "standing-calf-raise", 3, "AMRAP 12", 60, plan=_capped_amrap_plan(3, 12, 60)
+                        "standing-calf-raise",
+                        3,
+                        "максимум до 12",
+                        60,
+                        plan=_capped_amrap_plan(3, 12, 60),
                     ),
                 ],
             ),
@@ -2593,27 +2609,27 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                     _seed_exercise(
                         "incline-dumbbell-press",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         120,
                         plan=_capped_amrap_plan(3, 12, 120),
                     ),
                     _seed_exercise(
                         "dumbbell-bench-press",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         120,
                         plan=_capped_amrap_plan(3, 12, 120),
                     ),
                     _seed_exercise(
-                        "dumbbell-fly", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                        "dumbbell-fly", 3, "максимум до 12", 75, plan=_capped_amrap_plan(3, 12, 75)
                     ),
                     _seed_exercise(
-                        "arnold-press", 3, "AMRAP 12", 90, plan=_capped_amrap_plan(3, 12, 90)
+                        "arnold-press", 3, "максимум до 12", 90, plan=_capped_amrap_plan(3, 12, 90)
                     ),
                     _seed_exercise(
                         "dumbbell-overhead-extension",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         75,
                         plan=_capped_amrap_plan(3, 12, 75),
                     ),
@@ -2625,25 +2641,29 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                     _seed_exercise(
                         "chest-supported-dumbbell-row",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         90,
                         plan=_capped_amrap_plan(3, 12, 90),
                     ),
                     _seed_exercise(
                         "one-arm-dumbbell-row",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         90,
                         plan=_capped_amrap_plan(3, 12, 90),
                     ),
                     _seed_exercise(
-                        "rear-delt-fly", 3, "AMRAP 12", 60, plan=_capped_amrap_plan(3, 12, 60)
+                        "rear-delt-fly", 3, "максимум до 12", 60, plan=_capped_amrap_plan(3, 12, 60)
                     ),
                     _seed_exercise(
-                        "hammer-curl", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                        "hammer-curl", 3, "максимум до 12", 75, plan=_capped_amrap_plan(3, 12, 75)
                     ),
                     _seed_exercise(
-                        "dumbbell-shrug", 3, "AMRAP 12", 75, plan=_capped_amrap_plan(3, 12, 75)
+                        "dumbbell-shrug",
+                        3,
+                        "максимум до 12",
+                        75,
+                        plan=_capped_amrap_plan(3, 12, 75),
                     ),
                 ],
             ),
@@ -2653,21 +2673,33 @@ _SOURCE_TEMPLATE_SPECS: list[dict[str, object]] = [
                     _seed_exercise(
                         "bulgarian-split-squat",
                         3,
-                        "AMRAP 12",
+                        "максимум до 12",
                         120,
                         plan=_capped_amrap_plan(3, 12, 120),
                     ),
                     _seed_exercise(
-                        "db-squat", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
+                        "db-squat", 3, "максимум до 12", 120, plan=_capped_amrap_plan(3, 12, 120)
                     ),
                     _seed_exercise(
-                        "single-leg-rdl", 3, "AMRAP 12", 120, plan=_capped_amrap_plan(3, 12, 120)
+                        "single-leg-rdl",
+                        3,
+                        "максимум до 12",
+                        120,
+                        plan=_capped_amrap_plan(3, 12, 120),
                     ),
                     _seed_exercise(
-                        "seated-leg-curl", 3, "AMRAP 12", 90, plan=_capped_amrap_plan(3, 12, 90)
+                        "seated-leg-curl",
+                        3,
+                        "максимум до 12",
+                        90,
+                        plan=_capped_amrap_plan(3, 12, 90),
                     ),
                     _seed_exercise(
-                        "seated-calf-raise", 3, "AMRAP 12", 60, plan=_capped_amrap_plan(3, 12, 60)
+                        "seated-calf-raise",
+                        3,
+                        "максимум до 12",
+                        60,
+                        plan=_capped_amrap_plan(3, 12, 60),
                     ),
                 ],
             ),

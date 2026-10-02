@@ -710,3 +710,15 @@ registration
 ## Выполненные tasks и новые skills
 
 Tasks `00-55` не выполнять повторно из-за обновления `.agents`, новых skills или последующего design exploration. Поздняя task `76` остаётся release-stage retrospective audit. Реальные usability sessions — task `77`; production readiness — task `78`; final go/no-go — task `79`. Новый skill сам по себе не разрешает refactor без прямого требования текущей task или доказанного blocking defect.
+
+## Russian-first fitness terminology
+
+YFC is Russian-first in user-facing product copy.
+
+- Built-in program and template names, split names and generic fitness concepts must be understandable in Russian without English fitness vocabulary.
+- Internal enum values, slugs, API fields and source identifiers may remain English.
+- Do not expose unexplained `Beginner`, `Intermediate`, `Advanced`, `Full Body`, `Upper/Lower`, `Push/Pull/Legs`, `Hypertrophy` or similar generic English labels in Russian UI.
+- Prefer: `для начинающих`, `средний уровень`, `продвинутый уровень`, `всё тело`, `верх/низ`, `рост мышц`, `развитие силы`.
+- Established proper program names or abbreviations may remain only when identity matters and the user-facing label explains them in Russian, for example `толкай/тяни/ноги (PPL)` or `PHUL (сила и рост мышц, верх/низ)`.
+- User-created names are not rewritten merely because the user chose English. This rule governs built-in/system-authored content and generated defaults.
+- New built-in templates and generated default labels require regression coverage against untranslated generic English labels.

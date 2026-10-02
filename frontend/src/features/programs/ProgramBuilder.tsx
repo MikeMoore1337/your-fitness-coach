@@ -458,7 +458,7 @@ export function ProgramBuilder({
       ),
     );
     setTitle(
-      `${{ fullbody: 'Фуллбади', upper_lower: 'Верх/Низ', push_pull_legs: 'Тяни/Толкай/Ноги', split: 'Сплит' }[split]} · ${normalizedDays} дн.`,
+      `${{ fullbody: 'Всё тело', upper_lower: 'Верх/низ', push_pull_legs: 'Толкай/тяни/ноги (PPL)', split: 'Сплит' }[split]} · ${normalizedDays} дн.`,
     );
     if (nextRule.warning) toast(nextRule.warning, 'error');
     else toast('Силовой шаблон загружен');
@@ -1073,7 +1073,7 @@ export function ProgramBuilder({
                         setPresetDays(resolveStrengthRule(level, next).recommended);
                       }}
                     >
-                      <option value="fullbody">Фуллбади</option>
+                      <option value="fullbody">Всё тело</option>
                       <option value="upper_lower">Верх/Низ</option>
                       <option value="push_pull_legs">Тяни/Толкай/Ноги</option>
                       <option value="split">Сплит</option>

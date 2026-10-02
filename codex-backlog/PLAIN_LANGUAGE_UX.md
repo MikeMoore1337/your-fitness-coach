@@ -141,3 +141,15 @@ Use short action-oriented text. Long explanations belong to Public Web; TMA uses
 A novice can register, finish onboarding, choose a program, complete a workout, understand a progression hint, log food, add measurements and read Progress without external terminology lookup.
 
 A trainer can directly enable Trainer mode, invite a client, assign a program and review results without interpreting internal role terminology.
+
+## Russian-first fitness terminology
+
+YFC is Russian-first in user-facing product copy.
+
+- Built-in program and template names, split names and generic fitness concepts must be understandable in Russian without English fitness vocabulary.
+- Internal enum values, slugs, API fields and source identifiers may remain English.
+- Do not expose unexplained `Beginner`, `Intermediate`, `Advanced`, `Full Body`, `Upper/Lower`, `Push/Pull/Legs`, `Hypertrophy` or similar generic English labels in Russian UI.
+- Prefer: `для начинающих`, `средний уровень`, `продвинутый уровень`, `всё тело`, `верх/низ`, `рост мышц`, `развитие силы`.
+- Established proper program names or abbreviations may remain only when identity matters and the user-facing label explains them in Russian, for example `толкай/тяни/ноги (PPL)` or `PHUL (сила и рост мышц, верх/низ)`.
+- User-created names are not rewritten merely because the user chose English. This rule governs built-in/system-authored content and generated defaults.
+- New built-in templates and generated default labels require regression coverage against untranslated generic English labels.
