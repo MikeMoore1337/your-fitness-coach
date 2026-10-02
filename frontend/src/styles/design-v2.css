@@ -2606,6 +2606,37 @@ body:has(.app-shell--design-v2) {
   background: var(--v2-surface);
 }
 
+.active-workout--design-v2 .active-workout-set__prefill--commit {
+  border-color: var(--v2-lime);
+  background: var(--v2-lime);
+  color: var(--v2-on-lime);
+}
+
+.active-workout--design-v2 .active-workout-history,
+.active-workout--design-v2 .active-workout-helper-block {
+  border-color: var(--v2-border);
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-primary);
+}
+
+.active-workout--design-v2 .active-workout-history span,
+.active-workout--design-v2 .active-workout-history--loading,
+.active-workout--design-v2 .active-workout-helper-block p,
+.active-workout--design-v2 .active-workout-helper-muted {
+  color: var(--v2-text-secondary);
+}
+
+.active-workout--design-v2 .active-workout-helper-chip,
+.active-workout--design-v2 .active-workout-helper-inputs input {
+  border-color: var(--v2-border);
+  background: var(--v2-surface);
+  color: var(--v2-text-primary);
+}
+
+.active-workout--design-v2 .active-workout-helper-chip:hover {
+  background: var(--v2-surface-secondary);
+}
+
 .active-workout--design-v2 .active-workout-set__advanced {
   border-color: var(--v2-border);
 }
@@ -2672,6 +2703,10 @@ body:has(.app-shell--design-v2) {
   background: var(--v2-surface);
   color: var(--v2-text-primary);
   box-shadow: none;
+}
+
+.active-workout--design-v2 ~ .active-workout-rest--complete {
+  border-color: var(--v2-lime);
 }
 
 /* Login / public continuity */

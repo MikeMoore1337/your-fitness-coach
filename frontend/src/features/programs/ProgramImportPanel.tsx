@@ -42,9 +42,9 @@ const coachingRuleLabels: Record<string, string> = {
 const prescriptionRoleLabels: Record<string, string> = {
   warmup: 'Разминка',
   working: 'Рабочий подход',
-  top: 'Топ-сет',
+  top: 'Тяжёлый подход',
   backoff: 'Снижение нагрузки',
-  drop: 'Дроп-сет',
+  drop: 'Подход со снижением веса',
   activation: 'Активационный подход',
   mini_set: 'Мини-подход',
   cluster_member: 'Кластерный подход',
@@ -56,7 +56,7 @@ const prescriptionGroupLabels: Record<string, string> = {
   rest_pause: 'Отдых-пауза',
   myo_reps: 'Мио-повторы',
   cluster: 'Кластер',
-  drop_chain: 'Дроп-сет',
+  drop_chain: 'Подход со снижением веса',
   circuit: 'Круговая тренировка',
 };
 

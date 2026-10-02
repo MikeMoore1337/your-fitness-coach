@@ -243,7 +243,7 @@ test('@critical active workout keeps the current set primary across mobile width
     await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
     await expectUiAuditClean(page, 'active workout current set', { checkTouchTargets: true });
 
-    const numberInputs = currentSet.locator('input[type="number"]');
+    const numberInputs = currentSet.locator('input[type="number"]:visible');
     await expect(numberInputs).toHaveCount(2);
     expect(
       await numberInputs.evaluateAll((inputs) =>

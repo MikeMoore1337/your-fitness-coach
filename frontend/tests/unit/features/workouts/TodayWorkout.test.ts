@@ -56,15 +56,15 @@ describe('formatSetResult', () => {
 
 describe('structured workout labels', () => {
   it('keeps accepted planned roles readable without flattening them into set kind', () => {
-    expect(formatPlannedSetRole('top')).toBe('Топ-сет');
-    expect(formatPlannedSetRole('backoff')).toBe('Бэкофф');
+    expect(formatPlannedSetRole('top')).toBe('Тяжёлый подход');
+    expect(formatPlannedSetRole('backoff')).toBe('Облегчённый подход');
     expect(formatPlannedSetRole('mini_set')).toBe('Мини-сет');
     expect(formatPlannedSetRole(null)).toBeNull();
   });
 
   it('shows an accepted advanced group only when the API provides one', () => {
     expect(formatPlannedGroupKind('rest_pause')).toBe('Rest-pause');
-    expect(formatPlannedGroupKind('drop_chain')).toBe('Дроп-сет');
+    expect(formatPlannedGroupKind('drop_chain')).toBe('Подход со снижением веса');
     expect(formatPlannedGroupKind(undefined)).toBeNull();
   });
 });

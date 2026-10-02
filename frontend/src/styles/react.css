@@ -4616,6 +4616,47 @@ button.today-text-link {
   outline: 3px solid var(--focus-ring);
   outline-offset: 2px;
 }
+.active-workout-set__prefill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -3px 0 0 48px;
+}
+.active-workout-set__prefill-actions .active-workout-set__prefill {
+  margin: 0;
+}
+.active-workout-set__prefill--commit {
+  border-color: var(--accent-line);
+  background: var(--accent);
+  color: var(--button-text);
+}
+.active-workout-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-soft);
+}
+.active-workout-history > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.active-workout-history span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.active-workout-history strong {
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.active-workout-history--loading {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
 .active-workout-set__controls {
   display: grid;
   grid-template-columns: minmax(100px, 0.8fr) minmax(100px, 0.8fr) minmax(170px, 1.2fr);
@@ -4726,6 +4767,102 @@ button.today-text-link {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--button-text);
+}
+.active-workout-rir--quick {
+  padding-top: 2px;
+}
+.active-workout-rir--quick legend {
+  color: var(--text);
+}
+.active-workout-set__helpers {
+  border-top: 1px solid var(--border);
+}
+.active-workout-set__helpers > summary {
+  width: fit-content;
+  min-height: 44px;
+  padding-top: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+.active-workout-set__helpers-body {
+  display: grid;
+  gap: 12px;
+  padding: 4px 0 2px;
+}
+.active-workout-helper-block {
+  display: grid;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-soft);
+}
+.active-workout-helper-block > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+.active-workout-helper-block strong {
+  font-size: 0.8rem;
+}
+.active-workout-helper-block p,
+.active-workout-helper-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+.active-workout-helper-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.active-workout-helper-chip {
+  min-height: 44px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.active-workout-helper-chip:hover {
+  background: var(--secondary-hover);
+}
+.active-workout-helper-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.active-workout-helper-inputs label {
+  display: grid;
+  gap: 5px;
+}
+.active-workout-helper-inputs label span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.active-workout-helper-inputs input {
+  width: 100%;
+  min-height: 44px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.active-workout-helper-result {
+  padding-top: 2px;
+  border-top: 1px solid var(--border);
+}
+.active-workout-helper-result strong {
+  color: var(--accent-strong, var(--accent));
 }
 .active-workout-rir__help > summary {
   padding-top: 6px;
@@ -5051,6 +5188,15 @@ button.today-text-link {
   padding: 7px 10px;
   font-size: 0.72rem;
 }
+.active-workout-rest--complete {
+  pointer-events: auto;
+}
+.active-workout-rest__complete-copy {
+  grid-column: 1 / -1;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
 
 @media (min-width: 1000px) {
   .active-workout.is-embedded {
@@ -5096,7 +5242,8 @@ button.today-text-link {
     justify-content: stretch;
   }
   .active-workout-exercise__head-actions button {
-    flex: 1 1 150px;
+    width: 100%;
+    flex: 1 0 100%;
   }
   .active-workout-set {
     padding: 11px;
@@ -5120,6 +5267,12 @@ button.today-text-link {
     width: 100%;
     justify-content: center;
     margin-left: 0;
+  }
+  .active-workout-set__prefill-actions {
+    margin-left: 0;
+  }
+  .active-workout-set__prefill-actions .active-workout-set__prefill {
+    flex: 1 1 180px;
   }
   .active-workout-finish .ui-button {
     width: 100%;

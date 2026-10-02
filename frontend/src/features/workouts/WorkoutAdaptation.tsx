@@ -86,19 +86,25 @@ export function WorkoutAdaptation({
   workout,
   safetyOnly = false,
   entryContext = 'workout',
+  initialTargetId,
+  entryLabel,
 }: {
   workout: Workout;
   safetyOnly?: boolean;
   entryContext?: 'today' | 'workout';
+  initialTargetId?: number;
+  entryLabel?: string;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
   const titleId = useId();
   const descriptionId = useId();
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState<AdaptationReason>('limited_time');
+  const [reason, setReason] = useState<AdaptationReason>(
+    initialTargetId ? 'replace_exercise' : 'limited_time',
+  );
   const [timeBudget, setTimeBudget] = useState('30');
-  const [targetId, setTargetId] = useState('');
+  const [targetId, setTargetId] = useState(initialTargetId ? String(initialTargetId) : '');
   const [replacementId, setReplacementId] = useState('');
   const [equipmentIds, setEquipmentIds] = useState<EquipmentId[]>([]);
   const [preview, setPreview] = useState<WorkoutAdaptationPreview | null>(null);
@@ -228,7 +234,8 @@ export function WorkoutAdaptation({
     previewMutation.mutate(request);
   };
 
-  const entryLabel = safetyOnly ? 'Боль или травма во время тренировки' : 'Адаптировать тренировку';
+  const resolvedEntryLabel =
+    entryLabel ?? (safetyOnly ? 'Боль или травма во время тренировки' : 'Адаптировать тренировку');
 
   return (
     <div
@@ -244,10 +251,17 @@ export function WorkoutAdaptation({
             name: 'workout_adaptation_started',
             surface: productEventSurface(),
           });
+          if (initialTargetId) {
+            setReason('replace_exercise');
+            setTargetId(String(initialTargetId));
+            setReplacementId('');
+            setEquipmentIds([]);
+            resetPreview();
+          }
           setOpen(true);
         }}
       >
-        {entryLabel}
+        {resolvedEntryLabel}
       </Button>
 
       {open &&
