@@ -11,6 +11,7 @@ from fitminiapp_api.schemas.food_diary import (
     DiaryAmountUnit,
     FoodDiaryEntryResponse,
     FoodDiaryNutrition,
+    FoodDiaryTargets,
     MealType,
 )
 
@@ -133,7 +134,7 @@ class FoodDiaryBatchItem(BaseModel):
 
 
 class FoodDiaryBatchResponse(BaseModel):
-    operation_kind: Literal["meal_template", "natural_input"]
+    operation_kind: Literal["meal_template", "natural_input", "suggestion"]
     diary_date: date
     meal_type: MealType
     entries: list[FoodDiaryEntryResponse]
@@ -187,6 +188,79 @@ class NaturalInputCommitRequest(BaseModel):
     diary_date: date
     meal_type: MealType
     items: list[NaturalInputCommitItem] = Field(min_length=1, max_length=100)
+
+
+SuggestionSource = Literal[
+    "recent",
+    "frequent",
+    "favorite",
+    "used",
+    "saved_template",
+    "personal_recipe",
+]
+SuggestionCandidateKind = Literal["food", "recipe", "template"]
+SuggestionItemKind = Literal["food", "recipe"]
+SuggestionReason = Literal[
+    "protein_fit",
+    "lower_known_fat",
+    "recent",
+    "frequent",
+    "favorite",
+    "used",
+    "saved_template",
+    "personal_recipe",
+    "partial_nutrition",
+]
+
+
+class NutritionSuggestionItem(BaseModel):
+    position: int = Field(ge=0)
+    item_kind: SuggestionItemKind
+    food_id: int | None = Field(default=None, gt=0)
+    recipe_id: int | None = Field(default=None, gt=0)
+    name: str
+    brand: str | None
+    amount: Decimal = Field(gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False)
+    amount_unit: DiaryAmountUnit
+    nutrition: FoodDiaryNutrition
+    nutrition_confidence: Literal["exact", "approximate", "partial"]
+
+    @model_validator(mode="after")
+    def require_single_source(self) -> NutritionSuggestionItem:
+        if (self.food_id is None) == (self.recipe_id is None):
+            raise ValueError("exactly one of food_id or recipe_id must be provided")
+        if self.recipe_id is not None and self.amount_unit != "g":
+            raise ValueError("recipe suggestion items must use grams")
+        return self
+
+
+class NutritionSuggestionCandidate(BaseModel):
+    candidate_id: str
+    candidate_kind: SuggestionCandidateKind
+    identity_id: int = Field(gt=0)
+    name: str
+    items: list[NutritionSuggestionItem] = Field(min_length=1, max_length=100)
+    nutrition: FoodDiaryNutrition
+    nutrition_confidence: Literal["exact", "approximate", "partial"]
+    sources: list[SuggestionSource] = Field(min_length=1)
+    reasons: list[SuggestionReason] = Field(min_length=1)
+
+
+class NutritionSuggestionsResponse(BaseModel):
+    mode: Literal["deterministic"] = "deterministic"
+    diary_date: date
+    targets: FoodDiaryTargets | None
+    remaining: FoodDiaryTargets | None
+    remaining_confidence: Literal["exact", "approximate", "partial"] | None
+    limitations: list[str] = Field(default_factory=list)
+    candidates: list[NutritionSuggestionCandidate] = Field(default_factory=list)
+    max_candidates: int = Field(ge=1)
+
+
+class NutritionSuggestionCommitRequest(BaseModel):
+    diary_date: date
+    meal_type: MealType
+    items: list[FoodDiaryBatchItem] = Field(min_length=1, max_length=100)
 
 
 class FoodSearchAliasCreate(BaseModel):

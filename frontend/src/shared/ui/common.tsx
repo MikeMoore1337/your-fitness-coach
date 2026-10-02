@@ -381,7 +381,15 @@ export function EmptyState({ title, text }: { title: string; text?: string }) {
   );
 }
 
-export function ErrorState({ message, retry }: { message: string; retry?: () => void }) {
+export function ErrorState({
+  message,
+  retry,
+  retryLabel = 'Повторить',
+}: {
+  message: string;
+  retry?: () => void;
+  retryLabel?: string;
+}) {
   return (
     <div className="empty-state error-state ui-state ui-state--error" role="alert">
       <Icon className="ui-state__icon" name="error" size={24} />
@@ -389,7 +397,7 @@ export function ErrorState({ message, retry }: { message: string; retry?: () => 
       <p className="muted ui-state__text">{message}</p>
       {retry && (
         <Button onClick={retry} type="button" variant="secondary">
-          Повторить
+          {retryLabel}
         </Button>
       )}
     </div>

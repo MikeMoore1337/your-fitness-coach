@@ -77,6 +77,8 @@ from fitminiapp_api.schemas.nutrition_power import (
     NutritionMealTemplateListResponse,
     NutritionMealTemplateResponse,
     NutritionMealTemplateUpdate,
+    NutritionSuggestionCommitRequest,
+    NutritionSuggestionsResponse,
 )
 from fitminiapp_api.schemas.photo_meal import (
     PhotoMealConfirmRequest,
@@ -175,6 +177,10 @@ from fitminiapp_api.services.nutrition_power import (
     preview_natural_input,
     update_food_search_alias,
     update_meal_template,
+)
+from fitminiapp_api.services.nutrition_suggestions import (
+    commit_nutrition_suggestion,
+    get_nutrition_suggestions,
 )
 from fitminiapp_api.services.photo_meal import (
     PhotoMealError,
@@ -938,6 +944,35 @@ def get_diary_day(
 ):
     try:
         return get_food_diary_day(db, current_user, diary_date)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.get("/diary/suggestions", response_model=NutritionSuggestionsResponse)
+def get_diary_suggestions(
+    diary_date: date | None = None,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_nutrition_suggestions(db, current_user, diary_date)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
+    "/diary/suggestions/commit",
+    response_model=FoodDiaryBatchResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def commit_diary_suggestion(
+    payload: NutritionSuggestionCommitRequest,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return commit_nutrition_suggestion(db, current_user, payload, idempotency_key)
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
 
