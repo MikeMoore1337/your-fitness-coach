@@ -7713,3 +7713,45 @@ def test_maintenance_cleanup_removes_only_clean_merged_unleased_worktrees(
     assert stale.exists()
     assert dirty.exists()
     assert all(item.path != merged.resolve() for item in git_repository.worktrees())
+
+
+@pytest.mark.parametrize(
+    "owner_gate",
+    ("owner_visual_acceptance", "behavior_contract", "privacy_and_sharing_contract"),
+)
+def test_yellow_owner_gates_allow_implementation_start(
+    repository: tuple[Path, Any], owner_gate: str
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "239B", "yellow-gate", owner_gate=owner_gate)
+    controller = task_session.TaskController(git_repository)
+
+    started = controller.start("239B", owner_launch=True, session_label="yellow-gate", offline=True)
+
+    assert started["lease"]["task_id"] == "239B"
+    assert started["lease"]["lifecycle_state"] == task_session.WORKING_STATE
+
+
+def test_yellow_owner_gate_allows_adopt_current(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _ = repository
+    _write_task(root, "239C", "visual-adopt", owner_gate="owner_visual_acceptance")
+    adopted_path = root / ".artifacts" / "worktrees" / "visual-adopt-239C"
+    _git(
+        root,
+        "worktree",
+        "add",
+        "-b",
+        "task/239C-visual-adopt",
+        str(adopted_path),
+        "origin/master",
+    )
+    controller = task_session.TaskController(task_session.GitRepository(adopted_path))
+
+    lease = controller.adopt_current(
+        "239C", owner_launch=True, session_label="visual-adopt", offline=True
+    )
+
+    assert lease["task_id"] == "239C"
+    assert lease["lifecycle_state"] == task_session.WORKING_STATE

@@ -4319,3 +4319,68 @@ def test_owner_reconcile_prelease_refuses_open_task_pull_request(
             "507", control_issue=567, reason="resume stale queue", owner_authorize=True
         )
     assert claim_path.exists()
+
+
+def test_queue_allows_yellow_visual_gate_to_enter_implementation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tasks_root = tmp_path / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True)
+    (tasks_root / "520-workout.md").write_text("workout", encoding="utf-8")
+    issue = {
+        "number": 616,
+        "title": "[Task 520] workout",
+        "body": render_task_contract(
+            {
+                "task_id": "520",
+                "scope": "Workout execution v2",
+                "acceptance": ["owner visual acceptance remains required before rollout"],
+                "dependencies": ["519"],
+                "owner_gate": "owner_visual_acceptance",
+                "risk_lane": "YELLOW",
+                "source_spec": "codex-backlog/tasks/520-workout.md",
+                "issue_state": "queued",
+            }
+        ),
+        "state": "open",
+        "user": {"login": "owner"},
+    }
+
+    class FakeStore:
+        def delivery_state(self) -> dict[str, Any]:
+            return {}
+
+        def all_leases(self) -> list[dict[str, Any]]:
+            return []
+
+    class FakeController:
+        def __init__(self, repository: object) -> None:
+            del repository
+            self.store = FakeStore()
+
+        def _completed_dependency_ids(self) -> set[str]:
+            return {"519"}
+
+    monkeypatch.setattr(delivery, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(delivery, "GitRepository", lambda root: object())
+    monkeypatch.setattr(delivery, "TaskController", FakeController)
+    monkeypatch.setattr(
+        delivery,
+        "find_task_document",
+        lambda root, task_id: SimpleNamespace(
+            task_id=task_id,
+            executable=True,
+            slug="workout",
+            path=root / "codex-backlog" / "tasks" / "520-workout.md",
+        ),
+    )
+    monkeypatch.setattr(delivery, "_github_json", lambda endpoint: [issue])
+    monkeypatch.setattr(delivery, "_issue_authorized", lambda issue: True)
+    monkeypatch.setattr(delivery, "_trusted_issue_logins", lambda issue: ("owner",))
+    monkeypatch.setattr(delivery, "_control_issue_snapshot", lambda issue: (issue, []))
+
+    candidates = delivery._queue_candidates()
+
+    assert candidates[0]["task_id"] == "520"
+    assert candidates[0]["state"] == "queued"
+    assert candidates[0]["risk_lane"] == "YELLOW"

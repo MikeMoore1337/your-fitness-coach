@@ -2098,13 +2098,13 @@ def _queue_candidates() -> list[dict[str, Any]]:
             )
             break
         risk_lane = str(contract.get("risk_lane", "")).upper()
-        if risk_lane != "GREEN":
+        if risk_lane == "RED":
             result.append(
                 {
                     "task_id": task_id,
                     "state": "human_required",
-                    "risk_lane": risk_lane or "RED",
-                    "blocker": f"Task {task_id} retains declared {risk_lane or 'unknown'} gate",
+                    "risk_lane": "RED",
+                    "blocker": f"Task {task_id} retains declared RED gate",
                 }
             )
             break
@@ -2112,7 +2112,7 @@ def _queue_candidates() -> list[dict[str, Any]]:
             {
                 "task_id": task_id,
                 "state": "queued",
-                "risk_lane": task_risk_lane(str(contract.get("owner_gate", "none"))),
+                "risk_lane": risk_lane or task_risk_lane(str(contract.get("owner_gate", "none"))),
                 "issue_number": contract.get("issue_number"),
                 "branch_slug": document.slug,
                 "dependencies": sorted(issue_dependencies),
