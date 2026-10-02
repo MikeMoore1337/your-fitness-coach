@@ -25,11 +25,17 @@ from fitminiapp_api.middleware.request_context import RequestContextMiddleware
 from fitminiapp_api.models.news import WebArticle
 from fitminiapp_api.seo import (
     NOINDEX_ROBOTS,
+    SeoMetadata,
     public_origin,
     public_page_lastmod,
     public_page_paths,
     public_sitemap_paths,
     render_frontend_document,
+)
+from fitminiapp_api.services.public_shares import (
+    PUBLIC_SHARE_PATH_PREFIX,
+    get_active_public_share,
+    public_share_seo,
 )
 from fitminiapp_api.services.web_articles import published_articles
 
@@ -211,12 +217,17 @@ def _frontend_index(
     *,
     article: WebArticle | None = None,
     articles: tuple[WebArticle, ...] = (),
+    metadata_override: SeoMetadata | None = None,
 ) -> HTMLResponse:
     index = FRONTEND_DIST_DIR / "index.html"
     if not index.exists():
         raise RuntimeError("Frontend build is missing. Run `npm run build` in frontend/.")
     document, metadata = render_frontend_document(
-        index.read_text(encoding="utf-8"), path, article=article, articles=articles
+        index.read_text(encoding="utf-8"),
+        path,
+        article=article,
+        articles=articles,
+        metadata_override=metadata_override,
     )
     return HTMLResponse(
         document,
@@ -289,6 +300,33 @@ def miniapp() -> HTMLResponse:
 @app.get("/app/report", include_in_schema=False)
 def progress_report_page() -> HTMLResponse:
     return _frontend_index("/app/report")
+
+
+@app.get("/share/{share_id}", include_in_schema=False)
+def public_share_page(share_id: str) -> HTMLResponse:
+    path = f"{PUBLIC_SHARE_PATH_PREFIX}{share_id}"
+    with SessionLocal() as db:
+        share = get_active_public_share(db, share_id)
+    if share is None:
+        response = _frontend_index(path)
+        response.status_code = 404
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Robots-Tag"] = NOINDEX_ROBOTS
+        return response
+    title, description = public_share_seo(share)
+    response = _frontend_index(
+        path,
+        metadata_override=SeoMetadata(
+            title=title,
+            description=description,
+            robots=NOINDEX_ROBOTS,
+            canonical_url=f"{settings.frontend_base_url.rstrip('/')}{PUBLIC_SHARE_PATH_PREFIX}{share.share_id}",
+            og_description=description,
+        ),
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = NOINDEX_ROBOTS
+    return response
 
 
 @app.get("/demo")

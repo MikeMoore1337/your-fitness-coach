@@ -9,6 +9,7 @@ import type {
 import { api } from '../../shared/api/client';
 import { downloadProgressReport } from '../../features/reports/downloadProgressReport';
 import { ReportHandoffPanel } from '../../features/reports/ReportHandoffPanel';
+import { PublicProgressSharePanel } from '../../features/reports/PublicProgressSharePanel';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { DataConfidence } from '../../shared/ui/DataConfidence';
@@ -1025,6 +1026,14 @@ export default function ProgressReportPage() {
           period={applied.period}
           report={displayReport}
           trainer={auth.user.trainer}
+        />
+      )}
+
+      {handoffId === null && !clientId && (
+        <PublicProgressSharePanel
+          dateFrom={applied.dateFrom}
+          dateTo={applied.dateTo}
+          period={applied.period}
         />
       )}
 

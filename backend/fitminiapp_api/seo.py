@@ -1018,10 +1018,14 @@ def render_frontend_document(
     *,
     article: WebArticle | None = None,
     articles: tuple[WebArticle, ...] = (),
+    metadata_override: SeoMetadata | None = None,
 ) -> tuple[str, SeoMetadata]:
     """Inject route metadata and public fallback into the Vite HTML entry."""
 
-    if article is not None:
+    if metadata_override is not None:
+        metadata = metadata_override
+        fallback = ""
+    elif article is not None:
         metadata = metadata_for_article(article)
         fallback = render_article_fallback(
             article, tuple(item for item in articles if item.slug in article.related_slugs)

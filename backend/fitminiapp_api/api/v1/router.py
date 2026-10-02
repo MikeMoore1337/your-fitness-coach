@@ -17,6 +17,7 @@ from fitminiapp_api.api.v1 import (
     programs,
     public,
     report_handoffs,
+    shares,
     workouts,
 )
 
@@ -39,6 +40,7 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(
     report_handoffs.router, prefix="/report-handoffs", tags=["report-handoffs"]
 )
+api_router.include_router(shares.router, prefix="/shares", tags=["shares"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(bot.router, prefix="/bot", tags=["bot"])
 api_router.include_router(hermes.router, prefix="/hermes", tags=["hermes"])

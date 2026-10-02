@@ -93,6 +93,7 @@ from fitminiapp_api.models.program import (
     WorkoutSetMutation,
 )
 from fitminiapp_api.models.program_import import ProgramImport
+from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.recipe import Recipe, RecipeIngredient
 from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
 from fitminiapp_api.models.report_handoff import ReportHandoff
@@ -194,6 +195,8 @@ __all__ = [
     "ProgramTemplateDay",
     "ProgramTemplateExercise",
     "ProgramTemplateExerciseWeekPrescription",
+    "PublicShare",
+    "PublicShareImport",
     "Recipe",
     "RecipeIngredient",
     "RefreshToken",

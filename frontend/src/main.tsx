@@ -67,6 +67,10 @@ function isArticleRoute(path: string): boolean {
   return path === '/articles' || path.startsWith('/articles/');
 }
 
+function isPublicShareRoute(path: string): boolean {
+  return path.startsWith('/share/');
+}
+
 function isPublicContentRoute(path: string): boolean {
   return (
     publicContentRoots.has(path) || path.startsWith('/knowledge/') || path.startsWith('/exercises/')
@@ -80,6 +84,7 @@ const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
 const DemoPage = lazy(() => import('./pages/demo/DemoPage'));
 const PublicContentPage = lazy(() => import('./pages/public/PublicContentPage'));
+const PublicSharePage = lazy(() => import('./pages/public/PublicSharePage'));
 const ArticlesPage = lazy(() => import('./pages/public/ArticlesPage'));
 const PublicKnowledgeRoute = lazy(() => import('./pages/public/PublicKnowledgeRoute'));
 const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
@@ -140,12 +145,23 @@ function AppRoutes() {
   const { path } = useNavigation();
   const legacyKnowledgePath = publicKnowledgePathFromLegacyRoute(path);
   useEffect(() => {
-    if (path !== '/' && !isPublicContentRoute(path) && !isArticleRoute(path)) {
+    if (
+      path !== '/' &&
+      !isPublicContentRoute(path) &&
+      !isArticleRoute(path) &&
+      !isPublicShareRoute(path)
+    ) {
       applyPrivateRouteMetadata(path);
     }
   }, [path]);
   if (path === '/') return <LandingPage />;
   if (isArticleRoute(path)) return <ArticlesPage />;
+  if (isPublicShareRoute(path))
+    return (
+      <AuthProvider>
+        <PublicSharePage />
+      </AuthProvider>
+    );
   if (path === '/demo') {
     if (isTelegramLaunch(window.location)) return <Redirect to="/app" />;
     return <DemoPage />;
@@ -226,7 +242,8 @@ function AppRoutes() {
 
 function AnalyticsRuntime() {
   const { path } = useNavigation();
-  const publicRoute = path === '/' || isPublicContentRoute(path) || isArticleRoute(path);
+  const publicRoute =
+    path === '/' || isPublicContentRoute(path) || isArticleRoute(path) || isPublicShareRoute(path);
 
   useLayoutEffect(() => {
     setYandexPrivateContentMask(!publicRoute);
