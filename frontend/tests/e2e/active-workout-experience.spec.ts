@@ -694,6 +694,9 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(page.getByRole('complementary', { name: 'Контекст упражнения' })).toContainText(
     '40 кг × 8',
   );
+  await expect(page.getByRole('complementary', { name: 'Контекст упражнения' })).toContainText(
+    'Расчётный максимум на 1 повтор',
+  );
   await expect(firstSet.getByText('Повторы в запасе (RIR)', { exact: true })).toBeVisible();
   await firstSet.getByText('Разминка и блины', { exact: true }).click();
   await firstSet.getByLabel('Вес снаряда, кг').fill('80');
