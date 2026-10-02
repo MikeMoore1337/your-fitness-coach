@@ -15,12 +15,14 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -106,6 +108,8 @@ ACTIVE_DELIVERY_ARTIFACTS_ENV = "YFC_ACTIVE_DELIVERY_ARTIFACTS"
 TARGET_BASE_BRANCH = "master"
 MAX_GUARD_BUDGET_RECOVERIES = 1
 MAX_POST_START_TRANSPORT_RECOVERIES = 1
+WORKTREE_CLEANUP_ATTEMPTS = 5
+WORKTREE_CLEANUP_BACKOFF_SECONDS = (0.0, 0.05, 0.15, 0.35, 0.75)
 POST_START_TRANSPORT_FAILURE_KIND = "post_start_external_transport_interruption"
 POST_START_TRANSPORT_HANDOFF_BLOCKER = (
     "Owner-authorized bounded post-start transport recovery is launching the preserved task WIP."
@@ -667,8 +671,23 @@ class GitRepository:
         output = self.git("log", "--oneline", "HEAD", "--not", "--all", cwd=path, check=False)
         return output.splitlines() if output else []
 
-    def remove_worktree(self, path: Path) -> None:
-        self.git("worktree", "remove", "--", str(path), cwd=self.current_worktree)
+    def remove_worktree(self, path: Path) -> dict[str, Any]:
+        resolved = path.resolve()
+        result = _run(
+            ["git", "worktree", "remove", "--", str(resolved)],
+            cwd=self.current_worktree,
+            check=False,
+        )
+        registered = any(item.path == resolved for item in self.worktrees())
+        if registered:
+            detail = result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"
+            raise TaskSessionError(f"git worktree removal did not deregister {resolved}: {detail}")
+        return {
+            "git_returncode": result.returncode,
+            "git_stdout": result.stdout.strip(),
+            "git_stderr": result.stderr.strip(),
+            "registration_removed": True,
+        }
 
     def delete_local_branch(self, branch: str, *, force: bool = False) -> None:
         self.git("branch", "-D" if force else "--delete", "--", branch, cwd=self.current_worktree)
@@ -1703,6 +1722,88 @@ class TaskController:
 
     def _canonical_root(self) -> Path:
         return self.repository.repository_root
+
+    def _delete_managed_worktree_residue(self, worktree_path: Path) -> dict[str, Any]:
+        resolved = worktree_path.resolve()
+        expected_parent = (self._canonical_root() / ".artifacts" / "worktrees").resolve()
+        if resolved.parent != expected_parent:
+            raise TaskSessionError(
+                "terminal cleanup residue is outside canonical task worktree directory"
+            )
+        if any(item.path == resolved for item in self.repository.worktrees()):
+            raise TaskSessionError("terminal cleanup residue is still registered as a Git worktree")
+        if not resolved.exists():
+            return {
+                "status": "completed",
+                "path": str(resolved),
+                "attempts": 0,
+                "errors": [],
+            }
+
+        errors: list[str] = []
+
+        def make_writable_and_retry(function: Any, raw_path: str, _exc_info: Any) -> None:
+            with suppress(OSError):
+                os.chmod(raw_path, stat.S_IWRITE | stat.S_IREAD)
+            function(raw_path)
+
+        for attempt, delay in enumerate(WORKTREE_CLEANUP_BACKOFF_SECONDS, start=1):
+            if delay:
+                time.sleep(delay)
+            try:
+                shutil.rmtree(resolved, onerror=make_writable_and_retry)
+            except OSError as error:
+                errors.append(f"{type(error).__name__}: {error}")
+            if not resolved.exists():
+                return {
+                    "status": "completed",
+                    "path": str(resolved),
+                    "attempts": attempt,
+                    "errors": errors,
+                }
+
+        return {
+            "status": "pending",
+            "path": str(resolved),
+            "attempts": WORKTREE_CLEANUP_ATTEMPTS,
+            "errors": errors[-WORKTREE_CLEANUP_ATTEMPTS:],
+        }
+
+    def _retry_pending_worktree_cleanups(self) -> list[dict[str, Any]]:
+        self.store.initialize()
+        results: list[dict[str, Any]] = []
+        for history_path in sorted(self.store.history.glob("task-*.json")):
+            history = self.store.read_json(history_path)
+            if not isinstance(history, dict) or history.get("state") != "finished":
+                continue
+            cleanup = history.get("cleanup")
+            if not isinstance(cleanup, dict) or not cleanup.get("cleanup_pending"):
+                continue
+            raw_path = cleanup.get("worktree")
+            if not isinstance(raw_path, str) or not raw_path:
+                continue
+            try:
+                physical_cleanup = self._delete_managed_worktree_residue(Path(raw_path))
+            except TaskSessionError as error:
+                physical_cleanup = {
+                    "status": "blocked",
+                    "path": raw_path,
+                    "attempts": 0,
+                    "errors": [str(error)],
+                }
+            cleanup["physical_cleanup"] = physical_cleanup
+            cleanup["cleanup_pending"] = physical_cleanup.get("status") != "completed"
+            cleanup["last_retry_at"] = utc_now()
+            history["cleanup"] = cleanup
+            StateStore.replace_json(history_path, history)
+            results.append(
+                {
+                    "task_id": history.get("task_id"),
+                    "status": physical_cleanup.get("status"),
+                    "path": raw_path,
+                }
+            )
+        return results
 
     def _canonical_worktree_status(self, root: Path | None = None) -> list[str]:
         canonical_root = root or self._canonical_root()
@@ -3037,6 +3138,7 @@ class TaskController:
         if target.exists() or self.repository.ref_exists(f"refs/heads/{branch}"):
             raise TaskSessionError(f"Ambiguous existing branch/worktree for {branch}")
         self.store.initialize()
+        cleanup_retries = self._retry_pending_worktree_cleanups()
         lease_path = self.store.task_lease_path(expected)
         with self.store.lock():
             existing = self.store.all_leases()
@@ -3109,6 +3211,7 @@ class TaskController:
         return {
             "lease": lease,
             "canonical_master_refresh": canonical_refresh,
+            "cleanup_retries": cleanup_retries,
             "prompt": (
                 f"Worktree: {target.resolve()}\nBranch: {branch}\n"
                 f"Base origin/master: {base_sha}\nTask: {expected} ({document.path})\n"
@@ -9834,9 +9937,18 @@ class TaskController:
             raise TaskSessionError(
                 "finish cleanup requires exactly one matching task branch/worktree"
             )
-        if not worktree_registered and worktree_path.exists():
+        cleanup_intent = lease.get("terminal_cleanup_intent")
+        cleanup_intent_matches = (
+            isinstance(cleanup_intent, dict)
+            and cleanup_intent.get("task_id") == expected
+            and cleanup_intent.get("branch") == branch
+            and cleanup_intent.get("worktree") == str(worktree_path)
+            and cleanup_intent.get("expected_head") == expected_head
+            and cleanup_intent.get("validated_clean") is True
+        )
+        if not worktree_registered and worktree_path.exists() and not cleanup_intent_matches:
             raise TaskSessionError(
-                "finish cleanup found an unregistered task worktree at the expected path"
+                "finish cleanup found an unregistered task worktree without validated cleanup intent"
             )
         if self.repository.ref(branch) != expected_head or (
             worktree_registered and matches[0].head != expected_head
@@ -9860,6 +9972,44 @@ class TaskController:
             raise TaskSessionError("finish cleanup refuses task head absent from deployed master")
         if self.repository.unique_commits(branch) and not squash_merge_is_verified:
             raise TaskSessionError("finish cleanup refuses task branch with unique commits")
+
+        cleanup_intent_record = {
+            "version": 1,
+            "task_id": expected,
+            "branch": branch,
+            "worktree": str(worktree_path),
+            "expected_head": expected_head,
+            "validated_clean": True,
+            "validated_clean_at": (
+                cleanup_intent.get("validated_clean_at")
+                if cleanup_intent_matches and isinstance(cleanup_intent, dict)
+                else utc_now()
+            ),
+        }
+        if worktree_registered:
+            with self.store.lock():
+                current = self.store.read_json(lease_path)
+                if not isinstance(current, dict) or self._lease_state(current) != DEPLOYED_STATE:
+                    raise TaskSessionError(
+                        "finish task lease changed before terminal cleanup intent"
+                    )
+                existing_intent = current.get("terminal_cleanup_intent")
+                if existing_intent is not None and not (
+                    isinstance(existing_intent, dict)
+                    and existing_intent.get("task_id") == expected
+                    and existing_intent.get("branch") == branch
+                    and existing_intent.get("worktree") == str(worktree_path)
+                    and existing_intent.get("expected_head") == expected_head
+                    and existing_intent.get("validated_clean") is True
+                ):
+                    raise TaskSessionError("finish cleanup intent changed unexpectedly")
+                current["terminal_cleanup_intent"] = cleanup_intent_record
+                current["updated_at"] = utc_now()
+                StateStore.replace_json(lease_path, current)
+                lease = current
+                cleanup_intent = cleanup_intent_record
+                cleanup_intent_matches = True
+
         artifact_cleanup: dict[str, Any] = {"status": "noop", "removed_count": 0}
         try:
             preserved_prefixes = _active_delivery_exclude_prefixes(root, expected)
@@ -9876,8 +10026,17 @@ class TaskController:
             "cleanup_errors"
         ):
             raise TaskSessionError("finish artifact cleanup stopped fail-closed")
+        git_worktree_remove: dict[str, Any] = {
+            "status": "already-unregistered",
+            "registration_removed": True,
+        }
         if worktree_registered:
-            self.repository.remove_worktree(worktree_path)
+            git_worktree_remove = {
+                "status": "removed",
+                **self.repository.remove_worktree(worktree_path),
+            }
+        physical_cleanup = self._delete_managed_worktree_residue(worktree_path)
+        cleanup_pending = physical_cleanup.get("status") != "completed"
         if self.repository.ref(branch) != expected_head:
             raise TaskSessionError("finish cleanup branch changed after worktree removal")
         if squash_merge_is_verified:
@@ -9906,6 +10065,9 @@ class TaskController:
                 "branch": branch,
                 "worktree_already_removed": not worktree_registered,
                 "local_master_fast_forwarded": local_master_was_stale,
+                "git_worktree_remove": git_worktree_remove,
+                "physical_cleanup": physical_cleanup,
+                "cleanup_pending": cleanup_pending,
             }
             history["artifact_cleanup"] = artifact_cleanup
             StateStore.replace_json(history_path, history)
@@ -9924,6 +10086,8 @@ class TaskController:
             "deleted_local_branch": branch,
             "worktree_already_removed": not worktree_registered,
             "local_master_fast_forwarded": local_master_was_stale,
+            "cleanup_pending": cleanup_pending,
+            "physical_cleanup": physical_cleanup,
         }
 
 

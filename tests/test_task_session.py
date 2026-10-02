@@ -7366,6 +7366,75 @@ def test_finish_recovers_after_worktree_removed_before_branch_cleanup(
     )
 
 
+def test_finish_records_windows_residue_without_blocking_terminal_closeout(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "207F"
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    controller.mark_ready("207F", head_sha=head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    _prepare_delivery(controller, "207F", branch=branch)
+    _git(root, "merge", "--no-ff", branch, "-m", "Merge task 207F")
+    merge_sha = _git(root, "rev-parse", "HEAD")
+    _git(root, "push", "origin", "master")
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    github.pulls[207] = _task_pr(207, "207F", base_sha, head_sha, merge_sha=merge_sha)
+    github.commits[207] = [_task_commit("207F")]
+    github.files[207] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.successful_deployments.add((merge_sha, "production"))
+    controller.record_production_success(
+        "207F", pr_number=207, merge_sha=merge_sha, deployed_sha=merge_sha
+    )
+
+    original_remove = git_repository.remove_worktree
+
+    def remove_but_leave_residue(path: Path) -> dict[str, Any]:
+        result = original_remove(path)
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "locked.tmp").write_text("simulated Windows residue\n", encoding="utf-8")
+        return result
+
+    original_residue_cleanup = controller._delete_managed_worktree_residue
+
+    def leave_pending(path: Path) -> dict[str, Any]:
+        assert not any(item.path == path.resolve() for item in git_repository.worktrees())
+        return {
+            "status": "pending",
+            "path": str(path.resolve()),
+            "attempts": task_session.WORKTREE_CLEANUP_ATTEMPTS,
+            "errors": ["PermissionError: simulated Windows lock"],
+        }
+
+    monkeypatch.setattr(git_repository, "remove_worktree", remove_but_leave_residue)
+    monkeypatch.setattr(controller, "_delete_managed_worktree_residue", leave_pending)
+
+    result = controller.finish("207F")
+
+    assert result["cleanup_performed"] is True
+    assert result["cleanup_pending"] is True
+    assert worktree.exists()
+    assert not git_repository.ref_exists(branch)
+    assert not controller.store.task_lease_path("207F").exists()
+    assert controller.store.delivery_state()["owner"] is None
+    finished = controller.store.read_json(controller.store.history / "task-207F.json")
+    assert finished["state"] == "finished"
+    assert finished["cleanup"]["cleanup_pending"] is True
+    assert finished["cleanup"]["physical_cleanup"]["status"] == "pending"
+
+    monkeypatch.setattr(controller, "_delete_managed_worktree_residue", original_residue_cleanup)
+    retries = controller._retry_pending_worktree_cleanups()
+
+    assert {"task_id": "207F", "status": "completed", "path": str(worktree.resolve())} in retries
+    assert not worktree.exists()
+    finished = controller.store.read_json(controller.store.history / "task-207F.json")
+    assert finished["cleanup"]["cleanup_pending"] is False
+    assert finished["cleanup"]["physical_cleanup"]["status"] == "completed"
+
+
 def test_finish_cleans_only_delivered_task_and_preserves_next_delivery_task(
     repository: tuple[Path, Any],
 ) -> None:

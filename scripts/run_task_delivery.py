@@ -1343,7 +1343,17 @@ def _recover_stale_queue_claim(claim_path: Path) -> bool:
     process_instance = _queue_claim_process_instance(claim.get("process_instance"), claim_path)
     if _queue_owner_is_alive(pid, process_instance):
         return False
-    _reject_interrupted_queue_claim(claim_path, claim)
+
+    terminal_task_claim = claim.get("queue_phase") == QUEUE_CLAIM_TASK_PHASE and (
+        _controller_state_for_interrupted_claim(claim_path, str(claim.get("task_id", "")))
+        == "finished"
+    )
+    if terminal_task_claim:
+        if _live_continuous_queue_supervisors() or _live_task_workers():
+            return False
+    else:
+        _reject_interrupted_queue_claim(claim_path, claim)
+
     try:
         expected_bytes = claim_path.read_bytes()
     except OSError as error:
@@ -1355,7 +1365,11 @@ def _recover_stale_queue_claim(claim_path: Path) -> bool:
         content=content,
         claim=claim,
         expected_bytes=expected_bytes,
-        event_stage="STALE_QUEUE_CLAIM_RECOVERED",
+        event_stage=(
+            "TERMINAL_QUEUE_CLAIM_AUTO_RECLAIMED"
+            if terminal_task_claim
+            else "STALE_QUEUE_CLAIM_RECOVERED"
+        ),
         missing_is_success=True,
     )
 

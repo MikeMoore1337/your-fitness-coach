@@ -2523,6 +2523,90 @@ def test_continuous_queue_claim_refuses_reclaim_of_interrupted_task(
     assert not list(claim_path.parent.glob("continuous-queue.lock.stale-*"))
 
 
+def test_continuous_queue_claim_auto_reclaims_finished_task_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    state_root = common_dir / "codex-task-sessions-v1"
+    claim_path = state_root / "continuous-queue.lock"
+    history_path = state_root / "history" / "task-91.json"
+    history_path.parent.mkdir(parents=True)
+    old_claim = {
+        "control_issue": 218,
+        "pid": 424242,
+        "process_instance": _claim_process_instance(),
+        "started_at": "2026-09-09T08:00:00+00:00",
+        "queue_phase": "task_running",
+        "task_id": "91",
+        "task_issue": 219,
+        "worker_state": "running",
+        "worker_state_path": str(tmp_path / "old-worker-state.json"),
+    }
+    claim_path.write_text(json.dumps(old_claim, sort_keys=True) + "\n", encoding="utf-8")
+    history_path.write_text(
+        json.dumps({"version": 2, "task_id": "91", "state": "finished"}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(delivery, "_queue_owner_process_instance", lambda pid: None)
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
+    monkeypatch.setattr(delivery, "_live_continuous_queue_supervisors", lambda: [])
+    monkeypatch.setattr(delivery, "_live_task_workers", lambda: [])
+
+    with delivery._continuous_queue_claim(218):
+        current = json.loads(claim_path.read_text(encoding="utf-8"))
+        assert current["queue_phase"] == "idle"
+        assert current["task_id"] is None
+        assert current["pid"] != 424242
+
+    assert not claim_path.exists()
+    assert not list(state_root.glob("continuous-queue.lock.stale-*"))
+
+
+def test_continuous_queue_claim_keeps_finished_claim_when_other_worker_is_live(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common_dir = tmp_path / "git-common"
+    state_root = common_dir / "codex-task-sessions-v1"
+    claim_path = state_root / "continuous-queue.lock"
+    history_path = state_root / "history" / "task-91.json"
+    history_path.parent.mkdir(parents=True)
+    claim_path.write_text(
+        json.dumps(
+            {
+                "control_issue": 218,
+                "pid": 424242,
+                "process_instance": _claim_process_instance(),
+                "started_at": "2026-09-09T08:00:00+00:00",
+                "queue_phase": "task_running",
+                "task_id": "91",
+                "task_issue": 219,
+                "worker_state": "running",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    history_path.write_text(
+        json.dumps({"version": 2, "task_id": "91", "state": "finished"}) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(delivery, "_git_common_dir", lambda: common_dir)
+    monkeypatch.setattr(delivery, "_queue_owner_process_instance", lambda pid: None)
+    monkeypatch.setattr(delivery, "_current_process_instance_identity", _claim_process_instance)
+    monkeypatch.setattr(delivery, "_live_continuous_queue_supervisors", lambda: [])
+    monkeypatch.setattr(delivery, "_live_task_workers", lambda: [(777, "live worker")])
+
+    with (
+        pytest.raises(delivery.DeliveryError, match="already has an active owner"),
+        delivery._continuous_queue_claim(218),
+    ):
+        pass
+
+    assert claim_path.is_file()
+
+
 def test_continuous_queue_claim_reclaims_dead_owner_via_atomic_quarantine(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
