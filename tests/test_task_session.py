@@ -7685,3 +7685,31 @@ def test_legacy_lifecycle_is_read_as_working_without_history_rewrite(
     assert snapshot["raw_lifecycle_state"] == "implementation"
     assert snapshot["derived_lifecycle_state"] == task_session.WORKING_STATE
     assert controller.store.read_json(lease_path)["lifecycle_state"] == "implementation"
+
+
+def test_maintenance_cleanup_removes_only_clean_merged_unleased_worktrees(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    controller = task_session.TaskController(git_repository)
+
+    managed = root / ".artifacts" / "worktrees"
+    merged = managed / "900-merged-clean"
+    stale = managed / "512-product-v5-exercise-history-pr-analytics-stale"
+    dirty = managed / "901-dirty-merged"
+
+    _git(root, "worktree", "add", "-b", "task/900-merged-clean", str(merged), "origin/master")
+    _git(root, "worktree", "add", "-b", "task/512-stale", str(stale), "origin/master")
+    _git(root, "worktree", "add", "-b", "task/901-dirty-merged", str(dirty), "origin/master")
+    (dirty / "untracked.txt").write_text("keep\n", encoding="utf-8")
+
+    result = controller.maintenance_cleanup()
+    statuses = {Path(item["path"]).name: item["status"] for item in result["merged_worktrees"]}
+
+    assert statuses["900-merged-clean"] == "removed"
+    assert statuses["512-product-v5-exercise-history-pr-analytics-stale"] == "preserved"
+    assert statuses["901-dirty-merged"] == "preserved-dirty"
+    assert not merged.exists()
+    assert stale.exists()
+    assert dirty.exists()
+    assert all(item.path != merged.resolve() for item in git_repository.worktrees())

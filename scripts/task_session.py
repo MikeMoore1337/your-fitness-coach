@@ -24,7 +24,7 @@ import time
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
 from uuid import uuid4
@@ -349,6 +349,35 @@ def _active_delivery_exclude_prefixes(root: Path, task_id: str) -> tuple[str, ..
             f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must point to an existing directory"
         )
     return (relative.as_posix(),)
+
+
+def _active_delivery_artifact_exclude_prefixes(root: Path) -> tuple[str, ...]:
+    raw_path = os.environ.get(ACTIVE_DELIVERY_ARTIFACTS_ENV, "").strip()
+    if not raw_path:
+        return ()
+    active_path = Path(raw_path)
+    if not active_path.is_absolute():
+        raise TaskSessionError(f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must be an absolute path")
+    try:
+        active_path = active_path.resolve()
+        artifacts_root = (root / ".artifacts").resolve()
+        relative = active_path.relative_to(artifacts_root)
+    except (OSError, RuntimeError, ValueError) as error:
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must stay under the canonical .artifacts root"
+        ) from error
+    if (
+        len(relative.parts) < 5
+        or relative.parts[0] != "tasks"
+        or relative.parts[2] != "temporary"
+        or relative.parts[3] != "delivery"
+    ):
+        raise TaskSessionError(
+            f"{ACTIVE_DELIVERY_ARTIFACTS_ENV} must point to tasks/<id>/temporary/delivery/<run>"
+        )
+    task_id = normalize_task_id(relative.parts[1])
+    exact = _active_delivery_exclude_prefixes(root, task_id)
+    return tuple((Path("tasks") / task_id / "temporary" / prefix).as_posix() for prefix in exact)
 
 
 def task_id_from_branch(branch: str) -> str:
@@ -1805,6 +1834,88 @@ class TaskController:
             )
         return results
 
+    def _cleanup_merged_unleased_worktrees(self) -> list[dict[str, Any]]:
+        managed_root = (self._canonical_root() / ".artifacts" / "worktrees").resolve()
+        protected_markers = ("stale", "recovery", "quarantine", "preserv")
+        active_paths = {
+            str(Path(str(lease["worktree"])).resolve()).casefold()
+            for lease in self.store.all_leases()
+            if isinstance(lease.get("worktree"), str) and lease.get("worktree")
+        }
+        results: list[dict[str, Any]] = []
+        for worktree in self.repository.worktrees():
+            path = worktree.path.resolve()
+            if path.parent != managed_root:
+                continue
+            path_key = str(path).casefold()
+            name_key = path.name.casefold()
+            if path_key in active_paths or any(marker in name_key for marker in protected_markers):
+                results.append({"path": str(path), "status": "preserved"})
+                continue
+            if self.repository.status(path):
+                results.append({"path": str(path), "status": "preserved-dirty"})
+                continue
+            if not worktree.head or not self.repository.is_ancestor(worktree.head, "origin/master"):
+                results.append({"path": str(path), "status": "preserved-unmerged"})
+                continue
+            try:
+                git_cleanup = self.repository.remove_worktree(path)
+                physical_cleanup = self._delete_managed_worktree_residue(path)
+            except (TaskSessionError, OSError) as error:
+                results.append(
+                    {
+                        "path": str(path),
+                        "status": "deferred",
+                        "error": str(error),
+                    }
+                )
+                continue
+            results.append(
+                {
+                    "path": str(path),
+                    "status": (
+                        "removed"
+                        if physical_cleanup.get("status") == "completed"
+                        else "cleanup-pending"
+                    ),
+                    "git": git_cleanup,
+                    "physical": physical_cleanup,
+                }
+            )
+        return results
+
+    def maintenance_cleanup(self) -> dict[str, Any]:
+        """Run bounded non-blocking cleanup that cannot broaden beyond managed artifacts."""
+
+        pending_worktrees = self._retry_pending_worktree_cleanups()
+        merged_worktrees = self._cleanup_merged_unleased_worktrees()
+        manager = ArtifactManager(
+            self._canonical_root() / ".artifacts",
+            repo_root=self._canonical_root(),
+            controller_state_dir=self.store.root,
+        )
+        try:
+            artifacts = manager.auto_cleanup(
+                runtime_ttl=timedelta(hours=48),
+                max_entries=5000,
+                max_bytes=2 * 1024 * 1024 * 1024,
+                exclude_prefixes=_active_delivery_artifact_exclude_prefixes(self._canonical_root()),
+            )
+        except (ArtifactError, OSError) as error:
+            artifacts = {
+                "operation": "auto-cleanup",
+                "status": "deferred",
+                "cleanup_errors": [{"path": "artifacts", "reason": str(error)}],
+                "removed": [],
+                "removed_count": 0,
+                "removed_bytes": 0,
+            }
+        return {
+            "pending_worktree_retries": pending_worktrees,
+            "merged_worktrees": merged_worktrees,
+            "artifacts": artifacts,
+        }
+
     def _canonical_worktree_status(self, root: Path | None = None) -> list[str]:
         canonical_root = root or self._canonical_root()
         status = self.repository.status(canonical_root, include_ignored=True)
@@ -3138,7 +3249,8 @@ class TaskController:
         if target.exists() or self.repository.ref_exists(f"refs/heads/{branch}"):
             raise TaskSessionError(f"Ambiguous existing branch/worktree for {branch}")
         self.store.initialize()
-        cleanup_retries = self._retry_pending_worktree_cleanups()
+        maintenance_cleanup = self.maintenance_cleanup()
+        cleanup_retries = maintenance_cleanup["pending_worktree_retries"]
         lease_path = self.store.task_lease_path(expected)
         with self.store.lock():
             existing = self.store.all_leases()
@@ -3212,6 +3324,7 @@ class TaskController:
             "lease": lease,
             "canonical_master_refresh": canonical_refresh,
             "cleanup_retries": cleanup_retries,
+            "maintenance_cleanup": maintenance_cleanup,
             "prompt": (
                 f"Worktree: {target.resolve()}\nBranch: {branch}\n"
                 f"Base origin/master: {base_sha}\nTask: {expected} ({document.path})\n"
@@ -10079,6 +10192,7 @@ class TaskController:
             next_owner = self._promote_next_delivery_locked(latest_delivery)
             history["next_delivery_owner"] = next_owner
             StateStore.replace_json(history_path, history)
+        maintenance_cleanup = self.maintenance_cleanup()
         return {
             "history": history,
             "cleanup_performed": True,
@@ -10088,6 +10202,7 @@ class TaskController:
             "local_master_fast_forwarded": local_master_was_stale,
             "cleanup_pending": cleanup_pending,
             "physical_cleanup": physical_cleanup,
+            "maintenance_cleanup": maintenance_cleanup,
         }
 
 
@@ -10266,6 +10381,7 @@ def _parser() -> argparse.ArgumentParser:
     recover.add_argument("task_id")
     finish = subparsers.add_parser("finish")
     finish.add_argument("task_id")
+    subparsers.add_parser("maintenance-cleanup")
     validate_pr = subparsers.add_parser("validate-pr")
     validate_pr.add_argument("--event", type=Path, required=True)
     classify_release = subparsers.add_parser("classify-controller-release")
@@ -10514,6 +10630,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "finish":
             _print(controller.finish(args.task_id))
+            return 0
+        if args.command == "maintenance-cleanup":
+            _print(controller.maintenance_cleanup())
             return 0
         if args.command == "validate-pr":
             _print(validate_pr_event(repository, github, args.event))

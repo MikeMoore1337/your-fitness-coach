@@ -1689,6 +1689,156 @@ class ArtifactManager:
         result["operation"] = "cleanup-runtime"
         return result
 
+    def auto_cleanup(
+        self,
+        *,
+        runtime_ttl: timedelta = timedelta(hours=48),
+        runtime_cap_bytes: int = 3 * 1024 * 1024 * 1024,
+        max_entries: int = 5000,
+        max_bytes: int = 2 * 1024 * 1024 * 1024,
+        exclude_prefixes: Sequence[str | Path] = (),
+    ) -> dict[str, Any]:
+        """Apply only bounded DELETE entries produced by the built-in safety inventory."""
+
+        if max_entries < 1 or max_bytes < 1 or runtime_cap_bytes < 1:
+            raise ArtifactError("Automatic cleanup bounds must be positive")
+        guard = self._controller_guard()
+        if guard:
+            return {
+                "schema_version": SCHEMA_VERSION,
+                "operation": "auto-cleanup",
+                "status": "blocked",
+                "cleanup_errors": [{"path": "artifacts", "reason": issue} for issue in guard],
+                "removed": [],
+                "removed_count": 0,
+                "removed_bytes": 0,
+            }
+
+        excludes = tuple(_safe_relative_name(prefix) for prefix in exclude_prefixes)
+        inventory = self._inventory(stale_runtime=True, runtime_ttl=runtime_ttl)
+        candidates: list[dict[str, Any]] = []
+        for entry in inventory:
+            if entry.get("disposition") != "DELETE":
+                continue
+            raw_path = entry.get("path")
+            if not isinstance(raw_path, str):
+                raise ArtifactSafetyError("Automatic cleanup candidate is missing a path")
+            relative_path = _safe_relative_name(raw_path)
+            if any(_path_is_under(relative_path, prefix) for prefix in excludes):
+                continue
+            parts = relative_path.parts
+            allowed = (
+                parts[:1] in {("cache",), ("tmp",), ("tests",)}
+                or parts[:2]
+                in {
+                    ("runtime", "cache"),
+                    ("runtime", "tmp"),
+                    ("runtime", "tests"),
+                }
+                or (len(parts) >= 3 and parts[0] == "tasks" and parts[2] == "temporary")
+            )
+            if not allowed:
+                raise ArtifactSafetyError(
+                    f"Automatic cleanup refuses unexpected DELETE candidate: {raw_path}"
+                )
+            candidates.append(dict(entry))
+
+        candidate_paths = {str(entry["path"]) for entry in candidates}
+        runtime_items: list[dict[str, Any]] = []
+        runtime_bytes = 0
+        for base_name in ("cache", "tmp", "tests"):
+            base = self.root / "runtime" / base_name
+            for item in _iter_entries(base):
+                if item["kind"] != "file":
+                    continue
+                relative = Path("runtime") / base_name / Path(item["relative"])
+                runtime_item = dict(item)
+                runtime_item["relative"] = relative
+                runtime_items.append(runtime_item)
+                runtime_bytes += int(item.get("size_bytes", 0))
+
+        projected_runtime_bytes = runtime_bytes - sum(
+            int(entry.get("size_bytes", 0))
+            for entry in candidates
+            if str(entry.get("path", "")).startswith("runtime/")
+        )
+        if projected_runtime_bytes > runtime_cap_bytes:
+            runtime_items.sort(
+                key=lambda item: (
+                    int(item.get("mtime_ns", 0)),
+                    Path(item["relative"]).as_posix().casefold(),
+                )
+            )
+            for item in runtime_items:
+                if projected_runtime_bytes <= runtime_cap_bytes:
+                    break
+                raw_path = Path(item["relative"]).as_posix()
+                if raw_path in candidate_paths or any(
+                    _path_is_under(Path(raw_path), prefix) for prefix in excludes
+                ):
+                    continue
+                size = int(item.get("size_bytes", 0))
+                candidates.append(
+                    {
+                        "path": raw_path,
+                        "category": "temporary",
+                        "classification": "temporary",
+                        "reason": "runtime size cap pressure",
+                        "size_bytes": size,
+                        "disposition": "DELETE",
+                        "kind": "file",
+                        "fingerprint": {
+                            "kind": "file",
+                            "size_bytes": size,
+                            "mtime_ns": int(item["mtime_ns"]),
+                        },
+                    }
+                )
+                candidate_paths.add(raw_path)
+                projected_runtime_bytes -= size
+
+        candidates.sort(
+            key=lambda entry: (
+                int(entry.get("mtime_ns", 0)),
+                str(entry.get("path", "")).casefold(),
+            )
+        )
+        selected: list[dict[str, Any]] = []
+        selected_bytes = 0
+        for entry in candidates:
+            if len(selected) >= max_entries:
+                break
+            size = int(entry.get("size_bytes", 0))
+            if size > max_bytes - selected_bytes:
+                if selected:
+                    break
+                continue
+            selected.append(entry)
+            selected_bytes += size
+
+        if not selected:
+            return {
+                "schema_version": SCHEMA_VERSION,
+                "operation": "auto-cleanup",
+                "status": "noop",
+                "removed": [],
+                "removed_count": 0,
+                "removed_bytes": 0,
+                "cleanup_errors": [],
+            }
+
+        plan = self._plan_from_entries("auto-cleanup", selected)
+        result = self.apply_plan(plan, approved_plan_sha256=str(plan["plan_sha256"]))
+        result["operation"] = "auto-cleanup"
+        result["policy"] = {
+            "runtime_ttl_seconds": int(runtime_ttl.total_seconds()),
+            "runtime_cap_bytes": runtime_cap_bytes,
+            "runtime_bytes_before": runtime_bytes,
+            "max_entries": max_entries,
+            "max_bytes": max_bytes,
+        }
+        return result
+
     def _plan_from_entries(
         self, operation: str, entries: Sequence[Mapping[str, Any]]
     ) -> dict[str, Any]:
