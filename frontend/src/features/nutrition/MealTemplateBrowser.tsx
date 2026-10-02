@@ -36,6 +36,12 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Icon } from '../../shared/ui/Icon';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+const mealLabels: Record<MealType, string> = {
+  breakfast: 'Завтрак',
+  lunch: 'Обед',
+  dinner: 'Ужин',
+  snacks: 'Перекусы',
+};
 type TemplateItemUnit = 'g' | 'ml' | 'serving';
 type TemplateDraftItem = {
   itemKind: 'food' | 'recipe';
@@ -668,6 +674,18 @@ export function MealTemplateBrowser({
                   </span>
                   <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} />
                 </button>
+                <div className="nutrition-template-card__quick-action">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={unavailable || insert.isPending}
+                    onClick={() => requestInsert(template)}
+                  >
+                    {insert.isPending && selectedTemplateId === template.id
+                      ? 'Добавляем…'
+                      : `Быстро добавить в ${mealLabels[mealType]}`}
+                  </Button>
+                </div>
                 {open && (
                   <div className="nutrition-template-card__details">
                     <ul>
