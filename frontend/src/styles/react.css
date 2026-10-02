@@ -9499,10 +9499,14 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   color: var(--text);
 }
 .nutrition-template-browser__actions,
-.nutrition-template-card__actions {
+.nutrition-template-card__actions,
+.nutrition-template-card__quick-action {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.nutrition-template-card__quick-action {
+  padding: 0 12px 12px;
 }
 .nutrition-template-browser__note,
 .nutrition-template-editor__hint {
@@ -9790,12 +9794,14 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   }
   .nutrition-template-browser__actions,
   .nutrition-template-card__actions,
+  .nutrition-template-card__quick-action,
   .nutrition-natural-row__actions {
     display: grid;
     grid-template-columns: 1fr;
   }
   .nutrition-template-browser__actions .ui-button,
   .nutrition-template-card__actions .ui-button,
+  .nutrition-template-card__quick-action .ui-button,
   .nutrition-natural-row__actions button {
     width: 100%;
   }

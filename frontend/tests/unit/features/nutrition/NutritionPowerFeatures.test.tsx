@@ -321,8 +321,8 @@ describe('nutrition power features', () => {
       />,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: /Обычный завтрак/ }));
-    const insertButton = screen.getByRole('button', { name: 'Добавить в дневник' });
+    expect(await screen.findByRole('button', { name: /Обычный завтрак/ })).toBeVisible();
+    const insertButton = screen.getByRole('button', { name: 'Быстро добавить в Завтрак' });
     fireEvent.click(insertButton);
     fireEvent.click(insertButton);
     await waitFor(() =>
