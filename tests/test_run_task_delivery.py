@@ -4384,3 +4384,31 @@ def test_queue_allows_yellow_visual_gate_to_enter_implementation(
     assert candidates[0]["task_id"] == "520"
     assert candidates[0]["state"] == "queued"
     assert candidates[0]["risk_lane"] == "YELLOW"
+
+
+def test_resolve_codex_cli_prefers_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(delivery.shutil, "which", lambda name: "C:/tools/codex.exe")
+
+    assert delivery._resolve_codex_cli() == "C:/tools/codex.exe"
+
+
+def test_windows_codex_desktop_fallback_chooses_newest_candidate(tmp_path: Path) -> None:
+    root = tmp_path / "OpenAI" / "Codex" / "bin"
+    old = root / "old" / "codex.exe"
+    new = root / "new" / "codex.exe"
+    old.parent.mkdir(parents=True)
+    new.parent.mkdir(parents=True)
+    old.write_bytes(b"old")
+    new.write_bytes(b"new")
+    delivery.os.utime(old, ns=(100, 100))
+    delivery.os.utime(new, ns=(200, 200))
+
+    resolved = delivery._windows_codex_desktop_fallback(str(tmp_path))
+
+    assert resolved == str(new.resolve())
+
+
+def test_windows_codex_desktop_fallback_fails_closed_without_candidate(tmp_path: Path) -> None:
+    (tmp_path / "OpenAI" / "Codex" / "bin").mkdir(parents=True)
+
+    assert delivery._windows_codex_desktop_fallback(str(tmp_path)) is None

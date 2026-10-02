@@ -3410,6 +3410,39 @@ def _worker_bootstrap_from_args(
     )
 
 
+def _windows_codex_desktop_fallback(local_app_data: str | None) -> str | None:
+    if not local_app_data:
+        return None
+    trusted_root = (Path(local_app_data) / "OpenAI" / "Codex" / "bin").resolve()
+    if not trusted_root.is_dir():
+        return None
+
+    candidates: list[tuple[int, str, Path]] = []
+    for candidate in trusted_root.glob("*/codex.exe"):
+        try:
+            resolved = candidate.resolve(strict=True)
+            resolved.relative_to(trusted_root)
+            stat = resolved.stat()
+        except OSError, ValueError:
+            continue
+        if not resolved.is_file():
+            continue
+        candidates.append((stat.st_mtime_ns, str(resolved).casefold(), resolved))
+    if not candidates:
+        return None
+    candidates.sort()
+    return str(candidates[-1][2])
+
+
+def _resolve_codex_cli() -> str | None:
+    executable = shutil.which("codex.exe" if os.name == "nt" else "codex")
+    if executable is not None:
+        return executable
+    if os.name != "nt":
+        return None
+    return _windows_codex_desktop_fallback(os.environ.get("LOCALAPPDATA"))
+
+
 def _launch_worker(
     task_id: str,
     started: dict[str, Any],
@@ -3424,9 +3457,9 @@ def _launch_worker(
 ) -> int:
     # Windows' npm shim is constrained by cmd.exe's short command-line limit;
     # use the native executable so the bounded worker prompt reaches Codex intact.
-    codex = shutil.which("codex.exe" if os.name == "nt" else "codex")
+    codex = _resolve_codex_cli()
     if codex is None:
-        raise DeliveryError("Codex CLI is not available in PATH")
+        raise DeliveryError("Codex CLI is not available via PATH or Codex Desktop")
     worktree = Path(str(started["lease"]["worktree"]))
     result_path = artifacts / "final.md"
     log_path = artifacts / "events.jsonl"
