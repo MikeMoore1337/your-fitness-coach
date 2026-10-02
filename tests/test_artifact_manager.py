@@ -761,3 +761,101 @@ def test_runtime_cleanup_applies_the_saved_exact_plan(tmp_path: Path) -> None:
 
     assert result["status"] == "completed"
     assert not target.exists()
+
+
+def test_auto_cleanup_removes_only_policy_delete_candidates(tmp_path: Path) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout()
+
+    legacy = manager.root / "cache" / "legacy.bin"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_bytes(b"x" * 16)
+    runtime = manager.root / "runtime" / "cache" / "old.bin"
+    runtime.parent.mkdir(parents=True, exist_ok=True)
+    runtime.write_bytes(b"y" * 16)
+    protected = manager.root / "operations" / "keep.txt"
+    protected.parent.mkdir(parents=True, exist_ok=True)
+    protected.write_text("keep\n", encoding="utf-8")
+
+    os.utime(legacy, (1, 1))
+    os.utime(runtime, (1, 1))
+    os.utime(protected, (1, 1))
+
+    result = manager.auto_cleanup(
+        runtime_ttl=timedelta(hours=1),
+        max_entries=10,
+        max_bytes=1024,
+    )
+
+    assert result["status"] == "completed"
+    assert not legacy.exists()
+    assert not runtime.exists()
+    assert protected.exists()
+
+
+def test_auto_cleanup_is_non_mutating_while_controller_state_is_active(tmp_path: Path) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout()
+    state = tmp_path / "controller-state"
+    (state / "leases").mkdir(parents=True)
+    (state / "leases" / "task-900.json").write_text(
+        json.dumps(
+            {
+                "task_id": "900",
+                "mode": "write",
+                "lifecycle_state": "working",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manager.controller_state_dir = state
+    legacy = manager.root / "cache" / "keep.bin"
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_bytes(b"keep")
+
+    result = manager.auto_cleanup(runtime_ttl=timedelta(hours=1))
+
+    assert result["status"] == "blocked"
+    assert legacy.exists()
+
+
+def test_auto_cleanup_enforces_runtime_size_cap_for_young_files(tmp_path: Path) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout()
+
+    cache = manager.root / "runtime" / "cache"
+    files = [cache / name for name in ("oldest.bin", "middle.bin", "newest.bin")]
+    for index, path in enumerate(files, start=1):
+        path.write_bytes(b"x" * 8)
+        os.utime(path, (index * 100, index * 100))
+
+    result = manager.auto_cleanup(
+        runtime_ttl=timedelta(days=36500),
+        runtime_cap_bytes=16,
+        max_entries=10,
+        max_bytes=64,
+    )
+
+    assert result["status"] == "completed"
+    assert result["policy"]["runtime_bytes_before"] == 24
+    assert result["policy"]["runtime_cap_bytes"] == 16
+    assert not files[0].exists()
+    assert files[1].exists()
+    assert files[2].exists()
+
+
+def test_auto_cleanup_preserves_explicit_active_delivery_prefix(tmp_path: Path) -> None:
+    manager = _manager(tmp_path)
+    manager.ensure_layout("207")
+    active = manager.root / "tasks" / "207" / "temporary" / "delivery" / "run-1"
+    active.mkdir(parents=True, exist_ok=True)
+    protected = active / "events.jsonl"
+    protected.write_text("active\n", encoding="utf-8")
+
+    result = manager.auto_cleanup(
+        runtime_ttl=timedelta(seconds=0),
+        exclude_prefixes=("tasks/207/temporary/delivery/run-1",),
+    )
+
+    assert result["status"] == "noop"
+    assert protected.is_file()
