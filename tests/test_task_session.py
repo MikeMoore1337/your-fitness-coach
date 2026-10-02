@@ -7959,3 +7959,112 @@ def test_start_refuses_pristine_reuse_after_task_contract_drift(
             session_label="contract-drift",
             offline=True,
         )
+
+
+def _record_direct_guard_budget_failure(
+    root: Path,
+    worktree: Path,
+    *,
+    attempt_id: str | None = None,
+) -> tuple[Path, Path, str]:
+    attempt_id = attempt_id or (datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ") + "-delivery")
+    attempt_root = root / ".artifacts" / "tasks" / "241" / "temporary" / "delivery" / attempt_id
+    attempt_root.mkdir(parents=True)
+    (worktree / "README.md").write_text("direct guarded implementation\n", encoding="utf-8")
+    (worktree / "direct-module.py").write_text("value = 640\n", encoding="utf-8")
+    events_path = attempt_root / "events.jsonl"
+    limits = {
+        "max_completed_tool_actions": 240,
+        "max_collab_tool_calls": 10,
+        "max_spawned_subagents": 2,
+        "max_concurrent_subagents": 2,
+        "max_identical_failed_actions": 4,
+        "max_identical_actions_without_progress": 8,
+        "short_cycle_period_max": 3,
+        "short_cycle_repetitions": 4,
+    }
+    file_change_events = [
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "file_change",
+                "changes": [{"path": str(worktree / relative_path), "kind": "update"}],
+                "status": "completed",
+            },
+        }
+        for relative_path in ("README.md", "direct-module.py")
+    ]
+    command_events = [
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "command_execution",
+                "command": f"direct-guard-action-{action_number}",
+                "status": "completed",
+            },
+        }
+        for action_number in range(1, 242)
+    ]
+    events = "".join(
+        json.dumps(payload) + "\n" for payload in (*file_change_events, *command_events)
+    )
+    events_path.write_text(events, encoding="utf-8")
+    guard = task_session.WorkerEventGuard(task_session.GuardLimits.from_mapping(limits))
+    for line in events.splitlines(keepends=True):
+        guard.observe_line(line)
+    guard_path = attempt_root / "worker-guard.json"
+    guard_path.write_text(json.dumps(guard.report()), encoding="utf-8")
+    return guard_path, events_path, attempt_id
+
+
+def test_direct_guard_interrupted_resume_recovers_without_legacy_launch_audit(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository, controller, worktree, _, _, github = _prepare_preimplementation_resume(
+        repository
+    )
+    github.issue_comment_map[241] = []
+    guard_path, events_path, attempt_id = _record_direct_guard_budget_failure(root, worktree)
+    before_head = git_repository.head(cwd=worktree)
+    before_status = git_repository.status(worktree)
+
+    resumed = controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized direct guard recovery",
+        owner_authorize=True,
+    )
+
+    event = resumed["preimplementation_resume"]
+    checkpoint = event["guard_budget_recovery"]
+    assert resumed["mutation_performed"] is True
+    assert resumed["control_state"] == {}
+    assert event["classification"] == task_session.DIRECT_GUARD_RECOVERY_CLASSIFICATION
+    assert event["state"] == "prepared"
+    assert event["launch_attempts"] == []
+    assert checkpoint["attempt_id"] == attempt_id
+    assert checkpoint["guard_report_path"] == str(guard_path.resolve())
+    assert checkpoint["events_path"] == str(events_path.resolve())
+    assert set(checkpoint["changed_paths"]) == {"README.md", "direct-module.py"}
+    assert git_repository.head(cwd=worktree) == before_head
+    assert git_repository.status(worktree) == before_status
+
+    claimed = controller.claim_preimplementation_worker_launch("241")
+    assert claimed["preimplementation_resume"]["state"] == "launching"
+
+
+def test_direct_guard_interrupted_resume_refuses_ambiguous_blocked_attempts(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, worktree, _, _, github = _prepare_preimplementation_resume(repository)
+    github.issue_comment_map[241] = []
+    _record_direct_guard_budget_failure(root, worktree)
+    _record_direct_guard_budget_failure(root, worktree)
+
+    with pytest.raises(task_session.TaskSessionError, match="ambiguous direct guard"):
+        controller.resume_guard_interrupted(
+            "241",
+            control_issue_number=241,
+            reason="owner-authorized direct guard recovery",
+            owner_authorize=True,
+        )
