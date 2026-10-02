@@ -3042,6 +3042,78 @@ def test_superseded_archived_task_is_not_a_completed_dependency(
     assert "153" in completed
 
 
+def test_finished_history_is_a_completed_dependency_for_local_task_shims(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository = repository
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    controller.store.initialize()
+    task_session.StateStore.replace_json(
+        controller.store.history / "task-519.json",
+        {
+            "version": task_session.TASK_STATE_VERSION,
+            "task_id": "519",
+            "state": "finished",
+            "merge_sha": "a" * 40,
+            "deployed_sha": "a" * 40,
+        },
+    )
+    task_session.StateStore.replace_json(
+        controller.store.history / "task-520.json",
+        {
+            "version": task_session.TASK_STATE_VERSION,
+            "task_id": "520",
+            "state": "production-success",
+        },
+    )
+    task_session.StateStore.replace_json(
+        controller.store.history / "task-521.json",
+        {
+            "version": task_session.TASK_STATE_VERSION,
+            "task_id": "not-521",
+            "state": "finished",
+        },
+    )
+
+    completed = controller._completed_dependency_ids()
+
+    assert "519" in completed
+    assert "520" not in completed
+    assert "521" not in completed
+
+
+def test_finished_history_respects_superseded_lease_dependency_safety(
+    repository: tuple[Path, Any],
+) -> None:
+    _, git_repository = repository
+    controller = task_session.TaskController(
+        git_repository,
+        github=FakeGitHub(git_repository.ref("origin/master")),
+    )
+    controller.store.initialize()
+    task_session.StateStore.replace_json(
+        controller.store.history / "task-519.json",
+        {
+            "version": task_session.TASK_STATE_VERSION,
+            "task_id": "519",
+            "state": "finished",
+        },
+    )
+    task_session.StateStore.replace_json(
+        controller.store.task_lease_path("519"),
+        {
+            "task_id": "519",
+            "mode": "write",
+            "lifecycle_state": "superseded",
+        },
+    )
+
+    assert "519" not in controller._completed_dependency_ids()
+
+
 def test_record_queue_cycle_is_durable_and_bounded(repository: tuple[Path, Any]) -> None:
     _, _, controller, _, _, _ = _prepare_started(repository, "250", queue_mode=True)
 

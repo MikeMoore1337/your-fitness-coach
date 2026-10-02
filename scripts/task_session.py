@@ -2652,6 +2652,24 @@ class TaskController:
                         ):
                             continue
                         result.add(task_id)
+
+        for history_path in sorted(self.store.history.glob("task-*.json")):
+            history = self.store.read_json(history_path)
+            if not isinstance(history, dict) or history.get("state") != "finished":
+                continue
+            raw_task_id = history.get("task_id")
+            if not isinstance(raw_task_id, str):
+                continue
+            try:
+                task_id = normalize_task_id(raw_task_id)
+            except TaskSessionError:
+                continue
+            if history_path.name != f"task-{task_id}.json":
+                continue
+            lease = self.store.read_json(self.store.task_lease_path(task_id))
+            if isinstance(lease, dict) and self._lease_state(lease) in SUPERSEDED_LEASE_STATES:
+                continue
+            result.add(task_id)
         return result
 
     @staticmethod
