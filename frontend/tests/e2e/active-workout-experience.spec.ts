@@ -11,6 +11,12 @@ const captureLandingProductProofs =
       process?: { env?: Record<string, string | undefined> };
     }
   ).process?.env?.YFC_CAPTURE_LANDING_PRODUCT_PROOFS === '1';
+const captureTask520VisualPackage =
+  (
+    globalThis as typeof globalThis & {
+      process?: { env?: Record<string, string | undefined> };
+    }
+  ).process?.env?.YFC_CAPTURE_TASK_520_VISUALS === '1';
 
 type SetState = {
   actual_reps: number | null;
@@ -325,15 +331,28 @@ async function mockActiveWorkout(
       });
     }
     if (path.endsWith('/programs/exercises/11/history')) {
+      const previousWorkout = {
+        workout_id: 41,
+        workout_title: 'Прошлая тренировка',
+        performed_on: today,
+        completed_at: new Date(Date.now() - 7 * 86_400_000).toISOString(),
+      };
       return route.fulfill({
         json: {
           exercise_id: 11,
           exercise_title: 'Жим штанги лёжа',
           metric_type: 'strength',
           load_unit: 'kg',
-          last_performed: null,
-          best_authoritative_load: null,
-          estimated_1rm: null,
+          last_performed: previousWorkout,
+          best_authoritative_load: { value_kg: 40, workout: previousWorkout, reps: 8 },
+          estimated_1rm: {
+            kind: 'estimated',
+            formula: 'brzycki',
+            value_kg: 50,
+            workout: previousWorkout,
+            reps: 8,
+            load_kg: 40,
+          },
           rep_prs: [],
           windows: [7, 30, 90].map((days) => ({
             days,
@@ -346,10 +365,103 @@ async function mockActiveWorkout(
             best_authoritative_load_kg: null,
             estimated_1rm_kg: null,
           })),
-          recent_sessions: [],
+          recent_sessions: [
+            {
+              workout: previousWorkout,
+              workout_exercise_id: 101,
+              prescribed_reps: '8–10',
+              completed_set_count: 1,
+              authoritative_set_count: 1,
+              reps_total: 8,
+              max_authoritative_load_kg: 40,
+              best_set_volume_kg: 320,
+              estimated_1rm_kg: 50,
+              sets: [
+                {
+                  set_number: 1,
+                  reps: 8,
+                  load_kg: 40,
+                  volume_kg: 320,
+                  rir: '2',
+                  set_kind: 'working',
+                  planned_role: 'working',
+                  analytics_bucket: 'working',
+                  pr_eligible: true,
+                },
+              ],
+            },
+          ],
           progression: [],
           progression_events: [],
           history_truncated: false,
+        },
+      });
+    }
+    if (path.endsWith('/workouts/42/exercises/101/alternatives')) {
+      return route.fulfill({
+        json: [
+          {
+            exercise_id: 13,
+            title: 'Жим гантелей лёжа',
+            equipment_ids: ['dumbbell', 'bench'],
+            score: 0.96,
+            reason_keys: ['same_movement_pattern', 'same_primary_muscle'],
+          },
+        ],
+      });
+    }
+    if (path.endsWith('/workouts/42/adaptations/preview')) {
+      return route.fulfill({
+        json: {
+          status: 'preview',
+          workout_id: 42,
+          reason: 'replace_exercise',
+          ruleset_version: 'workout-adaptation-v1',
+          original_estimated_minutes: 30,
+          adapted_estimated_minutes: 31,
+          time_budget_minutes: null,
+          changes: [
+            {
+              kind: 'replaced',
+              workout_exercise_id: 101,
+              from_exercise_id: 11,
+              from_title: 'Жим штанги лёжа',
+              to_exercise_id: 13,
+              to_title: 'Жим гантелей лёжа',
+              transfer: 'compatible_with_load_reset',
+              load_reset_required: true,
+              reason_keys: ['same_movement_pattern', 'same_primary_muscle'],
+            },
+          ],
+          original_exercises: [
+            {
+              workout_exercise_id: 101,
+              exercise_id: 11,
+              title: 'Жим штанги лёжа',
+              equipment_ids: ['barbell', 'bench'],
+              prescribed_sets: 3,
+              prescribed_reps: '8–10',
+              rest_seconds: 90,
+              sort_order: 1,
+              priority: 'core',
+            },
+          ],
+          adapted_exercises: [
+            {
+              workout_exercise_id: 101,
+              exercise_id: 13,
+              title: 'Жим гантелей лёжа',
+              equipment_ids: ['dumbbell', 'bench'],
+              prescribed_sets: 3,
+              prescribed_reps: '8–10',
+              rest_seconds: 90,
+              sort_order: 1,
+              priority: 'core',
+            },
+          ],
+          warnings: ['После замены рабочий вес потребуется подтвердить заново.'],
+          message: 'Выбранная замена подходит по доступному оборудованию.',
+          preview_token: 'task-520-preview-token',
         },
       });
     }
@@ -476,6 +588,10 @@ async function expectRealMediaFullWidth(page: Page, label: string) {
     const mediaRect = media.getBoundingClientRect();
     const techniqueRect = technique.getBoundingClientRect();
     const imageRect = image.getBoundingClientRect();
+    const techniqueStyle = getComputedStyle(technique);
+    const actions = technique.parentElement as HTMLElement | null;
+    const actionsRect = actions?.getBoundingClientRect();
+    const actionsStyle = actions ? getComputedStyle(actions) : null;
     return {
       imageWidth: imageRect.width,
       mediaLeft: mediaRect.left,
@@ -484,6 +600,12 @@ async function expectRealMediaFullWidth(page: Page, label: string) {
       techniqueLeft: techniqueRect.left,
       techniqueRight: techniqueRect.right,
       techniqueWidth: techniqueRect.width,
+      techniqueCssWidth: techniqueStyle.width,
+      techniqueFlex: techniqueStyle.flex,
+      actionsWidth: actionsRect?.width ?? null,
+      actionsDisplay: actionsStyle?.display ?? null,
+      actionsFlexWrap: actionsStyle?.flexWrap ?? null,
+      actionsGap: actionsStyle?.gap ?? null,
     };
   });
 
@@ -495,7 +617,7 @@ async function expectRealMediaFullWidth(page: Page, label: string) {
   ).toBeLessThanOrEqual(tolerance);
   expect(
     Math.abs((geometry?.mediaRight ?? 0) - (geometry?.techniqueRight ?? 0)),
-    `${label}: media and Technique right edges must align`,
+    `${label}: media and Technique right edges must align ${JSON.stringify(geometry)}`,
   ).toBeLessThanOrEqual(tolerance);
   expect(
     geometry?.mediaWidth ?? 0,
@@ -534,6 +656,13 @@ test('active workout keeps one obvious next action through logging, timer and fi
     });
   });
   await mockActiveWorkout(page);
+  const secondSetPatchBodies: unknown[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (request.method() === 'PATCH' && url.pathname.endsWith('/api/v1/workouts/sets/202')) {
+      secondSetPatchBodies.push(request.postDataJSON());
+    }
+  });
 
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
@@ -561,7 +690,14 @@ test('active workout keeps one obvious next action through logging, timer and fi
 
   const firstSet = page.locator('[data-workout-set-id="201"]');
   await expect(firstSet).toHaveAttribute('aria-current', 'step');
-  await expect(firstSet.getByText('Топ-сет', { exact: true })).toBeVisible();
+  await expect(firstSet.getByText('Тяжёлый подход', { exact: true })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Контекст упражнения' })).toContainText(
+    '40 кг × 8',
+  );
+  await expect(firstSet.getByText('Повторы в запасе (RIR)', { exact: true })).toBeVisible();
+  await firstSet.getByText('Разминка и блины', { exact: true }).click();
+  await firstSet.getByLabel('Вес снаряда, кг').fill('80');
+  await expect(firstSet.getByRole('status')).toContainText('На сторону:');
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   const firstDone = firstSet.getByRole('button', {
@@ -572,10 +708,13 @@ test('active workout keeps one obvious next action through logging, timer and fi
 
   const secondSet = page.locator('[data-workout-set-id="202"]');
   await expect(secondSet).toHaveAttribute('aria-current', 'step');
-  await expect(secondSet.getByText('Бэкофф', { exact: true })).toBeVisible();
+  await expect(secondSet.getByText('Облегчённый подход', { exact: true })).toBeVisible();
   await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
   await secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }).fill('35');
+  await expect.poll(() => secondSetPatchBodies.length).toBeGreaterThan(0);
+  const patchesBeforePrefill = secondSetPatchBodies.length;
   await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
+  await expect.poll(() => secondSetPatchBodies.length).toBe(patchesBeforePrefill);
   await expect(
     secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }),
   ).toHaveValue('35');
@@ -601,10 +740,8 @@ test('active workout keeps one obvious next action through logging, timer and fi
 
   const thirdSet = page.locator('[data-workout-set-id="203"]');
   await expect(thirdSet).toHaveAttribute('aria-current', 'step');
-  await thirdSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 3' }).fill('32.5');
-  await thirdSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 3' }).fill('10');
   const thirdDone = thirdSet.getByRole('button', {
-    name: 'Завершить: Жим штанги лёжа, подход 3',
+    name: 'Подставить и завершить',
   });
   await thirdDone.evaluate((element) =>
     element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' }),
@@ -1171,6 +1308,21 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   const start = new Date('2026-09-09T12:00:00Z');
   await page.clock.setFixedTime(start);
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.addInitScript(() => {
+    const notifications: string[] = [];
+    Object.defineProperty(window, '__restNotifications', { value: notifications });
+    class TestNotification {
+      static permission = 'granted';
+
+      constructor(title: string) {
+        notifications.push(title);
+      }
+    }
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: TestNotification,
+    });
+  });
   await mockActiveWorkout(page);
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
@@ -1197,4 +1349,137 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await page.clock.setFixedTime(new Date(start.getTime() + 100_000));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect(timer).toHaveCount(0);
+  await expect(page.locator('.active-workout-rest--complete')).toContainText('Отдых завершён');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as typeof window & { __restNotifications: string[] }).__restNotifications.length,
+      ),
+    )
+    .toBe(1);
+});
+
+test('Task 520 owner visual package covers friction-reduction states', async ({ page }) => {
+  test.skip(!captureTask520VisualPackage, 'owner visual package capture is opt-in');
+  const packagePath = '../.artifacts/tasks/520/deliverables/visual-package';
+  const enterWorkout = async () => {
+    const clientEntry = page.getByRole('button', { name: 'Клиент' });
+    const continueButton = page.getByRole('button', { name: 'Продолжить тренировку' });
+    await Promise.race([
+      clientEntry.waitFor({ state: 'visible', timeout: 5000 }),
+      continueButton.waitFor({ state: 'visible', timeout: 5000 }),
+    ]);
+    if (await continueButton.isVisible()) {
+      await continueButton.click();
+      return;
+    }
+    await clientEntry.click();
+    await expect(continueButton).toBeVisible();
+    await continueButton.click();
+  };
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'light' });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await enterWorkout();
+
+  const firstSet = page.locator('[data-workout-set-id="201"]');
+  await expect(page.getByRole('complementary', { name: 'Контекст упражнения' })).toBeVisible();
+  await page.screenshot({
+    path: `${packagePath}/mobile-light-active-history-prefill.png`,
+    fullPage: true,
+  });
+
+  await page.getByRole('button', { name: 'Техника' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Техника выполнения' })).toBeVisible();
+  await page.screenshot({ path: `${packagePath}/mobile-light-technique.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Закрыть карточку упражнения' }).click();
+
+  await firstSet.getByText('Разминка и блины', { exact: true }).click();
+  await firstSet.getByLabel('Вес снаряда, кг').fill('80');
+  await expect(firstSet.getByRole('status')).toContainText('На сторону:');
+  await page.screenshot({
+    path: `${packagePath}/mobile-light-warmup-plate-helper.png`,
+    fullPage: true,
+  });
+
+  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
+  await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
+  await expect(page.getByRole('timer').filter({ hasText: 'Отдых' })).toBeVisible();
+  await page.screenshot({ path: `${packagePath}/mobile-light-rest.png`, fullPage: true });
+
+  const secondSet = page.locator('[data-workout-set-id="202"]');
+  await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
+  await page.screenshot({ path: `${packagePath}/mobile-light-prefilled-set.png`, fullPage: true });
+  await secondSet.getByText('Дополнительно', { exact: true }).click();
+  await secondSet.getByLabel('Вид подхода').selectOption('drop');
+  await secondSet.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+  await page.screenshot({ path: `${packagePath}/mobile-light-advanced-set.png`, fullPage: true });
+
+  const replacement = page.getByRole('button', { name: 'Заменить' }).first();
+  await replacement.click();
+  const adaptationDialog = page.getByRole('dialog', { name: 'Подстроить тренировку' });
+  await expect(adaptationDialog).toBeVisible();
+  await adaptationDialog.getByRole('checkbox', { name: 'Гантели' }).check();
+  await adaptationDialog.getByRole('checkbox', { name: 'Скамья' }).check();
+  const alternative = adaptationDialog.getByRole('radio', { name: /Жим гантелей лёжа/ });
+  await expect(alternative).toBeVisible();
+  await alternative.check();
+  await adaptationDialog.getByRole('button', { name: 'Показать изменения' }).click();
+  await expect(adaptationDialog.getByRole('heading', { name: 'Что изменится' })).toBeVisible();
+  await expect(adaptationDialog.locator('.adaptation-preview')).toContainText('Жим гантелей лёжа');
+  await adaptationDialog.locator('.adaptation-preview').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${packagePath}/mobile-light-substitution.png`, fullPage: true });
+
+  await page.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'dark' });
+  await page.evaluate(() => localStorage.setItem('app-theme', 'dark'));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await enterWorkout();
+  await expect(page.getByRole('heading', { name: 'Жим штанги лёжа' })).toBeVisible();
+  await page.screenshot({ path: `${packagePath}/mobile-dark-active-workout.png`, fullPage: true });
+
+  await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
+  await page.evaluate(() => localStorage.setItem('app-theme', 'light'));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await enterWorkout();
+  await expect(page.locator('.active-workout-exercise__media img')).toHaveAttribute(
+    'data-media-mode',
+    'static-poster',
+  );
+  await page.screenshot({
+    path: `${packagePath}/mobile-light-reduced-static-fallback.png`,
+    fullPage: true,
+  });
+
+  await page.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'light' });
+  await page.evaluate(() => localStorage.setItem('app-theme', 'light'));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await enterWorkout();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
+  await page.screenshot({
+    path: `${packagePath}/desktop-light-active-workout.png`,
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const skipRest = page.getByRole('button', { name: 'Пропустить' });
+  if (await skipRest.isVisible()) await skipRest.click();
+  const remainingSecondSet = page.locator('[data-workout-set-id="202"]');
+  await remainingSecondSet
+    .getByRole('button', { name: /Подставить и завершить|Завершить: Жим штанги лёжа, подход 2/ })
+    .click();
+  const remainingThirdSet = page.locator('[data-workout-set-id="203"]');
+  const skipSecondRest = page.getByRole('button', { name: 'Пропустить' });
+  if (await skipSecondRest.isVisible()) await skipSecondRest.click();
+  await remainingThirdSet
+    .getByRole('button', { name: /Подставить и завершить|Завершить: Жим штанги лёжа, подход 3/ })
+    .click();
+  await expect(page.getByText('Все подходы отмечены — можно завершать.')).toBeVisible();
+  await page.getByRole('button', { name: 'Завершить тренировку' }).click();
+  await expect(page.getByRole('heading', { name: 'Тренировка завершена' })).toBeVisible();
+  await page.screenshot({ path: `${packagePath}/mobile-light-completed.png`, fullPage: true });
 });

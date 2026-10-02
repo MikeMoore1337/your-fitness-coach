@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
-import type { Workout, WorkoutScheduleItem } from '../../shared/api/types';
+import type { ExerciseHistory, Workout, WorkoutScheduleItem } from '../../shared/api/types';
 import { haptic } from '../../shared/telegram/useTelegram';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
@@ -43,6 +43,7 @@ import { PWA_SAFE_UPDATE_EVENT } from '../../shared/pwa/pwaRuntime';
 import { ProgressionGuidance } from './ProgressionGuidance';
 import { useScreenWakeLock } from './useScreenWakeLock';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
+import { calculatePlateLoad, warmupSuggestions } from './workoutExecution';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -131,9 +132,9 @@ export function formatCardioResult(
 const plannedRoleLabels: Record<PlannedRole, string> = {
   warmup: 'Разминка',
   working: 'Рабочий подход',
-  top: 'Топ-сет',
-  backoff: 'Бэкофф',
-  drop: 'Дроп-сет',
+  top: 'Тяжёлый подход',
+  backoff: 'Облегчённый подход',
+  drop: 'Подход со снижением веса',
   activation: 'Активация',
   mini_set: 'Мини-сет',
   cluster_member: 'Кластерный мини-сет',
@@ -145,7 +146,7 @@ const plannedGroupKindLabels: Record<PlannedGroupKind, string> = {
   rest_pause: 'Rest-pause',
   myo_reps: 'Myo-reps',
   cluster: 'Кластер',
-  drop_chain: 'Дроп-сет',
+  drop_chain: 'Подход со снижением веса',
   circuit: 'Круг',
 };
 
@@ -161,6 +162,183 @@ function focusWorkoutControl(row: HTMLDivElement | null, field: 'reps' | 'distan
   const control = row?.querySelector<HTMLElement>(`[data-workout-field="${field}"]`);
   control?.focus();
   control?.scrollIntoView({ block: 'nearest' });
+}
+
+function formatWorkoutNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
+}
+
+function RirContextualHelp() {
+  return (
+    <ContextualHelp articlePath="/knowledge/training/repetitions-in-reserve">
+      <p>
+        Сколько повторов вы ещё могли бы сделать с хорошей техникой после завершения подхода? Поле
+        необязательное.
+      </p>
+    </ContextualHelp>
+  );
+}
+
+function RirSelector({
+  compact = false,
+  disabled,
+  value,
+  onChange,
+}: {
+  compact?: boolean;
+  disabled: boolean;
+  value: RirValue | null;
+  onChange: (value: RirValue | null) => void;
+}) {
+  return (
+    <fieldset className={`active-workout-rir${compact ? ' active-workout-rir--quick' : ''}`}>
+      <legend>{compact ? 'Повторы в запасе (RIR)' : 'Повторы в запасе'}</legend>
+      <div className="active-workout-rir__options">
+        {rirOptions.map((option) => (
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={option.label}
+            aria-pressed={value === option.value}
+            className={value === option.value ? 'is-selected' : ''}
+            key={option.value}
+            onClick={() => onChange(value === option.value ? null : option.value)}
+          >
+            {option.value}
+          </button>
+        ))}
+      </div>
+      {!compact && <RirContextualHelp />}
+    </fieldset>
+  );
+}
+
+function WorkoutSetHelpers({
+  disabled,
+  weight,
+  onUseWeight,
+}: {
+  disabled: boolean;
+  weight: string;
+  onUseWeight: (value: string) => void;
+}) {
+  const [plateWeight, setPlateWeight] = useState(weight);
+  const [barWeight, setBarWeight] = useState('20');
+  const suggestions = warmupSuggestions(Number(weight));
+  const plateLoad = calculatePlateLoad(Number(plateWeight), Number(barWeight));
+  const plateSummary = plateLoad?.plates.length
+    ? plateLoad.plates.map((plate) => `${formatWorkoutNumber(plate)} кг`).join(' + ')
+    : 'Только гриф';
+
+  return (
+    <details className="active-workout-set__helpers">
+      <summary>Разминка и блины</summary>
+      <div className="active-workout-set__helpers-body">
+        <div className="active-workout-helper-block">
+          <div>
+            <strong>Быстрая разминка</strong>
+            <p>Расчёт от рабочего веса. Подсказка не создаёт подход и не сохраняется сама.</p>
+          </div>
+          <div className="active-workout-helper-actions" aria-label="Вес для разминки">
+            {suggestions.length ? (
+              suggestions.map((suggestedWeight) => (
+                <button
+                  type="button"
+                  className="active-workout-helper-chip"
+                  disabled={disabled}
+                  key={suggestedWeight}
+                  onClick={() => onUseWeight(String(suggestedWeight))}
+                >
+                  {formatWorkoutNumber(suggestedWeight)} кг
+                </button>
+              ))
+            ) : (
+              <span className="active-workout-helper-muted">Введите рабочий вес от 20 кг.</span>
+            )}
+          </div>
+        </div>
+
+        <div className="active-workout-helper-block">
+          <div>
+            <strong>Блины на сторону</strong>
+            <p>Только арифметика для текущего веса; журнал и прогресс не меняются.</p>
+          </div>
+          <div className="active-workout-helper-inputs">
+            <label>
+              <span>Вес снаряда, кг</span>
+              <input
+                inputMode="decimal"
+                min="0"
+                step="0.5"
+                type="number"
+                value={plateWeight}
+                onChange={(event) => setPlateWeight(event.target.value)}
+              />
+            </label>
+            <label>
+              <span>Гриф, кг</span>
+              <input
+                inputMode="decimal"
+                min="1"
+                step="0.5"
+                type="number"
+                value={barWeight}
+                onChange={(event) => setBarWeight(event.target.value)}
+              />
+            </label>
+          </div>
+          {plateLoad && (
+            <p className="active-workout-helper-result" role="status">
+              На сторону: <strong>{plateSummary}</strong>
+              {plateLoad.remainder > 0 && (
+                <span> · не хватает {formatWorkoutNumber(plateLoad.remainder)} кг</span>
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function ExerciseHistoryContext({ exerciseId, enabled }: { exerciseId: number; enabled: boolean }) {
+  const history = useQuery({
+    queryKey: ['workout', 'exercise-history', exerciseId],
+    queryFn: () => api<ExerciseHistory>(`/api/v1/programs/exercises/${exerciseId}/history`),
+    enabled,
+    retry: false,
+    staleTime: 60_000,
+  });
+  if (!enabled || history.isError) return null;
+  if (history.isPending) {
+    return (
+      <p className="active-workout-history active-workout-history--loading" role="status">
+        Загружаем последний результат…
+      </p>
+    );
+  }
+  const session = history.data?.recent_sessions?.[0];
+  const result = session?.sets.find(
+    (set) => set.pr_eligible && (set.load_kg != null || set.reps != null),
+  );
+  const estimated = history.data?.estimated_1rm;
+  if (!result && !estimated) return null;
+  return (
+    <aside className="active-workout-history" aria-label="Контекст упражнения">
+      <div>
+        <span>Последний рабочий результат</span>
+        <strong>
+          {result ? formatSetResult(result.reps, result.load_kg) : 'Нет рабочего подхода'}
+        </strong>
+      </div>
+      {estimated && (
+        <div>
+          <span>Расчётный максимум на 1 повтор</span>
+          <strong>{formatWorkoutNumber(estimated.value_kg)} кг</strong>
+        </div>
+      )}
+    </aside>
+  );
 }
 
 function WorkoutDuration({ startedAt, completedAt }: { startedAt: string; completedAt?: string }) {
@@ -253,6 +431,12 @@ function WorkoutSetRow({
     previousResult !== null &&
     (canPrefillReps || canPrefillWeight);
 
+  const canStartRest = (nextSetKind: SetKind, nextCompleted: boolean) =>
+    nextCompleted &&
+    nextSetKind === 'working' &&
+    set.planned_role !== 'warmup' &&
+    set.planned_role !== 'activation';
+
   const enqueueSave = (
     next: Partial<{
       reps: string;
@@ -285,6 +469,8 @@ function WorkoutSetRow({
     );
     if (immediate && nextCompleted) {
       haptic('success');
+    }
+    if (immediate && canStartRest(nextSetKind, nextCompleted)) {
       window.dispatchEvent(
         new CustomEvent('fit:rest', { detail: { workoutId, seconds: restSeconds } }),
       );
@@ -377,24 +563,45 @@ function WorkoutSetRow({
         <p className="active-workout-set__previous">Предыдущий подход: {previousResult}</p>
       )}
       {canPrefill && (
-        <button
-          className="active-workout-set__prefill"
-          type="button"
-          onClick={() => {
-            const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
-            const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
-            editing.current = true;
-            setReps(nextReps);
-            setWeight(nextWeight);
-            enqueueSave({ reps: nextReps, weight: nextWeight });
-            trackProductEvent({
-              name: 'previous_set_reuse_used',
-              surface: productEventSurface(),
-            });
-          }}
-        >
-          Подставить предыдущий результат
-        </button>
+        <div className="active-workout-set__prefill-actions">
+          <button
+            className="active-workout-set__prefill"
+            type="button"
+            onClick={() => {
+              const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
+              const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
+              editing.current = true;
+              setReps(nextReps);
+              setWeight(nextWeight);
+              trackProductEvent({
+                name: 'previous_set_reuse_used',
+                surface: productEventSurface(),
+              });
+            }}
+          >
+            Подставить предыдущий результат
+          </button>
+          <button
+            className="active-workout-set__prefill active-workout-set__prefill--commit"
+            type="button"
+            onClick={() => {
+              const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
+              const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
+              editing.current = true;
+              setReps(nextReps);
+              setWeight(nextWeight);
+              setCompleted(true);
+              setJustConfirmed(true);
+              enqueueSave({ reps: nextReps, weight: nextWeight, completed: true }, true);
+              trackProductEvent({
+                name: 'previous_set_reuse_used',
+                surface: productEventSurface(),
+              });
+            }}
+          >
+            Подставить и завершить
+          </button>
+        </div>
       )}
 
       {isCurrent && (
@@ -403,6 +610,19 @@ function WorkoutSetRow({
           <span aria-hidden="true">·</span>
           <span>Отдых {restSeconds} с</span>
         </p>
+      )}
+
+      {isCurrent && (
+        <RirSelector
+          compact
+          disabled={disabled}
+          value={rir}
+          onChange={(nextRir) => {
+            editing.current = true;
+            setRir(nextRir);
+            enqueueSave({ rir: nextRir });
+          }}
+        />
       )}
 
       <div className="active-workout-set__controls">
@@ -487,6 +707,17 @@ function WorkoutSetRow({
         </Button>
       </div>
 
+      {isCurrent && (
+        <WorkoutSetHelpers
+          disabled={disabled}
+          weight={weight}
+          onUseWeight={(nextWeight) => {
+            editing.current = true;
+            setWeight(nextWeight);
+          }}
+        />
+      )}
+
       <details className="active-workout-set__advanced">
         <summary>Дополнительно</summary>
         <div className="active-workout-set__advanced-body">
@@ -504,39 +735,27 @@ function WorkoutSetRow({
             >
               <option value="working">Рабочий подход</option>
               <option value="warmup">Разминочный подход</option>
-              <option value="drop">Дроп-сет</option>
+              <option value="drop">Подход со снижением веса</option>
             </select>
           </label>
 
-          <fieldset className="active-workout-rir">
-            <legend>Повторы в запасе</legend>
-            <div className="active-workout-rir__options">
-              {rirOptions.map((option) => (
-                <button
-                  type="button"
-                  disabled={disabled}
-                  aria-label={option.label}
-                  aria-pressed={rir === option.value}
-                  className={rir === option.value ? 'is-selected' : ''}
-                  key={option.value}
-                  onClick={() => {
-                    const nextRir = rir === option.value ? null : option.value;
-                    editing.current = true;
-                    setRir(nextRir);
-                    enqueueSave({ rir: nextRir });
-                  }}
-                >
-                  {option.value}
-                </button>
-              ))}
+          {isCurrent && (
+            <div className="active-workout-rir">
+              <RirContextualHelp />
             </div>
-            <ContextualHelp articlePath="/knowledge/training/repetitions-in-reserve">
-              <p>
-                Сколько повторов вы ещё могли бы сделать с хорошей техникой после завершения
-                подхода? Поле необязательное.
-              </p>
-            </ContextualHelp>
-          </fieldset>
+          )}
+
+          {!isCurrent && (
+            <RirSelector
+              disabled={disabled}
+              value={rir}
+              onChange={(nextRir) => {
+                editing.current = true;
+                setRir(nextRir);
+                enqueueSave({ rir: nextRir });
+              }}
+            />
+          )}
 
           <label className="active-workout-failure">
             <input
@@ -554,7 +773,8 @@ function WorkoutSetRow({
           </label>
           {setKind === 'drop' && (
             <p className="active-workout-advanced-note">
-              Дроп-сет — подход со снижением веса без полноценного отдыха.
+              Подход со снижением веса — дополнительный подход с уменьшенной нагрузкой без
+              полноценного отдыха.
             </p>
           )}
         </div>
@@ -723,28 +943,55 @@ function CardioWorkoutRow({
         <p className="active-workout-set__previous">Предыдущий интервал: {previousResult}</p>
       )}
       {canPrefill && (
-        <button
-          className="active-workout-set__prefill"
-          type="button"
-          onClick={() => {
-            const nextDuration = canPrefillDuration
-              ? String(previousValues?.duration_minutes)
-              : duration;
-            const nextDistance = canPrefillDistance
-              ? String(previousValues?.distance_km)
-              : distance;
-            editing.current = true;
-            setDuration(nextDuration);
-            setDistance(nextDistance);
-            enqueueSave({ duration: nextDuration, distance: nextDistance });
-            trackProductEvent({
-              name: 'previous_set_reuse_used',
-              surface: productEventSurface(),
-            });
-          }}
-        >
-          Подставить предыдущий результат
-        </button>
+        <div className="active-workout-set__prefill-actions">
+          <button
+            className="active-workout-set__prefill"
+            type="button"
+            onClick={() => {
+              const nextDuration = canPrefillDuration
+                ? String(previousValues?.duration_minutes)
+                : duration;
+              const nextDistance = canPrefillDistance
+                ? String(previousValues?.distance_km)
+                : distance;
+              editing.current = true;
+              setDuration(nextDuration);
+              setDistance(nextDistance);
+              trackProductEvent({
+                name: 'previous_set_reuse_used',
+                surface: productEventSurface(),
+              });
+            }}
+          >
+            Подставить предыдущий результат
+          </button>
+          <button
+            className="active-workout-set__prefill active-workout-set__prefill--commit"
+            type="button"
+            onClick={() => {
+              const nextDuration = canPrefillDuration
+                ? String(previousValues?.duration_minutes)
+                : duration;
+              const nextDistance = canPrefillDistance
+                ? String(previousValues?.distance_km)
+                : distance;
+              editing.current = true;
+              setDuration(nextDuration);
+              setDistance(nextDistance);
+              setCompleted(true);
+              enqueueSave(
+                { duration: nextDuration, distance: nextDistance, completed: true },
+                true,
+              );
+              trackProductEvent({
+                name: 'previous_set_reuse_used',
+                surface: productEventSurface(),
+              });
+            }}
+          >
+            Подставить и завершить
+          </button>
+        </div>
       )}
 
       <div className="active-workout-set__controls active-workout-set__controls--cardio">
@@ -903,6 +1150,10 @@ function RestTimer({
     return legacy;
   });
   const [now, setNow] = useState(() => Date.now());
+  const [completedNotice, setCompletedNotice] = useState<string | null>(null);
+  const wasBackgrounded = useRef(
+    typeof document !== 'undefined' && document.visibilityState === 'hidden',
+  );
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
   useEffect(() => {
     const handler = (event: Event) => {
@@ -911,30 +1162,86 @@ function RestTimer({
       const nextDeadline = Date.now() + detail.seconds * 1000;
       setNow(Date.now());
       setDeadline(nextDeadline);
+      setCompletedNotice(null);
+      wasBackgrounded.current = document.visibilityState === 'hidden';
       writeStorage(storageKey, nextDeadline);
     };
     window.addEventListener('fit:rest', handler);
     return () => window.removeEventListener('fit:rest', handler);
   }, [storageKey, workoutId]);
   useEffect(() => {
+    const markBackgrounded = () => {
+      if (document.visibilityState === 'hidden') wasBackgrounded.current = true;
+      setNow(Date.now());
+    };
+    const markPageHidden = () => {
+      wasBackgrounded.current = true;
+    };
+    window.addEventListener('pageshow', markBackgrounded);
+    window.addEventListener('pagehide', markPageHidden);
+    document.addEventListener('visibilitychange', markBackgrounded);
+    return () => {
+      window.removeEventListener('pageshow', markBackgrounded);
+      window.removeEventListener('pagehide', markPageHidden);
+      document.removeEventListener('visibilitychange', markBackgrounded);
+    };
+  }, []);
+  useEffect(() => {
     if (!deadline) return;
     const update = () => {
       const currentTime = Date.now();
       setNow(currentTime);
       if (deadline <= currentTime) {
+        const wasHidden = wasBackgrounded.current || document.visibilityState === 'hidden';
         removeStorage(storageKey);
         setDeadline(0);
+        setCompletedNotice(`Отдых завершён · дальше: ${nextLabel}`);
+        if (
+          wasHidden &&
+          typeof Notification !== 'undefined' &&
+          Notification.permission === 'granted'
+        ) {
+          new Notification('Отдых завершён', {
+            body: `Дальше: ${nextLabel}`,
+            tag: `fit-rest-${workoutId}`,
+          });
+        }
+        wasBackgrounded.current = false;
         haptic('success');
       }
     };
     const timer = window.setInterval(update, 1000);
     document.addEventListener('visibilitychange', update);
+    window.addEventListener('pageshow', update);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', update);
+      window.removeEventListener('pageshow', update);
     };
-  }, [deadline, storageKey]);
-  if (!seconds) return null;
+  }, [deadline, nextLabel, storageKey, workoutId]);
+  if (!seconds && !completedNotice) return null;
+  if (!seconds && completedNotice) {
+    return (
+      <aside
+        {...glassProps('tinted')}
+        className="active-workout-rest active-workout-rest--complete"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="active-workout-rest__complete-copy">{completedNotice}</span>
+        <div className="active-workout-rest__actions app-action-group">
+          <button
+            {...glassProps('clear', true)}
+            type="button"
+            className="secondary"
+            onClick={() => setCompletedNotice(null)}
+          >
+            Скрыть
+          </button>
+        </div>
+      </aside>
+    );
+  }
   return (
     <aside
       {...glassProps('tinted')}
@@ -969,6 +1276,7 @@ function RestTimer({
           onClick={() => {
             removeStorage(storageKey);
             setDeadline(0);
+            setCompletedNotice(null);
           }}
         >
           Пропустить
@@ -1272,9 +1580,16 @@ export function TodayWorkout({
             );
             const isCurrentExercise = currentSet?.exercise.id === exercise.id;
             const exerciseOpen = isCurrentExercise || expandedExercises.has(exercise.id);
-            const supersetLabel = exercise.superset_group
-              ? `Суперсет — упражнение ${exercise.superset_order ?? exerciseIndex + 1} из 2`
-              : null;
+            const groupKind =
+              exercise.group_kind ?? (exercise.superset_group ? ('superset' as const) : null);
+            const groupLabel =
+              groupKind && groupKind !== 'sequence'
+                ? `${formatPlannedGroupKind(groupKind)}${
+                    exercise.group_order || exercise.superset_order
+                      ? ` · ${exercise.group_order ?? exercise.superset_order}`
+                      : ''
+                  }`
+                : null;
             const suggestedWeight =
               metricType === 'strength'
                 ? (exercise.progression_guidance?.suggested_weight ?? null)
@@ -1294,7 +1609,7 @@ export function TodayWorkout({
 
             return (
               <article
-                className={`active-workout-exercise ${isCurrentExercise ? 'is-current' : ''} ${exerciseCompleted === exercise.sets.length ? 'is-completed' : ''} ${supersetLabel ? 'is-superset' : ''}`}
+                className={`active-workout-exercise ${isCurrentExercise ? 'is-current' : ''} ${exerciseCompleted === exercise.sets.length ? 'is-completed' : ''} ${groupLabel ? 'is-superset' : ''}`}
                 key={exercise.id}
               >
                 <header className="active-workout-exercise__head">
@@ -1315,9 +1630,7 @@ export function TodayWorkout({
                         {exercise.rest_seconds} сек
                       </p>
                     )}
-                    {supersetLabel && (
-                      <span className="active-workout-superset">{supersetLabel}</span>
-                    )}
+                    {groupLabel && <span className="active-workout-superset">{groupLabel}</span>}
                     {exercise.notes && <p className="exercise-note">{exercise.notes}</p>}
                   </div>
                   <div className="active-workout-exercise__head-actions app-action-group">
@@ -1356,6 +1669,15 @@ export function TodayWorkout({
                     >
                       <span>{exercise.has_guide ? 'Техника' : 'Подробнее'}</span>
                     </button>
+                    {started && capabilities.canMutatePrograms && (
+                      <WorkoutAdaptation
+                        entryContext="workout"
+                        entryLabel="Заменить"
+                        initialTargetId={exercise.id}
+                        safetyOnly={false}
+                        workout={data}
+                      />
+                    )}
                   </div>
                 </header>
 
@@ -1386,6 +1708,12 @@ export function TodayWorkout({
                   )}
 
                 <div id={`workout-exercise-${exercise.id}-details`} hidden={!exerciseOpen}>
+                  {metricType === 'strength' && (
+                    <ExerciseHistoryContext
+                      enabled={started && exerciseOpen}
+                      exerciseId={exercise.exercise_id}
+                    />
+                  )}
                   {metricType === 'strength' &&
                     exercise.progression_guidance &&
                     !dismissedGuidance.has(exercise.id) && (
