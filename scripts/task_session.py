@@ -6953,6 +6953,9 @@ class TaskController:
             if isinstance(control_issue, bool) or not isinstance(control_issue, int):
                 raise TaskSessionError("Prepared resume has an invalid control Issue identity")
             document = find_task_document(self._canonical_root(), expected)
+            direct_guard_recovery = (
+                resume_event.get("classification") == DIRECT_GUARD_RECOVERY_CLASSIFICATION
+            )
             control_state = self._preimplementation_issue_state(
                 expected,
                 control_issue,
@@ -6966,18 +6969,11 @@ class TaskController:
                     resume_event.get("transport_interruption_recovery"), Mapping
                 ),
                 allow_verified_noop_retry=(
-                    resume_event.get("classification")
-                    in {
-                        NOOP_WORKER_RETRY_CLASSIFICATION,
-                        DIRECT_GUARD_RECOVERY_CLASSIFICATION,
-                    }
+                    resume_event.get("classification") == NOOP_WORKER_RETRY_CLASSIFICATION
                 ),
             )
             recovery = resume_event.get("guard_budget_recovery")
             transport_recovery = resume_event.get("transport_interruption_recovery")
-            direct_guard_recovery = (
-                resume_event.get("classification") == DIRECT_GUARD_RECOVERY_CLASSIFICATION
-            )
             if (
                 isinstance(recovery, Mapping)
                 and not isinstance(transport_recovery, Mapping)
