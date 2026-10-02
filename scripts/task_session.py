@@ -6216,15 +6216,29 @@ class TaskController:
                     raise TaskSessionError(
                         "Task has a post-start external transport interruption; use transport recovery"
                     )
+                direct_guard_recovery = (
+                    event.get("classification") == DIRECT_GUARD_RECOVERY_CLASSIFICATION
+                )
                 control_state = self._preimplementation_issue_state(
                     expected,
                     control_issue_number,
                     branch,
                     document,
                     lease,
-                    allow_guard_budget_failure=True,
+                    allow_guard_budget_failure=not direct_guard_recovery,
+                    allow_verified_noop_retry=direct_guard_recovery,
                 )
-                if not self._guard_control_state_matches_checkpoint(control_state, existing):
+                if (
+                    direct_guard_recovery
+                    and control_state
+                    and control_state.get("state") != "in_progress"
+                ):
+                    raise TaskSessionError(
+                        "Direct guard recovery requires no prior control state or in_progress"
+                    )
+                if not direct_guard_recovery and not self._guard_control_state_matches_checkpoint(
+                    control_state, existing
+                ):
                     raise TaskSessionError(
                         "Latest task guard blocker no longer matches its checkpoint"
                     )
