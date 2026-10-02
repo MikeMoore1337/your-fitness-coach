@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import type { FoodDiaryEntry, HydrationEntry } from '../../src/shared/api/types';
+import type {
+  FoodDiaryEntry,
+  HydrationEntry,
+  NutritionSuggestions as NutritionSuggestionsResponse,
+} from '../../src/shared/api/types';
 import { nutritionDaySummary } from './fixtures/locators';
 
 test.use({ serviceWorkers: 'block' });
@@ -219,6 +223,8 @@ async function mockNutritionApi(
     releaseHydrationLoading = resolve;
   });
   let entries: FoodDiaryEntry[] = [yogurtEntry];
+  let suggestionCommitCount = 0;
+  let lastSuggestionCommit: unknown = null;
   let hydrationEntries: HydrationEntry[] =
     hydrationState === 'empty'
       ? []
@@ -448,6 +454,80 @@ async function mockNutritionApi(
         },
       });
     }
+    if (path === '/api/v1/nutrition/diary/suggestions' && request.method() === 'GET') {
+      const suggestions: NutritionSuggestionsResponse = {
+        mode: 'deterministic',
+        diary_date: url.searchParams.get('diary_date') || '2026-08-19',
+        targets: {
+          energy_kcal: '2000.00',
+          protein_g: '140.000',
+          fat_g: '70.000',
+          carbs_g: '220.000',
+        },
+        remaining: {
+          energy_kcal: '500.00',
+          protein_g: '30.000',
+          fat_g: null,
+          carbs_g: '60.000',
+        },
+        remaining_confidence: 'partial',
+        limitations: ['Часть БЖУ неизвестна: неполные записи не превращаются в нули.'],
+        max_candidates: 6,
+        candidates: [
+          {
+            candidate_id: 'food:7',
+            candidate_kind: 'food',
+            identity_id: 7,
+            name: oatmealFood.name,
+            items: [
+              {
+                position: 0,
+                item_kind: 'food',
+                food_id: oatmealFood.id,
+                recipe_id: null,
+                name: oatmealFood.name,
+                brand: oatmealFood.brand,
+                amount: '100.000',
+                amount_unit: 'g',
+                nutrition: {
+                  energy_kcal: oatmealFood.energy_kcal_per_100g,
+                  protein_g: oatmealFood.protein_g_per_100g,
+                  fat_g: null,
+                  carbs_g: oatmealFood.carbs_g_per_100g,
+                  fiber_g: oatmealFood.fiber_g_per_100g,
+                },
+                nutrition_confidence: 'partial',
+              },
+            ],
+            nutrition: {
+              energy_kcal: oatmealFood.energy_kcal_per_100g,
+              protein_g: oatmealFood.protein_g_per_100g,
+              fat_g: null,
+              carbs_g: oatmealFood.carbs_g_per_100g,
+              fiber_g: oatmealFood.fiber_g_per_100g,
+            },
+            nutrition_confidence: 'partial',
+            sources: ['recent'],
+            reasons: ['recent', 'protein_fit', 'partial_nutrition'],
+          },
+        ],
+      };
+      return route.fulfill({ json: suggestions });
+    }
+    if (path === '/api/v1/nutrition/diary/suggestions/commit' && request.method() === 'POST') {
+      suggestionCommitCount += 1;
+      lastSuggestionCommit = request.postDataJSON();
+      return route.fulfill({
+        status: 201,
+        json: {
+          operation_kind: 'suggestion',
+          diary_date: '2026-08-19',
+          meal_type: 'dinner',
+          entries: [],
+          replayed: false,
+        },
+      });
+    }
     if (path === '/api/v1/nutrition/foods/recent') {
       return route.fulfill({ json: { items: [oatmealFood], total: 1, limit: 12, offset: 0 } });
     }
@@ -583,8 +663,40 @@ async function mockNutritionApi(
     return route.fulfill({ status: 404, json: { detail: `Unhandled ${path}` } });
   });
 
-  return { releaseHydrationLoading };
+  return {
+    releaseHydrationLoading,
+    getSuggestionCommitCount: () => suggestionCommitCount,
+    getLastSuggestionCommit: () => lastSuggestionCommit,
+  };
 }
+
+test('macro-aware suggestions show partial evidence and require an editable confirmation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const apiState = await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+
+  const suggestions = page.getByRole('region', { name: 'Варианты из вашей еды' });
+  await expect(suggestions).toBeVisible();
+  await expect(suggestions.getByText('Частичные БЖУ', { exact: true })).toBeVisible();
+  await expect(
+    suggestions.getByText('Часть БЖУ неизвестна: неполные записи не превращаются в нули.'),
+  ).toBeVisible();
+  await suggestions.getByRole('button', { name: 'Проверить вариант' }).click();
+  const amount = suggestions.getByLabel('Количество');
+  await amount.fill('150');
+  await suggestions.getByLabel('Приём пищи').selectOption('dinner');
+  await expect.poll(apiState.getSuggestionCommitCount).toBe(0);
+
+  await suggestions.getByRole('button', { name: 'Добавить выбранное' }).click();
+  await expect.poll(apiState.getSuggestionCommitCount).toBe(1);
+  expect(apiState.getLastSuggestionCommit()).toEqual({
+    diary_date: '2026-08-19',
+    meal_type: 'dinner',
+    items: [{ food_id: 7, amount: '150', amount_unit: 'g' }],
+  });
+});
 
 test('Task 81A groups nutrition into five cards and keeps profile choices compact', async ({
   page,
@@ -1106,7 +1218,7 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(page.getByRole('spinbutton', { name: 'Количество' })).toHaveValue('1');
   await page.getByRole('button', { name: 'Добавить в дневник' }).click();
   await expect(page.getByRole('dialog')).not.toBeAttached();
-  await expect(page.getByText('Овсяная каша')).toBeVisible();
+  await expect(page.locator('.nutrition-entry').filter({ hasText: 'Овсяная каша' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
 
   const oatmeal = page.locator('.nutrition-entry').filter({ hasText: 'Овсяная каша' });

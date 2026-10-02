@@ -26,6 +26,7 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { FoodPickerDialog, type MealType } from './FoodPickerDialog';
 import { CopyDiaryDialog, type CopySubject } from './CopyDiaryDialog';
 import { HydrationTracker } from './HydrationTracker';
+import { NutritionSuggestions } from './NutritionSuggestions';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 
 const mealOrder: MealType[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
@@ -783,6 +784,12 @@ export function NutritionDiary({
       {diary.data && (
         <>
           <DaySummary day={diary.data} />
+          <NutritionSuggestions
+            diaryDate={selectedDate}
+            initialMealType={initialMealType ?? defaultMealType(timeZone)}
+            readOnly={readOnlyEntries}
+            demoSafeMode={demoSafeMode}
+          />
           <DayCompleteness day={diary.data} readOnly={readOnlyEntries} />
           <section
             className="nutrition-section-card nutrition-food-card"

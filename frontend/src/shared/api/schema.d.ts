@@ -3503,6 +3503,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/diary/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Diary Suggestions */
+        get: operations["get_diary_suggestions_api_v1_nutrition_diary_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/suggestions/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Commit Diary Suggestion */
+        post: operations["commit_diary_suggestion_api_v1_nutrition_diary_suggestions_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/diary/natural-input/preview": {
         parameters: {
             query?: never;
@@ -8629,13 +8663,28 @@ export interface components {
             /** Provider Statuses */
             provider_statuses?: components["schemas"]["FoodProviderStatusResponse"][];
         };
+        /** FoodDiaryBatchItem */
+        FoodDiaryBatchItem: {
+            /** Food Id */
+            food_id?: number | null;
+            /** Recipe Id */
+            recipe_id?: number | null;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @default g
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
         /** FoodDiaryBatchResponse */
         FoodDiaryBatchResponse: {
             /**
              * Operation Kind
              * @enum {string}
              */
-            operation_kind: "meal_template" | "natural_input";
+            operation_kind: "meal_template" | "natural_input" | "suggestion";
             /**
              * Diary Date
              * Format: date
@@ -10274,6 +10323,102 @@ export interface components {
             average_deviation?: number | null;
             /** Evaluated Days */
             evaluated_days: number;
+        };
+        /** NutritionSuggestionCandidate */
+        NutritionSuggestionCandidate: {
+            /** Candidate Id */
+            candidate_id: string;
+            /**
+             * Candidate Kind
+             * @enum {string}
+             */
+            candidate_kind: "food" | "recipe" | "template";
+            /** Identity Id */
+            identity_id: number;
+            /** Name */
+            name: string;
+            /** Items */
+            items: components["schemas"]["NutritionSuggestionItem"][];
+            nutrition: components["schemas"]["FoodDiaryNutrition"];
+            /**
+             * Nutrition Confidence
+             * @enum {string}
+             */
+            nutrition_confidence: "exact" | "approximate" | "partial";
+            /** Sources */
+            sources: ("recent" | "frequent" | "favorite" | "used" | "saved_template" | "personal_recipe")[];
+            /** Reasons */
+            reasons: ("protein_fit" | "lower_known_fat" | "recent" | "frequent" | "favorite" | "used" | "saved_template" | "personal_recipe" | "partial_nutrition")[];
+        };
+        /** NutritionSuggestionCommitRequest */
+        NutritionSuggestionCommitRequest: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Items */
+            items: components["schemas"]["FoodDiaryBatchItem"][];
+        };
+        /** NutritionSuggestionItem */
+        NutritionSuggestionItem: {
+            /** Position */
+            position: number;
+            /**
+             * Item Kind
+             * @enum {string}
+             */
+            item_kind: "food" | "recipe";
+            /** Food Id */
+            food_id?: number | null;
+            /** Recipe Id */
+            recipe_id?: number | null;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+            /** Amount */
+            amount: string;
+            /**
+             * Amount Unit
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+            nutrition: components["schemas"]["FoodDiaryNutrition"];
+            /**
+             * Nutrition Confidence
+             * @enum {string}
+             */
+            nutrition_confidence: "exact" | "approximate" | "partial";
+        };
+        /** NutritionSuggestionsResponse */
+        NutritionSuggestionsResponse: {
+            /**
+             * Mode
+             * @default deterministic
+             * @constant
+             */
+            mode: "deterministic";
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            targets: components["schemas"]["FoodDiaryTargets"] | null;
+            remaining: components["schemas"]["FoodDiaryTargets"] | null;
+            /** Remaining Confidence */
+            remaining_confidence: ("exact" | "approximate" | "partial") | null;
+            /** Limitations */
+            limitations?: string[];
+            /** Candidates */
+            candidates?: components["schemas"]["NutritionSuggestionCandidate"][];
+            /** Max Candidates */
+            max_candidates: number;
         };
         /** NutritionTargetHistoryResponse */
         NutritionTargetHistoryResponse: {
@@ -22133,6 +22278,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoodDiaryDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_diary_suggestions_api_v1_nutrition_diary_suggestions_get: {
+        parameters: {
+            query?: {
+                diary_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSuggestionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_diary_suggestion_api_v1_nutrition_diary_suggestions_commit_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionSuggestionCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryBatchResponse"];
                 };
             };
             /** @description Validation Error */

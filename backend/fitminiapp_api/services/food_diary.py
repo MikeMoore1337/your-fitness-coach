@@ -416,7 +416,10 @@ def _batch_response(
         .all()
     )
     return FoodDiaryBatchResponse(
-        operation_kind=cast(Literal["meal_template", "natural_input"], operation.operation_kind),
+        operation_kind=cast(
+            Literal["meal_template", "natural_input", "suggestion"],
+            operation.operation_kind,
+        ),
         diary_date=operation.diary_date,
         meal_type=cast(MealType, operation.meal_type),
         entries=[_serialize_entry(entry) for entry in entries],
@@ -425,7 +428,7 @@ def _batch_response(
 
 
 def _batch_request_fingerprint(
-    operation_kind: Literal["meal_template", "natural_input"],
+    operation_kind: Literal["meal_template", "natural_input", "suggestion"],
     diary_date: date,
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
@@ -475,7 +478,7 @@ def create_food_diary_batch(
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
     idempotency_key: str,
-    operation_kind: Literal["meal_template", "natural_input"],
+    operation_kind: Literal["meal_template", "natural_input", "suggestion"],
     template_id: int | None = None,
 ) -> FoodDiaryBatchResponse:
     key = _normalize_idempotency_key(idempotency_key)

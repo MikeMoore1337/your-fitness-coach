@@ -2369,7 +2369,7 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
 
   api.setOffline(true);
   await tmaPage.getByRole('button', { name: 'Сохранить Quick Add' }).click();
-  await expect(tmaPage.getByRole('alert')).toBeVisible();
+  await expect(tmaPage.getByRole('dialog').getByRole('alert')).toBeVisible();
   await expect(calories).toHaveValue('510');
   api.setOffline(false);
   await tmaPage.getByRole('dialog').getByRole('button', { name: 'Повторить', exact: true }).click();
