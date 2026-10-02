@@ -3231,7 +3231,7 @@ class TaskController:
             raise TaskSessionError(f"Task {expected} status is blocked: {document.status}")
         owner_gate = normalize_owner_gate(document.owner_gate)
         gate_label, _, requirement = owner_gate.partition(":")
-        if gate_label not in {"", "explicit_launch", "owner_launch", "none"}:
+        if task_risk_lane(owner_gate) == "RED":
             gate_name = gate_label.upper()
             concrete_requirement = requirement.strip() or "the task-declared evidence"
             raise TaskSessionError(
@@ -6827,7 +6827,7 @@ class TaskController:
             raise TaskSessionError(f"Task {expected} status is blocked: {document.status}")
         owner_gate = normalize_owner_gate(document.owner_gate)
         gate_label, _, requirement = owner_gate.partition(":")
-        if gate_label not in {"", "explicit_launch", "owner_launch", "none"}:
+        if task_risk_lane(owner_gate) == "RED":
             gate_name = gate_label.upper()
             concrete_requirement = requirement.strip() or "the task-declared evidence"
             raise TaskSessionError(
