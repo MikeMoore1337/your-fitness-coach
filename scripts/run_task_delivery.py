@@ -58,6 +58,7 @@ try:
     from scripts.task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
         CLOSED_LEASE_STATES,
+        DIRECT_GUARD_RECOVERY_CLASSIFICATION,
         DONE_STATE,
         IMPLEMENTATION_STATES,
         KNOWN_LEASE_STATES,
@@ -96,6 +97,7 @@ except ModuleNotFoundError:
     from task_session import (
         ACTIVE_DELIVERY_ARTIFACTS_ENV,
         CLOSED_LEASE_STATES,
+        DIRECT_GUARD_RECOVERY_CLASSIFICATION,
         DONE_STATE,
         IMPLEMENTATION_STATES,
         KNOWN_LEASE_STATES,
@@ -3806,6 +3808,18 @@ def _deliver_one(
         control_state = started.get("control_state")
         if not isinstance(control_state, Mapping):
             raise DeliveryError("HUMAN_REQUIRED: resumed task has no verified control state")
+        direct_resume_event = started.get("preimplementation_resume")
+        direct_guard_recovery = (
+            direct_resume_event.get("guard_budget_recovery")
+            if isinstance(direct_resume_event, Mapping)
+            else None
+        )
+        direct_guard_retry = (
+            resume_guard_interrupted
+            and isinstance(direct_resume_event, Mapping)
+            and direct_resume_event.get("classification") == DIRECT_GUARD_RECOVERY_CLASSIFICATION
+            and isinstance(direct_guard_recovery, Mapping)
+        )
         if control_state.get("state") == "blocked":
             resume_event = started.get("preimplementation_resume")
             failure = (
@@ -3891,6 +3905,21 @@ def _deliver_one(
                         blocker="Owner-authorized bounded worker resume is launching the preserved WIP.",
                     ),
                 )
+        elif direct_guard_retry and control_state.get("state") in {None, "in_progress"}:
+            if status_issue is None:
+                raise DeliveryError("HUMAN_REQUIRED: direct guard recovery has no control Issue")
+            _post_control_state(
+                status_issue,
+                control_state_payload(
+                    task_id=task_id,
+                    state="human_required",
+                    issue_number=status_issue,
+                    branch=started["lease"]["branch"],
+                    blocker=(
+                        "Owner-authorized bounded guard recovery is launching the preserved task WIP."
+                    ),
+                ),
+            )
         elif control_state.get("state") != "human_required":
             raise DeliveryError(
                 "HUMAN_REQUIRED: resumed task is not in an executable control state"

@@ -4429,3 +4429,88 @@ def test_main_uses_shared_codex_resolver_before_delivery(
 
     assert delivery.main(["520", "--offline"]) == 0
     assert delivered == ["520"]
+
+
+def test_direct_guard_recovery_empty_control_state_enters_bounded_handoff(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    artifacts = tmp_path / "delivery"
+    artifacts.mkdir()
+    started = {
+        "lease": {
+            "branch": "task/520-product-v6-workout-execution-v2",
+            "worktree": str(tmp_path / "worktree"),
+        },
+        "control_state": {},
+        "preimplementation_resume": {
+            "classification": delivery.DIRECT_GUARD_RECOVERY_CLASSIFICATION,
+            "state": "prepared",
+            "guard_budget_recovery": {
+                "recovery_attempt_number": 1,
+                "checkpoint_ref": "refs/codex/task-wip-checkpoints/task-520/attempt",
+                "checkpoint_commit": "a" * 40,
+                "changed_paths": ["frontend/src/features/workouts/TodayWorkout.tsx"],
+            },
+        },
+    }
+    status_updates: list[dict[str, Any]] = []
+    monkeypatch.setattr(delivery, "_start", lambda *args, **kwargs: started)
+    monkeypatch.setattr(delivery, "_artifact_root", lambda task_id: artifacts)
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_agent_flow",
+        lambda *args, **kwargs: (
+            {
+                "worker_role_passes": [{"name": "implementer"}],
+                "graphify": {"bootstrap_required": False},
+                "agent_budget": _agent_budget(),
+            },
+            tmp_path / "agent-flow.json",
+        ),
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_prepare_skill_safety",
+        lambda *args, **kwargs: ({}, tmp_path / "skills.json"),
+    )
+    monkeypatch.setattr(delivery, "_event", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        delivery,
+        "_controller_payload",
+        lambda *args, **kwargs: {"preimplementation_resume": {"state": "worker-started"}},
+    )
+    monkeypatch.setattr(
+        delivery,
+        "_post_control_state",
+        lambda _issue, payload: status_updates.append(dict(payload)),
+    )
+
+    def interrupted(*args: Any, **kwargs: Any) -> int:
+        del args
+        assert status_updates[-1]["state"] == "human_required"
+        assert "bounded guard recovery" in status_updates[-1]["blocker"]
+        kwargs["on_command_started"](artifacts / "worker-state.json")
+        return 23
+
+    monkeypatch.setattr(delivery, "_launch_worker", interrupted)
+    monkeypatch.setattr(delivery, "_history", lambda task_id: None)
+
+    with pytest.raises(
+        delivery.DeliveryError, match="one-time guard-budget recovery did not complete"
+    ):
+        delivery._deliver_one(
+            "520",
+            session_label="test",
+            poll_seconds=10,
+            max_wait_minutes=1,
+            offline=False,
+            control_issue=616,
+            resume_reason="owner-authorized direct guard recovery",
+            resume_guard_interrupted=True,
+        )
+
+    assert [item["state"] for item in status_updates] == [
+        "human_required",
+        "in_progress",
+        "human_required",
+    ]
