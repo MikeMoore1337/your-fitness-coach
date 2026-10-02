@@ -8049,6 +8049,18 @@ def test_direct_guard_interrupted_resume_recovers_without_legacy_launch_audit(
     assert git_repository.head(cwd=worktree) == before_head
     assert git_repository.status(worktree) == before_status
 
+    repeated = controller.resume_guard_interrupted(
+        "241",
+        control_issue_number=241,
+        reason="owner-authorized direct guard recovery",
+        owner_authorize=True,
+    )
+    assert repeated["mutation_performed"] is False
+    assert repeated["control_state"] == {}
+    assert repeated["preimplementation_resume"]["guard_budget_recovery"] == checkpoint
+    assert git_repository.head(cwd=worktree) == before_head
+    assert git_repository.status(worktree) == before_status
+
     claimed = controller.claim_preimplementation_worker_launch("241")
     assert claimed["preimplementation_resume"]["state"] == "launching"
 
