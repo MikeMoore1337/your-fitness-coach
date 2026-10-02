@@ -3264,12 +3264,115 @@ class TaskController:
         branch = f"task/{expected}-{slug or document.slug}"
         task_id_from_branch(branch)
         target = self._canonical_root() / ".artifacts" / "worktrees" / branch.removeprefix("task/")
+        self.store.initialize()
+        lease_path = self.store.task_lease_path(expected)
+        existing_leases = self.store.all_leases()
+        matching_leases = [
+            item
+            for item in existing_leases
+            if isinstance(item.get("task_id"), str) and item.get("task_id", "").upper() == expected
+        ]
+        if matching_leases:
+            lease = self.store.read_json(lease_path)
+            if (
+                len(matching_leases) != 1
+                or not isinstance(lease, dict)
+                or matching_leases[0] != lease
+            ):
+                raise TaskSessionError(f"Task {expected} has an ambiguous active lease")
+            expected_target = target.resolve()
+            lease_worktree = Path(str(lease.get("worktree", ""))).resolve()
+            attempts = lease.get("attempts")
+            retry_evidence = any(
+                key in lease
+                for key in (
+                    "worker_retry",
+                    "preimplementation_resume",
+                    "worker_started_at",
+                    "worker_state",
+                )
+            )
+            contract_mismatch = (
+                lease.get("mode") != "write"
+                or self._lease_state(lease) != WORKING_STATE
+                or lease.get("owner_launch") is not True
+                or lease.get("branch") != branch
+                or lease_worktree != expected_target
+                or Path(str(lease.get("canonical_task_path", ""))).resolve()
+                != document.path.resolve()
+                or lease.get("concurrency_class") != document.concurrency_class
+                or lease.get("integration_policy") != "task-pr-to-master"
+                or tuple(str(item) for item in lease.get("dependency_ids", ()))
+                != tuple(resolved_dependencies)
+                or bool(lease.get("queue_mode")) != bool(queue_mode)
+                or lease.get("session_label") != session_label
+            )
+            if contract_mismatch:
+                raise TaskSessionError(
+                    f"Task {expected} existing working lease does not match the requested task contract"
+                )
+            if attempts != [] or retry_evidence:
+                raise TaskSessionError(
+                    f"Task {expected} existing working lease has worker/retry evidence; use bounded recovery"
+                )
+            delivery_owner = self.store.delivery_state().get("owner")
+            if delivery_owner is not None:
+                raise TaskSessionError(
+                    f"Task {expected} pristine lease reuse refuses an active delivery owner"
+                )
+            conflicts = self._implementation_lease_conflicts(
+                [item for item in existing_leases if item is not matching_leases[0]],
+                task_id=expected,
+                concurrency_class=document.concurrency_class,
+            )
+            if conflicts:
+                raise TaskSessionError(
+                    f"Task {expected} pristine lease reuse found incompatible implementation leases"
+                )
+            registered = [
+                item
+                for item in self.repository.worktrees()
+                if item.path == expected_target or item.branch == branch
+            ]
+            if (
+                len(registered) != 1
+                or registered[0].path != expected_target
+                or registered[0].branch != branch
+                or registered[0].detached
+                or not target.exists()
+                or not self.repository.ref_exists(f"refs/heads/{branch}")
+                or self.repository.current_branch(cwd=expected_target) != branch
+                or self.repository.ref(branch) != registered[0].head
+                or self.repository.status(expected_target)
+                or self.repository.operation_issues(expected_target)
+            ):
+                raise TaskSessionError(f"Ambiguous existing branch/worktree for {branch}")
+            base_sha = str(lease.get("base_origin_master_sha", ""))
+            canonical_refresh = lease.get("canonical_master_refresh")
+            return {
+                "lease": lease,
+                "canonical_master_refresh": canonical_refresh,
+                "cleanup_retries": [],
+                "maintenance_cleanup": {
+                    "status": "skipped",
+                    "reason": "reused exact pristine working lease",
+                },
+                "reused_existing_lease": True,
+                "prompt": (
+                    f"Worktree: {expected_target}\nBranch: {branch}\n"
+                    f"Base origin/master: {base_sha}\nTask: {expected} ({document.path})\n"
+                    f"Dependencies ({'Issue' if dependency_ids is not None else 'task spec'} source): "
+                    f"{', '.join(resolved_dependencies) or 'none'}\n"
+                    "Existing pristine working lease was reused after exact Git/task-state validation.\n"
+                    "Normal path: targeted checks/self-review/QA/commit -> push task branch -> PR master\n"
+                    "-> GitHub exact-head checks -> merge -> exact-SHA production deployment.\n"
+                    "Do not merge or push master directly.\n"
+                ),
+            }
         if target.exists() or self.repository.ref_exists(f"refs/heads/{branch}"):
             raise TaskSessionError(f"Ambiguous existing branch/worktree for {branch}")
-        self.store.initialize()
         maintenance_cleanup = self.maintenance_cleanup()
         cleanup_retries = maintenance_cleanup["pending_worktree_retries"]
-        lease_path = self.store.task_lease_path(expected)
         with self.store.lock():
             existing = self.store.all_leases()
             if any(item.get("task_id") == expected for item in existing):
