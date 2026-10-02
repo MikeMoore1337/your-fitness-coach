@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.config import settings
@@ -10,9 +10,11 @@ from fitminiapp_api.schemas.public import (
     PublicExerciseSummary,
     PublicProgramResponse,
 )
+from fitminiapp_api.schemas.public_share import PublicShareResponse
 from fitminiapp_api.seo import NOINDEX_ROBOTS
 from fitminiapp_api.services.public_exercises import public_exercise, public_exercises
 from fitminiapp_api.services.public_programs import public_program
+from fitminiapp_api.services.public_shares import get_active_public_share, serialize_public_share
 from fitminiapp_api.services.web_articles import (
     article_card,
     article_public_response,
@@ -57,6 +59,24 @@ def get_public_program(slug: str) -> dict[str, object]:
             headers={"X-Robots-Tag": NOINDEX_ROBOTS},
         )
     return program
+
+
+@router.get("/public/shares/{share_id}", response_model=PublicShareResponse)
+def get_public_share(
+    share_id: str,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> dict:
+    row = get_active_public_share(db, share_id)
+    if row is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Ссылка недоступна",
+            headers={"X-Robots-Tag": NOINDEX_ROBOTS},
+        )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Robots-Tag"] = NOINDEX_ROBOTS
+    return serialize_public_share(row)
 
 
 @router.get("/public/articles", response_model=list[WebArticleCard])

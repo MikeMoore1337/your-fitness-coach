@@ -24,6 +24,7 @@ import { LegacyProgramRecommendation } from './LegacyProgramRecommendation';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { AssignedProgramDetails } from './AssignedProgramDetails';
 import { ProgramImportPanel } from './ProgramImportPanel';
+import { PublicProgramSharePanel } from './PublicProgramSharePanel';
 import { AppLink } from '../../shared/navigation/router';
 
 const goalLabels: Record<string, string> = {
@@ -321,6 +322,7 @@ export function TemplatesList({
         </button>
         <button onClick={() => openAssignment(item)}>Запустить</button>
       </div>
+      {item.owner_user_id === user?.id && <PublicProgramSharePanel template={item} />}
       <details className="program-danger-menu">
         <summary>Другие действия</summary>
         <button
@@ -443,6 +445,9 @@ export function TemplatesList({
                       : 'Редактировать шаблон'}
                   </button>
                 </div>
+                {activeTemplate.owner_user_id === user?.id && (
+                  <PublicProgramSharePanel template={activeTemplate} />
+                )}
                 {activeTemplate.assigned_program_id != null && (
                   <details className="program-danger-menu">
                     <summary>Другие действия</summary>

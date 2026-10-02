@@ -61,6 +61,7 @@ from fitminiapp_api.models.program import (
     UserWorkoutExercise,
     UserWorkoutSet,
 )
+from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
 from fitminiapp_api.models.report_handoff import ReportHandoff
 from fitminiapp_api.models.support import BotSupportCase
@@ -456,6 +457,12 @@ def delete_user_cascade(db: Session, user: User) -> None:
         synchronize_session=False
     )
     db.query(PhotoMealDraft).filter(PhotoMealDraft.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(PublicShareImport).filter(PublicShareImport.recipient_user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(PublicShare).filter(PublicShare.owner_user_id == user.id).delete(
         synchronize_session=False
     )
     db.query(NutritionCatalogContribution).filter(

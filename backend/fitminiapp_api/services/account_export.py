@@ -65,6 +65,7 @@ from fitminiapp_api.models.program import (
     UserWorkout,
     UserWorkoutExercise,
 )
+from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
 from fitminiapp_api.models.report_handoff import ReportHandoff
@@ -83,7 +84,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 19
+ACCOUNT_EXPORT_SCHEMA_VERSION = 20
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -121,6 +122,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "program_template_days": "program_templates",
     "program_template_exercises": "program_templates",
     "program_template_exercise_weeks": "program_templates",
+    "public_shares": "public_shares",
+    "public_share_imports": "public_share_imports",
     "hidden_program_templates": "hidden_program_templates",
     "user_programs": "programs",
     "program_revisions": "programs",
@@ -879,6 +882,18 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(ProgramTemplate.created_at.asc(), ProgramTemplate.id.asc())
         .all()
     )
+    public_shares = (
+        db.query(PublicShare)
+        .filter(PublicShare.owner_user_id == user.id)
+        .order_by(PublicShare.created_at.asc(), PublicShare.id.asc())
+        .all()
+    )
+    public_share_imports = (
+        db.query(PublicShareImport)
+        .filter(PublicShareImport.recipient_user_id == user.id)
+        .order_by(PublicShareImport.created_at.asc(), PublicShareImport.id.asc())
+        .all()
+    )
     hidden_templates = (
         db.query(HiddenProgramTemplate)
         .filter(HiddenProgramTemplate.user_id == user.id)
@@ -1382,6 +1397,22 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             for row in diary_batch_operations
         ],
         "program_templates": [_serialize_program_template(row) for row in program_templates],
+        "public_shares": [
+            {
+                "share_id": row.share_id,
+                "share_type": row.share_type,
+                "status": row.status,
+                "snapshot_hash": row.snapshot_hash,
+                "public_snapshot": row.public_snapshot,
+                "created_at": row.created_at,
+                "revoked_at": row.revoked_at,
+            }
+            for row in public_shares
+        ],
+        "public_share_imports": [
+            _fields(row, ("template_id", "user_program_id", "created_at"))
+            for row in public_share_imports
+        ],
         "hidden_program_templates": [
             _fields(row, ("id", "template_id", "hidden_at")) for row in hidden_templates
         ],

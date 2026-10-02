@@ -10,6 +10,7 @@ describe('authenticated entry routing', () => {
     expect(safeAuthNextPath('/app?section=nutrition')).toBe('/app?section=nutrition');
     expect(safeAuthNextPath('/app/report?period=days_30')).toBe('/app/report?period=days_30');
     expect(safeAuthNextPath('/coach?client_id=42')).toBe('/coach?client_id=42');
+    expect(safeAuthNextPath(`/share/${'A'.repeat(43)}`)).toBe(`/share/${'A'.repeat(43)}`);
     expect(loginPathForNext('/coach?client_id=42')).toBe('/login?next=%2Fcoach%3Fclient_id%3D42');
   });
 

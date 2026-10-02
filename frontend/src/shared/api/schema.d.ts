@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/shares/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Public Share */
+        get: operations["get_public_share_api_v1_public_shares__share_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/articles": {
         parameters: {
             query?: never;
@@ -3979,6 +3996,125 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Shares */
+        get: operations["list_shares_api_v1_shares_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/progress/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Progress Share */
+        post: operations["preview_progress_share_api_v1_shares_progress_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Progress Public Share */
+        post: operations["create_progress_public_share_api_v1_shares_progress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/program/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Program Share */
+        post: operations["preview_program_share_api_v1_shares_program_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/program": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Program Public Share */
+        post: operations["create_program_public_share_api_v1_shares_program_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/{share_id}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Shared Program */
+        post: operations["import_shared_program_api_v1_shares__share_id__import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shares/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Share */
+        delete: operations["revoke_share_api_v1_shares__share_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -12501,6 +12637,248 @@ export interface components {
             /** Days */
             days: components["schemas"]["PublicProgramDay"][];
         };
+        /** PublicShareImportRequest */
+        PublicShareImportRequest: {
+            /** Preview Hash */
+            preview_hash: string;
+            /**
+             * Replace Active
+             * @default false
+             */
+            replace_active: boolean;
+        };
+        /** PublicShareImportResponse */
+        PublicShareImportResponse: {
+            /** Share Id */
+            share_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "imported" | "already_imported";
+            /** Template Id */
+            template_id: number;
+            /** User Program Id */
+            user_program_id: number;
+            /** Workouts Created */
+            workouts_created: number;
+        };
+        /** PublicShareOwnerResponse */
+        PublicShareOwnerResponse: {
+            /** Share Id */
+            share_id: string;
+            /**
+             * Share Type
+             * @enum {string}
+             */
+            share_type: "progress" | "program";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Revoked At */
+            revoked_at?: string | null;
+            /** Public Url */
+            public_url: string;
+        };
+        /** PublicSharePeriodRequest */
+        PublicSharePeriodRequest: {
+            period: components["schemas"]["NutritionReportPeriod"];
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+        };
+        /** PublicSharePreviewResponse */
+        PublicSharePreviewResponse: {
+            /**
+             * Share Type
+             * @enum {string}
+             */
+            share_type: "progress" | "program";
+            /** Preview Hash */
+            preview_hash: string;
+            /** Snapshot */
+            snapshot: components["schemas"]["PublicShareProgressSnapshot"] | components["schemas"]["PublicShareProgramSnapshot"];
+        };
+        /** PublicShareProgramCreateRequest */
+        PublicShareProgramCreateRequest: {
+            /** Template Id */
+            template_id: number;
+            /** Preview Hash */
+            preview_hash: string;
+        };
+        /** PublicShareProgramDay */
+        PublicShareProgramDay: {
+            /** Day Number */
+            day_number: number;
+            /** Title */
+            title: string;
+            /** Exercises */
+            exercises: components["schemas"]["PublicShareProgramExercise"][];
+        };
+        /** PublicShareProgramExercise */
+        PublicShareProgramExercise: {
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Metric Type
+             * @enum {string}
+             */
+            metric_type: "strength" | "cardio";
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds: number;
+            /** Weekly Prescriptions */
+            weekly_prescriptions: components["schemas"]["PublicShareProgramWeeklyPrescription"][];
+        };
+        /** PublicShareProgramPreviewRequest */
+        PublicShareProgramPreviewRequest: {
+            /** Template Id */
+            template_id: number;
+        };
+        /** PublicShareProgramSnapshot */
+        PublicShareProgramSnapshot: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "program";
+            /** Title */
+            title: string;
+            /** Goal */
+            goal: string;
+            /** Level */
+            level: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Days */
+            days: components["schemas"]["PublicShareProgramDay"][];
+        };
+        /** PublicShareProgramWeeklyPrescription */
+        PublicShareProgramWeeklyPrescription: {
+            /** Week Number */
+            week_number: number;
+            /** Prescribed Sets */
+            prescribed_sets: number;
+            /** Prescribed Reps */
+            prescribed_reps: string;
+            /** Prescribed Duration Minutes */
+            prescribed_duration_minutes?: number | null;
+            /** Rest Seconds */
+            rest_seconds: number;
+        };
+        /** PublicShareProgressCreateRequest */
+        PublicShareProgressCreateRequest: {
+            period: components["schemas"]["NutritionReportPeriod"];
+            /** Date From */
+            date_from?: string | null;
+            /** Date To */
+            date_to?: string | null;
+            /** Preview Hash */
+            preview_hash: string;
+        };
+        /** PublicShareProgressExercise */
+        PublicShareProgressExercise: {
+            /** Exercise Title */
+            exercise_title: string;
+            /** Performed Session Count */
+            performed_session_count: number;
+            /** Completed Set Count */
+            completed_set_count: number;
+            /** Max External Load Kg */
+            max_external_load_kg?: number | null;
+            /** External Load Volume Kg */
+            external_load_volume_kg?: number | null;
+        };
+        /** PublicShareProgressQuality */
+        PublicShareProgressQuality: {
+            /**
+             * Workout Logging
+             * @enum {string}
+             */
+            workout_logging: "sufficient" | "limited" | "insufficient";
+            /**
+             * Working Sets
+             * @enum {string}
+             */
+            working_sets: "sufficient" | "limited" | "insufficient";
+            /** Notes */
+            notes: string[];
+        };
+        /** PublicShareProgressSnapshot */
+        PublicShareProgressSnapshot: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "progress";
+            /**
+             * Period Start
+             * Format: date
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Planned Workouts */
+            planned_workouts: number;
+            /** Completed Workouts */
+            completed_workouts: number;
+            /** Frequency Per Week */
+            frequency_per_week: number;
+            /** Completed Working Sets */
+            completed_working_sets: number;
+            /** New Personal Records */
+            new_personal_records: number;
+            /** External Load Volume Kg */
+            external_load_volume_kg?: number | null;
+            /** Volume Recorded Sets */
+            volume_recorded_sets: number;
+            /** Exercises */
+            exercises: components["schemas"]["PublicShareProgressExercise"][];
+            data_quality: components["schemas"]["PublicShareProgressQuality"];
+        };
+        /** PublicShareResponse */
+        PublicShareResponse: {
+            /** Share Id */
+            share_id: string;
+            /**
+             * Share Type
+             * @enum {string}
+             */
+            share_type: "progress" | "program";
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Public Url */
+            public_url: string;
+            /** Preview Hash */
+            preview_hash: string;
+            /** Snapshot */
+            snapshot: components["schemas"]["PublicShareProgressSnapshot"] | components["schemas"]["PublicShareProgramSnapshot"];
+        };
         /** RecipeCreate */
         RecipeCreate: {
             /** Name */
@@ -14811,6 +15189,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicProgramResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_public_share_api_v1_public_shares__share_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
                 };
             };
             /** @description Validation Error */
@@ -23269,6 +23678,222 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ReportHandoffViewResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shares_api_v1_shares_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareOwnerResponse"][];
+                };
+            };
+        };
+    };
+    preview_progress_share_api_v1_shares_progress_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicSharePeriodRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSharePreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_progress_public_share_api_v1_shares_progress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicShareProgressCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_program_share_api_v1_shares_program_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicShareProgramPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicSharePreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_program_public_share_api_v1_shares_program_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicShareProgramCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_shared_program_api_v1_shares__share_id__import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicShareImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicShareImportResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_share_api_v1_shares__share_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

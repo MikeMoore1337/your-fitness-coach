@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ProgressReportPage from '../../../src/pages/reports/ProgressReportPage';
 import { NavigationProvider } from '../../../src/shared/navigation/router';
+import { FeedbackProvider } from '../../../src/shared/ui/FeedbackProvider';
 import { makeProgressReportFixture } from '../../fixtures/progress-report';
 
 function renderPage() {
@@ -10,7 +11,9 @@ function renderPage() {
   return render(
     <NavigationProvider>
       <QueryClientProvider client={queryClient}>
-        <ProgressReportPage />
+        <FeedbackProvider>
+          <ProgressReportPage />
+        </FeedbackProvider>
       </QueryClientProvider>
     </NavigationProvider>,
   );
