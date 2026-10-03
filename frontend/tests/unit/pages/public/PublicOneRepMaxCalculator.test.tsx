@@ -58,7 +58,9 @@ describe('PublicOneRepMaxCalculator', () => {
         'calculator_result',
       ]);
       expect(events.every((event) => Object.keys(event).length === 5)).toBe(true);
-      const eventPayloads = events.map(({ occurred_at: _occurredAt, ...event }) => event);
+      const eventPayloads = events.map((event) =>
+        Object.fromEntries(Object.entries(event).filter(([key]) => key !== 'occurred_at')),
+      );
       expect(JSON.stringify(eventPayloads)).not.toContain('100');
       expect(JSON.stringify(eventPayloads)).not.toContain('112');
 
