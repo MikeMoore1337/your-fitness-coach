@@ -32,7 +32,12 @@ def upgrade() -> None:
         sa.Column("schema_version", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("occurred_at", sa.DateTime(), nullable=False),
         sa.Column("surface", sa.String(length=16), nullable=False, server_default="server"),
-        sa.Column("server_confirmed", sa.Boolean(), nullable=False, server_default=sa.true()),
+        sa.Column(
+            "server_confirmed",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("true"),
+        ),
         sa.Column(
             "authoritative_outcome_status",
             sa.String(length=16),
