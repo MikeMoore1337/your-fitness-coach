@@ -1207,6 +1207,7 @@ def dev_login(
             is_coach=payload.is_coach,
             is_admin=payload.is_admin,
             is_active=True,
+            measurement_eligibility=("technical" if settings.app_env != "prod" else "real_client"),
         )
         db.add(user)
         db.flush()

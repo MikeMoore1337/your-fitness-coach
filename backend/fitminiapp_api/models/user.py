@@ -26,9 +26,25 @@ from fitminiapp_api.core.timezone import DEFAULT_TIMEZONE, now_msk_naive
 from fitminiapp_api.db.base import Base
 from fitminiapp_api.models.exercise import Muscle
 
+MEASUREMENT_ELIGIBILITY_TYPES = (
+    "real_client",
+    "demo",
+    "test",
+    "synthetic",
+    "load_test",
+    "technical",
+)
+
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "measurement_eligibility IN "
+            "('real_client', 'demo', 'test', 'synthetic', 'load_test', 'technical')",
+            name="ck_users_measurement_eligibility",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     telegram_user_id: Mapped[int | None] = mapped_column(
@@ -56,6 +72,12 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
+    )
+    # Coarse operational classification only. It is never sent to a provider
+    # or used as a user-facing score; it keeps synthetic/test rows out of
+    # production lifecycle aggregates while retaining a reconciliation signal.
+    measurement_eligibility: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="real_client", server_default="real_client"
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
 

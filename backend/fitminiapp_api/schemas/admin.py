@@ -116,9 +116,18 @@ class AdminLifecycleKpi(BaseModel):
 
 class AdminLifecycleDataQuality(BaseModel):
     status: Literal["clean", "attention"]
+    total_milestones: int = Field(ge=0)
+    authoritative_success_count: int = Field(ge=0)
+    authoritative_success_rate_percent: float | None = Field(default=None, ge=0, le=100)
     duplicate_milestones: int
+    duplicate_web_tma_outcomes: int = Field(ge=0)
     impossible_order: int
+    demo_test_contamination: int = Field(ge=0)
     client_success_without_server: int
+    post_deletion_milestones: int = Field(ge=0)
+    unauthorized_cross_account_outcomes: int = Field(ge=0)
+    malformed_schema_versions: int = Field(ge=0)
+    retention_expired_milestones: int = Field(ge=0)
     invalid_milestones: int
     excluded_role_accounts: int
     timezone_fallback_accounts: int
@@ -142,8 +151,12 @@ class AdminFunnelResponse(BaseModel):
     cohort_since: datetime
     cohort_until: datetime
     as_of: datetime
+    milestone_retention_days: int = Field(ge=180, le=3650)
+    aggregate_retention_days: int = Field(ge=180, le=730)
     cohort_size: int
     complete_weekly_cohorts: int
+    sample_status: Literal["INSUFFICIENT_SAMPLE", "READY_FOR_EFFECT_REVIEW"]
+    sample_note: str
     eligible_real_account_count: int
     recovery_eligible_real_account_count: int
     nutrition_repeat_metrics: AdminNutritionRepeatMetrics

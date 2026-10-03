@@ -28,6 +28,13 @@ LIFECYCLE_MILESTONE_TYPES = (
     "progress_next_action_completed",
 )
 
+# Version 1 is retained for rows written by the first Product v7 stage.  New
+# writes use version 2 after the instance-scoped recovery fields were added.
+# Reporting treats anything outside this allowlist as malformed instead of
+# silently interpreting a future schema as current data.
+LIFECYCLE_MILESTONE_SCHEMA_VERSIONS = frozenset({1, 2})
+LIFECYCLE_MILESTONE_CURRENT_SCHEMA_VERSION = 2
+
 
 class LifecycleMilestone(Base):
     """Privacy-safe, server-confirmed evidence for the first-use product loop."""

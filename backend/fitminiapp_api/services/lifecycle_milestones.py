@@ -11,12 +11,14 @@ from fitminiapp_api.core.timezone import (
     utc_naive_to_timezone_naive,
 )
 from fitminiapp_api.models.lifecycle_milestone import (
+    LIFECYCLE_MILESTONE_CURRENT_SCHEMA_VERSION,
     LIFECYCLE_MILESTONE_TYPES,
     LifecycleMilestone,
 )
+from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User
 
-LIFECYCLE_MILESTONE_SCHEMA_VERSION = 2
+LIFECYCLE_MILESTONE_SCHEMA_VERSION = LIFECYCLE_MILESTONE_CURRENT_SCHEMA_VERSION
 MEANINGFUL_MILESTONE_TYPES = frozenset(
     {
         "program_activated",
@@ -56,6 +58,42 @@ def _day_boundary_utc(value: datetime, user: User) -> datetime:
     )
 
 
+def _references_belong_to_user(
+    db: Session,
+    user: User,
+    *,
+    workout_id: int | None,
+    program_id: int | None,
+) -> bool:
+    """Reject instance context that the authenticated account does not own.
+
+    The lifecycle ledger is intentionally server-written, but server callers
+    still pass internal identifiers.  Checking their ownership here prevents a
+    malformed or cross-account caller from creating an apparently authoritative
+    outcome that the report would later have to discard.
+    """
+
+    workout = None
+    if workout_id is not None:
+        workout = (
+            db.query(UserWorkout)
+            .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+            .filter(UserWorkout.id == workout_id)
+            .first()
+        )
+        if workout is None or workout.user_program.user_id != user.id:
+            return False
+        if program_id is not None and workout.user_program_id != program_id:
+            return False
+
+    if program_id is not None:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).first()
+        if program is None or program.user_id != user.id:
+            return False
+
+    return True
+
+
 def record_lifecycle_milestone(
     db: Session,
     user: User,
@@ -79,6 +117,13 @@ def record_lifecycle_milestone(
     if milestone_type not in LIFECYCLE_MILESTONE_TYPES:
         raise ValueError("Unsupported lifecycle milestone")
     if getattr(user, "is_coach", False) or getattr(user, "is_admin", False):
+        return False
+    if not _references_belong_to_user(
+        db,
+        user,
+        workout_id=workout_id,
+        program_id=program_id,
+    ):
         return False
 
     normalized_at = _as_utc_naive(occurred_at)

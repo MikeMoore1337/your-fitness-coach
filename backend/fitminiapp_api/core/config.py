@@ -181,6 +181,9 @@ class Settings(BaseSettings):
     web_push_delivery_timeout_seconds: float = Field(default=10, ge=3, le=30)
     audit_event_retention_days: int = Field(default=365, ge=90, le=3650)
     lifecycle_milestone_retention_days: int = Field(default=180, ge=180, le=3650)
+    # Derived lifecycle reports are computed on demand and never retain account
+    # identifiers.  Keep their maximum report window bounded to 24 months.
+    lifecycle_aggregate_retention_days: int = Field(default=730, ge=180, le=730)
     news_ingestion_enabled: bool = False
     news_channel_id: int | None = None
     news_channel_username: str = ""
