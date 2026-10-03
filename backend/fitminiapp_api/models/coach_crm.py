@@ -286,7 +286,7 @@ class CoachTask(Base):
         CheckConstraint("state IN ('open', 'completed')", name="ck_coach_tasks_state"),
         CheckConstraint("length(trim(title)) BETWEEN 1 AND 240", name="ck_coach_tasks_title"),
         CheckConstraint(
-            "kind IN ('review_check_in', 'update_program', 'contact_client', "
+            "kind IS NOT NULL AND kind IN ('review_check_in', 'update_program', 'contact_client', "
             "'review_technique', 'schedule_follow_up', 'other')",
             name="ck_coach_tasks_kind",
         ),
@@ -314,7 +314,7 @@ class CoachTask(Base):
     due_at_utc: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False)
     kind: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="other", server_default="other"
+        String(32), nullable=True, default="other", server_default="other"
     )
     source_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
     source_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
