@@ -129,6 +129,21 @@ def test_coach_crm_migration_satisfies_production_online_contract() -> None:
     validate_added_migration(root / "backend" / "alembic" / "versions" / "0092_coach_crm_core.py")
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "0108_trainer_workspace_reviews.py",
+        "0109_coach_task_kind_backfill.py",
+        "0110_coach_task_kind_constraint.py",
+        "0111_coach_task_source_kind_constraint.py",
+    ],
+)
+def test_trainer_workspace_migrations_satisfy_production_online_contract(name: str) -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    validate_added_migration(root / "backend" / "alembic" / "versions" / name)
+
+
 def test_online_migration_rejects_index_on_existing_table(tmp_path: Path) -> None:
     path = _migration(
         tmp_path / "0065_existing_index.py",
