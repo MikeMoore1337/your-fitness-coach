@@ -8,9 +8,7 @@ from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.timezone import now_msk_naive
-from fitminiapp_api.models.program import (
-    ProgramTemplateExerciseWeekPrescription,
-)
+from fitminiapp_api.models.program import ProgramTemplate, ProgramTemplateExerciseWeekPrescription
 from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.program import ProgramTemplateCreate
@@ -352,7 +350,12 @@ def create_program_share(
     return row
 
 
-def get_active_public_share(db: Session, share_id: str) -> PublicShare | None:
+def get_active_public_share(
+    db: Session,
+    share_id: str,
+    *,
+    for_update: bool = False,
+) -> PublicShare | None:
     if not share_id or len(share_id) != PUBLIC_SHARE_ID_LENGTH:
         return None
     if any(
@@ -360,11 +363,12 @@ def get_active_public_share(db: Session, share_id: str) -> PublicShare | None:
         for character in share_id
     ):
         return None
-    return (
-        db.query(PublicShare)
-        .filter(PublicShare.share_id == share_id, PublicShare.status == "active")
-        .one_or_none()
+    query = db.query(PublicShare).filter(
+        PublicShare.share_id == share_id, PublicShare.status == "active"
     )
+    if for_update:
+        query = query.with_for_update()
+    return query.one_or_none()
 
 
 def get_owner_public_share(db: Session, current_user: User, share_id: str) -> PublicShare:
@@ -442,7 +446,11 @@ def import_program_share(
     preview_hash: str,
     replace_active: bool = False,
 ) -> tuple[str, int, int, int]:
-    row = get_active_public_share(db, share_id)
+    # Lock the immutable share before reading recipient provenance.  The lock
+    # serializes retries for one snapshot on PostgreSQL, so two concurrent
+    # confirmations cannot both create a copy before either provenance row is
+    # visible.
+    row = get_active_public_share(db, share_id, for_update=True)
     if row is None or row.share_type != "program":
         raise PublicShareError("Ссылка недоступна", 404)
     if row.snapshot_hash != preview_hash:
@@ -465,31 +473,53 @@ def import_program_share(
         update={"title": f"{create_payload.title[:120]} (копия)"}
     )
     try:
-        template = create_template(db, current_user, create_payload, force_private=True)
-        template.provenance_type = "CUSTOM"
-        template.provenance = {"source": "public_share_snapshot"}
-        db.flush()
-        created_days = sorted(template.days, key=lambda item: item.day_number)
-        for created_day, weekly_day in zip(
-            created_days, private_payload["weekly_prescriptions"], strict=True
-        ):
-            created_exercises = sorted(created_day.exercises, key=lambda item: item.sort_order)
-            for created_exercise, weekly_exercises in zip(
-                created_exercises, weekly_day, strict=True
+        template: ProgramTemplate | None = None
+        # A recovered provenance row may retain the already-created private copy
+        # while its assignment link was removed. Reuse that owned snapshot instead
+        # of creating a second copy during recovery.
+        if existing and existing.template_id and existing.user_program_id is None:
+            candidate = (
+                db.query(ProgramTemplate)
+                .filter(
+                    ProgramTemplate.id == existing.template_id,
+                    ProgramTemplate.owner_user_id == current_user.id,
+                    ProgramTemplate.created_by_user_id == current_user.id,
+                    ProgramTemplate.is_public.is_(False),
+                )
+                .one_or_none()
+            )
+            if candidate is not None and (
+                candidate.provenance_type == "CUSTOM"
+                and candidate.provenance == {"source": "public_share_snapshot"}
             ):
-                for weekly in weekly_exercises:
-                    db.add(
-                        ProgramTemplateExerciseWeekPrescription(
-                            template_exercise_id=created_exercise.id,
-                            exercise_id=weekly["exercise_id"],
-                            week_number=weekly["week_number"],
-                            prescribed_sets=weekly["prescribed_sets"],
-                            prescribed_reps=weekly["prescribed_reps"],
-                            prescribed_duration_minutes=weekly["prescribed_duration_minutes"],
-                            rest_seconds=weekly["rest_seconds"],
-                            prescription=weekly["prescription"],
+                template = candidate
+
+        if template is None:
+            template = create_template(db, current_user, create_payload, force_private=True)
+            template.provenance_type = "CUSTOM"
+            template.provenance = {"source": "public_share_snapshot"}
+            db.flush()
+            created_days = sorted(template.days, key=lambda item: item.day_number)
+            for created_day, weekly_day in zip(
+                created_days, private_payload["weekly_prescriptions"], strict=True
+            ):
+                created_exercises = sorted(created_day.exercises, key=lambda item: item.sort_order)
+                for created_exercise, weekly_exercises in zip(
+                    created_exercises, weekly_day, strict=True
+                ):
+                    for weekly in weekly_exercises:
+                        db.add(
+                            ProgramTemplateExerciseWeekPrescription(
+                                template_exercise_id=created_exercise.id,
+                                exercise_id=weekly["exercise_id"],
+                                week_number=weekly["week_number"],
+                                prescribed_sets=weekly["prescribed_sets"],
+                                prescribed_reps=weekly["prescribed_reps"],
+                                prescribed_duration_minutes=weekly["prescribed_duration_minutes"],
+                                rest_seconds=weekly["rest_seconds"],
+                                prescription=weekly["prescription"],
+                            )
                         )
-                    )
         db.flush()
         program, workouts_created = assign_template_to_user(
             db,
