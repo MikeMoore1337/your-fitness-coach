@@ -180,6 +180,7 @@ export type WebPushSubscriptionRequest = ApiSchemas['WebPushSubscriptionRequest'
 export type ReminderTemplate = ApiSchemas['ReminderTemplateResponse'];
 export type ReminderTemplateUpdate = ApiSchemas['ReminderTemplateUpdate'];
 export type WeeklyCheckInCurrent = ApiSchemas['WeeklyCheckInCurrentResponse'];
+export type ProgressWeeklyAction = ApiSchemas['ProgressWeeklyActionResponse'];
 export type WeeklyCheckInHistory = ApiSchemas['WeeklyCheckInHistoryResponse'];
 export type WeeklyCheckInSubmit = ApiSchemas['WeeklyCheckInSubmitRequest'];
 export type DailyWellbeingCheckIn = ApiSchemas['DailyWellbeingCheckInResponse'];

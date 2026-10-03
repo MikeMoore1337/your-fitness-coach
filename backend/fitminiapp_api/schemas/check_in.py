@@ -102,7 +102,25 @@ class WeeklyCheckInResponse(BaseModel):
     hunger: int | None = None
     adherence_difficulty: int | None = None
     note: str | None = None
+    progress_action_kind: Literal["workout", "nutrition", "measurement", "none"] | None = None
+    progress_action_completed_at: datetime | None = None
     created_at: datetime
+
+
+class ProgressWeeklyActionResponse(BaseModel):
+    kind: Literal["weekly_review", "workout", "nutrition", "measurement", "none"]
+    status: Literal["available", "completed", "unavailable"]
+    target: Literal["today", "nutrition", "body", "progress", "weekly_review"]
+    reason: Literal[
+        "review_required",
+        "scheduled_training_gap",
+        "nutrition_coverage_gap",
+        "weight_trend_insufficient",
+        "no_supported_action",
+    ]
+    title: str
+    detail: str
+    completed_at: datetime | None = None
 
 
 class WeeklyCheckInCurrentResponse(BaseModel):
@@ -112,6 +130,7 @@ class WeeklyCheckInCurrentResponse(BaseModel):
     timezone: str
     existing: WeeklyCheckInResponse | None = None
     summary: WeeklyCheckInSummary
+    progress_action: ProgressWeeklyActionResponse
 
 
 class WeeklyCheckInHistoryResponse(BaseModel):

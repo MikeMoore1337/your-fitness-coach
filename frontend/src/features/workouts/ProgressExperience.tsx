@@ -4,6 +4,7 @@ import { api } from '../../shared/api/client';
 import type {
   ApiSchemas,
   ProgressSummary,
+  ProgressWeeklyAction,
   TrainingAnalytics,
   WeeklyCheckInCurrent,
 } from '../../shared/api/types';
@@ -364,14 +365,49 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
   );
 }
 
+type WeeklyActionView = {
+  detail: string;
+  label: string;
+  status: ProgressWeeklyAction['status'];
+  to: string | null;
+};
+
+function progressWeeklyActionHref(search: string, action: ProgressWeeklyAction): string | null {
+  switch (action.target) {
+    case 'today':
+      return '/app?section=today';
+    case 'nutrition':
+      return '/app?section=nutrition';
+    case 'body':
+      return progressViewPath(search, 'body');
+    case 'weekly_review':
+      return progressViewPath(search, 'wellbeing');
+    case 'progress':
+      return progressViewPath(search, 'overview');
+  }
+}
+
 function reviewNextStep(
   search: string,
   summary: ProgressSummary,
-): { detail: string; label: string; to: string } {
+  current?: WeeklyCheckInCurrent,
+): WeeklyActionView {
+  if (current?.progress_action) {
+    return {
+      detail: current.progress_action.detail,
+      label: current.progress_action.title,
+      status: current.progress_action.status,
+      to:
+        current.progress_action.status === 'available'
+          ? progressWeeklyActionHref(search, current.progress_action)
+          : null,
+    };
+  }
   if (summary.training.completed_workouts < summary.training.planned_workouts) {
     return {
       detail: 'Завершите следующую запланированную тренировку и отметьте фактические подходы.',
       label: 'Открыть план недели',
+      status: 'available',
       to: '/app?section=today',
     };
   }
@@ -379,6 +415,7 @@ function reviewNextStep(
     return {
       detail: 'Заполните пропущенные дни, чтобы следующий обзор опирался на полный контекст.',
       label: 'Записать питание',
+      status: 'available',
       to: '/app?section=nutrition',
     };
   }
@@ -387,12 +424,14 @@ function reviewNextStep(
     return {
       detail: 'Добавьте повторный замер веса: одна точка не образует тренд.',
       label: 'Добавить замер',
+      status: 'available',
       to: progressViewPath(search, 'body'),
     };
   }
   return {
     detail: 'Сверьте факты недели и зафиксируйте, что стоит изменить дальше.',
     label: 'Пройти недельный обзор',
+    status: 'available',
     to: progressViewPath(search, 'wellbeing'),
   };
 }
@@ -406,7 +445,7 @@ function WeeklyReviewHub({
   search: string;
   summary: ProgressSummary;
 }) {
-  const nextStep = reviewNextStep(search, summary);
+  const nextStep = reviewNextStep(search, summary, current);
   const reviewStatus = current?.existing?.status;
   const reviewLabel =
     reviewStatus === 'completed'
@@ -456,10 +495,16 @@ function WeeklyReviewHub({
           <p>{nextStep.detail}</p>
         </div>
         <div className="progress-review-hub__actions">
-          <AppLink className="button-link" to={nextStep.to}>
-            {nextStep.label}
-          </AppLink>
-          {nextStep.to !== reviewPath && (
+          {nextStep.to ? (
+            <AppLink className="button-link" to={nextStep.to}>
+              {nextStep.label}
+            </AppLink>
+          ) : (
+            <Badge>
+              {nextStep.status === 'completed' ? 'Подтверждено' : 'Нет доступного шага'}
+            </Badge>
+          )}
+          {nextStep.to !== reviewPath && nextStep.status !== 'completed' && (
             <AppLink className="button-link secondary-link" to={reviewPath}>
               {reviewStatus ? 'Посмотреть обзор' : 'Пройти недельный обзор'}
             </AppLink>

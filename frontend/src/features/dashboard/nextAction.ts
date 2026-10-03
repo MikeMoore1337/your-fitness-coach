@@ -1,5 +1,6 @@
 import type {
   ProgressSummary,
+  ProgressWeeklyAction,
   WeeklyCheckInCurrent,
   Workout,
   WorkoutComment,
@@ -18,6 +19,7 @@ export type NextActionKind =
   | 'nutrition'
   | 'activity'
   | 'profile'
+  | 'progress_weekly_action'
   | 'workout_recovery'
   | 'resume_program';
 
@@ -32,13 +34,15 @@ export type NextActionReason =
   | 'rest_day'
   | 'profile_blocker'
   | 'missed_workout'
-  | 'resume_program';
+  | 'resume_program'
+  | 'weekly_action';
 
 export type NextActionTarget =
   | { type: 'today_workout'; workoutId: number }
   | { type: 'trainer_feedback'; workoutId: number; commentId: number }
   | { type: 'progress_workout'; workoutId: number }
   | { type: 'progress' }
+  | { type: 'progress_weekly_action'; destination: 'today' | 'nutrition' | 'body' | 'progress' }
   | { type: 'weekly_review' }
   | { type: 'programs'; mode: 'templates' | 'create' | 'assigned' }
   | { type: 'nutrition' }
@@ -140,6 +144,24 @@ function nutritionAction(nextWorkout: NextWorkout | null | undefined): NextActio
   );
 }
 
+function progressWeeklyActionAction(
+  actionData: ProgressWeeklyAction | undefined,
+): NextAction | null {
+  if (!actionData || actionData.status !== 'available' || actionData.kind === 'none') return null;
+  if (
+    actionData.target !== 'today' &&
+    actionData.target !== 'nutrition' &&
+    actionData.target !== 'body' &&
+    actionData.target !== 'progress'
+  ) {
+    return null;
+  }
+  return action('progress_weekly_action', actionData.title, actionData.detail, 'weekly_action', {
+    type: 'progress_weekly_action',
+    destination: actionData.target,
+  });
+}
+
 function recoveryAction(workout: WorkoutRecoveryState['missed_workouts'][number]): NextAction {
   return action(
     'workout_recovery',
@@ -173,6 +195,7 @@ export function selectNextAction({
     trainerComment?.workout_id ?? workout?.id ?? todayScheduleItem?.id,
   );
   const review = weeklyReview && !weeklyReview.existing ? weeklyReviewAction() : null;
+  const weeklyAction = progressWeeklyActionAction(weeklyReview?.progress_action);
   const completedToday = !workout && lastCompletedWorkoutOn === today;
   const plannedWorkout =
     workout?.status === 'planned'
@@ -266,8 +289,9 @@ export function selectNextAction({
     return {
       primary: feedback,
       secondary: secondary([
-        completed ? review : plannedAction,
+        completed ? weeklyAction : plannedAction,
         completed ? workoutResultAction(workout?.id ?? todayScheduleItem?.id) : review,
+        completed ? review : weeklyAction,
       ]),
     };
   }
@@ -276,30 +300,37 @@ export function selectNextAction({
     if (!hasNutritionConfirmation) {
       return {
         primary: nutritionAction(nextWorkout),
-        secondary: secondary([review, workoutResultAction(workout?.id ?? todayScheduleItem?.id)]),
+        secondary: secondary([
+          weeklyAction,
+          review,
+          workoutResultAction(workout?.id ?? todayScheduleItem?.id),
+        ]),
       };
     }
     if (review) {
       return {
         primary: review,
-        secondary: secondary([workoutResultAction(workout?.id ?? todayScheduleItem?.id)]),
+        secondary: secondary([
+          weeklyAction,
+          workoutResultAction(workout?.id ?? todayScheduleItem?.id),
+        ]),
       };
     }
     return {
       primary: workoutResultAction(workout?.id ?? todayScheduleItem?.id),
-      secondary: [],
+      secondary: secondary([weeklyAction]),
     };
   }
 
   if (plannedAction) {
-    return { primary: plannedAction, secondary: secondary([review]) };
+    return { primary: plannedAction, secondary: secondary([weeklyAction, review]) };
   }
 
   if (review) {
     if (!hasNutritionConfirmation) {
       return {
         primary: nutritionAction(nextWorkout),
-        secondary: secondary([review]),
+        secondary: secondary([weeklyAction, review]),
       };
     }
     return { primary: review, secondary: [] };
@@ -307,7 +338,8 @@ export function selectNextAction({
 
   return {
     primary: nutritionAction(nextWorkout),
-    secondary: [
+    secondary: secondary([
+      weeklyAction,
       action(
         'activity',
         'Добавить активность',
@@ -315,7 +347,7 @@ export function selectNextAction({
         'rest_day',
         { type: 'activity' },
       ),
-    ],
+    ]),
   };
 }
 
@@ -329,6 +361,14 @@ export function nextActionHref(target: NextActionTarget): string {
       return `/app?section=progress&workout_id=${target.workoutId}`;
     case 'progress':
       return '/app?section=progress';
+    case 'progress_weekly_action':
+      return target.destination === 'today'
+        ? '/app?section=today'
+        : target.destination === 'nutrition'
+          ? '/app?section=nutrition'
+          : target.destination === 'body'
+            ? '/app?section=progress&progress_view=body'
+            : '/app?section=progress';
     case 'weekly_review':
       return '/app?section=progress&weekly_review=1';
     case 'programs':

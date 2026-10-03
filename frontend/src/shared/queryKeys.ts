@@ -78,6 +78,7 @@ export async function invalidateMeasurementMutation(
     invalidations.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.progress.summaries }),
       queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.diary }),
+      queryClient.invalidateQueries({ queryKey: ['weekly-check-ins'] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all }),
     );
   } else {
@@ -99,6 +100,7 @@ export async function invalidateNutritionSummaries(
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.progress.summaries }),
       queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.diary }),
+      queryClient.invalidateQueries({ queryKey: ['weekly-check-ins'] }),
     ]);
     return;
   }

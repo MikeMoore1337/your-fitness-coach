@@ -28,6 +28,10 @@ from fitminiapp_api.services.nutrition import (
     get_nutrition_target_for_date,
 )
 from fitminiapp_api.services.progress import build_progress_summary_for_range
+from fitminiapp_api.services.progress_weekly_action import (
+    build_progress_weekly_action,
+    derive_progress_weekly_action_kind,
+)
 
 SUMMARY_VERSION = "weekly-review-summary-v2"
 
@@ -215,6 +219,8 @@ def serialize_weekly_check_in(row: WeeklyCheckIn) -> dict:
         "hunger": row.hunger,
         "adherence_difficulty": row.adherence_difficulty,
         "note": row.note,
+        "progress_action_kind": row.progress_action_kind,
+        "progress_action_completed_at": row.progress_action_completed_at,
         "created_at": row.created_at,
     }
 
@@ -238,6 +244,7 @@ def get_current_weekly_check_in(db: Session, user: User) -> dict:
         "timezone": get_user_timezone_name(user),
         "existing": serialize_weekly_check_in(existing) if existing else None,
         "summary": summary,
+        "progress_action": build_progress_weekly_action(summary, existing=existing),
     }
 
 
@@ -273,6 +280,9 @@ def submit_weekly_check_in(
         hunger=payload.hunger,
         adherence_difficulty=payload.adherence_difficulty,
         note=note or None,
+        progress_action_kind=(
+            derive_progress_weekly_action_kind(summary) if payload.status == "completed" else "none"
+        ),
         created_at=now_for_user_naive(user),
     )
     db.add(row)
