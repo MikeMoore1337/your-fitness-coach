@@ -42,6 +42,9 @@ def upgrade() -> None:
             sa.Column("missed_at", sa.DateTime(), nullable=True),
             if_not_exists=True,
         )
+        context = op.get_context()
+        if bind.in_transaction() and context._transaction is None:
+            bind.commit()
         with op.get_context().autocommit_block():
             op.create_index(
                 "ix_lifecycle_milestones_type_workout",
@@ -95,6 +98,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
+        context = op.get_context()
+        if bind.in_transaction() and context._transaction is None:
+            bind.commit()
         with op.get_context().autocommit_block():
             op.drop_index(
                 "uq_lifecycle_milestones_user_type_workout",
