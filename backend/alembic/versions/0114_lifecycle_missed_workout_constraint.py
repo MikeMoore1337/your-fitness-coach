@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from alembic import op
 
-revision: str = "0114_lifecycle_missed_workout_constraint"
+revision: str = "0114_missed_workout_constraint"
 down_revision: str | None = "0113_lifecycle_workout_instances"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

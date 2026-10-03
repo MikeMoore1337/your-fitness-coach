@@ -50,11 +50,7 @@ function ScheduleRow({
           <WorkoutRecovery
             workout={item}
             timeZone={timeZone}
-            triggerLabel={
-              item.status === 'missed'
-                ? 'Вернуться к тренировке'
-                : 'Изменить план'
-            }
+            triggerLabel={item.status === 'missed' ? 'Вернуться к тренировке' : 'Изменить план'}
           />
         </div>
       )}

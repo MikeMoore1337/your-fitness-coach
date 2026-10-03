@@ -13,11 +13,7 @@ import type {
   WorkoutRecoveryState,
   WorkoutScheduleItem,
 } from '../../shared/api/types';
-import {
-  calendarWeek,
-  dateInputValue,
-  formatCalendarDate,
-} from '../../shared/dateTime';
+import { calendarWeek, dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { queryKeys } from '../../shared/queryKeys';
 import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
