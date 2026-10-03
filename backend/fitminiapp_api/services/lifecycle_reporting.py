@@ -18,6 +18,7 @@ from fitminiapp_api.core.timezone import (
 )
 from fitminiapp_api.models.food_diary import FoodDiaryCopyOperation, FoodDiaryRepeatPreview
 from fitminiapp_api.models.lifecycle_milestone import (
+    LIFECYCLE_MILESTONE_SCHEMA_VERSIONS,
     LIFECYCLE_MILESTONE_TYPES,
     LifecycleMilestone,
 )
@@ -46,6 +47,9 @@ LIFECYCLE_KPI_KEYS = (
     "progress_next_action_completion_rate",
     "weekly_loop_completion",
 )
+
+MINIMUM_COMPLETED_WEEKLY_COHORTS = 4
+PREFERRED_REAL_ACCOUNT_COUNT = 100
 
 
 _UserEvents = dict[str, list[datetime]]
@@ -251,6 +255,7 @@ def _recovery_metrics(
     eligible_users: list[User],
     period_start: datetime,
     now: datetime,
+    retention_cutoff: datetime,
 ) -> _RecoveryMetrics:
     """Calculate instance-level recovery facts without exposing identifiers."""
 
@@ -258,13 +263,21 @@ def _recovery_metrics(
     missed_instances: dict[int, tuple[int, datetime]] = {}
     missed_rows = (
         db.query(LifecycleMilestone)
+        .join(UserWorkout, UserWorkout.id == LifecycleMilestone.workout_id)
+        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .filter(
             LifecycleMilestone.user_id.in_(user_by_id),
+            UserProgram.user_id == LifecycleMilestone.user_id,
             LifecycleMilestone.milestone_type == "workout_missed",
             LifecycleMilestone.workout_id.is_not(None),
             LifecycleMilestone.missed_at.is_not(None),
             LifecycleMilestone.missed_at >= period_start,
             LifecycleMilestone.missed_at <= now,
+            LifecycleMilestone.missed_at >= retention_cutoff,
+            LifecycleMilestone.schema_version.in_(LIFECYCLE_MILESTONE_SCHEMA_VERSIONS),
+            LifecycleMilestone.surface == "server",
+            LifecycleMilestone.server_confirmed.is_(True),
+            LifecycleMilestone.authoritative_outcome_status == "confirmed",
         )
         .order_by(LifecycleMilestone.missed_at.asc(), LifecycleMilestone.id.asc())
         .all()
@@ -287,13 +300,21 @@ def _recovery_metrics(
 
     recovery_rows = (
         db.query(LifecycleMilestone)
+        .join(UserWorkout, UserWorkout.id == LifecycleMilestone.workout_id)
+        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .filter(
             LifecycleMilestone.user_id.in_(user_by_id),
+            UserProgram.user_id == LifecycleMilestone.user_id,
             LifecycleMilestone.milestone_type == "recovery_action_confirmed",
             LifecycleMilestone.workout_id.is_not(None),
             LifecycleMilestone.missed_at.is_not(None),
             LifecycleMilestone.occurred_at >= period_start,
             LifecycleMilestone.occurred_at <= now,
+            LifecycleMilestone.occurred_at >= retention_cutoff,
+            LifecycleMilestone.schema_version.in_(LIFECYCLE_MILESTONE_SCHEMA_VERSIONS),
+            LifecycleMilestone.surface == "server",
+            LifecycleMilestone.server_confirmed.is_(True),
+            LifecycleMilestone.authoritative_outcome_status == "confirmed",
         )
         .order_by(LifecycleMilestone.occurred_at.asc(), LifecycleMilestone.id.asc())
         .all()
@@ -352,25 +373,148 @@ def _recovery_metrics(
     }
 
 
+def _reconcile_rows(
+    db: Session,
+    *,
+    rows: list[LifecycleMilestone],
+    retention_cutoff: datetime,
+) -> tuple[dict[str, object], set[int]]:
+    """Reconcile persisted lifecycle facts without returning account identity.
+
+    The ledger is server-owned and constrained, so most counters should remain
+    zero.  Keeping the checks in the report makes a broken import, legacy row or
+    failed cleanup visible instead of silently turning it into KPI evidence.
+    """
+
+    fresh_rows = [row for row in rows if row.occurred_at >= retention_cutoff]
+    row_user_ids = {int(row.user_id) for row in rows}
+    known_users = (
+        db.query(User.id, User.is_coach, User.is_admin, User.measurement_eligibility)
+        .filter(User.id.in_(row_user_ids))
+        .all()
+        if row_user_ids
+        else []
+    )
+    user_roles = {
+        int(user_id): (bool(is_coach), bool(is_admin), str(measurement_eligibility))
+        for user_id, is_coach, is_admin, measurement_eligibility in known_users
+    }
+
+    program_ids = {int(row.program_id) for row in fresh_rows if row.program_id is not None}
+    workout_ids = {int(row.workout_id) for row in fresh_rows if row.workout_id is not None}
+    program_rows = (
+        db.query(UserProgram.id, UserProgram.user_id).filter(UserProgram.id.in_(program_ids)).all()
+        if program_ids
+        else []
+    )
+    program_owners = {int(program_id): int(user_id) for program_id, user_id in program_rows}
+    workout_rows = (
+        db.query(UserWorkout.id, UserWorkout.user_program_id, UserProgram.user_id)
+        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .filter(UserWorkout.id.in_(workout_ids))
+        .all()
+        if workout_ids
+        else []
+    )
+    workout_context = {
+        int(workout_id): (int(program_id), int(user_id))
+        for workout_id, program_id, user_id in workout_rows
+    }
+
+    duplicate_counts = Counter(
+        (row.user_id, row.milestone_type, row.occurred_at) for row in fresh_rows
+    )
+    duplicate_milestones = sum(count - 1 for count in duplicate_counts.values() if count > 1)
+    malformed_schema_versions = sum(
+        1 for row in fresh_rows if row.schema_version not in LIFECYCLE_MILESTONE_SCHEMA_VERSIONS
+    )
+    post_deletion_milestones = sum(1 for row in rows if row.user_id not in user_roles)
+    retention_expired_milestones = sum(1 for row in rows if row.occurred_at < retention_cutoff)
+    demo_test_contamination = 0
+    client_success_without_server = 0
+    unauthorized_cross_account_outcomes = 0
+    invalid_milestones = 0
+    authoritative_row_ids: set[int] = set()
+
+    for row in fresh_rows:
+        role = user_roles.get(row.user_id)
+        is_role_account = role is not None and (role[0] or role[1])
+        is_measurement_excluded = role is not None and role[2] != "real_client"
+        if is_role_account or is_measurement_excluded:
+            demo_test_contamination += 1
+
+        client_only = (
+            row.surface != "server"
+            or not row.server_confirmed
+            or row.authoritative_outcome_status != "confirmed"
+        )
+        if client_only:
+            client_success_without_server += 1
+
+        cross_account = False
+        if row.program_id is not None and program_owners.get(row.program_id) != row.user_id:
+            cross_account = True
+        if row.workout_id is not None:
+            context = workout_context.get(row.workout_id)
+            if (
+                context is None
+                or context[1] != row.user_id
+                or (row.program_id is not None and context[0] != row.program_id)
+            ):
+                cross_account = True
+        if cross_account:
+            unauthorized_cross_account_outcomes += 1
+
+        valid_server_row = (
+            row.milestone_type in LIFECYCLE_MILESTONE_TYPES
+            and row.schema_version in LIFECYCLE_MILESTONE_SCHEMA_VERSIONS
+            and not client_only
+            and role is not None
+            and not is_role_account
+            and not is_measurement_excluded
+            and not cross_account
+        )
+        if not valid_server_row:
+            invalid_milestones += 1
+        else:
+            authoritative_row_ids.add(int(row.id))
+
+    total_milestones = len(fresh_rows)
+    authoritative_success_count = len(authoritative_row_ids)
+    authoritative_success_rate_percent = (
+        round(authoritative_success_count * 100 / total_milestones, 1) if total_milestones else None
+    )
+    return (
+        {
+            "total_milestones": total_milestones,
+            "authoritative_success_count": authoritative_success_count,
+            "authoritative_success_rate_percent": authoritative_success_rate_percent,
+            "duplicate_milestones": duplicate_milestones,
+            # Web and TMA intentionally share this server-side key.  A
+            # persisted duplicate is therefore the observable reconciliation
+            # signal for a duplicate authoritative emission.
+            "duplicate_web_tma_outcomes": duplicate_milestones,
+            "demo_test_contamination": demo_test_contamination,
+            "client_success_without_server": client_success_without_server,
+            "post_deletion_milestones": post_deletion_milestones,
+            "unauthorized_cross_account_outcomes": unauthorized_cross_account_outcomes,
+            "malformed_schema_versions": malformed_schema_versions,
+            "retention_expired_milestones": retention_expired_milestones,
+            "invalid_milestones": invalid_milestones,
+        },
+        authoritative_row_ids,
+    )
+
+
 def _quality_report(
     db: Session,
     *,
     eligible_users: list[User],
-    rows: list[LifecycleMilestone],
     events: dict[int, _UserEvents],
     cohort_since_msk: datetime,
     now: datetime,
+    reconciliation: dict[str, object],
 ) -> dict[str, object]:
-    duplicate_counts = Counter((row.user_id, row.milestone_type, row.occurred_at) for row in rows)
-    duplicate_milestones = sum(count - 1 for count in duplicate_counts.values() if count > 1)
-    invalid_milestones = sum(
-        1
-        for row in rows
-        if row.milestone_type not in LIFECYCLE_MILESTONE_TYPES
-        or row.surface != "server"
-        or not row.server_confirmed
-        or row.authoritative_outcome_status != "confirmed"
-    )
     impossible_order = 0
     for user in eligible_users:
         user_events = events[user.id]
@@ -411,47 +555,52 @@ def _quality_report(
         .count()
     )
     timezone_fallback_accounts = sum(1 for user in eligible_users if _report_timezone(user)[1])
-    client_success_without_server = sum(
-        1 for row in rows if row.surface != "server" or not row.server_confirmed
-    )
     status = (
         "attention"
         if any(
             (
-                duplicate_milestones,
-                invalid_milestones,
+                reconciliation["duplicate_milestones"],
+                reconciliation["duplicate_web_tma_outcomes"],
                 impossible_order,
-                client_success_without_server,
+                reconciliation["demo_test_contamination"],
+                reconciliation["client_success_without_server"],
+                reconciliation["post_deletion_milestones"],
+                reconciliation["unauthorized_cross_account_outcomes"],
+                reconciliation["malformed_schema_versions"],
+                reconciliation["retention_expired_milestones"],
+                reconciliation["invalid_milestones"],
             )
         )
         else "clean"
     )
     return {
         "status": status,
-        "duplicate_milestones": duplicate_milestones,
+        **reconciliation,
         "impossible_order": impossible_order,
-        "client_success_without_server": client_success_without_server,
-        "invalid_milestones": invalid_milestones,
         "excluded_role_accounts": excluded_role_accounts,
         "timezone_fallback_accounts": timezone_fallback_accounts,
     }
 
 
 def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, object]:
-    if period_days < 7 or period_days > 730:
-        raise ValueError("period_days must be between 7 and 730")
+    if period_days < 7 or period_days > settings.lifecycle_aggregate_retention_days:
+        raise ValueError(
+            f"period_days must be between 7 and {settings.lifecycle_aggregate_retention_days}"
+        )
 
     now_aware = datetime.now(UTC)
     now = now_aware.replace(tzinfo=None)
-    cohort_since_msk = now_msk_naive() - timedelta(days=period_days)
+    cohort_until_msk = now_msk_naive()
+    cohort_since_msk = cohort_until_msk - timedelta(days=period_days)
     users = (
         db.query(User)
         .options(joinedload(User.profile))
         .filter(
             User.created_at >= cohort_since_msk,
-            User.created_at <= now_msk_naive(),
+            User.created_at <= cohort_until_msk,
             User.is_coach.is_(False),
             User.is_admin.is_(False),
+            User.measurement_eligibility == "real_client",
         )
         .order_by(User.created_at.asc(), User.id.asc())
         .all()
@@ -459,14 +608,40 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
         else []
     )
     user_ids = [user.id for user in users]
-    rows = (
-        db.query(LifecycleMilestone)
-        .filter(LifecycleMilestone.user_id.in_(user_ids))
-        .order_by(LifecycleMilestone.user_id.asc(), LifecycleMilestone.occurred_at.asc())
+    recovery_accounts = (
+        db.query(User)
+        .options(joinedload(User.profile))
+        .filter(
+            User.created_at <= cohort_until_msk,
+            User.is_coach.is_(False),
+            User.is_admin.is_(False),
+            User.measurement_eligibility == "real_client",
+        )
+        .order_by(User.id.asc())
         .all()
-        if user_ids
+        if settings.app_env == "prod"
         else []
     )
+    all_rows = (
+        db.query(LifecycleMilestone)
+        .order_by(LifecycleMilestone.user_id.asc(), LifecycleMilestone.occurred_at.asc())
+        .all()
+        if settings.app_env == "prod"
+        else []
+    )
+    retention_cutoff = now - timedelta(days=settings.lifecycle_milestone_retention_days)
+    reconciliation, authoritative_row_ids = _reconcile_rows(
+        db,
+        rows=all_rows,
+        retention_cutoff=retention_cutoff,
+    )
+    rows = [
+        row
+        for row in all_rows
+        if row.user_id in user_ids
+        and row.occurred_at >= retention_cutoff
+        and row.id in authoritative_row_ids
+    ]
     events: dict[int, _UserEvents] = defaultdict(_empty_events)
     for row in rows:
         if row.user_id in user_ids and row.milestone_type in LIFECYCLE_MILESTONE_TYPES:
@@ -584,24 +759,12 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
                     weekly_loop += 1
 
     cohort_size = len(users)
-    recovery_accounts = (
-        db.query(User)
-        .options(joinedload(User.profile))
-        .filter(
-            User.created_at <= now_msk_naive(),
-            User.is_coach.is_(False),
-            User.is_admin.is_(False),
-        )
-        .order_by(User.id.asc())
-        .all()
-        if settings.app_env == "prod"
-        else []
-    )
     recovery_metrics = _recovery_metrics(
         db,
         eligible_users=recovery_accounts,
         period_start=now - timedelta(days=period_days),
         now=now,
+        retention_cutoff=retention_cutoff,
     )
     repeat_metrics = _nutrition_repeat_metrics(
         db,
@@ -612,12 +775,24 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
     quality = _quality_report(
         db,
         eligible_users=users,
-        rows=rows,
         events=events,
         cohort_since_msk=cohort_since_msk,
         now=now,
+        reconciliation=reconciliation,
     )
     complete_weekly_cohorts = len(complete_week_starts)
+    sample_ready = (
+        complete_weekly_cohorts >= MINIMUM_COMPLETED_WEEKLY_COHORTS
+        and cohort_size >= PREFERRED_REAL_ACCOUNT_COUNT
+    )
+    sample_status = "READY_FOR_EFFECT_REVIEW" if sample_ready else "INSUFFICIENT_SAMPLE"
+    sample_note = (
+        "Есть минимум четыре полные недельные когорты и предпочтительный объём в 100 реальных аккаунтов; "
+        "это только готовность к проверке эффекта, а не доказательство uplift."
+        if sample_ready
+        else "Недостаточно выборки: нужны минимум четыре полные недельные когорты и предпочтительно 100 реальных аккаунтов; "
+        "процентные значения остаются описательными."
+    )
     effect_status = "NOT_YET_PROVEN"
     effect_note = (
         "Эффект можно оценивать только после baseline и минимум четырёх полных недельных когорт; "
@@ -738,6 +913,7 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
         "root/admin и trainer-аккаунты",
         "demo/test/staging/synthetic/load/technical данные вне production client-когорты",
         "просмотры, открытия, показы, неуспешные отправки и неподтверждённые preview",
+        "устаревшие account-level milestones старше настроенного retention window",
     ]
     if settings.app_env != "prod":
         coverage_note = (
@@ -751,8 +927,12 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
         "cohort_since": now_aware - timedelta(days=period_days),
         "cohort_until": now_aware,
         "as_of": now_aware,
+        "milestone_retention_days": settings.lifecycle_milestone_retention_days,
+        "aggregate_retention_days": settings.lifecycle_aggregate_retention_days,
         "cohort_size": cohort_size,
         "complete_weekly_cohorts": complete_weekly_cohorts,
+        "sample_status": sample_status,
+        "sample_note": sample_note,
         "eligible_real_account_count": cohort_size,
         "recovery_eligible_real_account_count": len(recovery_accounts),
         "nutrition_repeat_metrics": repeat_metrics,
