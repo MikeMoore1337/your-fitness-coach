@@ -1520,6 +1520,25 @@ export async function installPlatformApi(
       });
     }
     if (path.endsWith('/coach/assigned-programs')) return route.fulfill({ json: [] });
+    if (path.endsWith('/coach/capacity'))
+      return route.fulfill({
+        json: {
+          active_client_count: 1,
+          pending_invite_count: 0,
+          open_task_count: 0,
+          attention_item_count: 0,
+          attention_client_count: 0,
+          attention_items_returned: 0,
+          attention_items_truncated: false,
+          clients_with_active_program_count: 0,
+          roster_coverage_percent: 0,
+          capacity_band: '0_9',
+          next_capacity_boundary: 10,
+          scale_boundaries: [10, 30, 100],
+          bottlenecks: [],
+          generated_at: '2026-08-20T10:00:00Z',
+        },
+      });
     if (path.endsWith('/coach/client-summaries')) {
       return route.fulfill({ json: { items: [], total: 0, limit: 100, offset: 0 } });
     }

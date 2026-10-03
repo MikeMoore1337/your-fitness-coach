@@ -519,6 +519,28 @@ async function mockCoachWorkspace(
           offset: 0,
         },
       });
+    if (path.endsWith('/coach/capacity'))
+      return route.fulfill({
+        json: {
+          active_client_count: 3,
+          pending_invite_count: 1,
+          open_task_count: 1,
+          attention_item_count: options.attention === 'actionable' ? 1 : 0,
+          attention_client_count: options.attention === 'actionable' ? 1 : 0,
+          attention_items_returned: options.attention === 'actionable' ? 1 : 0,
+          attention_items_truncated: false,
+          clients_with_active_program_count: 2,
+          roster_coverage_percent: 66.7,
+          capacity_band: '0_9',
+          next_capacity_boundary: 10,
+          scale_boundaries: [10, 30, 100],
+          bottlenecks:
+            options.attention === 'actionable'
+              ? [{ key: 'attention', count: 1, action: 'attention' }]
+              : [{ key: 'open_tasks', count: 1, action: 'tasks' }],
+          generated_at: '2026-08-20T10:00:00Z',
+        },
+      });
     if (path.endsWith('/coach/attention'))
       return route.fulfill({
         json:
@@ -1036,6 +1058,8 @@ test('Task 291 показывает action-first Today и ленивый кон�
   await page.getByRole('button', { name: 'Тренер' }).click();
 
   await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await expect(page.getByTestId('coach-capacity')).toBeVisible();
+  await expect(page.getByText('До 10 клиентов')).toBeVisible();
   await expect(page.getByText('Нужно назначить программу')).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Разделы тренера' })).toHaveCount(0);
   await expect(

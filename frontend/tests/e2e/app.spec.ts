@@ -1325,6 +1325,25 @@ async function mockApi(
           offset: 0,
         },
       });
+    if (path.endsWith('/coach/capacity'))
+      return route.fulfill({
+        json: {
+          active_client_count: withCoachClient ? 1 : 0,
+          pending_invite_count: 0,
+          open_task_count: 0,
+          attention_item_count: 0,
+          attention_client_count: 0,
+          attention_items_returned: 0,
+          attention_items_truncated: false,
+          clients_with_active_program_count: withCoachClient ? 1 : 0,
+          roster_coverage_percent: withCoachClient ? 100 : null,
+          capacity_band: '0_9',
+          next_capacity_boundary: 10,
+          scale_boundaries: [10, 30, 100],
+          bottlenecks: [],
+          generated_at: '2030-01-01T10:00:00Z',
+        },
+      });
     if (path.endsWith('/coach/clients'))
       return route.fulfill({
         json: withCoachClient

@@ -10,6 +10,7 @@ from fitminiapp_api.schemas.admin import (
     AdminJobRow,
     AdminOperationRequest,
     AdminTrainerCapabilityUpdate,
+    AdminTrainerCapacityResponse,
     AdminUserDetail,
     AdminUserSearchRow,
     AdminUserStatusUpdate,
@@ -21,6 +22,7 @@ from fitminiapp_api.services.admin_operations import (
     list_jobs,
     retry_account_export,
     search_users,
+    trainer_capacity_aggregates,
     update_trainer_capability,
     update_user_status,
     user_detail,
@@ -119,6 +121,15 @@ def admin_funnel(
     _: User = Depends(require_root_admin),
 ) -> dict:
     return funnel_aggregates(db, period_days=period_days)
+
+
+@router.get("/trainer-capacity", response_model=AdminTrainerCapacityResponse)
+def admin_trainer_capacity(
+    period_days: int = Query(default=30, ge=7, le=730),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_root_admin),
+) -> dict:
+    return trainer_capacity_aggregates(db, period_days=period_days)
 
 
 @router.get("/audit", response_model=list[AdminAuditRow])

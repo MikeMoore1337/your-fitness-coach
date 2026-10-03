@@ -26,6 +26,7 @@ from fitminiapp_api.services.coach_clients import close_user_coaching_relationsh
 from fitminiapp_api.services.lifecycle_reporting import lifecycle_funnel_report
 from fitminiapp_api.services.root_admin import is_root_user
 from fitminiapp_api.services.token_service import revoke_all_user_refresh_tokens
+from fitminiapp_api.services.trainer_capacity_reporting import build_trainer_capacity_report
 
 logger = logging.getLogger(__name__)
 
@@ -522,3 +523,9 @@ def retry_account_export(
 
 def funnel_aggregates(db: Session, *, period_days: int) -> dict:
     return lifecycle_funnel_report(db, period_days=period_days)
+
+
+def trainer_capacity_aggregates(db: Session, *, period_days: int) -> dict:
+    """Return trainer capacity metrics without changing the client KPI funnel."""
+
+    return build_trainer_capacity_report(db, period_days=period_days)

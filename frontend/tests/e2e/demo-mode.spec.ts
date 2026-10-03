@@ -838,6 +838,23 @@ function transport(snapshot: DemoSessionSnapshot, path: string, method: string, 
     return [...(['alexey', 'maria', 'ivan'] as const).map(client), pendingClient()];
   if (path === '/api/v1/coach/assigned-programs')
     return (['alexey', 'maria'] as const).map(assignedProgram);
+  if (path === '/api/v1/coach/capacity')
+    return {
+      active_client_count: 3,
+      pending_invite_count: 1,
+      open_task_count: 0,
+      attention_item_count: 1,
+      attention_client_count: 1,
+      attention_items_returned: 1,
+      attention_items_truncated: false,
+      clients_with_active_program_count: 2,
+      roster_coverage_percent: 66.7,
+      capacity_band: '0_9',
+      next_capacity_boundary: 10,
+      scale_boundaries: [10, 30, 100],
+      bottlenecks: [{ key: 'attention', count: 1, action: 'attention' }],
+      generated_at: '2026-09-15T10:00:00Z',
+    };
   if (path.startsWith('/api/v1/coach/attention'))
     return {
       items: [
