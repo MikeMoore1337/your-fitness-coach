@@ -49,6 +49,7 @@ from fitminiapp_api.services.foods import (
     calculate_food_amount,
     get_visible_food,
 )
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.nutrition import get_nutrition_target_for_user
 from fitminiapp_api.services.recipes import (
     RecipeCalculation,
@@ -380,6 +381,12 @@ def create_food_diary_entry(
         entry.quick_fat_g = quick_add.fat_g
         entry.quick_carbs_g = quick_add.carbs_g
     db.add(entry)
+    record_lifecycle_milestone(
+        db,
+        user,
+        "nutrition_entry_confirmed",
+        day_scope=True,
+    )
     try:
         db.commit()
     except IntegrityError:
@@ -536,6 +543,13 @@ def create_food_diary_batch(
                 entry.weight_g = calculation.weight_g
                 _set_nutrition_amount(entry, calculation)
             db.add(entry)
+        if items:
+            record_lifecycle_milestone(
+                db,
+                user,
+                "nutrition_entry_confirmed",
+                day_scope=True,
+            )
         db.commit()
     except FoodDiaryError:
         db.rollback()
@@ -617,6 +631,12 @@ def update_food_diary_entry(
     entry.amount_unit = amount_unit
     entry.weight_g = calculation.weight_g
     _set_nutrition_amount(entry, calculation)
+    record_lifecycle_milestone(
+        db,
+        user,
+        "nutrition_entry_confirmed",
+        day_scope=True,
+    )
     db.commit()
     db.refresh(entry)
     return _serialize_entry(entry)
@@ -754,6 +774,13 @@ def set_food_diary_day_status(
         )
     else:
         stored.status = payload.status
+    if payload.status == "complete":
+        record_lifecycle_milestone(
+            db,
+            user,
+            "nutrition_entry_confirmed",
+            day_scope=True,
+        )
     db.commit()
     return get_food_diary_day(db, user, payload.diary_date)
 
@@ -942,6 +969,12 @@ def _perform_copy(
                 operation_id=operation.id,
             )
         )
+    record_lifecycle_milestone(
+        db,
+        user,
+        "nutrition_entry_confirmed",
+        day_scope=True,
+    )
     db.commit()
     return _copy_response(db, operation, replayed=False)
 

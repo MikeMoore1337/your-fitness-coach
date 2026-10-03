@@ -37,6 +37,7 @@ from fitminiapp_api.models.exercise import (
 )
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
+from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
 from fitminiapp_api.models.notification import (
     Notification,
     NotificationDelivery,
@@ -429,6 +430,9 @@ def delete_user_cascade(db: Session, user: User) -> None:
         synchronize_session=False
     )
     db.query(FirstTouchAttribution).filter(FirstTouchAttribution.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db.query(LifecycleMilestone).filter(LifecycleMilestone.user_id == user.id).delete(
         synchronize_session=False
     )
     db.query(AiCoachConsent).filter(AiCoachConsent.user_id == user.id).delete(

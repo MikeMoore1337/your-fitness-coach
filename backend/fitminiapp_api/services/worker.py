@@ -29,6 +29,7 @@ from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery
 from fitminiapp_api.services.account_exports import prune_account_exports
 from fitminiapp_api.services.audit import prune_audit_events
 from fitminiapp_api.services.bot_support import prune_support_cases
+from fitminiapp_api.services.lifecycle_milestones import prune_lifecycle_milestones
 from fitminiapp_api.services.news_ingestion import utcnow
 from fitminiapp_api.services.news_review_schedule import current_news_review_slot
 from fitminiapp_api.services.news_worker import run_news_pipeline_once
@@ -678,6 +679,10 @@ async def run_once(*, sync_reminders: bool = True) -> None:
         expire_program_imports(db)
         if sync_reminders:
             prune_audit_events(db, retention_days=settings.audit_event_retention_days)
+            prune_lifecycle_milestones(
+                db,
+                retention_days=settings.lifecycle_milestone_retention_days,
+            )
             prune_weekly_digest(db, retention_days=settings.news_retention_days)
             prune_support_cases(db)
             sync_workout_reminders(db)

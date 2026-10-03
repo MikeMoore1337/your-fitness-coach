@@ -17,6 +17,7 @@ from fitminiapp_api.services.heart_rate import (
     calculate_heart_rates,
     calculate_max_heart_rate,
 )
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 
 
 class ProfileError(ValueError):
@@ -112,6 +113,7 @@ def update_profile(
     commit: bool = True,
 ) -> User:
     profile = ensure_profile(db, user, commit=commit)
+    onboarding_was_complete = profile.goal is not None
     changes = payload.model_dump(exclude_unset=True)
     body_priority = changes.pop("body_priority", ...)
     training_preferences = changes.pop("training_preferences", ...)
@@ -178,6 +180,13 @@ def update_profile(
             user,
             nutrition_updates,
             changed_by or user,
+        )
+    if not onboarding_was_complete and profile.goal is not None:
+        record_lifecycle_milestone(
+            db,
+            user,
+            "onboarding_completed",
+            account_scope=True,
         )
     if commit:
         db.commit()

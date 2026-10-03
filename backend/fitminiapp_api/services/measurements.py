@@ -21,6 +21,7 @@ from fitminiapp_api.schemas.workout import (
     BodyMeasurementSave,
 )
 from fitminiapp_api.services.audit import record_audit_event
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.nutrition import NutritionError, recalculate_nutrition_target
 
 MEASUREMENT_FIELDS = (
@@ -498,6 +499,13 @@ def save_measurement(
                         else canonical_changes
                     ),
                 },
+            )
+        else:
+            record_lifecycle_milestone(
+                db,
+                owner,
+                "progress_next_action_completed",
+                day_scope=True,
             )
         db.commit()
     except NutritionError as exc:

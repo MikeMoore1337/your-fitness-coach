@@ -43,6 +43,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryEntry,
 )
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
+from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
 from fitminiapp_api.models.news import (
     HermesWebArticleSubmission,
     NewsCluster,
@@ -167,6 +168,7 @@ __all__ = [
     "HydrationEntry",
     "HydrationGoal",
     "HydrationPreset",
+    "LifecycleMilestone",
     "LocalCredential",
     "Muscle",
     "NewsCluster",

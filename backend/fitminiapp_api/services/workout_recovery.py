@@ -11,6 +11,7 @@ from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.workout import WorkoutRecoveryRequest
 from fitminiapp_api.services.audit import record_audit_event
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.notifications import cancel_workout_reminder, queue_notification
 from fitminiapp_api.services.program_versioning import record_program_revision
 
@@ -442,6 +443,13 @@ def apply_recovery(
             )
     if payload.action == "skip":
         _reconcile_program_completion(db, program, current_user)
+
+    record_lifecycle_milestone(
+        db,
+        current_user,
+        "recovery_action_confirmed",
+        day_scope=True,
+    )
 
     db.commit()
     remaining = _workouts_for_recovery(db, program, current_user=current_user)

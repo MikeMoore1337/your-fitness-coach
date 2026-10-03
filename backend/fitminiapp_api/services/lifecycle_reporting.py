@@ -1,0 +1,500 @@
+from __future__ import annotations
+
+from collections import Counter, defaultdict
+from datetime import UTC, date, datetime, timedelta
+from statistics import median
+from zoneinfo import ZoneInfo
+
+from sqlalchemy.orm import Session, joinedload
+
+from fitminiapp_api.core.config import settings
+from fitminiapp_api.core.timezone import (
+    DEFAULT_TIMEZONE,
+    get_timezone,
+    is_valid_timezone,
+    local_naive_to_utc_naive,
+    now_msk_naive,
+)
+from fitminiapp_api.models.lifecycle_milestone import (
+    LIFECYCLE_MILESTONE_TYPES,
+    LifecycleMilestone,
+)
+from fitminiapp_api.models.program import UserProgram, UserWorkout
+from fitminiapp_api.models.user import User
+from fitminiapp_api.services.lifecycle_milestones import (
+    MEANINGFUL_MILESTONE_TYPES,
+)
+
+LIFECYCLE_KPI_KEYS = (
+    "activation_rate",
+    "time_to_first_useful_action",
+    "first_workout_completion_rate",
+    "first_week_value_rate",
+    "d1_meaningful_return",
+    "d7_meaningful_return",
+    "d30_meaningful_return",
+    "missed_workout_recovery_conversion",
+    "nutrition_repeat_rate",
+    "weekly_loop_completion",
+)
+
+
+_UserEvents = dict[str, list[datetime]]
+
+
+def _empty_events() -> _UserEvents:
+    return {milestone_type: [] for milestone_type in LIFECYCLE_MILESTONE_TYPES}
+
+
+def _as_utc_naive(value: datetime) -> datetime:
+    return value.astimezone(UTC).replace(tzinfo=None) if value.tzinfo else value
+
+
+def _report_timezone(user: User) -> tuple[ZoneInfo, bool]:
+    raw_timezone = getattr(getattr(user, "profile", None), "timezone", None)
+    if raw_timezone and is_valid_timezone(raw_timezone):
+        return get_timezone(raw_timezone), False
+    return ZoneInfo("UTC"), True
+
+
+def _registration_at_utc(user: User) -> datetime:
+    # User.created_at predates this ledger and is stored as Moscow wall time in
+    # the current account contract. Keep that conversion explicit at the report
+    # boundary; milestone evidence itself is UTC-naive.
+    return local_naive_to_utc_naive(user.created_at, DEFAULT_TIMEZONE)
+
+
+def _local_date(value: datetime, zone: ZoneInfo) -> date:
+    return value.replace(tzinfo=UTC).astimezone(zone).date()
+
+
+def _in_window(value: datetime, start: datetime, end: datetime) -> bool:
+    return start <= value < end
+
+
+def _first_after(values: list[datetime], start: datetime) -> datetime | None:
+    return next((value for value in values if value >= start), None)
+
+
+def _first_program_backed_start(
+    events: _UserEvents,
+    *,
+    not_before: datetime,
+) -> datetime | None:
+    for started_at in events["workout_started"]:
+        if started_at >= not_before and any(
+            not_before <= activated_at <= started_at for activated_at in events["program_activated"]
+        ):
+            return started_at
+    return None
+
+
+def _window_dates(
+    events: _UserEvents,
+    *,
+    registration_at: datetime,
+    zone: ZoneInfo,
+    duration_days: int,
+) -> set[date]:
+    end = registration_at + timedelta(days=duration_days)
+    return {
+        _local_date(value, zone)
+        for milestone_type in MEANINGFUL_MILESTONE_TYPES
+        for value in events[milestone_type]
+        if _in_window(value, registration_at, end)
+    }
+
+
+def _kpi(
+    *,
+    key: str,
+    numerator: int,
+    denominator: int,
+    cohort_size: int,
+    window: str,
+    median_seconds: float | None = None,
+) -> dict[str, object]:
+    return {
+        "key": key,
+        "numerator": numerator,
+        "denominator": denominator,
+        "cohort_size": cohort_size,
+        "rate_percent": round(numerator * 100 / denominator, 1) if denominator else None,
+        "median_seconds": round(median_seconds, 1) if median_seconds is not None else None,
+        "window": window,
+    }
+
+
+def _quality_report(
+    db: Session,
+    *,
+    eligible_users: list[User],
+    rows: list[LifecycleMilestone],
+    events: dict[int, _UserEvents],
+    cohort_since_msk: datetime,
+    now: datetime,
+) -> dict[str, object]:
+    duplicate_counts = Counter((row.user_id, row.milestone_type, row.occurred_at) for row in rows)
+    duplicate_milestones = sum(count - 1 for count in duplicate_counts.values() if count > 1)
+    invalid_milestones = sum(
+        1
+        for row in rows
+        if row.milestone_type not in LIFECYCLE_MILESTONE_TYPES
+        or row.surface != "server"
+        or not row.server_confirmed
+        or row.authoritative_outcome_status != "confirmed"
+    )
+    impossible_order = 0
+    for user in eligible_users:
+        user_events = events[user.id]
+        registration_at = _registration_at_utc(user)
+        first_program = (
+            user_events["program_activated"][0] if user_events["program_activated"] else None
+        )
+        first_start = user_events["workout_started"][0] if user_events["workout_started"] else None
+        first_complete = (
+            user_events["workout_completed"][0] if user_events["workout_completed"] else None
+        )
+        impossible_order += sum(
+            1
+            for values in user_events.values()
+            for value in values
+            if value < registration_at or value > now + timedelta(minutes=5)
+        )
+        if first_program is not None and first_program < registration_at:
+            impossible_order += 1
+        if first_start is not None and (
+            first_start < registration_at
+            or (first_program is not None and first_start < first_program)
+        ):
+            impossible_order += 1
+        if first_complete is not None and (
+            first_complete < registration_at
+            or (first_start is not None and first_complete < first_start)
+        ):
+            impossible_order += 1
+
+    excluded_role_accounts = (
+        db.query(User.id)
+        .filter(
+            User.created_at >= cohort_since_msk,
+            User.created_at <= now_msk_naive(),
+            (User.is_coach.is_(True) | User.is_admin.is_(True)),
+        )
+        .count()
+    )
+    timezone_fallback_accounts = sum(1 for user in eligible_users if _report_timezone(user)[1])
+    client_success_without_server = sum(
+        1 for row in rows if row.surface != "server" or not row.server_confirmed
+    )
+    status = (
+        "attention"
+        if any(
+            (
+                duplicate_milestones,
+                invalid_milestones,
+                impossible_order,
+                client_success_without_server,
+            )
+        )
+        else "clean"
+    )
+    return {
+        "status": status,
+        "duplicate_milestones": duplicate_milestones,
+        "impossible_order": impossible_order,
+        "client_success_without_server": client_success_without_server,
+        "invalid_milestones": invalid_milestones,
+        "excluded_role_accounts": excluded_role_accounts,
+        "timezone_fallback_accounts": timezone_fallback_accounts,
+    }
+
+
+def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, object]:
+    if period_days < 7 or period_days > 730:
+        raise ValueError("period_days must be between 7 and 730")
+
+    now_aware = datetime.now(UTC)
+    now = now_aware.replace(tzinfo=None)
+    cohort_since_msk = now_msk_naive() - timedelta(days=period_days)
+    users = (
+        db.query(User)
+        .options(joinedload(User.profile))
+        .filter(
+            User.created_at >= cohort_since_msk,
+            User.created_at <= now_msk_naive(),
+            User.is_coach.is_(False),
+            User.is_admin.is_(False),
+        )
+        .order_by(User.created_at.asc(), User.id.asc())
+        .all()
+        if settings.app_env == "prod"
+        else []
+    )
+    user_ids = [user.id for user in users]
+    rows = (
+        db.query(LifecycleMilestone)
+        .filter(LifecycleMilestone.user_id.in_(user_ids))
+        .order_by(LifecycleMilestone.user_id.asc(), LifecycleMilestone.occurred_at.asc())
+        .all()
+        if user_ids
+        else []
+    )
+    events: dict[int, _UserEvents] = defaultdict(_empty_events)
+    for row in rows:
+        if row.user_id in user_ids and row.milestone_type in LIFECYCLE_MILESTONE_TYPES:
+            events[row.user_id][row.milestone_type].append(row.occurred_at)
+
+    activation_count = 0
+    first_useful_times: list[float] = []
+    first_useful_users: set[int] = set()
+    first_workout_completed = 0
+    first_week_users: list[int] = []
+    first_week_value = 0
+    d1_denominator = d1_return = 0
+    d7_denominator = d7_return = 0
+    d30_denominator = d30_return = 0
+    nutrition_denominator = nutrition_repeat = 0
+    weekly_denominator = weekly_loop = 0
+    complete_week_starts: set[date] = set()
+
+    for user in users:
+        user_events = events[user.id]
+        registration_at = _registration_at_utc(user)
+        zone, _timezone_fallback = _report_timezone(user)
+        registration_day = _local_date(registration_at, zone)
+        now_local_day = now_aware.astimezone(zone).date()
+
+        onboarding_at = _first_after(user_events["onboarding_completed"], registration_at)
+        program_at = _first_after(user_events["program_activated"], registration_at)
+        useful_at = _first_program_backed_start(user_events, not_before=registration_at)
+        activation_ready = (
+            onboarding_at is not None
+            and program_at is not None
+            and useful_at is not None
+            and onboarding_at <= registration_at + timedelta(hours=24)
+            and program_at <= registration_at + timedelta(hours=24)
+            and useful_at <= registration_at + timedelta(hours=24)
+        )
+        if activation_ready:
+            activation_count += 1
+
+        if useful_at is not None:
+            first_useful_users.add(user.id)
+            first_useful_times.append((useful_at - registration_at).total_seconds())
+            completed_at = _first_after(user_events["workout_completed"], useful_at)
+            if completed_at is not None and completed_at <= useful_at + timedelta(hours=72):
+                first_workout_completed += 1
+
+        first_week_matured = registration_at + timedelta(days=7) <= now
+        if first_week_matured:
+            first_week_users.append(user.id)
+            complete_week_starts.add(registration_day - timedelta(days=registration_day.weekday()))
+            week_end = registration_at + timedelta(days=7)
+            completed_workout = any(
+                _in_window(value, registration_at, week_end)
+                for value in user_events["workout_completed"]
+            )
+            additional_action = any(
+                _in_window(value, registration_at, week_end)
+                for milestone_type in (
+                    "nutrition_entry_confirmed",
+                    "weekly_review_completed",
+                    "recovery_action_confirmed",
+                    "progress_next_action_completed",
+                )
+                for value in user_events[milestone_type]
+            )
+            meaningful_days = _window_dates(
+                user_events,
+                registration_at=registration_at,
+                zone=zone,
+                duration_days=7,
+            )
+            if completed_workout and additional_action and len(meaningful_days) >= 2:
+                first_week_value += 1
+
+        for offset, target in ((1, "d1"), (7, "d7"), (30, "d30")):
+            if registration_day + timedelta(days=offset) > now_local_day:
+                continue
+            target_day = registration_day + timedelta(days=offset)
+            returned = any(
+                _local_date(value, zone) == target_day
+                for milestone_type in MEANINGFUL_MILESTONE_TYPES
+                for value in user_events[milestone_type]
+            )
+            if target == "d1":
+                d1_denominator += 1
+                d1_return += int(returned)
+            elif target == "d7":
+                d7_denominator += 1
+                d7_return += int(returned)
+            else:
+                d30_denominator += 1
+                d30_return += int(returned)
+
+        nutrition_dates = {
+            _local_date(value, zone)
+            for value in user_events["nutrition_entry_confirmed"]
+            if _in_window(value, registration_at, registration_at + timedelta(days=7))
+        }
+        if nutrition_dates:
+            nutrition_denominator += 1
+            nutrition_repeat += int(len(nutrition_dates) >= 2)
+
+        if first_week_matured:
+            weekly_denominator += 1
+            weekly_loop += int(
+                any(
+                    _in_window(value, registration_at, registration_at + timedelta(days=7))
+                    for value in user_events["weekly_review_completed"]
+                )
+            )
+
+    missed_users: set[int] = set()
+    recovery_users = {user.id for user in users if events[user.id]["recovery_action_confirmed"]}
+    if user_ids:
+        missed_rows = (
+            db.query(UserWorkout, User)
+            .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+            .join(User, User.id == UserProgram.user_id)
+            .options(joinedload(User.profile))
+            .filter(
+                User.id.in_(user_ids),
+                UserProgram.is_active.is_(True),
+                UserProgram.status.in_({"scheduled", "active"}),
+                UserWorkout.status == "planned",
+            )
+            .all()
+        )
+        for workout, user in missed_rows:
+            zone, _timezone_fallback = _report_timezone(user)
+            if workout.scheduled_date < now_aware.astimezone(zone).date():
+                missed_users.add(user.id)
+    recovery_denominator = len(missed_users | recovery_users)
+    recovery_numerator = len(recovery_users & (missed_users | recovery_users))
+
+    cohort_size = len(users)
+    quality = _quality_report(
+        db,
+        eligible_users=users,
+        rows=rows,
+        events=events,
+        cohort_since_msk=cohort_since_msk,
+        now=now,
+    )
+    complete_weekly_cohorts = len(complete_week_starts)
+    effect_status = "NOT_YET_PROVEN"
+    effect_note = (
+        "Эффект можно оценивать только после baseline и минимум четырёх полных недельных когорт; "
+        "текущий отчёт показывает факты без проверки значимости."
+    )
+
+    kpis = [
+        _kpi(
+            key="activation_rate",
+            numerator=activation_count,
+            denominator=cohort_size,
+            cohort_size=cohort_size,
+            window="после регистрации, первые 24 часа",
+        ),
+        _kpi(
+            key="time_to_first_useful_action",
+            numerator=len(first_useful_times),
+            denominator=cohort_size,
+            cohort_size=cohort_size,
+            window="от регистрации до первой начатой тренировки",
+            median_seconds=median(first_useful_times) if first_useful_times else None,
+        ),
+        _kpi(
+            key="first_workout_completion_rate",
+            numerator=first_workout_completed,
+            denominator=len(first_useful_users),
+            cohort_size=cohort_size,
+            window="первая начатая тренировка, завершение до 72 часов",
+        ),
+        _kpi(
+            key="first_week_value_rate",
+            numerator=first_week_value,
+            denominator=len(first_week_users),
+            cohort_size=cohort_size,
+            window="первые 7 дней, только полные окна",
+        ),
+        _kpi(
+            key="d1_meaningful_return",
+            numerator=d1_return,
+            denominator=d1_denominator,
+            cohort_size=cohort_size,
+            window="следующий календарный день",
+        ),
+        _kpi(
+            key="d7_meaningful_return",
+            numerator=d7_return,
+            denominator=d7_denominator,
+            cohort_size=cohort_size,
+            window="седьмой календарный день",
+        ),
+        _kpi(
+            key="d30_meaningful_return",
+            numerator=d30_return,
+            denominator=d30_denominator,
+            cohort_size=cohort_size,
+            window="тридцатый календарный день",
+        ),
+        _kpi(
+            key="missed_workout_recovery_conversion",
+            numerator=recovery_numerator,
+            denominator=recovery_denominator,
+            cohort_size=cohort_size,
+            window="после доступного пропуска до подтверждённого действия",
+        ),
+        _kpi(
+            key="nutrition_repeat_rate",
+            numerator=nutrition_repeat,
+            denominator=nutrition_denominator,
+            cohort_size=cohort_size,
+            window="минимум два календарных дня записи питания в первые 7 дней",
+        ),
+        _kpi(
+            key="weekly_loop_completion",
+            numerator=weekly_loop,
+            denominator=weekly_denominator,
+            cohort_size=cohort_size,
+            window="подтверждённые итоги недели в первые 7 дней",
+        ),
+    ]
+
+    coverage_note = (
+        "Только серверно подтверждённые агрегаты по новым аккаунтам-клиентам. "
+        "Демо-сессии не создают аккаунты и события; root- и trainer-аккаунты исключены. "
+        "D1/D7/D30 используют часовой пояс профиля, а при его отсутствии — UTC. "
+        "Raw events, идентификаторы и данные питания в отчёт не попадают."
+    )
+    exclusions = [
+        "root/admin и trainer-аккаунты",
+        "demo/test/staging/synthetic/load/technical данные вне production client-когорты",
+        "просмотры, открытия, показы, неуспешные отправки и неподтверждённые preview",
+    ]
+    if settings.app_env != "prod":
+        coverage_note = (
+            "Отчёт доступен только в production: non-production окружение исключено fail-closed, "
+            "чтобы demo/test/staging данные не попали в KPI."
+        )
+        exclusions.insert(0, "любые аккаунты и события non-production окружений")
+
+    return {
+        "period_days": period_days,
+        "cohort_since": now_aware - timedelta(days=period_days),
+        "cohort_until": now_aware,
+        "as_of": now_aware,
+        "cohort_size": cohort_size,
+        "complete_weekly_cohorts": complete_weekly_cohorts,
+        "eligible_real_account_count": cohort_size,
+        "analytics_provider_status": "not_connected",
+        "effect_status": effect_status,
+        "effect_note": effect_note,
+        "coverage_note": coverage_note,
+        "exclusions": exclusions,
+        "data_quality": quality,
+        "kpis": kpis,
+    }

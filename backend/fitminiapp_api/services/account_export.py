@@ -43,6 +43,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryEntry,
 )
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
+from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
 from fitminiapp_api.models.notification import (
     Notification,
     NotificationDelivery,
@@ -85,7 +86,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 20
+ACCOUNT_EXPORT_SCHEMA_VERSION = 21
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -105,6 +106,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "hydration_goals": "hydration",
     "hydration_entries": "hydration",
     "hydration_presets": "hydration",
+    "lifecycle_milestones": "lifecycle_milestones",
     "energy_calibrations": "energy_calibrations",
     "weekly_check_ins": "weekly_check_ins",
     "daily_wellbeing_check_ins": "daily_wellbeing_check_ins",
@@ -787,6 +789,12 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(WeeklyCheckIn.week_start.asc(), WeeklyCheckIn.id.asc())
         .all()
     )
+    lifecycle_milestones = (
+        db.query(LifecycleMilestone)
+        .filter(LifecycleMilestone.user_id == user.id)
+        .order_by(LifecycleMilestone.occurred_at.asc(), LifecycleMilestone.id.asc())
+        .all()
+    )
     daily_wellbeing_check_ins = (
         db.query(DailyWellbeingCheckIn)
         .filter(DailyWellbeingCheckIn.user_id == user.id)
@@ -1257,6 +1265,21 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             _fields(row, ENERGY_CALIBRATION_FIELDS) for row in energy_calibrations
         ],
         "weekly_check_ins": [_fields(row, WEEKLY_CHECK_IN_FIELDS) for row in weekly_check_ins],
+        "lifecycle_milestones": [
+            _fields(
+                row,
+                (
+                    "id",
+                    "milestone_type",
+                    "schema_version",
+                    "occurred_at",
+                    "surface",
+                    "server_confirmed",
+                    "authoritative_outcome_status",
+                ),
+            )
+            for row in lifecycle_milestones
+        ],
         "daily_wellbeing_check_ins": [
             _fields(row, DAILY_WELLBEING_FIELDS) for row in daily_wellbeing_check_ins
         ],

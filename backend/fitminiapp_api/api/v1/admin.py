@@ -114,7 +114,7 @@ def admin_retry_export(
 
 @router.get("/funnel", response_model=AdminFunnelResponse)
 def admin_funnel(
-    period_days: int = Query(default=30, ge=7, le=365),
+    period_days: int = Query(default=30, ge=7, le=730),
     db: Session = Depends(get_db),
     _: User = Depends(require_root_admin),
 ) -> dict:
