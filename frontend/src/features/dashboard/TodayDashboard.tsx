@@ -36,6 +36,7 @@ import {
   selectNextAction,
   type NextAction,
   type NextActionKind,
+  type NextActionPlan,
 } from './nextAction';
 import {
   TRAINING_WEEK_LEGEND,
@@ -296,14 +297,53 @@ function hasNutritionConfirmation(
   );
 }
 
+type TodayActionDestination = 'nutrition' | 'progress';
+
+function actionUsesTodayDestination(
+  action: NextAction,
+  destination: TodayActionDestination,
+): boolean {
+  const target = action.target;
+  if (destination === 'nutrition') {
+    return (
+      target.type === 'nutrition' ||
+      (target.type === 'progress_weekly_action' && target.destination === 'nutrition')
+    );
+  }
+
+  if (
+    target.type === 'trainer_feedback' ||
+    target.type === 'progress_workout' ||
+    target.type === 'progress' ||
+    target.type === 'weekly_review'
+  ) {
+    return true;
+  }
+  return (
+    target.type === 'progress_weekly_action' &&
+    (target.destination === 'body' || target.destination === 'progress')
+  );
+}
+
+function planUsesTodayDestination(
+  plan: NextActionPlan,
+  destination: TodayActionDestination,
+): boolean {
+  return [plan.primary, ...plan.secondary].some((action) =>
+    actionUsesTodayDestination(action, destination),
+  );
+}
+
 function NutritionSummary({
   date,
   today,
   nutrition,
+  showAction = true,
 }: {
   date: string;
   today: string;
   nutrition: ReturnType<typeof useNutritionDay>;
+  showAction?: boolean;
 }) {
   const { diary, hydration } = nutrition;
 
@@ -409,16 +449,18 @@ function NutritionSummary({
               <p>{foodSummary}</p>
             )}
           </div>
-          <AppLink
-            className="today-summary-card__action"
-            to={`/app?section=nutrition&date=${date}`}
-            aria-label="Открыть дневник питания"
-          >
-            <span className="today-nutrition__action-label-full">Открыть дневник питания</span>
-            <span className="today-nutrition__action-label-compact" aria-hidden="true">
-              Открыть дневник
-            </span>
-          </AppLink>
+          {showAction && (
+            <AppLink
+              className="today-summary-card__action"
+              to={`/app?section=nutrition&date=${date}`}
+              aria-label="Открыть дневник питания"
+            >
+              <span className="today-nutrition__action-label-full">Открыть дневник питания</span>
+              <span className="today-nutrition__action-label-compact" aria-hidden="true">
+                Открыть дневник
+              </span>
+            </AppLink>
+          )}
         </div>
         <div className="today-nutrition__water">
           <span>{hydrationSummary}</span>
@@ -482,7 +524,13 @@ function ActivitySummary({
   );
 }
 
-function ProgressSummaryPanel({ summary }: { summary: ReturnType<typeof useProgressSummary> }) {
+function ProgressSummaryPanel({
+  summary,
+  showAction = true,
+}: {
+  summary: ReturnType<typeof useProgressSummary>;
+  showAction?: boolean;
+}) {
   if (summary.isLoading) {
     return (
       <section className="today-progress-grid" aria-label="Загружаем прогресс">
@@ -513,7 +561,9 @@ function ProgressSummaryPanel({ summary }: { summary: ReturnType<typeof useProgr
   return (
     <section className="today-progress-grid" aria-label="Главное о прогрессе">
       <SemanticCard
-        action={<AppLink to="/app?section=progress">Открыть прогресс</AppLink>}
+        action={
+          showAction ? <AppLink to="/app?section=progress">Открыть прогресс</AppLink> : undefined
+        }
         className="today-panel today-summary-card today-summary-card--progress"
         family="progress"
         icon="nav-progress"
@@ -536,10 +586,8 @@ function WorkoutOverview({
   today,
   workout,
   todayScheduleItem,
-  weeklyReview,
   trainerComment,
   progress,
-  recovery,
   detailsOpen,
   startPending,
   onOpenDetails,
@@ -547,27 +595,24 @@ function WorkoutOverview({
   onStart,
   onOpenRecovery,
   canMutateProgress,
-  profileBlocksRecommendation,
-  hasNutritionConfirmation,
+  hasActiveProgram,
+  plan,
 }: {
   today: string;
   workout?: Workout;
   todayScheduleItem?: WorkoutScheduleItem;
-  weeklyReview?: WeeklyCheckInCurrent;
   trainerComment?: WorkoutComment;
   progress: ReturnType<typeof useProgressSummary>;
-  recovery?: WorkoutRecoveryState | null;
   detailsOpen: boolean;
   startPending: boolean;
   onOpenDetails(): void;
   onAddActivity(): void;
   onStart(workoutId: number): void;
   canMutateProgress: boolean;
-  profileBlocksRecommendation: boolean;
-  hasNutritionConfirmation: boolean;
+  hasActiveProgram: boolean;
+  plan: NextActionPlan;
   onOpenRecovery(): void;
 }) {
-  const { user } = useAuth();
   const totalSets =
     workout?.exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0) ?? 0;
   const completedSets =
@@ -577,21 +622,6 @@ function WorkoutOverview({
     ) ?? 0;
   const completedToday = !workout && progress.data?.training.last_completed_workout_on === today;
   const nextWorkout = progress.data?.training.next_workout;
-  const hasActiveProgram =
-    Boolean(user?.has_active_program) && recovery?.status !== 'no_active_program';
-  const plan = selectNextAction({
-    today,
-    hasActiveProgram,
-    workout,
-    todayScheduleItem,
-    trainerComment,
-    weeklyReview,
-    lastCompletedWorkoutOn: progress.data?.training.last_completed_workout_on,
-    nextWorkout,
-    recovery,
-    profileBlocksRecommendation,
-    hasNutritionConfirmation,
-  });
   const primaryActionKind = plan.primary.kind;
   const secondaryActionKinds = plan.secondary.map((item) => item.kind).join('|');
 
@@ -1131,6 +1161,21 @@ export function TodayDashboard({
       ),
     [user],
   );
+  const hasActiveProgram =
+    Boolean(user?.has_active_program) && recovery.data?.status !== 'no_active_program';
+  const nextActionPlan = selectNextAction({
+    today,
+    hasActiveProgram,
+    workout: visibleWorkout,
+    todayScheduleItem,
+    trainerComment,
+    weeklyReview: weeklyReview.data,
+    lastCompletedWorkoutOn: progress.data?.training.last_completed_workout_on,
+    nextWorkout: progress.data?.training.next_workout,
+    recovery: recovery.data,
+    profileBlocksRecommendation: profileMissing,
+    hasNutritionConfirmation: nutritionConfirmed,
+  });
   const start = useMutation({
     mutationFn: (workoutId: number) =>
       api<Workout>(`/api/v1/workouts/${workoutId}/start`, { method: 'POST' }),
@@ -1329,18 +1374,16 @@ export function TodayDashboard({
                 today={today}
                 workout={visibleWorkout}
                 todayScheduleItem={todayScheduleItem}
-                weeklyReview={weeklyReview.data}
                 trainerComment={trainerComment}
                 progress={progress}
-                recovery={recovery.data}
                 detailsOpen={detailsOpen}
                 startPending={start.isPending}
                 onOpenDetails={() => setDetailsOpen(true)}
                 onAddActivity={() => setCardioOpenRequest((request) => request + 1)}
                 onStart={(workoutId) => start.mutate(workoutId)}
                 canMutateProgress={capabilities.canMutateProgress}
-                profileBlocksRecommendation={profileMissing}
-                hasNutritionConfirmation={nutritionConfirmed}
+                hasActiveProgram={hasActiveProgram}
+                plan={nextActionPlan}
                 onOpenRecovery={() => setRecoveryDialogOpen(true)}
               />
             )}
@@ -1384,7 +1427,14 @@ export function TodayDashboard({
           />
         </div>
         <div className="today-dashboard__facts">
-          <NutritionSummary date={selectedDate} today={today} nutrition={nutrition} />
+          <NutritionSummary
+            date={selectedDate}
+            today={today}
+            nutrition={nutrition}
+            showAction={
+              selectedDate !== today || !planUsesTodayDestination(nextActionPlan, 'nutrition')
+            }
+          />
           <ActivitySummary
             cardio={cardioWeek.data}
             date={selectedDate}
@@ -1393,7 +1443,12 @@ export function TodayDashboard({
             timeZone={timeZone}
             today={today}
           />
-          <ProgressSummaryPanel summary={progress} />
+          <ProgressSummaryPanel
+            summary={progress}
+            showAction={
+              selectedDate !== today || !planUsesTodayDestination(nextActionPlan, 'progress')
+            }
+          />
           {user && wellbeingRequested && (
             <>
               {!capabilities.canMutateProgress && (

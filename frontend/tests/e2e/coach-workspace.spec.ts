@@ -1284,7 +1284,9 @@ test('Issue 388 оставляет Today компактным и ведёт CRM-
   await expect(page.getByText('Проверить технику приседа', { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 
+  await expect(page.getByRole('button', { name: 'Открыть клиентов', exact: true })).toHaveCount(0);
   const clientsCta = page.getByRole('button', { name: /Открыть список клиентов/ });
+  await expect(clientsCta).toHaveCount(1);
   const clientsCard = page.locator('.coach-today__section--compact');
   await expect(clientsCta).toBeVisible();
   const clientsCtaBox = await clientsCta.boundingBox();

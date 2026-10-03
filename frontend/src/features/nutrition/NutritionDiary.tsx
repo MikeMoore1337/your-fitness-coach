@@ -778,6 +778,9 @@ export function NutritionDiary({
     () => (lastAddedEntryId == null ? new Set<number>() : new Set([lastAddedEntryId])),
     [lastAddedEntryId],
   );
+  const hasRepeatCandidate = Boolean(
+    diary.data?.repeat_candidate && diary.data.status !== 'fasted' && !readOnlyEntries,
+  );
 
   return (
     <div className="nutrition-diary nutrition-diary--design-v2">
@@ -790,6 +793,7 @@ export function NutritionDiary({
         <div className="nutrition-diary__intro-actions">
           <Button
             className="nutrition-diary__primary-action"
+            variant={hasRepeatCandidate ? 'secondary' : 'primary'}
             type="button"
             aria-label="Добавить продукт в текущий приём пищи"
             data-testid="nutrition-add-product"
