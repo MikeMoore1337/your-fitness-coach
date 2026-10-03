@@ -1,4 +1,5 @@
 import runpy
+import subprocess
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
@@ -54,3 +55,34 @@ def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
         revision.revision
         for revision in revisions.iterate_revisions("head", legacy_support.revision)
     }
+
+
+def test_lifecycle_milestone_migration_passes_the_online_rollout_gate(monkeypatch) -> None:
+    root = Path(__file__).resolve().parents[2]
+    active_revision = subprocess.run(
+        [
+            "git",
+            "log",
+            "-1",
+            "--format=%H",
+            "--",
+            "backend/alembic/versions/0111_coach_task_source_kind_constraint.py",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    target_revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    checker = runpy.run_path(str(root / "scripts" / "check_online_migrations.py"))
+
+    monkeypatch.chdir(root)
+    added = checker["check_online_migrations"](active_revision, target_revision)
+
+    assert Path("backend/alembic/versions/0112_lifecycle_milestones.py") in added
