@@ -75,11 +75,12 @@ class LifecycleMilestone(Base):
             "occurred_at",
             name="uq_lifecycle_milestones_user_type_occurred",
         ),
-        UniqueConstraint(
+        Index(
+            "uq_lifecycle_milestones_user_type_workout",
             "user_id",
             "milestone_type",
             "workout_id",
-            name="uq_lifecycle_milestones_user_type_workout",
+            unique=True,
         ),
     )
 
