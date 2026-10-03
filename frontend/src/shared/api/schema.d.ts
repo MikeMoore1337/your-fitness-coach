@@ -5186,7 +5186,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "activation_rate" | "time_to_first_useful_action" | "first_workout_completion_rate" | "first_week_value_rate" | "d1_meaningful_return" | "d7_meaningful_return" | "d30_meaningful_return" | "missed_workout_recovery_conversion" | "recovery_to_completion_rate" | "time_to_recovery" | "nutrition_repeat_rate" | "weekly_loop_completion";
+            key: "activation_rate" | "time_to_first_useful_action" | "first_workout_completion_rate" | "first_week_value_rate" | "d1_meaningful_return" | "d7_meaningful_return" | "d30_meaningful_return" | "missed_workout_recovery_conversion" | "recovery_to_completion_rate" | "time_to_recovery" | "nutrition_repeat_rate" | "progress_next_action_completion_rate" | "weekly_loop_completion";
             /** Numerator */
             numerator: number;
             /** Denominator */
@@ -12740,6 +12740,35 @@ export interface components {
             /** Volume Kg */
             volume_kg: number;
         };
+        /** ProgressWeeklyActionResponse */
+        ProgressWeeklyActionResponse: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "weekly_review" | "workout" | "nutrition" | "measurement" | "none";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "available" | "completed" | "unavailable";
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "today" | "nutrition" | "body" | "progress" | "weekly_review";
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "review_required" | "scheduled_training_gap" | "nutrition_coverage_gap" | "weight_trend_insufficient" | "no_supported_action";
+            /** Title */
+            title: string;
+            /** Detail */
+            detail: string;
+            /** Completed At */
+            completed_at?: string | null;
+        };
         /** ProgressWeightPoint */
         ProgressWeightPoint: {
             /**
@@ -14513,6 +14542,7 @@ export interface components {
             timezone: string;
             existing?: components["schemas"]["WeeklyCheckInResponse"] | null;
             summary: components["schemas"]["WeeklyCheckInSummary"];
+            progress_action: components["schemas"]["ProgressWeeklyActionResponse"];
         };
         /** WeeklyCheckInHistoryResponse */
         WeeklyCheckInHistoryResponse: {
@@ -14629,6 +14659,10 @@ export interface components {
             adherence_difficulty?: number | null;
             /** Note */
             note?: string | null;
+            /** Progress Action Kind */
+            progress_action_kind?: ("workout" | "nutrition" | "measurement" | "none") | null;
+            /** Progress Action Completed At */
+            progress_action_completed_at?: string | null;
             /**
              * Created At
              * Format: date-time

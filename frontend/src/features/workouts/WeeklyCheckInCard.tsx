@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
   EnergyCalibration,
+  ProgressWeeklyAction,
   WeeklyCheckInCurrent,
   WeeklyCheckInHistory,
   WeeklyCheckInSubmit,
@@ -15,6 +16,7 @@ import { Badge, Card, DisclosureIcon, ErrorState, LoadingState } from '../../sha
 import { DataConfidence } from '../../shared/ui/DataConfidence';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Icon } from '../../shared/ui/Icon';
+import { AppLink } from '../../shared/navigation/router';
 import {
   productEventSurface,
   trackCoreProductEvent,
@@ -96,6 +98,21 @@ function measurementCount(value: number): string {
           ? 'замера'
           : 'замеров';
   return `${value} ${word}`;
+}
+
+function progressWeeklyActionHref(action: ProgressWeeklyAction): string | null {
+  switch (action.target) {
+    case 'today':
+      return '/app?section=today';
+    case 'nutrition':
+      return '/app?section=nutrition';
+    case 'body':
+      return '/app?section=progress&progress_view=body';
+    case 'progress':
+      return '/app?section=progress';
+    case 'weekly_review':
+      return '/app?section=progress&progress_view=wellbeing';
+  }
 }
 
 function questionFields(current: WeeklyCheckInCurrent): Array<{
@@ -305,6 +322,7 @@ export function WeeklyCheckInCard({
   }
 
   const { summary, existing } = current.data;
+  const progressAction = current.data.progress_action;
   const target = summary.nutrition.current_target;
   const weightSignal = summary.data_sufficiency.weight_trend;
   const weightPoints = Number(weightSignal.counters.point_count ?? 0);
@@ -322,21 +340,47 @@ export function WeeklyCheckInCard({
     >
       <div id="weekly-review" ref={cardRef} tabIndex={-1} className="weekly-review stack top-gap">
         {existing ? (
-          <div className="weekly-review__complete">
-            <Badge>{existing.status === 'skipped' ? 'Пропущено' : 'Готово'}</Badge>
-            <div>
-              <strong>
-                {existing.status === 'skipped' ? 'Обзор этой недели пропущен' : 'Обзор сохранён'}
-              </strong>
-              <p className="muted">
-                {existing.status === 'skipped'
-                  ? 'Цель питания не менялась.'
-                  : existing.summary.adaptive_energy?.decision === 'accepted'
-                    ? 'Новая цель была явно подтверждена.'
-                    : 'Автоматических изменений цели не было.'}
-              </p>
+          <>
+            <div className="weekly-review__complete">
+              <Badge>{existing.status === 'skipped' ? 'Пропущено' : 'Готово'}</Badge>
+              <div>
+                <strong>
+                  {existing.status === 'skipped' ? 'Обзор этой недели пропущен' : 'Обзор сохранён'}
+                </strong>
+                <p className="muted">
+                  {existing.status === 'skipped'
+                    ? 'Цель питания не менялась.'
+                    : existing.summary.adaptive_energy?.decision === 'accepted'
+                      ? 'Новая цель была явно подтверждена.'
+                      : 'Автоматических изменений цели не было.'}
+                </p>
+              </div>
             </div>
-          </div>
+            {progressAction && (
+              <div className="weekly-review__complete" aria-live="polite">
+                <Badge>
+                  {progressAction.status === 'completed'
+                    ? 'Шаг подтверждён'
+                    : progressAction.status === 'unavailable'
+                      ? 'Без отдельного шага'
+                      : 'Следующий шаг'}
+                </Badge>
+                <div>
+                  <strong>{progressAction.title}</strong>
+                  <p className="muted">{progressAction.detail}</p>
+                  {progressAction.status === 'available' &&
+                    progressWeeklyActionHref(progressAction) && (
+                      <AppLink
+                        className="button-link secondary-link"
+                        to={progressWeeklyActionHref(progressAction) ?? '/app?section=progress'}
+                      >
+                        Открыть действие
+                      </AppLink>
+                    )}
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <ol className="weekly-review__steps" aria-label="Шаги недельного обзора">

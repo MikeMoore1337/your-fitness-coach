@@ -46,7 +46,8 @@ export type NextActionAnalyticsKind =
   | 'resume_program'
   | 'nutrition'
   | 'activity'
-  | 'profile';
+  | 'profile'
+  | 'progress_weekly_action';
 export type NextActionPosition = 'primary' | 'secondary';
 export type ProductSection =
   'today' | 'progress' | 'programs' | 'nutrition' | 'catalog' | 'profile' | 'coach' | 'admin';
@@ -709,6 +710,7 @@ const NEXT_ACTION_KINDS = new Set<NextActionAnalyticsKind>([
   'nutrition',
   'activity',
   'profile',
+  'progress_weekly_action',
 ]);
 const NEXT_ACTION_POSITIONS = new Set<NextActionPosition>(['primary', 'secondary']);
 const PRODUCT_SECTIONS = new Set<ProductSection>([

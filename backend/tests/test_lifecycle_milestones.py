@@ -95,6 +95,7 @@ def test_lifecycle_report_tracks_complete_windows_and_excludes_raw_identity(monk
             ("nutrition_entry_confirmed", timedelta(days=2)),
             ("nutrition_entry_confirmed", timedelta(days=3)),
             ("weekly_review_completed", timedelta(days=6)),
+            ("progress_next_action_completed", timedelta(days=6, hours=1)),
             ("workout_completed", timedelta(days=7)),
             ("workout_started", timedelta(days=30)),
         )
@@ -153,6 +154,11 @@ def test_lifecycle_report_tracks_complete_windows_and_excludes_raw_identity(monk
             after_kpis["weekly_loop_completion"]["numerator"]
             == before_kpis["weekly_loop_completion"]["numerator"] + 1
         )
+        assert (
+            after_kpis["progress_next_action_completion_rate"]["numerator"]
+            == before_kpis["progress_next_action_completion_rate"]["numerator"] + 1
+        )
+        assert after_kpis["progress_next_action_completion_rate"]["median_seconds"] == 3600.0
         assert "user_id" not in str(report)
         assert "nutrition" not in report["coverage_note"].lower()
 

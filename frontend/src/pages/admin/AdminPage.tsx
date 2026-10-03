@@ -82,6 +82,7 @@ const KPI_LABELS: Record<AdminFunnel['kpis'][number]['key'], string> = {
   recovery_to_completion_rate: 'Завершили восстановленную тренировку',
   time_to_recovery: 'Время до восстановления тренировки',
   nutrition_repeat_rate: 'Повторили запись питания',
+  progress_next_action_completion_rate: 'Завершили выбранный шаг после обзора',
   weekly_loop_completion: 'Завершили недельный цикл',
 };
 

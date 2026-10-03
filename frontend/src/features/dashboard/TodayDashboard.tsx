@@ -638,9 +638,17 @@ function WorkoutOverview({
                 ? 'workout'
                 : item.kind === 'nutrition'
                   ? 'nutrition'
-                  : item.kind === 'trainer_feedback' || item.kind === 'workout_result'
-                    ? 'progress'
-                    : null;
+                  : item.kind === 'progress_weekly_action'
+                    ? item.target.type === 'progress_weekly_action' &&
+                      item.target.destination === 'today'
+                      ? 'workout'
+                      : item.target.type === 'progress_weekly_action' &&
+                          item.target.destination === 'nutrition'
+                        ? 'nutrition'
+                        : 'progress'
+                    : item.kind === 'trainer_feedback' || item.kind === 'workout_result'
+                      ? 'progress'
+                      : null;
     if (position === 'primary' && destination) {
       trackProductEvent({
         name: 'today_primary_action_selected',

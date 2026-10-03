@@ -59,6 +59,9 @@ from fitminiapp_api.services.foods import (
 )
 from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.nutrition import get_nutrition_target_for_user
+from fitminiapp_api.services.progress_weekly_action import (
+    record_progress_weekly_action_completion,
+)
 from fitminiapp_api.services.recipes import (
     RecipeCalculation,
     RecipeError,
@@ -434,6 +437,7 @@ def create_food_diary_entry(
         "nutrition_entry_confirmed",
         day_scope=True,
     )
+    record_progress_weekly_action_completion(db, user, "nutrition")
     try:
         db.commit()
     except IntegrityError:
@@ -597,6 +601,7 @@ def create_food_diary_batch(
                 "nutrition_entry_confirmed",
                 day_scope=True,
             )
+            record_progress_weekly_action_completion(db, user, "nutrition")
         db.commit()
     except FoodDiaryError:
         db.rollback()
@@ -684,6 +689,7 @@ def update_food_diary_entry(
         "nutrition_entry_confirmed",
         day_scope=True,
     )
+    record_progress_weekly_action_completion(db, user, "nutrition")
     db.commit()
     db.refresh(entry)
     return _serialize_entry(entry)
@@ -835,6 +841,8 @@ def set_food_diary_day_status(
             "nutrition_entry_confirmed",
             day_scope=True,
         )
+    if payload.status in {"complete", "fasted"}:
+        record_progress_weekly_action_completion(db, user, "nutrition")
     db.commit()
     return get_food_diary_day(db, user, payload.diary_date)
 
@@ -1241,6 +1249,7 @@ def _perform_copy(
         "nutrition_entry_confirmed",
         day_scope=True,
     )
+    record_progress_weekly_action_completion(db, user, "nutrition")
     preview.confirmed_at = now_msk_naive()
     try:
         db.commit()

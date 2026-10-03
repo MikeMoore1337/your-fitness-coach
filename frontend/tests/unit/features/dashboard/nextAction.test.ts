@@ -191,6 +191,31 @@ describe('selectNextAction', () => {
     expect(plan.secondary.map((item) => item.kind)).toEqual(['weekly_review', 'workout_result']);
   });
 
+  it('surfaces the server-selected weekly action without replacing urgent Today actions', () => {
+    const plan = selectNextAction({
+      today,
+      hasActiveProgram: true,
+      weeklyReview: {
+        existing: { id: 1 },
+        progress_action: {
+          kind: 'measurement',
+          status: 'available',
+          target: 'body',
+          reason: 'weight_trend_insufficient',
+          title: 'Добавить замер',
+          detail: 'Добавьте повторный замер веса.',
+          completed_at: null,
+        },
+      } as unknown as WeeklyCheckInCurrent,
+    });
+
+    expect(plan.primary.kind).toBe('nutrition');
+    expect(plan.secondary[0]?.kind).toBe('progress_weekly_action');
+    expect(nextActionHref(plan.secondary[0]!.target)).toBe(
+      '/app?section=progress&progress_view=body',
+    );
+  });
+
   it('keeps deep links typed and bounded to existing app routes', () => {
     const plan = selectNextAction({
       today,

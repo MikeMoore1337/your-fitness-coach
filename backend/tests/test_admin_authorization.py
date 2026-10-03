@@ -406,6 +406,7 @@ def test_funnel_returns_only_server_confirmed_kpis_without_raw_events(client, mo
         "recovery_to_completion_rate",
         "time_to_recovery",
         "nutrition_repeat_rate",
+        "progress_next_action_completion_rate",
         "weekly_loop_completion",
     ]
     assert payload["kpis"][0]["denominator"] >= 2

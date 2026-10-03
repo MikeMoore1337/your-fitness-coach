@@ -422,6 +422,8 @@ WEEKLY_CHECK_IN_FIELDS = (
     "hunger",
     "adherence_difficulty",
     "note",
+    "progress_action_kind",
+    "progress_action_completed_at",
     "created_at",
 )
 

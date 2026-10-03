@@ -44,6 +44,11 @@ class WeeklyCheckIn(Base):
             "adherence_difficulty IS NULL OR adherence_difficulty BETWEEN 1 AND 5",
             name="ck_weekly_check_ins_adherence_difficulty",
         ),
+        CheckConstraint(
+            "progress_action_kind IS NULL OR progress_action_kind IN "
+            "('workout', 'nutrition', 'measurement', 'none')",
+            name="ck_weekly_check_ins_progress_action_kind",
+        ),
         Index("ix_weekly_check_ins_user_created", "user_id", "created_at", "id"),
     )
 
@@ -61,4 +66,6 @@ class WeeklyCheckIn(Base):
     hunger: Mapped[int | None] = mapped_column(Integer, nullable=True)
     adherence_difficulty: Mapped[int | None] = mapped_column(Integer, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    progress_action_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    progress_action_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)

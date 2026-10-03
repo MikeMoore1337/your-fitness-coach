@@ -117,6 +117,9 @@ from fitminiapp_api.services.progress_report_downloads import (
 )
 from fitminiapp_api.services.progress_report_pdf import build_progress_report_pdf
 from fitminiapp_api.services.progress_reports import build_progress_report
+from fitminiapp_api.services.progress_weekly_action import (
+    record_progress_weekly_action_completion,
+)
 from fitminiapp_api.services.progression_guidance import build_progression_guidance
 from fitminiapp_api.services.workout_adaptation import (
     WorkoutAdaptationError,
@@ -1117,6 +1120,7 @@ def finish_workout(
             "workout_completed",
             occurred_at=recovery_user_local_naive_to_utc_naive(workout.completed_at, current_user),
         )
+        record_progress_weekly_action_completion(db, current_user, "workout")
     cancel_workout_reminder(db, workout.id)
 
     _reconcile_program_completion(db, program, current_user)

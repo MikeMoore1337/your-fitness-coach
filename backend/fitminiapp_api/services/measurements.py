@@ -21,8 +21,10 @@ from fitminiapp_api.schemas.workout import (
     BodyMeasurementSave,
 )
 from fitminiapp_api.services.audit import record_audit_event
-from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.nutrition import NutritionError, recalculate_nutrition_target
+from fitminiapp_api.services.progress_weekly_action import (
+    record_progress_weekly_action_completion,
+)
 
 MEASUREMENT_FIELDS = (
     "weight_kg",
@@ -501,12 +503,7 @@ def save_measurement(
                 },
             )
         else:
-            record_lifecycle_milestone(
-                db,
-                owner,
-                "progress_next_action_completed",
-                day_scope=True,
-            )
+            record_progress_weekly_action_completion(db, owner, "measurement")
         db.commit()
     except NutritionError as exc:
         db.rollback()

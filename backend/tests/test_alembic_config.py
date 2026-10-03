@@ -50,7 +50,7 @@ def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
     assert auth_families is not None
     assert relocated_marker is not None
     assert auth_families.down_revision == legacy_support.revision
-    assert revisions.get_heads() == ["0115_nutrition_repeat_preview"]
+    assert revisions.get_heads() == ["0117_weekly_action_constraint"]
     assert relocated_marker.revision in {
         revision.revision
         for revision in revisions.iterate_revisions("head", legacy_support.revision)

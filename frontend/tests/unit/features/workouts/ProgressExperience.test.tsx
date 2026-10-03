@@ -354,6 +354,15 @@ function installApi({
           timezone: 'UTC',
           existing: null,
           summary: {},
+          progress_action: {
+            kind: 'weekly_review',
+            status: 'available',
+            target: 'weekly_review',
+            reason: 'review_required',
+            title: 'Пройти недельный обзор',
+            detail: 'Сверьте факты недели и зафиксируйте следующий шаг.',
+            completed_at: null,
+          },
         }),
         { status: 200 },
       );
@@ -420,15 +429,11 @@ describe('ProgressExperience', () => {
     expect(screen.queryByText('too_few_points')).not.toBeInTheDocument();
   });
 
-  it('turns progress facts into one review next action', async () => {
+  it('uses the server-selected weekly action in the progress hub', async () => {
     installApi();
     renderExperience();
 
     expect(await screen.findByRole('heading', { name: 'Факты → действие' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Открыть план недели' })).toHaveAttribute(
-      'href',
-      '/app?section=today',
-    );
     expect(screen.getByRole('link', { name: 'Пройти недельный обзор' })).toHaveAttribute(
       'href',
       '/app?section=progress&progress_view=wellbeing',

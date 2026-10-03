@@ -43,6 +43,7 @@ LIFECYCLE_KPI_KEYS = (
     "recovery_to_completion_rate",
     "time_to_recovery",
     "nutrition_repeat_rate",
+    "progress_next_action_completion_rate",
     "weekly_loop_completion",
 )
 
@@ -482,6 +483,8 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
     d30_denominator = d30_return = 0
     nutrition_denominator = nutrition_repeat = 0
     weekly_denominator = weekly_loop = 0
+    progress_action_denominator = progress_action_completed = 0
+    progress_action_times: list[float] = []
     complete_week_starts: set[date] = set()
 
     for user in users:
@@ -570,12 +573,15 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
 
         if first_week_matured:
             weekly_denominator += 1
-            weekly_loop += int(
-                any(
-                    _in_window(value, registration_at, registration_at + timedelta(days=7))
-                    for value in user_events["weekly_review_completed"]
-                )
-            )
+            week_end = registration_at + timedelta(days=7)
+            review_at = _first_after(user_events["weekly_review_completed"], registration_at)
+            if review_at is not None and _in_window(review_at, registration_at, week_end):
+                progress_action_denominator += 1
+                action_at = _first_after(user_events["progress_next_action_completed"], review_at)
+                if action_at is not None and _in_window(action_at, review_at, week_end):
+                    progress_action_completed += 1
+                    progress_action_times.append((action_at - review_at).total_seconds())
+                    weekly_loop += 1
 
     cohort_size = len(users)
     recovery_accounts = (
@@ -704,11 +710,19 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
             window="минимум два календарных дня записи питания в первые 7 дней",
         ),
         _kpi(
+            key="progress_next_action_completion_rate",
+            numerator=progress_action_completed,
+            denominator=progress_action_denominator,
+            cohort_size=cohort_size,
+            window="серверное подтверждение выбранного шага после недельного обзора, первые 7 дней",
+            median_seconds=median(progress_action_times) if progress_action_times else None,
+        ),
+        _kpi(
             key="weekly_loop_completion",
             numerator=weekly_loop,
             denominator=weekly_denominator,
             cohort_size=cohort_size,
-            window="подтверждённые итоги недели в первые 7 дней",
+            window="недельный обзор и выбранный шаг подтверждены в первые 7 дней",
         ),
     ]
 
