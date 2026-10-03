@@ -61,6 +61,7 @@ describe('selectNextAction', () => {
       hasActiveProgram: true,
       workout: workout('in_progress'),
       trainerComment: comment(),
+      recovery: recoveryState(),
     });
 
     expect(plan.primary.kind).toBe('active_workout');

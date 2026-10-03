@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from fitminiapp_api.core.timezone import today_msk
+from fitminiapp_api.core.timezone import today_in_timezone, today_msk
 from fitminiapp_api.db.session import get_session_context
-from fitminiapp_api.models.program import UserProgram, UserWorkout
+from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
+from fitminiapp_api.models.program import ProgramRevision, UserProgram, UserWorkout
+from fitminiapp_api.models.user import User, UserProfile
+from fitminiapp_api.services.workout_recovery import recovery_today_for_user
 
 
 def _auth(client, telegram_user_id: int) -> dict[str, str]:
@@ -52,6 +55,9 @@ def _create_one_day_program(client, headers: dict[str, str]) -> int:
 def test_recovery_preview_is_non_mutating_and_apply_records_lineage(client) -> None:
     headers = _auth(client, 519_001)
     program_id = _create_one_day_program(client, headers)
+    before_day_end = client.get("/api/v1/workouts/recovery", headers=headers)
+    assert before_day_end.status_code == 200, before_day_end.text
+    assert before_day_end.json()["status"] == "clear"
     missed_date = today_msk() - timedelta(days=1)
 
     with get_session_context() as db:
@@ -75,6 +81,15 @@ def test_recovery_preview_is_non_mutating_and_apply_records_lineage(client) -> N
             "week_number": 1,
         }
     ]
+
+    schedule = client.get(
+        "/api/v1/workouts/schedule",
+        params={"date_from": missed_date.isoformat(), "date_to": missed_date.isoformat()},
+        headers=headers,
+    )
+    assert schedule.status_code == 200, schedule.text
+    assert schedule.json()[0]["id"] == workout_id
+    assert schedule.json()[0]["status"] == "missed"
 
     payload = {
         "action": "move",
@@ -116,6 +131,54 @@ def test_recovery_preview_is_non_mutating_and_apply_records_lineage(client) -> N
         assert updated.scheduled_date == today_msk() + timedelta(days=1)
         assert updated.scheduled_time is not None
         assert updated.scheduled_time.isoformat() == "18:30:00"
+        assert (
+            db.query(LifecycleMilestone)
+            .filter(
+                LifecycleMilestone.workout_id == workout_id,
+                LifecycleMilestone.milestone_type == "recovery_action_confirmed",
+            )
+            .count()
+            == 1
+        )
+        missed_event = (
+            db.query(LifecycleMilestone)
+            .filter(
+                LifecycleMilestone.workout_id == workout_id,
+                LifecycleMilestone.milestone_type == "workout_missed",
+            )
+            .one()
+        )
+        recovery_event = (
+            db.query(LifecycleMilestone)
+            .filter(
+                LifecycleMilestone.workout_id == workout_id,
+                LifecycleMilestone.milestone_type == "recovery_action_confirmed",
+            )
+            .one()
+        )
+        assert missed_event.missed_at == missed_event.occurred_at
+        assert missed_event.program_revision_number < recovery_event.program_revision_number
+
+    replayed = client.post(
+        f"/api/v1/workouts/{workout_id}/recovery/apply",
+        headers=headers,
+        json={**payload, "preview_token": preview.json()["preview_token"]},
+    )
+    assert replayed.status_code == 200, replayed.text
+    assert (
+        replayed.json()["workout"]["scheduled_date"]
+        == (today_msk() + timedelta(days=1)).isoformat()
+    )
+    with get_session_context() as db:
+        assert (
+            db.query(LifecycleMilestone)
+            .filter(
+                LifecycleMilestone.workout_id == workout_id,
+                LifecycleMilestone.milestone_type == "recovery_action_confirmed",
+            )
+            .count()
+            == 1
+        )
 
     revisions = client.get(f"/api/v1/programs/assigned/{program_id}/revisions", headers=headers)
     assert revisions.status_code == 200, revisions.text
@@ -196,6 +259,23 @@ def test_recovery_skip_requires_confirmation_and_closes_finished_program(client)
         stored = db.get(UserWorkout, workout_id)
         assert stored is not None
         assert stored.status == "skipped"
+        assert (
+            db.query(LifecycleMilestone)
+            .filter(
+                LifecycleMilestone.workout_id == workout_id,
+                LifecycleMilestone.milestone_type == "workout_missed",
+            )
+            .count()
+            == 1
+        )
+
+    replayed = client.post(
+        f"/api/v1/workouts/{workout_id}/recovery/apply",
+        headers=headers,
+        json={**payload, "preview_token": preview.json()["preview_token"]},
+    )
+    assert replayed.status_code == 200, replayed.text
+    assert replayed.json()["workout"]["status"] == "skipped"
 
     state = client.get("/api/v1/workouts/recovery", headers=headers)
     assert state.status_code == 200, state.text
@@ -219,6 +299,75 @@ def test_recovery_surfaces_paused_program_for_existing_resume_flow(client) -> No
     assert state.json()["paused_program_id"] == program_id
 
 
+def test_interrupted_workout_remains_active_after_its_scheduled_day(client) -> None:
+    headers = _auth(client, 519_007)
+    program_id = _create_one_day_program(client, headers)
+    with get_session_context() as db:
+        workout = db.query(UserWorkout).filter(UserWorkout.user_program_id == program_id).one()
+        workout_id = workout.id
+
+    started = client.post(f"/api/v1/workouts/{workout_id}/start", headers=headers)
+    assert started.status_code == 200, started.text
+
+    with get_session_context() as db:
+        workout = db.get(UserWorkout, workout_id)
+        assert workout is not None
+        workout.scheduled_date = today_msk() - timedelta(days=1)
+        db.commit()
+
+    state = client.get("/api/v1/workouts/recovery", headers=headers)
+    assert state.status_code == 200, state.text
+    assert state.json()["status"] == "clear"
+    assert state.json()["missed_workouts"] == []
+
+    today = client.get("/api/v1/workouts/today", headers=headers)
+    assert today.status_code == 200, today.text
+    assert today.json()["id"] == workout_id
+    assert today.json()["status"] == "in_progress"
+
+    resumed = client.post(f"/api/v1/workouts/{workout_id}/start", headers=headers)
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["status"] == "in_progress"
+
+
+def test_recovery_fails_closed_for_workout_removed_from_current_revision(client) -> None:
+    headers = _auth(client, 519_008)
+    program_id = _create_one_day_program(client, headers)
+    missed_date = today_msk() - timedelta(days=1)
+    with get_session_context() as db:
+        workout = db.query(UserWorkout).filter(UserWorkout.user_program_id == program_id).one()
+        workout.scheduled_date = missed_date
+        program = db.get(UserProgram, program_id)
+        assert program is not None
+        program.current_revision_number += 1
+        db.add(
+            ProgramRevision(
+                user_program_id=program_id,
+                revision_number=program.current_revision_number,
+                actor_role="system",
+                change_kind="plan_updated",
+                changed_fields={"operation": "test_stale_revision"},
+                snapshot={"workouts": []},
+            )
+        )
+        db.commit()
+        workout_id = workout.id
+
+    state = client.get("/api/v1/workouts/recovery", headers=headers)
+    assert state.status_code == 200, state.text
+    assert state.json()["status"] == "clear"
+    preview = client.post(
+        f"/api/v1/workouts/{workout_id}/recovery/preview",
+        headers=headers,
+        json={
+            "action": "skip",
+            "expected_scheduled_date": missed_date.isoformat(),
+            "expected_scheduled_time": None,
+        },
+    )
+    assert preview.status_code == 409, preview.text
+
+
 def test_recovery_is_owner_scoped(client) -> None:
     owner_headers = _auth(client, 519_003)
     other_headers = _auth(client, 519_004)
@@ -239,3 +388,12 @@ def test_recovery_is_owner_scoped(client) -> None:
         },
     )
     assert response.status_code == 404, response.text
+
+
+def test_recovery_timezone_falls_back_explicitly_to_utc() -> None:
+    user_without_profile = User(telegram_user_id=519_009)
+    assert recovery_today_for_user(user_without_profile) == today_in_timezone("UTC")
+
+    user_with_invalid_profile = User(telegram_user_id=519_010)
+    user_with_invalid_profile.profile = UserProfile(timezone="Not/A-Timezone")
+    assert recovery_today_for_user(user_with_invalid_profile) == today_in_timezone("UTC")

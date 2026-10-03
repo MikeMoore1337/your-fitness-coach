@@ -121,7 +121,7 @@ const recoveryPreview = {
   status: 'preview',
   workout: schedule[0],
   action: 'move',
-  ruleset_version: 'schedule-recovery-v1',
+  ruleset_version: 'schedule-recovery-v2',
   changes: [
     {
       kind: 'moved',
@@ -288,6 +288,7 @@ function renderPanel(userId: number | 'anonymous' = 'anonymous') {
 describe('ProgressSchedule', () => {
   beforeEach(() => {
     localStorage.clear();
+    schedule[0]!.status = 'planned';
     suspiciousLowDays.length = 0;
     calibrationResult = insufficientCalibration;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -402,6 +403,15 @@ describe('ProgressSchedule', () => {
         }),
       ),
     );
+  });
+
+  it('uses the recovery action for a server-derived missed workout', async () => {
+    schedule[0]!.status = 'missed';
+    renderPanel();
+
+    expect(await screen.findByText('Тренировка A')).toBeInTheDocument();
+    expect(screen.getByText('Нужно решить')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Вернуться к тренировке' })).toBeInTheDocument();
   });
 
   it('submits optional weekly self-assessment', async () => {

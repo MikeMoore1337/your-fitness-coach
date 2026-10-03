@@ -143,8 +143,8 @@ function nutritionAction(nextWorkout: NextWorkout | null | undefined): NextActio
 function recoveryAction(workout: WorkoutRecoveryState['missed_workouts'][number]): NextAction {
   return action(
     'workout_recovery',
-    'Разобраться с пропущенной',
-    `«${workout.title}» осталась в плане — выберите перенос или пропуск`,
+    'Вернуться к тренировке',
+    `«${workout.title}» осталась невыполненной — можно восстановить план`,
     'missed_workout',
     { type: 'workout_recovery', workoutId: workout.id },
   );

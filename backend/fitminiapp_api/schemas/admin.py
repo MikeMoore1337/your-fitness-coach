@@ -96,6 +96,8 @@ AdminLifecycleKpiKey = Literal[
     "d7_meaningful_return",
     "d30_meaningful_return",
     "missed_workout_recovery_conversion",
+    "recovery_to_completion_rate",
+    "time_to_recovery",
     "nutrition_repeat_rate",
     "weekly_loop_completion",
 ]
@@ -129,6 +131,7 @@ class AdminFunnelResponse(BaseModel):
     cohort_size: int
     complete_weekly_cohorts: int
     eligible_real_account_count: int
+    recovery_eligible_real_account_count: int
     analytics_provider_status: Literal["not_connected"]
     coverage_note: str
     effect_status: Literal["NOT_YET_PROVEN", "BASELINE_ONLY"]

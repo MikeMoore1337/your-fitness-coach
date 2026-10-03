@@ -16,6 +16,7 @@ const captureTask116Proofs =
 
 type DashboardState = {
   workout?: 'planned' | 'in_progress' | 'completed' | 'none';
+  missedWorkout?: boolean;
   activeProgram?: boolean;
   incompleteProfile?: boolean;
   failNutrition?: boolean;
@@ -140,6 +141,35 @@ async function mockDashboard(page: Page, state: DashboardState = {}) {
         });
       }
       return route.fulfill({ json: [{ ...workout(), status: workoutStatus }] });
+    }
+    if (path.endsWith('/workouts/recovery')) {
+      return route.fulfill({
+        json: state.missedWorkout
+          ? {
+              status: 'missed',
+              missed_workouts: [
+                {
+                  id: 77,
+                  scheduled_date: addDays(today, -1),
+                  scheduled_time: '18:30:00',
+                  title: 'Силовая база',
+                  status: 'missed',
+                  day_number: 2,
+                  week_number: 1,
+                },
+              ],
+              next_workout: null,
+              paused_program_id: null,
+              paused_program_title: null,
+            }
+          : {
+              status: 'clear',
+              missed_workouts: [],
+              next_workout: null,
+              paused_program_id: null,
+              paused_program_title: null,
+            },
+      });
     }
     if (path.endsWith('/workouts/42/start')) {
       workoutStatus = 'in_progress';
@@ -458,6 +488,17 @@ test('started workout finishes into a factual completed state', async ({ page })
   await page.getByRole('button', { name: 'Завершить тренировку' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Завершить' }).click();
   await expect(page.getByRole('heading', { name: 'Тренировка завершена' })).toBeVisible();
+});
+
+test('surfaces a factual recovery action for a server-derived missed workout', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockDashboard(page, { workout: 'none', missedWorkout: true });
+  await openDashboard(page);
+
+  await expect(page.getByRole('button', { name: 'Вернуться к тренировке' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Тренировка осталась невыполненной' }),
+  ).toBeVisible();
 });
 
 test('new and incomplete profile states keep profile completion primary', async ({ page }) => {

@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
-from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
+from fitminiapp_api.core.timezone import now_msk_naive
 from fitminiapp_api.models.program import (
     UserProgram,
     UserWorkout,
@@ -12,6 +12,7 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.workout import WorkoutSetCreate
+from fitminiapp_api.services.workout_recovery import recovery_today_for_user
 
 
 class WorkoutStateError(ValueError):
@@ -78,6 +79,24 @@ def pr_record_set_filter():
 
 
 def get_today_workout(db: Session, user: User) -> UserWorkout | None:
+    active_workout = (
+        db.query(UserWorkout)
+        .join(UserProgram, UserWorkout.user_program_id == UserProgram.id)
+        .options(
+            joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
+            joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets),
+        )
+        .filter(
+            UserProgram.user_id == user.id,
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
+            UserWorkout.status == "in_progress",
+        )
+        .order_by(UserWorkout.started_at.desc(), UserWorkout.id.desc())
+        .first()
+    )
+    if active_workout is not None:
+        return active_workout
     return (
         db.query(UserWorkout)
         .join(UserProgram, UserWorkout.user_program_id == UserProgram.id)
@@ -88,8 +107,11 @@ def get_today_workout(db: Session, user: User) -> UserWorkout | None:
         .filter(
             UserProgram.user_id == user.id,
             UserProgram.is_active.is_(True),
-            UserWorkout.scheduled_date == today_for_user(user),
+            UserProgram.status.in_({"scheduled", "active"}),
+            UserWorkout.scheduled_date == recovery_today_for_user(user),
+            UserWorkout.status.in_({"planned", "completed"}),
         )
+        .order_by(UserWorkout.id.desc())
         .first()
     )
 

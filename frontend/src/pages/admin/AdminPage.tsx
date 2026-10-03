@@ -79,6 +79,8 @@ const KPI_LABELS: Record<AdminFunnel['kpis'][number]['key'], string> = {
   d7_meaningful_return: 'Вернулись через неделю',
   d30_meaningful_return: 'Вернулись через 30 дней',
   missed_workout_recovery_conversion: 'Отреагировали на пропуск тренировки',
+  recovery_to_completion_rate: 'Завершили восстановленную тренировку',
+  time_to_recovery: 'Время до восстановления тренировки',
   nutrition_repeat_rate: 'Повторили запись питания',
   weekly_loop_completion: 'Завершили недельный цикл',
 };
@@ -732,7 +734,8 @@ export default function AdminPage() {
                 <p>{funnel.data.coverage_note}</p>
                 <p className="admin-global-section__meta">
                   Аккаунтов в выборке: {funnel.data.cohort_size}. Полных недельных срезов:{' '}
-                  {funnel.data.complete_weekly_cohorts}. {funnel.data.effect_note}
+                  {funnel.data.complete_weekly_cohorts}. Аккаунтов для показателей восстановления:{' '}
+                  {funnel.data.recovery_eligible_real_account_count}. {funnel.data.effect_note}
                 </p>
                 <div className="admin-funnel" role="list">
                   {funnel.data.kpis.map((kpi) => (

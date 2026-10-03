@@ -50,7 +50,7 @@ def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
     assert auth_families is not None
     assert relocated_marker is not None
     assert auth_families.down_revision == legacy_support.revision
-    assert revisions.get_heads() == ["0112_lifecycle_milestones"]
+    assert revisions.get_heads() == ["0114_lifecycle_missed_workout_constraint"]
     assert relocated_marker.revision in {
         revision.revision
         for revision in revisions.iterate_revisions("head", legacy_support.revision)
@@ -85,4 +85,10 @@ def test_lifecycle_milestone_migration_passes_the_online_rollout_gate(monkeypatc
     monkeypatch.chdir(root)
     migration_path = Path("backend/alembic/versions/0112_lifecycle_milestones.py")
     checker["validate_added_migration"](migration_path)
+    checker["validate_added_migration"](
+        Path("backend/alembic/versions/0113_lifecycle_workout_instances.py")
+    )
+    checker["validate_added_migration"](
+        Path("backend/alembic/versions/0114_lifecycle_missed_workout_constraint.py")
+    )
     checker["check_online_migrations"](active_revision, target_revision)

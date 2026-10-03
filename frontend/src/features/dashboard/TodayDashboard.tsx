@@ -16,7 +16,6 @@ import type {
 import {
   calendarWeek,
   dateInputValue,
-  detectedTimeZone,
   formatCalendarDate,
 } from '../../shared/dateTime';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
@@ -965,7 +964,7 @@ export function TodayDashboard({
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [cardioOpenRequest, setCardioOpenRequest] = useState(initialCardioOpen ? 1 : 0);
   const wellbeingRequested = Boolean(initialWellbeingOpen || initialWellbeingDate);
-  const timeZone = user?.profile?.timezone || detectedTimeZone();
+  const timeZone = user?.profile?.timezone || 'UTC';
   const today = useCalendarDay(timeZone);
   const [selectedDate, setSelectedDate] = useState(today);
 
@@ -1194,6 +1193,7 @@ export function TodayDashboard({
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true }),
       queryClient.invalidateQueries({ queryKey: ['workout', 'week'], exact: true }),
+      queryClient.invalidateQueries({ queryKey: ['workout', 'recovery'], exact: true }),
       queryClient.invalidateQueries({ queryKey: ['weekly-check-ins', 'current'], exact: true }),
       queryClient.invalidateQueries({ queryKey: queryKeys.progress.summaries }),
     ]);
