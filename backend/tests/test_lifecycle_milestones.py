@@ -1,8 +1,9 @@
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.timezone import local_naive_to_utc_naive, now_msk_naive
 from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.models.food_diary import FoodDiaryCopyOperation, FoodDiaryRepeatPreview
 from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
 from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User, UserProfile
@@ -165,6 +166,64 @@ def test_lifecycle_report_is_empty_outside_production(monkeypatch) -> None:
     assert report["eligible_real_account_count"] == 0
     assert "non-production" in report["coverage_note"]
     assert report["exclusions"][0] == "любые аккаунты и события non-production окружений"
+
+
+def test_lifecycle_report_exposes_privacy_safe_repeat_metrics(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "prod")
+    with get_session_context() as db:
+        before = lifecycle_funnel_report(db, period_days=30)
+        user = User(
+            telegram_user_id=991006,
+            is_coach=False,
+            is_admin=False,
+            created_at=now_msk_naive() - timedelta(days=10),
+        )
+        user.profile = UserProfile(timezone="UTC")
+        db.add(user)
+        db.flush()
+        preview = FoodDiaryRepeatPreview(
+            user_id=user.id,
+            token_hash="a" * 64,
+            request_fingerprint="b" * 64,
+            source_snapshot_hash="c" * 64,
+            copy_scope="meal",
+            source_date=date(2026, 9, 20),
+            source_meal_type="breakfast",
+            target_date=date(2026, 9, 21),
+            target_meal_type="breakfast",
+            persistence_failure_count=1,
+        )
+        db.add(preview)
+        db.flush()
+        operation = FoodDiaryCopyOperation(
+            user_id=user.id,
+            preview_id=preview.id,
+            idempotency_key="metrics-repeat-0001",
+            request_fingerprint="d" * 64,
+            copy_scope="meal",
+            source_date=date(2026, 9, 20),
+            source_meal_type="breakfast",
+            target_date=date(2026, 9, 21),
+            target_meal_type="breakfast",
+            replay_count=2,
+        )
+        db.add(operation)
+        db.commit()
+
+        report = lifecycle_funnel_report(db, period_days=30)
+
+    metrics = report["nutrition_repeat_metrics"]
+    assert (
+        metrics["eligible_opportunities"]
+        == before["nutrition_repeat_metrics"]["eligible_opportunities"] + 1
+    )
+    assert (
+        metrics["confirmed_repeats"] == before["nutrition_repeat_metrics"]["confirmed_repeats"] + 1
+    )
+    assert metrics["preview_to_confirmed_percent"] == 100.0
+    assert metrics["persistence_failures"] == 1
+    assert metrics["duplicate_prevention_count"] == 2
+    assert "metrics-repeat-0001" not in str(report)
 
 
 def test_lifecycle_report_uses_instance_recovery_facts_for_all_client_accounts(monkeypatch) -> None:

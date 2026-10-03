@@ -30,8 +30,12 @@ from fitminiapp_api.schemas.food import (
 )
 from fitminiapp_api.schemas.food_diary import (
     FoodDiaryCopyDay,
+    FoodDiaryCopyDayPreview,
     FoodDiaryCopyMeal,
+    FoodDiaryCopyMealPreview,
+    FoodDiaryCopyPreviewResponse,
     FoodDiaryCopyProduct,
+    FoodDiaryCopyProductPreview,
     FoodDiaryCopyResponse,
     FoodDiaryDayResponse,
     FoodDiaryDayStatusUpdate,
@@ -112,6 +116,9 @@ from fitminiapp_api.services.food_diary import (
     create_food_diary_entry,
     delete_food_diary_entry,
     get_food_diary_day,
+    preview_diary_day,
+    preview_diary_meal,
+    preview_diary_product,
     set_food_diary_day_status,
     update_food_diary_entry,
 )
@@ -1064,6 +1071,51 @@ def delete_diary_entry(
     except FoodDiaryError as exc:
         _raise_diary_http_error(exc)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/diary/copy/product/preview",
+    response_model=FoodDiaryCopyPreviewResponse,
+)
+def preview_copy_product(
+    payload: FoodDiaryCopyProductPreview,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_diary_product(db, current_user, payload)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
+    "/diary/copy/meal/preview",
+    response_model=FoodDiaryCopyPreviewResponse,
+)
+def preview_copy_meal(
+    payload: FoodDiaryCopyMealPreview,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_diary_meal(db, current_user, payload)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
+    "/diary/copy/day/preview",
+    response_model=FoodDiaryCopyPreviewResponse,
+)
+def preview_copy_day(
+    payload: FoodDiaryCopyDayPreview,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return preview_diary_day(db, current_user, payload)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
 
 
 @router.post(

@@ -153,6 +153,12 @@ class FoodDiaryTargets(BaseModel):
     carbs_g: Decimal | None
 
 
+class FoodDiaryRepeatCandidate(BaseModel):
+    source_date: date
+    source_meal_type: MealType
+    entry_count: int = Field(gt=0)
+
+
 class FoodDiaryDayResponse(BaseModel):
     diary_date: date
     timezone: str
@@ -162,6 +168,7 @@ class FoodDiaryDayResponse(BaseModel):
     remaining: FoodDiaryTargets | None
     status: DiaryDayStatus
     status_is_explicit: bool
+    repeat_candidate: FoodDiaryRepeatCandidate | None = None
 
 
 class FoodDiaryDayStatusUpdate(BaseModel):
@@ -169,7 +176,7 @@ class FoodDiaryDayStatusUpdate(BaseModel):
     status: DiaryDayStatus
 
 
-class FoodDiaryCopyProduct(BaseModel):
+class FoodDiaryCopyProductPreview(BaseModel):
     source_entry_id: int = Field(gt=0)
     source_date: date
     source_meal_type: MealType
@@ -177,16 +184,39 @@ class FoodDiaryCopyProduct(BaseModel):
     target_meal_type: MealType
 
 
-class FoodDiaryCopyMeal(BaseModel):
+class FoodDiaryCopyProduct(FoodDiaryCopyProductPreview):
+    preview_token: str = Field(min_length=16, max_length=256)
+
+
+class FoodDiaryCopyMealPreview(BaseModel):
     source_date: date
     source_meal_type: MealType
     target_date: date
     target_meal_type: MealType
 
 
-class FoodDiaryCopyDay(BaseModel):
+class FoodDiaryCopyMeal(FoodDiaryCopyMealPreview):
+    preview_token: str = Field(min_length=16, max_length=256)
+
+
+class FoodDiaryCopyDayPreview(BaseModel):
     source_date: date
     target_date: date
+
+
+class FoodDiaryCopyDay(FoodDiaryCopyDayPreview):
+    preview_token: str = Field(min_length=16, max_length=256)
+
+
+class FoodDiaryCopyPreviewResponse(BaseModel):
+    copy_scope: Literal["product", "meal", "day"]
+    source_date: date
+    source_meal_type: MealType | None
+    target_date: date
+    target_meal_type: MealType | None
+    entries: list[FoodDiaryEntryResponse]
+    preview_token: str
+    previewed_at: datetime
 
 
 class FoodDiaryCopyResponse(BaseModel):

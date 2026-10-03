@@ -660,6 +660,29 @@ async function mockNutritionApi(
       entries = [...entries, created];
       return route.fulfill({ status: 201, json: created });
     }
+    if (path === '/api/v1/nutrition/diary/copy/product/preview' && request.method() === 'POST') {
+      const body = request.postDataJSON() as {
+        source_entry_id: number;
+        source_date: string;
+        target_date: string;
+        source_meal_type: FoodDiaryEntry['meal_type'];
+        target_meal_type: FoodDiaryEntry['meal_type'];
+      };
+      const source = entries.find((entry) => entry.id === body.source_entry_id);
+      if (!source) return route.fulfill({ status: 404, json: { detail: 'Entry not found' } });
+      return route.fulfill({
+        json: {
+          copy_scope: 'product',
+          source_date: body.source_date,
+          source_meal_type: body.source_meal_type,
+          target_date: body.target_date,
+          target_meal_type: body.target_meal_type,
+          entries: [source],
+          preview_token: 'inline-preview-token-1234567890',
+          previewed_at: '2026-08-19T08:00:00Z',
+        },
+      });
+    }
     return route.fulfill({ status: 404, json: { detail: `Unhandled ${path}` } });
   });
 
@@ -1225,6 +1248,9 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await oatmeal.getByRole('button', { name: 'Повторить Овсяная каша' }).click();
   await expect(page.getByRole('dialog', { name: 'Повторить продукт' })).toBeVisible();
   await expect(page.getByText('Новые записи добавятся к уже существующим.')).toBeVisible();
+  await page.getByRole('dialog', { name: 'Повторить продукт' }).screenshot({
+    path: '../.artifacts/runtime/tests/screenshots/task-536/nutrition-repeat-preview-mobile-360.png',
+  });
   await expect(page.getByRole('textbox', { name: 'Дата назначения' })).toHaveValue('2026-08-19');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(360);
   await page.keyboard.press('Escape');

@@ -548,16 +548,23 @@ def test_quick_add_full_macros_remain_available_to_day_totals(client) -> None:
         "carbs_g": "52.000",
         "fiber_g": None,
     }
+    copy_request = {
+        "source_entry_id": response.json()["id"],
+        "source_date": selected_date.isoformat(),
+        "source_meal_type": "dinner",
+        "target_date": (selected_date + timedelta(days=1)).isoformat(),
+        "target_meal_type": "lunch",
+    }
+    preview = client.post(
+        "/api/v1/nutrition/diary/copy/product/preview",
+        headers=headers,
+        json=copy_request,
+    )
+    assert preview.status_code == 200, preview.text
     copied = client.post(
         "/api/v1/nutrition/diary/copy/product",
         headers={**headers, "Idempotency-Key": "copy-quick-entry-full-1"},
-        json={
-            "source_entry_id": response.json()["id"],
-            "source_date": selected_date.isoformat(),
-            "source_meal_type": "dinner",
-            "target_date": (selected_date + timedelta(days=1)).isoformat(),
-            "target_meal_type": "lunch",
-        },
+        json={**copy_request, "preview_token": preview.json()["preview_token"]},
     )
     assert copied.status_code == 201, copied.text
     assert copied.json()["entries"][0]["entry_kind"] == "quick_add"
@@ -609,6 +616,38 @@ def test_quick_add_accepts_partial_macros_and_preserves_source_confidence(client
     }
 
 
+def test_diary_exposes_one_deterministic_prior_meal_repeat_candidate(client) -> None:
+    telegram_user_id = 16_043
+    headers = _auth(client, telegram_user_id)
+    food_id = _store_food(name="Повторяемая каша")
+    today = timezone_module.today_in_timezone("Europe/Moscow")
+    source_date = today - timedelta(days=1)
+    source = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "diary_date": source_date.isoformat(),
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert source.status_code == 201, source.text
+
+    current = client.get(
+        "/api/v1/nutrition/diary",
+        headers=headers,
+        params={"diary_date": today.isoformat()},
+    )
+    assert current.status_code == 200, current.text
+    assert current.json()["repeat_candidate"] == {
+        "source_date": source_date.isoformat(),
+        "source_meal_type": "breakfast",
+        "entry_count": 1,
+    }
+
+
 def test_diary_day_query_count_is_constant() -> None:
     selected_date = timezone_module.today_in_timezone("Europe/Moscow")
     with get_session_context() as db:
@@ -643,7 +682,7 @@ def test_diary_day_query_count_is_constant() -> None:
             reset_sql_metrics(token)
 
     assert len(result.meals[-1].entries) == 25
-    assert metrics.query_count == 3
+    assert metrics.query_count == 4
 
 
 def test_food_diary_migration_upgrades_from_food_domain_head(tmp_path: Path) -> None:

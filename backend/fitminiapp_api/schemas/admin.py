@@ -123,6 +123,19 @@ class AdminLifecycleDataQuality(BaseModel):
     timezone_fallback_accounts: int
 
 
+class AdminNutritionRepeatMetrics(BaseModel):
+    eligible_opportunities: int
+    confirmed_repeats: int
+    repeat_rate_percent: float | None = None
+    preview_count: int
+    confirmed_preview_count: int
+    preview_to_confirmed_percent: float | None = None
+    median_seconds: float | None = None
+    persistence_failures: int
+    persistence_failure_rate_percent: float | None = None
+    duplicate_prevention_count: int
+
+
 class AdminFunnelResponse(BaseModel):
     period_days: int
     cohort_since: datetime
@@ -132,6 +145,7 @@ class AdminFunnelResponse(BaseModel):
     complete_weekly_cohorts: int
     eligible_real_account_count: int
     recovery_eligible_real_account_count: int
+    nutrition_repeat_metrics: AdminNutritionRepeatMetrics
     analytics_provider_status: Literal["not_connected"]
     coverage_note: str
     effect_status: Literal["NOT_YET_PROVEN", "BASELINE_ONLY"]

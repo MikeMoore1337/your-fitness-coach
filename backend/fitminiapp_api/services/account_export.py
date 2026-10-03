@@ -188,6 +188,10 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "photo_meal_drafts": (
         "short-lived owner-scoped meal photo drafts; the source image is never persisted"
     ),
+    "food_diary_repeat_previews": (
+        "short-lived owner-scoped repeat preview capabilities and aggregate measurement metadata; "
+        "no diary content or raw nutrition facts are persisted"
+    ),
     "ai_coach_quota_windows": "operational AI Coach quota window and usage metadata",
     "ai_coach_quota_reservations": (
         "short-lived AI Coach quota reservations and opaque idempotency metadata"

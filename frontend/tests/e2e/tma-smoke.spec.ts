@@ -2411,8 +2411,8 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
 
   const entry = tmaPage.locator('.nutrition-entry').filter({ hasText: 'TMA перекус' });
   await entry.getByRole('button', { name: 'Повторить' }).click();
-  await tmaPage.getByRole('dialog').getByRole('button', { name: 'Повторить продукт' }).click();
-  await expect(tmaPage.getByText('Скопировано записей: 1')).toBeVisible();
+  await tmaPage.getByRole('dialog').getByRole('button', { name: 'Подтвердить' }).click();
+  await expect(tmaPage.getByText('Добавлено записей: 1')).toBeVisible();
   await expectNoHorizontalOverflow(tmaPage);
 
   await tmaPage.getByRole('link', { name: 'Прогресс', exact: true }).click();
