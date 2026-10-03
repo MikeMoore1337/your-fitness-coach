@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import UTC, date, datetime, timedelta
 from statistics import median
+from typing import TypedDict
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, joinedload
@@ -24,6 +25,10 @@ from fitminiapp_api.models.user import User
 from fitminiapp_api.services.lifecycle_milestones import (
     MEANINGFUL_MILESTONE_TYPES,
 )
+from fitminiapp_api.services.workout_recovery import (
+    missed_at_for_workout,
+    recoverable_missed_workouts,
+)
 
 LIFECYCLE_KPI_KEYS = (
     "activation_rate",
@@ -34,12 +39,23 @@ LIFECYCLE_KPI_KEYS = (
     "d7_meaningful_return",
     "d30_meaningful_return",
     "missed_workout_recovery_conversion",
+    "recovery_to_completion_rate",
+    "time_to_recovery",
     "nutrition_repeat_rate",
     "weekly_loop_completion",
 )
 
 
 _UserEvents = dict[str, list[datetime]]
+
+
+class _RecoveryMetrics(TypedDict):
+    missed_denominator: int
+    missed_numerator: int
+    completion_denominator: int
+    completion_numerator: int
+    recovery_count: int
+    median_recovery_seconds: float | None
 
 
 def _empty_events() -> _UserEvents:
@@ -113,15 +129,130 @@ def _kpi(
     cohort_size: int,
     window: str,
     median_seconds: float | None = None,
+    include_rate: bool = True,
 ) -> dict[str, object]:
     return {
         "key": key,
         "numerator": numerator,
         "denominator": denominator,
         "cohort_size": cohort_size,
-        "rate_percent": round(numerator * 100 / denominator, 1) if denominator else None,
+        "rate_percent": (
+            round(numerator * 100 / denominator, 1) if denominator and include_rate else None
+        ),
         "median_seconds": round(median_seconds, 1) if median_seconds is not None else None,
         "window": window,
+    }
+
+
+def _recovery_timezone_name(user: User) -> str:
+    raw_timezone = getattr(getattr(user, "profile", None), "timezone", None)
+    return raw_timezone if raw_timezone and is_valid_timezone(raw_timezone) else "UTC"
+
+
+def _recovery_metrics(
+    db: Session,
+    *,
+    eligible_users: list[User],
+    period_start: datetime,
+    now: datetime,
+) -> _RecoveryMetrics:
+    """Calculate instance-level recovery facts without exposing identifiers."""
+
+    user_by_id = {user.id: user for user in eligible_users}
+    missed_instances: dict[int, tuple[int, datetime]] = {}
+    missed_rows = (
+        db.query(LifecycleMilestone)
+        .filter(
+            LifecycleMilestone.user_id.in_(user_by_id),
+            LifecycleMilestone.milestone_type == "workout_missed",
+            LifecycleMilestone.workout_id.is_not(None),
+            LifecycleMilestone.missed_at.is_not(None),
+            LifecycleMilestone.missed_at >= period_start,
+            LifecycleMilestone.missed_at <= now,
+        )
+        .order_by(LifecycleMilestone.missed_at.asc(), LifecycleMilestone.id.asc())
+        .all()
+        if user_by_id
+        else []
+    )
+    for row in missed_rows:
+        if row.workout_id is not None and row.missed_at is not None:
+            missed_instances.setdefault(row.workout_id, (row.user_id, row.missed_at))
+
+    # A currently outstanding missed workout has no ledger row until the user
+    # confirms an action, so derive it from the authoritative schedule too.
+    for user in eligible_users:
+        for workout in recoverable_missed_workouts(db, user):
+            if workout.id in missed_instances:
+                continue
+            missed_at = missed_at_for_workout(workout, user)
+            if period_start <= missed_at <= now:
+                missed_instances[workout.id] = (user.id, missed_at)
+
+    recovery_rows = (
+        db.query(LifecycleMilestone)
+        .filter(
+            LifecycleMilestone.user_id.in_(user_by_id),
+            LifecycleMilestone.milestone_type == "recovery_action_confirmed",
+            LifecycleMilestone.workout_id.is_not(None),
+            LifecycleMilestone.missed_at.is_not(None),
+            LifecycleMilestone.occurred_at >= period_start,
+            LifecycleMilestone.occurred_at <= now,
+        )
+        .order_by(LifecycleMilestone.occurred_at.asc(), LifecycleMilestone.id.asc())
+        .all()
+        if user_by_id
+        else []
+    )
+    confirmed_recoveries: dict[int, LifecycleMilestone] = {}
+    for row in recovery_rows:
+        if row.workout_id is None or row.missed_at is None:
+            continue
+        if not row.missed_at <= row.occurred_at <= row.missed_at + timedelta(days=7):
+            continue
+        confirmed_recoveries.setdefault(row.workout_id, row)
+
+    recovery_workout_ids = set(confirmed_recoveries)
+    workout_rows = (
+        db.query(UserWorkout, UserProgram)
+        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .filter(UserWorkout.id.in_(recovery_workout_ids))
+        .all()
+        if recovery_workout_ids
+        else []
+    )
+    completed_by_id: dict[int, datetime] = {}
+    for workout, program in workout_rows:
+        account = user_by_id.get(program.user_id)
+        if account is None or workout.status != "completed" or workout.completed_at is None:
+            continue
+        completed_by_id[workout.id] = local_naive_to_utc_naive(
+            workout.completed_at,
+            _recovery_timezone_name(account),
+        )
+
+    recovered_missed_instances = set(confirmed_recoveries).intersection(missed_instances)
+    completion_denominator = len(confirmed_recoveries)
+    completion_numerator = sum(
+        1
+        for workout_id, recovery in confirmed_recoveries.items()
+        if workout_id in completed_by_id
+        and recovery.occurred_at
+        <= completed_by_id[workout_id]
+        <= recovery.occurred_at + timedelta(days=7)
+    )
+    recovery_durations = [
+        (recovery.occurred_at - recovery.missed_at).total_seconds()
+        for recovery in confirmed_recoveries.values()
+        if recovery.missed_at is not None
+    ]
+    return {
+        "missed_denominator": len(missed_instances),
+        "missed_numerator": len(recovered_missed_instances),
+        "completion_denominator": completion_denominator,
+        "completion_numerator": completion_numerator,
+        "recovery_count": len(confirmed_recoveries),
+        "median_recovery_seconds": median(recovery_durations) if recovery_durations else None,
     }
 
 
@@ -351,30 +482,26 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
                 )
             )
 
-    missed_users: set[int] = set()
-    recovery_users = {user.id for user in users if events[user.id]["recovery_action_confirmed"]}
-    if user_ids:
-        missed_rows = (
-            db.query(UserWorkout, User)
-            .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
-            .join(User, User.id == UserProgram.user_id)
-            .options(joinedload(User.profile))
-            .filter(
-                User.id.in_(user_ids),
-                UserProgram.is_active.is_(True),
-                UserProgram.status.in_({"scheduled", "active"}),
-                UserWorkout.status == "planned",
-            )
-            .all()
-        )
-        for workout, user in missed_rows:
-            zone, _timezone_fallback = _report_timezone(user)
-            if workout.scheduled_date < now_aware.astimezone(zone).date():
-                missed_users.add(user.id)
-    recovery_denominator = len(missed_users | recovery_users)
-    recovery_numerator = len(recovery_users & (missed_users | recovery_users))
-
     cohort_size = len(users)
+    recovery_accounts = (
+        db.query(User)
+        .options(joinedload(User.profile))
+        .filter(
+            User.created_at <= now_msk_naive(),
+            User.is_coach.is_(False),
+            User.is_admin.is_(False),
+        )
+        .order_by(User.id.asc())
+        .all()
+        if settings.app_env == "prod"
+        else []
+    )
+    recovery_metrics = _recovery_metrics(
+        db,
+        eligible_users=recovery_accounts,
+        period_start=now - timedelta(days=period_days),
+        now=now,
+    )
     quality = _quality_report(
         db,
         eligible_users=users,
@@ -443,10 +570,30 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
         ),
         _kpi(
             key="missed_workout_recovery_conversion",
-            numerator=recovery_numerator,
-            denominator=recovery_denominator,
-            cohort_size=cohort_size,
-            window="после доступного пропуска до подтверждённого действия",
+            numerator=recovery_metrics["missed_numerator"],
+            denominator=recovery_metrics["missed_denominator"],
+            cohort_size=len(recovery_accounts),
+            window="тот же пропущенный экземпляр, подтверждение в течение 7 дней после missed_at",
+        ),
+        _kpi(
+            key="recovery_to_completion_rate",
+            numerator=recovery_metrics["completion_numerator"],
+            denominator=recovery_metrics["completion_denominator"],
+            cohort_size=len(recovery_accounts),
+            window="тот же восстановленный экземпляр, завершение в течение 7 дней",
+        ),
+        _kpi(
+            key="time_to_recovery",
+            numerator=recovery_metrics["recovery_count"],
+            denominator=recovery_metrics["recovery_count"],
+            cohort_size=len(recovery_accounts),
+            window="от missed_at до серверного подтверждения восстановления",
+            median_seconds=(
+                float(recovery_metrics["median_recovery_seconds"])
+                if recovery_metrics["median_recovery_seconds"] is not None
+                else None
+            ),
+            include_rate=False,
         ),
         _kpi(
             key="nutrition_repeat_rate",
@@ -465,10 +612,11 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
     ]
 
     coverage_note = (
-        "Только серверно подтверждённые агрегаты по новым аккаунтам-клиентам. "
-        "Демо-сессии не создают аккаунты и события; root- и trainer-аккаунты исключены. "
-        "D1/D7/D30 используют часовой пояс профиля, а при его отсутствии — UTC. "
-        "Raw events, идентификаторы и данные питания в отчёт не попадают."
+        "Когортные KPI считают серверно подтверждённые агрегаты по новым аккаунтам-клиентам; "
+        "показатели восстановления — по всем доступным клиентским аккаунтам за период. Демо-сессии не создают "
+        "аккаунты и события; root- и trainer-аккаунты исключены. D1/D7/D30 и recovery используют "
+        "часовой пояс профиля, а при его отсутствии — UTC. Raw events, идентификаторы и данные "
+        "питания в отчёт не попадают."
     )
     exclusions = [
         "root/admin и trainer-аккаунты",
@@ -490,6 +638,7 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
         "cohort_size": cohort_size,
         "complete_weekly_cohorts": complete_weekly_cohorts,
         "eligible_real_account_count": cohort_size,
+        "recovery_eligible_real_account_count": len(recovery_accounts),
         "analytics_provider_status": "not_connected",
         "effect_status": effect_status,
         "effect_note": effect_note,

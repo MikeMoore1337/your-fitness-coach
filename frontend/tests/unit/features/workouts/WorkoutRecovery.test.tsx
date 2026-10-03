@@ -20,7 +20,7 @@ const preview: WorkoutRecoveryPreview = {
   status: 'preview',
   workout,
   action: 'move',
-  ruleset_version: 'schedule-recovery-v1',
+  ruleset_version: 'schedule-recovery-v2',
   changes: [
     {
       kind: 'moved',

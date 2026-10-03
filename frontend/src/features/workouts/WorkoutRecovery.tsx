@@ -8,7 +8,7 @@ import type {
   WorkoutRecoveryRequest,
   WorkoutScheduleItem,
 } from '../../shared/api/types';
-import { dateInputValue, detectedTimeZone, formatCalendarDate } from '../../shared/dateTime';
+import { dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import { Badge, Button, CloseIcon, Field, IconButton, Select } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
@@ -52,7 +52,7 @@ export function WorkoutRecovery({
   const queryClient = useQueryClient();
   const titleId = useId();
   const descriptionId = useId();
-  const minDate = dateInputValue(new Date(), timeZone || detectedTimeZone());
+  const minDate = dateInputValue(new Date(), timeZone || 'UTC');
   const [internalOpen, setInternalOpen] = useState(false);
   const [action, setAction] = useState<RecoveryAction>('move');
   const [scheduledDate, setScheduledDate] = useState(() =>
@@ -142,7 +142,7 @@ export function WorkoutRecovery({
           onClick={() => setOpen(true)}
         >
           {triggerLabel ||
-            (workout.status === 'missed' ? 'Разобраться с пропуском' : 'Изменить план')}
+            (workout.status === 'missed' ? 'Вернуться к тренировке' : 'Изменить план')}
         </Button>
       )}
 
@@ -152,10 +152,10 @@ export function WorkoutRecovery({
           aria-labelledby={`${titleId}-summary`}
         >
           <Badge tone="warning">Нужно решить</Badge>
-          <h2 id={`${titleId}-summary`}>Пропущена тренировка</h2>
+          <h2 id={`${titleId}-summary`}>Тренировка осталась невыполненной</h2>
           <p>
-            {workout.title} · {scheduleText(workout)}. Выберите перенос или отметьте её пропущенной;
-            остальные упражнения и программа не изменятся.
+            {workout.title} · {scheduleText(workout)}. Посмотрите изменения и выберите новый день
+            или явно отметьте тренировку пропущенной. Остальные тренировки и программа не изменятся.
           </p>
         </section>
       )}
@@ -182,10 +182,11 @@ export function WorkoutRecovery({
             >
               <header className="workout-recovery-dialog__header workout-adaptation-dialog__header">
                 <div>
-                  <span className="eyebrow">План остаётся под вашим контролем</span>
-                  <h2 id={titleId}>Восстановить расписание</h2>
+                  <span className="eyebrow">Сначала — предпросмотр изменений</span>
+                  <h2 id={titleId}>Восстановить план</h2>
                   <p id={descriptionId}>
-                    Сначала покажем изменение. До подтверждения расписание и история не меняются.
+                    До подтверждения расписание и история не меняются. После подтверждения
+                    применится только выбранное действие.
                   </p>
                 </div>
                 <IconButton

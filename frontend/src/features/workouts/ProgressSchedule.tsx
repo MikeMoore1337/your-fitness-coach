@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { WorkoutScheduleItem } from '../../shared/api/types';
-import { dateInputValue, detectedTimeZone, formatCalendarDate } from '../../shared/dateTime';
+import { formatCalendarDate } from '../../shared/dateTime';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
 import { ProgressExperience } from './ProgressExperience';
@@ -45,16 +45,12 @@ function ScheduleRow({
         </span>
         <Badge>{workoutStatusLabel(item.status)}</Badge>
       </div>
-      {item.status === 'planned' && (
+      {(item.status === 'planned' || item.status === 'missed') && (
         <div className="list-row__actions workout-schedule-actions">
           <WorkoutRecovery
             workout={item}
             timeZone={timeZone}
-            triggerLabel={
-              item.scheduled_date < dateInputValue(new Date(), timeZone || detectedTimeZone())
-                ? 'Разобраться с пропуском'
-                : 'Изменить план'
-            }
+            triggerLabel={item.status === 'missed' ? 'Вернуться к тренировке' : 'Изменить план'}
           />
         </div>
       )}

@@ -16,7 +16,7 @@ from fitminiapp_api.models.lifecycle_milestone import (
 )
 from fitminiapp_api.models.user import User
 
-LIFECYCLE_MILESTONE_SCHEMA_VERSION = 1
+LIFECYCLE_MILESTONE_SCHEMA_VERSION = 2
 MEANINGFUL_MILESTONE_TYPES = frozenset(
     {
         "program_activated",
@@ -64,6 +64,10 @@ def record_lifecycle_milestone(
     occurred_at: datetime | None = None,
     day_scope: bool = False,
     account_scope: bool = False,
+    workout_id: int | None = None,
+    program_id: int | None = None,
+    program_revision_number: int | None = None,
+    missed_at: datetime | None = None,
 ) -> bool:
     """Record one confirmed outcome without accepting client analytics payloads.
 
@@ -85,7 +89,10 @@ def record_lifecycle_milestone(
         LifecycleMilestone.user_id == user.id,
         LifecycleMilestone.milestone_type == milestone_type,
     )
-    if account_scope:
+    if workout_id is not None:
+        if query.filter(LifecycleMilestone.workout_id == workout_id).first() is not None:
+            return False
+    elif account_scope:
         if query.first() is not None:
             return False
     else:
@@ -97,6 +104,10 @@ def record_lifecycle_milestone(
         milestone_type=milestone_type,
         schema_version=LIFECYCLE_MILESTONE_SCHEMA_VERSION,
         occurred_at=normalized_at,
+        workout_id=workout_id,
+        program_id=program_id,
+        program_revision_number=program_revision_number,
+        missed_at=_as_utc_naive(missed_at) if missed_at is not None else None,
         surface="server",
         server_confirmed=True,
         authoritative_outcome_status="confirmed",

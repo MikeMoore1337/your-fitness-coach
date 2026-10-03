@@ -141,6 +141,7 @@ async function mockAdminApi(page: Page, { root = true, coach = false } = {}) {
           cohort_size: 120,
           complete_weekly_cohorts: 4,
           eligible_real_account_count: 120,
+          recovery_eligible_real_account_count: 132,
           analytics_provider_status: 'not_connected',
           coverage_note:
             'Только агрегаты подтверждённых данных аккаунта; anonymous landing, login и demo events не хранятся на сервере.',
@@ -228,6 +229,24 @@ async function mockAdminApi(page: Page, { root = true, coach = false } = {}) {
               rate_percent: 66.7,
               median_seconds: null,
               window: 'после пропуска',
+            },
+            {
+              key: 'recovery_to_completion_rate',
+              numerator: 12,
+              denominator: 20,
+              cohort_size: 132,
+              rate_percent: 60,
+              median_seconds: null,
+              window: 'восстановление',
+            },
+            {
+              key: 'time_to_recovery',
+              numerator: 20,
+              denominator: 20,
+              cohort_size: 132,
+              rate_percent: null,
+              median_seconds: 5400,
+              window: 'до восстановления',
             },
             {
               key: 'nutrition_repeat_rate',

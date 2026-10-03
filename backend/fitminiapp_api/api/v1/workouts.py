@@ -6,11 +6,6 @@ from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.api.dependencies.auth import require_user
 from fitminiapp_api.core.config import settings
-from fitminiapp_api.core.timezone import (
-    now_for_user_naive,
-    today_for_user,
-    user_local_naive_to_utc_naive,
-)
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.notification import Notification
@@ -143,7 +138,12 @@ from fitminiapp_api.services.workout_recovery import (
     WorkoutRecoveryError,
     apply_recovery,
     build_recovery_preview,
+    recoverable_missed_workout_ids,
+    recovery_now_for_user_naive,
     recovery_state,
+    recovery_today_for_user,
+    recovery_user_local_naive_to_utc_naive,
+    serialize_schedule_item,
 )
 from fitminiapp_api.services.workout_sync import (
     WorkoutSetSyncError,
@@ -157,6 +157,11 @@ from fitminiapp_api.services.workouts import (
 )
 
 router = APIRouter()
+
+
+def now_for_user_naive(user: User):
+    """Compatibility seam for existing route tests and local time control."""
+    return recovery_now_for_user_naive(user)
 
 
 @router.get("/cardio", response_model=list[CardioSessionResponse])
@@ -478,9 +483,9 @@ def get_today_workout(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    today = today_for_user(current_user)
+    today = recovery_today_for_user(current_user)
 
-    workout = (
+    active_workout = (
         db.query(UserWorkout)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .options(
@@ -489,22 +494,32 @@ def get_today_workout(
         )
         .filter(
             UserProgram.user_id == current_user.id,
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
+            UserWorkout.status == "in_progress",
+        )
+        .order_by(UserWorkout.started_at.desc(), UserWorkout.id.desc())
+        .first()
+    )
+    workout = active_workout or (
+        db.query(UserWorkout)
+        .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
+        .options(
+            joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.exercise),
+            joinedload(UserWorkout.exercises).joinedload(UserWorkoutExercise.sets),
+        )
+        .filter(
+            UserProgram.user_id == current_user.id,
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
             UserWorkout.scheduled_date == today,
-            UserWorkout.status.in_({"planned", "in_progress", "completed"}),
+            UserWorkout.status.in_({"planned", "completed"}),
         )
         .order_by(
-            case(
-                (UserWorkout.status == "in_progress", 0),
-                (UserWorkout.status == "planned", 1),
-                else_=2,
-            ),
+            case((UserWorkout.status == "planned", 0), else_=1),
             case((UserWorkout.completed_at.is_(None), 1), else_=0),
             UserWorkout.completed_at.desc(),
-            case(
-                (UserWorkout.status == "completed", UserWorkout.id),
-                else_=None,
-            ).desc(),
-            UserWorkout.id.asc(),
+            UserWorkout.id.desc(),
         )
         .first()
     )
@@ -646,7 +661,7 @@ def get_week_schedule(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    today = today_for_user(current_user)
+    today = recovery_today_for_user(current_user)
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     workouts = (
@@ -655,21 +670,19 @@ def get_week_schedule(
         .filter(
             UserProgram.user_id == current_user.id,
             UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
             UserWorkout.scheduled_date.between(week_start, week_end),
         )
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
     )
+    missed_ids = recoverable_missed_workout_ids(db, current_user)
     return [
-        {
-            "id": workout.id,
-            "scheduled_date": str(workout.scheduled_date),
-            "scheduled_time": workout.scheduled_time,
-            "title": workout.title,
-            "status": workout.status,
-            "day_number": workout.day_number,
-            "week_number": workout.week_number,
-        }
+        serialize_schedule_item(
+            workout,
+            current_user,
+            status_override="missed" if workout.id in missed_ids else None,
+        )
         for workout in workouts
     ]
 
@@ -681,7 +694,7 @@ def get_schedule(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    start = date_from or today_for_user(current_user)
+    start = date_from or recovery_today_for_user(current_user)
     end = date_to or (start + timedelta(days=55))
     if end < start:
         raise HTTPException(status_code=422, detail="date_to must not be before date_from")
@@ -696,21 +709,19 @@ def get_schedule(
         .filter(
             UserProgram.user_id == current_user.id,
             UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
             UserWorkout.scheduled_date.between(start, end),
         )
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
     )
+    missed_ids = recoverable_missed_workout_ids(db, current_user)
     return [
-        {
-            "id": workout.id,
-            "scheduled_date": workout.scheduled_date,
-            "scheduled_time": workout.scheduled_time,
-            "title": workout.title,
-            "status": workout.status,
-            "day_number": workout.day_number,
-            "week_number": workout.week_number,
-        }
+        serialize_schedule_item(
+            workout,
+            current_user,
+            status_override="missed" if workout.id in missed_ids else None,
+        )
         for workout in workouts
     ]
 
@@ -940,7 +951,7 @@ def delete_today_workout(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    today = today_for_user(current_user)
+    today = recovery_today_for_user(current_user)
 
     workout = (
         db.query(UserWorkout)
@@ -985,11 +996,13 @@ def start_workout(
     program = _lock_program(db, workout.user_program_id)
     db.refresh(workout)
 
-    if workout.scheduled_date != today_for_user(current_user):
-        raise HTTPException(status_code=409, detail="Можно начать только тренировку на сегодня")
     if workout.status == "completed":
         raise HTTPException(status_code=409, detail="Тренировка уже завершена")
     _require_active_program(program)
+    if workout.status == "in_progress":
+        return _serialize_workout(workout, db, current_user)
+    if workout.scheduled_date != recovery_today_for_user(current_user):
+        raise HTTPException(status_code=409, detail="Можно начать только тренировку на сегодня")
     if workout.status not in {"planned", "in_progress"}:
         raise HTTPException(status_code=409, detail="Недопустимое состояние тренировки")
 
@@ -1002,7 +1015,7 @@ def start_workout(
             db,
             current_user,
             "workout_started",
-            occurred_at=user_local_naive_to_utc_naive(workout.started_at, current_user),
+            occurred_at=recovery_user_local_naive_to_utc_naive(workout.started_at, current_user),
         )
     cancel_workout_reminder(db, workout.id)
     if program.status == "scheduled":
@@ -1049,8 +1062,6 @@ def finish_workout(
 
     if workout.status == "completed":
         return _serialize_workout(workout, db, current_user)
-    if workout.scheduled_date != today_for_user(current_user):
-        raise HTTPException(status_code=409, detail="Можно завершить только тренировку на сегодня")
     _require_active_program(program)
     if workout.status != "in_progress":
         raise HTTPException(status_code=409, detail="Сначала начните тренировку")
@@ -1104,7 +1115,7 @@ def finish_workout(
             db,
             current_user,
             "workout_completed",
-            occurred_at=user_local_naive_to_utc_naive(workout.completed_at, current_user),
+            occurred_at=recovery_user_local_naive_to_utc_naive(workout.completed_at, current_user),
         )
     cancel_workout_reminder(db, workout.id)
 
@@ -1219,7 +1230,7 @@ def reschedule_workout(
             status_code=409,
             detail="Перенести можно только запланированную тренировку",
         )
-    if payload.scheduled_date < today_for_user(current_user):
+    if payload.scheduled_date < recovery_today_for_user(current_user):
         raise HTTPException(status_code=422, detail="Нельзя перенести тренировку в прошлое")
     now = now_for_user_naive(current_user)
     if (

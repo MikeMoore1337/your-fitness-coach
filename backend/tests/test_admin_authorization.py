@@ -403,6 +403,8 @@ def test_funnel_returns_only_server_confirmed_kpis_without_raw_events(client, mo
         "d7_meaningful_return",
         "d30_meaningful_return",
         "missed_workout_recovery_conversion",
+        "recovery_to_completion_rate",
+        "time_to_recovery",
         "nutrition_repeat_rate",
         "weekly_loop_completion",
     ]

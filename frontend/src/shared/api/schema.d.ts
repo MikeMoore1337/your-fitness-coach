@@ -5043,6 +5043,8 @@ export interface components {
             complete_weekly_cohorts: number;
             /** Eligible Real Account Count */
             eligible_real_account_count: number;
+            /** Recovery Eligible Real Account Count */
+            recovery_eligible_real_account_count: number;
             /**
              * Analytics Provider Status
              * @constant
@@ -5132,7 +5134,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "activation_rate" | "time_to_first_useful_action" | "first_workout_completion_rate" | "first_week_value_rate" | "d1_meaningful_return" | "d7_meaningful_return" | "d30_meaningful_return" | "missed_workout_recovery_conversion" | "nutrition_repeat_rate" | "weekly_loop_completion";
+            key: "activation_rate" | "time_to_first_useful_action" | "first_workout_completion_rate" | "first_week_value_rate" | "d1_meaningful_return" | "d7_meaningful_return" | "d30_meaningful_return" | "missed_workout_recovery_conversion" | "recovery_to_completion_rate" | "time_to_recovery" | "nutrition_repeat_rate" | "weekly_loop_completion";
             /** Numerator */
             numerator: number;
             /** Denominator */

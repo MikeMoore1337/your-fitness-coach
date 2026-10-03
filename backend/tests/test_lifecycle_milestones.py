@@ -1,9 +1,10 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.core.timezone import local_naive_to_utc_naive, now_msk_naive
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
+from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.services.accounts import delete_user_cascade
 from fitminiapp_api.services.lifecycle_milestones import (
@@ -164,6 +165,120 @@ def test_lifecycle_report_is_empty_outside_production(monkeypatch) -> None:
     assert report["eligible_real_account_count"] == 0
     assert "non-production" in report["coverage_note"]
     assert report["exclusions"][0] == "любые аккаунты и события non-production окружений"
+
+
+def test_lifecycle_report_uses_instance_recovery_facts_for_all_client_accounts(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "app_env", "prod")
+    with get_session_context() as db:
+        before = lifecycle_funnel_report(db, period_days=30)
+        missed_date = now_msk_naive().date() - timedelta(days=3)
+        missed_at = local_naive_to_utc_naive(
+            datetime.combine(missed_date + timedelta(days=1), time.min),
+            "UTC",
+        )
+        recovery_at = missed_at + timedelta(hours=2)
+
+        outstanding_user = User(
+            telegram_user_id=991004,
+            is_coach=False,
+            is_admin=False,
+            created_at=now_msk_naive() - timedelta(days=10),
+        )
+        outstanding_user.profile = UserProfile(timezone="UTC")
+        recovered_user = User(
+            telegram_user_id=991005,
+            is_coach=False,
+            is_admin=False,
+            created_at=now_msk_naive() - timedelta(days=10),
+        )
+        recovered_user.profile = UserProfile(timezone="UTC")
+        db.add_all([outstanding_user, recovered_user])
+        db.flush()
+
+        outstanding_program = UserProgram(
+            user_id=outstanding_user.id,
+            start_date=missed_date - timedelta(days=1),
+            duration_weeks=1,
+            schedule_weekdays=[0],
+            status="active",
+            is_active=True,
+        )
+        recovered_program = UserProgram(
+            user_id=recovered_user.id,
+            start_date=missed_date - timedelta(days=1),
+            duration_weeks=1,
+            schedule_weekdays=[0],
+            status="active",
+            is_active=True,
+        )
+        db.add_all([outstanding_program, recovered_program])
+        db.flush()
+        outstanding_workout = UserWorkout(
+            user_program_id=outstanding_program.id,
+            scheduled_date=missed_date,
+            day_number=1,
+            week_number=1,
+            title="Невыполненная тренировка",
+            status="planned",
+        )
+        recovered_workout = UserWorkout(
+            user_program_id=recovered_program.id,
+            scheduled_date=missed_date,
+            day_number=1,
+            week_number=1,
+            title="Восстановленная тренировка",
+            status="completed",
+            completed_at=recovery_at + timedelta(hours=2),
+        )
+        db.add_all([outstanding_workout, recovered_workout])
+        db.flush()
+        assert record_lifecycle_milestone(
+            db,
+            recovered_user,
+            "workout_missed",
+            occurred_at=missed_at,
+            workout_id=recovered_workout.id,
+            program_id=recovered_program.id,
+            program_revision_number=0,
+            missed_at=missed_at,
+        )
+        assert record_lifecycle_milestone(
+            db,
+            recovered_user,
+            "recovery_action_confirmed",
+            occurred_at=recovery_at,
+            workout_id=recovered_workout.id,
+            program_id=recovered_program.id,
+            program_revision_number=0,
+            missed_at=missed_at,
+        )
+        db.commit()
+
+        report = lifecycle_funnel_report(db, period_days=30)
+
+    before_kpis = _kpis(before)
+    after_kpis = _kpis(report)
+    assert (
+        after_kpis["missed_workout_recovery_conversion"]["denominator"]
+        == before_kpis["missed_workout_recovery_conversion"]["denominator"] + 2
+    )
+    assert (
+        after_kpis["missed_workout_recovery_conversion"]["numerator"]
+        == before_kpis["missed_workout_recovery_conversion"]["numerator"] + 1
+    )
+    assert (
+        after_kpis["recovery_to_completion_rate"]["denominator"]
+        == before_kpis["recovery_to_completion_rate"]["denominator"] + 1
+    )
+    assert (
+        after_kpis["recovery_to_completion_rate"]["numerator"]
+        == before_kpis["recovery_to_completion_rate"]["numerator"] + 1
+    )
+    assert after_kpis["time_to_recovery"]["median_seconds"] is not None
+    assert report["recovery_eligible_real_account_count"] >= (
+        before["recovery_eligible_real_account_count"] + 2
+    )
+    assert "991004" not in str(report)
 
 
 def test_milestone_retention_and_account_deletion_remove_evidence() -> None:

@@ -310,16 +310,20 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
             owner = function.value.id
             if phase == "expand":
                 allowed = (
-                    owner == "op"
-                    and function.attr
-                    in {"add_column", "create_table", "create_index", "get_bind", "get_context"}
-                ) or (
-                    owner == "sa"
-                    and (
-                        function.attr in SAFE_TABLE_CONSTRUCTORS
-                        or function.attr in SAFE_COLUMN_TYPES
-                        or function.attr == "text"
+                    (
+                        owner == "op"
+                        and function.attr
+                        in {"add_column", "create_table", "create_index", "get_bind", "get_context"}
                     )
+                    or (
+                        owner == "sa"
+                        and (
+                            function.attr in SAFE_TABLE_CONSTRUCTORS
+                            or function.attr in SAFE_COLUMN_TYPES
+                            or function.attr == "text"
+                        )
+                    )
+                    or (owner == "bind" and function.attr in {"in_transaction", "commit"})
                 )
             elif phase == "backfill":
                 allowed = owner == "op" and function.attr == "execute"
