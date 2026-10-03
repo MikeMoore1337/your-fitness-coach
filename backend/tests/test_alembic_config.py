@@ -83,6 +83,6 @@ def test_lifecycle_milestone_migration_passes_the_online_rollout_gate(monkeypatc
     checker = runpy.run_path(str(root / "scripts" / "check_online_migrations.py"))
 
     monkeypatch.chdir(root)
-    added = checker["check_online_migrations"](active_revision, target_revision)
-
-    assert Path("backend/alembic/versions/0112_lifecycle_milestones.py") in added
+    migration_path = Path("backend/alembic/versions/0112_lifecycle_milestones.py")
+    checker["validate_added_migration"](migration_path)
+    checker["check_online_migrations"](active_revision, target_revision)
