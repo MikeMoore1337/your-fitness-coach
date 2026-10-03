@@ -5,7 +5,7 @@ import re
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.exercise import Exercise
 from fitminiapp_api.models.program import ProgramTemplate
-from fitminiapp_api.models.public_share import PublicShareImport
+from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.user import CoachClient, User
 
 OPAQUE_SHARE_PATTERN = re.compile(r"^[A-Za-z0-9_-]{43}$")
@@ -155,6 +155,7 @@ def test_program_share_is_preview_first_snapshot_based_and_bounded(client) -> No
 
     recipient_headers = _auth(client, 524_003)
     recipient_id = _user_id(524_003)
+    partial_template_id = _create_template(client, recipient_headers, "Программа для общей ссылки")
     with get_session_context() as db:
         assert (
             db.query(PublicShareImport)
@@ -162,6 +163,42 @@ def test_program_share_is_preview_first_snapshot_based_and_bounded(client) -> No
             .count()
             == 0
         )
+        recipient_template_count = (
+            db.query(ProgramTemplate).filter(ProgramTemplate.owner_user_id == recipient_id).count()
+        )
+        share_row = db.query(PublicShare).filter(PublicShare.share_id == created["share_id"]).one()
+        share_row_id = share_row.id
+        partial_template = db.get(ProgramTemplate, partial_template_id)
+        assert partial_template is not None
+        partial_template.provenance_type = "CUSTOM"
+        partial_template.provenance = {"source": "public_share_snapshot"}
+        db.add(
+            PublicShareImport(
+                public_share_id=share_row_id,
+                recipient_user_id=recipient_id,
+                template_id=partial_template_id,
+            )
+        )
+        db.commit()
+
+    stale_preview = client.post(
+        f"/api/v1/shares/{created['share_id']}/import",
+        headers=recipient_headers,
+        json={"preview_hash": "b" * 64},
+    )
+    assert stale_preview.status_code == 409, stale_preview.text
+    assert "Ссылка" not in stale_preview.text
+    with get_session_context() as db:
+        partial = (
+            db.query(PublicShareImport)
+            .filter(
+                PublicShareImport.public_share_id == share_row_id,
+                PublicShareImport.recipient_user_id == recipient_id,
+            )
+            .one()
+        )
+        assert partial.template_id == partial_template_id
+        assert partial.user_program_id is None
 
     imported = client.post(
         f"/api/v1/shares/{created['share_id']}/import",
@@ -170,8 +207,24 @@ def test_program_share_is_preview_first_snapshot_based_and_bounded(client) -> No
     )
     assert imported.status_code == 200, imported.text
     assert imported.json()["status"] == "imported"
-    assert imported.json()["template_id"] > 0
+    assert imported.json()["template_id"] == partial_template_id
     assert imported.json()["user_program_id"] > 0
+
+    with get_session_context() as db:
+        recovered = (
+            db.query(PublicShareImport)
+            .filter(
+                PublicShareImport.public_share_id == share_row_id,
+                PublicShareImport.recipient_user_id == recipient_id,
+            )
+            .one()
+        )
+        assert recovered.template_id == imported.json()["template_id"]
+        assert recovered.user_program_id == imported.json()["user_program_id"]
+        assert (
+            db.query(ProgramTemplate).filter(ProgramTemplate.owner_user_id == recipient_id).count()
+            == recipient_template_count
+        )
 
     duplicate = client.post(
         f"/api/v1/shares/{created['share_id']}/import",
@@ -198,6 +251,23 @@ def test_program_share_is_preview_first_snapshot_based_and_bounded(client) -> No
     assert (
         client.delete(f"/api/v1/shares/{created['share_id']}", headers=outsider).status_code == 404
     )
+
+    revoked = client.delete(f"/api/v1/shares/{created['share_id']}", headers=owner_headers)
+    assert revoked.status_code == 204, revoked.text
+    revoked_recipient = _auth(client, 524_007)
+    rejected = client.post(
+        f"/api/v1/shares/{created['share_id']}/import",
+        headers=revoked_recipient,
+        json={"preview_hash": created["preview_hash"]},
+    )
+    assert rejected.status_code == 404, rejected.text
+    with get_session_context() as db:
+        assert (
+            db.query(PublicShareImport)
+            .filter(PublicShareImport.recipient_user_id == _user_id(524_007))
+            .count()
+            == 0
+        )
 
 
 def test_program_share_rejects_coach_access_to_client_template(client) -> None:

@@ -49,6 +49,17 @@ const authenticatedUser = {
   trainer: null,
 };
 
+async function installProductEventCapture(page: Page) {
+  await page.addInitScript(() => {
+    const target = window as Window & { __yfcProductEvents?: string[] };
+    target.__yfcProductEvents = [];
+    window.addEventListener('yfc:product-event', (event) => {
+      const name = (event as CustomEvent<{ name?: unknown }>).detail?.name;
+      if (typeof name === 'string') target.__yfcProductEvents?.push(name);
+    });
+  });
+}
+
 async function installPublicShareApi(page: Page) {
   await page.route('**/api/v1/public/config', (route) =>
     route.fulfill({
@@ -76,6 +87,7 @@ test('program share is visible as a preview and imports only after explicit conf
   page,
 }) => {
   await page.addInitScript(() => sessionStorage.setItem('fit_access_token', 'browser-token'));
+  await installProductEventCapture(page);
   let importCalls = 0;
   await installPublicShareApi(page);
   await page.route(`**/api/v1/shares/${shareId}/import`, async (route) => {
@@ -83,10 +95,10 @@ test('program share is visible as a preview and imports only after explicit conf
     await route.fulfill({
       json: {
         share_id: shareId,
-        status: 'imported',
+        status: importCalls === 1 ? 'imported' : 'already_imported',
         template_id: 91,
         user_program_id: 92,
-        workouts_created: 4,
+        workouts_created: importCalls === 1 ? 4 : 0,
       },
     });
   });
@@ -106,12 +118,37 @@ test('program share is visible as a preview and imports only after explicit conf
     .getByRole('button', { name: 'Добавить программу' })
     .click();
   await expect(
-    page.getByText('Копия создана через стандартный процесс назначения программы.'),
+    page.getByText('Копия создана и программа активирована через стандартный процесс назначения.'),
   ).toBeVisible();
   expect(importCalls).toBe(1);
+
+  await page.getByRole('button', { name: 'Добавить программу' }).click();
+  await page
+    .getByRole('dialog', { name: 'Добавить копию программы?' })
+    .getByRole('button', { name: 'Добавить программу' })
+    .click();
+  await expect(page.getByText('Копия уже есть в вашем профиле.')).toBeVisible();
+  expect(importCalls).toBe(2);
+
+  const eventNames = await page.evaluate(
+    () => (window as Window & { __yfcProductEvents?: string[] }).__yfcProductEvents ?? [],
+  );
+  expect(eventNames).toEqual(
+    expect.arrayContaining([
+      'share_opened',
+      'program_import_started',
+      'program_import_confirmed',
+      'program_imported',
+      'program_import_duplicate',
+      'program_added',
+      'program_activated',
+    ]),
+  );
+  expect(eventNames.filter((name) => name === 'program_activated')).toHaveLength(1);
 });
 
 test('revoked or malformed public share remains a non-disclosing error state', async ({ page }) => {
+  await installProductEventCapture(page);
   await page.route('**/api/v1/public/config', (route) =>
     route.fulfill({
       json: {
@@ -137,4 +174,8 @@ test('revoked or malformed public share remains a non-disclosing error state', a
   await page.goto(`/share/${'B'.repeat(43)}`);
   await expect(page.getByText('Ссылка недоступна или больше не действует.')).toBeVisible();
   await expect(page.getByText('Силовая программа · снимок', { exact: true })).toHaveCount(0);
+  const eventNames = await page.evaluate(
+    () => (window as Window & { __yfcProductEvents?: string[] }).__yfcProductEvents ?? [],
+  );
+  expect(eventNames.filter((name) => name === 'share_open_failed')).toHaveLength(1);
 });

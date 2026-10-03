@@ -173,9 +173,11 @@ type ContextFreeProductEventName =
   | 'program_import_previewed'
   | 'program_import_confirmed'
   | 'program_imported'
+  | 'program_import_duplicate'
   | 'program_import_cancelled'
   | 'program_import_failed'
   | 'share_opened'
+  | 'share_open_failed'
   | 'program_activated'
   | 'today_viewed'
   | 'workout_started'
@@ -541,9 +543,11 @@ const CONTEXT_FREE_EVENT_NAMES = new Set<ProductEventName>([
   'program_import_previewed',
   'program_import_confirmed',
   'program_imported',
+  'program_import_duplicate',
   'program_import_cancelled',
   'program_import_failed',
   'share_opened',
+  'share_open_failed',
   'program_activated',
   'today_viewed',
   'workout_started',

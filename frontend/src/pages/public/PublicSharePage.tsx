@@ -9,7 +9,12 @@ import type {
   PublicShareProgressSnapshot,
 } from '../../shared/api/types';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
-import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import {
+  productEventSurface,
+  trackCoreProductEvent,
+  trackGrowthEvent,
+  trackProductEvent,
+} from '../../shared/analytics/productEvents';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Badge, Button, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
 import { PublicShell } from '../../shared/ui/PublicShell';
@@ -228,6 +233,13 @@ function PublicShareContent({ share }: { share: PublicShare }) {
       setImportResult(result);
       if (result.status === 'imported') {
         trackProductEvent({ name: 'program_imported', surface: productEventSurface() });
+        trackGrowthEvent('program_added');
+        trackCoreProductEvent(
+          { name: 'program_activated', surface: productEventSurface() },
+          'program_activated',
+        );
+      } else {
+        trackProductEvent({ name: 'program_import_duplicate', surface: productEventSurface() });
       }
       toast(
         result.status === 'already_imported'
@@ -242,23 +254,42 @@ function PublicShareContent({ share }: { share: PublicShare }) {
         !replaceActive &&
         reason.message.toLowerCase().includes('confirmation')
       ) {
-        if (
-          await confirm({
-            title: 'Заменить активную программу?',
-            message:
-              'Текущая программа будет отправлена в архив. Тренировку, которая уже идёт, заменить нельзя.',
-            confirmText: 'Заменить программу',
-          })
-        )
+        const accepted = await confirm({
+          title: 'Заменить активную программу?',
+          message:
+            'Текущая программа будет отправлена в архив. Тренировку, которая уже идёт, заменить нельзя.',
+          confirmText: 'Заменить программу',
+        });
+        if (accepted) {
           importMutation.mutate(true);
+        } else {
+          trackProductEvent({ name: 'program_import_cancelled', surface: productEventSurface() });
+        }
         return;
       }
+      trackProductEvent({ name: 'program_import_failed', surface: productEventSurface() });
       toast(reason instanceof Error ? reason.message : 'Не удалось добавить программу', 'error');
     },
   });
 
   if (share.share_type !== 'program' || share.snapshot.kind !== 'program') return null;
   const loggedIn = Boolean(auth?.user);
+  const requestImport = () => {
+    trackProductEvent({ name: 'program_import_started', surface: productEventSurface() });
+    void confirm({
+      title: 'Добавить копию программы?',
+      message:
+        'Будет создана отдельная копия программы и запущен существующий процесс назначения. Исходник останется без изменений.',
+      confirmText: 'Добавить программу',
+    }).then((accepted) => {
+      if (accepted) {
+        trackProductEvent({ name: 'program_import_confirmed', surface: productEventSurface() });
+        importMutation.mutate(false);
+      } else {
+        trackProductEvent({ name: 'program_import_cancelled', surface: productEventSurface() });
+      }
+    });
+  };
   return (
     <>
       <ProgramSnapshot snapshot={share.snapshot} />
@@ -274,16 +305,7 @@ function PublicShareContent({ share }: { share: PublicShare }) {
         {loggedIn ? (
           <Button
             disabled={importMutation.isPending || importResult?.status === 'already_imported'}
-            onClick={() =>
-              void confirm({
-                title: 'Добавить копию программы?',
-                message:
-                  'Будет создана отдельная копия программы и запущен существующий процесс назначения. Исходник останется без изменений.',
-                confirmText: 'Добавить программу',
-              }).then((accepted) => {
-                if (accepted) importMutation.mutate(false);
-              })
-            }
+            onClick={requestImport}
             type="button"
           >
             {importMutation.isPending ? 'Добавляем…' : 'Добавить программу'}
@@ -297,7 +319,7 @@ function PublicShareContent({ share }: { share: PublicShare }) {
           <p className="public-share__import-result" role="status">
             {importResult.status === 'already_imported'
               ? 'Копия уже есть в вашем профиле.'
-              : 'Копия создана через стандартный процесс назначения программы.'}
+              : 'Копия создана и программа активирована через стандартный процесс назначения.'}
           </p>
         )}
       </section>
@@ -308,7 +330,7 @@ function PublicShareContent({ share }: { share: PublicShare }) {
 export default function PublicSharePage() {
   const { path } = useNavigation();
   const shareId = path.startsWith('/share/') ? path.slice('/share/'.length) : '';
-  const openedRef = useRef(false);
+  const openOutcomeRef = useRef(false);
   const [reloadToken, setReloadToken] = useState(0);
   const shareIdValid = SHARE_ID_PATTERN.test(shareId);
   const requestKey = `${shareId}:${reloadToken}`;
@@ -337,10 +359,19 @@ export default function PublicSharePage() {
   const shareError = shareIdValid && currentRequest?.status === 'error';
 
   useEffect(() => {
-    if (!share || openedRef.current) return;
-    openedRef.current = true;
-    trackProductEvent({ name: 'share_opened', surface: productEventSurface() });
-  }, [share]);
+    openOutcomeRef.current = false;
+  }, [requestKey]);
+
+  useEffect(() => {
+    if (openOutcomeRef.current) return;
+    if (share) {
+      openOutcomeRef.current = true;
+      trackProductEvent({ name: 'share_opened', surface: productEventSurface() });
+    } else if (!shareIdValid || shareError) {
+      openOutcomeRef.current = true;
+      trackProductEvent({ name: 'share_open_failed', surface: productEventSurface() });
+    }
+  }, [share, shareError, shareIdValid]);
 
   useEffect(() => {
     let cancelled = false;
