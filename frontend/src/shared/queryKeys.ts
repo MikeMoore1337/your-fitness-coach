@@ -18,6 +18,8 @@ export const queryKeys = {
   },
   trainer: {
     attention: ['coach', 'attention'] as const,
+    checkInReviews: (status: 'pending' | 'reviewed' = 'pending') =>
+      ['coach', 'check-in-reviews', status] as const,
     operationsToday: ['coach', 'operations', 'today'] as const,
     agenda: (dateFrom: string, dateTo: string) => ['coach', 'agenda', dateFrom, dateTo] as const,
     clients: ['coach', 'clients'] as const,

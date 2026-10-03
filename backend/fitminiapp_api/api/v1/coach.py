@@ -37,6 +37,11 @@ from fitminiapp_api.schemas.coach_crm import (
     CoachTaskResponse,
     CoachTaskStateUpdate,
 )
+from fitminiapp_api.schemas.coach_reviews import (
+    CoachCheckInReviewItem,
+    CoachCheckInReviewListResponse,
+    CoachCheckInReviewRequest,
+)
 from fitminiapp_api.schemas.feedback import (
     WorkoutCommentCreate,
     WorkoutCommentResponse,
@@ -103,6 +108,11 @@ from fitminiapp_api.services.coach_crm import (
     update_session,
     update_task_state,
 )
+from fitminiapp_api.services.coach_reviews import (
+    CoachReviewError,
+    list_coach_check_in_reviews,
+    review_coach_check_in,
+)
 from fitminiapp_api.services.exercise_catalog import _effective_exercise_id, list_exercises
 from fitminiapp_api.services.measurements import (
     MeasurementError,
@@ -167,6 +177,10 @@ def _crm_error(exc: CoachCrmError) -> HTTPException:
 
 
 def _comment_error(exc: WorkoutCommentError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+def _review_error(exc: CoachReviewError) -> HTTPException:
     return HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -275,6 +289,44 @@ def coach_attention(
     return CoachAttentionResponse.model_validate(
         build_coach_attention(db, current_user, limit=limit)
     )
+
+
+@router.get(
+    "/check-ins/review",
+    response_model=CoachCheckInReviewListResponse,
+)
+def coach_check_in_reviews(
+    review_status: str | None = Query(default=None, alias="status", pattern="^(pending|reviewed)$"),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachCheckInReviewListResponse:
+    return CoachCheckInReviewListResponse.model_validate(
+        list_coach_check_in_reviews(
+            db,
+            current_user,
+            status=review_status,
+            limit=limit,
+            offset=offset,
+        )
+    )
+
+
+@router.post(
+    "/check-ins/{check_in_id}/review",
+    response_model=CoachCheckInReviewItem,
+)
+def review_coach_check_in_route(
+    check_in_id: int,
+    payload: CoachCheckInReviewRequest,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachCheckInReviewItem:
+    try:
+        return review_coach_check_in(db, current_user, check_in_id, payload)
+    except CoachReviewError as exc:
+        raise _review_error(exc) from exc
 
 
 @router.get("/operations/today", response_model=CoachOperationsTodayResponse)

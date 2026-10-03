@@ -285,6 +285,16 @@ class CoachTask(Base):
     __table_args__ = (
         CheckConstraint("state IN ('open', 'completed')", name="ck_coach_tasks_state"),
         CheckConstraint("length(trim(title)) BETWEEN 1 AND 240", name="ck_coach_tasks_title"),
+        CheckConstraint(
+            "kind IN ('review_check_in', 'update_program', 'contact_client', "
+            "'review_technique', 'schedule_follow_up', 'other')",
+            name="ck_coach_tasks_kind",
+        ),
+        CheckConstraint(
+            "source_kind IS NULL OR source_kind IN "
+            "('weekly_check_in', 'workout', 'program', 'client', 'manual')",
+            name="ck_coach_tasks_source_kind",
+        ),
         UniqueConstraint(
             "coach_user_id", "idempotency_key", name="uq_coach_tasks_coach_idempotency"
         ),
@@ -303,6 +313,12 @@ class CoachTask(Base):
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     due_at_utc: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="other", server_default="other"
+    )
+    source_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    source_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(240), nullable=True)
     state: Mapped[str] = mapped_column(
         String(16), nullable=False, default="open", server_default="open"
     )

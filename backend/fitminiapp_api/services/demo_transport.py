@@ -1293,6 +1293,10 @@ def _crm_task(
         "due_at": _iso(due_at),
         "due_at_utc": _iso(due_at - timedelta(hours=3)),
         "timezone": "Europe/Moscow",
+        "kind": "review_technique",
+        "source_kind": "manual",
+        "source_id": None,
+        "reason": "Демо follow-up для проверки техники.",
         "state": state,
         "completed_at": _iso(_now(session)) if state == "completed" else None,
         "created_at": _iso(_now(session) - timedelta(days=1)),
@@ -2339,6 +2343,10 @@ def handle_demo_transport(
             task["title"] = title.strip()
             task["due_at"] = due_at
             task["due_at_utc"] = due_at
+            task["kind"] = payload.get("kind", task["kind"])
+            task["source_kind"] = payload.get("source_kind", task["source_kind"])
+            task["source_id"] = payload.get("source_id", task["source_id"])
+            task["reason"] = payload.get("reason", task["reason"])
             state["tasks"].append(task)
             session.revision += 1
             return task

@@ -412,6 +412,317 @@
   overflow-wrap: anywhere;
 }
 
+.coach-attention-center,
+.coach-review-workspace,
+.coach-roster-analytics {
+  display: grid;
+  gap: var(--v2-space-4);
+}
+
+.coach-attention-center {
+  padding: var(--v2-space-4);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.coach-attention-center__heading,
+.coach-attention-center__controls,
+.coach-attention-item__meta,
+.coach-review-card__header,
+.coach-roster-analytics__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+}
+
+.coach-attention-center__heading h2,
+.coach-review-card h3 {
+  margin: var(--v2-space-1) 0 0;
+  font-family: var(--font-display);
+  letter-spacing: -0.035em;
+}
+
+.coach-attention-center__controls {
+  align-items: end;
+  padding-block: var(--v2-space-2);
+  border-block: 1px solid var(--coach-line);
+}
+
+.coach-attention-center__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.coach-attention-center__filters button {
+  min-height: 36px;
+  padding-inline: var(--v2-space-2);
+  border: 1px solid var(--coach-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--v2-text-secondary);
+  font-size: 0.82rem;
+}
+
+.coach-attention-center__filters button.is-active {
+  border-color: var(--v2-border-strong);
+  background: var(--v2-surface);
+  color: var(--v2-text-primary);
+  font-weight: 800;
+}
+
+.coach-attention-center__sort {
+  display: grid;
+  gap: 4px;
+  min-width: 170px;
+  color: var(--v2-text-secondary);
+  font-size: 0.75rem;
+}
+
+.coach-attention-center__sort select {
+  min-height: 36px;
+}
+
+.coach-attention-center__list,
+.coach-review-list,
+.coach-roster-analytics__list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.coach-attention-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--v2-space-4);
+  padding-block: var(--v2-space-3);
+  border-top: 1px solid var(--coach-line);
+}
+
+.coach-attention-item__copy,
+.coach-review-card__header > div,
+.coach-roster-row__identity,
+.coach-review-card__form,
+.coach-review-card__follow-up {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-1);
+}
+
+.coach-attention-item__copy p,
+.coach-review-card__header p,
+.coach-review-card__note {
+  margin: 0;
+  color: var(--v2-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.coach-attention-item__meta {
+  justify-content: start;
+}
+
+.coach-attention-item__evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-1) var(--v2-space-3);
+  margin: var(--v2-space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--v2-text-secondary);
+  font-size: 0.8rem;
+}
+
+.coach-attention-item__evidence li {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.coach-attention-item__evidence strong {
+  color: var(--v2-text-primary);
+}
+
+.coach-attention-item__age {
+  color: var(--v2-text-secondary);
+  font-size: 0.76rem;
+}
+
+.coach-review-workspace > .card,
+.coach-roster-analytics > .card {
+  min-width: 0;
+}
+
+.coach-review-list {
+  gap: var(--v2-space-4);
+}
+
+.coach-review-card {
+  display: grid;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-4);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-panel-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.coach-review-card__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+}
+
+.coach-review-card__facts span {
+  padding: 6px 9px;
+  border: 1px solid var(--coach-line);
+  border-radius: 999px;
+  color: var(--v2-text-secondary);
+  font-size: 0.8rem;
+}
+
+.coach-review-card__note {
+  padding-inline-start: var(--v2-space-3);
+  border-inline-start: 3px solid var(--v2-lime);
+}
+
+.coach-review-card__follow-up {
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 1fr);
+  align-items: end;
+}
+
+.coach-roster-analytics__summary {
+  background: var(--v2-surface-secondary);
+}
+
+.coach-roster-analytics__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-control-radius);
+  background: var(--coach-line);
+}
+
+.coach-roster-analytics__metrics > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--v2-space-3);
+  background: var(--v2-surface);
+}
+
+.coach-roster-analytics__metrics span {
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+}
+
+.coach-roster-analytics__metrics strong {
+  font-size: 1.5rem;
+}
+
+.coach-roster-analytics__toolbar {
+  align-items: end;
+  margin-block-end: var(--v2-space-3);
+}
+
+.coach-roster-analytics__toolbar .field:first-child {
+  flex: 1 1 320px;
+}
+
+.coach-roster-analytics__toolbar .field:last-child {
+  flex: 0 1 220px;
+}
+
+.coach-roster-analytics__list {
+  --coach-roster-columns: minmax(156px, 1.25fr) minmax(150px, 1.4fr) minmax(92px, 0.8fr)
+    minmax(92px, 0.8fr) minmax(112px, 0.85fr) minmax(112px, 0.9fr);
+}
+
+.coach-roster-table__header,
+.coach-roster-row {
+  display: grid;
+  grid-template-columns: var(--coach-roster-columns);
+  gap: var(--v2-space-3);
+  min-width: 0;
+}
+
+.coach-roster-table__header {
+  align-items: end;
+  padding-block: var(--v2-space-2);
+  color: var(--v2-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.coach-roster-table__header > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.coach-roster-row {
+  align-items: start;
+  padding-block: var(--v2-space-3);
+  border-top: 1px solid var(--coach-line);
+}
+
+.coach-roster-row > [role='cell'] {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.coach-roster-cell__label {
+  display: none;
+  color: var(--v2-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.coach-roster-row__identity > span:not(.coach-roster-cell__label),
+.coach-roster-cell__value {
+  color: var(--v2-text-secondary);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.coach-roster-row__identity strong,
+.coach-roster-cell__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.coach-roster-row__attention .badge {
+  justify-self: start;
+  max-width: 100%;
+  text-align: left;
+  white-space: normal;
+}
+
+.coach-roster-row__actions {
+  justify-items: end;
+}
+
+.coach-roster-row__actions button {
+  justify-self: end;
+  min-height: 40px;
+  padding-inline: var(--v2-space-2);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-compact-radius);
+  background: transparent;
+  color: var(--v2-text-primary);
+  font-weight: 700;
+}
+
 .coach-operations {
   display: grid;
   gap: var(--v2-space-4);
@@ -935,6 +1246,32 @@
     max-height: none;
     overflow: visible;
   }
+
+  .coach-roster-table__header {
+    display: none;
+  }
+
+  .coach-roster-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coach-roster-row__identity,
+  .coach-roster-row__program {
+    grid-column: 1 / -1;
+  }
+
+  .coach-roster-row__attention {
+    grid-column: 1;
+  }
+
+  .coach-roster-row__actions {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  .coach-roster-cell__label {
+    display: block;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1058,6 +1395,64 @@
   .coach-os .coach-invite-panel__create,
   .coach-os .coach-invite-pending-action {
     width: 100%;
+  }
+
+  .coach-attention-center,
+  .coach-review-card,
+  .coach-roster-analytics__summary,
+  .coach-roster-analytics__roster {
+    padding: var(--v2-space-3);
+  }
+
+  .coach-attention-center__controls,
+  .coach-roster-analytics__toolbar {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .coach-attention-center__sort,
+  .coach-roster-analytics__toolbar .field,
+  .coach-roster-analytics__toolbar .field:first-child,
+  .coach-roster-analytics__toolbar .field:last-child {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .coach-attention-item {
+    grid-template-columns: 1fr;
+    gap: var(--v2-space-2);
+  }
+
+  .coach-attention-item .button-link {
+    justify-self: start;
+  }
+
+  .coach-review-card__header {
+    align-items: start;
+    display: grid;
+  }
+
+  .coach-review-card__follow-up,
+  .coach-roster-analytics__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coach-roster-row {
+    grid-template-columns: 1fr;
+  }
+
+  .coach-roster-row__attention,
+  .coach-roster-row__actions {
+    grid-column: 1;
+  }
+
+  .coach-roster-row__actions {
+    justify-self: stretch;
+    justify-items: start;
+  }
+
+  .coach-roster-row__actions button {
+    justify-self: start;
   }
 
   .coach-operations__quick-actions {

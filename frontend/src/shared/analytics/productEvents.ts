@@ -63,7 +63,12 @@ export type PublicArticleCtaDestination = 'tma' | 'web' | 'landing';
 export type AiCoachEntryPoint =
   'today' | 'workout' | 'nutrition' | 'program' | 'progress' | 'profile';
 export type CoachAttentionKind =
-  'workout_feedback' | 'weekly_check_in' | 'missed_workout' | 'skipped_workout' | 'without_program';
+  | 'workout_feedback'
+  | 'weekly_check_in'
+  | 'missed_workout'
+  | 'skipped_workout'
+  | 'without_program'
+  | 'program_ending_soon';
 export type CoachAttentionLatencyBucket = 'under_250ms' | '250_1000ms' | 'over_1s';
 export type CoachQuickActionKind =
   | 'review_workout'
@@ -753,6 +758,7 @@ const COACH_ATTENTION_KINDS = new Set<CoachAttentionKind>([
   'missed_workout',
   'skipped_workout',
   'without_program',
+  'program_ending_soon',
 ]);
 const COACH_ATTENTION_LATENCY_BUCKETS = new Set<CoachAttentionLatencyBucket>([
   'under_250ms',

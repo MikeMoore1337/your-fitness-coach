@@ -190,6 +190,10 @@ def _task_response(task: CoachTask, name: str) -> CoachTaskResponse:
         due_at=_local_response(task.due_at_utc, task.timezone),
         due_at_utc=task.due_at_utc.replace(tzinfo=UTC),
         timezone=task.timezone,
+        kind=task.kind,
+        source_kind=task.source_kind,
+        source_id=task.source_id,
+        reason=task.reason,
         state=task.state,
         completed_at=task.completed_at,
         created_at=task.created_at,
@@ -965,6 +969,10 @@ def create_task(
         title=payload.title.strip(),
         due_at_utc=due_at_utc,
         timezone=payload.timezone,
+        kind=payload.kind,
+        source_kind=payload.source_kind,
+        source_id=payload.source_id,
+        reason=payload.reason.strip() if payload.reason else None,
     )
     db.add(task)
     db.flush()
