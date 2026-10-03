@@ -26,8 +26,7 @@ The coarse `users.measurement_eligibility` value is an operational boundary, not
 a product score. `real_client` is the only eligible value for production client
 cohorts. `demo`, `test`, `synthetic`, `load_test` and `technical` rows remain
 reconcilable but are excluded from KPI denominators. Accounts created before
-this additive migration may have `NULL`; reports treat that legacy state as
-`real_client` and fail closed for any other unknown value. Non-production
+this additive migration receive the bounded `real_client` default. Non-production
 reports are also fail-closed.
 
 ## Retention and deletion

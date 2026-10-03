@@ -163,9 +163,6 @@ def test_web_and_tma_retries_share_one_authoritative_milestone(monkeypatch) -> N
     monkeypatch.setattr(settings, "app_env", "prod")
     with get_session_context() as db:
         user = _user(db, 2001)
-        # Accounts created before the eligibility column existed have NULL and
-        # remain eligible as legacy real clients.
-        user.measurement_eligibility = None
         occurred_at = local_naive_to_utc_naive(
             now_msk_naive() - timedelta(hours=1),
             "Europe/Moscow",

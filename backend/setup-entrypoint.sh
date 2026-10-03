@@ -20,5 +20,5 @@ else:
     raise SystemExit("Database did not become ready in time")
 PY
 
-alembic upgrade head
+PGOPTIONS="${YFC_MIGRATION_PGOPTIONS:-}" alembic upgrade head
 python -m fitminiapp_api.services.seed
