@@ -78,6 +78,12 @@ function formatDate(value: string, today: string): { title: string; subtitle: st
   return { title: weekday, subtitle: String(date.getFullYear()) };
 }
 
+function shortDate(value: string): string {
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(
+    new Date(`${value}T12:00:00`),
+  );
+}
+
 function amountLabel(entry: FoodDiaryEntry): string {
   if (entry.amount_unit === 'serving') {
     const weight = entry.weight_g === null ? '' : ` · ${formatNumber(entry.weight_g)} г`;
@@ -677,6 +683,42 @@ function NutritionWeekSelector({
   );
 }
 
+function RepeatCandidateCard({
+  candidate,
+  targetDate,
+  today,
+  readOnly,
+  onRepeat,
+}: {
+  candidate: NonNullable<FoodDiaryDay['repeat_candidate']>;
+  targetDate: string;
+  today: string;
+  readOnly: boolean;
+  onRepeat: () => void;
+}) {
+  if (readOnly) return null;
+  const sourceLabel = formatDate(candidate.source_date, today);
+  const isYesterday = candidate.source_date === addCalendarDays(targetDate, -1);
+  const actionLabel = isYesterday
+    ? `Повторить вчерашний ${mealLabels[candidate.source_meal_type].toLowerCase()}`
+    : `Повторить ${mealLabels[candidate.source_meal_type].toLowerCase()} за ${shortDate(candidate.source_date)}`;
+  return (
+    <section className="nutrition-repeat-default" aria-label="Быстрый повтор">
+      <div>
+        <span className="eyebrow">Быстрый путь</span>
+        <strong>{actionLabel}</strong>
+        <span>
+          {candidate.entry_count} {plural(candidate.entry_count, 'запись', 'записи', 'записей')} ·{' '}
+          {sourceLabel.subtitle}
+        </span>
+      </div>
+      <Button type="button" onClick={onRepeat} data-testid="nutrition-repeat-default">
+        Повторить
+      </Button>
+    </section>
+  );
+}
+
 function defaultMealType(timeZone?: string | null): MealType {
   try {
     const hour = Number(
@@ -783,6 +825,23 @@ export function NutritionDiary({
       )}
       {diary.data && (
         <>
+          {diary.data.repeat_candidate && diary.data.status !== 'fasted' && (
+            <RepeatCandidateCard
+              candidate={diary.data.repeat_candidate}
+              targetDate={selectedDate}
+              today={today}
+              readOnly={readOnlyEntries}
+              onRepeat={() =>
+                setCopySubject({
+                  scope: 'meal',
+                  sourceDate: diary.data?.repeat_candidate?.source_date ?? selectedDate,
+                  sourceMeal: diary.data?.repeat_candidate?.source_meal_type ?? 'breakfast',
+                  initialTargetDate: selectedDate,
+                  label: `${mealLabels[diary.data?.repeat_candidate?.source_meal_type ?? 'breakfast']} за ${formatDate(diary.data?.repeat_candidate?.source_date ?? selectedDate, today).title.toLowerCase()}`,
+                })
+              }
+            />
+          )}
           <DaySummary day={diary.data} />
           <NutritionSuggestions
             diaryDate={selectedDate}

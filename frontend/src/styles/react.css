@@ -7739,6 +7739,29 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   justify-content: flex-end;
   gap: 8px;
 }
+.nutrition-repeat-default {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.nutrition-repeat-default > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.nutrition-repeat-default strong {
+  font-size: 0.92rem;
+}
+.nutrition-repeat-default > div > span:last-child {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
 .nutrition-picker__back {
   min-height: 36px;
   padding: 7px 10px;
@@ -9350,6 +9373,59 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   font-size: 0.76rem;
   line-height: 1.45;
 }
+.nutrition-copy__preview {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-subtle);
+}
+.nutrition-copy__preview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.nutrition-copy__preview-heading h3 {
+  margin-top: 3px;
+  font-size: 0.94rem;
+}
+.nutrition-copy__preview-heading > span {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+.nutrition-copy__preview-list {
+  display: grid;
+  gap: 7px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.nutrition-copy__preview-list li {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.nutrition-copy__preview-list strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+.nutrition-copy__preview-list span,
+.nutrition-copy__preview-state {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.4;
+}
+.nutrition-copy__preview-state {
+  margin: 0;
+}
 
 .nutrition-natural-input,
 .nutrition-template-browser,
@@ -9820,6 +9896,13 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   .nutrition-diary__intro-actions .ui-button {
     min-width: 0;
     padding-inline: 8px;
+  }
+  .nutrition-repeat-default {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .nutrition-repeat-default .ui-button {
+    width: 100%;
   }
   .nutrition-diary__intro .ui-badge {
     justify-self: start;

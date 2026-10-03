@@ -2,29 +2,36 @@ from __future__ import annotations
 
 import hashlib
 import json
+import secrets
 from datetime import date
 from decimal import Decimal
 from typing import Literal, cast
 
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from fitminiapp_api.core.timezone import get_user_timezone_name, today_for_user
+from fitminiapp_api.core.timezone import get_user_timezone_name, now_msk_naive, today_for_user
 from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import (
     FoodDiaryBatchOperation,
     FoodDiaryCopyOperation,
     FoodDiaryDayStatus,
     FoodDiaryEntry,
+    FoodDiaryRepeatPreview,
 )
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.food_diary import (
     DiaryAmountUnit,
     FoodDiaryCopyDay,
+    FoodDiaryCopyDayPreview,
     FoodDiaryCopyMeal,
+    FoodDiaryCopyMealPreview,
+    FoodDiaryCopyPreviewResponse,
     FoodDiaryCopyProduct,
+    FoodDiaryCopyProductPreview,
     FoodDiaryCopyResponse,
     FoodDiaryDayResponse,
     FoodDiaryDayStatusUpdate,
@@ -34,6 +41,7 @@ from fitminiapp_api.schemas.food_diary import (
     FoodDiaryMeal,
     FoodDiaryNutrition,
     FoodDiaryQuickAdd,
+    FoodDiaryRepeatCandidate,
     FoodDiaryTargets,
     MealType,
 )
@@ -296,6 +304,45 @@ def _sum_nutrition(values: list[FoodDiaryNutrition]) -> FoodDiaryNutrition:
         fat_g=optional_sum([value.fat_g for value in values]),
         carbs_g=optional_sum([value.carbs_g for value in values]),
         fiber_g=fiber,
+    )
+
+
+def _repeat_candidate(
+    db: Session,
+    user: User,
+    target_date: date,
+    preferred_meals: list[MealType],
+) -> FoodDiaryRepeatCandidate | None:
+    latest_source_date = (
+        db.query(func.max(FoodDiaryEntry.diary_date))
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.diary_date < target_date,
+        )
+        .scalar()
+    )
+    if latest_source_date is None:
+        return None
+    source_entries = (
+        db.query(FoodDiaryEntry)
+        .filter(
+            FoodDiaryEntry.user_id == user.id,
+            FoodDiaryEntry.diary_date == latest_source_date,
+        )
+        .order_by(FoodDiaryEntry.id.asc())
+        .all()
+    )
+    by_meal: dict[str, list[FoodDiaryEntry]] = {}
+    for entry in source_entries:
+        by_meal.setdefault(entry.meal_type, []).append(entry)
+    meal_order = [*preferred_meals, *(meal for meal in MEAL_TYPES if meal not in preferred_meals)]
+    source_meal = next((meal for meal in meal_order if by_meal.get(meal)), None)
+    if source_meal is None:
+        return None
+    return FoodDiaryRepeatCandidate(
+        source_date=latest_source_date,
+        source_meal_type=source_meal,
+        entry_count=len(by_meal[source_meal]),
     )
 
 
@@ -695,6 +742,12 @@ def get_food_diary_day(
             )
         )
     totals = _sum_nutrition([entry.nutrition for entry in serialized])
+    repeat_candidate = _repeat_candidate(
+        db,
+        user,
+        selected_date,
+        [meal.meal_type for meal in meals if meal.entries],
+    )
     stored_status = _stored_day_status(db, user, selected_date)
     day_status = (
         stored_status.status
@@ -738,6 +791,7 @@ def get_food_diary_day(
         remaining=remaining,
         status=cast(Literal["complete", "incomplete", "unlogged", "fasted"], day_status),
         status_is_explicit=stored_status is not None,
+        repeat_candidate=repeat_candidate,
     )
 
 
@@ -785,9 +839,17 @@ def set_food_diary_day_status(
     return get_food_diary_day(db, user, payload.diary_date)
 
 
-def _request_fingerprint(scope: str, payload: BaseModel) -> str:
+def _request_fingerprint(
+    scope: str,
+    payload: BaseModel,
+    *,
+    include_preview_token: bool = True,
+) -> str:
+    payload_data = payload.model_dump(mode="json")
+    if not include_preview_token:
+        payload_data.pop("preview_token", None)
     canonical = json.dumps(
-        {"copy_scope": scope, **payload.model_dump(mode="json")},
+        {"copy_scope": scope, **payload_data},
         ensure_ascii=True,
         sort_keys=True,
         separators=(",", ":"),
@@ -800,6 +862,110 @@ def _normalize_idempotency_key(value: str) -> str:
     if len(normalized) < 8 or len(normalized) > 128:
         raise FoodDiaryError("Idempotency-Key must contain 8 to 128 characters")
     return normalized
+
+
+def _preview_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _repeat_snapshot_value(value: object) -> object:
+    if isinstance(value, (date,)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    return value
+
+
+def _repeat_entry_snapshot(entry: FoodDiaryEntry) -> dict[str, object]:
+    fields = (
+        "id",
+        "diary_date",
+        "meal_type",
+        "food_id",
+        "recipe_id",
+        "entry_kind",
+        "nutrition_source",
+        "amount",
+        "amount_unit",
+        "weight_g",
+        "food_name",
+        "food_brand",
+        "energy_kcal_per_100g",
+        "protein_g_per_100g",
+        "fat_g_per_100g",
+        "carbs_g_per_100g",
+        "fiber_g_per_100g",
+        "quick_energy_kcal",
+        "quick_protein_g",
+        "quick_fat_g",
+        "quick_carbs_g",
+        "serving_amount",
+        "serving_unit",
+        "serving_weight_g",
+        "nutrition_basis_kind",
+        "nutrition_basis_amount",
+        "nutrition_basis_unit",
+        "nutrition_snapshot",
+        "nutrition_amount",
+        "logged_at",
+        "created_at",
+        "updated_at",
+    )
+    return {field: _repeat_snapshot_value(getattr(entry, field)) for field in fields} | {
+        "nutrition_confidence": diary_entry_confidence(entry)
+    }
+
+
+def _repeat_source_snapshot_hash(entries: list[FoodDiaryEntry]) -> str:
+    canonical = json.dumps(
+        [_repeat_entry_snapshot(entry) for entry in entries],
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _load_copy_source_entries(
+    db: Session,
+    user: User,
+    *,
+    scope: CopyScope,
+    source_entry_id: int | None,
+    source_date: date,
+    source_meal_type: MealType | None,
+    target_date: date,
+    target_meal_type: MealType | None,
+) -> list[FoodDiaryEntry]:
+    _validate_diary_date(user, source_date)
+    _validate_diary_date(user, target_date)
+    _ensure_day_accepts_entries(db, user, target_date)
+    if scope == "meal" and (source_date, source_meal_type) == (
+        target_date,
+        target_meal_type,
+    ):
+        raise FoodDiaryError("source and target meal must differ")
+    if scope == "day" and source_date == target_date:
+        raise FoodDiaryError("source and target day must differ")
+
+    source_query = db.query(FoodDiaryEntry).filter(
+        FoodDiaryEntry.user_id == user.id,
+        FoodDiaryEntry.diary_date == source_date,
+    )
+    if scope == "product":
+        source_query = source_query.filter(
+            FoodDiaryEntry.id == source_entry_id,
+            FoodDiaryEntry.meal_type == source_meal_type,
+        )
+    elif scope == "meal":
+        source_query = source_query.filter(FoodDiaryEntry.meal_type == source_meal_type)
+    source_entries = source_query.order_by(FoodDiaryEntry.id.asc()).all()
+    if not source_entries:
+        if scope == "product":
+            raise FoodDiaryNotFoundError("source diary entry not found")
+        raise FoodDiaryError(f"source {scope} is empty")
+    return source_entries
 
 
 def _copy_response(
@@ -830,6 +996,7 @@ def _existing_copy_operation(
     user: User,
     idempotency_key: str,
     fingerprint: str,
+    record_replay: bool = False,
 ) -> FoodDiaryCopyResponse | None:
     operation = (
         db.query(FoodDiaryCopyOperation)
@@ -843,6 +1010,9 @@ def _existing_copy_operation(
         return None
     if operation.request_fingerprint != fingerprint:
         raise FoodDiaryConflictError("Idempotency-Key was already used for another request")
+    if record_replay:
+        operation.replay_count = (operation.replay_count or 0) + 1
+        db.commit()
     return _copy_response(db, operation, replayed=True)
 
 
@@ -889,6 +1059,96 @@ def _clone_entry(
     )
 
 
+def _copy_preview_response(
+    db: Session,
+    preview: FoodDiaryRepeatPreview,
+    entries: list[FoodDiaryEntry],
+    token: str,
+) -> FoodDiaryCopyPreviewResponse:
+    return FoodDiaryCopyPreviewResponse(
+        copy_scope=cast(CopyScope, preview.copy_scope),
+        source_date=preview.source_date,
+        source_meal_type=cast(MealType | None, preview.source_meal_type),
+        target_date=preview.target_date,
+        target_meal_type=cast(MealType | None, preview.target_meal_type),
+        entries=[_serialize_entry(entry) for entry in entries],
+        preview_token=token,
+        previewed_at=preview.created_at,
+    )
+
+
+def _perform_preview(
+    db: Session,
+    user: User,
+    *,
+    scope: CopyScope,
+    payload: BaseModel,
+    source_entry_id: int | None,
+    source_date: date,
+    source_meal_type: MealType | None,
+    target_date: date,
+    target_meal_type: MealType | None,
+) -> FoodDiaryCopyPreviewResponse:
+    source_entries = _load_copy_source_entries(
+        db,
+        user,
+        scope=scope,
+        source_entry_id=source_entry_id,
+        source_date=source_date,
+        source_meal_type=source_meal_type,
+        target_date=target_date,
+        target_meal_type=target_meal_type,
+    )
+    token = secrets.token_urlsafe(32)
+    preview = FoodDiaryRepeatPreview(
+        user_id=user.id,
+        token_hash=_preview_token_hash(token),
+        request_fingerprint=_request_fingerprint(
+            scope,
+            payload,
+            include_preview_token=False,
+        ),
+        source_snapshot_hash=_repeat_source_snapshot_hash(source_entries),
+        copy_scope=scope,
+        source_entry_id=source_entry_id,
+        source_date=source_date,
+        source_meal_type=source_meal_type,
+        target_date=target_date,
+        target_meal_type=target_meal_type,
+    )
+    db.add(preview)
+    try:
+        db.flush()
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise FoodDiaryConflictError("repeat preview could not be created") from exc
+    db.refresh(preview)
+    return _copy_preview_response(db, preview, source_entries, token)
+
+
+def _record_repeat_persistence_failure(
+    db: Session,
+    user: User,
+    preview_id: int,
+) -> None:
+    preview = (
+        db.query(FoodDiaryRepeatPreview)
+        .filter(
+            FoodDiaryRepeatPreview.id == preview_id,
+            FoodDiaryRepeatPreview.user_id == user.id,
+        )
+        .first()
+    )
+    if preview is None:
+        return
+    preview.persistence_failure_count += 1
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+
+
 def _perform_copy(
     db: Session,
     user: User,
@@ -904,40 +1164,45 @@ def _perform_copy(
 ) -> FoodDiaryCopyResponse:
     key = _normalize_idempotency_key(idempotency_key)
     fingerprint = _request_fingerprint(scope, payload)
-    replay = _existing_copy_operation(db, user, key, fingerprint)
+    replay = _existing_copy_operation(db, user, key, fingerprint, record_replay=True)
     if replay is not None:
         return replay
 
-    _validate_diary_date(user, source_date)
-    _validate_diary_date(user, target_date)
-    _ensure_day_accepts_entries(db, user, target_date)
-    if scope == "meal" and (source_date, source_meal_type) == (
-        target_date,
-        target_meal_type,
-    ):
-        raise FoodDiaryError("source and target meal must differ")
-    if scope == "day" and source_date == target_date:
-        raise FoodDiaryError("source and target day must differ")
-
-    source_query = db.query(FoodDiaryEntry).filter(
-        FoodDiaryEntry.user_id == user.id,
-        FoodDiaryEntry.diary_date == source_date,
-    )
-    if scope == "product":
-        source_query = source_query.filter(
-            FoodDiaryEntry.id == source_entry_id,
-            FoodDiaryEntry.meal_type == source_meal_type,
+    preview = (
+        db.query(FoodDiaryRepeatPreview)
+        .filter(
+            FoodDiaryRepeatPreview.user_id == user.id,
+            FoodDiaryRepeatPreview.token_hash == _preview_token_hash(payload.preview_token),
         )
-    elif scope == "meal":
-        source_query = source_query.filter(FoodDiaryEntry.meal_type == source_meal_type)
-    source_entries = source_query.order_by(FoodDiaryEntry.id.asc()).all()
-    if not source_entries:
-        if scope == "product":
-            raise FoodDiaryNotFoundError("source diary entry not found")
-        raise FoodDiaryError(f"source {scope} is empty")
+        .first()
+    )
+    if preview is None:
+        raise FoodDiaryConflictError("repeat preview is missing or expired")
+    if preview.request_fingerprint != _request_fingerprint(
+        scope,
+        payload,
+        include_preview_token=False,
+    ):
+        raise FoodDiaryConflictError("repeat preview does not match the request")
+    if preview.confirmed_at is not None:
+        raise FoodDiaryConflictError("repeat preview was already confirmed")
+
+    source_entries = _load_copy_source_entries(
+        db,
+        user,
+        scope=scope,
+        source_entry_id=source_entry_id,
+        source_date=source_date,
+        source_meal_type=source_meal_type,
+        target_date=target_date,
+        target_meal_type=target_meal_type,
+    )
+    if _repeat_source_snapshot_hash(source_entries) != preview.source_snapshot_hash:
+        raise FoodDiaryConflictError("repeat preview is stale; request a new preview")
 
     operation = FoodDiaryCopyOperation(
         user_id=user.id,
+        preview_id=preview.id,
         idempotency_key=key,
         request_fingerprint=fingerprint,
         copy_scope=scope,
@@ -952,8 +1217,9 @@ def _perform_copy(
         db.flush()
     except IntegrityError:
         db.rollback()
-        replay = _existing_copy_operation(db, user, key, fingerprint)
+        replay = _existing_copy_operation(db, user, key, fingerprint, record_replay=True)
         if replay is None:
+            _record_repeat_persistence_failure(db, user, preview.id)
             raise FoodDiaryConflictError("copy request could not be completed")
         return replay
 
@@ -975,8 +1241,71 @@ def _perform_copy(
         "nutrition_entry_confirmed",
         day_scope=True,
     )
-    db.commit()
+    preview.confirmed_at = now_msk_naive()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        replay = _existing_copy_operation(db, user, key, fingerprint, record_replay=True)
+        if replay is not None:
+            return replay
+        _record_repeat_persistence_failure(db, user, preview.id)
+        raise FoodDiaryConflictError("copy request could not be completed")
     return _copy_response(db, operation, replayed=False)
+
+
+def preview_diary_product(
+    db: Session,
+    user: User,
+    payload: FoodDiaryCopyProductPreview,
+) -> FoodDiaryCopyPreviewResponse:
+    return _perform_preview(
+        db,
+        user,
+        scope="product",
+        payload=payload,
+        source_entry_id=payload.source_entry_id,
+        source_date=payload.source_date,
+        source_meal_type=payload.source_meal_type,
+        target_date=payload.target_date,
+        target_meal_type=payload.target_meal_type,
+    )
+
+
+def preview_diary_meal(
+    db: Session,
+    user: User,
+    payload: FoodDiaryCopyMealPreview,
+) -> FoodDiaryCopyPreviewResponse:
+    return _perform_preview(
+        db,
+        user,
+        scope="meal",
+        payload=payload,
+        source_entry_id=None,
+        source_date=payload.source_date,
+        source_meal_type=payload.source_meal_type,
+        target_date=payload.target_date,
+        target_meal_type=payload.target_meal_type,
+    )
+
+
+def preview_diary_day(
+    db: Session,
+    user: User,
+    payload: FoodDiaryCopyDayPreview,
+) -> FoodDiaryCopyPreviewResponse:
+    return _perform_preview(
+        db,
+        user,
+        scope="day",
+        payload=payload,
+        source_entry_id=None,
+        source_date=payload.source_date,
+        source_meal_type=None,
+        target_date=payload.target_date,
+        target_meal_type=None,
+    )
 
 
 def copy_diary_product(

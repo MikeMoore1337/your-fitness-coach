@@ -2335,6 +2335,24 @@ export async function installPlatformApi(
       nutritionEntries = [...nutritionEntries, entry];
       return route.fulfill({ status: 201, json: entry });
     }
+    if (path.endsWith('/nutrition/diary/copy/product/preview') && request.method() === 'POST') {
+      const source = nutritionEntries.find(
+        (entry) => entry.id === request.postDataJSON().source_entry_id,
+      );
+      if (!source) return route.fulfill({ status: 404, json: { detail: 'Entry not found' } });
+      return route.fulfill({
+        json: {
+          copy_scope: 'product',
+          source_date: source.diary_date,
+          source_meal_type: source.meal_type,
+          target_date: request.postDataJSON().target_date,
+          target_meal_type: request.postDataJSON().target_meal_type,
+          entries: [source],
+          preview_token: 'platform-preview-token-1234567890',
+          previewed_at: `${today}T08:00:00Z`,
+        },
+      });
+    }
     if (path.endsWith('/nutrition/diary/copy/product') && request.method() === 'POST') {
       const source = nutritionEntries.find(
         (entry) => entry.id === request.postDataJSON().source_entry_id,

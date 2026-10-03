@@ -203,6 +203,42 @@ describe('NutritionDiary', () => {
     );
   });
 
+  it('offers one deterministic prior-meal repeat as the Nutrition default', async () => {
+    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.startsWith('/api/v1/nutrition/diary?')) {
+        return Promise.resolve({
+          ...makeDay([]),
+          repeat_candidate: {
+            source_date: '2026-08-18',
+            source_meal_type: 'breakfast',
+            entry_count: 1,
+          },
+        });
+      }
+      if (path.endsWith('/copy/meal/preview') && options?.method === 'POST') {
+        return Promise.resolve({
+          copy_scope: 'meal',
+          source_date: '2026-08-18',
+          source_meal_type: 'breakfast',
+          target_date: '2026-08-19',
+          target_meal_type: 'breakfast',
+          entries: [{ ...entry, diary_date: '2026-08-18' }],
+          preview_token: 'meal-preview-token-1234567890',
+          previewed_at: '2026-08-19T08:00:00Z',
+        });
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderDiary();
+
+    const defaultRepeat = await screen.findByTestId('nutrition-repeat-default');
+    expect(screen.getByText('Повторить вчерашний завтрак')).toBeVisible();
+    fireEvent.click(defaultRepeat);
+    expect(await screen.findByRole('heading', { name: 'Повторить приём пищи' })).toBeVisible();
+    expect(await screen.findByText('Овсяная каша', { selector: 'strong' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Подтвердить' })).toBeEnabled();
+  });
+
   it('keeps empty meals compact and lets every meal be expanded or collapsed', async () => {
     apiMock.mockResolvedValue(makeDay());
     renderDiary();
@@ -1099,16 +1135,33 @@ describe('NutritionDiary', () => {
     const copyPromise = new Promise((resolve) => {
       resolveCopy = resolve;
     });
-    apiMock.mockImplementation((path: string, options?: { method?: string }) => {
-      if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay());
-      if (path.endsWith('/copy/product') && options?.method === 'POST') return copyPromise;
-      throw new Error(`Unexpected API call: ${path}`);
-    });
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: { method?: string; body?: unknown; headers?: Record<string, string> },
+      ) => {
+        if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay());
+        if (path.endsWith('/copy/product/preview') && options?.method === 'POST') {
+          return Promise.resolve({
+            copy_scope: 'product',
+            source_date: '2026-08-19',
+            source_meal_type: 'breakfast',
+            target_date: targetDate,
+            target_meal_type: 'breakfast',
+            entries: [entry],
+            preview_token: 'preview-token-1234567890',
+            previewed_at: '2026-08-19T08:00:00Z',
+          });
+        }
+        if (path.endsWith('/copy/product') && options?.method === 'POST') return copyPromise;
+        throw new Error(`Unexpected API call: ${path}`);
+      },
+    );
     renderDiary();
     await screen.findByText('Овсяная каша');
     fireEvent.click(screen.getByRole('button', { name: 'Повторить Овсяная каша' }));
     expect(await screen.findByText('Овсяная каша', { selector: 'dd' })).toBeVisible();
-    const submit = screen.getByRole('button', { name: 'Повторить продукт' });
+    const submit = await screen.findByRole('button', { name: 'Подтвердить' });
     fireEvent.click(submit);
     fireEvent.click(submit);
     await waitFor(() =>
@@ -1128,6 +1181,7 @@ describe('NutritionDiary', () => {
           source_entry_id: 41,
           source_meal_type: 'breakfast',
           target_meal_type: 'breakfast',
+          preview_token: 'preview-token-1234567890',
         },
       }),
     );
@@ -1140,6 +1194,66 @@ describe('NutritionDiary', () => {
       entries: [entry],
       replayed: false,
     });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('reuses the same repeat idempotency key after a recoverable network failure', async () => {
+    const targetDate = dateInputValue(new Date(), 'Europe/Moscow');
+    let attempts = 0;
+    apiMock.mockImplementation(
+      (
+        path: string,
+        options?: { method?: string; body?: unknown; headers?: Record<string, string> },
+      ) => {
+        if (path.startsWith('/api/v1/nutrition/diary?')) return Promise.resolve(makeDay());
+        if (path.endsWith('/copy/product/preview') && options?.method === 'POST') {
+          return Promise.resolve({
+            copy_scope: 'product',
+            source_date: '2026-08-19',
+            source_meal_type: 'breakfast',
+            target_date: targetDate,
+            target_meal_type: 'breakfast',
+            entries: [entry],
+            preview_token: 'preview-token-1234567890',
+            previewed_at: '2026-08-19T08:00:00Z',
+          });
+        }
+        if (path.endsWith('/copy/product') && options?.method === 'POST') {
+          attempts += 1;
+          if (attempts === 1) return Promise.reject(new Error('Соединение прервано'));
+          return Promise.resolve({
+            copy_scope: 'product',
+            source_date: '2026-08-19',
+            source_meal_type: 'breakfast',
+            target_date: targetDate,
+            target_meal_type: 'breakfast',
+            entries: [entry],
+            replayed: true,
+          });
+        }
+        throw new Error(`Unexpected API call: ${path}`);
+      },
+    );
+
+    renderDiary();
+    await screen.findByText('Овсяная каша');
+    fireEvent.click(screen.getByRole('button', { name: 'Повторить Овсяная каша' }));
+    expect(await screen.findByText('Овсяная каша', { selector: 'dd' })).toBeVisible();
+    fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить' }));
+    await waitFor(() => expect(attempts).toBe(1));
+
+    const firstSubmission = apiMock.mock.calls.find(([path]) =>
+      String(path).endsWith('/copy/product'),
+    );
+    const requestId = firstSubmission?.[1]?.headers?.['Idempotency-Key'];
+    expect(requestId).toEqual(expect.any(String));
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Повторить$/ }));
+    await waitFor(() => expect(attempts).toBe(2));
+    const submissions = apiMock.mock.calls.filter(([path]) =>
+      String(path).endsWith('/copy/product'),
+    );
+    expect(submissions[1]?.[1]?.headers?.['Idempotency-Key']).toBe(requestId);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 

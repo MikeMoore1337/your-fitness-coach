@@ -82,6 +82,16 @@ def _create_entry(
     return response.json()
 
 
+def _preview_copy(client, headers: dict[str, str], scope: str, payload: dict) -> dict:
+    response = client.post(
+        f"/api/v1/nutrition/diary/copy/{scope}/preview",
+        headers=headers,
+        json=payload,
+    )
+    assert response.status_code == 200, response.text
+    return {**payload, "preview_token": response.json()["preview_token"]}
+
+
 def test_recipe_math_final_weight_and_diary_serving_are_deterministic(client) -> None:
     headers = _auth(client, 18_001)
     first_food_id = _store_food(name="Яйцо")
@@ -231,13 +241,14 @@ def test_copy_product_meal_day_and_idempotent_replay(client) -> None:
     breakfast = _create_entry(client, headers, food_id, source_date, "breakfast", "80")
     _create_entry(client, headers, food_id, source_date, "lunch", "120")
 
-    product_payload = {
+    product_request = {
         "source_entry_id": breakfast["id"],
         "source_date": source_date.isoformat(),
         "source_meal_type": "breakfast",
         "target_date": middle_date.isoformat(),
         "target_meal_type": "dinner",
     }
+    product_payload = _preview_copy(client, headers, "product", product_request)
     first = client.post(
         "/api/v1/nutrition/diary/copy/product",
         headers={**headers, "Idempotency-Key": "repeat-product-1"},
@@ -268,50 +279,134 @@ def test_copy_product_meal_day_and_idempotent_replay(client) -> None:
     ).json()
     assert sum(len(meal["entries"]) for meal in middle_day["meals"]) == 1
 
+    meal_request = {
+        "source_date": source_date.isoformat(),
+        "source_meal_type": "breakfast",
+        "target_date": middle_date.isoformat(),
+        "target_meal_type": "breakfast",
+    }
     meal = client.post(
         "/api/v1/nutrition/diary/copy/meal",
         headers={**headers, "Idempotency-Key": "copy-meal-0001"},
-        json={
-            "source_date": source_date.isoformat(),
-            "source_meal_type": "breakfast",
-            "target_date": middle_date.isoformat(),
-            "target_meal_type": "breakfast",
-        },
+        json=_preview_copy(client, headers, "meal", meal_request),
     )
     assert meal.status_code == 201
     assert len(meal.json()["entries"]) == 1
 
+    yesterday_request = {
+        "source_date": middle_date.isoformat(),
+        "source_meal_type": "breakfast",
+        "target_date": today.isoformat(),
+        "target_meal_type": "breakfast",
+    }
     repeated_yesterday = client.post(
         "/api/v1/nutrition/diary/copy/meal",
         headers={**headers, "Idempotency-Key": "yesterday-breakfast"},
-        json={
-            "source_date": middle_date.isoformat(),
-            "source_meal_type": "breakfast",
-            "target_date": today.isoformat(),
-            "target_meal_type": "breakfast",
-        },
+        json=_preview_copy(client, headers, "meal", yesterday_request),
     )
     assert repeated_yesterday.status_code == 201
     assert len(repeated_yesterday.json()["entries"]) == 1
 
+    day_request = {"source_date": source_date.isoformat(), "target_date": today.isoformat()}
     copied_day = client.post(
         "/api/v1/nutrition/diary/copy/day",
         headers={**headers, "Idempotency-Key": "copy-day-000001"},
-        json={"source_date": source_date.isoformat(), "target_date": today.isoformat()},
+        json=_preview_copy(client, headers, "day", day_request),
     )
     assert copied_day.status_code == 201
     assert [entry["meal_type"] for entry in copied_day.json()["entries"]] == [
         "breakfast",
         "lunch",
     ]
-    assert (
-        client.post(
-            "/api/v1/nutrition/diary/copy/product",
-            headers={**other_headers, "Idempotency-Key": "foreign-product"},
-            json=product_payload,
-        ).status_code
-        == 404
+    foreign_repeat = client.post(
+        "/api/v1/nutrition/diary/copy/product",
+        headers={**other_headers, "Idempotency-Key": "foreign-product"},
+        json=product_payload,
     )
+    assert foreign_repeat.status_code == 409
+
+
+def test_repeat_preview_is_read_only_and_stale_confirmation_fails_safe(client) -> None:
+    headers = _auth(client, 18_022)
+    food_id = _store_food(name="Предварительный продукт")
+    today = timezone_module.today_in_timezone("Europe/Moscow")
+    source_date = today - timedelta(days=2)
+    target_date = today - timedelta(days=1)
+    source = _create_entry(client, headers, food_id, source_date, "breakfast", "80")
+    request = {
+        "source_entry_id": source["id"],
+        "source_date": source_date.isoformat(),
+        "source_meal_type": "breakfast",
+        "target_date": target_date.isoformat(),
+        "target_meal_type": "lunch",
+    }
+
+    preview = client.post(
+        "/api/v1/nutrition/diary/copy/product/preview",
+        headers=headers,
+        json=request,
+    )
+    assert preview.status_code == 200, preview.text
+    preview_json = preview.json()
+    assert preview_json["entries"][0]["food_name"] == "Предварительный продукт"
+    assert preview_json["entries"][0]["amount"] == "80.000"
+    preview_day = client.get(
+        "/api/v1/nutrition/diary",
+        headers=headers,
+        params={"diary_date": target_date.isoformat()},
+    )
+    assert preview_day.status_code == 200
+    assert all(not meal["entries"] for meal in preview_day.json()["meals"])
+
+    updated = client.patch(
+        f"/api/v1/nutrition/diary/entries/{source['id']}",
+        headers=headers,
+        json={"amount": "90"},
+    )
+    assert updated.status_code == 200, updated.text
+    stale = client.post(
+        "/api/v1/nutrition/diary/copy/product",
+        headers={**headers, "Idempotency-Key": "stale-preview-0001"},
+        json={**request, "preview_token": preview_json["preview_token"]},
+    )
+    assert stale.status_code == 409
+    assert "stale" in stale.json()["detail"]
+
+    fresh_request = {**request}
+    fresh_preview = client.post(
+        "/api/v1/nutrition/diary/copy/product/preview",
+        headers=headers,
+        json=fresh_request,
+    )
+    assert fresh_preview.status_code == 200, fresh_preview.text
+    confirmed = client.post(
+        "/api/v1/nutrition/diary/copy/product",
+        headers={**headers, "Idempotency-Key": "repeat-double-click-0001"},
+        json={**fresh_request, "preview_token": fresh_preview.json()["preview_token"]},
+    )
+    assert confirmed.status_code == 201, confirmed.text
+    assert confirmed.json()["entries"][0]["amount"] == "90.000"
+    assert confirmed.json()["entries"][0]["diary_date"] == target_date.isoformat()
+    replay = client.post(
+        "/api/v1/nutrition/diary/copy/product",
+        headers={**headers, "Idempotency-Key": "repeat-double-click-0001"},
+        json={**fresh_request, "preview_token": fresh_preview.json()["preview_token"]},
+    )
+    assert replay.status_code == 201
+    assert replay.json()["replayed"] is True
+    alternate_confirmation = client.post(
+        "/api/v1/nutrition/diary/copy/product",
+        headers={**headers, "Idempotency-Key": "repeat-double-click-0002"},
+        json={**fresh_request, "preview_token": fresh_preview.json()["preview_token"]},
+    )
+    assert alternate_confirmation.status_code == 409
+    target = client.get(
+        "/api/v1/nutrition/diary",
+        headers=headers,
+        params={"diary_date": target_date.isoformat()},
+    )
+    assert target.status_code == 200
+    assert sum(len(meal["entries"]) for meal in target.json()["meals"]) == 1
 
 
 def test_copy_target_date_uses_the_authenticated_users_timezone(client, monkeypatch) -> None:
@@ -345,19 +440,20 @@ def test_copy_target_date_uses_the_authenticated_users_timezone(client, monkeypa
             "target_meal_type": "breakfast",
         }
 
+    tokyo_request = payload(tokyo_source["id"], "2026-08-18")
     tokyo_copy = client.post(
         "/api/v1/nutrition/diary/copy/product",
         headers={**tokyo_headers, "Idempotency-Key": "tokyo-target-001"},
-        json=payload(tokyo_source["id"], "2026-08-18"),
+        json=_preview_copy(client, tokyo_headers, "product", tokyo_request),
     )
     assert tokyo_copy.status_code == 201
-    la_copy = client.post(
-        "/api/v1/nutrition/diary/copy/product",
-        headers={**los_angeles_headers, "Idempotency-Key": "la-target-00001"},
+    la_preview = client.post(
+        "/api/v1/nutrition/diary/copy/product/preview",
+        headers=los_angeles_headers,
         json=payload(la_source["id"], "2026-08-17"),
     )
-    assert la_copy.status_code == 422
-    assert la_copy.json()["detail"] == "future diary dates are not allowed"
+    assert la_preview.status_code == 422
+    assert la_preview.json()["detail"] == "future diary dates are not allowed"
 
 
 def test_recipes_copying_migration_upgrades_and_downgrades(tmp_path: Path) -> None:

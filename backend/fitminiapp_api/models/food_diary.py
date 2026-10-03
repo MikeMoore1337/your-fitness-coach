@@ -280,6 +280,67 @@ class FoodDiaryDayStatus(Base):
     )
 
 
+class FoodDiaryRepeatPreview(Base):
+    """Short-lived server state for an authorized repeat preview.
+
+    The preview stores only the request shape and opaque source snapshot hashes. It
+    never stores food names, quantities, nutrient values, or recipe contents.
+    """
+
+    __tablename__ = "food_diary_repeat_previews"
+    __table_args__ = (
+        CheckConstraint(
+            "copy_scope IN ('product', 'meal', 'day')",
+            name="ck_food_diary_repeat_previews_scope",
+        ),
+        CheckConstraint(
+            "source_meal_type IS NULL OR "
+            "source_meal_type IN ('breakfast', 'lunch', 'dinner', 'snacks')",
+            name="ck_food_diary_repeat_previews_source_meal",
+        ),
+        CheckConstraint(
+            "target_meal_type IS NULL OR "
+            "target_meal_type IN ('breakfast', 'lunch', 'dinner', 'snacks')",
+            name="ck_food_diary_repeat_previews_target_meal",
+        ),
+        CheckConstraint(
+            "persistence_failure_count >= 0",
+            name="ck_food_diary_repeat_previews_failure_count",
+        ),
+        UniqueConstraint("token_hash", name="uq_food_diary_repeat_previews_token"),
+        Index(
+            "ix_food_diary_repeat_previews_user_created",
+            "user_id",
+            "created_at",
+            "id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    copy_scope: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_date: Mapped[date] = mapped_column(Date, nullable=False)
+    source_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    target_date: Mapped[date] = mapped_column(Date, nullable=False)
+    target_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=now_msk_naive,
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    persistence_failure_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
+
 class FoodDiaryCopyOperation(Base):
     __tablename__ = "food_diary_copy_operations"
     __table_args__ = (
@@ -306,6 +367,8 @@ class FoodDiaryCopyOperation(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # Nullable for historical copy operations created before preview-first repeat.
+    preview_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
     request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     copy_scope: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -314,6 +377,7 @@ class FoodDiaryCopyOperation(Base):
     source_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
     target_date: Mapped[date] = mapped_column(Date, nullable=False)
     target_meal_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    replay_count: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

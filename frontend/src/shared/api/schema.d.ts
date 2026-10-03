@@ -3674,6 +3674,57 @@ export interface paths {
         patch: operations["update_diary_entry_api_v1_nutrition_diary_entries__entry_id__patch"];
         trace?: never;
     };
+    "/api/v1/nutrition/diary/copy/product/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Copy Product */
+        post: operations["preview_copy_product_api_v1_nutrition_diary_copy_product_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/copy/meal/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Copy Meal */
+        post: operations["preview_copy_meal_api_v1_nutrition_diary_copy_meal_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/diary/copy/day/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Copy Day */
+        post: operations["preview_copy_day_api_v1_nutrition_diary_copy_day_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/diary/copy/product": {
         parameters: {
             query?: never;
@@ -5045,6 +5096,7 @@ export interface components {
             eligible_real_account_count: number;
             /** Recovery Eligible Real Account Count */
             recovery_eligible_real_account_count: number;
+            nutrition_repeat_metrics: components["schemas"]["AdminNutritionRepeatMetrics"];
             /**
              * Analytics Provider Status
              * @constant
@@ -5147,6 +5199,29 @@ export interface components {
             median_seconds?: number | null;
             /** Window */
             window: string;
+        };
+        /** AdminNutritionRepeatMetrics */
+        AdminNutritionRepeatMetrics: {
+            /** Eligible Opportunities */
+            eligible_opportunities: number;
+            /** Confirmed Repeats */
+            confirmed_repeats: number;
+            /** Repeat Rate Percent */
+            repeat_rate_percent?: number | null;
+            /** Preview Count */
+            preview_count: number;
+            /** Confirmed Preview Count */
+            confirmed_preview_count: number;
+            /** Preview To Confirmed Percent */
+            preview_to_confirmed_percent?: number | null;
+            /** Median Seconds */
+            median_seconds?: number | null;
+            /** Persistence Failures */
+            persistence_failures: number;
+            /** Persistence Failure Rate Percent */
+            persistence_failure_rate_percent?: number | null;
+            /** Duplicate Prevention Count */
+            duplicate_prevention_count: number;
         };
         /** AdminOperationRequest */
         AdminOperationRequest: {
@@ -9068,6 +9143,21 @@ export interface components {
              * Format: date
              */
             target_date: string;
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** FoodDiaryCopyDayPreview */
+        FoodDiaryCopyDayPreview: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
         };
         /** FoodDiaryCopyMeal */
         FoodDiaryCopyMeal: {
@@ -9091,9 +9181,92 @@ export interface components {
              * @enum {string}
              */
             target_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** FoodDiaryCopyMealPreview */
+        FoodDiaryCopyMealPreview: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Source Meal Type
+             * @enum {string}
+             */
+            source_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /**
+             * Target Meal Type
+             * @enum {string}
+             */
+            target_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+        };
+        /** FoodDiaryCopyPreviewResponse */
+        FoodDiaryCopyPreviewResponse: {
+            /**
+             * Copy Scope
+             * @enum {string}
+             */
+            copy_scope: "product" | "meal" | "day";
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /** Source Meal Type */
+            source_meal_type: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Target Meal Type */
+            target_meal_type: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /** Entries */
+            entries: components["schemas"]["FoodDiaryEntryResponse"][];
+            /** Preview Token */
+            preview_token: string;
+            /**
+             * Previewed At
+             * Format: date-time
+             */
+            previewed_at: string;
         };
         /** FoodDiaryCopyProduct */
         FoodDiaryCopyProduct: {
+            /** Source Entry Id */
+            source_entry_id: number;
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Source Meal Type
+             * @enum {string}
+             */
+            source_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /**
+             * Target Meal Type
+             * @enum {string}
+             */
+            target_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Preview Token */
+            preview_token: string;
+        };
+        /** FoodDiaryCopyProductPreview */
+        FoodDiaryCopyProductPreview: {
             /** Source Entry Id */
             source_entry_id: number;
             /**
@@ -9164,6 +9337,7 @@ export interface components {
             status: "complete" | "incomplete" | "unlogged" | "fasted";
             /** Status Is Explicit */
             status_is_explicit: boolean;
+            repeat_candidate?: components["schemas"]["FoodDiaryRepeatCandidate"] | null;
         };
         /** FoodDiaryDayStatusUpdate */
         FoodDiaryDayStatusUpdate: {
@@ -9331,6 +9505,21 @@ export interface components {
             fat_g?: number | string | null;
             /** Carbs G */
             carbs_g?: number | string | null;
+        };
+        /** FoodDiaryRepeatCandidate */
+        FoodDiaryRepeatCandidate: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Source Meal Type
+             * @enum {string}
+             */
+            source_meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Entry Count */
+            entry_count: number;
         };
         /** FoodDiaryTargets */
         FoodDiaryTargets: {
@@ -23241,6 +23430,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoodDiaryEntryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_copy_product_api_v1_nutrition_diary_copy_product_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodDiaryCopyProductPreview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryCopyPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_copy_meal_api_v1_nutrition_diary_copy_meal_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodDiaryCopyMealPreview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryCopyPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_copy_day_api_v1_nutrition_diary_copy_day_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FoodDiaryCopyDayPreview"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodDiaryCopyPreviewResponse"];
                 };
             };
             /** @description Validation Error */

@@ -16,6 +16,7 @@ from fitminiapp_api.core.timezone import (
     local_naive_to_utc_naive,
     now_msk_naive,
 )
+from fitminiapp_api.models.food_diary import FoodDiaryCopyOperation, FoodDiaryRepeatPreview
 from fitminiapp_api.models.lifecycle_milestone import (
     LIFECYCLE_MILESTONE_TYPES,
     LifecycleMilestone,
@@ -56,6 +57,19 @@ class _RecoveryMetrics(TypedDict):
     completion_numerator: int
     recovery_count: int
     median_recovery_seconds: float | None
+
+
+class _NutritionRepeatMetrics(TypedDict):
+    eligible_opportunities: int
+    confirmed_repeats: int
+    repeat_rate_percent: float | None
+    preview_count: int
+    confirmed_preview_count: int
+    preview_to_confirmed_percent: float | None
+    median_seconds: float | None
+    persistence_failures: int
+    persistence_failure_rate_percent: float | None
+    duplicate_prevention_count: int
 
 
 def _empty_events() -> _UserEvents:
@@ -147,6 +161,87 @@ def _kpi(
 def _recovery_timezone_name(user: User) -> str:
     raw_timezone = getattr(getattr(user, "profile", None), "timezone", None)
     return raw_timezone if raw_timezone and is_valid_timezone(raw_timezone) else "UTC"
+
+
+def _nutrition_repeat_metrics(
+    db: Session,
+    *,
+    eligible_users: list[User],
+    period_start: datetime,
+    period_end: datetime,
+) -> _NutritionRepeatMetrics:
+    user_ids = [user.id for user in eligible_users]
+    if not user_ids:
+        return {
+            "eligible_opportunities": 0,
+            "confirmed_repeats": 0,
+            "repeat_rate_percent": None,
+            "preview_count": 0,
+            "confirmed_preview_count": 0,
+            "preview_to_confirmed_percent": None,
+            "median_seconds": None,
+            "persistence_failures": 0,
+            "persistence_failure_rate_percent": None,
+            "duplicate_prevention_count": 0,
+        }
+
+    previews = (
+        db.query(FoodDiaryRepeatPreview)
+        .filter(
+            FoodDiaryRepeatPreview.user_id.in_(user_ids),
+            FoodDiaryRepeatPreview.created_at >= period_start,
+            FoodDiaryRepeatPreview.created_at <= period_end,
+        )
+        .all()
+    )
+    preview_by_id = {preview.id: preview for preview in previews}
+    operations = (
+        db.query(FoodDiaryCopyOperation)
+        .filter(
+            FoodDiaryCopyOperation.user_id.in_(user_ids),
+            FoodDiaryCopyOperation.preview_id.in_(list(preview_by_id)),
+            FoodDiaryCopyOperation.created_at >= period_start,
+            FoodDiaryCopyOperation.created_at <= period_end,
+        )
+        .all()
+        if preview_by_id
+        else []
+    )
+    durations = [
+        (operation.created_at - preview_by_id[operation.preview_id].created_at).total_seconds()
+        for operation in operations
+        if operation.preview_id in preview_by_id
+        and operation.created_at >= preview_by_id[operation.preview_id].created_at
+    ]
+    confirmed_repeats = len(operations)
+    eligible_opportunities = len(previews)
+    persistence_failures = sum(preview.persistence_failure_count for preview in previews)
+    persistence_attempts = confirmed_repeats + persistence_failures
+    duplicate_prevention_count = sum(operation.replay_count or 0 for operation in operations)
+    return {
+        "eligible_opportunities": eligible_opportunities,
+        "confirmed_repeats": confirmed_repeats,
+        "repeat_rate_percent": (
+            round(confirmed_repeats * 100 / eligible_opportunities, 1)
+            if eligible_opportunities
+            else None
+        ),
+        "preview_count": eligible_opportunities,
+        "confirmed_preview_count": confirmed_repeats,
+        "preview_to_confirmed_percent": (
+            round(confirmed_repeats * 100 / eligible_opportunities, 1)
+            if eligible_opportunities
+            else None
+        ),
+        "median_seconds": median(durations) if durations else None,
+        "persistence_failures": persistence_failures,
+        "persistence_failure_rate_percent": (
+            round(persistence_failures * 100 / persistence_attempts, 1)
+            if persistence_attempts
+            else None
+        ),
+        "duplicate_prevention_count": duplicate_prevention_count,
+    }
 
 
 def _recovery_metrics(
@@ -502,6 +597,12 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
         period_start=now - timedelta(days=period_days),
         now=now,
     )
+    repeat_metrics = _nutrition_repeat_metrics(
+        db,
+        eligible_users=users,
+        period_start=cohort_since_msk,
+        period_end=now_msk_naive(),
+    )
     quality = _quality_report(
         db,
         eligible_users=users,
@@ -616,7 +717,8 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
         "показатели восстановления — по всем доступным клиентским аккаунтам за период. Демо-сессии не создают "
         "аккаунты и события; root- и trainer-аккаунты исключены. D1/D7/D30 и recovery используют "
         "часовой пояс профиля, а при его отсутствии — UTC. Raw events, идентификаторы и данные "
-        "питания в отчёт не попадают."
+        "питания в отчёт не попадают. Repeat-метрики используют только серверные preview/confirmation "
+        "факты и не включают названия, количества или nutrient payload."
     )
     exclusions = [
         "root/admin и trainer-аккаунты",
@@ -639,6 +741,7 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
         "complete_weekly_cohorts": complete_weekly_cohorts,
         "eligible_real_account_count": cohort_size,
         "recovery_eligible_real_account_count": len(recovery_accounts),
+        "nutrition_repeat_metrics": repeat_metrics,
         "analytics_provider_status": "not_connected",
         "effect_status": effect_status,
         "effect_note": effect_note,
