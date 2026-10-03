@@ -5122,10 +5122,21 @@ export interface components {
              * Format: date-time
              */
             as_of: string;
+            /** Milestone Retention Days */
+            milestone_retention_days: number;
+            /** Aggregate Retention Days */
+            aggregate_retention_days: number;
             /** Cohort Size */
             cohort_size: number;
             /** Complete Weekly Cohorts */
             complete_weekly_cohorts: number;
+            /**
+             * Sample Status
+             * @enum {string}
+             */
+            sample_status: "INSUFFICIENT_SAMPLE" | "READY_FOR_EFFECT_REVIEW";
+            /** Sample Note */
+            sample_note: string;
             /** Eligible Real Account Count */
             eligible_real_account_count: number;
             /** Recovery Eligible Real Account Count */
@@ -5201,12 +5212,30 @@ export interface components {
              * @enum {string}
              */
             status: "clean" | "attention";
+            /** Total Milestones */
+            total_milestones: number;
+            /** Authoritative Success Count */
+            authoritative_success_count: number;
+            /** Authoritative Success Rate Percent */
+            authoritative_success_rate_percent?: number | null;
             /** Duplicate Milestones */
             duplicate_milestones: number;
+            /** Duplicate Web Tma Outcomes */
+            duplicate_web_tma_outcomes: number;
             /** Impossible Order */
             impossible_order: number;
+            /** Demo Test Contamination */
+            demo_test_contamination: number;
             /** Client Success Without Server */
             client_success_without_server: number;
+            /** Post Deletion Milestones */
+            post_deletion_milestones: number;
+            /** Unauthorized Cross Account Outcomes */
+            unauthorized_cross_account_outcomes: number;
+            /** Malformed Schema Versions */
+            malformed_schema_versions: number;
+            /** Retention Expired Milestones */
+            retention_expired_milestones: number;
             /** Invalid Milestones */
             invalid_milestones: number;
             /** Excluded Role Accounts */
