@@ -1690,6 +1690,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Capacity */
+        get: operations["coach_capacity_api_v1_coach_capacity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/check-ins/review": {
         parameters: {
             query?: never;
@@ -4341,6 +4358,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/trainer-capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Trainer Capacity */
+        get: operations["admin_trainer_capacity_api_v1_admin_trainer_capacity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -5269,6 +5303,80 @@ export interface components {
             reason: "security_incident" | "abuse" | "account_recovery" | "support_request" | "relationship_safety";
             /** Is Active */
             is_active: boolean;
+        };
+        /** AdminTrainerCapacityBand */
+        AdminTrainerCapacityBand: {
+            /**
+             * Band
+             * @enum {string}
+             */
+            band: "0_9" | "10_29" | "30_99" | "100_plus";
+            /** Trainer Count */
+            trainer_count: number;
+            /** Active Client Count */
+            active_client_count: number;
+        };
+        /** AdminTrainerCapacityResponse */
+        AdminTrainerCapacityResponse: {
+            /** Period Days */
+            period_days: number;
+            /**
+             * Cohort Since
+             * Format: date-time
+             */
+            cohort_since: string;
+            /**
+             * Cohort Until
+             * Format: date-time
+             */
+            cohort_until: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Eligible Account Count */
+            eligible_account_count: number;
+            /** Activated Trainer Count */
+            activated_trainer_count: number;
+            /** Trainer Activation Rate Percent */
+            trainer_activation_rate_percent?: number | null;
+            /** Trainers With First Client Action */
+            trainers_with_first_client_action: number;
+            /** Time To First Client Action Median Seconds */
+            time_to_first_client_action_median_seconds?: number | null;
+            /** Active Trainer Count */
+            active_trainer_count: number;
+            /** Active Client Count */
+            active_client_count: number;
+            /** Pending Invite Count */
+            pending_invite_count: number;
+            /** Open Task Count */
+            open_task_count: number;
+            /** Authorized Client Action Success Count */
+            authorized_client_action_success_count: number;
+            /** Authorized Client Action Failure Count */
+            authorized_client_action_failure_count?: number | null;
+            /**
+             * Authorized Client Action Failure Status
+             * @constant
+             */
+            authorized_client_action_failure_status: "not_recorded";
+            /** Response Time P50 Ms */
+            response_time_p50_ms?: number | null;
+            /** Response Time P95 Ms */
+            response_time_p95_ms?: number | null;
+            /**
+             * Response Time Status
+             * @constant
+             */
+            response_time_status: "not_measured";
+            /** Capacity Bands */
+            capacity_bands: components["schemas"]["AdminTrainerCapacityBand"][];
+            /** Coverage Note */
+            coverage_note: string;
+            /** Exclusions */
+            exclusions: string[];
         };
         /** AdminUserDetail */
         AdminUserDetail: {
@@ -7026,6 +7134,62 @@ export interface components {
             items?: components["schemas"]["CoachAttentionItem"][];
             /** Total */
             total: number;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** CoachCapacityBottleneck */
+        CoachCapacityBottleneck: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "attention" | "open_tasks" | "without_program" | "pending_invites";
+            /** Count */
+            count: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "attention" | "tasks" | "without_program" | "pending";
+        };
+        /** CoachCapacityResponse */
+        CoachCapacityResponse: {
+            /** Active Client Count */
+            active_client_count: number;
+            /** Pending Invite Count */
+            pending_invite_count: number;
+            /** Open Task Count */
+            open_task_count: number;
+            /** Attention Item Count */
+            attention_item_count: number;
+            /** Attention Client Count */
+            attention_client_count: number;
+            /** Attention Items Returned */
+            attention_items_returned: number;
+            /** Attention Items Truncated */
+            attention_items_truncated: boolean;
+            /** Clients With Active Program Count */
+            clients_with_active_program_count: number;
+            /** Roster Coverage Percent */
+            roster_coverage_percent?: number | null;
+            /**
+             * Capacity Band
+             * @enum {string}
+             */
+            capacity_band: "0_9" | "10_29" | "30_99" | "100_plus";
+            /** Next Capacity Boundary */
+            next_capacity_boundary?: number | null;
+            /** Scale Boundaries */
+            scale_boundaries: [
+                number,
+                number,
+                number
+            ];
+            /** Bottlenecks */
+            bottlenecks: components["schemas"]["CoachCapacityBottleneck"][];
             /**
              * Generated At
              * Format: date-time
@@ -19014,6 +19178,26 @@ export interface operations {
             };
         };
     };
+    coach_capacity_api_v1_coach_capacity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachCapacityResponse"];
+                };
+            };
+        };
+    };
     coach_check_in_reviews_api_v1_coach_check_ins_review_get: {
         parameters: {
             query?: {
@@ -24763,6 +24947,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminFunnelResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_trainer_capacity_api_v1_admin_trainer_capacity_get: {
+        parameters: {
+            query?: {
+                period_days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminTrainerCapacityResponse"];
                 };
             };
             /** @description Validation Error */

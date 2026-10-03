@@ -354,6 +354,37 @@
   margin-top: var(--v2-space-2);
 }
 
+.coach-today__capacity-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--v2-space-3);
+}
+
+.coach-today__capacity-metrics > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: var(--v2-space-3);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-muted);
+}
+
+.coach-today__capacity-metrics span {
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+}
+
+.coach-today__capacity-metrics strong {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+}
+
+.coach-today__capacity-bottleneck {
+  margin: 0;
+  color: var(--v2-text-secondary);
+}
+
 .coach-tools-hub {
   display: grid;
   gap: var(--v2-space-4);
@@ -1233,6 +1264,10 @@
     grid-template-columns: 1fr;
   }
 
+  .coach-today__capacity-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .coach-operations__facts-grid {
     grid-template-columns: 1fr;
   }
@@ -1325,6 +1360,10 @@
     width: 100%;
     justify-content: space-between;
     text-align: left;
+  }
+
+  .coach-today__capacity-metrics {
+    gap: var(--v2-space-2);
   }
 
   .coach-os .coach-client-facts {

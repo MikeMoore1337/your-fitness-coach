@@ -270,6 +270,40 @@ async function mockAdminApi(page: Page, { root = true, coach = false } = {}) {
         },
       });
     }
+    if (path.endsWith('/admin/trainer-capacity')) {
+      return route.fulfill({
+        json: {
+          period_days: 30,
+          cohort_since: '2030-01-01T00:00:00Z',
+          cohort_until: '2030-01-31T00:00:00Z',
+          as_of: '2030-01-31T00:00:00Z',
+          eligible_account_count: 120,
+          activated_trainer_count: 12,
+          trainer_activation_rate_percent: 10,
+          trainers_with_first_client_action: 9,
+          time_to_first_client_action_median_seconds: 3600,
+          active_trainer_count: 4,
+          active_client_count: 72,
+          pending_invite_count: 3,
+          open_task_count: 11,
+          authorized_client_action_success_count: 85,
+          authorized_client_action_failure_count: null,
+          authorized_client_action_failure_status: 'not_recorded',
+          response_time_p50_ms: null,
+          response_time_p95_ms: null,
+          response_time_status: 'not_measured',
+          capacity_bands: [
+            { band: '0_9', trainer_count: 1, active_client_count: 4 },
+            { band: '10_29', trainer_count: 1, active_client_count: 18 },
+            { band: '30_99', trainer_count: 2, active_client_count: 50 },
+            { band: '100_plus', trainer_count: 0, active_client_count: 0 },
+          ],
+          coverage_note:
+            'Отдельный trainer-capacity срез; клиентский funnel и его KPI в этот срез не входят.',
+          exclusions: ['Неуспешные запросы не записываются.', 'Request latency не измеряется.'],
+        },
+      });
+    }
     if (path.includes('/admin/') && ['PATCH', 'POST'].includes(request.method())) {
       return route.fulfill({ json: detail });
     }
@@ -354,6 +388,21 @@ test('tablet dark state keeps job status readable and retry bounded to exports',
     path: '../.artifacts/screenshots/task-71/768-dark-jobs.png',
     fullPage: true,
   });
+});
+
+test('root workspace keeps trainer capacity metrics outside the client funnel', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockAdminApi(page);
+  await page.goto('/admin');
+  await page.getByRole('button', { name: 'Ёмкость тренеров' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Ёмкость тренеров' })).toBeVisible();
+  await expect(page.getByText('Не клиентский funnel')).toBeVisible();
+  await expect(page.getByText('До 10 клиентов')).toBeVisible();
+  await expect(page.getByText('Ошибки: не записываются · p50/p95: не измерены')).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 test('mobile destructive confirmation names the subject and preserves touch geometry', async ({

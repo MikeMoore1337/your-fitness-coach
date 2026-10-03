@@ -154,3 +154,34 @@ class AdminFunnelResponse(BaseModel):
     exclusions: list[str]
     data_quality: AdminLifecycleDataQuality
     kpis: list[AdminLifecycleKpi]
+
+
+class AdminTrainerCapacityBand(BaseModel):
+    band: Literal["0_9", "10_29", "30_99", "100_plus"]
+    trainer_count: int = Field(ge=0)
+    active_client_count: int = Field(ge=0)
+
+
+class AdminTrainerCapacityResponse(BaseModel):
+    period_days: int = Field(ge=7, le=730)
+    cohort_since: datetime
+    cohort_until: datetime
+    as_of: datetime
+    eligible_account_count: int = Field(ge=0)
+    activated_trainer_count: int = Field(ge=0)
+    trainer_activation_rate_percent: float | None = Field(default=None, ge=0, le=100)
+    trainers_with_first_client_action: int = Field(ge=0)
+    time_to_first_client_action_median_seconds: float | None = Field(default=None, ge=0)
+    active_trainer_count: int = Field(ge=0)
+    active_client_count: int = Field(ge=0)
+    pending_invite_count: int = Field(ge=0)
+    open_task_count: int = Field(ge=0)
+    authorized_client_action_success_count: int = Field(ge=0)
+    authorized_client_action_failure_count: int | None = Field(default=None, ge=0)
+    authorized_client_action_failure_status: Literal["not_recorded"]
+    response_time_p50_ms: float | None = Field(default=None, ge=0)
+    response_time_p95_ms: float | None = Field(default=None, ge=0)
+    response_time_status: Literal["not_measured"]
+    capacity_bands: list[AdminTrainerCapacityBand]
+    coverage_note: str
+    exclusions: list[str]

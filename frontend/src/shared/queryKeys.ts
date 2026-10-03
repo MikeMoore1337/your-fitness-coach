@@ -18,6 +18,7 @@ export const queryKeys = {
   },
   trainer: {
     attention: ['coach', 'attention'] as const,
+    capacity: ['coach', 'capacity'] as const,
     checkInReviews: (status: 'pending' | 'reviewed' = 'pending') =>
       ['coach', 'check-in-reviews', status] as const,
     operationsToday: ['coach', 'operations', 'today'] as const,

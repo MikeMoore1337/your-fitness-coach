@@ -19,6 +19,7 @@ from fitminiapp_api.models.program import (
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.check_in import WeeklyCheckInHistoryResponse
 from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
+from fitminiapp_api.schemas.coach_capacity import CoachCapacityResponse
 from fitminiapp_api.schemas.coach_crm import (
     CoachAgendaResponse,
     CoachClientOperationalStatusUpdate,
@@ -84,6 +85,7 @@ from fitminiapp_api.services.analytics import (
 )
 from fitminiapp_api.services.audit import record_audit_event
 from fitminiapp_api.services.coach_attention import build_coach_attention
+from fitminiapp_api.services.coach_capacity import build_coach_capacity_snapshot
 from fitminiapp_api.services.coach_clients import (
     create_coach_invite_link,
     get_client_managed_by_coach,
@@ -289,6 +291,14 @@ def coach_attention(
     return CoachAttentionResponse.model_validate(
         build_coach_attention(db, current_user, limit=limit)
     )
+
+
+@router.get("/capacity", response_model=CoachCapacityResponse)
+def coach_capacity(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachCapacityResponse:
+    return CoachCapacityResponse.model_validate(build_coach_capacity_snapshot(db, current_user))
 
 
 @router.get(

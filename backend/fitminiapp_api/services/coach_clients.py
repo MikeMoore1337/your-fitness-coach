@@ -236,6 +236,15 @@ def remove_client_for_coach(db: Session, coach: User, client_id: int) -> None:
     link.status = "ended"
     link.ended_at = now_msk_naive()
     link.ended_reason = "removed_by_trainer"
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        target_user_id=client_id,
+        action="coach.relation_ended",
+        resource_type="coach_client",
+        resource_id=link.id,
+        details={"status": "ended", "reason": "removed_by_trainer"},
+    )
     db.commit()
 
 
@@ -255,6 +264,15 @@ def revoke_coach_invite(db: Session, coach: User, invite_id: int) -> None:
 
     invite.status = "revoked"
     cancel_client_request_notification(db, invite.id)
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        target_user_id=invite.client_user_id,
+        action="coach.invite_revoked",
+        resource_type="coach_client_invite",
+        resource_id=invite.id,
+        details={"status": "revoked"},
+    )
     db.commit()
 
 
@@ -356,6 +374,15 @@ def create_coach_invite_link(db: Session, coach: User) -> dict:
         expires_at=now_msk_naive() + timedelta(days=14),
     )
     db.add(invite)
+    db.flush()
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        action="coach.invite_created",
+        resource_type="coach_client_invite",
+        resource_id=invite.id,
+        details={"source": invite.source, "status": invite.status},
+    )
     db.commit()
     db.refresh(invite)
     start_param = f"trainer_{raw_token}"
@@ -449,7 +476,8 @@ def confirm_coach_invite_link(db: Session, client: User, raw_token: str) -> None
         active_relation.status = "ended"
         active_relation.ended_at = now_msk_naive()
         active_relation.ended_reason = "client_switched_trainer"
-    if not active_relation or active_relation.coach_user_id != coach.id:
+    relation_created = not active_relation or active_relation.coach_user_id != coach.id
+    if relation_created:
         db.add(
             CoachClient(
                 coach_user_id=coach.id,
@@ -467,4 +495,13 @@ def confirm_coach_invite_link(db: Session, client: User, raw_token: str) -> None
     invite.username = normalize_telegram_username(client.username)
     invite.full_name = client.profile.full_name if client.profile else None
     cancel_client_request_notification(db, invite.id)
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        target_user_id=client.id,
+        action="coach.invite_accepted",
+        resource_type="coach_client_invite",
+        resource_id=invite.id,
+        details={"status": "accepted", "relation_created": relation_created},
+    )
     db.commit()
