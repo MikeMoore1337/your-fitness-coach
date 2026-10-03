@@ -6,6 +6,7 @@ from statistics import median
 from typing import TypedDict
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.core.config import settings
@@ -46,6 +47,11 @@ LIFECYCLE_KPI_KEYS = (
     "nutrition_repeat_rate",
     "progress_next_action_completion_rate",
     "weekly_loop_completion",
+)
+
+REAL_CLIENT_ELIGIBILITY = or_(
+    User.measurement_eligibility == "real_client",
+    User.measurement_eligibility.is_(None),
 )
 
 MINIMUM_COMPLETED_WEEKLY_COHORTS = 4
@@ -396,7 +402,11 @@ def _reconcile_rows(
         else []
     )
     user_roles = {
-        int(user_id): (bool(is_coach), bool(is_admin), str(measurement_eligibility))
+        int(user_id): (
+            bool(is_coach),
+            bool(is_admin),
+            "real_client" if measurement_eligibility is None else str(measurement_eligibility),
+        )
         for user_id, is_coach, is_admin, measurement_eligibility in known_users
     }
 
@@ -600,7 +610,7 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
             User.created_at <= cohort_until_msk,
             User.is_coach.is_(False),
             User.is_admin.is_(False),
-            User.measurement_eligibility == "real_client",
+            REAL_CLIENT_ELIGIBILITY,
         )
         .order_by(User.created_at.asc(), User.id.asc())
         .all()
@@ -615,7 +625,7 @@ def lifecycle_funnel_report(db: Session, *, period_days: int) -> dict[str, objec
             User.created_at <= cohort_until_msk,
             User.is_coach.is_(False),
             User.is_admin.is_(False),
-            User.measurement_eligibility == "real_client",
+            REAL_CLIENT_ELIGIBILITY,
         )
         .order_by(User.id.asc())
         .all()

@@ -40,7 +40,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint(
-            "measurement_eligibility IN "
+            "measurement_eligibility IS NULL OR measurement_eligibility IN "
             "('real_client', 'demo', 'test', 'synthetic', 'load_test', 'technical')",
             name="ck_users_measurement_eligibility",
         ),
@@ -76,8 +76,8 @@ class User(Base):
     # Coarse operational classification only. It is never sent to a provider
     # or used as a user-facing score; it keeps synthetic/test rows out of
     # production lifecycle aggregates while retaining a reconciliation signal.
-    measurement_eligibility: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="real_client", server_default="real_client"
+    measurement_eligibility: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, default="real_client"
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
 
