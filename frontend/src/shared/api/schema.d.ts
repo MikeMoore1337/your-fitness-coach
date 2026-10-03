@@ -1690,6 +1690,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/check-ins/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Check In Reviews */
+        get: operations["coach_check_in_reviews_api_v1_coach_check_ins_review_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-ins/{check_in_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Coach Check In Route */
+        post: operations["review_coach_check_in_route_api_v1_coach_check_ins__check_in_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/operations/today": {
         parameters: {
             query?: never;
@@ -6799,6 +6833,13 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CoachAttentionEvidence */
+        CoachAttentionEvidence: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
         /** CoachAttentionItem */
         CoachAttentionItem: {
             /** Key */
@@ -6807,7 +6848,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "workout_feedback" | "weekly_check_in" | "missed_workout" | "skipped_workout" | "without_program";
+            kind: "workout_feedback" | "weekly_check_in" | "missed_workout" | "skipped_workout" | "without_program" | "program_ending_soon";
             client: components["schemas"]["CoachAttentionClient"];
             /** Title */
             title: string;
@@ -6817,7 +6858,7 @@ export interface components {
              * Source Kind
              * @enum {string}
              */
-            source_kind: "workout" | "weekly_check_in" | "client";
+            source_kind: "workout" | "weekly_check_in" | "client" | "program";
             /** Source Id */
             source_id: number;
             /** Source State */
@@ -6826,7 +6867,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "review_workout" | "review_check_in" | "assign_program";
+            action: "review_workout" | "review_check_in" | "assign_program" | "review_program";
             /** Destination */
             destination: string;
             /**
@@ -6834,6 +6875,19 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Priority
+             * @default normal
+             * @enum {string}
+             */
+            priority: "urgent" | "soon" | "normal";
+            /**
+             * Age Days
+             * @default 0
+             */
+            age_days: number;
+            /** Evidence */
+            evidence?: components["schemas"]["CoachAttentionEvidence"][];
         };
         /** CoachAttentionResponse */
         CoachAttentionResponse: {
@@ -6846,6 +6900,93 @@ export interface components {
              * Format: date-time
              */
             generated_at: string;
+        };
+        /** CoachCheckInReviewItem */
+        CoachCheckInReviewItem: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Check In Id */
+            check_in_id: number;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /**
+             * Submitted On
+             * Format: date
+             */
+            submitted_on: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "skipped";
+            /** Training Load */
+            training_load?: number | null;
+            /** Recovery */
+            recovery?: number | null;
+            /** Hunger */
+            hunger?: number | null;
+            /** Adherence Difficulty */
+            adherence_difficulty?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Summary */
+            summary: {
+                [key: string]: unknown;
+            };
+            /**
+             * Review Status
+             * @enum {string}
+             */
+            review_status: "pending" | "reviewed";
+            /** Review Response */
+            review_response?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            follow_up?: components["schemas"]["CoachTaskResponse"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** CoachCheckInReviewListResponse */
+        CoachCheckInReviewListResponse: {
+            /** Items */
+            items?: components["schemas"]["CoachCheckInReviewItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** CoachCheckInReviewRequest */
+        CoachCheckInReviewRequest: {
+            /** Response */
+            response?: string | null;
+            /** Follow Up Title */
+            follow_up_title?: string | null;
+            /** Follow Up Due At */
+            follow_up_due_at?: string | null;
+            /** Follow Up Timezone */
+            follow_up_timezone?: string | null;
+            /**
+             * Fold
+             * @default 0
+             */
+            fold: number;
         };
         /** CoachClientOperationalStatusUpdate */
         CoachClientOperationalStatusUpdate: {
@@ -7284,6 +7425,18 @@ export interface components {
              * @default 0
              */
             fold: number;
+            /**
+             * Kind
+             * @default other
+             * @enum {string}
+             */
+            kind: "review_check_in" | "update_program" | "contact_client" | "review_technique" | "schedule_follow_up" | "other";
+            /** Source Kind */
+            source_kind?: ("weekly_check_in" | "workout" | "program" | "client" | "manual") | null;
+            /** Source Id */
+            source_id?: number | null;
+            /** Reason */
+            reason?: string | null;
         };
         /** CoachTaskResponse */
         CoachTaskResponse: {
@@ -7307,6 +7460,17 @@ export interface components {
             due_at_utc: string;
             /** Timezone */
             timezone: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "review_check_in" | "update_program" | "contact_client" | "review_technique" | "schedule_follow_up" | "other";
+            /** Source Kind */
+            source_kind: ("weekly_check_in" | "workout" | "program" | "client" | "manual") | null;
+            /** Source Id */
+            source_id: number | null;
+            /** Reason */
+            reason: string | null;
             /**
              * State
              * @enum {string}
@@ -18558,6 +18722,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoachAttentionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_check_in_reviews_api_v1_coach_check_ins_review_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachCheckInReviewListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_coach_check_in_route_api_v1_coach_check_ins__check_in_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                check_in_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachCheckInReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachCheckInReviewItem"];
                 };
             };
             /** @description Validation Error */

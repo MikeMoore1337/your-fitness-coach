@@ -58,8 +58,11 @@ describe('PublicOneRepMaxCalculator', () => {
         'calculator_result',
       ]);
       expect(events.every((event) => Object.keys(event).length === 5)).toBe(true);
-      expect(JSON.stringify(events)).not.toContain('100');
-      expect(JSON.stringify(events)).not.toContain('112');
+      const eventPayloads = events.map((event) =>
+        Object.fromEntries(Object.entries(event).filter(([key]) => key !== 'occurred_at')),
+      );
+      expect(JSON.stringify(eventPayloads)).not.toContain('100');
+      expect(JSON.stringify(eventPayloads)).not.toContain('112');
 
       fireEvent.click(within(form).getByRole('button', { name: 'Рассчитать 1ПМ' }));
       expect(events.map((event) => event.name)).toEqual([

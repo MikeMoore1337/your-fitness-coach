@@ -13,6 +13,8 @@ import {
   CoachOperationsPanel,
 } from '../../features/coach/CoachOperationsPanel';
 import { CoachToolsHub, type CoachTool } from '../../features/coach/CoachToolsHub';
+import { CoachCheckInReviews } from '../../features/coach/CoachCheckInReviews';
+import { CoachRosterAnalytics } from '../../features/coach/CoachRosterAnalytics';
 import { CoachClientTimeline } from '../../features/coach/CoachClientTimeline';
 import { CoachReportHandoffEntry } from '../../features/coach/CoachReportHandoffEntry';
 import { CoachProgramOperations } from '../../features/coach/CoachProgramOperations';
@@ -434,6 +436,8 @@ function operationalStatusLabel(status: Client['operational_status']): string {
 }
 
 const coachToolValues: readonly CoachTool[] = [
+  'reviews',
+  'analytics',
   'schedule',
   'tasks',
   'finance',
@@ -742,6 +746,7 @@ function CoachClientDetail({
           К списку клиентов
         </button>
         <div className="coach-client-detail__identity">
+          <span className="eyebrow">Профиль клиента 360</span>
           <span className="eyebrow">Сейчас открыт клиент</span>
           <h2 id="coach-client-detail-title">{clientDisplayName(client)}</h2>
           <p>
@@ -1411,7 +1416,7 @@ export default function CoachPage({
                     <span>Найти клиента</span>
                     <input
                       type="search"
-                      placeholder="Имя или username"
+                      placeholder="Имя или имя пользователя"
                       value={clientSearch}
                       onChange={(event) => setClientSearch(event.target.value)}
                     />
@@ -1654,7 +1659,16 @@ export default function CoachPage({
         )}
         {tab === 'tools' && (
           <>
-            {activeTool === 'schedule' || activeTool === 'tasks' || activeTool === 'finance' ? (
+            {activeTool === 'reviews' ? (
+              <CoachCheckInReviews timezone={user.profile?.timezone} />
+            ) : activeTool === 'analytics' ? (
+              <CoachRosterAnalytics
+                clients={clients.data ?? []}
+                onOpenClient={openClient}
+                programs={programs.data ?? []}
+                summaries={clientSummaries.data}
+              />
+            ) : activeTool === 'schedule' || activeTool === 'tasks' || activeTool === 'finance' ? (
               <CoachOperationsPanel
                 clients={activeClients}
                 onDemoStep={markDemoStep}

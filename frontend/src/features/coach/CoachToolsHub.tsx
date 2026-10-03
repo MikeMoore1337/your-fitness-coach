@@ -1,8 +1,19 @@
 import { Icon } from '../../shared/ui/Icon';
 
-export type CoachTool = 'schedule' | 'tasks' | 'finance' | 'invitations' | 'catalog';
+export type CoachTool =
+  'schedule' | 'tasks' | 'finance' | 'invitations' | 'catalog' | 'reviews' | 'analytics';
 
 const tools: ReadonlyArray<{ key: CoachTool; title: string; description: string }> = [
+  {
+    key: 'reviews',
+    title: 'Проверка итогов',
+    description: 'Недельные итоги клиентов, ответ тренера и последующая задача',
+  },
+  {
+    key: 'analytics',
+    title: 'Реестр и факты',
+    description: 'Операционная сводка, поиск и следующий шаг по клиентам',
+  },
   {
     key: 'schedule',
     title: 'Расписание и встречи',

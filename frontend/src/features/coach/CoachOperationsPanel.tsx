@@ -37,6 +37,7 @@ import type { CoachTool } from './CoachToolsHub';
 type Composer = 'session' | 'task' | 'package' | 'payment' | null;
 type ViewMode = 'day' | 'week';
 type SessionStatus = CoachSession['status'];
+type TaskKind = CoachTask['kind'];
 type CoachOperationsSurface = 'overview' | 'schedule' | 'tasks' | 'finance';
 
 type SessionDraft = {
@@ -76,6 +77,15 @@ const paymentStatusLabels: Record<CoachPayment['status'], string> = {
   partial: 'Частично оплачено',
   paid: 'Оплачено',
   cancelled: 'Отменено',
+};
+
+const taskKindLabels: Record<TaskKind, string> = {
+  review_check_in: 'Проверка итога',
+  update_program: 'Обновить программу',
+  contact_client: 'Связаться с клиентом',
+  review_technique: 'Проверить технику',
+  schedule_follow_up: 'Последующая задача',
+  other: 'Другая задача',
 };
 
 function randomKey(): string {
@@ -325,6 +335,7 @@ export function CoachOperationsPanel({
     defaultSessionDraft(today, clients),
   );
   const [taskTitle, setTaskTitle] = useState('');
+  const [taskKind, setTaskKind] = useState<TaskKind>('other');
   const [taskClientId, setTaskClientId] = useState('');
   const [taskDate, setTaskDate] = useState(today);
   const [packageName, setPackageName] = useState('Сопровождение');
@@ -425,6 +436,7 @@ export function CoachOperationsPanel({
   const openNewTask = () => {
     setFormError(null);
     setTaskTitle('');
+    setTaskKind('other');
     setTaskClientId('');
     setTaskDate(today);
     setComposer('task');
@@ -526,6 +538,8 @@ export function CoachOperationsPanel({
       body: {
         client_id: clientId,
         title: taskTitle.trim(),
+        kind: taskKind,
+        reason: taskKind === 'other' ? null : `Рабочее действие: ${taskKindLabels[taskKind]}.`,
         due_at: `${taskDate}T12:00:00`,
         timezone: timezoneName,
         fold: 0,
@@ -815,6 +829,19 @@ export function CoachOperationsPanel({
                   placeholder="Например, отправить обратную связь"
                   value={taskTitle}
                 />
+              </Field>
+              <Field label="Тип действия" labelFor="crm-task-kind">
+                <Select
+                  id="crm-task-kind"
+                  onChange={(event) => setTaskKind(event.target.value as TaskKind)}
+                  value={taskKind}
+                >
+                  {Object.entries(taskKindLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
               </Field>
               <Field label="Срок" labelFor="crm-task-date">
                 <Input
@@ -1141,9 +1168,10 @@ export function CoachOperationsPanel({
                       <div>
                         <strong>{task.title}</strong>
                         <span>
-                          {task.client_name} ·{' '}
+                          {task.client_name} · {taskKindLabels[task.kind]} ·{' '}
                           {task.due_at.slice(0, 10) < today ? 'просрочено' : 'сегодня'}
                         </span>
+                        {task.reason && <small>{task.reason}</small>}
                       </div>
                       <Button
                         onClick={() =>

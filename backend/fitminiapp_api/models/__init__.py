@@ -23,6 +23,7 @@ from fitminiapp_api.models.coach_crm import (
     CoachSessionSeries,
     CoachTask,
 )
+from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
     Equipment,
@@ -136,6 +137,7 @@ __all__ = [
     "BotSupportCase",
     "CardioSession",
     "CoachBusinessSession",
+    "CoachCheckInReview",
     "CoachClient",
     "CoachClientInvite",
     "CoachPackage",

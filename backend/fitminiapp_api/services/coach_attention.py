@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_in_timezone
 from fitminiapp_api.models.check_in import WeeklyCheckIn
+from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.feedback import WorkoutComment
 from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import CoachClient, User, UserProfile
@@ -19,9 +20,19 @@ FEEDBACK_LOOKBACK_DAYS = 30
 _KIND_PRIORITY = {
     "workout_feedback": 0,
     "weekly_check_in": 1,
-    "skipped_workout": 2,
-    "missed_workout": 3,
-    "without_program": 4,
+    "program_ending_soon": 2,
+    "skipped_workout": 3,
+    "missed_workout": 4,
+    "without_program": 5,
+}
+
+_KIND_WORKFLOW_PRIORITY = {
+    "workout_feedback": "urgent",
+    "weekly_check_in": "urgent",
+    "program_ending_soon": "soon",
+    "skipped_workout": "soon",
+    "missed_workout": "soon",
+    "without_program": "normal",
 }
 
 _FEEDBACK_LABELS = {
@@ -88,6 +99,7 @@ def _item(
     action: str,
     destination: str,
     created_at: datetime,
+    evidence: list[dict[str, str]],
 ) -> dict:
     return {
         "key": f"{kind}:{client_id}:{source_id}",
@@ -101,6 +113,7 @@ def _item(
         "action": action,
         "destination": destination,
         "created_at": created_at,
+        "evidence": evidence,
     }
 
 
@@ -191,7 +204,14 @@ def build_coach_attention(
     workout_ids = list(workout_client_id) or [-1]
 
     check_ins = (
-        db.query(WeeklyCheckIn)
+        db.query(WeeklyCheckIn, CoachCheckInReview)
+        .outerjoin(
+            CoachCheckInReview,
+            and_(
+                CoachCheckInReview.check_in_id == WeeklyCheckIn.id,
+                CoachCheckInReview.coach_user_id == coach.id,
+            ),
+        )
         .filter(
             WeeklyCheckIn.user_id.in_(client_ids),
             WeeklyCheckIn.status == "completed",
@@ -266,16 +286,22 @@ def build_coach_attention(
                 action="review_workout",
                 destination=f"/coach?client_id={client_id}&workout_id={workout.id}",
                 created_at=event_at,
+                evidence=[
+                    {"label": "Событие", "value": "Обратная связь по тренировке"},
+                    {"label": "Дата", "value": event_at.date().isoformat()},
+                ],
             )
         )
 
     latest_check_in = _latest_by_client(
         check_ins,
-        client_id_getter=lambda row: row.user_id,
-        timestamp_getter=lambda row: row.created_at,
-        id_getter=lambda row: int(row.id),
+        client_id_getter=lambda row: row[0].user_id,
+        timestamp_getter=lambda row: row[0].created_at,
+        id_getter=lambda row: int(row[0].id),
     )
-    for client_id, check_in in latest_check_in.items():
+    for client_id, (check_in, review) in latest_check_in.items():
+        if review is not None:
+            continue
         relation, client, profile = relation_by_client[client_id]
         items.append(
             _item(
@@ -290,6 +316,10 @@ def build_coach_attention(
                 action="review_check_in",
                 destination=f"/coach?client_id={client_id}&focus=weekly_check_in",
                 created_at=check_in.created_at,
+                evidence=[
+                    {"label": "Событие", "value": "Недельный итог отправлен"},
+                    {"label": "Неделя", "value": check_in.week_start.isoformat()},
+                ],
             )
         )
 
@@ -354,8 +384,39 @@ def build_coach_attention(
                     action="review_workout",
                     destination=f"/coach?client_id={client_id}&workout_id={workout.id}",
                     created_at=datetime.combine(workout.scheduled_date, time.min),
+                    evidence=[
+                        {"label": "Дата", "value": workout.scheduled_date.isoformat()},
+                        {"label": "Статус", "value": state},
+                    ],
                 )
             )
+
+    for program in programs:
+        client_id = int(program.user_id)
+        end_date = program.start_date + timedelta(weeks=program.duration_weeks) - timedelta(days=1)
+        days_until_end = (end_date - local_today[client_id]).days
+        if not 0 <= days_until_end <= 14:
+            continue
+        relation, client, profile = relation_by_client[client_id]
+        items.append(
+            _item(
+                kind="program_ending_soon",
+                client_id=client_id,
+                client_name=_display_name(client, relation, profile),
+                title="Программа скоро завершится",
+                reason="Проверьте следующую версию или продление программы.",
+                source_kind="program",
+                source_id=int(program.id),
+                source_state="active",
+                action="review_program",
+                destination=f"/coach?client_id={client_id}&focus=program",
+                created_at=datetime.combine(end_date, time.min),
+                evidence=[
+                    {"label": "Завершение", "value": end_date.isoformat()},
+                    {"label": "Действие", "value": "Проверить продление"},
+                ],
+            )
+        )
 
     for client_id in sorted(set(client_ids) - active_clients):
         relation, client, profile = relation_by_client[client_id]
@@ -372,9 +433,19 @@ def build_coach_attention(
                 action="assign_program",
                 destination=f"/coach?client_id={client_id}&focus=program",
                 created_at=relation.created_at,
+                evidence=[
+                    {"label": "Состояние", "value": "Нет активной программы"},
+                    {"label": "Действие", "value": "Назначить программу"},
+                ],
             )
         )
 
+    for item in items:
+        item["priority"] = _KIND_WORKFLOW_PRIORITY[item["kind"]]
+        item["age_days"] = max(
+            0,
+            min(3650, int((generated_at - item["created_at"]).total_seconds() // 86_400)),
+        )
     items.sort(key=_sort_key, reverse=False)
     total = len(items)
     items = items[: max(1, min(limit, 100))]

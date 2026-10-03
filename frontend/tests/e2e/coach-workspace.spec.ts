@@ -39,6 +39,12 @@ const task388EvidenceDir = (
     process?: { env?: Record<string, string | undefined> };
   }
 ).process?.env?.TASK_388_EVIDENCE_DIR;
+const task525VisualDir =
+  (
+    globalThis as typeof globalThis & {
+      process?: { env?: Record<string, string | undefined> };
+    }
+  ).process?.env?.TASK_525_VISUAL_DIR ?? '../.artifacts/tasks/525/deliverables/visual';
 
 const clients = [
   {
@@ -320,6 +326,10 @@ async function mockCoachWorkspace(
     due_at: `${operationDate}T12:00:00+03:00`,
     due_at_utc: `${operationDate}T09:00:00Z`,
     timezone: 'Europe/Moscow',
+    kind: 'review_technique',
+    source_kind: 'manual',
+    source_id: null,
+    reason: 'Нужно проверить технику после последней тренировки.',
     state: 'open',
     completed_at: null,
     created_at: `${operationDate}T09:00:00Z`,
@@ -377,6 +387,28 @@ async function mockCoachWorkspace(
           low_packages: [],
           payment_facts: [],
         };
+  let reviewPending = true;
+  const reviewItem = () => ({
+    id: 901,
+    client_id: 11,
+    client_name: 'Анна Петрова',
+    check_in_id: 901,
+    week_start: '2026-08-10',
+    week_end: '2026-08-16',
+    submitted_on: '2026-08-17',
+    status: 'completed',
+    training_load: 3,
+    recovery: 4,
+    hunger: 2,
+    adherence_difficulty: 2,
+    note: 'Энергии на этой неделе было достаточно.',
+    summary: { training: { completed_workouts: 3 } },
+    review_status: reviewPending ? 'pending' : 'reviewed',
+    review_response: reviewPending ? null : 'Сохраняем текущий объём и проверяем следующий шаг.',
+    reviewed_at: reviewPending ? null : '2026-08-20T15:00:00',
+    follow_up: null,
+    created_at: '2026-08-17T10:00:00',
+  });
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -505,6 +537,12 @@ async function mockCoachWorkspace(
                     action: 'assign_program',
                     destination: '/coach?client_id=12',
                     created_at: '2026-08-20T10:00:00',
+                    priority: 'normal',
+                    age_days: 0,
+                    evidence: [
+                      { label: 'Состояние', value: 'Нет активной программы' },
+                      { label: 'Действие', value: 'Назначить программу' },
+                    ],
                   },
                 ],
                 total: 1,
@@ -512,6 +550,20 @@ async function mockCoachWorkspace(
               }
             : { items: [], total: 0, generated_at: '2026-08-20T10:00:00' },
       });
+    if (/\/coach\/check-ins(?:\/\d+)?\/review$/.test(path)) {
+      if (request.method() === 'POST') {
+        reviewPending = false;
+        return route.fulfill({ json: reviewItem() });
+      }
+      return route.fulfill({
+        json: {
+          items: reviewPending ? [reviewItem()] : [],
+          total: reviewPending ? 1 : 0,
+          limit: 50,
+          offset: 0,
+        },
+      });
+    }
     if (path.endsWith('/coach/operations/today')) return route.fulfill({ json: operations });
     if (path.endsWith('/coach/packages')) return route.fulfill({ json: operations.low_packages });
     if (path.endsWith('/coach/payments')) return route.fulfill({ json: operations.payment_facts });
@@ -1926,4 +1978,179 @@ test('desktop package actions keep the shared horizontal gap', async ({ page }) 
   expect(await group.evaluate((element) => getComputedStyle(element).gap)).toBe('8px');
   expect(Math.abs(newPackage!.y - recordPayment!.y)).toBeLessThanOrEqual(1);
   expect(recordPayment!.x - (newPackage!.x + newPackage!.width)).toBeGreaterThanOrEqual(8);
+});
+
+test('task 525 visual package covers operational workspace states', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockCoachWorkspace(page, { attention: 'actionable', operations: 'seeded' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+  await expect(page.locator('.coach-attention-center')).toBeVisible();
+  await page.screenshot({
+    path: `${task525VisualDir}/coach-home-desktop-light.png`,
+    fullPage: true,
+  });
+
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await page.screenshot({
+    path: `${task525VisualDir}/coach-home-desktop-dark.png`,
+    fullPage: true,
+  });
+
+  await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Реестр и факты' }).click();
+  await expect(page.getByTestId('coach-roster-analytics')).toBeVisible();
+  await expect(page.getByText('Список клиентов', { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder('Имя или имя пользователя')).toBeVisible();
+
+  const rosterTable = page.getByTestId('coach-roster-table');
+  const rosterCard = page.locator('.coach-roster-analytics__roster');
+  await expect(rosterTable).toBeVisible();
+  const rosterGeometry = await rosterTable.evaluate((element) => {
+    const rect = (node: Element | null) => {
+      if (!node) throw new Error('Missing roster geometry target');
+      const bounds = node.getBoundingClientRect();
+      return { left: bounds.left, right: bounds.right, width: bounds.width };
+    };
+    const header = Array.from(
+      element.querySelectorAll<HTMLElement>(
+        ':scope > .coach-roster-table__header > [role="columnheader"]',
+      ),
+    ).map(rect);
+    const rows = Array.from(
+      element.querySelectorAll<HTMLElement>(':scope > .coach-roster-row'),
+    ).map((row) => ({
+      cells: Array.from(row.querySelectorAll<HTMLElement>(':scope > [role="cell"]')).map(rect),
+      action: (() => {
+        const button = row.querySelector('.coach-roster-row__actions button');
+        return button ? rect(button) : null;
+      })(),
+    }));
+    return {
+      header,
+      rows,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    };
+  });
+  expect(rosterGeometry.header).toHaveLength(6);
+  expect(rosterGeometry.rows.length).toBeGreaterThanOrEqual(3);
+  expect(rosterGeometry.documentScrollWidth).toBeLessThanOrEqual(rosterGeometry.viewportWidth);
+  for (const row of rosterGeometry.rows) {
+    for (const [index, cell] of row.cells.entries()) {
+      const headerCell = rosterGeometry.header[index];
+      expect(headerCell).toBeDefined();
+      if (!headerCell) continue;
+      expect(Math.abs(cell.left - headerCell.left)).toBeLessThanOrEqual(1);
+    }
+  }
+  const actionButtons = rosterGeometry.rows
+    .map((row) => row.action)
+    .filter((action): action is { left: number; right: number; width: number } => action != null);
+  expect(actionButtons.length).toBeGreaterThanOrEqual(2);
+  const firstAction = actionButtons[0];
+  expect(firstAction).toBeDefined();
+  if (!firstAction) throw new Error('Missing action button geometry');
+  for (const action of actionButtons.slice(1)) {
+    expect(Math.abs(action.right - firstAction.right)).toBeLessThanOrEqual(1);
+  }
+  await rosterCard.screenshot({
+    path: `${task525VisualDir}/roster-analytics-populated.png`,
+  });
+
+  await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+  await expect(rosterTable).toBeVisible();
+  await rosterCard.screenshot({
+    path: `${task525VisualDir}/roster-analytics-desktop-dark.png`,
+  });
+  await page.getByRole('button', { name: 'Включить светлую тему' }).click();
+
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Проверка итогов' }).click();
+  await expect(page.getByTestId('coach-check-in-reviews')).toBeVisible();
+  await expect(page.getByText('Энергии на этой неделе было достаточно.')).toBeVisible();
+  await page.screenshot({
+    path: `${task525VisualDir}/check-in-review-pending.png`,
+    fullPage: true,
+  });
+  const reviewCard = page.locator('.coach-review-card').first();
+  await reviewCard
+    .locator('textarea')
+    .fill('Зафиксировать текущий объём и проверить следующий шаг.');
+  await reviewCard
+    .getByLabel('Последующая задача, если нужна')
+    .fill('Написать после следующей тренировки');
+  await reviewCard.locator('input[type="datetime-local"]').fill('2030-01-10T12:00');
+  await reviewCard.getByRole('button', { name: 'Отметить проверенным' }).click();
+  await expect(page.getByText('Очередь проверки пуста')).toBeVisible();
+  await page.screenshot({
+    path: `${task525VisualDir}/check-in-review-after-confirmation.png`,
+    fullPage: true,
+  });
+  await page.getByRole('button', { name: 'Закрыть сообщение' }).click();
+
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }).click();
+  await page
+    .getByRole('button', { name: /Анна Петрова/ })
+    .first()
+    .click();
+  await expect(page.getByText('Профиль клиента 360', { exact: true })).toBeVisible();
+  await page.screenshot({ path: `${task525VisualDir}/client-360.png`, fullPage: true });
+
+  await trainerPrimaryNavigation(page)
+    .getByRole('link', { name: 'Программы', exact: true })
+    .click();
+  await expect(page.getByText('Программы клиентов', { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: `${task525VisualDir}/program-template-revision.png`,
+    fullPage: true,
+  });
+
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Задачи' }).click();
+  await expect(page.getByText('Проверить технику приседа', { exact: true })).toBeVisible();
+  await page.screenshot({ path: `${task525VisualDir}/tasks-follow-ups.png`, fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/coach');
+  await expect(page.locator('.coach-attention-center')).toBeVisible();
+  const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(scrollWidth).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: `${task525VisualDir}/mobile-attention-queue.png`, fullPage: true });
+
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Реестр и факты' }).click();
+  await expect(page.getByTestId('coach-roster-table')).toBeVisible();
+  await expect(page.locator('.coach-roster-table__header')).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.setViewportSize({ width: 390, height: 2000 });
+  await page.locator('.coach-roster-analytics__roster').screenshot({
+    path: `${task525VisualDir}/roster-analytics-mobile.png`,
+  });
+});
+
+test('task 525 visual package covers empty and permission-error states', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCoachWorkspace(page, { attention: 'empty', operations: 'empty' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+  await expect(page.getByText('Срочных действий нет')).toBeVisible();
+  await page.screenshot({ path: `${task525VisualDir}/empty-low-data.png`, fullPage: true });
+
+  await page.route('**/api/v1/coach/check-ins/review*', async (route) => {
+    await route.fulfill({
+      status: 403,
+      json: { detail: 'Недоступно для этого рабочего кабинета' },
+    });
+  });
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Проверка итогов' }).click();
+  await expect(
+    page.getByText('Не удалось загрузить итоги клиентов.', { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: `${task525VisualDir}/permission-error-review.png`,
+    fullPage: true,
+  });
 });

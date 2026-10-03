@@ -9,6 +9,15 @@ SessionStatus = Literal["scheduled", "completed", "cancelled", "no_show"]
 SessionFormat = Literal["gym", "online", "other"]
 PackageState = Literal["active", "finished", "cancelled"]
 PaymentStatus = Literal["expected", "partial", "paid", "cancelled"]
+CoachTaskKind = Literal[
+    "review_check_in",
+    "update_program",
+    "contact_client",
+    "review_technique",
+    "schedule_follow_up",
+    "other",
+]
+CoachTaskSourceKind = Literal["weekly_check_in", "workout", "program", "client", "manual"]
 
 
 class CoachSessionRecurrence(BaseModel):
@@ -215,6 +224,10 @@ class CoachTaskCreate(BaseModel):
     due_at: datetime
     timezone: str = Field(min_length=1, max_length=64)
     fold: int = Field(default=0, ge=0, le=1)
+    kind: CoachTaskKind = "other"
+    source_kind: CoachTaskSourceKind | None = None
+    source_id: int | None = Field(default=None, gt=0)
+    reason: str | None = Field(default=None, max_length=240)
 
 
 class CoachTaskStateUpdate(BaseModel):
@@ -233,6 +246,10 @@ class CoachTaskResponse(BaseModel):
     due_at: datetime
     due_at_utc: datetime
     timezone: str
+    kind: CoachTaskKind
+    source_kind: CoachTaskSourceKind | None
+    source_id: int | None
+    reason: str | None
     state: Literal["open", "completed"]
     completed_at: datetime | None
     created_at: datetime
@@ -276,6 +293,8 @@ __all__ = [
     "CoachSessionResponse",
     "CoachSessionUpdate",
     "CoachTaskCreate",
+    "CoachTaskKind",
     "CoachTaskResponse",
+    "CoachTaskSourceKind",
     "CoachTaskStateUpdate",
 ]

@@ -275,6 +275,7 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
     )
 
     from alembic.config import Config
+    from alembic.script import ScriptDirectory
     from sqlalchemy import create_engine, inspect, text
     from sqlalchemy.engine import make_url
 
@@ -294,6 +295,7 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
     schema_database_url = schema_url.render_as_string(hide_password=False)
     alembic_config = Config(str(root / "backend" / "alembic.ini"))
     alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    expected_revision = ScriptDirectory.from_config(alembic_config).get_current_head()
     schema_engine = create_engine(schema_database_url)
     try:
         with schema_engine.connect() as connection:
@@ -413,7 +415,7 @@ def test_program_schema_upgrades_from_0092_on_postgres16() -> None:
             ).one()
             assert migration_context[0] == schema_name, migration_context
             assert migration_context[1].split(",")[0].strip('"') == schema_name, migration_context
-            assert migration_context[2] == "0107_public_shares", migration_context
+            assert migration_context[2] == expected_revision, migration_context
             assert template_schema == schema_name, template_schema
             assert provenance == {
                 "stronglifts-5x5": "SOURCE_ADAPTATION",
@@ -446,6 +448,7 @@ def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -
     )
 
     from alembic.config import Config
+    from alembic.script import ScriptDirectory
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import make_url
     from sqlalchemy.orm import Session
@@ -470,6 +473,7 @@ def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -
     schema_database_url = schema_url.render_as_string(hide_password=False)
     alembic_config = Config(str(root / "backend" / "alembic.ini"))
     alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    expected_revision = ScriptDirectory.from_config(alembic_config).get_current_head()
     schema_engine = create_engine(schema_database_url)
     try:
         with schema_engine.connect() as connection:
@@ -501,7 +505,7 @@ def test_nutrition_catalog_trust_constraint_upgrades_from_0095_on_postgres16() -
             ).scalar_one()
             assert "community_unverified" in corrected_constraint
             assert validated is True
-            assert revision == "0107_public_shares"
+            assert revision == expected_revision
             connection.commit()
 
         with Session(schema_engine) as session:

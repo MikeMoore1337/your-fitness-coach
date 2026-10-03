@@ -11,9 +11,22 @@ CoachAttentionKind = Literal[
     "missed_workout",
     "skipped_workout",
     "without_program",
+    "program_ending_soon",
 ]
-CoachAttentionSourceKind = Literal["workout", "weekly_check_in", "client"]
-CoachAttentionAction = Literal["review_workout", "review_check_in", "assign_program"]
+CoachAttentionSourceKind = Literal["workout", "weekly_check_in", "client", "program"]
+CoachAttentionAction = Literal[
+    "review_workout",
+    "review_check_in",
+    "assign_program",
+    "review_program",
+]
+
+
+class CoachAttentionEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(..., min_length=1, max_length=48)
+    value: str = Field(..., min_length=1, max_length=160)
 
 
 class CoachAttentionClient(BaseModel):
@@ -32,7 +45,8 @@ class CoachAttentionItem(BaseModel):
         max_length=96,
         pattern=(
             r"^(?:workout_feedback|weekly_check_in|missed_workout|"
-            r"skipped_workout|without_program):[1-9][0-9]*:[1-9][0-9]*$"
+            r"skipped_workout|without_program|program_ending_soon):"
+            r"[1-9][0-9]*:[1-9][0-9]*$"
         ),
     )
     kind: CoachAttentionKind
@@ -50,6 +64,9 @@ class CoachAttentionItem(BaseModel):
         pattern=r"^/coach\?client_id=[1-9][0-9]*(?:&(?:workout_id|focus)=[a-z0-9_:-]+)?$",
     )
     created_at: datetime
+    priority: Literal["urgent", "soon", "normal"] = "normal"
+    age_days: int = Field(default=0, ge=0, le=3650)
+    evidence: list[CoachAttentionEvidence] = Field(default_factory=list, max_length=4)
 
 
 class CoachAttentionResponse(BaseModel):
@@ -63,6 +80,7 @@ class CoachAttentionResponse(BaseModel):
 __all__ = [
     "CoachAttentionAction",
     "CoachAttentionClient",
+    "CoachAttentionEvidence",
     "CoachAttentionItem",
     "CoachAttentionKind",
     "CoachAttentionResponse",

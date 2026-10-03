@@ -26,6 +26,7 @@ from fitminiapp_api.models.coach_crm import (
     CoachSessionSeries,
     CoachTask,
 )
+from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
     Exercise,
@@ -145,6 +146,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "coach_package_ledger": "coach_package_ledger",
     "coach_payments": "coach_payments",
     "coach_tasks": "coach_tasks",
+    "coach_check_in_reviews": "coach_check_in_reviews",
     "coach_role_applications": "coach_role_applications",
     "workout_comments": "workout_comments",
     "workout_comment_revisions": "workout_comments",
@@ -1032,6 +1034,12 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(CoachTask.created_at.asc(), CoachTask.id.asc())
         .all()
     )
+    coach_check_in_reviews = (
+        db.query(CoachCheckInReview)
+        .filter(CoachCheckInReview.coach_user_id == user.id)
+        .order_by(CoachCheckInReview.created_at.asc(), CoachCheckInReview.id.asc())
+        .all()
+    )
     report_handoffs = (
         db.query(ReportHandoff)
         .filter(
@@ -1536,6 +1544,10 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                     "title",
                     "due_at_utc",
                     "timezone",
+                    "kind",
+                    "source_kind",
+                    "source_id",
+                    "reason",
                     "state",
                     "completed_at",
                     "reopened_at",
@@ -1544,6 +1556,23 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
                 ),
             )
             for task in coach_tasks
+        ],
+        "coach_check_in_reviews": [
+            _fields(
+                review,
+                (
+                    "id",
+                    "client_user_id",
+                    "check_in_id",
+                    "follow_up_task_id",
+                    "status",
+                    "response",
+                    "reviewed_at",
+                    "created_at",
+                    "updated_at",
+                ),
+            )
+            for review in coach_check_in_reviews
         ],
         "report_handoffs": [
             {
