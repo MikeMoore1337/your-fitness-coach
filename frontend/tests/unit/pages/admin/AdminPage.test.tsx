@@ -136,13 +136,116 @@ describe('AdminPage', () => {
           JSON.stringify({
             period_days: 30,
             cohort_since: '2030-01-01T00:00:00',
+            cohort_until: '2030-01-31T00:00:00',
+            as_of: '2030-01-31T00:00:00',
+            cohort_size: 10,
+            complete_weekly_cohorts: 1,
+            eligible_real_account_count: 10,
             analytics_provider_status: 'not_connected',
             coverage_note: 'Только агрегаты подтверждённых данных аккаунта.',
-            stages: [
-              { key: 'registered', account_count: 10, cohort_rate_percent: 100 },
-              { key: 'profile_ready', account_count: 8, cohort_rate_percent: 80 },
-              { key: 'program_activated', account_count: 6, cohort_rate_percent: 60 },
-              { key: 'core_value_reached', account_count: 5, cohort_rate_percent: 50 },
+            effect_status: 'NOT_YET_PROVEN',
+            effect_note: 'Эффект пока не подтверждён.',
+            exclusions: [],
+            data_quality: {
+              status: 'clean',
+              duplicate_milestones: 0,
+              impossible_order: 0,
+              client_success_without_server: 0,
+              invalid_milestones: 0,
+              excluded_role_accounts: 0,
+              timezone_fallback_accounts: 0,
+            },
+            kpis: [
+              {
+                key: 'activation_rate',
+                numerator: 6,
+                denominator: 10,
+                cohort_size: 10,
+                rate_percent: 60,
+                median_seconds: null,
+                window: 'первые 24 часа',
+              },
+              {
+                key: 'time_to_first_useful_action',
+                numerator: 5,
+                denominator: 10,
+                cohort_size: 10,
+                rate_percent: 50,
+                median_seconds: 3600,
+                window: 'до первой тренировки',
+              },
+              {
+                key: 'first_workout_completion_rate',
+                numerator: 4,
+                denominator: 5,
+                cohort_size: 10,
+                rate_percent: 80,
+                median_seconds: null,
+                window: 'до 72 часов',
+              },
+              {
+                key: 'first_week_value_rate',
+                numerator: 3,
+                denominator: 8,
+                cohort_size: 10,
+                rate_percent: 37.5,
+                median_seconds: null,
+                window: 'первые 7 дней',
+              },
+              {
+                key: 'd1_meaningful_return',
+                numerator: 4,
+                denominator: 8,
+                cohort_size: 10,
+                rate_percent: 50,
+                median_seconds: null,
+                window: 'следующий день',
+              },
+              {
+                key: 'd7_meaningful_return',
+                numerator: 3,
+                denominator: 6,
+                cohort_size: 10,
+                rate_percent: 50,
+                median_seconds: null,
+                window: 'седьмой день',
+              },
+              {
+                key: 'd30_meaningful_return',
+                numerator: 1,
+                denominator: 2,
+                cohort_size: 10,
+                rate_percent: 50,
+                median_seconds: null,
+                window: 'тридцатый день',
+              },
+              {
+                key: 'missed_workout_recovery_conversion',
+                numerator: 2,
+                denominator: 4,
+                cohort_size: 10,
+                rate_percent: 50,
+                median_seconds: null,
+                window: 'после пропуска',
+              },
+              {
+                key: 'nutrition_repeat_rate',
+                numerator: 2,
+                denominator: 5,
+                cohort_size: 10,
+                rate_percent: 40,
+                median_seconds: null,
+                window: 'первые 7 дней',
+              },
+              {
+                key: 'weekly_loop_completion',
+                numerator: 1,
+                denominator: 8,
+                cohort_size: 10,
+                rate_percent: 12.5,
+                median_seconds: null,
+                window: 'первые 7 дней',
+              },
             ],
           }),
           { status: 200 },
@@ -259,8 +362,8 @@ describe('AdminPage', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Агрегаты' }));
 
-    expect(await screen.findByText('10')).toBeInTheDocument();
-    expect(screen.getByText('Provider не подключён')).toBeInTheDocument();
+    expect(await screen.findByText('60%')).toBeInTheDocument();
+    expect(screen.getByText('Данные проверены')).toBeInTheDocument();
     expect(screen.getByText('Только агрегаты подтверждённых данных аккаунта.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Аудит' }));

@@ -87,15 +87,52 @@ class AdminUserDetail(AdminUserSearchRow):
     audit_history: list[AdminAuditRow] = Field(default_factory=list)
 
 
-class AdminFunnelStage(BaseModel):
-    key: Literal["registered", "profile_ready", "program_activated", "core_value_reached"]
-    account_count: int
-    cohort_rate_percent: float
+AdminLifecycleKpiKey = Literal[
+    "activation_rate",
+    "time_to_first_useful_action",
+    "first_workout_completion_rate",
+    "first_week_value_rate",
+    "d1_meaningful_return",
+    "d7_meaningful_return",
+    "d30_meaningful_return",
+    "missed_workout_recovery_conversion",
+    "nutrition_repeat_rate",
+    "weekly_loop_completion",
+]
+
+
+class AdminLifecycleKpi(BaseModel):
+    key: AdminLifecycleKpiKey
+    numerator: int
+    denominator: int
+    cohort_size: int
+    rate_percent: float | None = None
+    median_seconds: float | None = None
+    window: str
+
+
+class AdminLifecycleDataQuality(BaseModel):
+    status: Literal["clean", "attention"]
+    duplicate_milestones: int
+    impossible_order: int
+    client_success_without_server: int
+    invalid_milestones: int
+    excluded_role_accounts: int
+    timezone_fallback_accounts: int
 
 
 class AdminFunnelResponse(BaseModel):
     period_days: int
     cohort_since: datetime
+    cohort_until: datetime
+    as_of: datetime
+    cohort_size: int
+    complete_weekly_cohorts: int
+    eligible_real_account_count: int
     analytics_provider_status: Literal["not_connected"]
     coverage_note: str
-    stages: list[AdminFunnelStage]
+    effect_status: Literal["NOT_YET_PROVEN", "BASELINE_ONLY"]
+    effect_note: str
+    exclusions: list[str]
+    data_quality: AdminLifecycleDataQuality
+    kpis: list[AdminLifecycleKpi]

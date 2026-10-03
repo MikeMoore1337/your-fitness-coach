@@ -5028,26 +5028,40 @@ export interface components {
              */
             cohort_since: string;
             /**
+             * Cohort Until
+             * Format: date-time
+             */
+            cohort_until: string;
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Cohort Size */
+            cohort_size: number;
+            /** Complete Weekly Cohorts */
+            complete_weekly_cohorts: number;
+            /** Eligible Real Account Count */
+            eligible_real_account_count: number;
+            /**
              * Analytics Provider Status
              * @constant
              */
             analytics_provider_status: "not_connected";
             /** Coverage Note */
             coverage_note: string;
-            /** Stages */
-            stages: components["schemas"]["AdminFunnelStage"][];
-        };
-        /** AdminFunnelStage */
-        AdminFunnelStage: {
             /**
-             * Key
+             * Effect Status
              * @enum {string}
              */
-            key: "registered" | "profile_ready" | "program_activated" | "core_value_reached";
-            /** Account Count */
-            account_count: number;
-            /** Cohort Rate Percent */
-            cohort_rate_percent: number;
+            effect_status: "NOT_YET_PROVEN" | "BASELINE_ONLY";
+            /** Effect Note */
+            effect_note: string;
+            /** Exclusions */
+            exclusions: string[];
+            data_quality: components["schemas"]["AdminLifecycleDataQuality"];
+            /** Kpis */
+            kpis: components["schemas"]["AdminLifecycleKpi"][];
         };
         /** AdminIdentityRow */
         AdminIdentityRow: {
@@ -5091,6 +5105,46 @@ export interface components {
             error_code?: string | null;
             /** Retry Allowed */
             retry_allowed: boolean;
+        };
+        /** AdminLifecycleDataQuality */
+        AdminLifecycleDataQuality: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "clean" | "attention";
+            /** Duplicate Milestones */
+            duplicate_milestones: number;
+            /** Impossible Order */
+            impossible_order: number;
+            /** Client Success Without Server */
+            client_success_without_server: number;
+            /** Invalid Milestones */
+            invalid_milestones: number;
+            /** Excluded Role Accounts */
+            excluded_role_accounts: number;
+            /** Timezone Fallback Accounts */
+            timezone_fallback_accounts: number;
+        };
+        /** AdminLifecycleKpi */
+        AdminLifecycleKpi: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "activation_rate" | "time_to_first_useful_action" | "first_workout_completion_rate" | "first_week_value_rate" | "d1_meaningful_return" | "d7_meaningful_return" | "d30_meaningful_return" | "missed_workout_recovery_conversion" | "nutrition_repeat_rate" | "weekly_loop_completion";
+            /** Numerator */
+            numerator: number;
+            /** Denominator */
+            denominator: number;
+            /** Cohort Size */
+            cohort_size: number;
+            /** Rate Percent */
+            rate_percent?: number | null;
+            /** Median Seconds */
+            median_seconds?: number | null;
+            /** Window */
+            window: string;
         };
         /** AdminOperationRequest */
         AdminOperationRequest: {

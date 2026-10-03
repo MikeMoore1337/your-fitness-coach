@@ -6,7 +6,12 @@ from uuid import uuid4
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, aliased, contains_eager, joinedload
 
-from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
+from fitminiapp_api.core.timezone import (
+    DEFAULT_TIMEZONE,
+    local_naive_to_utc_naive,
+    now_msk_naive,
+    today_for_user,
+)
 from fitminiapp_api.models.exercise import Exercise
 from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.program import (
@@ -40,6 +45,7 @@ from fitminiapp_api.services.exercise_catalog import (
     get_visible_exercise_display_map,
 )
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.notifications import cancel_workout_reminder, queue_notification
 from fitminiapp_api.services.nutrition import build_nutrition_target_response_from_users
 from fitminiapp_api.services.prescription_semantics import (
@@ -616,6 +622,12 @@ def assign_template_to_user(
     )
     db.add(user_program)
     db.flush()
+    record_lifecycle_milestone(
+        db,
+        target_user,
+        "program_activated",
+        occurred_at=local_naive_to_utc_naive(user_program.assigned_at, DEFAULT_TIMEZONE),
+    )
 
     created = 0
 

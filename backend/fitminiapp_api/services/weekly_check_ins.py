@@ -10,6 +10,7 @@ from fitminiapp_api.core.timezone import (
     get_user_timezone_name,
     now_for_user_naive,
     today_for_user,
+    user_local_naive_to_utc_naive,
 )
 from fitminiapp_api.models.check_in import WeeklyCheckIn
 from fitminiapp_api.models.food_diary import FoodDiaryDayStatus, FoodDiaryEntry
@@ -21,6 +22,7 @@ from fitminiapp_api.services.energy_calibration import (
     get_energy_calibration_snapshot,
     inspect_energy_calibration,
 )
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.nutrition import (
     get_current_nutrition_target,
     get_nutrition_target_for_date,
@@ -274,6 +276,14 @@ def submit_weekly_check_in(
         created_at=now_for_user_naive(user),
     )
     db.add(row)
+    if payload.status == "completed":
+        record_lifecycle_milestone(
+            db,
+            user,
+            "weekly_review_completed",
+            occurred_at=user_local_naive_to_utc_naive(row.created_at, user),
+            day_scope=True,
+        )
     try:
         db.commit()
     except IntegrityError as exc:

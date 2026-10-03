@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.api.dependencies.auth import require_user
 from fitminiapp_api.core.config import settings
-from fitminiapp_api.core.timezone import now_for_user_naive, today_for_user
+from fitminiapp_api.core.timezone import (
+    now_for_user_naive,
+    today_for_user,
+    user_local_naive_to_utc_naive,
+)
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.notification import Notification
@@ -84,6 +88,7 @@ from fitminiapp_api.services.exercise_catalog import (
 from fitminiapp_api.services.exercise_catalog_metadata import CANONICAL_EXERCISE_REDIRECTS
 from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
+from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.measurements import (
     CustomMeasurementDefinitionError,
     MeasurementError,
@@ -988,9 +993,17 @@ def start_workout(
     if workout.status not in {"planned", "in_progress"}:
         raise HTTPException(status_code=409, detail="Недопустимое состояние тренировки")
 
+    was_started = workout.started_at is not None
     if not workout.started_at:
         workout.started_at = now_for_user_naive(current_user)
     workout.status = "in_progress"
+    if not was_started and workout.started_at is not None:
+        record_lifecycle_milestone(
+            db,
+            current_user,
+            "workout_started",
+            occurred_at=user_local_naive_to_utc_naive(workout.started_at, current_user),
+        )
     cancel_workout_reminder(db, workout.id)
     if program.status == "scheduled":
         previous_status = program.status
@@ -1086,6 +1099,13 @@ def finish_workout(
 
     workout.completed_at = now_for_user_naive(current_user)
     workout.status = "completed"
+    if workout.completed_at is not None:
+        record_lifecycle_milestone(
+            db,
+            current_user,
+            "workout_completed",
+            occurred_at=user_local_naive_to_utc_naive(workout.completed_at, current_user),
+        )
     cancel_workout_reminder(db, workout.id)
 
     _reconcile_program_completion(db, program, current_user)

@@ -70,12 +70,28 @@ const JOB_STATUS_LABELS: Record<string, string> = {
   error: 'Ошибка',
 };
 
-const FUNNEL_LABELS: Record<AdminFunnel['stages'][number]['key'], string> = {
-  registered: 'Создали аккаунт',
-  profile_ready: 'Заполнили основу профиля',
-  program_activated: 'Активировали программу',
-  core_value_reached: 'Зафиксировали первое полезное действие',
+const KPI_LABELS: Record<AdminFunnel['kpis'][number]['key'], string> = {
+  activation_rate: 'Начали программу в первые 24 часа',
+  time_to_first_useful_action: 'Время до первой начатой тренировки',
+  first_workout_completion_rate: 'Завершили первую тренировку',
+  first_week_value_rate: 'Получили ценность в первую неделю',
+  d1_meaningful_return: 'Вернулись на следующий день',
+  d7_meaningful_return: 'Вернулись через неделю',
+  d30_meaningful_return: 'Вернулись через 30 дней',
+  missed_workout_recovery_conversion: 'Отреагировали на пропуск тренировки',
+  nutrition_repeat_rate: 'Повторили запись питания',
+  weekly_loop_completion: 'Завершили недельный цикл',
 };
+
+function formatKpiValue(kpi: AdminFunnel['kpis'][number]): string {
+  if (typeof kpi.median_seconds === 'number') {
+    const minutes = Math.floor(kpi.median_seconds / 60);
+    if (minutes < 1) return 'меньше минуты';
+    if (minutes < 60) return `${minutes} мин`;
+    return `${Math.floor(minutes / 60)} ч ${minutes % 60} мин`;
+  }
+  return kpi.rate_percent == null ? 'Нет данных' : `${kpi.rate_percent}%`;
+}
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
@@ -695,10 +711,14 @@ export default function AdminPage() {
           <Surface className="admin-global-section" aria-labelledby="funnel-title">
             <div className="admin-section-heading">
               <div>
-                <span className="eyebrow">Когорта за 30 дней</span>
-                <h2 id="funnel-title">Приватные агрегаты активации</h2>
+                <span className="eyebrow">Новые аккаунты за 30 дней</span>
+                <h2 id="funnel-title">Ключевые показатели первой недели</h2>
               </div>
-              <Badge tone="warning">Provider не подключён</Badge>
+              <Badge tone={funnel.data?.data_quality.status === 'clean' ? 'success' : 'warning'}>
+                {funnel.data?.data_quality.status === 'clean'
+                  ? 'Данные проверены'
+                  : 'Нужна проверка данных'}
+              </Badge>
             </div>
             {funnel.isLoading ? (
               <LoadingState />
@@ -710,12 +730,18 @@ export default function AdminPage() {
             ) : funnel.data ? (
               <>
                 <p>{funnel.data.coverage_note}</p>
+                <p className="admin-global-section__meta">
+                  Аккаунтов в выборке: {funnel.data.cohort_size}. Полных недельных срезов:{' '}
+                  {funnel.data.complete_weekly_cohorts}. {funnel.data.effect_note}
+                </p>
                 <div className="admin-funnel" role="list">
-                  {funnel.data.stages.map((stage) => (
-                    <div className="admin-funnel__stage" key={stage.key} role="listitem">
-                      <span>{FUNNEL_LABELS[stage.key]}</span>
-                      <strong>{stage.account_count}</strong>
-                      <small>{stage.cohort_rate_percent}% от созданных аккаунтов</small>
+                  {funnel.data.kpis.map((kpi) => (
+                    <div className="admin-funnel__stage" key={kpi.key} role="listitem">
+                      <span>{KPI_LABELS[kpi.key]}</span>
+                      <strong>{formatKpiValue(kpi)}</strong>
+                      <small>
+                        {kpi.numerator} из {kpi.denominator}. {kpi.window}
+                      </small>
                     </div>
                   ))}
                 </div>
