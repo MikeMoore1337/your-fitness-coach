@@ -646,9 +646,40 @@ describe('TodayDashboard', () => {
       'href',
       '/app?section=nutrition',
     );
+    expect(screen.queryByRole('link', { name: 'Открыть дневник питания' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Добавить активность' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Сон и настроение' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /^Кардио$/ })).not.toBeInTheDocument();
+  });
+
+  it('does not repeat the progress destination when the result is the next action', async () => {
+    const today = dateInputValue(new Date(), 'Europe/Moscow');
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/v1/workouts/today') {
+        return Promise.reject(new ApiError('На сегодня тренировка не назначена', 404));
+      }
+      if (path.startsWith('/api/v1/workouts/progress/summary')) {
+        return Promise.resolve({
+          ...progressSummary,
+          period_end: today,
+          training: {
+            ...progressSummary.training,
+            last_completed_workout_on: today,
+            next_workout: null,
+          },
+        });
+      }
+      if (path.startsWith('/api/v1/nutrition/diary')) return Promise.resolve(loggedDiary);
+      const auxiliary = auxiliaryResponse(path, {
+        week: [{ ...plannedWorkout, scheduled_date: today, status: 'completed' }],
+      });
+      if (auxiliary) return auxiliary;
+      throw new Error(`Unexpected API path: ${path}`);
+    });
+    renderDashboard();
+
+    expect(await screen.findByRole('link', { name: 'Посмотреть итог' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Открыть прогресс' })).not.toBeInTheDocument();
   });
 
   it('guides a new user to the profile prerequisite before a program', async () => {

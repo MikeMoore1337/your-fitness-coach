@@ -13,6 +13,7 @@ export interface PlatformApiOptions {
   weeklyReviewAvailable?: boolean;
   weeklyCalibration?: 'insufficient' | 'pending';
   nutritionTargetSource?: 'manual' | 'trainer';
+  nutritionRepeatCandidate?: boolean;
   programHistory?: 'empty' | 'one' | 'many';
   progressionOutcome?: ProgressionOutcome;
   longExerciseName?: boolean;
@@ -2246,6 +2247,8 @@ export async function installPlatformApi(
     }
     if (path.endsWith('/nutrition/diary') && request.method() === 'GET') {
       const totals = nutritionTotals();
+      const repeatCandidateDate = new Date(todayDate);
+      repeatCandidateDate.setUTCDate(todayDate.getUTCDate() - 1);
       return route.fulfill({
         json: {
           diary_date: url.searchParams.get('diary_date') || today,
@@ -2271,6 +2274,15 @@ export async function installPlatformApi(
           },
           status: nutritionEntries.length ? 'incomplete' : 'unlogged',
           status_is_explicit: false,
+          ...(options.nutritionRepeatCandidate
+            ? {
+                repeat_candidate: {
+                  source_date: repeatCandidateDate.toISOString().slice(0, 10),
+                  source_meal_type: 'breakfast',
+                  entry_count: 1,
+                },
+              }
+            : {}),
         },
       });
     }

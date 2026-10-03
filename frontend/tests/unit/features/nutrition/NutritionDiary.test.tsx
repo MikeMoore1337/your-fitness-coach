@@ -233,6 +233,8 @@ describe('NutritionDiary', () => {
 
     const defaultRepeat = await screen.findByTestId('nutrition-repeat-default');
     expect(screen.getByText('Повторить вчерашний завтрак')).toBeVisible();
+    expect(defaultRepeat).toHaveClass('ui-button--primary');
+    expect(screen.getByTestId('nutrition-add-product')).toHaveClass('ui-button--secondary');
     fireEvent.click(defaultRepeat);
     expect(await screen.findByRole('heading', { name: 'Повторить приём пищи' })).toBeVisible();
     expect(await screen.findByText('Овсяная каша', { selector: 'strong' })).toBeVisible();

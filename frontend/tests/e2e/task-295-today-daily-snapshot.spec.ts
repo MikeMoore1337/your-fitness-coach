@@ -239,32 +239,33 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
     'Появится после первых тренировок и замеров',
   );
   await expect(page.getByRole('region', { name: 'Активность за сегодня' })).toHaveCount(0);
-  const diaryAction = page.getByRole('link', { name: 'Открыть дневник питания' });
-  await expect(diaryAction).toHaveAttribute('href', `/app?section=nutrition&date=${FIXED_DATE}`);
-  expect(await diaryAction.evaluate((element) => (element as HTMLElement).innerText)).toBe(
-    'Открыть дневник',
-  );
+  const primaryNutritionAction = page.getByRole('link', {
+    name: 'Добавить питание',
+    exact: true,
+  });
+  await expect(primaryNutritionAction).toHaveAttribute('href', '/app?section=nutrition');
+  await expect(page.getByRole('link', { name: 'Открыть дневник питания' })).toHaveCount(0);
   await page.mouse.wheel(0, 120);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  const [diaryActionBox, todayBottomNavBox, todayFabBox] = await Promise.all([
-    diaryAction.boundingBox(),
+  const [primaryNutritionActionBox, todayBottomNavBox, todayFabBox] = await Promise.all([
+    primaryNutritionAction.boundingBox(),
     page.locator('#appBottomNav').boundingBox(),
     page.locator('.app-quick-add-trigger').boundingBox(),
   ]);
-  expect(diaryActionBox).not.toBeNull();
+  expect(primaryNutritionActionBox).not.toBeNull();
   expect(todayBottomNavBox).not.toBeNull();
   expect(todayFabBox).not.toBeNull();
-  expect(diaryActionBox!.height).toBeGreaterThanOrEqual(44);
+  expect(primaryNutritionActionBox!.height).toBeGreaterThanOrEqual(44);
   const overlaps = (
-    first: NonNullable<typeof diaryActionBox>,
-    second: NonNullable<typeof fabBox>,
+    first: NonNullable<typeof primaryNutritionActionBox>,
+    second: NonNullable<typeof todayFabBox>,
   ) =>
     first.x < second.x + second.width &&
     first.x + first.width > second.x &&
     first.y < second.y + second.height &&
     first.y + first.height > second.y;
-  expect(overlaps(diaryActionBox!, todayFabBox!)).toBe(false);
-  expect(overlaps(diaryActionBox!, todayBottomNavBox!)).toBe(false);
+  expect(overlaps(primaryNutritionActionBox!, todayFabBox!)).toBe(false);
+  expect(overlaps(primaryNutritionActionBox!, todayBottomNavBox!)).toBe(false);
   await expectNoHorizontalOverflow(page);
   await capture(page, 'today-390-sparse-light.png');
 
@@ -273,39 +274,46 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
     await openApp(page, 'today');
     await page.mouse.wheel(0, 120);
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-    const action = page.getByRole('link', { name: 'Открыть дневник питания' });
+    const action = page.getByRole('link', { name: 'Добавить питание', exact: true });
+    const workoutActions = page.locator('.today-workout-actions').first();
     const water = page.getByRole('link', { name: '+ Вода' });
     const group = page.locator('.today-nutrition__food-group');
     const nutrition = page.getByRole('region', { name: 'Питание на сегодня' });
     const values = nutrition.locator('.today-nutrition__values');
-    const [actionBox, waterBox, groupBox, nutritionBox, valuesBox] = await Promise.all([
-      action.boundingBox(),
-      water.boundingBox(),
-      group.boundingBox(),
-      nutrition.boundingBox(),
-      values.boundingBox(),
-    ]);
+    const [actionBox, workoutActionsBox, waterBox, groupBox, nutritionBox, valuesBox] =
+      await Promise.all([
+        action.boundingBox(),
+        workoutActions.boundingBox(),
+        water.boundingBox(),
+        group.boundingBox(),
+        nutrition.boundingBox(),
+        values.boundingBox(),
+      ]);
     expect(actionBox).not.toBeNull();
+    expect(workoutActionsBox).not.toBeNull();
     expect(waterBox).not.toBeNull();
     expect(groupBox).not.toBeNull();
     expect(nutritionBox).not.toBeNull();
     expect(valuesBox).not.toBeNull();
-    if (!actionBox || !waterBox || !groupBox || !nutritionBox || !valuesBox) continue;
-    if (width >= 390 && width <= 440) {
-      expect(
-        Math.abs(actionBox.x + actionBox.width - (waterBox.x + waterBox.width)),
-      ).toBeLessThanOrEqual(2);
-    }
-    expect(actionBox.x).toBeGreaterThanOrEqual(nutritionBox.x);
+    if (!actionBox || !workoutActionsBox || !waterBox || !groupBox || !nutritionBox || !valuesBox)
+      continue;
+    expect(actionBox.x).toBeGreaterThanOrEqual(workoutActionsBox.x);
     expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(
+      workoutActionsBox.x + workoutActionsBox.width + 1,
+    );
+    expect(groupBox.x).toBeGreaterThanOrEqual(nutritionBox.x);
+    expect(groupBox.x + groupBox.width).toBeLessThanOrEqual(
       nutritionBox.x + nutritionBox.width + 1,
     );
-    expect(actionBox.x).toBeGreaterThanOrEqual(groupBox.x);
-    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(groupBox.x + groupBox.width + 1);
-    expect(valuesBox.x + valuesBox.width).toBeLessThanOrEqual(actionBox.x + 1);
+    expect(valuesBox.x).toBeGreaterThanOrEqual(groupBox.x);
+    expect(valuesBox.x + valuesBox.width).toBeLessThanOrEqual(groupBox.x + groupBox.width + 1);
+    expect(waterBox.x).toBeGreaterThanOrEqual(nutritionBox.x);
+    expect(waterBox.x + waterBox.width).toBeLessThanOrEqual(
+      nutritionBox.x + nutritionBox.width + 1,
+    );
     expect(actionBox!.height).toBeGreaterThanOrEqual(44);
     expect(await action.evaluate((element) => (element as HTMLElement).innerText)).toBe(
-      width < 440 ? 'Открыть дневник' : 'Открыть дневник питания',
+      'Добавить питание',
     );
     const [fabBox, bottomNavBox] = await Promise.all([
       page.locator('.app-quick-add-trigger').boundingBox(),
