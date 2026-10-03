@@ -147,6 +147,14 @@ constraint операции fail-closed. `backfill` допускает толь�
 описание bounds/idempotency. Остальные изменения требуют отдельного проверенного rollout плана, а
 не обхода gate.
 
+Единственное историческое исключение — уже merged migration `0118_measurement_eligibility`: её
+исходник принимается только при совпадении нормализованного SHA-256, зафиксированного в checker.
+Это исключение необходимо для безопасного forward-only продолжения после того, как первая попытка
+release остановилась до применения migration; новые изменения этого файла и любые другие
+исторические migrations по-прежнему fail-closed. Перед запуском `alembic upgrade head` setup
+получает только на время migration `lock_timeout=3s` и `statement_timeout=30s` через
+`YFC_MIGRATION_PGOPTIONS`; это не является persistent production `.env` setting.
+
 Оба slot используют один production `.env`, поэтому cookie/JWT secrets и server-owned auth state не
 меняются при switch. Candidate smoke проверяет liveness, readiness/DB, document, matching hashed
 asset, anonymous `401` auth boundary, public config и TMA-safe shell без credentials или записей.

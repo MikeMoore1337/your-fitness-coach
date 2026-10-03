@@ -32,6 +32,7 @@ class DeploymentError(RuntimeError):
 
 REGISTRY_PULL_ATTEMPTS = 5
 REGISTRY_PULL_BASE_DELAY_SECONDS = 10
+MIGRATION_PGOPTIONS = "-c lock_timeout=3s -c statement_timeout=30s"
 
 
 @dataclass(frozen=True)
@@ -294,6 +295,12 @@ def _online_migration_command(active_revision: str, target_revision: str) -> lis
     if manifest:
         command.extend(["--manifest", manifest])
     return command
+
+
+def _migration_environment(env: dict[str, str]) -> dict[str, str]:
+    migration_env = dict(env)
+    migration_env["YFC_MIGRATION_PGOPTIONS"] = MIGRATION_PGOPTIONS
+    return migration_env
 
 
 def _image_digest(image: str, expected_revision: str) -> str:
@@ -1147,7 +1154,13 @@ def deploy(config: DeployConfig) -> Evidence:
 
         with _stage(evidence, "migration"):
             _run(_online_migration_command(state.active_revision, config.target_revision))
-            _compose("run", "--rm", "--no-deps", "setup", env=candidate_env)
+            _compose(
+                "run",
+                "--rm",
+                "--no-deps",
+                "setup",
+                env=_migration_environment(candidate_env),
+            )
 
         with _stage(evidence, "candidate_start"):
             candidate_backend_service = _slot_service("backend", candidate_slot)
@@ -1588,7 +1601,13 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
         with _stage(evidence, "migration"):
             if target_env is None:
                 raise DeploymentError("target images were not resolved before maintenance")
-            _compose("run", "--rm", "--no-deps", "setup", env=target_env)
+            _compose(
+                "run",
+                "--rm",
+                "--no-deps",
+                "setup",
+                env=_migration_environment(target_env),
+            )
 
         with _stage(evidence, "application_start"):
             _start_legacy_backend(target_env, config)

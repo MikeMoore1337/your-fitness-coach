@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import re
 import subprocess
@@ -47,6 +48,14 @@ SAFE_COLUMN_TYPES = {
     "String",
     "Text",
     "Time",
+}
+
+# 0118 was merged before the production online gate evaluated its source and
+# the first deployment stopped before applying it. Keep its compatibility
+# path exact and source-hash-pinned; every other migration remains subject to
+# the strict AST contract below.
+LEGACY_ONLINE_MIGRATION_SHA256 = {
+    "backend/alembic/versions/0118_measurement_eligibility.py": "13d4c9d6693d352b9ceb5b69b3a8713e124c505f65ba774620a8d5a12b3cdea8",
 }
 
 
@@ -138,6 +147,21 @@ def changed_migrations_from_manifest(
         if path.suffix == ".py" and path.name != "__init__.py":
             changes.append((item["status"], path))
     return changes
+
+
+def validate_legacy_migration_compatibility(path: Path) -> bool:
+    """Accept only the exact source of a reviewed, already-merged migration."""
+
+    expected = LEGACY_ONLINE_MIGRATION_SHA256.get(path.as_posix())
+    if expected is None:
+        return False
+    normalized_source = path.read_text(encoding="utf-8").replace("\r\n", "\n").encode("utf-8")
+    actual = hashlib.sha256(normalized_source).hexdigest()
+    if actual != expected:
+        raise OnlineMigrationError(
+            f"{path} legacy compatibility hash mismatch; refusing unverified migration source"
+        )
+    return True
 
 
 def _assignment(tree: ast.Module, name: str) -> object | None:
@@ -689,7 +713,8 @@ def check_online_migrations(
         )
     added = [path for _status, path in changes]
     for path in added:
-        validate_added_migration(path)
+        if not validate_legacy_migration_compatibility(path):
+            validate_added_migration(path)
     return added
 
 

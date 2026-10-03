@@ -6,6 +6,7 @@ from scripts.check_online_migrations import (
     OnlineMigrationError,
     changed_migrations_from_manifest,
     validate_added_migration,
+    validate_legacy_migration_compatibility,
 )
 
 
@@ -35,6 +36,15 @@ def test_production_migration_manifest_is_revision_bound(tmp_path: Path) -> None
     ]
     with pytest.raises(OnlineMigrationError, match="revision range"):
         changed_migrations_from_manifest(active, "c" * 40, manifest)
+
+
+def test_merged_measurement_migration_uses_exact_legacy_compatibility() -> None:
+    assert validate_legacy_migration_compatibility(
+        Path("backend/alembic/versions/0118_measurement_eligibility.py")
+    )
+    assert not validate_legacy_migration_compatibility(
+        Path("backend/alembic/versions/0117_progress_weekly_action_constraint.py")
+    )
 
 
 def test_online_migration_accepts_declared_additive_expand(tmp_path: Path) -> None:

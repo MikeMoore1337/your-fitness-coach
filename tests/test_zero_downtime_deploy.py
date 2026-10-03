@@ -70,6 +70,17 @@ def test_production_migration_command_uses_immutable_manifest(monkeypatch) -> No
     assert command[-2:] == ["--manifest", "deployment-migration-manifest.json"]
 
 
+def test_migration_environment_applies_bounded_postgres_timeouts() -> None:
+    source = {"BACKEND_IMAGE": "image"}
+
+    migration_env = deploy._migration_environment(source)
+
+    assert source == {"BACKEND_IMAGE": "image"}
+    assert migration_env["YFC_MIGRATION_PGOPTIONS"] == (
+        "-c lock_timeout=3s -c statement_timeout=30s"
+    )
+
+
 def test_image_digest_resolves_repo_digest_from_immutable_image_id(monkeypatch) -> None:
     repo_digest = "registry/backend@sha256:" + "d" * 64
     monkeypatch.setattr(

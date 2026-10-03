@@ -132,6 +132,8 @@ services:
     <<: *backend-image
     restart: "no"
     env_file: .env
+    environment:
+      YFC_MIGRATION_PGOPTIONS: ${YFC_MIGRATION_PGOPTIONS:-}
     depends_on:
       db:
         condition: service_healthy
