@@ -87,6 +87,7 @@ from fitminiapp_api.services.exercise_catalog import (
 from fitminiapp_api.services.exercise_catalog_metadata import CANONICAL_EXERCISE_REDIRECTS
 from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.exercise_guides import get_exercise_guide
+from fitminiapp_api.services.exercise_setup_memory import get_exercise_setup_memories_for_workout
 from fitminiapp_api.services.lifecycle_milestones import record_lifecycle_milestone
 from fitminiapp_api.services.measurements import (
     CustomMeasurementDefinitionError,
@@ -403,6 +404,11 @@ def _delete_workouts(db: Session, workout_ids: list[int]) -> int:
 
 def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) -> dict:
     visible_map = get_visible_exercise_display_map(db, current_user)
+    setup_memories = get_exercise_setup_memories_for_workout(
+        db,
+        current_user,
+        (item.exercise_id for item in workout.exercises),
+    )
     exercise_titles = {
         item.id: (
             visible_map[item.exercise_id].title
@@ -452,6 +458,7 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                 "prescribed_duration_minutes": item.prescribed_duration_minutes,
                 "rest_seconds": item.rest_seconds,
                 "notes": item.notes,
+                "setup_memory": setup_memories.get(item.exercise_id),
                 "superset_group": item.superset_group,
                 "superset_order": item.superset_order,
                 "prescription": item.prescription,

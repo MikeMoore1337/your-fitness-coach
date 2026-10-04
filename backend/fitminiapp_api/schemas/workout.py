@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.data_quality import TrainingDataSufficiency
+from fitminiapp_api.schemas.exercise_setup import ExerciseSetupMemoryResponse
 from fitminiapp_api.schemas.program import (
     EquipmentIdentifier,
     ExercisePrescriptionPlan,
@@ -299,6 +300,7 @@ class WorkoutExerciseItem(BaseModel):
     prescribed_duration_minutes: int | None = None
     rest_seconds: int
     notes: str | None = None
+    setup_memory: ExerciseSetupMemoryResponse | None = None
     superset_group: int | None = None
     superset_order: int | None = None
     prescription: ExercisePrescriptionPlan | None = None

@@ -224,6 +224,7 @@ export type TrainerClientProgressList = ApiSchemas['TrainerClientProgressListRes
 export type CoachAttentionResponse = ApiSchemas['CoachAttentionResponse'];
 export type CoachAttentionItem = ApiSchemas['CoachAttentionItem'];
 export type CoachCapacityResponse = ApiSchemas['CoachCapacityResponse'];
+export type ExerciseSetupMemory = ApiSchemas['ExerciseSetupMemoryResponse'];
 export type AiCoachContextDescriptor = ApiSchemas['AiCoachContextDescriptor'];
 export type AiCoachContextAttachment = ApiSchemas['AiCoachContextAttachment'];
 export type AiCoachResponse = ApiSchemas['AiCoachResponse'];

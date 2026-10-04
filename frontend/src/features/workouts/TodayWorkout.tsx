@@ -45,6 +45,7 @@ import { useScreenWakeLock } from './useScreenWakeLock';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { WarmupProposal } from './WarmupProposal';
 import { PlateCalculator } from './PlateCalculator';
+import { ExerciseSetupMemory } from './ExerciseSetupMemory';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -1603,6 +1604,13 @@ export function TodayWorkout({
                     )}
                     {groupLabel && <span className="active-workout-superset">{groupLabel}</span>}
                     {exercise.notes && <p className="exercise-note">{exercise.notes}</p>}
+                    <ExerciseSetupMemory
+                      key={`setup-memory-${exercise.exercise_id}-${exercise.setup_memory?.version ?? 'none'}`}
+                      canEdit={capabilities.canMutatePrograms}
+                      exerciseId={exercise.exercise_id}
+                      memory={exercise.setup_memory ?? null}
+                      userId={user?.id ?? 0}
+                    />
                   </div>
                   <div className="active-workout-exercise__head-actions app-action-group">
                     {(!isCurrentExercise || isPersistedComplete) && (

@@ -866,6 +866,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/exercise-setup-memories/{exercise_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Own Exercise Setup Memory */
+        get: operations["get_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__get"];
+        /** Save Own Exercise Setup Memory */
+        put: operations["save_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__put"];
+        post?: never;
+        /** Delete Own Exercise Setup Memory */
+        delete: operations["delete_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/export": {
         parameters: {
             query?: never;
@@ -9019,6 +9038,34 @@ export interface components {
             best_load_kg?: number | null;
             best_load_workout?: components["schemas"]["ExerciseHistoryWorkout"] | null;
         };
+        /** ExerciseSetupMemoryResponse */
+        ExerciseSetupMemoryResponse: {
+            /** Id */
+            id: number;
+            /** Exercise Id */
+            exercise_id: number;
+            /** Body */
+            body: string;
+            /** Version */
+            version: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ExerciseSetupMemorySaveRequest */
+        ExerciseSetupMemorySaveRequest: {
+            /** Body */
+            body: string;
+            /** Expected Version */
+            expected_version?: number | null;
+        };
         /** ExerciseTaxonomyItem */
         ExerciseTaxonomyItem: {
             /** Identifier */
@@ -15384,6 +15431,7 @@ export interface components {
             rest_seconds: number;
             /** Notes */
             notes?: string | null;
+            setup_memory?: components["schemas"]["ExerciseSetupMemoryResponse"] | null;
             /** Superset Group */
             superset_group?: number | null;
             /** Superset Order */
@@ -17623,6 +17671,103 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HeartRatePreviewResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseSetupMemoryResponse"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExerciseSetupMemorySaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExerciseSetupMemoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_own_exercise_setup_memory_api_v1_me_exercise_setup_memories__exercise_id__delete: {
+        parameters: {
+            query?: {
+                expected_version?: number | null;
+            };
+            header?: never;
+            path: {
+                exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

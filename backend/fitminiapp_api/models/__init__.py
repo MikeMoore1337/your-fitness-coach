@@ -34,6 +34,7 @@ from fitminiapp_api.models.exercise import (
     ExerciseMuscle,
     Muscle,
 )
+from fitminiapp_api.models.exercise_setup_memory import ExerciseSetupMemory
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.food import Food, FoodFavorite
 from fitminiapp_api.models.food_diary import (
@@ -155,6 +156,7 @@ __all__ = [
     "ExerciseEquipment",
     "ExerciseGuideMetadata",
     "ExerciseMuscle",
+    "ExerciseSetupMemory",
     "FirstTouchAttribution",
     "Food",
     "FoodDiaryBatchOperation",

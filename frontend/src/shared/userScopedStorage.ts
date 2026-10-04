@@ -26,6 +26,10 @@ export const USER_SCOPED_PERSISTENT_STORAGE_REGISTRY = [
   { domain: 'nutrition_label_draft', prefixes: ['fit_nutrition_label_draft_v1_'] },
   { domain: 'nutrition_natural_input', prefixes: ['fit_nutrition_natural_input_v1_'] },
   { domain: 'measurement_draft', prefixes: ['fit_measurement_draft_'] },
+  {
+    domain: 'exercise_setup_memory_draft',
+    prefixes: ['fit_exercise_setup_memory_draft_v1_'],
+  },
   { domain: 'nutrition_draft', prefixes: ['fit_nutrition_draft_v2_', 'fit_nutrition_draft_'] },
   { domain: 'profile_draft', prefixes: ['fit_profile_draft_'] },
   { domain: 'training_preferences_draft', prefixes: ['fit_training_preferences_draft_'] },
@@ -99,6 +103,13 @@ export function naturalInputDraftStorageKey(
 
 export function measurementDraftStorageKey(scope: string): string {
   return `fit_measurement_draft_${scope}`;
+}
+
+export function exerciseSetupMemoryDraftStorageKey(
+  userId: number | 'anonymous',
+  exerciseId: number,
+): string {
+  return `fit_exercise_setup_memory_draft_v1_${userId}_${exerciseId}`;
 }
 
 export function nutritionDraftStorageKey(scope: string): string {
