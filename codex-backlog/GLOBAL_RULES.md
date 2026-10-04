@@ -32,6 +32,10 @@ block Product v8. V8-03 is cancelled as a generic placeholder; the old UX-reset 
 historical provenance only. Measurement boundedness is `V8-R1`, a separate optional reliability
 task blocked on evidence and not a Product v8 blocker.
 
+Product v8 is now `COMPLETED / CLOSED`: V8-01 delivered the confirmed executable scope, the
+bounded reconciliation selected no additional executable task, and no parked/gated workstream is
+transferred automatically to a future product version. No Product v9 is created by this closeout.
+
 Tasks `109-111` have stale pending labels in older owner-only backlog snapshots; current source and
 history show their requested implementations already present. They are not current Product v8
 candidates and must not be duplicated.

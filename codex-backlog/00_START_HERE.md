@@ -5,23 +5,26 @@ Backlog использует resource-aware lifecycle. В owner workspace зав
 
 ## Текущее состояние
 
-### Product v8 current governance — 2026-10-04
+### Product v8 completed governance closeout — 2026-10-04
 
 Каноническая roadmap — [Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Repository baseline: `206058185dda7357582f088997b7522ab42765f0` (governance PR #690 merge).
+Closeout source baseline: `e8d9228b259e35740ff68048f2772482fb4e8945` (governance sync PR #691 merge).
 
 ```text
+Product v8 -> COMPLETED
 V8-01 / Task 684 -> COMPLETED / PRODUCTION VERIFIED
 V8-00 / Task 124B -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
 V8-R1 measurement boundedness -> separate optional reliability / BLOCKED_ON_EVIDENCE
 V8-03 -> CANCELLED AS GENERIC PLACEHOLDER
-CURRENT_EXECUTABLE_PRODUCT_V8_TASK -> NONE after bounded backlog review
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK -> NONE / Product v8 closed
 ```
 
 Task `124B` is preserved as historical provenance only. It is not an evidence gate, dependency,
 blocker or automatic task; synthetic/demo evidence remains distinct from real-user evidence, but
-its absence does not block Product v8. Controller refactor remains `SEPARATE_INFRA_WORKSTREAM /
-DEFER`; video exercise technique evaluation remains `NO_GO / OUT_OF_SCOPE`.
+its absence did not block Product v8 closeout. Controller refactor remains
+`SEPARATE_INFRA_WORKSTREAM / DEFER`; video exercise technique evaluation remains
+`NO_GO / OUT_OF_SCOPE`. Parked workstreams do not transfer automatically to a future product
+version.
 
 - tasks `00-80`, включая буквенные подзадачи, `69B`, `73A` и `74A`, а также owner-selected tasks
   `103-106` подтверждены как завершённые;
@@ -36,16 +39,17 @@ DEFER`; video exercise technique evaluation remains `NO_GO / OUT_OF_SCOPE`.
   owner approval через constrained-host `single-slot` fallback с bounded downtime и verdict
   `active`, без заявления production blue/green zero observed downtime;
 - task `113` завершила branch normalization и automatic release eligibility contract;
-- task `114` назначена current, но её Trigger/реализация не запускались;
+- историческая запись о task `114` не является current Product v8 task и не запускает её lifecycle;
 - owner-selected tasks `107-111` созданы вне основной очереди и не являются current.
 
 ## Текущая задача
 
 ```text
-CURRENT_EXECUTABLE_PRODUCT_V8_TASK = NONE
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK = NONE / Product v8 CLOSED
 ```
 
-Не выбирать и не запускать старую UX-reset sequence автоматически. Направления `81/82/83/84/85`,
+Product v8 closeout завершён. Не выбирать и не запускать старую UX-reset sequence автоматически.
+Направления `81/82/83/84/85`,
 `86/86A`, bounded AI, imports, Progress, trainer and nutrition improvements были проверены и уже
 реализованы либо имеют собственный gate; подробная selection table находится в
 `POST_RELEASE_PRODUCT_REVIEW.md`.
