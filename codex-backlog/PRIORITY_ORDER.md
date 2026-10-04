@@ -7,7 +7,29 @@ owner-selected Telegram tasks `103-106`, tasks `109/112`, owner-approved UX rese
 UX-reset implementation tasks `116-118`.
 Task-файлы находятся в локальном owner-only `tasks/done/`.
 
-## Current
+## Product v8 current selection — 2026-10-04
+
+Repository baseline: `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`; roadmap: Issue `#683`.
+
+```text
+V8-01 / Task 684 -> COMPLETED / PRODUCTION VERIFIED
+V8-00 / Task 124B -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
+V8-R1 measurement boundedness -> separate optional reliability / BLOCKED_ON_EVIDENCE
+V8-03 -> CANCELLED AS GENERIC PLACEHOLDER
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK -> NONE after bounded backlog review
+```
+
+Hydration, Sleep/Mood, trainer report handoff, reminders, knowledge, PWA/Web Push, bounded AI,
+imports, Progress, trainer and nutrition directions were checked against current code/history and
+are already implemented. The remaining report-delivery, SEO/product-handoff, provider-routing and
+measurement options retain independent gates. No new Product v8 Issue or implementation task is
+selected by this reconciliation. `124B` is historical provenance only and is not a gate or
+dependency; synthetic/demo evidence remains non-real-user evidence without blocking v8.
+
+## Historical/stale current sequence
+
+The following sequence is retained for provenance and is not an executable current order. Task
+`119` is not the next Product v8 task; the old `124B -> 124C` tail was removed by owner decision.
 
 ```text
 113A Owner UX Stabilization [COMPLETED, OWNER ACCEPTED]

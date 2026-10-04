@@ -1,5 +1,14 @@
 # Trigger and owner decision matrix
 
+## Current Product v8 reconciliation — 2026-10-04
+
+This matrix remains a provenance record for direction-specific triggers. It is not an automatic
+queue. The bounded review found the core directions `81/82/83/84/85/86/86A/93A/93B` and the
+bounded AI/Progress/trainer work already implemented in current source. Task `124B` / V8-00 is
+`REMOVED_FROM_PRODUCT_V8 / NO_GO BY OWNER`; no row in this matrix may restore it as a universal
+evidence gate or create V8-03. Measurement boundedness remains a separate optional
+`BLOCKED_ON_EVIDENCE` reliability candidate.
+
 Перед запуском направления заполнить его строку фактическим evidence. Для downstream task
 дополнительно проверить dependency и собственный checkpoint из task-файла.
 

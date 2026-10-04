@@ -1,5 +1,12 @@
 # Не планируется без отдельного evidence
 
+Этот список запрещённых/speculative направлений не является универсальным real-user gate для
+Product v8. После owner decision по Issue `#683` bounded task может попасть в Product v8 без
+real-user evidence, если её user job и objective gap подтверждены текущим продуктом, scope
+ограничен, есть технически проверяемая acceptance и нет критической external dependency.
+Task `124B` / V8-00 удалена из Product v8 и не блокирует такой выбор; synthetic/demo evidence всё
+равно нельзя выдавать за real-user evidence.
+
 Даже после release gate `79` и переноса post-release tasks не добавлять автоматически:
 
 - социальную сеть, друзей, ленту и лидерборды;

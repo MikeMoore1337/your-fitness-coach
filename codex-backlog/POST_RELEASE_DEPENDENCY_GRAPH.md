@@ -3,39 +3,45 @@
 ## Canonical Product v8 current-state graph — 2026-10-04
 
 Roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Baseline `bffaf336f350def789376ce7eb299705371188f3`; PR `#685` and PR `#686` merged. Product v8
-**STARTED**; V8-01 / Task 684 is **COMPLETED / PRODUCTION VERIFIED** with no env, migration,
-schema or provider changes.
+Repository baseline `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`; V8-01 / Task 684 remains
+**COMPLETED / PRODUCTION VERIFIED**. Dependency maintenance PRs `#589` and `#689` are separate
+lockfile-only workstreams and are not Product v8 nodes.
 
 ```text
 V8-01 / Task 684
   -> COMPLETED / PRODUCTION VERIFIED
 
 V8-00 / Task 124B
-  -> WAITING_FOR_REAL_USER_EVIDENCE
-  -> no synthetic/demo substitution
-  -> V8-03 only from concrete real-user findings
+  -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
+  -> not a gate, dependency or blocker
+  -> no auto-start and no V8-03 generation
 
-V8-02
+V8-R1 / measurement reporting boundedness
   -> BLOCKED_ON_EVIDENCE
-  -> no implementation
+  -> separate optional reliability task
+  -> not a Product v8 blocker
 
 V8-03
-  -> NOT CREATED / NOT EXECUTABLE
-  -> requires concrete V8-00 finding
+  -> CANCELLED AS GENERIC PLACEHOLDER
+  -> do not create without a concrete newly specified problem
+
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK
+  -> determined by the reconstructed v8 backlog selection
+  -> NONE after the bounded 2026-10-04 review
 ```
 
-`V8-01` больше не является pending/executable candidate. `V8-02` требует production-relevant
-boundedness evidence до любой реализации; `V8-03` требует concrete real-user evidence и не может
-быть выведен из synthetic/demo fixtures. Сейчас нет допустимой следующей Product v8 task:
-`NO_CURRENT_EXECUTABLE_PRODUCT_V8_TASK`. Не создавать V8-04+ без нового подтверждённого finding.
+Synthetic/demo evidence still cannot be described as real-user evidence, but missing real-user
+validation is not a Product v8 blocker. The review found no unimplemented, independently
+executable product node: the requested daily-workflow, trainer, progress, nutrition, knowledge,
+PWA/Web Push, import and bounded AI directions are already implemented. Remaining candidates keep
+their own gates and are not silently attached to this graph. No V8-04+ placeholder is created.
 Task `138` is `ALREADY_IMPLEMENTED` through
 Task `364`/PR `#365`, not a v8 dependency. The historical UX-reset graph below is retained for
 traceability and must not auto-start Task `119` or any other old product task. Controller refactor
 is `SEPARATE_INFRA_WORKSTREAM / DEFER`. Exercise video technique evaluation is `NO_GO` /
 `OUT_OF_SCOPE`.
 
-## Текущий UX-reset critical path
+## Исторический UX-reset critical path (provenance only; not canonical Product v8)
 
 ```text
 113 -> 113A STABILIZATION -> production smoke -> OWNER VERIFICATION -> 114 -> 115A -> OWNER APPROVAL
@@ -45,7 +51,7 @@ is `SEPARATE_INFRA_WORKSTREAM / DEFER`. Exercise video technique evaluation is `
  -> 81 -> 82 -> 84 -> 124A
  -> OWNER RELEASE APPROVAL
  -> dev -> master -> production deployment
- -> 124B -> 124C only if BLOCKER/HIGH
+ -> 124B -> 124C only if BLOCKER/HIGH [HISTORICAL ONLY]
 ```
 
 - `81` зависит от `123`; Today использует compact quick action, detail/history — Nutrition.
@@ -53,7 +59,9 @@ is `SEPARATE_INFRA_WORKSTREAM / DEFER`. Exercise video technique evaluation is `
 - `84` зависит от `82` и `122`; settings compact/default-off, Today только actionable state.
 - `85 -> 121`, `110 -> 122`, `111 -> 123`; эти tasks вне critical path `124A`, пока владелец не
   включил их в release candidate.
-- `115B` отсутствует; real-user validation выполняется Task `124B` после production release.
+- `115B` отсутствует. The old `124B` real-user validation link is preserved here only as
+  historical provenance; owner decision removed Task `124B` from Product v8, so it is not an
+  executable dependency and does not create `124C`.
 
 ```text
 release 79
