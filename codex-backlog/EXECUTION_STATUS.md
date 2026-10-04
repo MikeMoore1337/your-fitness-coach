@@ -3,7 +3,7 @@
 ## Product v8 current state — 2026-10-04
 
 Канонический Product v8 roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Текущий repository baseline — `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18` на `master` и
+Текущий repository baseline — `206058185dda7357582f088997b7522ab42765f0` на `master` и
 `origin/master`; Product v8 implementation baseline остаётся production-verified после V8-01,
 а dependency maintenance PR `#589` и replacement PR `#689` merged separately. Product v8
 **RECONSTRUCTED / NO CURRENT EXECUTABLE TASK SELECTED**.
