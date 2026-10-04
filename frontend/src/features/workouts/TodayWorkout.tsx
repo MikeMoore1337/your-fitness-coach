@@ -46,6 +46,7 @@ import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { WarmupProposal } from './WarmupProposal';
 import { PlateCalculator } from './PlateCalculator';
 import { ExerciseSetupMemory } from './ExerciseSetupMemory';
+import { ActiveSessionSummary } from './ActiveSessionSummary';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -232,8 +233,14 @@ function WorkoutSetHelpers({
   exerciseTitle: string;
   hasWarmupRows: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <details className="active-workout-set__helpers">
+    <details
+      className="active-workout-set__helpers"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary>Разминка и блины</summary>
       <div className="active-workout-set__helpers-body">
         <div className="active-workout-helper-block">
@@ -1442,6 +1449,16 @@ export function TodayWorkout({
     activeSync.pendingCount > 0 &&
     activeSync.syncState !== 'syncing' &&
     activeSync.syncState !== 'pending';
+  const adaptationEntry =
+    data.status === 'planned' || started ? (
+      capabilities.canMutatePrograms ? (
+        <WorkoutAdaptation workout={data} safetyOnly={started} />
+      ) : (
+        <p className="muted demo-capability-notice" role="status">
+          Изменение плана тренировки доступно после входа.
+        </p>
+      )
+    ) : null;
 
   if (data.status === 'completed') {
     return (
@@ -1528,14 +1545,7 @@ export function TodayWorkout({
           entryPoint="workout"
         />
 
-        {(data.status === 'planned' || started) &&
-          (capabilities.canMutatePrograms ? (
-            <WorkoutAdaptation workout={data} safetyOnly={started} />
-          ) : (
-            <p className="muted demo-capability-notice" role="status">
-              Изменение плана тренировки доступно после входа.
-            </p>
-          ))}
+        {!currentSet && adaptationEntry}
 
         <div className="active-workout-exercises">
           {data.exercises.map((exercise, exerciseIndex) => {
@@ -1578,6 +1588,39 @@ export function TodayWorkout({
                   (pending?.actual_weight ?? set.actual_weight) === update.proposed_weight
                 );
               });
+            const applyGuidance =
+              started && suggestedWeight != null && targetSetUpdates.length > 0
+                ? () => {
+                    for (const update of targetSetUpdates) {
+                      const set = exercise.sets.find((item) => item.id === update.set_id);
+                      if (!set) continue;
+                      const pending = activeSync.pendingBySet.get(set.id)?.values;
+                      if (pending?.is_completed ?? set.is_completed) continue;
+                      activeSync.enqueue(set.id, update.set_version, {
+                        actual_reps: pending?.actual_reps ?? set.actual_reps ?? null,
+                        actual_weight: update.proposed_weight,
+                        rir: pending?.rir ?? set.rir ?? null,
+                        set_kind: pending?.set_kind ?? set.set_kind ?? 'working',
+                        reached_failure: pending?.reached_failure ?? set.reached_failure ?? false,
+                        is_completed: pending?.is_completed ?? set.is_completed,
+                      });
+                    }
+                  }
+                : undefined;
+            const guidanceElement =
+              metricType === 'strength' &&
+              exercise.progression_guidance &&
+              !dismissedGuidance.has(exercise.id) ? (
+                <ProgressionGuidance
+                  applied={guidanceApplied}
+                  exerciseKey={exercise.id}
+                  guidance={exercise.progression_guidance}
+                  onApply={applyGuidance}
+                  onDismiss={() =>
+                    setDismissedGuidance((current) => new Set(current).add(exercise.id))
+                  }
+                />
+              ) : undefined;
 
             return (
               <article
@@ -1604,13 +1647,15 @@ export function TodayWorkout({
                     )}
                     {groupLabel && <span className="active-workout-superset">{groupLabel}</span>}
                     {exercise.notes && <p className="exercise-note">{exercise.notes}</p>}
-                    <ExerciseSetupMemory
-                      key={`setup-memory-${exercise.exercise_id}-${exercise.setup_memory?.version ?? 'none'}`}
-                      canEdit={capabilities.canMutatePrograms}
-                      exerciseId={exercise.exercise_id}
-                      memory={exercise.setup_memory ?? null}
-                      userId={user?.id ?? 0}
-                    />
+                    {!isCurrentExercise && (
+                      <ExerciseSetupMemory
+                        key={`setup-memory-${exercise.exercise_id}-${exercise.setup_memory?.version ?? 'none'}`}
+                        canEdit={capabilities.canMutatePrograms}
+                        exerciseId={exercise.exercise_id}
+                        memory={exercise.setup_memory ?? null}
+                        userId={user?.id ?? 0}
+                      />
+                    )}
                   </div>
                   <div className="active-workout-exercise__head-actions app-action-group">
                     {(!isCurrentExercise || isPersistedComplete) && (
@@ -1660,6 +1705,38 @@ export function TodayWorkout({
                   </div>
                 </header>
 
+                {isCurrentExercise && currentSet && (
+                  <ActiveSessionSummary
+                    adaptation={adaptationEntry}
+                    currentSet={currentSet.set}
+                    exercise={exercise}
+                    guidance={guidanceElement}
+                    onFocusCurrentSet={() => {
+                      const currentElement = document.querySelector<HTMLElement>(
+                        `[data-workout-set-id="${currentSet.set.id}"]`,
+                      );
+                      if (!currentElement) return;
+                      currentElement.scrollIntoView({ block: 'center' });
+                      const field =
+                        currentSet.exercise.metric_type === 'cardio' ? 'duration' : 'weight';
+                      currentElement
+                        .querySelector<HTMLElement>(`[data-workout-field="${field}"]`)
+                        ?.focus({ preventScroll: true });
+                    }}
+                    pending={activeSync.pendingBySet.get(currentSet.set.id)}
+                    setupMemory={
+                      <ExerciseSetupMemory
+                        key={`setup-memory-${exercise.exercise_id}-${exercise.setup_memory?.version ?? 'none'}`}
+                        canEdit={capabilities.canMutatePrograms}
+                        exerciseId={exercise.exercise_id}
+                        memory={exercise.setup_memory ?? null}
+                        userId={user?.id ?? 0}
+                      />
+                    }
+                    started={started}
+                  />
+                )}
+
                 {isCurrentExercise &&
                   (exercise.media_state === 'approved_animated' ||
                     exercise.media_state === 'blocked') && (
@@ -1693,41 +1770,7 @@ export function TodayWorkout({
                       exerciseId={exercise.exercise_id}
                     />
                   )}
-                  {metricType === 'strength' &&
-                    exercise.progression_guidance &&
-                    !dismissedGuidance.has(exercise.id) && (
-                      <ProgressionGuidance
-                        applied={guidanceApplied}
-                        exerciseKey={exercise.id}
-                        guidance={exercise.progression_guidance}
-                        onApply={
-                          started && suggestedWeight != null && targetSetUpdates.length > 0
-                            ? () => {
-                                for (const update of targetSetUpdates) {
-                                  const set = exercise.sets.find(
-                                    (item) => item.id === update.set_id,
-                                  );
-                                  if (!set) continue;
-                                  const pending = activeSync.pendingBySet.get(set.id)?.values;
-                                  if (pending?.is_completed ?? set.is_completed) continue;
-                                  activeSync.enqueue(set.id, update.set_version, {
-                                    actual_reps: pending?.actual_reps ?? set.actual_reps ?? null,
-                                    actual_weight: update.proposed_weight,
-                                    rir: pending?.rir ?? set.rir ?? null,
-                                    set_kind: pending?.set_kind ?? set.set_kind ?? 'working',
-                                    reached_failure:
-                                      pending?.reached_failure ?? set.reached_failure ?? false,
-                                    is_completed: pending?.is_completed ?? set.is_completed,
-                                  });
-                                }
-                              }
-                            : undefined
-                        }
-                        onDismiss={() =>
-                          setDismissedGuidance((current) => new Set(current).add(exercise.id))
-                        }
-                      />
-                    )}
+                  {!isCurrentExercise && guidanceElement}
 
                   <div className="active-workout-exercise__sets">
                     {exercise.sets.map((set, setIndex) => {
