@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectTouchTargets } from './fixtures/mobile-tma';
 
 const mediaThumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
@@ -1018,6 +1019,124 @@ test('V9-02 does not persist an unsaved proposal offline', async ({ page }) => {
   await page.context().setOffline(false);
 });
 
+test('V9-03 calculates exact and nearest local loads without network or workout mutation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const currentSet = page.locator('[data-workout-set-id="201"]');
+  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  const calculator = currentSet.locator('.active-workout-plate-calculator');
+  await calculator.getByLabel('Целевой вес, кг').fill('80');
+  await expect(calculator.getByRole('status')).toContainText('Точный результат');
+  await expect(calculator.getByRole('status')).toContainText('Итог80 кг');
+  await expect(calculator.getByRole('status')).toContainText('25 кг + 5 кг');
+
+  const inventoryLabels = [25, 20, 15, 10, 5, 2.5, 1.25, 1, 0.5].map(
+    (weight) => `Количество блинов ${weight} кг на сторону`,
+  );
+  for (const label of inventoryLabels) {
+    await calculator.getByLabel(label).fill('0');
+  }
+  await calculator.getByLabel('Количество блинов 10 кг на сторону').fill('1');
+  await calculator.getByLabel('Количество блинов 5 кг на сторону').fill('1');
+  await calculator.getByLabel('Целевой вес, кг').fill('35');
+  await expect(calculator.getByRole('status')).toContainText('Ближайший доступный результат');
+  await expect(calculator.getByRole('status')).toContainText('Итог30 кг');
+  await expect(calculator.getByRole('status')).toContainText('Разница к цели: −5 кг');
+
+  await calculator.getByLabel('Целевой вес, кг').fill('10');
+  await expect(calculator.getByRole('alert')).toContainText('не может быть меньше веса грифа');
+
+  await page.context().setOffline(true);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  await calculator.getByLabel('Целевой вес, кг').fill('80');
+  await calculator.getByRole('button', { name: 'Сбросить' }).click();
+  await expect(calculator.getByRole('status')).toContainText('Точный результат');
+  await expect(currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('');
+  await expect(currentSet.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('');
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+  await page.context().setOffline(false);
+});
+
+test('V9-03 fits the supported 360, 390 and 430px Mobile Web widths', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const currentSet = page.locator('[data-workout-set-id="201"]');
+  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  const calculator = currentSet.locator('.active-workout-plate-calculator');
+  await calculator.getByLabel('Целевой вес, кг').fill('80');
+  await expect(calculator.getByRole('status')).toContainText('Точный результат');
+
+  for (const width of [360, 390, 430]) {
+    await page.setViewportSize({ width, height: width === 360 ? 800 : width === 390 ? 844 : 932 });
+    await expect(calculator).toBeVisible();
+    await expectTouchTargets(calculator.locator('input, button'));
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+    ).toBe(true);
+  }
+});
+
+test('V9-03 keeps the calculator keyboard-usable in mocked TMA dark reduced-motion mode', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await installMockedTelegram(page);
+  await mockActiveWorkout(page);
+  await page.goto('/app?tgWebAppPlatform=android');
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const currentSet = page.locator('[data-workout-set-id="201"]');
+  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  const calculator = currentSet.locator('.active-workout-plate-calculator');
+  await calculator.getByLabel('Целевой вес, кг').fill('80');
+  await expect(calculator.getByRole('status')).toContainText('Точный результат');
+  await calculator.getByLabel('Целевой вес, кг').focus();
+  await expect(calculator.getByLabel('Целевой вес, кг')).toBeFocused();
+  await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
+  expect(await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)).toBe(
+    true,
+  );
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});
+
+test('V9-03 stays compact on desktop in dark reduced-motion mode', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const currentSet = page.locator('[data-workout-set-id="201"]');
+  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  const calculator = currentSet.locator('.active-workout-plate-calculator');
+  await calculator.getByLabel('Целевой вес, кг').fill('80');
+  await expect(calculator.getByRole('status')).toContainText('Точный результат');
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});
+
 test('active workout keeps one obvious next action through logging, timer and finish', async ({
   page,
 }) => {
@@ -1079,7 +1198,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
   );
   await expect(firstSet.getByText('Повторы в запасе (RIR)', { exact: true })).toBeVisible();
   await firstSet.getByText('Разминка и блины', { exact: true }).click();
-  await firstSet.getByLabel('Вес снаряда, кг').fill('80');
+  await firstSet.getByLabel('Целевой вес, кг').fill('80');
   await expect(firstSet.locator('.active-workout-helper-result')).toContainText('На сторону:');
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');

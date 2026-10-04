@@ -44,7 +44,7 @@ import { ProgressionGuidance } from './ProgressionGuidance';
 import { useScreenWakeLock } from './useScreenWakeLock';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { WarmupProposal } from './WarmupProposal';
-import { calculatePlateLoad } from './workoutExecution';
+import { PlateCalculator } from './PlateCalculator';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -231,13 +231,6 @@ function WorkoutSetHelpers({
   exerciseTitle: string;
   hasWarmupRows: boolean;
 }) {
-  const [plateWeight, setPlateWeight] = useState(weight);
-  const [barWeight, setBarWeight] = useState('20');
-  const plateLoad = calculatePlateLoad(Number(plateWeight), Number(barWeight));
-  const plateSummary = plateLoad?.plates.length
-    ? plateLoad.plates.map((plate) => `${formatWorkoutNumber(plate)} кг`).join(' + ')
-    : 'Только гриф';
-
   return (
     <details className="active-workout-set__helpers">
       <summary>Разминка и блины</summary>
@@ -261,40 +254,9 @@ function WorkoutSetHelpers({
         <div className="active-workout-helper-block">
           <div>
             <strong>Блины на сторону</strong>
-            <p>Только арифметика для текущего веса; журнал и прогресс не меняются.</p>
+            <p>Подберите доступные блины для целевого веса; журнал и прогресс не меняются.</p>
           </div>
-          <div className="active-workout-helper-inputs">
-            <label>
-              <span>Вес снаряда, кг</span>
-              <input
-                inputMode="decimal"
-                min="0"
-                step="0.5"
-                type="number"
-                value={plateWeight}
-                onChange={(event) => setPlateWeight(event.target.value)}
-              />
-            </label>
-            <label>
-              <span>Гриф, кг</span>
-              <input
-                inputMode="decimal"
-                min="1"
-                step="0.5"
-                type="number"
-                value={barWeight}
-                onChange={(event) => setBarWeight(event.target.value)}
-              />
-            </label>
-          </div>
-          {plateLoad && (
-            <p className="active-workout-helper-result" role="status">
-              На сторону: <strong>{plateSummary}</strong>
-              {plateLoad.remainder > 0 && (
-                <span> · не хватает {formatWorkoutNumber(plateLoad.remainder)} кг</span>
-              )}
-            </p>
-          )}
+          <PlateCalculator disabled={disabled} initialTargetWeight={weight} />
         </div>
       </div>
     </details>
