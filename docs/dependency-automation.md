@@ -1,46 +1,71 @@
-# Dependency automation
+# Dependency updates and vulnerability alerts
 
-Routine dependency updates are owned by Renovate. Dependabot version-update configuration is intentionally absent.
+No automated version-update PR bot is configured. Dependency changes are manual, reviewed as
+ordinary pull requests, and subject to the repository's existing lockfile, CI and security gates.
 
-## Repository contract
+## Repository policy
 
-- Renovate branches use `renovate/`.
-- Python dependencies are managed from the root `pyproject.toml` with `uv.lock` as the required lockfile artifact.
-- Renovate's PEP 621 manager must update `pyproject.toml` and `uv.lock` together.
-- CI stays fail-closed: any stale `uv.lock` fails `uv sync --locked` / `uv lock --check`.
-- npm PRs must pass `npm ci`, typecheck, lint, unit tests and the routed frontend regression lanes.
-- Major dependency upgrades never auto-merge and require explicit approval in the Renovate Dependency Dashboard.
-- Minor, patch, pin and digest updates may auto-merge only after the repository's required checks are green.
-- Security fixes are surfaced by Renovate and never auto-merge.
+- `.github/dependabot.yml` is intentionally absent; Dependabot version-update configuration is not
+  enabled.
+- `.github/renovate.json` is intentionally absent; no repository integration is configured.
+- `Dependabot alerts` may remain enabled for passive vulnerability visibility.
+- `Dependabot security updates` and automatic security PRs remain disabled, so no automated
+  dependency PR stream is created by this repository policy.
+- Major dependency upgrades require explicit manual review.
 
-## Update cadence
+## Python dependencies
 
-- Python / uv: Monday.
-- npm frontend: Tuesday.
-- Docker: Wednesday.
-- GitHub Actions: Thursday.
-- uv lockfile maintenance: Monday.
+Python dependencies are managed from the root `pyproject.toml`. Every dependency change must keep
+`pyproject.toml` and `uv.lock` consistent and must preserve the pinned project policy in
+`pyproject.toml`.
 
-A 7-day minimum release age is used for the scheduled ecosystems. This avoids immediately consuming freshly published packages and keeps uv's resolver behavior aligned with the bot policy.
+CI remains fail-closed: `uv sync --locked` rejects a stale or inconsistent `uv.lock`. Do not bypass
+that check or regenerate the lockfile under a different Python/uv project policy.
 
-## One-time GitHub setup
+For a development dependency, make the manifest and lockfile change together, then verify the
+locked environment from the repository root:
 
-The repository configuration file alone cannot install a GitHub App or change Advanced Security account settings. An owner must perform these one-time settings:
+```bash
+uv add --group dev "<package>==<version-or-range>"
+uv lock
+uv sync --locked --no-default-groups --group dev
+```
 
-1. Install the Mend Renovate GitHub App for `MikeMoore1337/your-fitness-coach`.
-2. In **Settings -> Security -> Advanced Security**, keep **Dependency graph** and **Dependabot alerts** enabled.
-3. Disable **Dependabot security updates** so GitHub does not create a second, competing dependency PR stream. Alerts stay enabled because Renovate can consume them.
-4. Confirm that the Renovate App has read access to Dependabot alerts and write access required to create/update branches and pull requests.
+For an existing dependency whose declared range already permits the intended update, use the
+repository's pinned uv version to refresh only that package and then run the same locked sync:
 
-Repository-native GitHub auto-merge is not required. `platformAutomerge` is disabled, so Renovate itself merges eligible non-major PRs only after it observes required status checks passing.
+```bash
+uv lock --upgrade-package <package>
+uv sync --locked --no-default-groups --extra backend --extra bot --group dev
+```
 
-## Recovery
+Review the resulting `pyproject.toml` and `uv.lock` diff together. A major upgrade needs explicit
+human review of compatibility, security findings and affected CI/runtime paths.
 
-If a Renovate PR fails:
+## Frontend npm dependencies
 
-- do not bypass `checks`;
-- inspect the failing dependency lane;
-- if the update is incompatible, close it or keep it pending in the Dependency Dashboard;
-- never regenerate `uv.lock` with a different project policy just to make CI green.
+Frontend dependency changes must keep `frontend/package.json` and
+`frontend/package-lock.json` consistent. Use npm to update both files, then verify the exact
+lockfile install and the existing frontend checks:
 
-If Renovate stops creating PRs, first verify the GitHub App installation/permissions and the Dependency Dashboard issue before changing repository policy.
+```bash
+npm --prefix frontend install --save <package>@<version-or-range>
+npm --prefix frontend ci
+npm --prefix frontend run check
+```
+
+For a development-only package, use `--save-dev` instead of `--save`. Do not commit a
+`package.json` change without its matching `package-lock.json` update, and do not replace `npm ci`
+with an unlocked install in CI.
+
+## Review and release
+
+Every manual dependency PR must:
+
+- explain the reason for the update and any major-version compatibility impact;
+- preserve `uv.lock` or `package-lock.json` integrity as applicable;
+- pass the relevant Python/frontend checks, dependency audit and security scans;
+- receive explicit review for major upgrades or changes that affect runtime, CI or deployment.
+
+The repository does not create a dependency dashboard or automated version-update schedule. GitHub
+issues or alerts can be used for manual tracking, but they do not replace the lockfile and CI gates.
