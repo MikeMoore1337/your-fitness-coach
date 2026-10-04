@@ -1,29 +1,39 @@
 # Dependency graph — post-release trigger-gated pool
 
-## Canonical Product v8 audit graph — 2026-10-04
+## Canonical Product v8 current-state graph — 2026-10-04
 
 Roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Baseline `4526ce46231f70b76447e2b48f8febe84fad0f43`; Product v7/Task 544 complete, Product v8
-not started.
+Baseline `bffaf336f350def789376ce7eb299705371188f3`; PR `#685` and PR `#686` merged. Product v8
+**STARTED**; V8-01 / Task 684 is **COMPLETED / PRODUCTION VERIFIED** with no env, migration,
+schema or provider changes.
 
 ```text
-V8-01 / Task 684 (trainer demo capacity parity)
-  -> execute now
+V8-01 / Task 684
+  -> COMPLETED / PRODUCTION VERIFIED
 
-V8-00 / Task 124B (real-user evidence, read-only, parallel)
-  -> V8-03 (conditional core-UX remediation)
+V8-00 / Task 124B
+  -> WAITING_FOR_REAL_USER_EVIDENCE
+  -> no synthetic/demo substitution
+  -> V8-03 only from concrete real-user findings
 
-V8-02 (measurement report boundedness evidence gate)
+V8-02
   -> BLOCKED_ON_EVIDENCE
+  -> no implementation
+
+V8-03
+  -> NOT CREATED / NOT EXECUTABLE
+  -> requires concrete V8-00 finding
 ```
 
-`V8-01 / Task 684` is the only current executable Product v8 candidate and is independent of
-Task `124B`. `V8-02` requires production-relevant boundedness evidence before implementation;
-`V8-03` requires real-user evidence and must not be inferred from synthetic/demo fixtures. Task `138` is `ALREADY_IMPLEMENTED` through
+`V8-01` больше не является pending/executable candidate. `V8-02` требует production-relevant
+boundedness evidence до любой реализации; `V8-03` требует concrete real-user evidence и не может
+быть выведен из synthetic/demo fixtures. Сейчас нет допустимой следующей Product v8 task:
+`NO_CURRENT_EXECUTABLE_PRODUCT_V8_TASK`. Не создавать V8-04+ без нового подтверждённого finding.
+Task `138` is `ALREADY_IMPLEMENTED` through
 Task `364`/PR `#365`, not a v8 dependency. The historical UX-reset graph below is retained for
 traceability and must not auto-start Task `119` or any other old product task. Controller refactor
-is a separate infrastructure workstream/defer decision. Exercise video technique evaluation is
-`NO_GO` / `OUT_OF_SCOPE`.
+is `SEPARATE_INFRA_WORKSTREAM / DEFER`. Exercise video technique evaluation is `NO_GO` /
+`OUT_OF_SCOPE`.
 
 ## Текущий UX-reset critical path
 
