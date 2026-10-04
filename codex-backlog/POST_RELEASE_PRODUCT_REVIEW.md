@@ -1,11 +1,17 @@
 # Product review post-release направлений `80-101`
 
-## Product v8 bounded reconstruction — 2026-10-04
+## Product v8 bounded reconstruction and closeout — 2026-10-04
 
 Owner decision: Task `124B` / V8-00 is `REMOVED_FROM_PRODUCT_V8 / NO_GO BY OWNER`. It is no
 longer an evidence gate, dependency or blocker, must not auto-start, and must not create V8-03.
 Synthetic/demo evidence remains explicitly different from real-user evidence, but missing
 real-user validation is not a universal Product v8 prerequisite.
+
+Owner closeout decision: Product v8 is **COMPLETED**. V8-01 delivered the confirmed executable
+scope and was production verified. Removed/cancelled placeholders do not count as unfinished
+tasks; optional or evidence-gated external workstreams do not block closure. The empty executable
+slate is the result of bounded reconciliation, not a blocker. No future product version is created
+or populated automatically.
 
 The current repository baseline for this review is
 `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`. The review used the current source tree, task files,
@@ -37,7 +43,7 @@ Dependabot/backlog description as proof of a current gap.
 
 ### Product v8 slate
 
-The selected *executable* slate is intentionally empty after this bounded review. The existing
+The selected *executable* slate is intentionally empty after this bounded review and closeout. The existing
 backlog contains no unimplemented, independently executable product task that adds real value
 without duplicating shipped behavior or bypassing an independent gate. The parked candidates are
 not Product v8 tasks and do not receive new V8 numbers:
@@ -57,8 +63,9 @@ not Product v8 tasks and do not receive new V8 numbers:
 5. SEO/product handoff wave: possible M, public Web first and authenticated handoff only where a
    canonical persistence target exists; `BLOCKED_ON_OWN_GATE` under `#320-#324` evidence contract.
 
-None of these is an executable first task today. No new Product v8 Issue is created from a parked
-candidate, and no implementation/worktree is started by this reconstruction.
+None of these is an executable Product v8 task. No new Product v8 Issue is created from a parked
+candidate, no implementation/worktree is started, and no candidate is transferred automatically
+to a future product version.
 
 ### Selection contract for a future v8 task
 

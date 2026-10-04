@@ -1,13 +1,16 @@
 # Dependency graph — post-release trigger-gated pool
 
-## Canonical Product v8 current-state graph — 2026-10-04
+## Canonical Product v8 completed graph — 2026-10-04
 
 Roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Repository baseline `206058185dda7357582f088997b7522ab42765f0` (governance PR #690 merge); V8-01 / Task 684 remains
+Closeout source baseline `e8d9228b259e35740ff68048f2772482fb4e8945` (governance sync PR #691 merge); V8-01 / Task 684 remains
 **COMPLETED / PRODUCTION VERIFIED**. Dependency maintenance PRs `#589` and `#689` are separate
 lockfile-only workstreams and are not Product v8 nodes.
 
 ```text
+Product v8
+  -> COMPLETED
+
 V8-01 / Task 684
   -> COMPLETED / PRODUCTION VERIFIED
 
@@ -26,8 +29,8 @@ V8-03
   -> do not create without a concrete newly specified problem
 
 CURRENT_EXECUTABLE_PRODUCT_V8_TASK
-  -> determined by the reconstructed v8 backlog selection
-  -> NONE after the bounded 2026-10-04 review
+  -> NONE
+  -> Product v8 is closed; no next Product v8 task is selected
 ```
 
 Synthetic/demo evidence still cannot be described as real-user evidence, but missing real-user
@@ -39,7 +42,9 @@ Task `138` is `ALREADY_IMPLEMENTED` through
 Task `364`/PR `#365`, not a v8 dependency. The historical UX-reset graph below is retained for
 traceability and must not auto-start Task `119` or any other old product task. Controller refactor
 is `SEPARATE_INFRA_WORKSTREAM / DEFER`. Exercise video technique evaluation is `NO_GO` /
-`OUT_OF_SCOPE`.
+`OUT_OF_SCOPE`. SEO `#320-#324` remains a separate evidence-gated roadmap; `92B`, `95A` and
+`95B` remain separate own-gate workstreams. No parked node transfers to a future product version
+automatically.
 
 ## Исторический UX-reset critical path (provenance only; not canonical Product v8)
 

@@ -3,10 +3,10 @@
 ## Product v8 current state — 2026-10-04
 
 Канонический Product v8 roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Текущий repository baseline — `206058185dda7357582f088997b7522ab42765f0` на `master` и
+Closeout source baseline — `e8d9228b259e35740ff68048f2772482fb4e8945` on `master` and
 `origin/master`; Product v8 implementation baseline остаётся production-verified после V8-01,
 а dependency maintenance PR `#589` и replacement PR `#689` merged separately. Product v8
-**RECONSTRUCTED / NO CURRENT EXECUTABLE TASK SELECTED**.
+**COMPLETED / CLOSED**.
 
 V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**: Issue `#684` closed, PR `#686`
 merged, product deployed SHA `bffaf336f350def789376ce7eb299705371188f3`. Для V8-01 не потребовались
@@ -16,6 +16,9 @@ Later lockfile-only maintenance merges do not change this product verification r
 Product v8 current execution state:
 
 ```text
+Product v8
+  -> COMPLETED
+
 V8-01 / Task 684
   -> COMPLETED / PRODUCTION VERIFIED
 
@@ -35,8 +38,8 @@ V8-03
   -> do not create without a newly specified concrete problem
 
 CURRENT_EXECUTABLE_PRODUCT_V8_TASK
-  -> determined by the reconstructed v8 backlog selection
-  -> NONE after the bounded 2026-10-04 review
+  -> NONE
+  -> Product v8 is closed; no next Product v8 task is selected
 ```
 
 Synthetic/demo evidence still cannot be represented as real-user evidence. Its absence is no
@@ -46,6 +49,11 @@ AI/import/progress/nutrition and trainer directions are already implemented in t
 remaining candidates retain their own evidence, provider, owner or infrastructure gates.
 Controller refactor — `SEPARATE_INFRA_WORKSTREAM / DEFER`; exercise video technique evaluation —
 `NO_GO / OUT_OF_SCOPE`.
+
+The confirmed executable Product v8 scope is delivered. Removed/cancelled placeholders and
+optional or evidence-gated external workstreams do not count as unfinished Product v8 tasks and
+do not block closeout. Parked workstreams are not transferred to a future product version
+automatically.
 
 Этот current-state block имеет приоритет над историческими owner-driven очередями ниже.
 

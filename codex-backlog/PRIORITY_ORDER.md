@@ -7,16 +7,17 @@ owner-selected Telegram tasks `103-106`, tasks `109/112`, owner-approved UX rese
 UX-reset implementation tasks `116-118`.
 Task-файлы находятся в локальном owner-only `tasks/done/`.
 
-## Product v8 current selection — 2026-10-04
+## Product v8 completed closeout — 2026-10-04
 
-Repository baseline: `206058185dda7357582f088997b7522ab42765f0` (governance PR #690 merge); roadmap: Issue `#683`.
+Closeout source baseline: `e8d9228b259e35740ff68048f2772482fb4e8945` (governance sync PR #691 merge); roadmap: Issue `#683`.
 
 ```text
+Product v8 -> COMPLETED
 V8-01 / Task 684 -> COMPLETED / PRODUCTION VERIFIED
 V8-00 / Task 124B -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
 V8-R1 measurement boundedness -> separate optional reliability / BLOCKED_ON_EVIDENCE
 V8-03 -> CANCELLED AS GENERIC PLACEHOLDER
-CURRENT_EXECUTABLE_PRODUCT_V8_TASK -> NONE after bounded backlog review
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK -> NONE / Product v8 closed
 ```
 
 Hydration, Sleep/Mood, trainer report handoff, reminders, knowledge, PWA/Web Push, bounded AI,
@@ -24,7 +25,8 @@ imports, Progress, trainer and nutrition directions were checked against current
 are already implemented. The remaining report-delivery, SEO/product-handoff, provider-routing and
 measurement options retain independent gates. No new Product v8 Issue or implementation task is
 selected by this reconciliation. `124B` is historical provenance only and is not a gate or
-dependency; synthetic/demo evidence remains non-real-user evidence without blocking v8.
+dependency; synthetic/demo evidence remains non-real-user evidence without blocking closeout.
+Parked or gated workstreams do not transfer automatically to a future product version.
 
 ## Historical/stale current sequence
 

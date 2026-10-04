@@ -1,9 +1,9 @@
 # Порядок направлений после release gate `79`
 
-## Canonical Product v8 current state — 2026-10-04
+## Canonical Product v8 closeout — 2026-10-04
 
 См. [Product v8 roadmap #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Repository baseline: `206058185dda7357582f088997b7522ab42765f0` (governance PR #690 merge). Product v8 implementation
+Closeout source baseline: `e8d9228b259e35740ff68048f2772482fb4e8945` (governance sync PR #691 merge). Product v8 implementation
 baseline remains V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**; later dependency-only
 merges `#589` and `#689` are separate maintenance workstreams. No environment, migration, schema
 or provider change is required by this governance reconciliation.
@@ -11,6 +11,9 @@ or provider change is required by this governance reconciliation.
 Канонический current-state decision после owner removal Task 124B:
 
 ```text
+Product v8
+  -> COMPLETED
+
 V8-01 / Task 684
   -> COMPLETED / PRODUCTION VERIFIED
 
@@ -29,8 +32,8 @@ V8-03
   -> no creation without a concrete newly specified problem
 
 CURRENT_EXECUTABLE_PRODUCT_V8_TASK
-  -> determined by the reconstructed v8 backlog selection
-  -> NONE after the bounded 2026-10-04 review
+  -> NONE
+  -> Product v8 is closed; no next Product v8 task is selected
 ```
 
 Synthetic/demo evidence remains distinct from real-user evidence, but its absence no longer blocks
@@ -45,14 +48,15 @@ own gates and are not promoted into the executable slate. Controller refactor �
 owner-selected tasks остаются outside v8 или под своими trigger/evidence gates. Старые записи
 `119` как “next product task” и последовательность `116 -> 119...` — historical/stale и не должны
 использоваться для запуска Product v8. Exercise video technique evaluation — `NO_GO / OUT_OF_SCOPE`.
+Parked or gated workstreams do not transfer automatically to a future product version.
 
-## Product v8 selection result — bounded backlog review
+## Product v8 closeout result — bounded backlog review
 
-Selected executable slate: **empty**. No new Issues were created because every reviewed product
-direction was either already implemented or retained an explicit independent gate. This is a
-deliberate no-duplication result, not a return to the generic real-user evidence gate. The next
-selection must use an existing unfinished task or a newly written bounded task after a concrete
-problem is identified; it must not restore V8-00/V8-03.
+Product v8 status: **COMPLETED**. The executable slate is **empty** because the confirmed scope was
+already delivered and every remaining candidate was either already implemented or retained an
+explicit independent gate. No new Issues were created. This is a deliberate closeout result, not
+a blocker and not a return to the generic real-user evidence gate. It does not create or select a
+future product version.
 
 ## Исторический owner-driven UX-reset cycle (provenance only; not the Product v8 graph)
 
