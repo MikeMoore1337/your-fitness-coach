@@ -34,6 +34,7 @@ from fitminiapp_api.models.exercise import (
     ExerciseEquipment,
     ExerciseMuscle,
 )
+from fitminiapp_api.models.exercise_setup_memory import ExerciseSetupMemory
 from fitminiapp_api.models.feedback import WorkoutComment
 from fitminiapp_api.models.food import Food, FoodFavorite
 from fitminiapp_api.models.food_diary import (
@@ -86,7 +87,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 21
+ACCOUNT_EXPORT_SCHEMA_VERSION = 22
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -136,6 +137,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "workout_adaptations": "programs",
     "user_workout_exercises": "programs",
     "user_workout_sets": "programs",
+    "exercise_setup_memories": "exercise_setup_memories",
     "exercises": "custom_exercises",
     "exercise_muscles": "custom_exercises",
     "exercise_equipment": "custom_exercises",
@@ -928,6 +930,12 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .all()
     )
     custom_exercise_ids = {row.id for row in custom_exercises}
+    exercise_setup_memories = (
+        db.query(ExerciseSetupMemory)
+        .filter(ExerciseSetupMemory.user_id == user.id)
+        .order_by(ExerciseSetupMemory.created_at.asc(), ExerciseSetupMemory.id.asc())
+        .all()
+    )
     visible_exercise_ids = {
         row.id
         for row in db.query(Exercise.id)
@@ -1458,6 +1466,13 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             _fields(row, ("id", "template_id", "hidden_at")) for row in hidden_templates
         ],
         "programs": [_serialize_program(program) for program in programs],
+        "exercise_setup_memories": [
+            _fields(
+                row,
+                ("id", "exercise_id", "body", "version", "created_at", "updated_at"),
+            )
+            for row in exercise_setup_memories
+        ],
         "custom_exercises": [
             {
                 **_fields(

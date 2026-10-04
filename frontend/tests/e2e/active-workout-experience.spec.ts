@@ -58,11 +58,22 @@ async function mockActiveWorkout(
   mixed = false,
   mediaState: 'approved_animated' | 'blocked' = 'approved_animated',
   targetStarted = false,
+  setupMemoryBody: string | null = null,
 ) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   let finished = false;
   let replacementApplied = false;
   let warmupProposalApplied = false;
+  let setupMemory = setupMemoryBody
+    ? {
+        id: 501,
+        exercise_id: 11,
+        body: setupMemoryBody,
+        version: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+    : null;
   let failSetPatch = false;
   let resolveCardioCompleted!: () => void;
   const cardioCompleted = new Promise<void>((resolve) => {
@@ -149,6 +160,7 @@ async function mockActiveWorkout(
         prescribed_reps: '8–10',
         rest_seconds: 90,
         notes: 'Сохраняйте устойчивое положение корпуса.',
+        setup_memory: setupMemory,
         has_guide: true,
         media_state: mediaState,
         media_thumbnail_url: mediaState === 'approved_animated' ? mediaThumbnailUrl : null,
@@ -441,6 +453,26 @@ async function mockActiveWorkout(
           message: 'Предложение рассчитано от рабочего веса: 40%, 60% и 75%.',
         },
       });
+    }
+    const setupMemoryMatch = path.match(/\/me\/exercise-setup-memories\/(\d+)$/);
+    if (setupMemoryMatch && Number(setupMemoryMatch[1]) === 11) {
+      if (request.method() === 'GET') return route.fulfill({ json: setupMemory });
+      if (request.method() === 'PUT') {
+        const body = request.postDataJSON() as { body?: string; expected_version?: number | null };
+        setupMemory = {
+          id: setupMemory?.id ?? 501,
+          exercise_id: 11,
+          body: String(body.body ?? ''),
+          version: (setupMemory?.version ?? 0) + 1,
+          created_at: setupMemory?.created_at ?? new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        return route.fulfill({ json: setupMemory });
+      }
+      if (request.method() === 'DELETE') {
+        setupMemory = null;
+        return route.fulfill({ status: 204, body: '' });
+      }
     }
     if (path.endsWith('/workouts/42/exercises/101/warmup-proposals/apply')) {
       const body = request.postDataJSON() as {
@@ -1135,6 +1167,96 @@ test('V9-03 stays compact on desktop in dark reduced-motion mode', async ({ page
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
+});
+
+test('V9-04 keeps a private setup memory through create, edit, delete and reload', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
+  const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
+  await expect(setupMemory.getByText('Личная настройка')).toBeVisible();
+  await setupMemory.getByRole('button', { name: 'Добавить настройку' }).click();
+  await setupMemory.getByRole('textbox', { name: 'Что важно настроить' }).fill('Сиденье 4');
+  await setupMemory.getByRole('button', { name: 'Сохранить настройку' }).click();
+  await expect(setupMemory.getByText('Сиденье 4')).toBeVisible();
+  await expect(setupMemory.getByRole('button', { name: 'Изменить настройку' })).toBeVisible();
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const reloadedMemory = page
+    .locator('.active-workout-exercise')
+    .filter({ hasText: 'Жим штанги лёжа' })
+    .getByTestId('exercise-setup-memory-11');
+  await expect(reloadedMemory.getByText('Сиденье 4')).toBeVisible();
+  await reloadedMemory.getByRole('button', { name: 'Изменить настройку' }).click();
+  await reloadedMemory.getByRole('textbox', { name: 'Что важно настроить' }).fill('Спинка 2');
+  await reloadedMemory.getByRole('button', { name: 'Сохранить настройку' }).click();
+  await expect(reloadedMemory.getByText('Спинка 2')).toBeVisible();
+  await reloadedMemory.getByRole('button', { name: 'Изменить настройку' }).click();
+  await reloadedMemory.getByRole('button', { name: 'Удалить' }).click();
+  await expect(reloadedMemory.getByRole('button', { name: 'Добавить настройку' })).toBeVisible();
+  await expect(reloadedMemory.getByText('Спинка 2')).not.toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});
+
+test('V9-04 fits Mobile Web and mocked TMA widths without moving the next-set action', async ({
+  page,
+}) => {
+  await installMockedTelegram(page);
+  await mockActiveWorkout(page, false, 'approved_animated', false, 'Скамья 30°');
+  await page.goto('/app?tgWebAppPlatform=android');
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
+  const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
+  await expect(setupMemory.getByText('Скамья 30°')).toBeVisible();
+  await expect(setupMemory.getByRole('button', { name: 'Изменить настройку' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
+
+  for (const width of [360, 390, 430]) {
+    await page.setViewportSize({ width, height: width === 360 ? 800 : width === 390 ? 844 : 932 });
+    await expect(setupMemory.getByText('Скамья 30°')).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+    ).toBe(true);
+  }
+  await expect(page.locator('[data-workout-set-id="201"]')).toHaveAttribute('aria-current', 'step');
+});
+
+test('V9-04 preserves a draft when the memory save is offline', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const setupMemory = page
+    .locator('.active-workout-exercise')
+    .filter({ hasText: 'Жим штанги лёжа' })
+    .getByTestId('exercise-setup-memory-11');
+  await setupMemory.getByRole('button', { name: 'Добавить настройку' }).click();
+  await setupMemory.getByRole('textbox', { name: 'Что важно настроить' }).fill('Узкий хват');
+  await page.context().setOffline(true);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  await setupMemory.getByRole('button', { name: 'Сохранить настройку' }).click();
+  await expect(
+    setupMemory.getByText('Черновик сохранён на устройстве. Сервер ещё не подтвердил сохранение.'),
+  ).toBeVisible();
+  await expect(setupMemory.getByRole('textbox', { name: 'Что важно настроить' })).toHaveValue(
+    'Узкий хват',
+  );
+  await page.context().setOffline(false);
 });
 
 test('active workout keeps one obvious next action through logging, timer and finish', async ({

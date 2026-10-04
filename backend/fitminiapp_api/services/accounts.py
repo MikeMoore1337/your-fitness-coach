@@ -35,6 +35,7 @@ from fitminiapp_api.models.exercise import (
     ExerciseGuideMetadata,
     ExerciseMuscle,
 )
+from fitminiapp_api.models.exercise_setup_memory import ExerciseSetupMemory
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
 from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
@@ -358,6 +359,9 @@ def delete_user_cascade(db: Session, user: User) -> None:
     ).update(
         {"training_preferences_updated_by_user_id": None},
         synchronize_session=False,
+    )
+    db.query(ExerciseSetupMemory).filter(ExerciseSetupMemory.user_id == user.id).delete(
+        synchronize_session=False
     )
 
     db.query(EnergyCalibration).filter(EnergyCalibration.user_id == user.id).delete(

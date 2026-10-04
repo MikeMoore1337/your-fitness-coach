@@ -1,6 +1,16 @@
 from typing import Literal, cast
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -15,6 +25,10 @@ from fitminiapp_api.models.food_diary import FoodDiaryEntry
 from fitminiapp_api.models.program import UserProgram, UserWorkout
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.schemas.acquisition import FirstTouchAttributionRequest
+from fitminiapp_api.schemas.exercise_setup import (
+    ExerciseSetupMemoryResponse,
+    ExerciseSetupMemorySaveRequest,
+)
 from fitminiapp_api.schemas.invite import CoachInvitePreviewResponse, CoachInviteTokenRequest
 from fitminiapp_api.schemas.trainer_capability import (
     TrainerCapabilityActivateRequest,
@@ -81,6 +95,14 @@ from fitminiapp_api.services.coach_clients import (
     remove_current_trainer,
 )
 from fitminiapp_api.services.exercise_domain import BODY_PRIORITY_TAXONOMY
+from fitminiapp_api.services.exercise_setup_memory import (
+    ExerciseSetupMemoryConflictError,
+    ExerciseSetupMemoryError,
+    ExerciseSetupMemoryNotFoundError,
+    delete_exercise_setup_memory,
+    get_exercise_setup_memory,
+    save_exercise_setup_memory,
+)
 from fitminiapp_api.services.nutrition import (
     NutritionError,
     build_nutrition_target_response_for_user,
@@ -491,6 +513,68 @@ def preview_heart_rates(
     if heart_rates is None:  # The request schema requires birth_date.
         raise HTTPException(status_code=422, detail="Birth date is required")
     return _heart_rate_response(heart_rates)
+
+
+@router.get(
+    "/exercise-setup-memories/{exercise_id}",
+    response_model=ExerciseSetupMemoryResponse | None,
+)
+def get_own_exercise_setup_memory(
+    exercise_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ExerciseSetupMemoryResponse | None:
+    try:
+        return get_exercise_setup_memory(db, user, exercise_id)
+    except ExerciseSetupMemoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.put(
+    "/exercise-setup-memories/{exercise_id}",
+    response_model=ExerciseSetupMemoryResponse,
+)
+def save_own_exercise_setup_memory(
+    exercise_id: int,
+    payload: ExerciseSetupMemorySaveRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ExerciseSetupMemoryResponse:
+    try:
+        return save_exercise_setup_memory(
+            db,
+            user,
+            exercise_id,
+            payload.body,
+            payload.expected_version,
+        )
+    except ExerciseSetupMemoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ExerciseSetupMemoryConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ExerciseSetupMemoryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+
+@router.delete(
+    "/exercise-setup-memories/{exercise_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_own_exercise_setup_memory(
+    exercise_id: int,
+    expected_version: int | None = Query(default=None, ge=1),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    try:
+        delete_exercise_setup_memory(db, user, exercise_id, expected_version)
+    except ExerciseSetupMemoryNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ExerciseSetupMemoryConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/export")
