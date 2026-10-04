@@ -126,6 +126,7 @@ from fitminiapp_api.services.workout_adaptation import (
     apply_adaptation,
     build_adaptation_preview,
     list_compatible_alternatives,
+    record_adaptation_outcome,
 )
 from fitminiapp_api.services.workout_comments import (
     WorkoutCommentError,
@@ -257,8 +258,14 @@ def get_my_workout_comments(
     return [serialize_workout_comment(comment) for comment in comments]
 
 
-def _get_user_workout_or_404(db: Session, current_user: User, workout_id: int) -> UserWorkout:
-    workout = (
+def _get_user_workout_or_404(
+    db: Session,
+    current_user: User,
+    workout_id: int,
+    *,
+    refresh: bool = False,
+) -> UserWorkout:
+    query = (
         db.query(UserWorkout)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .options(
@@ -271,8 +278,10 @@ def _get_user_workout_or_404(db: Session, current_user: User, workout_id: int) -
             UserWorkout.id == workout_id,
             UserProgram.user_id == current_user.id,
         )
-        .first()
     )
+    if refresh:
+        query = query.populate_existing()
+    workout = query.first()
     if not workout:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
     return workout
@@ -561,15 +570,40 @@ def workout_exercise_alternatives(
             detail="Укажите не больше девяти уникальных видов оборудования",
         )
     workout = _get_user_workout_or_404(db, current_user, workout_id)
+    workout_status = workout.status
     try:
-        return list_compatible_alternatives(
+        alternatives = list_compatible_alternatives(
             db,
             current_user,
             workout,
             workout_exercise_id,
             set(available_equipment_ids or []),
         )
+        if not alternatives and workout_status == "in_progress":
+            record_adaptation_outcome(
+                db,
+                current_user,
+                workout_id=workout_id,
+                reason="replace_exercise",
+                outcome="no_compatible_alternative",
+                workout_status=workout_status,
+                target_workout_exercise_id=workout_exercise_id,
+            )
+            db.commit()
+        return alternatives
     except WorkoutAdaptationError as exc:
+        db.rollback()
+        if exc.outcome is not None:
+            record_adaptation_outcome(
+                db,
+                current_user,
+                workout_id=workout_id,
+                reason="replace_exercise",
+                outcome=exc.outcome,
+                workout_status=workout_status,
+                target_workout_exercise_id=workout_exercise_id,
+            )
+            db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -584,9 +618,41 @@ def preview_workout_adaptation(
     db: Session = Depends(get_db),
 ):
     workout = _get_user_workout_or_404(db, current_user, workout_id)
+    workout_status = workout.status
     try:
-        return build_adaptation_preview(db, current_user, workout, payload)
+        result = build_adaptation_preview(db, current_user, workout, payload)
+        if workout_status == "in_progress":
+            outcome = "safety_stop" if result["status"] == "safety_stop" else None
+            if result["status"] == "preview":
+                outcome = "preview_created"
+            if outcome is not None:
+                record_adaptation_outcome(
+                    db,
+                    current_user,
+                    workout_id=workout_id,
+                    reason=payload.reason,
+                    outcome=outcome,
+                    workout_status=workout_status,
+                    target_workout_exercise_id=payload.target_workout_exercise_id,
+                    changed_workout_exercise_ids=[
+                        item["workout_exercise_id"] for item in result["changes"]
+                    ],
+                )
+                db.commit()
+        return result
     except WorkoutAdaptationError as exc:
+        db.rollback()
+        if exc.outcome is not None:
+            record_adaptation_outcome(
+                db,
+                current_user,
+                workout_id=workout_id,
+                reason=payload.reason,
+                outcome=exc.outcome,
+                workout_status=workout_status,
+                target_workout_exercise_id=payload.target_workout_exercise_id,
+            )
+            db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
@@ -602,7 +668,8 @@ def apply_workout_adaptation(
 ):
     workout = _get_user_workout_or_404(db, current_user, workout_id)
     _lock_program(db, workout.user_program_id)
-    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    workout = _get_user_workout_or_404(db, current_user, workout_id, refresh=True)
+    workout_status = workout.status
     try:
         adaptation = apply_adaptation(
             db,
@@ -613,6 +680,17 @@ def apply_workout_adaptation(
         )
     except WorkoutAdaptationError as exc:
         db.rollback()
+        if exc.outcome is not None:
+            record_adaptation_outcome(
+                db,
+                current_user,
+                workout_id=workout_id,
+                reason=payload.reason,
+                outcome=exc.outcome,
+                workout_status=workout_status,
+                target_workout_exercise_id=payload.target_workout_exercise_id,
+            )
+            db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     updated = _get_user_workout_or_404(db, current_user, workout_id)
     return {
