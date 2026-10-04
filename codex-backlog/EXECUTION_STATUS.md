@@ -1,5 +1,52 @@
 # Execution status v51
 
+## Product v8 audit baseline — 2026-10-04
+
+Канонический pre-v8 audit и roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
+Зафиксированный baseline — `4526ce46231f70b76447e2b48f8febe84fad0f43` на `master` и
+`origin/master`; Product v7 и Task 544 завершены, migration `0117 -> 0118` применена,
+Product v8 и controller refactor не запускались. Этот раздел отражает фактический audit
+baseline и имеет приоритет над историческими owner-driven очередями ниже.
+
+Audit reconciliation:
+
+- Task `138` — `ALREADY_IMPLEMENTED`: security-gate/SkillSpector delivered through Task `364`
+  and PR `#365`; это не dependency Product v8. Root task/link drift должен быть убран отдельной
+  governance-синхронизацией, но не требует продуктовой реализации.
+- Tasks `119`, `120A-D`, `120E`, `124A` и Product v7 tasks — уже закрытые фактические
+  workstreams; старое утверждение о Task `119` как следующей незапущенной product task — stale.
+- Task `124B` остаётся отдельным read-only real-user evidence gate со статусом
+  `WAITING_FOR_REAL_USER_EVIDENCE`; synthetic/demo fixtures не заменяют cohort evidence. Task
+  `124C` запускается только при подтверждённом BLOCKER/HIGH.
+- Nutrition label-scan finding `F-128G-01` остаётся отдельным deferred/flag-off workstream и
+  не переносится в v8 без production-quality GO и owner trigger.
+- SEO `#324` и зависимые `#320-#323` остаются `BLOCKED_ON_EVIDENCE`; SEO Growth Stage 2 и
+  массовые programmatic pages не входят в v8.
+- Optional, owner-selected и infrastructure workstreams (`107`, `108`, `110`, `111`, `127`,
+  `138`, `269`, `388`, `403`, `415`, AI/SEO pools) не запускаются автоматически и не становятся
+  Product v8 только из-за наличия в backlog.
+
+Product v8 execution model:
+
+```text
+V8-01 / Task 684 trainer-demo capacity transport parity
+  -> execute now; independent of Task 124B
+
+V8-00 / Task 124B real-user evidence
+  -> parallel evidence workstream; WAITING_FOR_REAL_USER_EVIDENCE
+  -> V8-03 evidence-driven core UX remediation (conditional)
+
+V8-02 measurement reporting boundedness/telemetry
+  -> BLOCKED_ON_EVIDENCE; do not start now
+```
+
+V8-01 / Task 684 — единственный текущий executable product candidate; его issue создан из
+roadmap #683. V8-02/V8-03 не являются разрешением на реализацию до соответствующей evidence.
+Exercise video technique evaluation — `NO_GO` / `OUT_OF_SCOPE`.
+Audit не требует env change, migration, production data mutation, secret/provider/DNS change;
+реализация Product v8 начнётся с Task 684. Controller refactor — отдельный infrastructure
+workstream/defer, не dependency v8.
+
 Подтверждённое владельцем состояние на 28.08.2026:
 
 - [x] tasks `00-73`, включая `69B` и предшествующие буквенные подзадачи, complete;
@@ -60,9 +107,10 @@
 - [x] tasks `116-core-navigation-today-quick-start.md`,
       `117-first-run-without-mandatory-onboarding.md` и
       `118-simple-training-program-flow.md` завершены и архивированы отдельными task lifecycle;
-- [ ] **next product task, not started:** `119-type-aware-workout-logging.md` — требует отдельной
-      команды владельца и не запускается автоматически;
-- [ ] owner-driven sequence сохраняется:
+- [ ] **historical/stale sequence (superseded by Product v8 audit #683):** `119-type-aware-workout-logging.md`
+      не является текущей next product task; её lifecycle требует отдельной команды владельца
+      и не запускается автоматически;
+- [ ] historical owner-driven sequence (superseded by Product v8 audit #683):
       `114 -> 115A -> 116 -> 117 -> 118 [COMPLETED] -> 119..123 -> 81 -> 82 -> 84`
       `-> 124A -> owner release approval -> 124B -> conditional 124C`;
 - [x] owner-selected task `106-landing-telegram-product-news-links.md` завершена вне основной
@@ -119,8 +167,8 @@ branch normalization owner вставил и принял Task `113A`; Task `114
 owner approval, production release явно разрешён.
 `DESIGN_V2_1` с owner-approved bounded Pulse pilot остаётся production baseline. Permanent branch
 source разработки — `dev`, production source — protected `master`. Tasks `114`, `115A` и `116-118`
-завершены и архивированы; фактическая next product task — `119`, но её lifecycle не запускается без
-отдельной команды владельца.
+завершены и архивированы; историческая запись о Task `119` как фактической next product task
+superseded Product v8 audit #683 и не запускает её lifecycle.
 Umbrella `100` отдельно не выполняется; `100A` не назначена без собственного Trigger, dependency
 и owner decision. Tasks `107-111`, family `126` и Task `127` также не запускаются автоматически.
 Завершённая task `112` не изменила product order. Другие pending tasks автоматически не
