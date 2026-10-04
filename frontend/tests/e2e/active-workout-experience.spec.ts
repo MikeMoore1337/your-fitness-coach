@@ -1199,7 +1199,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(firstSet.getByText('Повторы в запасе (RIR)', { exact: true })).toBeVisible();
   await firstSet.getByText('Разминка и блины', { exact: true }).click();
   await firstSet.getByLabel('Целевой вес, кг').fill('80');
-  await expect(firstSet.locator('.active-workout-helper-result')).toContainText('На сторону:');
+  await expect(firstSet.locator('.active-workout-plate-result')).toContainText('На сторону:');
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   const firstDone = firstSet.getByRole('button', {
