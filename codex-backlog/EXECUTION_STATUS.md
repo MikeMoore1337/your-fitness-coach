@@ -1,14 +1,17 @@
-# Execution status v52
+# Execution status v53
 
 ## Product v8 current state — 2026-10-04
 
 Канонический Product v8 roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Текущий baseline — `bffaf336f350def789376ce7eb299705371188f3` на `master` и
-`origin/master`; PR `#685` и PR `#686` merged. Product v8 **STARTED**.
+Текущий repository baseline — `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18` на `master` и
+`origin/master`; Product v8 implementation baseline остаётся production-verified после V8-01,
+а dependency maintenance PR `#589` и replacement PR `#689` merged separately. Product v8
+**RECONSTRUCTED / NO CURRENT EXECUTABLE TASK SELECTED**.
 
 V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**: Issue `#684` closed, PR `#686`
-merged, deployed SHA `bffaf336f350def789376ce7eb299705371188f3`. Для V8-01 не потребовались
+merged, product deployed SHA `bffaf336f350def789376ce7eb299705371188f3`. Для V8-01 не потребовались
 env, migration, schema или provider changes. Post-merge/release и production smoke зелёные.
+Later lockfile-only maintenance merges do not change this product verification result.
 
 Product v8 current execution state:
 
@@ -17,23 +20,31 @@ V8-01 / Task 684
   -> COMPLETED / PRODUCTION VERIFIED
 
 V8-00 / Task 124B
-  -> WAITING_FOR_REAL_USER_EVIDENCE
-  -> no synthetic/demo substitution
-  -> V8-03 only from concrete real-user findings
+  -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
+  -> not an evidence gate
+  -> not a dependency or Product v8 blocker
+  -> must not auto-start or recreate V8-03
 
-V8-02
+V8-R1 / measurement reporting boundedness
   -> BLOCKED_ON_EVIDENCE
-  -> no implementation
+  -> separate optional reliability task
+  -> NOT a Product v8 blocker
 
 V8-03
-  -> NOT CREATED / NOT EXECUTABLE
-  -> requires concrete V8-00 finding
+  -> CANCELLED AS GENERIC PLACEHOLDER
+  -> do not create without a newly specified concrete problem
+
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK
+  -> determined by the reconstructed v8 backlog selection
+  -> NONE after the bounded 2026-10-04 review
 ```
 
-No current executable Product v8 task exists: `NO_CURRENT_EXECUTABLE_PRODUCT_V8_TASK`.
-Не создавать V8-04+ без нового подтверждённого correctness/security/data-integrity/core-UX/
-production-performance или real-user finding. Controller refactor —
-`SEPARATE_INFRA_WORKSTREAM / DEFER`; exercise video technique evaluation —
+Synthetic/demo evidence still cannot be represented as real-user evidence. Its absence is no
+longer a blocker for Product v8. The bounded backlog review found no unimplemented, independently
+executable product task: the requested hydration/wellbeing/trainer/reminder/knowledge/PWA/Web Push/
+AI/import/progress/nutrition and trainer directions are already implemented in the current product;
+remaining candidates retain their own evidence, provider, owner or infrastructure gates.
+Controller refactor — `SEPARATE_INFRA_WORKSTREAM / DEFER`; exercise video technique evaluation —
 `NO_GO / OUT_OF_SCOPE`.
 
 Этот current-state block имеет приоритет над историческими owner-driven очередями ниже.
@@ -45,18 +56,23 @@ Historical audit reconciliation:
   governance-синхронизацией, но не требует продуктовой реализации.
 - Tasks `119`, `120A-D`, `120E`, `124A` и Product v7 tasks — уже закрытые фактические
   workstreams; старое утверждение о Task `119` как следующей незапущенной product task — stale.
-- Task `124B` остаётся отдельным read-only real-user evidence gate со статусом
-  `WAITING_FOR_REAL_USER_EVIDENCE`; synthetic/demo fixtures не заменяют cohort evidence. Task
-  `124C` запускается только при подтверждённом BLOCKER/HIGH.
+- Task `124B` is preserved only as historical provenance and is
+  `REMOVED_FROM_PRODUCT_V8 / NO_GO BY OWNER`; it is not a gate, dependency, blocker or auto-run
+  candidate. Task `124C` is likewise not spawned by it; the old conditional remediation linkage
+  is historical only.
 - Nutrition label-scan finding `F-128G-01` остаётся отдельным deferred/flag-off workstream и
   не переносится в v8 без production-quality GO и owner trigger.
 - SEO `#324` и зависимые `#320-#323` остаются `BLOCKED_ON_EVIDENCE`; SEO Growth Stage 2 и
   массовые programmatic pages не входят в v8.
 - Optional, owner-selected и infrastructure workstreams (`107`, `108`, `110`, `111`, `127`,
   `138`, `269`, `388`, `403`, `415`, AI/SEO pools) не запускаются автоматически и не становятся
-  Product v8 только из-за наличия в backlog.
+  Product v8 только из-за наличия в backlog. The bounded review separately recorded completed
+  implementations and own-gated candidates in `POST_RELEASE_PRODUCT_REVIEW.md`.
 
-Подтверждённое владельцем состояние на 28.08.2026:
+## Historical backlog/provenance — owner-confirmed state on 2026-08-28
+
+The following historical checklist is retained for provenance. It does not override the
+Product v8 current-state block above and does not define an executable task or dependency.
 
 - [x] tasks `00-73`, включая `69B` и предшествующие буквенные подзадачи, complete;
 - [x] завершённые task-файлы перенесены в локальный owner-only `tasks/done/` и доступны владельцу
@@ -119,7 +135,8 @@ Historical audit reconciliation:
 - [ ] **historical/stale sequence (superseded by Product v8 audit #683):** `119-type-aware-workout-logging.md`
       не является текущей next product task; её lifecycle требует отдельной команды владельца
       и не запускается автоматически;
-- [ ] historical owner-driven sequence (superseded by Product v8 audit #683):
+- [ ] historical owner-driven sequence (superseded by Product v8 audit #683 and owner removal of
+      Task `124B`):
       `114 -> 115A -> 116 -> 117 -> 118 [COMPLETED] -> 119..123 -> 81 -> 82 -> 84`
       `-> 124A -> owner release approval -> 124B -> conditional 124C`;
 - [x] owner-selected task `106-landing-telegram-product-news-links.md` завершена вне основной

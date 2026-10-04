@@ -5,6 +5,24 @@ Backlog использует resource-aware lifecycle. В owner workspace зав
 
 ## Текущее состояние
 
+### Product v8 current governance — 2026-10-04
+
+Каноническая roadmap — [Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
+Repository baseline: `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`.
+
+```text
+V8-01 / Task 684 -> COMPLETED / PRODUCTION VERIFIED
+V8-00 / Task 124B -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
+V8-R1 measurement boundedness -> separate optional reliability / BLOCKED_ON_EVIDENCE
+V8-03 -> CANCELLED AS GENERIC PLACEHOLDER
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK -> NONE after bounded backlog review
+```
+
+Task `124B` is preserved as historical provenance only. It is not an evidence gate, dependency,
+blocker or automatic task; synthetic/demo evidence remains distinct from real-user evidence, but
+its absence does not block Product v8. Controller refactor remains `SEPARATE_INFRA_WORKSTREAM /
+DEFER`; video exercise technique evaluation remains `NO_GO / OUT_OF_SCOPE`.
+
 - tasks `00-80`, включая буквенные подзадачи, `69B`, `73A` и `74A`, а также owner-selected tasks
   `103-106` подтверждены как завершённые;
 - завершённые task-файлы перенесены в локальный owner-only `tasks/done/` без переименования;
@@ -24,8 +42,13 @@ Backlog использует resource-aware lifecycle. В owner workspace зав
 ## Текущая задача
 
 ```text
-114-nutrition-search-barcode-production-regression.md [CURRENT NOT STARTED]
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK = NONE
 ```
+
+Не выбирать и не запускать старую UX-reset sequence автоматически. Направления `81/82/83/84/85`,
+`86/86A`, bounded AI, imports, Progress, trainer and nutrition improvements были проверены и уже
+реализованы либо имеют собственный gate; подробная selection table находится в
+`POST_RELEASE_PRODUCT_REVIEW.md`.
 
 Не запускать заново `00-80`, `74A`, `103-106` и `113`. Назначение `114` не запускает её реализацию, а
 создание owner-selected tasks `107-111` не разрешает их implementation, external actions или
@@ -69,7 +92,7 @@ V2.1 / A / B / C / explicit hybrid
   -> 113 branch normalization [COMPLETED]
   -> 114 nutrition/barcode P0 regression [CURRENT, NOT STARTED]
   -> 115A -> OWNER APPROVAL -> 116..123 -> 81 -> 82 -> 84 -> 124A
-  -> OWNER RELEASE APPROVAL -> 124B -> conditional 124C
+  -> OWNER RELEASE APPROVAL -> 124B -> conditional 124C [HISTORICAL; 124B REMOVED / 124C CANCELLED]
 103-106 owner-selected Telegram flow/Landing tasks [done]
 107 Scheduled regression + private Allure reports [OWNER-SELECTED PENDING; NOT CURRENT]
 108 Russian law compliance audit + continuous legal gate [OWNER-SELECTED PENDING; NOT CURRENT]

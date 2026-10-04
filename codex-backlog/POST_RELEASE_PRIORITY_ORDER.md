@@ -2,45 +2,63 @@
 
 ## Canonical Product v8 current state — 2026-10-04
 
-См. [Product v8 audit roadmap #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Current release baseline: `bffaf336f350def789376ce7eb299705371188f3`; PR `#685` and PR `#686`
-merged. Product v8 **STARTED**; V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**,
-Issue `#684` closed, deployed SHA `bffaf336f350def789376ce7eb299705371188f3`.
-No env, migration, schema or provider changes were required.
+См. [Product v8 roadmap #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
+Repository baseline: `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`. Product v8 implementation
+baseline remains V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**; later dependency-only
+merges `#589` and `#689` are separate maintenance workstreams. No environment, migration, schema
+or provider change is required by this governance reconciliation.
 
-Канонический current-state decision до появления новых owner-approved evidence:
+Канонический current-state decision после owner removal Task 124B:
 
 ```text
 V8-01 / Task 684
   -> COMPLETED / PRODUCTION VERIFIED
 
 V8-00 / Task 124B
-  -> WAITING_FOR_REAL_USER_EVIDENCE
-  -> no synthetic/demo substitution
-  -> V8-03 only from concrete real-user findings
+  -> REMOVED_FROM_ROADMAP / NO_GO BY OWNER
+  -> not an evidence gate, dependency or blocker
+  -> no auto-start and no V8-03 generation
 
-V8-02
+V8-R1 / measurement reporting boundedness
   -> BLOCKED_ON_EVIDENCE
-  -> no implementation
+  -> separate optional reliability task
+  -> not a Product v8 blocker
 
 V8-03
-  -> NOT CREATED / NOT EXECUTABLE
-  -> requires concrete V8-00 finding
+  -> CANCELLED AS GENERIC PLACEHOLDER
+  -> no creation without a concrete newly specified problem
+
+CURRENT_EXECUTABLE_PRODUCT_V8_TASK
+  -> determined by the reconstructed v8 backlog selection
+  -> NONE after the bounded 2026-10-04 review
 ```
 
-`V8-01` больше не является pending/executable candidate. Сейчас нет допустимой следующей
-Product v8 task: `NO_CURRENT_EXECUTABLE_PRODUCT_V8_TASK`. Не создавать V8-04+ без нового
-подтверждённого correctness/security/data-integrity/core-UX/production-performance или real-user
-finding. Controller refactor — `SEPARATE_INFRA_WORKSTREAM / DEFER`.
+Synthetic/demo evidence remains distinct from real-user evidence, but its absence no longer blocks
+Product v8. The review found no unimplemented, independently executable bounded product task in the
+existing backlog: Hydration, Sleep/Mood, trainer handoff, reminder templates, knowledge, PWA,
+Web Push, bounded AI Coach, imports, Progress, trainer and nutrition improvements are already
+implemented. Report-delivery, SEO/product-handoff, AI-routing and measurement options retain their
+own gates and are not promoted into the executable slate. Controller refactor —
+`SEPARATE_INFRA_WORKSTREAM / DEFER`.
 
 Существующие SEO, AI, legal, billing, import, PWA, notifications, camera/photo, controller и
 owner-selected tasks остаются outside v8 или под своими trigger/evidence gates. Старые записи
 `119` как “next product task” и последовательность `116 -> 119...` — historical/stale и не должны
 использоваться для запуска Product v8. Exercise video technique evaluation — `NO_GO / OUT_OF_SCOPE`.
 
-## Текущий owner-driven UX-reset cycle
+## Product v8 selection result — bounded backlog review
 
-До возврата к прежнему trigger-gated pool действует линейная canonical очередь:
+Selected executable slate: **empty**. No new Issues were created because every reviewed product
+direction was either already implemented or retained an explicit independent gate. This is a
+deliberate no-duplication result, not a return to the generic real-user evidence gate. The next
+selection must use an existing unfinished task or a newly written bounded task after a concrete
+problem is identified; it must not restore V8-00/V8-03.
+
+## Исторический owner-driven UX-reset cycle (provenance only; not the Product v8 graph)
+
+Старый sequence сохранён для provenance. Он superseded и не запускается автоматически; в нём
+сохраняется исходная связь `124B -> conditional 124C`, но текущий owner decision удалил 124B из
+Product v8 и отменил generic remediation path.
 
 ```text
 113 branch normalization [COMPLETED]
@@ -81,10 +99,10 @@ deferred ветку: production-quality GO отсутствует, exposure вы
 ждать OCR; dependency на 128H сохраняется только для будущей production-ready label-scanning
 работы после миграции host и exact owner trigger.
 
-## Последовательность pending-задач
+## Legacy pending-pool inventory (provenance; not the current Product v8 slate)
 
-Таблица ниже сохраняет порядок общего pool после текущего UX-reset cycle и не переопределяет
-описанный выше critical path.
+Таблица ниже сохраняет старый порядок общего pool для provenance и не переопределяет
+описанный выше Product v8 current state или bounded review.
 
 |        Task | Направление                          | Почему здесь                                                                                                      |
 | ----------: | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |

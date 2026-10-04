@@ -19,16 +19,22 @@ merge при scanner/audit failure. Repository-native semantic Security Review �
 остаётся manual/conditional для фактического security trigger или отдельного full audit.
 
 Этот файл действует для завершённых и архивированных release tasks `75-80`, включая буквенные
-подзадачи, owner-approved Pulse concepts pilot `75C`, завершённую UX-reset gate `115A` и
-completed implementation tasks `116-118`, current product task `119`, а также
-trigger-gated post-release pool `81-101` с буквенными подзадачами и owner-selected pending tasks
-`107-111` и owner-selected governance task `127`. Completed tasks `00-73A`, включая буквенные
-подзадачи, tasks `74A-75`, отдельно завершённые tasks `103-106`, `112-118` не переигрываются и хранятся в
-`tasks/done/`.
+подзадачи, owner-approved Pulse concepts pilot `75C`, UX-reset implementation tasks `116-118`,
+trigger-gated post-release pool `81-101` с буквенными подзадачами и owner-selected governance
+workstreams. Completed tasks `00-73A`, включая буквенные подзадачи, tasks `74A-75`, отдельно
+завершённые tasks `103-106`, `112-118` не переигрываются и хранятся в `tasks/done/`.
 
-Tasks `109-111` остаются owner-selected pending: Landing offer использует только factual claims и
-approved security baseline task `108`; avatar сохраняет private-media lifecycle; Progress не
-выдумывает данные из визуального референса. Каждая требует отдельного owner запуска.
+Product v8 governance is canonical in `EXECUTION_STATUS.md`, `POST_RELEASE_PRIORITY_ORDER.md`,
+`POST_RELEASE_DEPENDENCY_GRAPH.md` and Issue `#683`. Task `124B` / V8-00 is
+`REMOVED_FROM_PRODUCT_V8 / NO_GO BY OWNER`: it is not an evidence gate, dependency, blocker or
+auto-run candidate. Synthetic/demo evidence is never real-user evidence, but its absence does not
+block Product v8. V8-03 is cancelled as a generic placeholder; the old UX-reset chain remains
+historical provenance only. Measurement boundedness is `V8-R1`, a separate optional reliability
+task blocked on evidence and not a Product v8 blocker.
+
+Tasks `109-111` have stale pending labels in older owner-only backlog snapshots; current source and
+history show their requested implementations already present. They are not current Product v8
+candidates and must not be duplicated.
 
 ## Structured artifact contract
 
@@ -212,9 +218,10 @@ Direct push в `master` запрещён. Legacy `dev` refs не являютс�
 - Task `113A` завершена, выпущена в production revision `17bee56c` и архивирована после owner
   acceptance `2026-08-30`. Task `114` завершена и архивирована после owner approval; Task `115A`
   является current/not started и требует отдельной команды на запуск lifecycle.
-- UX-reset sequence `115A -> owner approval -> 116..123 -> 81 -> 82 -> 84 -> 124A -> owner release
-  approval -> 124B -> conditional 124C` продолжается с current/not-started Task `119` и не отменяет собственные Trigger,
-  dependency и owner decisions task files.
+- Historical UX-reset sequence `115A -> owner approval -> 116..123 -> 81 -> 82 -> 84 -> 124A ->
+  owner release approval -> 124B -> conditional 124C` is retained for provenance only. It is
+  superseded by Product v8 reconstruction; Task `124B` is removed/no-go by owner and `124C` is not
+  generated from it. The sequence does not define a current task or dependency.
 - Task `50A` уже создала общий continuous Mobile Web/TMA gate, который переиспользуют последующие client-facing tasks.
 - Перед client-facing task прочитать `MOBILE_TMA_FIRST_CONTRACT.md` и применимые пункты `.agents/references/MOBILE_TMA_ACCEPTANCE_MATRIX.md`.
 - Не повторять полный аудит репозитория без прямого требования task; завершённая `75A` была таким
