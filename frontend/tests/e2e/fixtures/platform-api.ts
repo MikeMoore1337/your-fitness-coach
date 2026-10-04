@@ -580,7 +580,7 @@ export async function installPlatformApi(
             actual_weight: setValues.actualWeight,
             rir: null,
             set_kind: 'working',
-            reached_failure: false,
+            reached_failure: setValues.completed ? false : null,
             is_completed: setValues.completed,
             version: setVersion,
           },

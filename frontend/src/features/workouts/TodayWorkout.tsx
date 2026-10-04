@@ -27,7 +27,7 @@ import {
   type ActiveWorkoutSetValues,
 } from './activeWorkoutQueue';
 import { legacyWorkoutRestStorageKey } from '../../shared/userScopedStorage';
-import { WorkoutAdaptation } from './WorkoutAdaptation';
+import { hasWorkoutExecutionEvidence, WorkoutAdaptation } from './WorkoutAdaptation';
 import { WorkoutCompletionSummary } from './WorkoutCompletionSummary';
 import { WorkoutRecovery } from './WorkoutRecovery';
 import { reconcileFinishedWorkout } from './finishWorkoutRecovery';
@@ -1575,6 +1575,10 @@ export function TodayWorkout({
             const exerciseCompleted = exercise.sets.filter(
               (set) => activeSync.pendingBySet.get(set.id)?.values.is_completed ?? set.is_completed,
             ).length;
+            const canReplaceExercise =
+              started &&
+              capabilities.canMutatePrograms &&
+              !hasWorkoutExecutionEvidence(exercise, activeSync.pendingBySet);
             const isPersistedComplete = shouldCollapseCompletedExercise(exercise.sets, (setId) =>
               activeSync.pendingBySet.has(setId),
             );
@@ -1669,10 +1673,10 @@ export function TodayWorkout({
                     >
                       <span>{exercise.has_guide ? 'Техника' : 'Подробнее'}</span>
                     </button>
-                    {started && capabilities.canMutatePrograms && (
+                    {canReplaceExercise && (
                       <WorkoutAdaptation
                         entryContext="workout"
-                        entryLabel="Заменить"
+                        entryLabel="Заменить только в этой тренировке"
                         initialTargetId={exercise.id}
                         safetyOnly={false}
                         workout={data}

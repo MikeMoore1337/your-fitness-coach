@@ -13,7 +13,9 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Button, CloseIcon, Field, IconButton, Input, Select } from '../../shared/ui/common';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { Icon } from '../../shared/ui/Icon';
+import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import type { ActiveWorkoutMutation } from './activeWorkoutQueue';
 
 type AdaptationReason = WorkoutAdaptationRequest['reason'];
 type EquipmentId = NonNullable<WorkoutAdaptationRequest['available_equipment_ids']>[number];
@@ -82,6 +84,37 @@ function errorTitle(kind: ErrorKind): string {
   return 'Проверьте выбранные условия';
 }
 
+type WorkoutExercise = Workout['exercises'][number];
+
+export function hasWorkoutExecutionEvidence(
+  exercise: WorkoutExercise,
+  pendingBySet?: { get(setId: number): ActiveWorkoutMutation | undefined },
+): boolean {
+  return exercise.sets.some((set) => {
+    const pending = pendingBySet?.get(set.id)?.values;
+    return Boolean(
+      pending?.is_completed ||
+      pending?.actual_reps != null ||
+      pending?.actual_weight != null ||
+      pending?.duration_minutes != null ||
+      pending?.distance_km != null ||
+      pending?.average_heart_rate_bpm != null ||
+      pending?.heart_rate_zone != null ||
+      pending?.rir != null ||
+      pending?.reached_failure != null ||
+      set.is_completed ||
+      set.actual_reps != null ||
+      set.actual_weight != null ||
+      set.duration_minutes != null ||
+      set.distance_km != null ||
+      set.average_heart_rate_bpm != null ||
+      set.heart_rate_zone != null ||
+      set.rir != null ||
+      set.reached_failure != null,
+    );
+  });
+}
+
 export function WorkoutAdaptation({
   workout,
   safetyOnly = false,
@@ -97,6 +130,7 @@ export function WorkoutAdaptation({
 }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
+  const online = useOnlineStatus();
   const titleId = useId();
   const descriptionId = useId();
   const [open, setOpen] = useState(false);
@@ -126,7 +160,8 @@ export function WorkoutAdaptation({
     queryKey: ['workout', 'adaptation-alternatives', workout.id, targetId, equipmentIds],
     queryFn: () =>
       api<WorkoutAlternative[]>(alternativesPath(workout.id, Number(targetId), equipmentIds)),
-    enabled: activeReason === 'replace_exercise' && Boolean(targetId) && equipmentIds.length > 0,
+    enabled:
+      online && activeReason === 'replace_exercise' && Boolean(targetId) && equipmentIds.length > 0,
     retry: false,
   });
 
@@ -134,6 +169,13 @@ export function WorkoutAdaptation({
     () => workout.exercises.find((item) => item.id === Number(targetId)),
     [targetId, workout.exercises],
   );
+  const initialTarget = initialTargetId
+    ? workout.exercises.find((item) => item.id === initialTargetId)
+    : undefined;
+  const initialTargetStarted =
+    workout.status === 'in_progress' &&
+    initialTarget != null &&
+    hasWorkoutExecutionEvidence(initialTarget);
 
   const resetPreview = () => {
     setPreview(null);
@@ -228,6 +270,10 @@ export function WorkoutAdaptation({
   });
 
   const requestPreview = () => {
+    if (!online && !safetyOnly) {
+      setError({ kind: 'preview', message: 'Замена требует подключения к интернету.' });
+      return;
+    }
     const request = buildRequest();
     if (!request) return;
     setError(null);
@@ -236,6 +282,19 @@ export function WorkoutAdaptation({
 
   const resolvedEntryLabel =
     entryLabel ?? (safetyOnly ? 'Боль или травма во время тренировки' : 'Адаптировать тренировку');
+
+  if (initialTargetStarted) {
+    return (
+      <div
+        className={`workout-adaptation-entry workout-adaptation-entry--${entryContext}`}
+        data-testid="workout-adaptation-entry"
+      >
+        <p className="muted" role="status">
+          Замена недоступна: в этом упражнении уже есть фактические данные.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -246,6 +305,7 @@ export function WorkoutAdaptation({
         fullWidth={entryContext === 'today'}
         type="button"
         variant={entryContext === 'today' ? 'ghost' : 'secondary'}
+        disabled={!online && !safetyOnly}
         onClick={() => {
           trackProductEvent({
             name: 'workout_adaptation_started',
@@ -263,6 +323,11 @@ export function WorkoutAdaptation({
       >
         {resolvedEntryLabel}
       </Button>
+      {!online && !safetyOnly && (
+        <p className="muted" role="status">
+          Замена требует подключения к интернету. Текущая тренировка на устройстве не изменяется.
+        </p>
+      )}
 
       {open &&
         createPortal(
@@ -286,8 +351,12 @@ export function WorkoutAdaptation({
             >
               <header className="workout-adaptation-dialog__header">
                 <div>
-                  <span className="eyebrow">Только сегодняшняя тренировка</span>
-                  <h2 id={titleId}>Подстроить тренировку</h2>
+                  <span className="eyebrow">Только эта тренировка</span>
+                  <h2 id={titleId}>
+                    {initialTargetId
+                      ? 'Заменить только в этой тренировке'
+                      : 'Подстроить тренировку'}
+                  </h2>
                   <p id={descriptionId}>
                     Сначала покажем точные изменения. Программа и будущие тренировки не изменятся.
                   </p>
@@ -388,8 +457,17 @@ export function WorkoutAdaptation({
                       >
                         <option value="">Выберите упражнение</option>
                         {workout.exercises.map((item) => (
-                          <option value={item.id} key={item.id}>
+                          <option
+                            value={item.id}
+                            key={item.id}
+                            disabled={
+                              workout.status === 'in_progress' && hasWorkoutExecutionEvidence(item)
+                            }
+                          >
                             {item.exercise_title}
+                            {workout.status === 'in_progress' && hasWorkoutExecutionEvidence(item)
+                              ? ' — уже начато'
+                              : ''}
                           </option>
                         ))}
                       </Select>
@@ -503,6 +581,13 @@ export function WorkoutAdaptation({
                   </div>
                 )}
 
+                {!online && !safetyOnly && (
+                  <p className="adaptation-inline-status" role="status">
+                    Замена требует подключения. После восстановления связи повторно загрузите
+                    тренировку перед подтверждением.
+                  </p>
+                )}
+
                 {preview && (
                   <section
                     className={`adaptation-preview is-${preview.status}`}
@@ -576,7 +661,7 @@ export function WorkoutAdaptation({
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={previewMutation.isPending || applyMutation.isPending}
+                  disabled={!online || previewMutation.isPending || applyMutation.isPending}
                   aria-busy={previewMutation.isPending}
                   onClick={requestPreview}
                 >
@@ -591,7 +676,7 @@ export function WorkoutAdaptation({
                 {preview?.status === 'preview' && preview.preview_token && (
                   <Button
                     type="button"
-                    disabled={applyMutation.isPending}
+                    disabled={!online || applyMutation.isPending}
                     aria-busy={applyMutation.isPending}
                     onClick={() => {
                       const request = buildRequest();

@@ -56,9 +56,11 @@ async function mockActiveWorkout(
   page: Page,
   mixed = false,
   mediaState: 'approved_animated' | 'blocked' = 'approved_animated',
+  targetStarted = false,
 ) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   let finished = false;
+  let replacementApplied = false;
   let failSetPatch = false;
   let resolveCardioCompleted!: () => void;
   const cardioCompleted = new Promise<void>((resolve) => {
@@ -68,11 +70,11 @@ async function mockActiveWorkout(
     [
       201,
       {
-        actual_reps: null,
+        actual_reps: targetStarted ? 1 : null,
         actual_weight: null,
         rir: null,
         set_kind: 'working',
-        reached_failure: false,
+        reached_failure: null,
         is_completed: false,
         version: 1,
         planned_role: 'top',
@@ -85,7 +87,7 @@ async function mockActiveWorkout(
         actual_weight: null,
         rir: null,
         set_kind: 'working',
-        reached_failure: false,
+        reached_failure: null,
         is_completed: false,
         version: 1,
         planned_role: 'backoff',
@@ -98,7 +100,7 @@ async function mockActiveWorkout(
         actual_weight: null,
         rir: null,
         set_kind: 'working',
-        reached_failure: false,
+        reached_failure: null,
         is_completed: false,
         version: 1,
         planned_role: 'backoff',
@@ -137,8 +139,8 @@ async function mockActiveWorkout(
     exercises: [
       {
         id: 101,
-        exercise_id: 11,
-        exercise_title: 'Жим штанги лёжа',
+        exercise_id: replacementApplied ? 13 : 11,
+        exercise_title: replacementApplied ? 'Жим гантелей лёжа' : 'Жим штанги лёжа',
         metric_type: 'strength',
         sort_order: 1,
         prescribed_sets: 3,
@@ -411,12 +413,32 @@ async function mockActiveWorkout(
       });
     }
     if (path.endsWith('/workouts/42/adaptations/preview')) {
+      const body = request.postDataJSON() as { reason?: string } | null;
+      if (body?.reason === 'pain_or_injury') {
+        return route.fulfill({
+          json: {
+            status: 'safety_stop',
+            workout_id: 42,
+            reason: 'pain_or_injury',
+            ruleset_version: 'workout-adaptation-v2',
+            original_estimated_minutes: 30,
+            adapted_estimated_minutes: 30,
+            time_budget_minutes: null,
+            changes: [],
+            original_exercises: [],
+            adapted_exercises: [],
+            warnings: [],
+            message: 'При боли приложение не подбирает медицинскую замену.',
+            preview_token: null,
+          },
+        });
+      }
       return route.fulfill({
         json: {
           status: 'preview',
           workout_id: 42,
           reason: 'replace_exercise',
-          ruleset_version: 'workout-adaptation-v1',
+          ruleset_version: 'workout-adaptation-v2',
           original_estimated_minutes: 30,
           adapted_estimated_minutes: 31,
           time_budget_minutes: null,
@@ -462,6 +484,16 @@ async function mockActiveWorkout(
           warnings: ['После замены рабочий вес потребуется подтвердить заново.'],
           message: 'Выбранная замена подходит по доступному оборудованию.',
           preview_token: 'task-520-preview-token',
+        },
+      });
+    }
+    if (path.endsWith('/workouts/42/adaptations/apply')) {
+      replacementApplied = true;
+      return route.fulfill({
+        json: {
+          adaptation_id: 9,
+          applied_at: new Date().toISOString(),
+          workout: workout(),
         },
       });
     }
@@ -637,6 +669,195 @@ async function resetPageScroll(page: Page) {
     document.querySelector<HTMLElement>('#appContent')?.scrollTo(0, 0);
   });
 }
+
+async function installMockedTelegram(page: Page) {
+  await page.addInitScript(() => {
+    const handlers = new Map<string, Set<() => void>>();
+    const backState = { hide: 0, show: 0 };
+    const backButton = {
+      show() {
+        backState.show += 1;
+      },
+      hide() {
+        backState.hide += 1;
+      },
+      setText() {},
+      enable() {},
+      disable() {},
+      onClick() {},
+      offClick() {},
+    };
+    const telegram = {
+      initData: 'signed-test-data',
+      initDataUnsafe: {},
+      isActive: true,
+      viewportHeight: 560,
+      viewportStableHeight: 844,
+      safeAreaInset: { top: 28, right: 2, bottom: 20, left: 2 },
+      contentSafeAreaInset: { top: 44, right: 0, bottom: 16, left: 0 },
+      colorScheme: 'dark' as const,
+      themeParams: {},
+      BackButton: backButton,
+      ready() {},
+      expand() {},
+      onEvent(event: string, callback: () => void) {
+        const callbacks = handlers.get(event) ?? new Set<() => void>();
+        callbacks.add(callback);
+        handlers.set(event, callbacks);
+      },
+      offEvent(event: string, callback: () => void) {
+        handlers.get(event)?.delete(callback);
+      },
+    };
+    Object.assign(window, {
+      Telegram: { WebApp: telegram },
+      __backButtonState: backState,
+    });
+  });
+}
+
+test('V9-01 replaces only an untouched active exercise and survives refresh', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const exercise = page
+    .locator('.active-workout-exercise')
+    .filter({ hasText: 'Жим штанги лёжа' })
+    .first();
+  await expect(
+    exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }),
+  ).toBeVisible();
+  await exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Заменить только в этой тренировке' }),
+  ).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Гантели' }).check();
+  await page.getByRole('checkbox', { name: 'Скамья' }).check();
+  await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
+  await page.getByRole('button', { name: 'Показать изменения' }).click();
+  await expect(page.getByRole('heading', { name: 'Что изменится' })).toBeVisible();
+  await page.getByRole('button', { name: 'Применить' }).click();
+  await expect(page.getByText('Изменения применены только к сегодняшней тренировке')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth + 1,
+  );
+  expect(overflow).toBe(false);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('button', { name: 'Продолжить тренировку' })).toBeVisible();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+});
+
+test('V9-01 replaces an untouched active exercise in mocked TMA', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installMockedTelegram(page);
+  await mockActiveWorkout(page);
+  await page.goto('/app?tgWebAppPlatform=android');
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const exercise = page
+    .locator('.active-workout-exercise')
+    .filter({ hasText: 'Жим штанги лёжа' })
+    .first();
+  await expect(
+    exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }),
+  ).toBeVisible();
+  await exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }).click();
+  await page.getByRole('checkbox', { name: 'Гантели' }).check();
+  await page.getByRole('checkbox', { name: 'Скамья' }).check();
+  await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
+  await page.getByRole('button', { name: 'Показать изменения' }).click();
+  await expect(page.getByRole('heading', { name: 'Что изменится' })).toBeVisible();
+  await page.getByRole('button', { name: 'Применить' }).click();
+  await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});
+
+test('V9-01 desktop smoke keeps replacement scoped to the current workout', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const exercise = page
+    .locator('.active-workout-exercise')
+    .filter({ hasText: 'Жим штанги лёжа' })
+    .first();
+  await expect(
+    exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }),
+  ).toBeVisible();
+  await exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }).click();
+  await page.getByRole('checkbox', { name: 'Гантели' }).check();
+  await page.getByRole('checkbox', { name: 'Скамья' }).check();
+  await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
+  await page.getByRole('button', { name: 'Показать изменения' }).click();
+  await page.getByRole('button', { name: 'Применить' }).click();
+  await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});
+
+test('V9-01 does not offer replacement after the target has actual data', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page, false, 'approved_animated', true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const exercise = page
+    .locator('.active-workout-exercise')
+    .filter({ hasText: 'Жим штанги лёжа' })
+    .first();
+  await expect(
+    exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }),
+  ).toHaveCount(0);
+});
+
+test('V9-01 keeps pain inside the safety-stop boundary', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  await page.getByRole('button', { name: 'Боль или травма во время тренировки' }).click();
+  await page.getByRole('button', { name: 'Показать рекомендации' }).click();
+  await expect(page.getByRole('heading', { name: 'Безопасность прежде всего' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Применить' })).toHaveCount(0);
+});
+
+test('V9-01 keeps replacement unavailable offline without local mutation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const replacement = page
+    .locator('.active-workout-exercise')
+    .filter({ hasText: 'Жим штанги лёжа' })
+    .first()
+    .getByRole('button', { name: 'Заменить только в этой тренировке' });
+  await expect(replacement).toBeEnabled();
+  await page.context().setOffline(true);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  await expect(replacement).toBeDisabled();
+  await expect(page.getByText(/Замена требует подключения к интернету/)).toBeVisible();
+  await page.context().setOffline(false);
+});
 
 test('active workout keeps one obvious next action through logging, timer and finish', async ({
   page,
