@@ -2627,7 +2627,9 @@ body:has(.app-shell--design-v2) {
 }
 
 .active-workout--design-v2 .active-workout-helper-chip,
-.active-workout--design-v2 .active-workout-helper-inputs input {
+.active-workout--design-v2 .active-workout-helper-inputs input,
+.active-workout--design-v2 .active-workout-plate-inventory__grid input,
+.active-workout--design-v2 .active-workout-plate-result {
   border-color: var(--v2-border);
   background: var(--v2-surface);
   color: var(--v2-text-primary);
@@ -2635,6 +2637,20 @@ body:has(.app-shell--design-v2) {
 
 .active-workout--design-v2 .active-workout-helper-chip:hover {
   background: var(--v2-surface-secondary);
+}
+
+.active-workout--design-v2 .active-workout-plate-inventory > legend,
+.active-workout--design-v2 .active-workout-plate-result__metrics dd {
+  color: var(--v2-text-primary);
+}
+
+.active-workout--design-v2 .active-workout-plate-inventory__grid label span,
+.active-workout--design-v2 .active-workout-plate-result__state span {
+  color: var(--v2-text-secondary);
+}
+
+.active-workout--design-v2 .active-workout-plate-result.is-exact {
+  border-color: var(--v2-lime);
 }
 
 .warmup-proposal-entry {
