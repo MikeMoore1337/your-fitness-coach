@@ -133,10 +133,8 @@ GUARD_RECOVERY_HANDOFF_BLOCKER = (
 MAX_GUARD_EVIDENCE_BYTES = 16 * 1024 * 1024
 TASK_INTEGRATION_BRANCHES = {"feature/app-experience-v3": "393"}
 DEPENDABOT_LOGIN = "dependabot[bot]"
-RENOVATE_LOGIN = "renovate[bot]"
 TRUSTED_DEPENDENCY_BOT_BRANCH_PREFIXES = {
     DEPENDABOT_LOGIN: "dependabot/",
-    RENOVATE_LOGIN: "renovate/",
 }
 VALID_CHECK_CONCLUSIONS = {"SUCCESS"}
 UMBRELLA_TASK_IDS = {"90", "92", "93", "94", "95", "99", "100", "126"}
@@ -426,10 +424,6 @@ def trusted_dependency_bot_login(pull_request: Mapping[str, Any]) -> str | None:
 
 def is_dependabot_pull_request(pull_request: Mapping[str, Any]) -> bool:
     return trusted_dependency_bot_login(pull_request) == DEPENDABOT_LOGIN
-
-
-def is_renovate_pull_request(pull_request: Mapping[str, Any]) -> bool:
-    return trusted_dependency_bot_login(pull_request) == RENOVATE_LOGIN
 
 
 def normalize_concurrency_class(value: str) -> str:
@@ -1624,16 +1618,14 @@ def validate_pr_event(
         head = pull_request.get("head", {})
         base_repo = base.get("repo", {}).get("full_name")
         head_repo = head.get("repo", {}).get("full_name")
-        bot_name = "Dependabot" if dependency_bot_login == DEPENDABOT_LOGIN else "Renovate"
         if not base_repo or not head_repo or head_repo != base_repo:
             raise TaskSessionError(
-                f"{bot_name} pull request must originate from the same repository"
+                "Dependabot pull request must originate from the same repository"
             )
         head_sha = str(head.get("sha", ""))
         if not head_sha:
-            raise TaskSessionError(f"{bot_name} pull request head SHA is missing")
-        kind = "dependabot-pr" if dependency_bot_login == DEPENDABOT_LOGIN else "renovate-pr"
-        return {"kind": kind, "head_sha": head_sha}
+            raise TaskSessionError("Dependabot pull request head SHA is missing")
+        return {"kind": "dependabot-pr", "head_sha": head_sha}
     event_base_sha = str(pull_request.get("base", {}).get("sha", ""))
     current_master_sha = github.branch_head(TARGET_BASE_BRANCH)
     if event_base_sha != current_master_sha:
@@ -1711,17 +1703,13 @@ def verify_master_merge(
             branch
         ) is not None and title.startswith("[Controller]")
         dependency_bot_login = trusted_dependency_bot_login(pull_request)
-        is_dependency_bot_merge = dependency_bot_login is not None and is_same_repository
+        is_dependency_bot_merge = dependency_bot_login == DEPENDABOT_LOGIN and is_same_repository
         if is_task_merge:
             merge_kind = "task-pr-merge"
         elif is_controller_merge and is_same_repository:
             merge_kind = "controller-pr-merge"
         elif is_dependency_bot_merge:
-            merge_kind = (
-                "dependabot-pr-merge"
-                if dependency_bot_login == DEPENDABOT_LOGIN
-                else "renovate-pr-merge"
-            )
+            merge_kind = "dependabot-pr-merge"
         else:
             continue
         matches.append(
