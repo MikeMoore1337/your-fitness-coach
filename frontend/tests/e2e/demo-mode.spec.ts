@@ -108,6 +108,14 @@ async function assertBottomNavigationGeometry(page: Page, width: number): Promis
   expect(geometry.floatingActionOverlap).toBe(false);
 }
 
+async function assertTrainerCapacityAvailable(page: Page): Promise<void> {
+  const capacity = page.getByTestId('coach-capacity');
+  await expect(capacity).toBeVisible();
+  await expect(capacity).toContainText('Активные клиенты');
+  await expect(capacity).toContainText('66.7%');
+  await expect(capacity).not.toContainText('Факты ёмкости временно недоступны.');
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 function demoUser(snapshot: DemoSessionSnapshot) {
@@ -1258,6 +1266,7 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await installDemoTransport(trainerPage);
   await trainerPage.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
   await expect(trainerPage.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await assertTrainerCapacityAvailable(trainerPage);
   await expect(
     trainerPage.getByRole('button', { name: 'Пригласить клиента' }).first(),
   ).toBeDisabled();
@@ -1273,6 +1282,7 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await trainerPage.setViewportSize({ width: 1440, height: 900 });
   await trainerPage.getByRole('button', { name: 'Сегодня', exact: true }).click();
   await expect(trainerPage.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await assertTrainerCapacityAvailable(trainerPage);
   await captureTask291Evidence(trainerPage, 'demo-trainer-desktop-light.png');
   await trainerPage.getByRole('button', { name: 'Клиенты', exact: true }).click();
   await trainerPage.getByRole('button', { name: /^Алексей/ }).click();

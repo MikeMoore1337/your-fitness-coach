@@ -6,6 +6,7 @@ import pytest
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
+from fitminiapp_api.schemas.coach_capacity import CoachCapacityResponse
 from fitminiapp_api.schemas.coach_crm import (
     CoachAgendaResponse,
     CoachClientOperationsResponse,
@@ -342,6 +343,23 @@ def test_demo_transport_returns_production_dtos_and_keeps_set_updates_independen
         _transport(client, token, "/api/v1/workouts/today").json()
     )
     assert [item.is_completed for item in refreshed.exercises[0].sets] == [True, True, True]
+
+
+def test_demo_transport_maps_coach_capacity_to_current_response_dto(client) -> None:
+    token, _ = _create_session(client, "trainer")
+
+    response = _transport(client, token, "/api/v1/coach/capacity")
+
+    assert response.status_code == 200, response.text
+    payload = CoachCapacityResponse.model_validate(response.json())
+    assert payload.active_client_count == 3
+    assert payload.pending_invite_count == 1
+    assert payload.clients_with_active_program_count == 2
+    assert payload.roster_coverage_percent == 66.7
+    assert payload.capacity_band == "0_9"
+    assert payload.next_capacity_boundary == 10
+    assert payload.scale_boundaries == (10, 30, 100)
+    assert payload.bottlenecks[0].key == "attention"
 
 
 def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_writes(

@@ -5,6 +5,7 @@ from math import isfinite
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from fitminiapp_api.schemas.coach_capacity import CoachCapacityBottleneck, CoachCapacityResponse
 from fitminiapp_api.services.demo_sessions import (
     DemoActionForbiddenError,
     DemoSessionStore,
@@ -31,6 +32,25 @@ def _iso(value: date | datetime) -> str:
 def _query(path: str, key: str, default: str | None = None) -> str | None:
     value = parse_qs(urlsplit(path).query).get(key, [default])[0]
     return value
+
+
+def _coach_capacity(session: _DemoSession) -> dict[str, Any]:
+    return CoachCapacityResponse(
+        active_client_count=3,
+        pending_invite_count=1,
+        open_task_count=0,
+        attention_item_count=1,
+        attention_client_count=1,
+        attention_items_returned=1,
+        attention_items_truncated=False,
+        clients_with_active_program_count=2,
+        roster_coverage_percent=66.7,
+        capacity_band="0_9",
+        next_capacity_boundary=10,
+        scale_boundaries=(10, 30, 100),
+        bottlenecks=[CoachCapacityBottleneck(key="attention", count=1, action="attention")],
+        generated_at=_now(session),
+    ).model_dump(mode="json")
 
 
 def _period_days(raw_value: str | None) -> int:
@@ -1931,6 +1951,8 @@ def handle_demo_transport(
                 item["client_name"] = {"alexey": "Алексей", "maria": "Мария", "ivan": "Иван"}[slug]
                 items.append(item)
             return {"items": items, "total": len(items), "limit": 100, "offset": 0}
+        if path == "/api/v1/coach/capacity":
+            return _coach_capacity(session)
         if path == "/api/v1/coach/attention":
             return {
                 "items": [
