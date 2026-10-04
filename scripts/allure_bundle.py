@@ -23,9 +23,20 @@ else:
     from scheduled_regression import MAX_BUNDLE_BYTES
 
 BUNDLE_SCHEMA_VERSION = 1
+MEASUREMENT_SCHEMA_VERSION = 1
 DEFAULT_KEY_ENV = "ALLURE_REPORT_ENCRYPTION_KEY"
 BUNDLE_MAGIC = b"YFC-ALLURE-BUNDLE-v1\n"
 _SAFE_TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_MEASUREMENT_CLASSES = (
+    "allure_result_json",
+    "allure_container_json",
+    "trace_archive",
+    "screenshots",
+    "video",
+    "json_attachment",
+    "text_attachment",
+    "other",
+)
 
 
 class AllureBundleError(RuntimeError):
@@ -45,7 +56,7 @@ def _safe_text(value: str, *, field: str) -> str:
     return value
 
 
-def _source_files(source: Path) -> tuple[tuple[Path, str, int], ...]:
+def _source_files(source: Path, *, enforce_limit: bool = True) -> tuple[tuple[Path, str, int], ...]:
     if not source.is_dir():
         raise AllureBundleError(f"result directory does not exist: {source}")
     files: list[tuple[Path, str, int]] = []
@@ -62,10 +73,71 @@ def _source_files(source: Path) -> tuple[tuple[Path, str, int], ...]:
             raise AllureBundleError("source result directory must not contain manifest.json")
         size = candidate.stat().st_size
         total_bytes += size
-        if total_bytes > MAX_BUNDLE_BYTES:
+        if enforce_limit and total_bytes > MAX_BUNDLE_BYTES:
             raise AllureBundleError(f"result bundle exceeds {MAX_BUNDLE_BYTES} uncompressed bytes")
         files.append((candidate, relative, size))
     return tuple(files)
+
+
+def _measurement_class(relative: str) -> str:
+    normalized = relative.lower()
+    if normalized.endswith("-result.json"):
+        return "allure_result_json"
+    if normalized.endswith("-container.json"):
+        return "allure_container_json"
+    if normalized.endswith((".trace.zip", ".trace.tar", ".trace.tar.gz")):
+        return "trace_archive"
+    if normalized.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg")):
+        return "screenshots"
+    if normalized.endswith((".webm", ".mp4", ".mov", ".avi")):
+        return "video"
+    if normalized.endswith(".json"):
+        return "json_attachment"
+    if normalized.endswith((".txt", ".log", ".html", ".htm", ".xml", ".csv")):
+        return "text_attachment"
+    return "other"
+
+
+def measure_bundle(
+    *,
+    source: Path,
+    output: Path,
+    suite: str,
+    browser: str,
+) -> dict[str, object]:
+    """Write non-sensitive size/class evidence without encrypting or exposing names."""
+
+    normalized_suite = _safe_text(suite, field="suite")
+    normalized_browser = _safe_text(browser, field="browser")
+    source = source.resolve()
+    output = output.resolve()
+    if output == source or output.is_relative_to(source):
+        raise AllureBundleError("measurement output must be outside the result directory")
+    files = _source_files(source, enforce_limit=False)
+    classes = {name: {"file_count": 0, "bytes": 0} for name in _MEASUREMENT_CLASSES}
+    for _, relative, size in files:
+        category = classes[_measurement_class(relative)]
+        category["file_count"] += 1
+        category["bytes"] += size
+    source_bytes = sum(size for _, _, size in files)
+    payload: dict[str, object] = {
+        "schema_version": MEASUREMENT_SCHEMA_VERSION,
+        "suite": normalized_suite,
+        "browser": normalized_browser,
+        "file_count": len(files),
+        "source_bytes": source_bytes,
+        "limit_bytes": MAX_BUNDLE_BYTES,
+        "within_limit": source_bytes <= MAX_BUNDLE_BYTES,
+        "classes": classes,
+        "created_at": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        raise AllureBundleError(f"refusing to overwrite existing measurement: {output}")
+    output.write_text(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return payload
 
 
 def _bundle_tag(ciphertext: bytes, *, key_env: str) -> bytes:
@@ -320,6 +392,11 @@ def decrypt_bundle(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
+    measure = subparsers.add_parser("measure")
+    measure.add_argument("--source", type=Path, required=True)
+    measure.add_argument("--output", type=Path, required=True)
+    measure.add_argument("--suite", required=True)
+    measure.add_argument("--browser", required=True)
     encrypt = subparsers.add_parser("encrypt")
     encrypt.add_argument("--source", type=Path, required=True)
     encrypt.add_argument("--output", type=Path, required=True)
@@ -336,7 +413,14 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        if args.command == "encrypt":
+        if args.command == "measure":
+            payload = measure_bundle(
+                source=args.source,
+                output=args.output,
+                suite=args.suite,
+                browser=args.browser,
+            )
+        elif args.command == "encrypt":
             payload = encrypt_bundle(
                 source=args.source,
                 output=args.output,

@@ -40,7 +40,10 @@ Daily запускает bounded deterministic набор:
 
 Weekly включает Daily и дополнительно запускает policy, dependency audit, расширенный mobile
 набор, frontend-cross-browser (Chromium + Firefox + WebKit), image/deployment/container
-contracts. Allure-агрегатор ожидает только suite, которые фактически производят results:
+contracts. Cross-browser suite запускается параллельными изолированными browser-процессами с
+разными API/preview ports и передаёт три
+browser-labelled encrypted bundles; каждый upload также содержит privacy-safe size/class evidence.
+Allure-агрегатор ожидает только suite, которые фактически производят results:
 frontend-checks, frontend-e2e, frontend-mobile-regression, python-tests, migrated-stack, а для
 Weekly также frontend-mobile-regression-extended и frontend-cross-browser. Native policy, audit и
 deployment результаты остаются в обычных CI jobs.
@@ -60,7 +63,7 @@ deployment результаты остаются в обычных CI jobs.
     npm --prefix frontend run e2e:ci
     npm --prefix frontend run e2e:mobile-regression
     npm --prefix frontend run e2e:mobile-regression:extended
-    npm --prefix frontend run e2e:cross-browser
+    python scripts/run_cross_browser_regression.py
     & .venv\Scripts\python.exe scripts\run_pytest.py backend\tests bot\tests -q -n 4 --dist=worksteal
 
 Для локального report-only прогона сначала установить scheduled-only adapters в

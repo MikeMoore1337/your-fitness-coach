@@ -69,7 +69,9 @@ REPORT_BUNDLES_BY_RUN_KIND: Mapping[str, tuple[tuple[str, str], ...]] = {
         ),
         ("frontend-mobile-regression", "mobile-chromium-webkit"),
         ("frontend-mobile-regression-extended", "mobile-firefox-webkit"),
-        ("frontend-cross-browser", "chromium-firefox-webkit"),
+        ("frontend-cross-browser", "chromium"),
+        ("frontend-cross-browser", "firefox"),
+        ("frontend-cross-browser", "webkit"),
         *tuple(
             ("python-tests", f"python-shard-{shard}")
             for shard in range(1, PYTHON_TEST_SHARD_COUNT + 1)
