@@ -45,12 +45,36 @@ async function expectNoOverlap(first: Locator, second: Locator) {
   expect(overlaps).toBe(false);
 }
 
+function waitForSetPatch(page: Page, setId: number, completed?: boolean) {
+  return page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    if (
+      response.request().method() !== 'PATCH' ||
+      !url.pathname.endsWith(`/workouts/sets/${setId}`) ||
+      !response.ok()
+    ) {
+      return false;
+    }
+    try {
+      const isCompleted = response.request().postDataJSON()?.is_completed;
+      return completed === undefined || isCompleted === completed;
+    } catch {
+      return false;
+    }
+  });
+}
+
 async function completeWorkout(page: Page) {
   await page.goto('/app?section=today');
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
+  const valuesPatch = waitForSetPatch(page, 201, false);
   await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
   await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
-  await page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
+  await valuesPatch;
+  await Promise.all([
+    waitForSetPatch(page, 201, true),
+    page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click(),
+  ]);
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   await page.getByRole('button', { name: 'Завершить тренировку' }).click();
   return page.locator('.workout-completion');
@@ -406,9 +430,14 @@ test('full Pulse completion motion exposes facts immediately and settles within 
   await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
   await page.goto('/app?section=today');
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
+  const valuesPatch = waitForSetPatch(page, 201, false);
   await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
   await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
-  await page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
+  await valuesPatch;
+  await Promise.all([
+    waitForSetPatch(page, 201, true),
+    page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click(),
+  ]);
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   await page.evaluate(() => {
     const lab = (window as PulseLabWindow).__pulseLab!;
