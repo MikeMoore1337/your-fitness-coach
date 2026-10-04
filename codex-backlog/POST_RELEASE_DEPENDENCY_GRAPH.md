@@ -3,7 +3,7 @@
 ## Canonical Product v8 current-state graph — 2026-10-04
 
 Roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Repository baseline `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`; V8-01 / Task 684 remains
+Repository baseline `206058185dda7357582f088997b7522ab42765f0` (governance PR #690 merge); V8-01 / Task 684 remains
 **COMPLETED / PRODUCTION VERIFIED**. Dependency maintenance PRs `#589` and `#689` are separate
 lockfile-only workstreams and are not Product v8 nodes.
 

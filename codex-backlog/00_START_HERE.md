@@ -8,7 +8,7 @@ Backlog использует resource-aware lifecycle. В owner workspace зав
 ### Product v8 current governance — 2026-10-04
 
 Каноническая roadmap — [Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Repository baseline: `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`.
+Repository baseline: `206058185dda7357582f088997b7522ab42765f0` (governance PR #690 merge).
 
 ```text
 V8-01 / Task 684 -> COMPLETED / PRODUCTION VERIFIED

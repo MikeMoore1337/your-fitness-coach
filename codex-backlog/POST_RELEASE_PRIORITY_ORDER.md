@@ -3,7 +3,7 @@
 ## Canonical Product v8 current state — 2026-10-04
 
 См. [Product v8 roadmap #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Repository baseline: `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`. Product v8 implementation
+Repository baseline: `206058185dda7357582f088997b7522ab42765f0` (governance PR #690 merge). Product v8 implementation
 baseline remains V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**; later dependency-only
 merges `#589` and `#689` are separate maintenance workstreams. No environment, migration, schema
 or provider change is required by this governance reconciliation.

@@ -9,7 +9,7 @@ Task-файлы находятся в локальном owner-only `tasks/done/
 
 ## Product v8 current selection — 2026-10-04
 
-Repository baseline: `6e231e068fe513cc5bf8ba2c24ff32c4e577ec18`; roadmap: Issue `#683`.
+Repository baseline: `206058185dda7357582f088997b7522ab42765f0` (governance PR #690 merge); roadmap: Issue `#683`.
 
 ```text
 V8-01 / Task 684 -> COMPLETED / PRODUCTION VERIFIED
