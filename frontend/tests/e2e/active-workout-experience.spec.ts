@@ -676,6 +676,13 @@ function waitForSetPatch(page: Page, setId: number) {
   });
 }
 
+async function clickDetailsSummary(summary: Locator) {
+  await summary.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', inline: 'nearest' }),
+  );
+  await summary.click();
+}
+
 async function expectClearOfBottomDock(target: Locator, label: string) {
   await target.scrollIntoViewIfNeeded();
   const geometry = await target.evaluate((element) => {
@@ -972,7 +979,7 @@ test('V9-02 keeps warm-up editable until confirmation and survives reload', asyn
     waitForSetPatch(page, 201),
     currentSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('80'),
   ]);
-  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   const warmupEntry = currentSet.getByTestId('warmup-proposal-entry');
   await expect(warmupEntry.getByRole('button', { name: 'Подготовить разминку' })).toBeVisible();
   await warmupEntry.getByRole('button', { name: 'Подготовить разминку' }).click();
@@ -1014,7 +1021,7 @@ test('V9-02 is available in mocked TMA without mobile overflow', async ({ page }
     waitForSetPatch(page, 201),
     currentSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('80'),
   ]);
-  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   await expect(currentSet.getByRole('button', { name: 'Подготовить разминку' })).toBeVisible();
   await currentSet.getByRole('button', { name: 'Подготовить разминку' }).click();
   await page.getByRole('button', { name: 'Рассчитать предложение' }).click();
@@ -1044,7 +1051,7 @@ test('V9-02 does not persist an unsaved proposal offline', async ({ page }) => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     window.dispatchEvent(new Event('offline'));
   });
-  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   await expect(page.getByText('Разминка требует подключения. Ничего не сохранено.')).toBeVisible();
   await expect(currentSet.getByRole('button', { name: 'Подготовить разминку' })).toBeDisabled();
   expect(await page.locator('[data-workout-set-id="301"]').count()).toBe(0);
@@ -1061,7 +1068,7 @@ test('V9-03 calculates exact and nearest local loads without network or workout 
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const currentSet = page.locator('[data-workout-set-id="201"]');
-  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   const calculator = currentSet.locator('.active-workout-plate-calculator');
   await calculator.getByLabel('Целевой вес, кг').fill('80');
   await expect(calculator.getByRole('status')).toContainText('Точный результат');
@@ -1108,7 +1115,7 @@ test('V9-03 fits the supported 360, 390 and 430px Mobile Web widths', async ({ p
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const currentSet = page.locator('[data-workout-set-id="201"]');
-  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   const calculator = currentSet.locator('.active-workout-plate-calculator');
   await calculator.getByLabel('Целевой вес, кг').fill('80');
   await expect(calculator.getByRole('status')).toContainText('Точный результат');
@@ -1134,7 +1141,7 @@ test('V9-03 keeps the calculator keyboard-usable in mocked TMA dark reduced-moti
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const currentSet = page.locator('[data-workout-set-id="201"]');
-  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   const calculator = currentSet.locator('.active-workout-plate-calculator');
   await calculator.getByLabel('Целевой вес, кг').fill('80');
   await expect(calculator.getByRole('status')).toContainText('Точный результат');
@@ -1159,7 +1166,7 @@ test('V9-03 stays compact on desktop in dark reduced-motion mode', async ({ page
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const currentSet = page.locator('[data-workout-set-id="201"]');
-  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   const calculator = currentSet.locator('.active-workout-plate-calculator');
   await calculator.getByLabel('Целевой вес, кг').fill('80');
   await expect(calculator.getByRole('status')).toContainText('Точный результат');
@@ -1249,7 +1256,14 @@ test('V9-04 preserves a draft when the memory save is offline', async ({ page })
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     window.dispatchEvent(new Event('offline'));
   });
-  await setupMemory.getByRole('button', { name: 'Сохранить настройку' }).click();
+  await expect(
+    page.getByText('Нет сети · изменения подходов сохранятся как черновик'),
+  ).toBeVisible();
+  const saveSetupMemory = setupMemory.getByRole('button', { name: 'Сохранить настройку' });
+  await saveSetupMemory.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', inline: 'nearest' }),
+  );
+  await saveSetupMemory.click();
   await expect(
     setupMemory.getByText('Черновик сохранён на устройстве. Сервер ещё не подтвердил сохранение.'),
   ).toBeVisible();
@@ -1319,7 +1333,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
     'Расчётный максимум на 1 повтор',
   );
   await expect(firstSet.getByText('Повторы в запасе (RIR)', { exact: true })).toBeVisible();
-  await firstSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(firstSet.getByText('Разминка и блины', { exact: true }));
   await firstSet.getByLabel('Целевой вес, кг').fill('80');
   await expect(firstSet.locator('.active-workout-plate-result')).toContainText('На сторону:');
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
@@ -2021,7 +2035,7 @@ test('Task 520 owner visual package covers friction-reduction states', async ({ 
   await page.screenshot({ path: `${packagePath}/mobile-light-technique.png`, fullPage: true });
   await page.getByRole('button', { name: 'Закрыть карточку упражнения' }).click();
 
-  await firstSet.getByText('Разминка и блины', { exact: true }).click();
+  await clickDetailsSummary(firstSet.getByText('Разминка и блины', { exact: true }));
   await firstSet.getByLabel('Вес снаряда, кг').fill('80');
   await expect(firstSet.getByRole('status')).toContainText('На сторону:');
   await page.screenshot({
