@@ -43,7 +43,8 @@ import { PWA_SAFE_UPDATE_EVENT } from '../../shared/pwa/pwaRuntime';
 import { ProgressionGuidance } from './ProgressionGuidance';
 import { useScreenWakeLock } from './useScreenWakeLock';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
-import { calculatePlateLoad, warmupSuggestions } from './workoutExecution';
+import { WarmupProposal } from './WarmupProposal';
+import { calculatePlateLoad } from './workoutExecution';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -216,15 +217,22 @@ function RirSelector({
 function WorkoutSetHelpers({
   disabled,
   weight,
-  onUseWeight,
+  workoutId,
+  workoutExerciseId,
+  targetSetId,
+  exerciseTitle,
+  hasWarmupRows,
 }: {
   disabled: boolean;
   weight: string;
-  onUseWeight: (value: string) => void;
+  workoutId: number;
+  workoutExerciseId: number;
+  targetSetId: number;
+  exerciseTitle: string;
+  hasWarmupRows: boolean;
 }) {
   const [plateWeight, setPlateWeight] = useState(weight);
   const [barWeight, setBarWeight] = useState('20');
-  const suggestions = warmupSuggestions(Number(weight));
   const plateLoad = calculatePlateLoad(Number(plateWeight), Number(barWeight));
   const plateSummary = plateLoad?.plates.length
     ? plateLoad.plates.map((plate) => `${formatWorkoutNumber(plate)} кг`).join(' + ')
@@ -236,26 +244,18 @@ function WorkoutSetHelpers({
       <div className="active-workout-set__helpers-body">
         <div className="active-workout-helper-block">
           <div>
-            <strong>Быстрая разминка</strong>
-            <p>Расчёт от рабочего веса. Подсказка не создаёт подход и не сохраняется сама.</p>
+            <strong>Разминочные подходы</strong>
+            <p>Расчёт от рабочего веса. Вы сможете изменить предложение перед добавлением.</p>
           </div>
-          <div className="active-workout-helper-actions" aria-label="Вес для разминки">
-            {suggestions.length ? (
-              suggestions.map((suggestedWeight) => (
-                <button
-                  type="button"
-                  className="active-workout-helper-chip"
-                  disabled={disabled}
-                  key={suggestedWeight}
-                  onClick={() => onUseWeight(String(suggestedWeight))}
-                >
-                  {formatWorkoutNumber(suggestedWeight)} кг
-                </button>
-              ))
-            ) : (
-              <span className="active-workout-helper-muted">Введите рабочий вес от 20 кг.</span>
-            )}
-          </div>
+          <WarmupProposal
+            disabled={disabled}
+            exerciseTitle={exerciseTitle}
+            hasWarmupRows={hasWarmupRows}
+            targetSetId={targetSetId}
+            workoutExerciseId={workoutExerciseId}
+            workoutId={workoutId}
+            workingWeight={weight}
+          />
         </div>
 
         <div className="active-workout-helper-block">
@@ -378,7 +378,9 @@ function WorkoutSetRow({
   previousValues,
   restSeconds,
   workoutId,
+  workoutExerciseId,
   exerciseTitle,
+  hasWarmupRows,
   pending,
   syncing,
   enqueue,
@@ -393,7 +395,9 @@ function WorkoutSetRow({
   previousValues?: PreviousSetValues;
   restSeconds: number;
   workoutId: number;
+  workoutExerciseId: number;
   exerciseTitle: string;
+  hasWarmupRows: boolean;
   pending?: ActiveWorkoutMutation;
   syncing: boolean;
   enqueue: (
@@ -707,14 +711,15 @@ function WorkoutSetRow({
         </Button>
       </div>
 
-      {isCurrent && (
+      {isCurrent && set.set_kind !== 'warmup' && set.planned_role !== 'warmup' && (
         <WorkoutSetHelpers
           disabled={disabled}
+          exerciseTitle={exerciseTitle}
+          hasWarmupRows={hasWarmupRows}
+          targetSetId={set.id}
           weight={weight}
-          onUseWeight={(nextWeight) => {
-            editing.current = true;
-            setWeight(nextWeight);
-          }}
+          workoutExerciseId={workoutExerciseId}
+          workoutId={workoutId}
         />
       )}
 
@@ -1797,7 +1802,11 @@ export function TodayWorkout({
                           restSeconds={exercise.rest_seconds}
                           disabled={!started}
                           workoutId={data.id}
+                          workoutExerciseId={exercise.id}
                           exerciseTitle={exercise.exercise_title}
+                          hasWarmupRows={exercise.sets.some(
+                            (item) => item.set_kind === 'warmup' || item.planned_role === 'warmup',
+                          )}
                           isCurrent={currentSet?.set.id === set.id}
                           previousResult={previousResult}
                           previousValues={previousValues}

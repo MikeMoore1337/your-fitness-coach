@@ -2637,6 +2637,125 @@ body:has(.app-shell--design-v2) {
   background: var(--v2-surface-secondary);
 }
 
+.warmup-proposal-entry {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+}
+
+.warmup-proposal-entry .ui-button {
+  width: fit-content;
+  min-height: 44px;
+}
+
+.warmup-proposal-status {
+  margin: 0;
+}
+
+.warmup-proposal-intro,
+.warmup-proposal-editor {
+  display: grid;
+  gap: var(--v2-space-3);
+  min-width: 0;
+}
+
+.warmup-proposal-intro {
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.warmup-proposal-intro p,
+.warmup-proposal-editor__message,
+.warmup-proposal-editor__note {
+  margin: 0;
+  color: var(--v2-text-secondary);
+  line-height: 1.45;
+}
+
+.warmup-proposal-editor__heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+}
+
+.warmup-proposal-editor__heading h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.warmup-proposal-editor__limit {
+  flex: 0 0 auto;
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.warmup-proposal-rows {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+}
+
+.warmup-proposal-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--v2-space-2);
+  min-width: 0;
+  padding: var(--v2-space-3);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.warmup-proposal-row__number {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 44px;
+  color: var(--v2-accent-text);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.warmup-proposal-row label {
+  display: grid;
+  gap: var(--v2-space-1);
+  min-width: 0;
+}
+
+.warmup-proposal-row label > span {
+  color: var(--v2-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.warmup-proposal-row__remove {
+  min-height: var(--touch-target);
+  padding: 0 var(--v2-space-2);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-compact-radius);
+  background: transparent;
+  color: var(--v2-text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.warmup-proposal-row__remove:hover {
+  border-color: var(--v2-border-strong);
+  color: var(--v2-text-primary);
+}
+
+.warmup-proposal-row__remove:focus-visible {
+  outline: 2px solid var(--v2-lime);
+  outline-offset: 2px;
+}
+
 .active-workout--design-v2 .active-workout-set__advanced {
   border-color: var(--v2-border);
 }
@@ -3470,6 +3589,15 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .workout-adaptation-dialog__footer .ui-button:not(.ui-button--secondary, .ui-button--ghost) {
     grid-column: 1 / -1;
+  }
+
+  .warmup-proposal-row {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .warmup-proposal-row__remove {
+    grid-column: 2 / -1;
+    justify-self: start;
   }
 
   .active-workout--design-v2 .active-workout-exercise {

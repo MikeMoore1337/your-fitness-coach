@@ -40,6 +40,10 @@ from fitminiapp_api.schemas.workout import (
     BodyMeasurementResponse,
     BodyMeasurementSave,
     TrainingAnalyticsResponse,
+    WarmupProposalApplyRequest,
+    WarmupProposalApplyResponse,
+    WarmupProposalPreviewRequest,
+    WarmupProposalPreviewResponse,
     WorkoutAdaptationApplyRequest,
     WorkoutAdaptationApplyResponse,
     WorkoutAdaptationPreviewResponse,
@@ -121,6 +125,11 @@ from fitminiapp_api.services.progress_weekly_action import (
     record_progress_weekly_action_completion,
 )
 from fitminiapp_api.services.progression_guidance import build_progression_guidance
+from fitminiapp_api.services.warmup_proposals import (
+    WarmupProposalError,
+    apply_warmup_proposal,
+    build_warmup_proposal,
+)
 from fitminiapp_api.services.workout_adaptation import (
     WorkoutAdaptationError,
     apply_adaptation,
@@ -414,6 +423,13 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
 
     media_previews = {item.id: media_preview(item) for item in workout.exercises}
 
+    def set_sort_key(set_item: UserWorkoutSet) -> tuple[int, int, int]:
+        return (
+            0 if set_item.set_kind == "warmup" or set_item.planned_role == "warmup" else 1,
+            set_item.set_number,
+            set_item.id,
+        )
+
     return {
         "id": workout.id,
         "scheduled_date": str(workout.scheduled_date),
@@ -475,7 +491,7 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                         "planned_position": set_item.planned_position,
                         "planned_round": set_item.planned_round,
                     }
-                    for set_item in sorted(item.sets, key=lambda x: x.set_number)
+                    for set_item in sorted(item.sets, key=set_sort_key)
                 ],
             }
             for item in sorted(workout.exercises, key=lambda x: x.sort_order)
@@ -605,6 +621,65 @@ def workout_exercise_alternatives(
             )
             db.commit()
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/{workout_id}/exercises/{workout_exercise_id}/warmup-proposals/preview",
+    response_model=WarmupProposalPreviewResponse,
+)
+def preview_warmup_proposal(
+    workout_id: int,
+    workout_exercise_id: int,
+    payload: WarmupProposalPreviewRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    try:
+        return build_warmup_proposal(
+            db,
+            current_user,
+            workout,
+            workout_exercise_id,
+            payload,
+        )
+    except WarmupProposalError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.detail},
+        ) from exc
+
+
+@router.post(
+    "/{workout_id}/exercises/{workout_exercise_id}/warmup-proposals/apply",
+    response_model=WarmupProposalApplyResponse,
+)
+def apply_warmup_proposal_route(
+    workout_id: int,
+    workout_exercise_id: int,
+    payload: WarmupProposalApplyRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    workout = _get_user_workout_or_404(db, current_user, workout_id)
+    _lock_program(db, workout.user_program_id)
+    workout = _get_user_workout_or_404(db, current_user, workout_id, refresh=True)
+    try:
+        result = apply_warmup_proposal(
+            db,
+            current_user,
+            workout,
+            workout_exercise_id,
+            payload,
+        )
+    except WarmupProposalError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.code, "message": exc.detail},
+        ) from exc
+    updated = _get_user_workout_or_404(db, current_user, workout_id, refresh=True)
+    return {**result, "workout": _serialize_workout(updated, db, current_user)}
 
 
 @router.post(

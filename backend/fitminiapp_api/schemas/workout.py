@@ -381,6 +381,45 @@ class WorkoutAdaptationApplyResponse(BaseModel):
     workout: WorkoutTodayResponse
 
 
+class WarmupProposalRow(BaseModel):
+    weight_kg: float = Field(gt=0, le=1000, allow_inf_nan=False)
+    reps: int = Field(ge=1, le=30)
+
+
+class WarmupProposalPreviewRequest(BaseModel):
+    target_set_id: int = Field(ge=1)
+    working_weight_kg: float = Field(gt=0, le=1000, allow_inf_nan=False)
+
+
+class WarmupProposalPreviewResponse(BaseModel):
+    status: Literal["proposal", "unavailable"]
+    workout_id: int
+    workout_exercise_id: int
+    ruleset_version: str
+    working_weight_kg: float
+    rows: list[WarmupProposalRow]
+    max_rows: int = Field(ge=1)
+    state_token: str | None = Field(default=None, min_length=64, max_length=64)
+    proposal_token: str | None = Field(default=None, min_length=64, max_length=64)
+    message: str
+
+
+class WarmupProposalApplyRequest(WarmupProposalPreviewRequest):
+    rows: list[WarmupProposalRow] = Field(min_length=1, max_length=5)
+    state_token: str = Field(min_length=64, max_length=64)
+    proposal_token: str = Field(min_length=64, max_length=64)
+    mutation_id: str = Field(min_length=16, max_length=64)
+
+
+class WarmupProposalApplyResponse(BaseModel):
+    workout_id: int
+    workout_exercise_id: int
+    ruleset_version: str
+    idempotent: bool
+    materialized_set_ids: list[int]
+    workout: WorkoutTodayResponse
+
+
 class WorkoutStatusResponse(BaseModel):
     id: int
     set_number: int
