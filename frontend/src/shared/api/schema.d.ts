@@ -2448,6 +2448,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/{workout_id}/exercises/{workout_exercise_id}/warmup-proposals/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Warmup Proposal */
+        post: operations["preview_warmup_proposal_api_v1_workouts__workout_id__exercises__workout_exercise_id__warmup_proposals_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/{workout_id}/exercises/{workout_exercise_id}/warmup-proposals/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Warmup Proposal Route */
+        post: operations["apply_warmup_proposal_route_api_v1_workouts__workout_id__exercises__workout_exercise_id__warmup_proposals_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/{workout_id}/adaptations/preview": {
         parameters: {
             query?: never;
@@ -14563,6 +14597,75 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** WarmupProposalApplyRequest */
+        WarmupProposalApplyRequest: {
+            /** Target Set Id */
+            target_set_id: number;
+            /** Working Weight Kg */
+            working_weight_kg: number;
+            /** Rows */
+            rows: components["schemas"]["WarmupProposalRow"][];
+            /** State Token */
+            state_token: string;
+            /** Proposal Token */
+            proposal_token: string;
+            /** Mutation Id */
+            mutation_id: string;
+        };
+        /** WarmupProposalApplyResponse */
+        WarmupProposalApplyResponse: {
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Ruleset Version */
+            ruleset_version: string;
+            /** Idempotent */
+            idempotent: boolean;
+            /** Materialized Set Ids */
+            materialized_set_ids: number[];
+            workout: components["schemas"]["WorkoutTodayResponse"];
+        };
+        /** WarmupProposalPreviewRequest */
+        WarmupProposalPreviewRequest: {
+            /** Target Set Id */
+            target_set_id: number;
+            /** Working Weight Kg */
+            working_weight_kg: number;
+        };
+        /** WarmupProposalPreviewResponse */
+        WarmupProposalPreviewResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "proposal" | "unavailable";
+            /** Workout Id */
+            workout_id: number;
+            /** Workout Exercise Id */
+            workout_exercise_id: number;
+            /** Ruleset Version */
+            ruleset_version: string;
+            /** Working Weight Kg */
+            working_weight_kg: number;
+            /** Rows */
+            rows: components["schemas"]["WarmupProposalRow"][];
+            /** Max Rows */
+            max_rows: number;
+            /** State Token */
+            state_token?: string | null;
+            /** Proposal Token */
+            proposal_token?: string | null;
+            /** Message */
+            message: string;
+        };
+        /** WarmupProposalRow */
+        WarmupProposalRow: {
+            /** Weight Kg */
+            weight_kg: number;
+            /** Reps */
+            reps: number;
+        };
         /** WebArticleCard */
         WebArticleCard: {
             /** Slug */
@@ -20811,6 +20914,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutAlternativeItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_warmup_proposal_api_v1_workouts__workout_id__exercises__workout_exercise_id__warmup_proposals_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+                workout_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarmupProposalPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarmupProposalPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_warmup_proposal_route_api_v1_workouts__workout_id__exercises__workout_exercise_id__warmup_proposals_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+                workout_exercise_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarmupProposalApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarmupProposalApplyResponse"];
                 };
             };
             /** @description Validation Error */

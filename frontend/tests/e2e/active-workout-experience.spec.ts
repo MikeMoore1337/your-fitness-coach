@@ -61,6 +61,7 @@ async function mockActiveWorkout(
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   let finished = false;
   let replacementApplied = false;
+  let warmupProposalApplied = false;
   let failSetPatch = false;
   let resolveCardioCompleted!: () => void;
   const cardioCompleted = new Promise<void>((resolve) => {
@@ -153,9 +154,17 @@ async function mockActiveWorkout(
         media_animation_url: mediaState === 'approved_animated' ? mediaAnimationUrl : null,
         sets: [...sets]
           .filter(([id]) => id !== 204)
-          .map(([id, state], index) => ({
+          .sort(([leftId, leftState], [rightId, rightState]) => {
+            if (warmupProposalApplied) {
+              const leftWarmup = leftState.set_kind === 'warmup';
+              const rightWarmup = rightState.set_kind === 'warmup';
+              if (leftWarmup !== rightWarmup) return leftWarmup ? -1 : 1;
+            }
+            return leftId - rightId;
+          })
+          .map(([id, state]) => ({
             id,
-            set_number: index + 1,
+            set_number: id >= 301 ? id - 297 : id - 200,
             ...state,
           })),
       },
@@ -412,6 +421,54 @@ async function mockActiveWorkout(
         ],
       });
     }
+    if (path.endsWith('/workouts/42/exercises/101/warmup-proposals/preview')) {
+      return route.fulfill({
+        json: {
+          status: 'proposal',
+          workout_id: 42,
+          workout_exercise_id: 101,
+          ruleset_version: 'warmup-proposal-v1',
+          working_weight_kg: 80,
+          rows: [
+            { weight_kg: 32, reps: 8 },
+            { weight_kg: 48, reps: 5 },
+            { weight_kg: 60, reps: 3 },
+          ],
+          max_rows: 5,
+          state_token: 'a'.repeat(64),
+          proposal_token: 'b'.repeat(64),
+          message: 'Предложение рассчитано от рабочего веса: 40%, 60% и 75%.',
+        },
+      });
+    }
+    if (path.endsWith('/workouts/42/exercises/101/warmup-proposals/apply')) {
+      const body = request.postDataJSON() as {
+        rows?: Array<{ weight_kg: number; reps: number }>;
+      };
+      warmupProposalApplied = true;
+      body.rows?.forEach((row, index) => {
+        sets.set(301 + index, {
+          actual_reps: row.reps,
+          actual_weight: row.weight_kg,
+          rir: null,
+          set_kind: 'warmup',
+          reached_failure: null,
+          is_completed: false,
+          version: 1,
+          planned_role: 'warmup',
+        });
+      });
+      return route.fulfill({
+        json: {
+          workout_id: 42,
+          workout_exercise_id: 101,
+          ruleset_version: 'warmup-proposal-v1',
+          idempotent: false,
+          materialized_set_ids: [...(body.rows ?? [])].map((_, index) => 301 + index),
+          workout: workout(),
+        },
+      });
+    }
     if (path.endsWith('/workouts/42/adaptations/preview')) {
       const body = request.postDataJSON() as { reason?: string } | null;
       if (body?.reason === 'pain_or_injury') {
@@ -572,6 +629,17 @@ function waitForCompletedSetPatch(page: Page, setId: number) {
     } catch {
       return false;
     }
+  });
+}
+
+function waitForSetPatch(page: Page, setId: number) {
+  return page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'PATCH' &&
+      url.pathname.endsWith(`/workouts/sets/${setId}`) &&
+      response.ok()
+    );
   });
 }
 
@@ -859,6 +927,97 @@ test('V9-01 keeps replacement unavailable offline without local mutation', async
   await page.context().setOffline(false);
 });
 
+test('V9-02 keeps warm-up editable until confirmation and survives reload', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const currentSet = page.locator('[data-workout-set-id="201"]');
+  await Promise.all([
+    waitForSetPatch(page, 201),
+    currentSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('80'),
+  ]);
+  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  const warmupEntry = currentSet.getByTestId('warmup-proposal-entry');
+  await expect(warmupEntry.getByRole('button', { name: 'Подготовить разминку' })).toBeVisible();
+  await warmupEntry.getByRole('button', { name: 'Подготовить разминку' }).click();
+  expect(page.getByRole('button', { name: 'Добавить в тренировку' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Рассчитать предложение' }).click();
+  await expect(page.getByRole('heading', { name: 'Проверьте подходы' })).toBeVisible();
+  await expect(page.getByLabel('Вес разминки, подход 1')).toHaveValue('32');
+  await page.getByLabel('Вес разминки, подход 1').fill('30');
+  await page.getByRole('button', { name: 'Добавить подход' }).click();
+  await expect(page.getByLabel('Вес разминки, подход 4')).toBeVisible();
+  await page.getByRole('button', { name: 'Удалить подход разминки 4' }).click();
+  await page.getByRole('button', { name: 'Добавить в тренировку' }).click();
+  await expect(page.getByText('Разминочные подходы добавлены в эту тренировку')).toBeVisible();
+  await expect(page.locator('[data-workout-set-id="301"]')).toHaveAttribute('aria-current', 'step');
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const continueButton = page.getByRole('button', { name: 'Продолжить тренировку' });
+  await expect(continueButton).toBeVisible();
+  await continueButton.click();
+  await expect(page.locator('[data-workout-set-id="301"]')).toHaveAttribute('aria-current', 'step');
+  await expect(page.locator('[data-testid="warmup-proposal-entry"]')).toHaveCount(0);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});
+
+test('V9-02 is available in mocked TMA without mobile overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installMockedTelegram(page);
+  await mockActiveWorkout(page);
+  await page.goto('/app?tgWebAppPlatform=android');
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const currentSet = page.locator('[data-workout-set-id="201"]');
+  await Promise.all([
+    waitForSetPatch(page, 201),
+    currentSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('80'),
+  ]);
+  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await expect(currentSet.getByRole('button', { name: 'Подготовить разминку' })).toBeVisible();
+  await currentSet.getByRole('button', { name: 'Подготовить разминку' }).click();
+  await page.getByRole('button', { name: 'Рассчитать предложение' }).click();
+  await expect(page.getByRole('heading', { name: 'Проверьте подходы' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+  await page.getByRole('button', { name: 'Отмена' }).click();
+  expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('V9-02 does not persist an unsaved proposal offline', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const currentSet = page.locator('[data-workout-set-id="201"]');
+  await Promise.all([
+    waitForSetPatch(page, 201),
+    currentSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('80'),
+  ]);
+  await page.context().setOffline(true);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  await currentSet.getByText('Разминка и блины', { exact: true }).click();
+  await expect(page.getByText('Разминка требует подключения. Ничего не сохранено.')).toBeVisible();
+  await expect(currentSet.getByRole('button', { name: 'Подготовить разминку' })).toBeDisabled();
+  expect(await page.locator('[data-workout-set-id="301"]').count()).toBe(0);
+  await page.context().setOffline(false);
+});
+
 test('active workout keeps one obvious next action through logging, timer and finish', async ({
   page,
 }) => {
@@ -921,7 +1080,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(firstSet.getByText('Повторы в запасе (RIR)', { exact: true })).toBeVisible();
   await firstSet.getByText('Разминка и блины', { exact: true }).click();
   await firstSet.getByLabel('Вес снаряда, кг').fill('80');
-  await expect(firstSet.getByRole('status')).toContainText('На сторону:');
+  await expect(firstSet.locator('.active-workout-helper-result')).toContainText('На сторону:');
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   const firstDone = firstSet.getByRole('button', {
