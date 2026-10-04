@@ -1,14 +1,44 @@
-# Execution status v51
+# Execution status v52
 
-## Product v8 audit baseline — 2026-10-04
+## Product v8 current state — 2026-10-04
 
-Канонический pre-v8 audit и roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Зафиксированный baseline — `4526ce46231f70b76447e2b48f8febe84fad0f43` на `master` и
-`origin/master`; Product v7 и Task 544 завершены, migration `0117 -> 0118` применена,
-Product v8 и controller refactor не запускались. Этот раздел отражает фактический audit
-baseline и имеет приоритет над историческими owner-driven очередями ниже.
+Канонический Product v8 roadmap: [GitHub Issue #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
+Текущий baseline — `bffaf336f350def789376ce7eb299705371188f3` на `master` и
+`origin/master`; PR `#685` и PR `#686` merged. Product v8 **STARTED**.
 
-Audit reconciliation:
+V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**: Issue `#684` closed, PR `#686`
+merged, deployed SHA `bffaf336f350def789376ce7eb299705371188f3`. Для V8-01 не потребовались
+env, migration, schema или provider changes. Post-merge/release и production smoke зелёные.
+
+Product v8 current execution state:
+
+```text
+V8-01 / Task 684
+  -> COMPLETED / PRODUCTION VERIFIED
+
+V8-00 / Task 124B
+  -> WAITING_FOR_REAL_USER_EVIDENCE
+  -> no synthetic/demo substitution
+  -> V8-03 only from concrete real-user findings
+
+V8-02
+  -> BLOCKED_ON_EVIDENCE
+  -> no implementation
+
+V8-03
+  -> NOT CREATED / NOT EXECUTABLE
+  -> requires concrete V8-00 finding
+```
+
+No current executable Product v8 task exists: `NO_CURRENT_EXECUTABLE_PRODUCT_V8_TASK`.
+Не создавать V8-04+ без нового подтверждённого correctness/security/data-integrity/core-UX/
+production-performance или real-user finding. Controller refactor —
+`SEPARATE_INFRA_WORKSTREAM / DEFER`; exercise video technique evaluation —
+`NO_GO / OUT_OF_SCOPE`.
+
+Этот current-state block имеет приоритет над историческими owner-driven очередями ниже.
+
+Historical audit reconciliation:
 
 - Task `138` — `ALREADY_IMPLEMENTED`: security-gate/SkillSpector delivered through Task `364`
   and PR `#365`; это не dependency Product v8. Root task/link drift должен быть убран отдельной
@@ -25,27 +55,6 @@ Audit reconciliation:
 - Optional, owner-selected и infrastructure workstreams (`107`, `108`, `110`, `111`, `127`,
   `138`, `269`, `388`, `403`, `415`, AI/SEO pools) не запускаются автоматически и не становятся
   Product v8 только из-за наличия в backlog.
-
-Product v8 execution model:
-
-```text
-V8-01 / Task 684 trainer-demo capacity transport parity
-  -> execute now; independent of Task 124B
-
-V8-00 / Task 124B real-user evidence
-  -> parallel evidence workstream; WAITING_FOR_REAL_USER_EVIDENCE
-  -> V8-03 evidence-driven core UX remediation (conditional)
-
-V8-02 measurement reporting boundedness/telemetry
-  -> BLOCKED_ON_EVIDENCE; do not start now
-```
-
-V8-01 / Task 684 — единственный текущий executable product candidate; его issue создан из
-roadmap #683. V8-02/V8-03 не являются разрешением на реализацию до соответствующей evidence.
-Exercise video technique evaluation — `NO_GO` / `OUT_OF_SCOPE`.
-Audit не требует env change, migration, production data mutation, secret/provider/DNS change;
-реализация Product v8 начнётся с Task 684. Controller refactor — отдельный infrastructure
-workstream/defer, не dependency v8.
 
 Подтверждённое владельцем состояние на 28.08.2026:
 

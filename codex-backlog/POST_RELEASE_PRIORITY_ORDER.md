@@ -1,31 +1,42 @@
 # Порядок направлений после release gate `79`
 
-## Canonical Product v8 audit path — 2026-10-04
+## Canonical Product v8 current state — 2026-10-04
 
 См. [Product v8 audit roadmap #683](https://github.com/MikeMoore1337/your-fitness-coach/issues/683).
-Current release baseline: `4526ce46231f70b76447e2b48f8febe84fad0f43`; Product v7 закрыт,
-Product v8 не начат. Нижеследующая историческая UX-reset очередь не является автоматическим
-планом v8: она сохранена для provenance и reconciled audit'ом.
+Current release baseline: `bffaf336f350def789376ce7eb299705371188f3`; PR `#685` and PR `#686`
+merged. Product v8 **STARTED**; V8-01 / Task 684 — **COMPLETED / PRODUCTION VERIFIED**,
+Issue `#684` closed, deployed SHA `bffaf336f350def789376ce7eb299705371188f3`.
+No env, migration, schema or provider changes were required.
 
-Канонический порядок до появления новых owner-approved evidence:
+Канонический current-state decision до появления новых owner-approved evidence:
 
-1. `V8-01 / Task 684` — trainer demo capacity transport parity; единственная текущая executable
-   task, запускается первой и не зависит от `124B`, relative size `S`; production authorization/
-   data path не меняется.
-2. `V8-00 / Task 124B` — parallel production real-user validation, read-only evidence gate со
-   статусом `WAITING_FOR_REAL_USER_EVIDENCE`; demo и synthetic fixtures не считаются evidence.
-3. `V8-02` — bounded measurement/cohort reporting telemetry, только evidence-gated `P3`; сначала
-   read-only production-relevant evidence, без миграции и без преждевременной оптимизации.
-4. `V8-03` — core UX remediation только после реального user/cohort evidence; scope не создаёт
-   новый feature checklist.
+```text
+V8-01 / Task 684
+  -> COMPLETED / PRODUCTION VERIFIED
 
-`V8-00` не блокирует независимый `V8-01`. После успешного production closeout Task 684 нужно
-остановиться и не запускать `V8-02` или `V8-03` автоматически.
+V8-00 / Task 124B
+  -> WAITING_FOR_REAL_USER_EVIDENCE
+  -> no synthetic/demo substitution
+  -> V8-03 only from concrete real-user findings
+
+V8-02
+  -> BLOCKED_ON_EVIDENCE
+  -> no implementation
+
+V8-03
+  -> NOT CREATED / NOT EXECUTABLE
+  -> requires concrete V8-00 finding
+```
+
+`V8-01` больше не является pending/executable candidate. Сейчас нет допустимой следующей
+Product v8 task: `NO_CURRENT_EXECUTABLE_PRODUCT_V8_TASK`. Не создавать V8-04+ без нового
+подтверждённого correctness/security/data-integrity/core-UX/production-performance или real-user
+finding. Controller refactor — `SEPARATE_INFRA_WORKSTREAM / DEFER`.
 
 Существующие SEO, AI, legal, billing, import, PWA, notifications, camera/photo, controller и
 owner-selected tasks остаются outside v8 или под своими trigger/evidence gates. Старые записи
 `119` как “next product task” и последовательность `116 -> 119...` — historical/stale и не должны
-использоваться для запуска Product v8. Exercise video technique evaluation — `NO_GO`.
+использоваться для запуска Product v8. Exercise video technique evaluation — `NO_GO / OUT_OF_SCOPE`.
 
 ## Текущий owner-driven UX-reset cycle
 
