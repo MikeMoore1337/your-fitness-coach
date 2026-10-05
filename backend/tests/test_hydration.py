@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from threading import Barrier
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 from sqlalchemy.exc import IntegrityError
 
 from fitminiapp_api.core.timezone import today_in_timezone
-from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.hydration import HydrationEntryCreate, HydrationGoalSave
@@ -70,6 +73,30 @@ def test_hydration_quick_add_is_idempotent_and_isolated(client) -> None:
         ).status_code
         == 404
     )
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_concurrent_hydration_preset_upserts_keep_one_label(client) -> None:
+    headers = _auth(client, 81_009)
+    start = Barrier(2)
+
+    def save(volume_ml: int):
+        start.wait(timeout=5)
+        return client.post(
+            "/api/v1/nutrition/hydration/presets",
+            headers=headers,
+            json={"label": "Гонка", "volume_ml": volume_ml, "beverage_type": "water"},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(save, (250, 500)))
+
+    assert [response.status_code for response in responses] == [200, 200]
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 81_009).one()
+        presets = db.query(HydrationPreset).filter_by(user_id=user.id, label="Гонка").all()
+        assert len(presets) == 1
+        assert presets[0].volume_ml in {250, 500}
 
 
 def test_hydration_entry_can_be_edited_backdated_and_deleted(client) -> None:

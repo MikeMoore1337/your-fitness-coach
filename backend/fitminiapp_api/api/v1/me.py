@@ -601,6 +601,17 @@ def current_account_export(
     return _account_export_status(row)
 
 
+def _current_export_status_or_account_gone(
+    db: Session, user_id: int
+) -> AccountExportStatusResponse:
+    latest = db.query(AccountDataExport).filter(AccountDataExport.user_id == user_id).first()
+    if latest is None:
+        # Account deletion cascades the generation row while an archive may be
+        # building. Do not turn that expected lifecycle race into a 500.
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Аккаунт больше недоступен")
+    return _account_export_status(latest)
+
+
 @router.post(
     "/exports",
     response_model=AccountExportStatusResponse,
@@ -620,8 +631,7 @@ def create_account_export(
         archive_bytes, filename = build_account_export_archive(db, user)
         current_row = lock_account_export_generation(db, user.id, generation_id)
         if current_row is None:
-            latest = db.query(AccountDataExport).filter(AccountDataExport.user_id == user.id).one()
-            return _account_export_status(latest)
+            return _current_export_status_or_account_gone(db, user.id)
         complete_account_export(current_row, archive_bytes, filename)
         record_audit_event(
             db,
@@ -635,8 +645,7 @@ def create_account_export(
     except AccountExportError as exc:
         current_row = lock_account_export_generation(db, user.id, generation_id)
         if current_row is None:
-            latest = db.query(AccountDataExport).filter(AccountDataExport.user_id == user.id).one()
-            return _account_export_status(latest)
+            return _current_export_status_or_account_gone(db, user.id)
         fail_account_export(current_row, exc.error_code)
         record_audit_event(
             db,
@@ -651,8 +660,7 @@ def create_account_export(
         db.rollback()
         current_row = lock_account_export_generation(db, user.id, generation_id)
         if current_row is None:
-            latest = db.query(AccountDataExport).filter(AccountDataExport.user_id == user.id).one()
-            return _account_export_status(latest)
+            return _current_export_status_or_account_gone(db, user.id)
         fail_account_export(current_row, "generation_failed")
         db.commit()
         raise HTTPException(
