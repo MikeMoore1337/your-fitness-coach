@@ -188,7 +188,8 @@ test('active workout переживает offline edit, refresh и reconnect б�
   workoutOffline = false;
   workoutMissing = false;
   const callsBeforeReconnect = setPatchCalls;
-  await page.getByRole('button', { name: 'Повторить' }).click();
+  expect(await page.evaluate(() => navigator.onLine)).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect(page.getByText('Синхронизировано')).toBeVisible();
   expect(setPatchCalls - callsBeforeReconnect).toBe(1);
   expect(setState).toEqual({ actual_reps: 8, actual_weight: 40, is_completed: true });
