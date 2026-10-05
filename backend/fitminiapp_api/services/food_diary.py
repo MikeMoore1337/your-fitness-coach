@@ -1182,6 +1182,7 @@ def _perform_copy(
             FoodDiaryRepeatPreview.user_id == user.id,
             FoodDiaryRepeatPreview.token_hash == _preview_token_hash(payload.preview_token),
         )
+        .with_for_update()
         .first()
     )
     if preview is None:

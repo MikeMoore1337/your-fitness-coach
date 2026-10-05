@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from threading import Barrier, Lock
 
+import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import CheckConstraint, Column, Integer, MetaData, Table, create_engine, inspect
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Integer,
+    MetaData,
+    Table,
+    create_engine,
+    event,
+    inspect,
+)
 from sqlalchemy.orm import joinedload
 
 from fitminiapp_api import main as main_module
@@ -17,9 +29,13 @@ from fitminiapp_api.db.performance import (
     current_sql_metrics,
     reset_sql_metrics,
 )
-from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.food import Food
-from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.food_diary import (
+    FoodDiaryCopyOperation,
+    FoodDiaryEntry,
+    FoodDiaryRepeatPreview,
+)
 from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.user import User, UserProfile
 from fitminiapp_api.schemas.food_diary import FoodDiaryEntryCreate
@@ -569,6 +585,87 @@ def test_quick_add_full_macros_remain_available_to_day_totals(client) -> None:
     assert copied.status_code == 201, copied.text
     assert copied.json()["entries"][0]["entry_kind"] == "quick_add"
     assert copied.json()["entries"][0]["nutrition"] == response.json()["nutrition"]
+
+
+@pytest.mark.skipif(engine.dialect.name != "postgresql", reason="requires PostgreSQL row locks")
+def test_concurrent_repeat_confirmations_consume_one_preview(client) -> None:
+    telegram_user_id = 16_044
+    headers = _auth(client, telegram_user_id)
+    selected_date = timezone_module.today_in_timezone("Europe/Moscow") - timedelta(days=2)
+    source = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "quick_add": {"energy_kcal": "520"},
+            "diary_date": selected_date.isoformat(),
+            "meal_type": "dinner",
+            "amount": "1",
+            "amount_unit": "serving",
+        },
+    )
+    assert source.status_code == 201, source.text
+    request = {
+        "source_entry_id": source.json()["id"],
+        "source_date": selected_date.isoformat(),
+        "source_meal_type": "dinner",
+        "target_date": (selected_date + timedelta(days=1)).isoformat(),
+        "target_meal_type": "lunch",
+    }
+    preview = client.post(
+        "/api/v1/nutrition/diary/copy/product/preview",
+        headers=headers,
+        json=request,
+    )
+    assert preview.status_code == 200, preview.text
+    payload = {**request, "preview_token": preview.json()["preview_token"]}
+
+    preview_reads = 0
+    preview_reads_lock = Lock()
+    release_reads = Barrier(2)
+
+    def synchronize_preview_reads(
+        _conn, _cursor, statement, _parameters, _context, _executemany
+    ) -> None:
+        nonlocal preview_reads
+        if "food_diary_repeat_previews" not in statement or "token_hash" not in statement:
+            return
+        with preview_reads_lock:
+            preview_reads += 1
+        release_reads.wait(timeout=5)
+
+    event.listen(engine, "before_cursor_execute", synchronize_preview_reads)
+    try:
+        request_barrier = Barrier(2)
+
+        def confirm(key: str):
+            request_barrier.wait(timeout=5)
+            return client.post(
+                "/api/v1/nutrition/diary/copy/product",
+                headers={**headers, "Idempotency-Key": key},
+                json=payload,
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            responses = list(executor.map(confirm, ("repeat-race-a", "repeat-race-b")))
+    finally:
+        event.remove(engine, "before_cursor_execute", synchronize_preview_reads)
+
+    assert preview_reads == 2
+    assert sorted(response.status_code for response in responses) == [201, 409]
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == telegram_user_id).one()
+        stored_preview = db.query(FoodDiaryRepeatPreview).filter_by(user_id=user.id).one()
+        assert stored_preview.confirmed_at is not None
+        assert db.query(FoodDiaryCopyOperation).filter_by(user_id=user.id).count() == 1
+        assert (
+            db.query(FoodDiaryEntry)
+            .filter(
+                FoodDiaryEntry.user_id == user.id,
+                FoodDiaryEntry.diary_date == selected_date + timedelta(days=1),
+            )
+            .count()
+            == 1
+        )
 
 
 def test_quick_add_accepts_partial_macros_and_preserves_source_confidence(client) -> None:
