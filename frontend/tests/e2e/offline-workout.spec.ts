@@ -115,6 +115,19 @@ test('active workout переживает offline edit, refresh и reconnect б�
           remaining: null,
         },
       });
+    if (path.endsWith('/nutrition/diary/suggestions'))
+      return route.fulfill({
+        json: {
+          mode: 'deterministic',
+          diary_date: '2030-01-10',
+          targets: null,
+          remaining: null,
+          remaining_confidence: null,
+          limitations: [],
+          max_candidates: 0,
+          candidates: [],
+        },
+      });
     if (path.endsWith('/workouts/sets/201')) {
       setPatchCalls += 1;
       if (workoutOffline) return route.abort('internetdisconnected');

@@ -861,8 +861,11 @@ test('public 1RM calculator stays stateless, bounded and readable in light and d
     expect(pageState.events.map((event) => event.name)).toContain('calculator_started');
     expect(pageState.events.map((event) => event.name)).toContain('calculator_result');
     expect(pageState.events.every((event) => Object.keys(event).length === 5)).toBe(true);
-    expect(JSON.stringify(pageState.events)).not.toContain('100');
-    expect(JSON.stringify(pageState.events)).not.toContain('112');
+    const eventMetadata = pageState.events.map((event) =>
+      Object.fromEntries(Object.entries(event).filter(([key]) => key !== 'occurred_at')),
+    );
+    expect(JSON.stringify(eventMetadata)).not.toContain('100');
+    expect(JSON.stringify(eventMetadata)).not.toContain('112');
 
     if (process.env.TASK_241E_EVIDENCE_DIR) {
       await page.evaluate(() => {

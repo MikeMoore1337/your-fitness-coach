@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { installPlatformApi } from './fixtures/platform-api';
 
 const gymThumbnail = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
+const gymAnimation = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
 
 const gymExercise = {
   id: 39301,
@@ -26,7 +27,7 @@ const gymExercise = {
   source_exercise_id: null,
   media_state: 'approved_animated',
   media_thumbnail_url: gymThumbnail,
-  media_animation_url: '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif',
+  media_animation_url: gymAnimation,
 };
 
 const missingExercise = {
@@ -52,6 +53,12 @@ test('catalog missing-media thumbnail keeps square geometry and preserves approv
     route.fulfill({
       path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg',
       contentType: 'image/jpeg',
+    }),
+  );
+  await page.route(`**${gymAnimation}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif',
+      contentType: 'image/gif',
     }),
   );
 

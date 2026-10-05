@@ -1309,6 +1309,16 @@ export async function installPlatformApi(
     if (
       path.endsWith('/nutrition/diary/suggestions') &&
       request.method() === 'GET' &&
+      nutritionSuggestions === undefined
+    ) {
+      return route.fulfill({
+        status: 503,
+        json: { detail: 'Not available in platform smoke: /api/v1/nutrition/diary/suggestions' },
+      });
+    }
+    if (
+      path.endsWith('/nutrition/diary/suggestions') &&
+      request.method() === 'GET' &&
       nutritionSuggestions === 'empty'
     ) {
       return route.fulfill({

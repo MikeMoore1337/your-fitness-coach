@@ -77,6 +77,16 @@ async function mockFirstRunApi(
   profile: 'missing' | 'partial' | 'complete' = 'missing',
 ) {
   const user = onboardingUser(status, profile);
+  const suggestionsResponse = (url: URL) => ({
+    mode: 'deterministic',
+    diary_date: url.searchParams.get('diary_date') || '2030-01-30',
+    targets: null,
+    remaining: null,
+    remaining_confidence: null,
+    limitations: [],
+    max_candidates: 0,
+    candidates: [],
+  });
 
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
@@ -130,6 +140,9 @@ async function mockFirstRunApi(
           status_is_explicit: false,
         },
       });
+    }
+    if (path.endsWith('/nutrition/diary/suggestions')) {
+      return route.fulfill({ json: suggestionsResponse(url) });
     }
     if (path.endsWith('/workouts/progress/summary')) {
       return route.fulfill({
@@ -439,6 +452,14 @@ async function mockFirstRunApi(
       return route.fulfill({ json: [] });
     }
     return route.fulfill({ json: [] });
+  });
+
+  // Keep this route outside the broad handler: some tests replace that handler
+  // between navigations while a suggestions request from the previous view may
+  // still be in flight.
+  await page.route('**/api/v1/nutrition/diary/suggestions*', async (route) => {
+    const url = new URL(route.request().url());
+    return route.fulfill({ json: suggestionsResponse(url) });
   });
 }
 
