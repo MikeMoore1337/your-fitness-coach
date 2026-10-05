@@ -567,6 +567,10 @@
     background: var(--v2-canvas);
   }
 
+  .auth-public-shell--design-v2.auth-public-shell--design-v2-1 .login-card > [aria-busy='true'] {
+    min-block-size: 42rem;
+  }
+
   .auth-public-shell--design-v2-1 .login-privacy-note {
     display: none;
   }
