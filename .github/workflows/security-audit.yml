@@ -36,7 +36,7 @@ jobs:
           category: /language:${{ matrix.language }}
           output: .artifacts/codeql/${{ matrix.language }}
       - name: Enforce blocking CodeQL severities
-        run: python3 scripts/codeql_sarif_gate.py "${{ steps.codeql.outputs.sarif-output }}"
+        run: python3 scripts/codeql_sarif_gate.py ".artifacts/codeql/${{ matrix.language }}"
 
   dependency-audit:
     name: Dependency audit
