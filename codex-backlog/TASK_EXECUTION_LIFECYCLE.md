@@ -61,8 +61,9 @@ Lifecycle разделён на две coordination boundary:
   provenance, ancestor relation, exact-head `checks`, отсутствие production deployment и
   explicit no-deploy statement проверяются fail-closed. `merged-no-deploy` сохраняет immutable
   lease/history evidence, снимает implementation/delivery ownership и допускает missing task
-  worktree после проверки; active/dirty/ambiguous task remains blocked. Production-required task
-  не может пройти этот путь.
+  worktree после проверки; уже наблюдавшийся автоматический deployment только фиксируется в
+  evidence и не запускается повторно. Active/dirty/ambiguous task remains blocked.
+  Production-required task не может пройти этот путь.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
   может выполнить `refresh/rebase` относительно latest `origin/master`, current-base/provenance
   check, PR/CI, merge, product-task production deploy, smoke и terminal closeout. Owner сохраняется до завершения
