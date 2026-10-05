@@ -221,7 +221,8 @@ exact-head `checks`, отсутствие active/successful production deploymen
 merge SHA, однозначной PR provenance, valid lease/history transition или при production-required
 scope запись не выполняется. Успех атомарно сохраняет `merged-no-deploy` lease/history с PR,
 branch, original head, merge/master SHA, checks, reason, authorization, recovery/cleanup
-classification; lease больше не считается active, а missing worktree больше не блокирует
+classification и факт уже наблюдавшегося автоматического deployment, если он был; новый deploy
+не запускается. Lease больше не считается active, а missing worktree больше не блокирует
 canonical refresh. Старый `done` lease без этой history остаётся blocker до reconciliation.
 Команда не вызывает production deploy и не заменяет `complete-production`/`finish` для task,
 которым deployment действительно нужен.

@@ -2753,6 +2753,7 @@ class TaskController:
             )
         reason = history_payload.get("reason")
         contract = history_payload.get("no_deploy_contract")
+        deployment_observed = history_payload.get("production_deployment_observed")
         if (
             not isinstance(reason, str)
             or not reason.strip()
@@ -2760,6 +2761,8 @@ class TaskController:
             or not isinstance(contract, Mapping)
             or contract.get("statement") != NO_DEPLOY_CONTRACT_STATEMENT
             or contract.get("source") != "pull_request_body"
+            or not isinstance(deployment_observed, bool)
+            or lease.get("production_deployment_observed") != deployment_observed
         ):
             raise TaskSessionError(
                 f"Task {expected} merged/no-deploy history has no valid deployment contract"
@@ -8677,10 +8680,9 @@ class TaskController:
             raise TaskSessionError(
                 "Merged/no-deploy reconciliation requires the exact no-deploy contract in the PR body"
             )
-        if github.has_successful_deployment(normalized_merge_sha, "production"):
-            raise TaskSessionError(
-                "Merged/no-deploy reconciliation refuses a SHA with successful production deployment"
-            )
+        production_deployment_observed = github.has_successful_deployment(
+            normalized_merge_sha, "production"
+        )
 
         worktree_value = lease.get("worktree")
         if not isinstance(worktree_value, str) or not worktree_value.strip():
@@ -8772,6 +8774,7 @@ class TaskController:
             "authorization": "explicit --owner-authorize",
             "reason": normalized_reason,
             "deployment_required": False,
+            "production_deployment_observed": production_deployment_observed,
             "no_deploy_contract": contract,
             "pr_number": pr_number,
             "branch": branch,
@@ -8836,6 +8839,7 @@ class TaskController:
                     "terminal_result": MERGED_NO_DEPLOY_STATE,
                     "owner_authorized": True,
                     "deployment_required": False,
+                    "production_deployment_observed": production_deployment_observed,
                     "no_deploy_reason": normalized_reason,
                     "no_deploy_contract": contract,
                     "pr_number": pr_number,

@@ -3236,7 +3236,6 @@ def test_reconcile_merged_no_deploy_requires_owner_authorization(
         ("contract", "exact no-deploy contract"),
         ("ambiguous", "exactly one matching merged PR provenance"),
         ("non_ancestor", "not based on its recorded master base"),
-        ("production", "successful production deployment"),
     ],
 )
 def test_reconcile_merged_no_deploy_fails_closed_for_invalid_evidence(
@@ -3274,8 +3273,6 @@ def test_reconcile_merged_no_deploy_fails_closed_for_invalid_evidence(
         pull_request["merge_commit_sha"] = base_sha
         github.associated_pulls_by_commit[base_sha] = [pull_request]
         call_merge_sha = base_sha
-    elif mutation == "production":
-        github.successful_deployments.add((merge_sha, "production"))
     else:
         raise AssertionError(mutation)
     lease_before = controller.store.read_json(controller.store.task_lease_path("729"))
@@ -3291,6 +3288,27 @@ def test_reconcile_merged_no_deploy_fails_closed_for_invalid_evidence(
 
     assert controller.store.read_json(controller.store.task_lease_path("729")) == lease_before
     assert controller.store.read_json(controller.store.history / "task-729.json") is None
+
+
+def test_reconcile_merged_no_deploy_records_observed_automatic_deployment(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, _, merge_sha, github, _ = _prepare_merged_no_deploy_reconciliation(
+        repository
+    )
+    github.successful_deployments.add((merge_sha, "production"))
+
+    result = controller.reconcile_merged_no_deploy(
+        "729",
+        pr_number=730,
+        merge_sha=merge_sha,
+        reason="The merged CI-only task did not require another production deployment.",
+        owner_authorize=True,
+    )
+
+    assert result["history"]["state"] == task_session.MERGED_NO_DEPLOY_STATE
+    assert result["history"]["deployment_required"] is False
+    assert result["history"]["production_deployment_observed"] is True
 
 
 def test_reconcile_merged_no_deploy_rejects_dirty_or_changed_anchor(
