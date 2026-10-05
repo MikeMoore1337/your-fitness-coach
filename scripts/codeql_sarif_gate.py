@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 SECURITY_BLOCK_SCORE = 7.0
 BLOCKING_NON_SECURITY_LEVELS = {"error"}
@@ -76,9 +77,7 @@ def findings(document: dict[str, Any]) -> list[dict[str, Any]]:
             rule = rules.get(rule_id, {})
             score = _security_score(rule)
             level = _result_level(result, rule)
-            blocked = (
-                score is not None and score >= SECURITY_BLOCK_SCORE
-            ) or (
+            blocked = (score is not None and score >= SECURITY_BLOCK_SCORE) or (
                 score is None and level in BLOCKING_NON_SECURITY_LEVELS
             )
             path, line = _location(result)
