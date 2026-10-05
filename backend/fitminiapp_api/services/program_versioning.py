@@ -157,27 +157,36 @@ def list_program_import_targets(db: Session, actor: User) -> list[dict[str, obje
         .order_by(UserProgram.id.asc())
         .all()
     )
+    program_ids = [program.id for program in programs]
+    owner_ids = {program.user_id for program in programs if program.user_id != actor.id}
+    profiles_by_user_id = {
+        profile.user_id: profile
+        for profile in (
+            db.query(UserProfile).filter(UserProfile.user_id.in_(owner_ids)).all()
+            if owner_ids
+            else []
+        )
+    }
+    day_numbers_by_program: dict[int, set[int]] = {}
+    if program_ids:
+        day_rows = (
+            db.query(UserWorkout.user_program_id, UserWorkout.day_number)
+            .filter(UserWorkout.user_program_id.in_(program_ids))
+            .distinct()
+            .all()
+        )
+        for program_id, day_number in day_rows:
+            day_numbers_by_program.setdefault(program_id, set()).add(day_number)
+
     result: list[dict[str, object]] = []
     for program in programs:
-        try:
-            get_program_for_actor(db, actor, program.id)
-        except ProgramError:
-            continue
         owner_name = None
         if program.user_id != actor.id:
-            profile = db.query(UserProfile).filter(UserProfile.user_id == program.user_id).first()
+            profile = profiles_by_user_id.get(program.user_id)
             owner_name = (
                 profile.full_name if profile is not None else f"Пользователь {program.user_id}"
             )
-        day_numbers = sorted(
-            {
-                row[0]
-                for row in db.query(UserWorkout.day_number)
-                .filter(UserWorkout.user_program_id == program.id)
-                .distinct()
-                .all()
-            }
-        )
+        day_numbers = sorted(day_numbers_by_program.get(program.id, set()))
         if not day_numbers or len(day_numbers) > 8:
             continue
         result.append(
