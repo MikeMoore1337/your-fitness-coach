@@ -1301,6 +1301,23 @@ export async function installPlatformApi(
     if (path.endsWith('/auth/dev-login')) {
       return route.fulfill({ json: { access_token: 'dev-test-token', token_type: 'bearer' } });
     }
+    if (path.endsWith('/public/articles') && request.method() === 'GET') {
+      return route.fulfill({ json: [] });
+    }
+    if (path.endsWith('/nutrition/diary/suggestions') && request.method() === 'GET') {
+      return route.fulfill({
+        json: {
+          mode: 'deterministic',
+          diary_date: url.searchParams.get('diary_date') ?? today,
+          targets: null,
+          remaining: null,
+          remaining_confidence: null,
+          limitations: [],
+          max_candidates: 0,
+          candidates: [],
+        },
+      });
+    }
     if (path.endsWith('/ai-coach/status')) {
       return route.fulfill({
         json:

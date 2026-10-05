@@ -7,6 +7,95 @@ const capture =
     ?.YFC_CAPTURE_TASK_74A === '1';
 const screenshotRoot = '../.artifacts/runtime/tests/screenshots/task-74a';
 
+type WorkoutMotionEvidence = {
+  markerTransitions: Array<{ name: string; durationMs: number }>;
+  animationStarts: Array<{ name: string; durationMs: number }>;
+};
+
+async function armWorkoutMotionEvidence(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    if (!document.querySelector<HTMLElement>('.active-workout-set')) {
+      throw new Error('Expected an active workout set before completion action');
+    }
+
+    const evidence: WorkoutMotionEvidence = { markerTransitions: [], animationStarts: [] };
+    const durationMs = (value: string): number => {
+      const trimmed = value.trim();
+      return trimmed.endsWith('ms')
+        ? Number.parseFloat(trimmed)
+        : Number.parseFloat(trimmed) * 1_000;
+    };
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        const target = record.target;
+        if (
+          record.attributeName !== 'data-motion-confirm' ||
+          record.oldValue === 'true' ||
+          !(target instanceof HTMLElement) ||
+          !target.matches('.active-workout-set')
+        ) {
+          continue;
+        }
+        const style = getComputedStyle(target);
+        evidence.markerTransitions.push({
+          name: style.animationName,
+          durationMs: durationMs(style.animationDuration),
+        });
+      }
+    });
+    const onAnimationStart = (event: AnimationEvent) => {
+      const target = event.target;
+      if (
+        event.animationName !== 'active-workout-set-confirm' ||
+        !(target instanceof HTMLElement) ||
+        !target.matches('.active-workout-set')
+      ) {
+        return;
+      }
+      const style = getComputedStyle(target);
+      evidence.animationStarts.push({
+        name: event.animationName,
+        durationMs: durationMs(style.animationDuration),
+      });
+    };
+    observer.observe(document.body, {
+      attributes: true,
+      subtree: true,
+      attributeFilter: ['data-motion-confirm'],
+      attributeOldValue: true,
+    });
+    document.addEventListener('animationstart', onAnimationStart, true);
+
+    Object.assign(window, {
+      __yfcWorkoutMotionEvidence: evidence,
+      __yfcWorkoutMotionEvidenceCleanup: () => {
+        observer.disconnect();
+        document.removeEventListener('animationstart', onAnimationStart, true);
+      },
+    });
+  });
+}
+
+async function readWorkoutMotionEvidence(page: Page): Promise<WorkoutMotionEvidence> {
+  return page.evaluate(
+    () =>
+      (window as typeof window & { __yfcWorkoutMotionEvidence: WorkoutMotionEvidence })
+        .__yfcWorkoutMotionEvidence,
+  );
+}
+
+async function clearWorkoutMotionEvidence(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const windowWithEvidence = window as typeof window & {
+      __yfcWorkoutMotionEvidence?: WorkoutMotionEvidence;
+      __yfcWorkoutMotionEvidenceCleanup?: () => void;
+    };
+    windowWithEvidence.__yfcWorkoutMotionEvidenceCleanup?.();
+    delete windowWithEvidence.__yfcWorkoutMotionEvidence;
+    delete windowWithEvidence.__yfcWorkoutMotionEvidenceCleanup;
+  });
+}
+
 interface PilotTmaHarness {
   active(value: boolean): void;
   back(): void;
@@ -247,15 +336,39 @@ test('workout confirmation and Nutrition add keep final production state immedia
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installPlatformApi(page, { browserSession: true, workoutStatus: 'planned' });
+  const platformApi = await installPlatformApi(page, {
+    browserSession: true,
+    workoutStatus: 'planned',
+  });
   await page.goto('/app?section=today');
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
   await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
   await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+  await expect.poll(() => platformApi.setPatchCalls()).toBeGreaterThan(0);
+  await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+  await armWorkoutMotionEvidence(page);
   await page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
   const completedSet = page.locator('.active-workout-set').first();
-  await expect(completedSet).toHaveAttribute('data-motion-confirm', 'true');
+  await expect
+    .poll(async () => {
+      const evidence = await readWorkoutMotionEvidence(page);
+      return evidence.markerTransitions.length > 0 || evidence.animationStarts.length > 0;
+    })
+    .toBe(true);
+  const motionEvidence = await readWorkoutMotionEvidence(page);
+  expect([...motionEvidence.markerTransitions, ...motionEvidence.animationStarts]).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ name: 'active-workout-set-confirm', durationMs: 180 }),
+    ]),
+  );
+  const motionToken = await page.evaluate(() => {
+    const value = getComputedStyle(document.documentElement).getPropertyValue('--motion-state');
+    return value.endsWith('ms') ? Number.parseFloat(value) : Number.parseFloat(value) * 1_000;
+  });
+  expect(motionToken).toBe(180);
+  await clearWorkoutMotionEvidence(page);
   await expect(completedSet).toContainText('Выполнен');
+  await expect(completedSet).toHaveClass(/is-completed/);
   const restTimer = page.locator('.active-workout-rest');
   await expect(restTimer).toBeVisible();
   await restTimer.evaluate(async (element) => {
