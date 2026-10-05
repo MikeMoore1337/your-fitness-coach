@@ -55,6 +55,14 @@ Lifecycle разделён на две coordination boundary:
   ownership. Перед переходом controller проверяет отсутствие открытого PR этой task; archived
   `superseded` task не считается выполненной dependency. `superseded` не является
   `production-success`; такой task нельзя закрывать через `finish` или выпускать в production.
+- Owner-authorized `reconcile-merged-no-deploy` — отдельный успешный terminal переход для уже
+  merged CI-only task, когда production deploy по явному PR contract не требуется. Он не
+  переименовывает такой результат в `superseded`: same-repository PR, exact merge/head/base
+  provenance, ancestor relation, exact-head `checks`, отсутствие production deployment и
+  explicit no-deploy statement проверяются fail-closed. `merged-no-deploy` сохраняет immutable
+  lease/history evidence, снимает implementation/delivery ownership и допускает missing task
+  worktree после проверки; active/dirty/ambiguous task remains blocked. Production-required task
+  не может пройти этот путь.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
   может выполнить `refresh/rebase` относительно latest `origin/master`, current-base/provenance
   check, PR/CI, merge, product-task production deploy, smoke и terminal closeout. Owner сохраняется до завершения
