@@ -1,3 +1,5 @@
+from datetime import date
+
 from fitminiapp_api.api.v1.me import _build_user_response
 from fitminiapp_api.db.performance import (
     begin_sql_metrics,
@@ -6,7 +8,9 @@ from fitminiapp_api.db.performance import (
 )
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.nutrition import NutritionTarget
+from fitminiapp_api.models.program import ProgramTemplate, UserProgram, UserWorkout
 from fitminiapp_api.models.user import CoachClient, User, UserProfile
+from fitminiapp_api.services.program_versioning import list_program_import_targets
 from fitminiapp_api.services.programs import list_clients
 
 
@@ -91,3 +95,62 @@ def test_me_response_needs_five_queries_after_authentication() -> None:
     assert response.telegram_user_id == 2001
     assert response.auth_providers == ["telegram"]
     assert metrics.query_count == 5
+
+
+def test_coach_program_import_targets_keep_query_count_bounded_at_client_scale() -> None:
+    with get_session_context() as db:
+        coach = User(telegram_user_id=912_000, username="import_scale_coach", is_coach=True)
+        db.add(coach)
+        db.flush()
+        template = ProgramTemplate(
+            slug="import-scale-template",
+            title="Import scale",
+            goal="maintenance",
+            level="beginner",
+            default_duration_weeks=1,
+        )
+        db.add(template)
+        db.flush()
+
+        for index in range(25):
+            client = User(
+                telegram_user_id=913_000 + index,
+                username=f"import_scale_client_{index}",
+                profile=UserProfile(full_name=f"Import scale client {index}"),
+            )
+            db.add(client)
+            db.flush()
+            db.add(CoachClient(coach_user_id=coach.id, client_user_id=client.id))
+            program = UserProgram(
+                user_id=client.id,
+                template_id=template.id,
+                assigned_by_user_id=coach.id,
+                start_date=date.today(),
+                duration_weeks=1,
+                schedule_weekdays=[date.today().weekday()],
+                status="active",
+                is_active=True,
+            )
+            program.workouts.append(
+                UserWorkout(
+                    scheduled_date=date.today(),
+                    day_number=1,
+                    week_number=1,
+                    title="Import scale workout",
+                    status="planned",
+                )
+            )
+            db.add(program)
+        db.commit()
+        db.refresh(coach)
+
+        token = begin_sql_metrics()
+        try:
+            result = list_program_import_targets(db, coach)
+            metrics = current_sql_metrics()
+        finally:
+            reset_sql_metrics(token)
+
+    assert len(result) == 25
+    assert metrics.query_count <= 5
+    assert all(row["day_numbers"] == [1] for row in result)
