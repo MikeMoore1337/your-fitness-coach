@@ -4,12 +4,7 @@ from pathlib import Path
 from scripts import codeql_sarif_gate
 
 
-def _sarif(
-    *,
-    security_severity: str | None,
-    level: str,
-    suppressed: bool = False,
-) -> dict:
+def _sarif(*, security_severity: str | None, level: str, suppressed: bool = False) -> dict:
     properties = {}
     if security_severity is not None:
         properties["security-severity"] = security_severity
@@ -69,9 +64,7 @@ def test_high_security_finding_blocks(tmp_path: Path) -> None:
     ]
 
 
-def test_medium_security_finding_is_reported_but_does_not_block(
-    tmp_path: Path,
-) -> None:
+def test_medium_security_finding_is_reported_but_does_not_block(tmp_path: Path) -> None:
     path = _write(tmp_path, _sarif(security_severity="6.1", level="error"))
 
     result = codeql_sarif_gate.evaluate(path)
