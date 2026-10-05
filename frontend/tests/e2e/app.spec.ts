@@ -5,6 +5,10 @@ import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platf
 
 test.use({ serviceWorkers: 'block' });
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
+});
+
 type AppDestination = 'Сегодня' | 'План' | 'Прогресс' | 'Питание' | 'Упражнения' | 'Профиль';
 const TASK_293_EVIDENCE_DIR = process.env.TASK_293_EVIDENCE_DIR;
 const STAGE4_THUMBNAIL_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
@@ -109,6 +113,7 @@ test('мобильное меню не сохраняет активную за�
     viewport: { width: 390, height: 844 },
   });
   const page = await context.newPage();
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await page.goto('/');
 
@@ -447,6 +452,18 @@ async function mockApi(
     weekly_volume: [],
     personal_records: [],
   };
+  await page.route(`**${STAGE4_THUMBNAIL_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg',
+      contentType: 'image/jpeg',
+    }),
+  );
+  await page.route(`**${STAGE4_ANIMATION_URL}`, (route) =>
+    route.fulfill({
+      path: '../backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif',
+      contentType: 'image/gif',
+    }),
+  );
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -464,6 +481,8 @@ async function mockApi(
       role = body.is_admin ? 'admin' : body.is_coach ? 'coach' : 'client';
       return route.fulfill({ json: { access_token: 'test-token', token_type: 'bearer' } });
     }
+    if (path.endsWith('/public/articles') && request.method() === 'GET')
+      return route.fulfill({ json: [] });
     if (path.endsWith('/me/profile/heart-rates/preview')) {
       const body = request.postDataJSON() as {
         resting_heart_rate: number | null;

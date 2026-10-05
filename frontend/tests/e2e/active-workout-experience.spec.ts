@@ -220,6 +220,9 @@ async function mockActiveWorkout(
     if (path.endsWith('/auth/dev-login')) {
       return route.fulfill({ json: { access_token: 'test-token', token_type: 'bearer' } });
     }
+    if (path.endsWith('/public/articles') && request.method() === 'GET') {
+      return route.fulfill({ json: [] });
+    }
     if (path.endsWith('/me')) {
       return route.fulfill({
         json: {

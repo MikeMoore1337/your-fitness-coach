@@ -32,6 +32,10 @@ const screenshotRoot = captureTask109
     ? '../.artifacts/runtime/tests/landing/telegram-access'
     : '../.artifacts/runtime/tests/landing/owner-review';
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
+});
+
 async function openLanding(page: Page, theme: 'light' | 'dark') {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate((value) => localStorage.setItem('app-theme', value), theme);
@@ -701,6 +705,7 @@ test('captures the owner-review packet when requested', async ({ page, browser }
     deviceScaleFactor: 2,
   });
   const mobile360Page = await mobile360Context.newPage();
+  await mobile360Page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
   await mobile360Page.emulateMedia({ reducedMotion: 'reduce' });
   await openLanding(mobile360Page, 'light');
   await expectLandingReady(mobile360Page);

@@ -69,6 +69,7 @@ test.describe('motion demonstration', () => {
   test('scene finishes offscreen and hidden without replaying or delaying actions', async ({
     page,
   }) => {
+    await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/');

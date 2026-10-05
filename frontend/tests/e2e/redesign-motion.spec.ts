@@ -3,6 +3,10 @@ import { expectNoHorizontalOverflow } from './fixtures/mobile-tma';
 
 test.use({ video: 'on' });
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
+});
+
 async function scrollToProgress(page: Page, scene: Locator, progress: number) {
   const range = await scene.evaluate((element) => {
     const section = element as HTMLElement;
