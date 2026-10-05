@@ -1,11 +1,11 @@
 """Fail-closed task worktree, provenance and trunk-based release controller.
 
 The normal lifecycle is deliberately small: a task branch is based on master,
-runs relevant local checks, enters a PR into master, and is closed only after
-the merged master revision is deployed successfully. GitHub CI is the release
-quality source of truth; local checks provide fast feedback and do not create
-release evidence. Coordination state lives in the shared Git common directory
-and is never committed.
+runs relevant local checks, enters a PR into master, and closes through either
+verified production success or an explicit merged/no-deploy terminal contract.
+GitHub CI is the release quality source of truth; local checks provide fast
+feedback and do not create release evidence. Coordination state lives in the
+shared Git common directory and is never committed.
 """
 
 from __future__ import annotations
@@ -153,7 +153,13 @@ WORKING_STATE = "working"
 HUMAN_REQUIRED_STATE = "human-required"
 DEPLOYED_STATE = "deployed"
 DONE_STATE = "done"
-DURABLE_LEASE_STATES = frozenset({WORKING_STATE, HUMAN_REQUIRED_STATE, DEPLOYED_STATE, DONE_STATE})
+MERGED_NO_DEPLOY_STATE = "merged-no-deploy"
+NO_DEPLOY_CONTRACT_STATEMENT = (
+    "CI-only change; no production deploy is required by the diff classification."
+)
+DURABLE_LEASE_STATES = frozenset(
+    {WORKING_STATE, HUMAN_REQUIRED_STATE, DEPLOYED_STATE, DONE_STATE, MERGED_NO_DEPLOY_STATE}
+)
 DERIVED_LIFECYCLE_STATES = frozenset({"queued", "pr-open", "ci-green", "merged"})
 LEGACY_LIFECYCLE_STATE_MAP = {
     "starting": WORKING_STATE,
@@ -183,7 +189,10 @@ WAITING_STATES = frozenset({WORKING_STATE})
 DELIVERY_STATES = frozenset({WORKING_STATE})
 TERMINAL_LEASE_STATES = frozenset({DEPLOYED_STATE})
 SUPERSEDED_LEASE_STATES = frozenset({DONE_STATE})
-CLOSED_LEASE_STATES = TERMINAL_LEASE_STATES | SUPERSEDED_LEASE_STATES
+NO_DEPLOY_TERMINAL_LEASE_STATES = frozenset({MERGED_NO_DEPLOY_STATE})
+CLOSED_LEASE_STATES = (
+    TERMINAL_LEASE_STATES | SUPERSEDED_LEASE_STATES | NO_DEPLOY_TERMINAL_LEASE_STATES
+)
 RECOVERY_STATES = frozenset({HUMAN_REQUIRED_STATE})
 KNOWN_LEASE_STATES = DURABLE_LEASE_STATES | set(LEGACY_LIFECYCLE_STATE_MAP)
 DELIVERY_OWNER_STATES = frozenset({WORKING_STATE, DEPLOYED_STATE})
@@ -2073,6 +2082,23 @@ class TaskController:
                     f"(Tasks {lease_worktrees[worktree_key]} and {raw_task_id})",
                 )
             lease_worktrees[worktree_key] = raw_task_id
+            state = self._lease_state(lease)
+            raw_state = self._raw_lease_state(lease)
+            if state == MERGED_NO_DEPLOY_STATE:
+                try:
+                    self._validated_merged_no_deploy_closeout(raw_task_id, lease)
+                except TaskSessionError as error:
+                    return ("BLOCKED", str(error))
+                if lease.get("delivery_owner") is not None or raw_state in {
+                    "delivering",
+                    "delivery-refreshing",
+                    "delivery-gate",
+                }:
+                    return (
+                        "BLOCKED",
+                        f"Task {raw_task_id} merged/no-deploy lease has delivery ownership",
+                    )
+                continue
             repository_worktree = repository_worktrees.get(worktree_key)
             if repository_worktree is None:
                 return (
@@ -2084,8 +2110,6 @@ class TaskController:
                     "BLOCKED",
                     f"Task {raw_task_id} lease worktree branch does not match {branch}",
                 )
-            state = self._lease_state(lease)
-            raw_state = self._raw_lease_state(lease)
             has_delivery_claim = lease.get("delivery_owner") == raw_task_id or raw_state in {
                 "delivering",
                 "delivery-refreshing",
@@ -2649,7 +2673,10 @@ class TaskController:
 
         for history_path in sorted(self.store.history.glob("task-*.json")):
             history = self.store.read_json(history_path)
-            if not isinstance(history, dict) or history.get("state") != "finished":
+            if not isinstance(history, dict) or history.get("state") not in {
+                "finished",
+                MERGED_NO_DEPLOY_STATE,
+            }:
                 continue
             raw_task_id = history.get("task_id")
             if not isinstance(raw_task_id, str):
@@ -2663,8 +2690,113 @@ class TaskController:
             lease = self.store.read_json(self.store.task_lease_path(task_id))
             if isinstance(lease, dict) and self._lease_state(lease) in SUPERSEDED_LEASE_STATES:
                 continue
+            if history.get("state") == MERGED_NO_DEPLOY_STATE:
+                if (
+                    not isinstance(lease, dict)
+                    or self._lease_state(lease) != MERGED_NO_DEPLOY_STATE
+                ):
+                    continue
+                try:
+                    self._validated_merged_no_deploy_closeout(task_id, lease, history=history)
+                except TaskSessionError:
+                    continue
             result.add(task_id)
         return result
+
+    def _validated_merged_no_deploy_closeout(
+        self,
+        task_id: str,
+        lease: Mapping[str, Any],
+        *,
+        history: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Validate the immutable evidence for an anchorless CI-only terminal lease."""
+
+        expected = normalize_task_id(task_id)
+        if self._lease_state(lease) != MERGED_NO_DEPLOY_STATE:
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy lease has an invalid lifecycle state"
+            )
+        if lease.get("mode") != "write" or str(lease.get("task_id", "")).upper() != expected:
+            raise TaskSessionError(f"Task {expected} merged/no-deploy lease identity is invalid")
+        if (
+            lease.get("owner_authorized") is not True
+            or lease.get("deployment_required") is not False
+        ):
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy lease lacks explicit owner terminal evidence"
+            )
+        if lease.get("delivery_owner") is not None:
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy lease still claims delivery ownership"
+            )
+        if history is None:
+            history_payload = self.store.read_json(self.store.history / f"task-{expected}.json")
+        else:
+            history_payload = history
+        if not isinstance(history_payload, Mapping):
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy lease has no terminal history"
+            )
+        required_history = {
+            "version": TASK_STATE_VERSION,
+            "task_id": expected,
+            "state": MERGED_NO_DEPLOY_STATE,
+            "lease_state": MERGED_NO_DEPLOY_STATE,
+            "terminal_result": MERGED_NO_DEPLOY_STATE,
+            "owner_authorized": True,
+            "deployment_required": False,
+        }
+        if any(history_payload.get(key) != value for key, value in required_history.items()):
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy history is incomplete or ambiguous"
+            )
+        reason = history_payload.get("reason")
+        contract = history_payload.get("no_deploy_contract")
+        if (
+            not isinstance(reason, str)
+            or not reason.strip()
+            or len(reason.strip()) > 4096
+            or not isinstance(contract, Mapping)
+            or contract.get("statement") != NO_DEPLOY_CONTRACT_STATEMENT
+            or contract.get("source") != "pull_request_body"
+        ):
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy history has no valid deployment contract"
+            )
+        pr_number = history_payload.get("pr_number")
+        if type(pr_number) is not int or pr_number <= 0 or lease.get("pr_number") != pr_number:
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy history has invalid PR provenance"
+            )
+        for key in ("base_sha", "head_sha", "merge_sha", "reconciled_against_master_sha"):
+            if re.fullmatch(r"[0-9a-f]{40}", str(history_payload.get(key, ""))) is None:
+                raise TaskSessionError(
+                    f"Task {expected} merged/no-deploy history has invalid {key}"
+                )
+        if history_payload.get("merge_sha") != lease.get("merge_sha"):
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy lease/history merge SHA differs"
+            )
+        if history_payload.get("branch") != lease.get("branch"):
+            raise TaskSessionError(f"Task {expected} merged/no-deploy lease/history branch differs")
+        required_check = history_payload.get("required_check")
+        if required_check != {
+            "name": "checks",
+            "head_sha": history_payload.get("head_sha"),
+            "status": "completed",
+            "conclusion": "SUCCESS",
+        }:
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy history lacks exact required-check evidence"
+            )
+        if not isinstance(history_payload.get("completed_at"), str) or not history_payload.get(
+            "completed_at"
+        ):
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy history has no completion timestamp"
+            )
+        return dict(history_payload)
 
     @staticmethod
     def _lease_state(lease: Mapping[str, Any]) -> str:
@@ -2714,7 +2846,7 @@ class TaskController:
         cls, lease: Mapping[str, Any], *, delivery_owner_id: str
     ) -> dict[str, bool]:
         task_session_active = lease.get("mode") == "write" and (
-            cls._lease_state(lease) not in SUPERSEDED_LEASE_STATES
+            cls._lease_state(lease) not in CLOSED_LEASE_STATES
         )
         try:
             implementation_exclusion_active = cls._lease_holds_implementation_exclusion(lease)
@@ -3070,8 +3202,7 @@ class TaskController:
         active_task_ids = {
             item.get("task_id")
             for item in leases
-            if item.get("mode") == "write"
-            and self._lease_state(item) not in SUPERSEDED_LEASE_STATES
+            if item.get("mode") == "write" and self._lease_state(item) not in CLOSED_LEASE_STATES
         }
         if any(item.get("mode") in {"integration", "release"} for item in leases):
             recovery_findings.append(
@@ -8425,6 +8556,305 @@ class TaskController:
             StateStore.replace_json(lease_path, current)
         return current
 
+    def reconcile_merged_no_deploy(
+        self,
+        task_id: str,
+        *,
+        pr_number: int,
+        merge_sha: str,
+        reason: str,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        """Close a verified merged CI-only task without inventing production evidence."""
+
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation requires explicit owner authorization"
+            )
+        if type(pr_number) is not int or pr_number <= 0:
+            raise TaskSessionError("Merged/no-deploy reconciliation requires a positive PR number")
+        if not isinstance(merge_sha, str):
+            raise TaskSessionError("Merged/no-deploy reconciliation requires a string merge SHA")
+        normalized_merge_sha = merge_sha.strip()
+        if re.fullmatch(r"[0-9a-f]{40}", normalized_merge_sha) is None:
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation requires a full lowercase merge SHA"
+            )
+        if not isinstance(reason, str):
+            raise TaskSessionError("Merged/no-deploy reason must be a string")
+        normalized_reason = reason.strip()
+        if not normalized_reason or len(normalized_reason) > 4096:
+            raise TaskSessionError("Merged/no-deploy reason must be a bounded non-empty string")
+
+        lease_path = self.store.task_lease_path(expected)
+        history_path = self.store.history / f"task-{expected}.json"
+        lease = self.store.read_json(lease_path)
+        if not isinstance(lease, dict):
+            raise TaskSessionError(f"Task {expected} has no lease to reconcile")
+        if lease.get("task_id") != expected or lease.get("mode") != "write":
+            raise TaskSessionError(f"Task {expected} lease is not a valid write lease")
+        initial_state = self._lease_state(lease)
+        if initial_state in TERMINAL_LEASE_STATES | NO_DEPLOY_TERMINAL_LEASE_STATES:
+            raise TaskSessionError(
+                f"Task {expected} cannot be reconciled from terminal state {initial_state}"
+            )
+        allowed_states = IMPLEMENTATION_STATES | READY_STATES | WAITING_STATES | RECOVERY_STATES
+        if initial_state not in allowed_states | SUPERSEDED_LEASE_STATES:
+            raise TaskSessionError(
+                f"Task {expected} cannot be reconciled from {lease.get('lifecycle_state')}"
+            )
+        if self.store.read_json(history_path) is not None:
+            raise TaskSessionError(f"Task {expected} already has terminal history")
+
+        delivery = self.store.delivery_state()
+        if delivery.get("owner") is not None or lease.get("delivery_owner") is not None:
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation requires an empty delivery lane"
+            )
+        if lease.get("branch") is None or lease.get("worktree") is None:
+            raise TaskSessionError(
+                f"Task {expected} merged/no-deploy reconciliation lacks a Git anchor"
+            )
+        branch = str(lease["branch"])
+        if task_id_from_branch(branch) != expected:
+            raise TaskSessionError(f"Task {expected} lease branch does not match its task ID")
+
+        try:
+            self.repository.fetch_origin_master(cwd=self.repository.current_worktree, prune=True)
+        except (TaskSessionError, OSError) as error:
+            raise TaskSessionError(
+                f"Cannot refresh origin/master for merged/no-deploy reconciliation: {error}"
+            ) from error
+        master_sha = self.repository.ref("origin/master")
+        if re.fullmatch(r"[0-9a-f]{40}", master_sha) is None:
+            raise TaskSessionError("origin/master is not a full lowercase Git SHA")
+        self._verify_live_master(master_sha)
+        if self._active_production_deployment():
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation refuses while a production deployment is active"
+            )
+
+        github = self._github()
+        associated = github.pull_requests_for_commit(normalized_merge_sha)
+        exact_provenance: list[int] = []
+        for row in associated:
+            if not isinstance(row, Mapping):
+                raise TaskSessionError("GitHub returned malformed merged PR provenance")
+            base = row.get("base")
+            number = row.get("number")
+            if not isinstance(base, Mapping):
+                raise TaskSessionError("GitHub returned malformed merged PR provenance")
+            if (
+                row.get("merged_at")
+                and base.get("ref") == TARGET_BASE_BRANCH
+                and row.get("merge_commit_sha") == normalized_merge_sha
+            ):
+                if type(number) is not int or number <= 0:
+                    raise TaskSessionError("GitHub returned an invalid merged PR number")
+                exact_provenance.append(number)
+        if exact_provenance != [pr_number]:
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation requires exactly one matching merged PR provenance"
+            )
+
+        evidence = self._verified_reconciliation_pr(pr_number, expected, master_sha)
+        if evidence["merge_sha"] != normalized_merge_sha:
+            raise TaskSessionError("Provided merge SHA does not match the verified task PR")
+        if evidence["branch"] != branch:
+            raise TaskSessionError("Verified task PR branch does not match the task lease")
+        if lease.get("base_origin_master_sha") != evidence["base_sha"]:
+            raise TaskSessionError("Verified task PR base does not match the task lease")
+        original_base = lease.get("original_base_origin_master_sha")
+        if original_base is not None and original_base != evidence["base_sha"]:
+            raise TaskSessionError("Verified task PR base does not match the original task anchor")
+
+        pull_request = github.pull_request(pr_number)
+        body = pull_request.get("body")
+        if not isinstance(body, str) or not any(
+            line.strip() == NO_DEPLOY_CONTRACT_STATEMENT for line in body.splitlines()
+        ):
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation requires the exact no-deploy contract in the PR body"
+            )
+        if github.has_successful_deployment(normalized_merge_sha, "production"):
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation refuses a SHA with successful production deployment"
+            )
+
+        worktree_value = lease.get("worktree")
+        if not isinstance(worktree_value, str) or not worktree_value.strip():
+            raise TaskSessionError(f"Task {expected} lease has no valid worktree anchor")
+        worktree_path = Path(worktree_value).resolve()
+        expected_parent = (self._canonical_root() / ".artifacts" / "worktrees").resolve()
+        if (
+            worktree_path.parent != expected_parent
+            or worktree_path == self._canonical_root().resolve()
+        ):
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation worktree is outside the canonical task worktree directory"
+            )
+        branch_refs = [
+            line.removeprefix("refs/heads/")
+            for line in self.repository.git(
+                "for-each-ref", "--format=%(refname)", f"refs/heads/{branch}"
+            ).splitlines()
+            if line
+        ]
+        if len(branch_refs) > 1:
+            raise TaskSessionError("Merged/no-deploy reconciliation found duplicate task branches")
+        matches = [
+            item
+            for item in self.repository.worktrees()
+            if item.path == worktree_path or item.branch == branch
+        ]
+        if len(matches) > 1:
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation found duplicate task worktree anchors"
+            )
+        if matches:
+            match = matches[0]
+            if match.path != worktree_path or match.branch != branch:
+                raise TaskSessionError(
+                    "Merged/no-deploy reconciliation found a mismatched task worktree anchor"
+                )
+            if self.repository.status(worktree_path):
+                raise TaskSessionError(
+                    "Merged/no-deploy reconciliation refuses a dirty task worktree"
+                )
+            operations = self.repository.operation_issues(worktree_path)
+            if operations:
+                raise TaskSessionError(
+                    "Merged/no-deploy reconciliation refuses an interrupted task worktree"
+                )
+            if self.repository.head(cwd=worktree_path) != evidence["head_sha"]:
+                raise TaskSessionError(
+                    "Merged/no-deploy reconciliation refuses a changed task worktree head"
+                )
+        elif worktree_path.exists():
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation refuses unregistered task worktree residue"
+            )
+        if branch_refs and self.repository.ref(branch) != evidence["head_sha"]:
+            raise TaskSessionError(
+                "Merged/no-deploy reconciliation refuses an unmerged or changed task branch"
+            )
+
+        worktree_evidence = {
+            "path": str(worktree_path),
+            "registered": bool(matches),
+            "branch_present": bool(branch_refs),
+            "head_sha": evidence["head_sha"],
+            "cleanup_classification": (
+                "preserved_clean_anchor"
+                if matches or branch_refs
+                else "anchor_missing_but_pr_verified"
+            ),
+        }
+        now = utc_now()
+        recovery_classification = (
+            "corrected_stale_superseded_lease"
+            if initial_state in SUPERSEDED_LEASE_STATES
+            else "merged_no_deploy_terminal"
+        )
+        contract = {
+            "statement": NO_DEPLOY_CONTRACT_STATEMENT,
+            "source": "pull_request_body",
+            "pr_number": pr_number,
+        }
+        history = {
+            "version": TASK_STATE_VERSION,
+            "task_id": expected,
+            "state": MERGED_NO_DEPLOY_STATE,
+            "lease_state": MERGED_NO_DEPLOY_STATE,
+            "terminal_result": MERGED_NO_DEPLOY_STATE,
+            "owner_authorized": True,
+            "authorization": "explicit --owner-authorize",
+            "reason": normalized_reason,
+            "deployment_required": False,
+            "no_deploy_contract": contract,
+            "pr_number": pr_number,
+            "branch": branch,
+            "base_sha": evidence["base_sha"],
+            "head_sha": evidence["head_sha"],
+            "merge_sha": normalized_merge_sha,
+            "merged_at": evidence["merged_at"],
+            "required_check": evidence["required_check"],
+            "reconciled_against_master_sha": master_sha,
+            "worktree_evidence": worktree_evidence,
+            "recovery": {
+                "classification": recovery_classification,
+                "previous_lease_state": initial_state,
+                "previous_terminal_result": lease.get("terminal_result"),
+                "worktree_required": False,
+            },
+            "completed_at": now,
+        }
+
+        with self.store.lock():
+            current = self.store.read_json(lease_path)
+            current_delivery = self.store.delivery_state()
+            current_history = self.store.read_json(history_path)
+            if current != lease or current_history is not None:
+                raise TaskSessionError(
+                    "Task lease or history changed during merged/no-deploy reconciliation"
+                )
+            if current_delivery.get("owner") != delivery.get("owner"):
+                raise TaskSessionError("Delivery ownership changed during reconciliation")
+            if current_delivery.get("owner") is not None:
+                raise TaskSessionError("Merged/no-deploy reconciliation found a delivery owner")
+            if self._lease_state(current) not in allowed_states | SUPERSEDED_LEASE_STATES:
+                raise TaskSessionError(
+                    "Task lease changed to an incompatible state during reconciliation"
+                )
+            for key in (
+                "delivery_owner",
+                "delivery_acquired_at",
+                "delivery_base_origin_master_sha",
+                "delivery_head_sha",
+                "delivery_anchor",
+                "delivery_released_at",
+                "delivery_failed_at",
+                "delivery_handoff_blocker",
+                "delivery_next_owner",
+                "delivery_waiting_since",
+                "ready_head_sha",
+                "ready_base_origin_master_sha",
+                "ready_for_delivery_at",
+                "ready_sequence",
+                "quality_verdict",
+                "qa_verdict",
+                "task_provenance",
+                "canonical_master_refresh",
+                "delivery_priority_override",
+                "deployed_sha",
+            ):
+                current.pop(key, None)
+            current.update(
+                {
+                    "lifecycle_state": MERGED_NO_DEPLOY_STATE,
+                    "terminal_result": MERGED_NO_DEPLOY_STATE,
+                    "owner_authorized": True,
+                    "deployment_required": False,
+                    "no_deploy_reason": normalized_reason,
+                    "no_deploy_contract": contract,
+                    "pr_number": pr_number,
+                    "head_sha": evidence["head_sha"],
+                    "merge_sha": normalized_merge_sha,
+                    "updated_at": now,
+                }
+            )
+            StateStore.replace_json(lease_path, current)
+            StateStore.replace_json(history_path, history)
+        return {
+            "task_id": expected,
+            "lease": current,
+            "history": history,
+            "delivery": self.store.delivery_state(),
+            "recovery_classification": recovery_classification,
+            "mutation_performed": True,
+        }
+
     def record_production_success(
         self,
         task_id: str,
@@ -10083,11 +10513,19 @@ class TaskController:
         ]
         issues: list[str] = []
         state = self._lease_state(lease) if isinstance(lease, dict) else ""
+        anchorless_terminal = False
+        if isinstance(lease, dict) and state == MERGED_NO_DEPLOY_STATE:
+            try:
+                self._validated_merged_no_deploy_closeout(expected, lease)
+            except TaskSessionError:
+                pass
+            else:
+                anchorless_terminal = True
         if lease is None:
             issues.append("missing task lease")
         if len(branches) > 1 or len(matches) > 1:
             issues.append("duplicate task branch/worktree")
-        if lease and not matches:
+        if lease and not matches and not anchorless_terminal:
             issues.append("lease exists but worktree is missing")
         stale_or_interrupted = any(item["dirty"] or item["operation_issues"] for item in details)
         if stale_or_interrupted:
@@ -10113,6 +10551,8 @@ class TaskController:
             )
         elif state in SUPERSEDED_LEASE_STATES:
             classification = "SUPERSEDED"
+        elif state in NO_DEPLOY_TERMINAL_LEASE_STATES and anchorless_terminal:
+            classification = "MERGED_NO_DEPLOY"
         elif state in TERMINAL_LEASE_STATES:
             classification = "TERMINAL_SUCCESS"
         elif owner_id == expected or lease.get("delivery_owner") == expected:
@@ -10732,6 +11172,20 @@ def archive_guard(backlog_root: Path, task_id: str) -> None:
         return
     lease = store.read_json(store.task_lease_path(expected))
     if (
+        isinstance(history, dict)
+        and isinstance(lease, dict)
+        and history.get("state") == MERGED_NO_DEPLOY_STATE
+        and canonical_lifecycle_state(lease.get("lifecycle_state")) == MERGED_NO_DEPLOY_STATE
+    ):
+        try:
+            TaskController(GitRepository(repository_root))._validated_merged_no_deploy_closeout(
+                expected, lease, history=history
+            )
+        except TaskSessionError:
+            pass
+        else:
+            return
+    if (
         isinstance(lease, dict)
         and lease.get("task_id") == expected
         and lease.get("mode") == "write"
@@ -10861,6 +11315,12 @@ def _parser() -> argparse.ArgumentParser:
     production.add_argument("--pr", type=int, required=True)
     production.add_argument("--merge-sha", required=True)
     production.add_argument("--deployed-sha", required=True)
+    reconcile_no_deploy = subparsers.add_parser("reconcile-merged-no-deploy")
+    reconcile_no_deploy.add_argument("task_id")
+    reconcile_no_deploy.add_argument("--pr", type=int, required=True)
+    reconcile_no_deploy.add_argument("--merge-sha", required=True)
+    reconcile_no_deploy.add_argument("--reason", required=True)
+    reconcile_no_deploy.add_argument("--owner-authorize", action="store_true")
     reconcile_production = subparsers.add_parser("reconcile-production-success")
     reconcile_production.add_argument("task_id")
     reconcile_production.add_argument("--original-pr", type=int, required=True)
@@ -11091,6 +11551,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     pr_number=args.pr,
                     merge_sha=args.merge_sha,
                     deployed_sha=args.deployed_sha,
+                )
+            )
+            return 0
+        if args.command == "reconcile-merged-no-deploy":
+            _print(
+                controller.reconcile_merged_no_deploy(
+                    args.task_id,
+                    pr_number=args.pr,
+                    merge_sha=args.merge_sha,
+                    reason=args.reason,
+                    owner_authorize=args.owner_authorize,
                 )
             )
             return 0

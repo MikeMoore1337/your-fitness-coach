@@ -176,13 +176,16 @@ commits, divergence refs, changed head и artifact cleanup error останав�
 
 ### Durable lease model (#583)
 
-Новые lease используют только четыре durable lifecycle state:
+Новые lease используют только пять durable lifecycle state:
 
 - `working` — реализация, готовность к delivery и текущая delivery ownership;
 - `human-required` — неоднозначность или owner-required recovery; такая задача не
   репромоутится в delivery автоматически;
 - `deployed` — exact merge/deployment уже подтверждены, но `finish` ещё не завершил closeout;
 - `done` — owner-authorized supersede с сохранённым Git anchor.
+- `merged-no-deploy` — exact merged PR, required `checks` и явный no-deploy contract уже
+  подтверждены, а production deployment по contract не требуется. Это успешная dependency, но
+  не `production-success`; lease сохраняет immutable evidence и не удерживает delivery lane.
 
 `queued`, `pr-open`, `ci-green` и `merged` — derived labels из `ready_head_sha`, `delivery.json`,
 GitHub PR/checks и Git merge/deployment evidence. Они не записываются как lease state и не
@@ -199,6 +202,29 @@ history не переписывается и destructive migration не выпо
 `recover` — read-only диагностика. Он сохраняет dirty files, unique commits и interrupted Git
 operations для owner-safe решения. Ни `recover`, ни `finish` не выполняют `reset --hard`, force
 delete или несанкционированное восстановление.
+
+Для уже merged CI-only task, у которой delivery lease осталась в старом stale/superseded состоянии
+или task worktree больше не существует, используется отдельная owner-authorized команда:
+
+```powershell
+./.venv/Scripts/python.exe scripts/task_session.py reconcile-merged-no-deploy 729 `
+  --pr 730 `
+  --merge-sha <exact-merged-sha> `
+  --reason "CI-only dependency remediation; production deploy is not required" `
+  --owner-authorize
+```
+
+Она fail-closed проверяет same-repository merged PR, branch/task provenance, ancestor merge,
+exact-head `checks`, отсутствие active/successful production deployment, отсутствие dirty или
+изменённого task anchor и точную строку в PR body:
+`CI-only change; no production deploy is required by the diff classification.` Без owner authorization, explicit contract, полного
+merge SHA, однозначной PR provenance, valid lease/history transition или при production-required
+scope запись не выполняется. Успех атомарно сохраняет `merged-no-deploy` lease/history с PR,
+branch, original head, merge/master SHA, checks, reason, authorization, recovery/cleanup
+classification; lease больше не считается active, а missing worktree больше не блокирует
+canonical refresh. Старый `done` lease без этой history остаётся blocker до reconciliation.
+Команда не вызывает production deploy и не заменяет `complete-production`/`finish` для task,
+которым deployment действительно нужен.
 
 Если `human-required` lease возник из-за прерванного delivery, а его единственный task worktree чист,
 не имеет Git-операций и однозначно совпадает с lease, владелец может явно вернуть его в `working`:

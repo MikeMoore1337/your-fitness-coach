@@ -282,6 +282,64 @@ def _prepare_started(
     return root, git_repository, controller, worktree, branch, base_sha + ":" + head_sha
 
 
+def _prepare_merged_no_deploy_reconciliation(
+    repository: tuple[Path, Any],
+    task_id: str = "729",
+    *,
+    stale_done: bool = True,
+    keep_anchor: bool = False,
+) -> tuple[Path, Any, Any, Path, str, str, str, str, FakeGitHub, dict[str, Any]]:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, task_id
+    )
+    base_sha, head_sha = sha_pair.split(":")
+    merge_sha = _publish_task_squash_without_advancing_local_master(root, branch)
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    github.master_sha = merge_sha
+    pull_request = _task_pr(730, task_id, base_sha, head_sha, merge_sha=merge_sha)
+    pull_request.update(
+        {
+            "state": "closed",
+            "body": task_session.NO_DEPLOY_CONTRACT_STATEMENT,
+        }
+    )
+    pull_request["head"]["ref"] = branch
+    github.pulls[730] = pull_request
+    github.commits[730] = [_task_commit(task_id)]
+    github.files[730] = [{"filename": "change.txt"}]
+    github.checks[head_sha] = [_success_check(head_sha)]
+    github.associated_pulls_by_commit[merge_sha] = [pull_request]
+    if stale_done:
+        lease = controller.store.read_json(controller.store.task_lease_path(task_id))
+        assert isinstance(lease, dict)
+        lease.update(
+            {
+                "lifecycle_state": task_session.DONE_STATE,
+                "terminal_result": "superseded",
+                "owner_authorized": True,
+                "superseded_reason": "legacy stale closeout fixture",
+                "superseded_at": "2026-10-05T12:00:00Z",
+            }
+        )
+        task_session.StateStore.replace_json(controller.store.task_lease_path(task_id), lease)
+    if not keep_anchor:
+        _git(root, "worktree", "remove", "--force", str(worktree))
+        _git(root, "branch", "-D", branch)
+    return (
+        root,
+        git_repository,
+        controller,
+        worktree,
+        branch,
+        base_sha,
+        head_sha,
+        merge_sha,
+        github,
+        pull_request,
+    )
+
+
 def _prepare_ready_production_reconciliation(
     repository: tuple[Path, Any], task_id: str = "506"
 ) -> tuple[Path, Any, Any, Path, str, str, str, FakeGitHub]:
@@ -3112,6 +3170,178 @@ def test_finished_history_respects_superseded_lease_dependency_safety(
     )
 
     assert "519" not in controller._completed_dependency_ids()
+
+
+def test_reconcile_merged_no_deploy_corrects_stale_lease_and_unblocks_controller(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _, controller, _, _, _, _, merge_sha, _, _ = _prepare_merged_no_deploy_reconciliation(
+        repository
+    )
+
+    blocker = controller._canonical_refresh_controller_blocker(delivery_task_id=None)
+    assert blocker is not None and blocker[0] == "BLOCKED"
+    assert "worktree is missing" in blocker[1]
+
+    result = controller.reconcile_merged_no_deploy(
+        "729",
+        pr_number=730,
+        merge_sha=merge_sha,
+        reason="Task 729 is merged CI-only dependency remediation; production deploy is not required.",
+        owner_authorize=True,
+    )
+
+    assert result["mutation_performed"] is True
+    assert result["recovery_classification"] == "corrected_stale_superseded_lease"
+    assert result["lease"]["lifecycle_state"] == task_session.MERGED_NO_DEPLOY_STATE
+    assert result["history"]["state"] == task_session.MERGED_NO_DEPLOY_STATE
+    assert result["history"]["merge_sha"] == merge_sha
+    assert controller._canonical_refresh_controller_blocker(delivery_task_id=None) is None
+    assert "729" in controller._completed_dependency_ids()
+    assert controller._is_active_write_lease(result["lease"]) is False
+    recovery = controller.recover("729")
+    assert recovery["classification"] == "MERGED_NO_DEPLOY"
+    assert recovery["issues"] == []
+    task_session.archive_guard(root / "codex-backlog" / "tasks", "729")
+
+
+def test_reconcile_merged_no_deploy_requires_owner_authorization(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, _, merge_sha, _, _ = _prepare_merged_no_deploy_reconciliation(
+        repository
+    )
+    lease_before = controller.store.read_json(controller.store.task_lease_path("729"))
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit owner authorization"):
+        controller.reconcile_merged_no_deploy(
+            "729",
+            pr_number=730,
+            merge_sha=merge_sha,
+            reason="owner did not authorize",
+            owner_authorize=False,
+        )
+
+    assert controller.store.read_json(controller.store.task_lease_path("729")) == lease_before
+    assert controller.store.read_json(controller.store.history / "task-729.json") is None
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_message"),
+    [
+        ("open", "not a closed pull request"),
+        ("wrong_task", "PR title"),
+        ("sha", "exactly one matching merged PR provenance"),
+        ("checks", "checks"),
+        ("contract", "exact no-deploy contract"),
+        ("ambiguous", "exactly one matching merged PR provenance"),
+        ("non_ancestor", "not based on its recorded master base"),
+        ("production", "successful production deployment"),
+    ],
+)
+def test_reconcile_merged_no_deploy_fails_closed_for_invalid_evidence(
+    repository: tuple[Path, Any], mutation: str, expected_message: str
+) -> None:
+    (
+        _,
+        _,
+        controller,
+        _,
+        _,
+        base_sha,
+        head_sha,
+        merge_sha,
+        github,
+        pull_request,
+    ) = _prepare_merged_no_deploy_reconciliation(repository)
+    call_merge_sha = merge_sha
+    if mutation == "open":
+        pull_request["state"] = "open"
+    elif mutation == "wrong_task":
+        pull_request["title"] = "[Task 730] Wrong task provenance"
+    elif mutation == "sha":
+        call_merge_sha = base_sha
+    elif mutation == "checks":
+        github.checks[head_sha] = [{**_success_check(head_sha), "conclusion": "FAILURE"}]
+    elif mutation == "contract":
+        pull_request["body"] = "runtime change requires production"
+    elif mutation == "ambiguous":
+        github.associated_pulls_by_commit[merge_sha] = [
+            pull_request,
+            {**pull_request, "number": 731},
+        ]
+    elif mutation == "non_ancestor":
+        pull_request["merge_commit_sha"] = base_sha
+        github.associated_pulls_by_commit[base_sha] = [pull_request]
+        call_merge_sha = base_sha
+    elif mutation == "production":
+        github.successful_deployments.add((merge_sha, "production"))
+    else:
+        raise AssertionError(mutation)
+    lease_before = controller.store.read_json(controller.store.task_lease_path("729"))
+
+    with pytest.raises(task_session.TaskSessionError, match=expected_message):
+        controller.reconcile_merged_no_deploy(
+            "729",
+            pr_number=730,
+            merge_sha=call_merge_sha,
+            reason="invalid evidence fixture",
+            owner_authorize=True,
+        )
+
+    assert controller.store.read_json(controller.store.task_lease_path("729")) == lease_before
+    assert controller.store.read_json(controller.store.history / "task-729.json") is None
+
+
+def test_reconcile_merged_no_deploy_rejects_dirty_or_changed_anchor(
+    repository: tuple[Path, Any],
+) -> None:
+    (
+        _,
+        _,
+        controller,
+        worktree,
+        _,
+        _,
+        _,
+        merge_sha,
+        _,
+        _,
+    ) = _prepare_merged_no_deploy_reconciliation(repository, keep_anchor=True)
+    (worktree / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+    with pytest.raises(task_session.TaskSessionError, match="dirty task worktree"):
+        controller.reconcile_merged_no_deploy(
+            "729",
+            pr_number=730,
+            merge_sha=merge_sha,
+            reason="dirty anchor fixture",
+            owner_authorize=True,
+        )
+
+    _git(worktree, "add", "dirty.txt")
+    _git(worktree, "commit", "-m", "feat: [Task 729] unmerged follow-up")
+    with pytest.raises(task_session.TaskSessionError, match="changed task worktree head"):
+        controller.reconcile_merged_no_deploy(
+            "729",
+            pr_number=730,
+            merge_sha=merge_sha,
+            reason="changed anchor fixture",
+            owner_authorize=True,
+        )
+
+
+def test_missing_worktree_still_blocks_unfinished_task(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, _, _, _, _ = _prepare_merged_no_deploy_reconciliation(
+        repository, stale_done=False
+    )
+    lease = controller.store.read_json(controller.store.task_lease_path("729"))
+    assert isinstance(lease, dict)
+    assert controller._is_active_write_lease(lease) is True
+    blocker = controller._canonical_refresh_controller_blocker(delivery_task_id=None)
+    assert blocker is not None and blocker[0] == "BLOCKED"
+    assert "worktree is missing" in blocker[1]
 
 
 def test_record_queue_cycle_is_durable_and_bounded(repository: tuple[Path, Any]) -> None:
