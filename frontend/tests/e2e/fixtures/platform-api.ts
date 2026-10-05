@@ -13,6 +13,7 @@ export interface PlatformApiOptions {
   weeklyReviewAvailable?: boolean;
   weeklyCalibration?: 'insufficient' | 'pending';
   nutritionTargetSource?: 'manual' | 'trainer';
+  nutritionSuggestions?: 'empty';
   nutritionRepeatCandidate?: boolean;
   programHistory?: 'empty' | 'one' | 'many';
   progressionOutcome?: ProgressionOutcome;
@@ -335,6 +336,7 @@ export async function installPlatformApi(
   const previousTargetDate = new Date(todayDate);
   previousTargetDate.setUTCDate(previousTargetDate.getUTCDate() - 30);
   const targetSource = options.nutritionTargetSource ?? 'manual';
+  const nutritionSuggestions = options.nutritionSuggestions;
   const targetAuthor =
     targetSource === 'trainer'
       ? { id: 11, telegram_user_id: 7011, full_name: 'Ирина Тренерова' }
@@ -1304,7 +1306,11 @@ export async function installPlatformApi(
     if (path.endsWith('/public/articles') && request.method() === 'GET') {
       return route.fulfill({ json: [] });
     }
-    if (path.endsWith('/nutrition/diary/suggestions') && request.method() === 'GET') {
+    if (
+      path.endsWith('/nutrition/diary/suggestions') &&
+      request.method() === 'GET' &&
+      nutritionSuggestions === 'empty'
+    ) {
       return route.fulfill({
         json: {
           mode: 'deterministic',

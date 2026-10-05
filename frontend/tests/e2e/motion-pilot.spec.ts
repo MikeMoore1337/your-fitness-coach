@@ -339,6 +339,7 @@ test('workout confirmation and Nutrition add keep final production state immedia
   const platformApi = await installPlatformApi(page, {
     browserSession: true,
     workoutStatus: 'planned',
+    nutritionSuggestions: 'empty',
   });
   await page.goto('/app?section=today');
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
