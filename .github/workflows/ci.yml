@@ -1171,26 +1171,22 @@ jobs:
       matrix:
         language: [python, javascript-typescript]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: security-extended
-      - uses: github/codeql-action/analyze@v3
+      - name: Analyze with CodeQL
+        id: codeql
+        uses: github/codeql-action/analyze@v4
         with:
           category: /language:${{ matrix.language }}
-      - name: Inspect open Code Scanning alerts metadata
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --paginate \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
-            --jq '.[] | {number, tool: .tool.name, rule_id: .rule.id, description: .rule.description, severity: .rule.severity, security_severity_level: .rule.security_severity_level, path: .most_recent_instance.location.path, start_line: .most_recent_instance.location.start_line, ref: .most_recent_instance.ref, state}'
+          output: .artifacts/codeql/${{ matrix.language }}
+      - name: Enforce blocking CodeQL severities
+        run: python3 scripts/codeql_sarif_gate.py "${{ steps.codeql.outputs.sarif-output }}"
 
   security-audit:
     name: Free PR security audit
