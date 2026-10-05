@@ -42,7 +42,6 @@ export function SearchableExercisePicker({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const guideQueryRef = useRef<string | null>(null);
   const [resultsStyle, setResultsStyle] = useState<CSSProperties>();
   const results = useMemo(() => {
     if (!normalizeExerciseSearchText(query)) return exercises;
@@ -82,11 +81,6 @@ export function SearchableExercisePicker({
     onChange(exercise.id);
     setQuery(exercise.title);
     setOpen(false);
-  };
-
-  const openGuide = (exercise: ExercisePickerExercise) => {
-    guideQueryRef.current = query;
-    onOpenGuide?.(exercise);
   };
 
   const resultsPanel = open ? (
@@ -142,10 +136,10 @@ export function SearchableExercisePicker({
                   key={exercise.id}
                   onPointerDown={(event) => {
                     event.preventDefault();
-                    openGuide(exercise);
+                    onOpenGuide(exercise);
                   }}
                   onClick={(event) => {
-                    if (event.detail === 0) openGuide(exercise);
+                    if (event.detail === 0) onOpenGuide(exercise);
                   }}
                 >
                   {exercise.has_guide ? 'Техника' : 'Подробнее'}
@@ -168,8 +162,6 @@ export function SearchableExercisePicker({
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setOpen(false);
-          setQuery(guideQueryRef.current ?? selectedTitle);
-          guideQueryRef.current = null;
         }
       }}
     >
@@ -189,10 +181,9 @@ export function SearchableExercisePicker({
         }
         autoComplete="off"
         enterKeyHint="search"
-        value={open ? query : selectedTitle}
+        value={query}
         placeholder="Начните вводить название"
         onFocus={() => {
-          guideQueryRef.current = null;
           setActiveIndex(-1);
           setOpen(true);
         }}
