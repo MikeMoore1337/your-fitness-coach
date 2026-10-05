@@ -2235,6 +2235,7 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
     await expectNoHorizontalOverflow(tmaPage);
   }
 
+  await mobilePage.route('**/api/v1/public/articles*', (request) => request.fulfill({ json: [] }));
   await mobilePage.goto('/');
   const landingButtons = mobilePage.locator('.landing-button');
   await expect(landingButtons).not.toHaveCount(0);
