@@ -59,6 +59,13 @@ def get_current_user(
             detail="Invalid user id in token",
         )
 
+    access_token_id = payload.get("jti")
+    if not isinstance(access_token_id, str) or not access_token_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Сессия недействительна или истекла",
+        )
+
     session_family_id = payload.get("sid")
     if not isinstance(session_family_id, str) or not session_family_id:
         raise HTTPException(
