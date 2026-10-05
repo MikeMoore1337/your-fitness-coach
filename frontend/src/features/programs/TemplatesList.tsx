@@ -872,7 +872,7 @@ export function TemplatesList({
             aria-label="Закрыть редактирование"
             onClick={() => setEditingTemplate(null)}
           />
-          <div className="modal__panel assignment-modal">
+          <div className="modal__panel program-editor-modal">
             <div className="section-head">
               <strong>
                 {saveAsCopy ? 'Редактирование личной копии' : 'Редактирование программы'}

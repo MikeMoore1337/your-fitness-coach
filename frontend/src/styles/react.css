@@ -1168,6 +1168,9 @@ details:not([open]) > :not(summary) {
   background: var(--card);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
+.exercise-picker__results:not(.exercise-picker__results--with-guides) {
+  grid-template-columns: minmax(0, 1fr);
+}
 .exercise-picker__options,
 .exercise-picker__guides {
   display: grid;
@@ -1190,6 +1193,7 @@ details:not([open]) > :not(summary) {
   justify-items: start;
   align-items: start;
   line-height: 1.2;
+  cursor: pointer;
 }
 .exercise-picker__option-copy {
   display: grid;
@@ -2332,6 +2336,25 @@ details:not([open]) > :not(summary) {
   max-height: calc(100dvh - 24px);
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+.program-editor-modal {
+  width: min(1180px, calc(100vw - 32px));
+  max-width: 1180px;
+  max-height: calc(100dvh - 24px);
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.program-editor-modal .section-head,
+.program-editor-modal .section-head > div,
+.program-editor-modal .program-builder,
+.program-editor-modal .program-exercise-row {
+  min-width: 0;
+}
+.program-editor-modal .section-head strong {
+  overflow-wrap: anywhere;
 }
 .assignment-modal__hint {
   margin: 0;
