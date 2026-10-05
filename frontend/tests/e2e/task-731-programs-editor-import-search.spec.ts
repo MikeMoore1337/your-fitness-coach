@@ -87,12 +87,35 @@ async function assertEditorGeometry(
           width: Math.round(control.getBoundingClientRect().width),
         })),
       rowsWithOverflow: rows.filter((row) => row.scrollWidth > row.clientWidth + 1).length,
+      rowsWithMisalignedFields: rows.filter((row) => {
+        const heading = row.querySelector<HTMLElement>('.program-exercise-row__heading');
+        const picker = row.querySelector<HTMLElement>('.exercise-picker > input');
+        const metricLabels = Array.from(
+          row.querySelectorAll<HTMLElement>('.program-exercise-row__metrics .field > span'),
+        );
+        const metricInputs = Array.from(
+          row.querySelectorAll<HTMLElement>('.program-exercise-row__metrics .field > input'),
+        );
+        if (!heading || !picker || metricLabels.length === 0 || metricInputs.length === 0) {
+          return true;
+        }
+        const center = (box: DOMRect) => box.top + box.height / 2;
+        const headingCenter = center(heading.getBoundingClientRect());
+        const pickerTop = picker.getBoundingClientRect().top;
+        return (
+          metricLabels.some(
+            (label) => Math.abs(center(label.getBoundingClientRect()) - headingCenter) > 2,
+          ) ||
+          metricInputs.some((input) => Math.abs(input.getBoundingClientRect().top - pickerTop) > 2)
+        );
+      }).length,
     };
   });
   expect(geometry.panelClientWidth).toBeGreaterThan(700);
   expect(geometry.panelScrollWidth).toBeLessThanOrEqual(geometry.panelClientWidth + 1);
   expect(geometry.controlsOutside).toEqual([]);
   expect(geometry.rowsWithOverflow).toBe(0);
+  expect(geometry.rowsWithMisalignedFields).toBe(0);
 }
 
 test('Task 731 desktop program editor has bounded geometry at supported widths', async ({

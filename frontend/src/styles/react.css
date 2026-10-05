@@ -2356,6 +2356,16 @@ details:not([open]) > :not(summary) {
 .program-editor-modal .section-head strong {
   overflow-wrap: anywhere;
 }
+@media (min-width: 761px) {
+  .program-editor-modal .program-exercise-row {
+    align-items: start;
+  }
+  .program-editor-modal .program-exercise-row__metrics .field > span {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
 .assignment-modal__hint {
   margin: 0;
   font-size: 0.8rem;
