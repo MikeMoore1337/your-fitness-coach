@@ -133,6 +133,95 @@ def test_json_formatter_preserves_bounded_ai_coach_metadata_without_content() ->
     assert "user_id" not in payload
 
 
+def test_json_formatter_preserves_ai_adaptation_and_vision_metadata_without_content() -> None:
+    adaptation = logging.LogRecord(
+        name="app.ai_coach",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="ai_coach_adaptation_generation",
+        args=(),
+        exc_info=None,
+    )
+    adaptation_fields = {
+        "request_id": "request-adaptation-123",
+        "actor_role": "trainer",
+        "proposal_type": "progression",
+        "prompt_version": "ai-coach-adaptation-v1",
+        "schema_version": "ai-coach-adaptation-v1",
+        "policy_version": "verified-adaptation-v1",
+        "outcome": "answer",
+        "latency_ms": 321,
+    }
+    for key, value in adaptation_fields.items():
+        setattr(adaptation, key, value)
+
+    vision = logging.LogRecord(
+        name="app.nutrition",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="nutrition_scan_completed",
+        args=(),
+        exc_info=None,
+    )
+    vision_fields = {
+        "outcome": "draft_created",
+        "assessment_outcome": "review_required",
+        "route_class": "local_ocr",
+        "provider_class": "none",
+        "provider_outcome": "not_invoked",
+    }
+    for key, value in vision_fields.items():
+        setattr(vision, key, value)
+
+    formatter = JsonFormatter(service="api")
+    adaptation_payload = json.loads(formatter.format(adaptation))
+    vision_payload = json.loads(formatter.format(vision))
+
+    assert adaptation_payload["message"] == "ai_coach_adaptation_generation"
+    assert {key: adaptation_payload[key] for key in adaptation_fields} == adaptation_fields
+    assert vision_payload["message"] == "nutrition_scan_completed"
+    assert {key: vision_payload[key] for key in vision_fields} == vision_fields
+
+
+def test_json_formatter_preserves_bounded_chat_provider_failure_diagnostics() -> None:
+    record = logging.LogRecord(
+        name="app.ai_coach",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="ai_coach_chat_generation",
+        args=(),
+        exc_info=None,
+    )
+    fields = {
+        "provider_failure_reason": "timeout",
+        "failure_category": "provider_unavailable",
+        "history_count": 2,
+        "context_count": 3,
+        "reasoning_tokens": 4,
+        "http_status": 503,
+        "provider_response_bytes": 512,
+        "choices_count": 1,
+        "choices_item_type": "dict",
+        "response_payload_type": "object",
+        "message_type": "assistant",
+        "finish_reason": "stop",
+        "content_type": "string",
+        "message_present": True,
+        "refusal_present": False,
+        "content_present": True,
+    }
+    for key, value in fields.items():
+        setattr(record, key, value)
+
+    payload = json.loads(JsonFormatter(service="api").format(record))
+
+    assert payload["message"] == "ai_coach_chat_generation"
+    assert {key: payload[key] for key in fields} == fields
+
+
 def test_json_formatter_preserves_bounded_chat_metadata_without_content() -> None:
     record = logging.LogRecord(
         name="app.ai_coach",
