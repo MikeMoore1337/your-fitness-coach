@@ -1182,6 +1182,15 @@ jobs:
       - uses: github/codeql-action/analyze@v3
         with:
           category: /language:${{ matrix.language }}
+      - name: Inspect open Code Scanning alerts metadata
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" \
+            --jq '.[] | {number, tool: .tool.name, rule_id: .rule.id, description: .rule.description, severity: .rule.severity, security_severity_level: .rule.security_severity_level, path: .most_recent_instance.location.path, start_line: .most_recent_instance.location.start_line, ref: .most_recent_instance.ref, state}'
 
   security-audit:
     name: Free PR security audit
