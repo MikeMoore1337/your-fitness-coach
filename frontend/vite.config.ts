@@ -13,6 +13,7 @@ const testReporters: TestReporters | undefined = process.env.ALLURE_RESULTS_DIR
       ],
     ]
   : undefined;
+const apiPort = process.env.PW_API_PORT ?? '8000';
 
 export default defineConfig({
   plugins: [react()],
@@ -28,9 +29,9 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5173,
     proxy: {
-      '/api': 'http://127.0.0.1:8000',
-      '/static/exercise-guides': 'http://127.0.0.1:8000',
-      '/health': 'http://127.0.0.1:8000',
+      '/api': `http://127.0.0.1:${apiPort}`,
+      '/static/exercise-guides': `http://127.0.0.1:${apiPort}`,
+      '/health': `http://127.0.0.1:${apiPort}`,
     },
   },
   test: {

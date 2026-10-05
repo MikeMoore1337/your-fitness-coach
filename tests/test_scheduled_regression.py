@@ -62,10 +62,10 @@ def _write_bundle(
 
 
 def _aggregate_metadata(
-    tmp_path: Path, *, attachment_text: str = "synthetic output"
+    tmp_path: Path, *, attachment_text: str = "synthetic output", run_kind: str = "daily"
 ) -> dict[str, object]:
     bundles = tmp_path / "bundles"
-    for suite, browser in scheduled_regression.report_bundles("daily"):
+    for suite, browser in scheduled_regression.report_bundles(run_kind):
         _write_bundle(
             bundles,
             suite=suite,
@@ -77,8 +77,8 @@ def _aggregate_metadata(
         bundle_root=bundles,
         output_root=tmp_path / "merged",
         metadata_path=metadata_path,
-        run_kind="daily",
-        tier="daily-regression",
+        run_kind=run_kind,
+        tier=scheduled_regression.profile_for_run_kind(run_kind),
         run_id="12345",
         commit_sha="a" * 40,
         branch="master",
@@ -126,6 +126,12 @@ def test_scheduled_report_bundle_topology_matches_ci_shard_counts() -> None:
             for shard in range(1, scheduled_regression.PYTHON_TEST_SHARD_COUNT + 1)
         ]
 
+    assert [browser for suite, browser in daily if suite == "frontend-cross-browser"] == []
+    assert [browser for suite, browser in weekly if suite == "frontend-cross-browser"] == [
+        "chromium",
+        "firefox",
+        "webkit",
+    ]
     assert scheduled_regression.FRONTEND_E2E_SHARD_COUNT == 5
     assert scheduled_regression.PYTHON_TEST_SHARD_COUNT == 5
 
@@ -137,6 +143,7 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
     cross_browser = (root / "frontend" / "playwright.cross-browser.config.ts").read_text(
         encoding="utf-8"
     )
+    vite_config = (root / "frontend" / "vite.config.ts").read_text(encoding="utf-8")
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     action = (root / ".github" / "actions" / "upload-allure-results" / "action.yml").read_text(
         encoding="utf-8"
@@ -184,6 +191,14 @@ def test_private_report_origin_uses_isolated_caddy_and_dedicated_tunnel() -> Non
         in cross_browser
     )
     assert '--run-id "${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"' in workflow
+    assert "process.env.PLAYWRIGHT_OUTPUT_DIR" in cross_browser
+    assert "process.env.PW_API_PORT" in cross_browser
+    assert "process.env.PW_API_PORT" in vite_config
+    assert "frontend-cross-browser-chromium" in workflow
+    assert "frontend-cross-browser-firefox" in workflow
+    assert "frontend-cross-browser-webkit" in workflow
+    assert "chromium-firefox-webkit" not in workflow
+    assert "Measure isolated Allure results" in action
 
 
 def test_publisher_scripts_parse_on_vps_python_310() -> None:
@@ -1026,6 +1041,18 @@ def test_aggregate_results_merges_current_run_and_adds_allowlisted_metadata(tmp_
     assert result["attachments"][0]["source"].startswith("frontend-")
 
 
+def test_weekly_aggregate_requires_each_cross_browser_bundle(tmp_path: Path) -> None:
+    metadata = _aggregate_metadata(tmp_path, run_kind="weekly")
+
+    expected_bundles = sorted(
+        f"{suite}/{browser}" for suite, browser in scheduled_regression.report_bundles("weekly")
+    )
+    assert metadata["status"] == "complete"
+    assert metadata["expected_bundles"] == expected_bundles
+    assert metadata["present_bundles"] == expected_bundles
+    assert metadata["result_files"] == len(expected_bundles)
+
+
 def test_container_attachments_are_rewritten_only_to_copied_files() -> None:
     payload: dict[str, object] = {
         "befores": [{"attachments": [{"name": "trace", "source": "trace.txt"}]}]
@@ -1202,6 +1229,47 @@ def test_bundle_round_trip_is_encrypted_and_traversal_safe(tmp_path: Path, monke
         )
     }
     assert (extracted / "result.json").read_text(encoding="utf-8") == '{"status":"passed"}\n'
+
+
+def test_bundle_measurement_reports_size_classes_without_paths(tmp_path: Path, monkeypatch) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "case-result.json").write_text("{}", encoding="utf-8")
+    (source / "case.trace.zip").write_bytes(b"trace")
+    (source / "screenshot.png").write_bytes(b"png")
+    (source / "recording.webm").write_bytes(b"video")
+    (source / "stdout.txt").write_text("output", encoding="utf-8")
+    (source / "opaque.bin").write_bytes(b"other")
+    output = tmp_path / "evidence" / "size.json"
+
+    payload = allure_bundle.measure_bundle(
+        source=source,
+        output=output,
+        suite="frontend-cross-browser",
+        browser="chromium",
+    )
+
+    assert payload["within_limit"] is True
+    assert payload["file_count"] == 6
+    assert payload["source_bytes"] == sum(path.stat().st_size for path in source.iterdir())
+    classes = payload["classes"]
+    assert classes["allure_result_json"] == {"file_count": 1, "bytes": 2}
+    assert classes["trace_archive"] == {"file_count": 1, "bytes": 5}
+    assert classes["screenshots"] == {"file_count": 1, "bytes": 3}
+    assert classes["video"] == {"file_count": 1, "bytes": 5}
+    assert classes["text_attachment"] == {"file_count": 1, "bytes": 6}
+    assert classes["other"] == {"file_count": 1, "bytes": 5}
+    serialized = output.read_text(encoding="utf-8")
+    assert str(source) not in serialized
+
+    monkeypatch.setattr(allure_bundle, "MAX_BUNDLE_BYTES", 1)
+    oversized = allure_bundle.measure_bundle(
+        source=source,
+        output=tmp_path / "evidence" / "oversized.json",
+        suite="frontend-cross-browser",
+        browser="chromium",
+    )
+    assert oversized["within_limit"] is False
 
 
 def test_retention_keeps_daily_calendar_window_and_four_weeklies() -> None:

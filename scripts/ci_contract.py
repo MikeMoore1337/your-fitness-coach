@@ -199,7 +199,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "head",
                 cwd="backend",
             ),
-            _cmd("frontend-cross-browser", "npm", "run", "e2e:cross-browser", cwd="frontend"),
+            _cmd("frontend-cross-browser", "python", "scripts/run_cross_browser_regression.py"),
             _cmd(
                 "frontend-ui-quality-sweep",
                 "npm",

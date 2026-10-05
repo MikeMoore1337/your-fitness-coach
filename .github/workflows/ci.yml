@@ -612,11 +612,35 @@ jobs:
           ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
         with:
           enabled: "true"
-          source: ${{ env.ALLURE_RESULTS_DIR }}
-          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser.enc
-          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser
+          source: ${{ env.ALLURE_RESULTS_DIR }}/chromium
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-chromium.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-chromium
           suite: frontend-cross-browser
-          browser: chromium-firefox-webkit
+          browser: chromium
+      - name: Upload encrypted Firefox Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}/firefox
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-firefox.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-firefox
+          suite: frontend-cross-browser
+          browser: firefox
+      - name: Upload encrypted WebKit Allure results
+        if: always() && needs.scope-router.outputs.run_scheduled_report == 'true'
+        uses: ./.github/actions/upload-allure-results
+        env:
+          ALLURE_REPORT_ENCRYPTION_KEY: ${{ secrets.ALLURE_REPORT_ENCRYPTION_KEY }}
+        with:
+          enabled: "true"
+          source: ${{ env.ALLURE_RESULTS_DIR }}/webkit
+          bundle: .artifacts/runtime/tests/allure-bundles/frontend-cross-browser-webkit.enc
+          artifact-name: allure-results-${{ github.run_id }}-frontend-cross-browser-webkit
+          suite: frontend-cross-browser
+          browser: webkit
 
   python-tests:
     name: Python tests (${{ matrix.shard }}/5)

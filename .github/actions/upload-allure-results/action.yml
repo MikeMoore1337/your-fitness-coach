@@ -26,8 +26,28 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Measure isolated Allure results
+      if: always() && inputs.enabled == 'true' && inputs.suite == 'frontend-cross-browser'
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        mkdir -p '${{ inputs.source }}' "$(dirname '${{ inputs.bundle }}')"
+        python scripts/allure_bundle.py measure \
+          --source '${{ inputs.source }}' \
+          --output '${{ inputs.bundle }}.size.json' \
+          --suite '${{ inputs.suite }}' \
+          --browser '${{ inputs.browser }}'
+    - name: Upload Allure size evidence
+      if: always() && inputs.enabled == 'true' && inputs.suite == 'frontend-cross-browser'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.artifact-name }}-size
+        path: ${{ inputs.bundle }}.size.json
+        if-no-files-found: error
+        include-hidden-files: true
+        retention-days: ${{ inputs.retention-days }}
     - name: Encrypt isolated Allure results
-      if: inputs.enabled == 'true'
+      if: always() && inputs.enabled == 'true'
       shell: bash
       env:
         ALLURE_REPORT_ENCRYPTION_KEY: ${{ env.ALLURE_REPORT_ENCRYPTION_KEY }}
