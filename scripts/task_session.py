@@ -9593,6 +9593,423 @@ class TaskController:
             StateStore.replace_json(history_path, history)
         return history
 
+    def _verified_historical_production_evidence(
+        self,
+        expected: str,
+        lease: Mapping[str, Any],
+        *,
+        pr_number: int,
+        deployed_sha: str,
+        production_run_id: int,
+        master_sha: str,
+    ) -> dict[str, Any]:
+        """Verify a historically deployed task and every protected-master change after it."""
+
+        github = self._github()
+        branch = str(lease.get("branch", ""))
+        ready_base_sha = str(lease.get("ready_base_origin_master_sha", ""))
+        ready_head_sha = str(lease.get("ready_head_sha", ""))
+        delivery_base_sha = str(lease.get("delivery_base_origin_master_sha", ""))
+        delivery_head_sha = str(lease.get("delivery_head_sha", ""))
+        anchor = {
+            "task_id": expected,
+            "branch": branch,
+            "base_sha": delivery_base_sha,
+            "head_sha": delivery_head_sha,
+        }
+        provenance = lease.get("task_provenance")
+        if (
+            task_id_from_branch(branch) != expected
+            or any(
+                re.fullmatch(r"[0-9a-f]{40}", sha) is None
+                for sha in (
+                    ready_base_sha,
+                    ready_head_sha,
+                    delivery_base_sha,
+                    delivery_head_sha,
+                )
+            )
+            or ready_base_sha != delivery_base_sha
+            or ready_head_sha != delivery_head_sha
+            or lease.get("base_origin_master_sha") != delivery_base_sha
+            or lease.get("delivery_anchor") != anchor
+            or not isinstance(provenance, Mapping)
+            or provenance.get("task_id") != expected
+            or provenance.get("branch") != branch
+            or provenance.get("base_sha") != delivery_base_sha
+            or provenance.get("head_sha") != delivery_head_sha
+        ):
+            raise TaskSessionError(
+                "Historical production reconciliation requires one preserved ready/delivery anchor"
+            )
+
+        pull_request = self._verified_reconciliation_pr(pr_number, expected, master_sha)
+        if pull_request["branch"] != branch:
+            raise TaskSessionError("Historical production PR branch does not match the recovery lease")
+        if pull_request["merge_sha"] != deployed_sha:
+            raise TaskSessionError("Historical production PR merge SHA does not match deployed SHA")
+        final_head_sha = str(pull_request["head_sha"])
+        if not self.repository.is_ancestor(delivery_head_sha, final_head_sha):
+            raise TaskSessionError(
+                "Preserved delivery anchor is not an ancestor of the final task PR head"
+            )
+        if not self.repository.is_ancestor(delivery_base_sha, pull_request["base_sha"]):
+            raise TaskSessionError(
+                "Final task PR base does not descend from the preserved delivery base"
+            )
+
+        pr_commits = github.pull_request_commits(pr_number)
+        declared_commit_count = github.pull_request(pr_number).get("commits")
+        if (
+            type(declared_commit_count) is not int
+            or declared_commit_count != len(pr_commits)
+            or not pr_commits
+        ):
+            raise TaskSessionError("Historical production PR commit inventory is incomplete")
+        commits_by_sha: dict[str, str] = {}
+        for item in pr_commits:
+            sha = str(item.get("sha", ""))
+            commit = item.get("commit")
+            message = str(commit.get("message", "")) if isinstance(commit, Mapping) else ""
+            if re.fullmatch(r"[0-9a-f]{40}", sha) is None or not message:
+                raise TaskSessionError("Historical production PR has invalid commit provenance")
+            commits_by_sha[sha] = message
+        if final_head_sha not in commits_by_sha:
+            raise TaskSessionError("Final task PR head is absent from its commit inventory")
+
+        bounded_commits = [
+            sha
+            for sha in self.repository.git(
+                "rev-list", "--reverse", f"{delivery_head_sha}..{final_head_sha}"
+            ).splitlines()
+            if sha
+        ]
+        if any(sha not in commits_by_sha for sha in bounded_commits):
+            raise TaskSessionError(
+                "Delivery history between the preserved anchor and final PR head contains foreign commits"
+            )
+        if bounded_commits:
+            try:
+                validate_task_commit_messages(
+                    expected,
+                    [commits_by_sha[sha] for sha in bounded_commits],
+                    dependency_ids=None,
+                )
+            except TaskSessionError as error:
+                raise TaskSessionError(
+                    "Delivery history between the preserved anchor and final PR head "
+                    "does not belong exclusively to the same task"
+                ) from error
+
+        root = self._canonical_root()
+        worktree_path = Path(str(lease.get("worktree", ""))).resolve()
+        if worktree_path.parent != (root / ".artifacts" / "worktrees").resolve():
+            raise TaskSessionError(
+                "Historical production task worktree is outside the canonical worktree directory"
+            )
+        branches = [
+            line.removeprefix("refs/heads/")
+            for line in self.repository.git(
+                "for-each-ref", "--format=%(refname)", f"refs/heads/task/{expected}-*"
+            ).splitlines()
+            if line
+        ]
+        matches = [
+            item
+            for item in self.repository.worktrees()
+            if item.path == worktree_path
+            or (item.branch and item.branch.startswith(f"task/{expected}-"))
+        ]
+        if branches != [branch] or len(matches) != 1 or matches[0].path != worktree_path:
+            raise TaskSessionError(
+                "Historical production reconciliation requires one unambiguous task branch/worktree"
+            )
+        if (
+            not worktree_path.is_dir()
+            or matches[0].branch != branch
+            or matches[0].head != final_head_sha
+            or self.repository.ref(branch) != final_head_sha
+        ):
+            raise TaskSessionError(
+                "Historical production task branch/worktree does not match the final task PR head"
+            )
+        if self.repository.status(worktree_path) or self.repository.operation_issues(worktree_path):
+            raise TaskSessionError(
+                "Historical production reconciliation refuses a dirty or interrupted task worktree"
+            )
+        if self.repository.unique_commits(branch):
+            raise TaskSessionError(
+                "Historical production reconciliation refuses unique local task commits"
+            )
+
+        try:
+            run = github.api(f"actions/runs/{production_run_id}")
+        except (KeyError, OSError, TaskSessionError) as error:
+            raise TaskSessionError(
+                f"Production run {production_run_id} is unavailable for historical reconciliation"
+            ) from error
+        if (
+            not isinstance(run, Mapping)
+            or run.get("id") != production_run_id
+            or run.get("name") != "Release production"
+            or run.get("head_sha") != deployed_sha
+            or run.get("status") != "completed"
+            or str(run.get("conclusion", "")).lower() != "success"
+        ):
+            raise TaskSessionError(
+                "Historical production run is not successful for the exact deployed SHA"
+            )
+        if not github.has_successful_deployment(deployed_sha, "production"):
+            raise TaskSessionError(
+                "Historical production reconciliation lacks an exact successful deployment"
+            )
+
+        master_evidence = self._verified_subsequent_production_chain(deployed_sha, master_sha)
+
+        files = github.pull_request_files(pr_number)
+        changed_paths = sorted(
+            {
+                str(item.get("filename", ""))
+                for item in files
+                if isinstance(item, Mapping) and str(item.get("filename", ""))
+            }
+        )
+        if not changed_paths:
+            raise TaskSessionError("Historical production PR has no verifiable changed paths")
+        preserved_paths = sorted(
+            {
+                path
+                for path in self.repository.git(
+                    "diff",
+                    "--name-only",
+                    f"{pull_request['base_sha']}..{master_sha}",
+                    "--",
+                    *changed_paths,
+                ).splitlines()
+                if path
+            }
+        )
+        if not preserved_paths:
+            raise TaskSessionError(
+                "Historical production implementation appears fully reverted from protected master"
+            )
+        migration_paths = [
+            path
+            for path in changed_paths
+            if path.startswith("backend/alembic/versions/") and path.endswith(".py")
+        ]
+        missing_migrations = sorted(set(migration_paths) - set(preserved_paths))
+        if missing_migrations:
+            raise TaskSessionError(
+                "Historical production migration no longer survives in protected master: "
+                + ", ".join(missing_migrations)
+            )
+
+        return {
+            "preserved_anchor": {
+                **anchor,
+                "ready_base_sha": ready_base_sha,
+                "ready_head_sha": ready_head_sha,
+            },
+            "final_task_pr": {
+                **pull_request,
+                "bounded_delivery_commits": bounded_commits,
+            },
+            "original_production": {
+                "run_id": production_run_id,
+                "run_url": run.get("html_url"),
+                "run_conclusion": "success",
+                "environment": "production",
+                "deployed_sha": deployed_sha,
+                "deployment_success_verified": True,
+            },
+            "feature_preservation": {
+                "task_paths": changed_paths,
+                "paths_still_different_from_pre_task_base": preserved_paths,
+                "migration_paths": migration_paths,
+            },
+            "verified_master_evidence": master_evidence,
+        }
+
+    def reconcile_historical_production_success(
+        self,
+        task_id: str,
+        *,
+        pr_number: int,
+        deployed_sha: str,
+        production_run_id: int,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        """Recover a missed closeout after independently verified protected-master drift."""
+
+        expected = normalize_task_id(task_id)
+        if not owner_authorize:
+            raise TaskSessionError(
+                "Historical production reconciliation requires explicit owner authorization"
+            )
+        if type(pr_number) is not int or pr_number <= 0:
+            raise TaskSessionError(
+                "Historical production reconciliation requires a positive PR number"
+            )
+        if type(production_run_id) is not int or production_run_id <= 0:
+            raise TaskSessionError(
+                "Historical production reconciliation requires a positive production run ID"
+            )
+        if re.fullmatch(r"[0-9a-f]{40}", deployed_sha) is None:
+            raise TaskSessionError(
+                "Historical production reconciliation deployed SHA is invalid"
+            )
+
+        lease_path = self.store.task_lease_path(expected)
+        history_path = self.store.history / f"task-{expected}.json"
+        lease = self.store.read_json(lease_path)
+        if (
+            not isinstance(lease, dict)
+            or lease.get("task_id") != expected
+            or lease.get("mode") != "write"
+        ):
+            raise TaskSessionError(f"Task {expected} has no valid historical recovery lease")
+        if self._lease_state(lease) != HUMAN_REQUIRED_STATE:
+            raise TaskSessionError(
+                "Historical production reconciliation only accepts a human-required recovery lease"
+            )
+        self._validated_lease_concurrency_class(lease)
+        if self.store.read_json(history_path) is not None:
+            raise TaskSessionError(f"Production history already exists for Task {expected}")
+        delivery = self.store.delivery_state()
+        if delivery.get("owner") is not None or lease.get("delivery_owner") not in {None, ""}:
+            raise TaskSessionError(
+                "Historical production reconciliation refuses an active delivery owner"
+            )
+        if self.repository.current_worktree != self._canonical_root():
+            raise TaskSessionError(
+                "Historical production reconciliation must run from the canonical repository worktree"
+            )
+        if self.repository.current_branch() != TARGET_BASE_BRANCH:
+            raise TaskSessionError(
+                "Historical production reconciliation requires canonical local master"
+            )
+        if self.repository.status(
+            self.repository.current_worktree
+        ) or self.repository.operation_issues(self.repository.current_worktree):
+            raise TaskSessionError(
+                "Historical production reconciliation requires a clean controller worktree"
+            )
+        if self._preimplementation_worker_state_paths(expected):
+            raise TaskSessionError(
+                "Historical production reconciliation refuses unreconciled worker state"
+            )
+        if self._active_production_deployment():
+            raise TaskSessionError(
+                "Historical production reconciliation refuses while a production deployment is active"
+            )
+
+        previous_master_sha = self.repository.ref("origin/master")
+        try:
+            self.repository.fetch_origin_master(cwd=self.repository.current_worktree, prune=False)
+        except (TaskSessionError, OSError) as error:
+            raise TaskSessionError(
+                f"Cannot refresh origin/master for historical production reconciliation: {error}"
+            ) from error
+        master_sha = self.repository.ref("origin/master")
+        if not self.repository.is_ancestor(previous_master_sha, master_sha):
+            raise TaskSessionError(
+                "origin/master changed non-fast-forward during historical production reconciliation"
+            )
+        self._verify_live_master(master_sha)
+        if master_sha == deployed_sha:
+            raise TaskSessionError(
+                "Historical production reconciliation requires independently advanced protected master"
+            )
+
+        evidence = self._verified_historical_production_evidence(
+            expected,
+            lease,
+            pr_number=pr_number,
+            deployed_sha=deployed_sha,
+            production_run_id=production_run_id,
+            master_sha=master_sha,
+        )
+        now = utc_now()
+        reconciliation = {
+            "version": 1,
+            "owner_authorized": True,
+            "authorization": "explicit --owner-authorize",
+            "authorized_at": now,
+            "reconciled_at": now,
+            "original_state": HUMAN_REQUIRED_STATE,
+            "reconciled_against_master_sha": master_sha,
+            **evidence,
+        }
+        final_pr = evidence["final_task_pr"]
+        history = {
+            "version": TASK_STATE_VERSION,
+            "task_id": expected,
+            "state": "production-success",
+            "head_sha": final_pr["head_sha"],
+            "base_sha": final_pr["base_sha"],
+            "merge_sha": deployed_sha,
+            "deployed_sha": deployed_sha,
+            "pr_number": pr_number,
+            "completed_at": now,
+            "closeout_required": True,
+            "historical_production_reconciliation": reconciliation,
+        }
+        if "queue_budget" in lease:
+            history["queue_budget"] = lease["queue_budget"]
+        if "delivery_priority_override" in lease:
+            history["delivery_priority_override"] = lease["delivery_priority_override"]
+        if isinstance(lease.get("preimplementation_resume"), Mapping):
+            history["preimplementation_resume"] = lease["preimplementation_resume"]
+
+        with self.store.lock():
+            current = self.store.read_json(lease_path)
+            if current != lease:
+                raise TaskSessionError(
+                    "Historical recovery lease changed during production reconciliation"
+                )
+            if self.store.delivery_state().get("owner") is not None:
+                raise TaskSessionError(
+                    "Delivery ownership changed during historical production reconciliation"
+                )
+            if self.store.read_json(history_path) is not None:
+                raise TaskSessionError(
+                    f"Production history appeared for Task {expected} during reconciliation"
+                )
+            if self.repository.ref("origin/master") != master_sha:
+                raise TaskSessionError(
+                    "origin/master changed during historical production reconciliation"
+                )
+            self._verify_live_master(master_sha)
+            if self._active_production_deployment():
+                raise TaskSessionError(
+                    "A production deployment started during historical reconciliation"
+                )
+            if self._preimplementation_worker_state_paths(expected):
+                raise TaskSessionError(
+                    "Worker state appeared during historical production reconciliation"
+                )
+            latest_evidence = self._verified_historical_production_evidence(
+                expected,
+                current,
+                pr_number=pr_number,
+                deployed_sha=deployed_sha,
+                production_run_id=production_run_id,
+                master_sha=master_sha,
+            )
+            if latest_evidence != evidence:
+                raise TaskSessionError(
+                    "Historical production evidence changed during reconciliation"
+                )
+            current["lifecycle_state"] = DEPLOYED_STATE
+            current["merge_sha"] = deployed_sha
+            current["deployed_sha"] = deployed_sha
+            current["historical_production_reconciliation"] = reconciliation
+            current["updated_at"] = utc_now()
+            StateStore.replace_json(lease_path, current)
+            StateStore.replace_json(history_path, history)
+        return history
+
     def reconcile_production_success(
         self,
         task_id: str,
@@ -11336,6 +11753,12 @@ def _parser() -> argparse.ArgumentParser:
     reconcile_no_deploy.add_argument("--merge-sha", required=True)
     reconcile_no_deploy.add_argument("--reason", required=True)
     reconcile_no_deploy.add_argument("--owner-authorize", action="store_true")
+    reconcile_historical = subparsers.add_parser("reconcile-historical-production-success")
+    reconcile_historical.add_argument("task_id")
+    reconcile_historical.add_argument("--pr", type=int, required=True)
+    reconcile_historical.add_argument("--deployed-sha", required=True)
+    reconcile_historical.add_argument("--production-run", type=int, required=True)
+    reconcile_historical.add_argument("--owner-authorize", action="store_true")
     reconcile_production = subparsers.add_parser("reconcile-production-success")
     reconcile_production.add_argument("task_id")
     reconcile_production.add_argument("--original-pr", type=int, required=True)
@@ -11576,6 +11999,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                     pr_number=args.pr,
                     merge_sha=args.merge_sha,
                     reason=args.reason,
+                    owner_authorize=args.owner_authorize,
+                )
+            )
+            return 0
+        if args.command == "reconcile-historical-production-success":
+            _print(
+                controller.reconcile_historical_production_success(
+                    args.task_id,
+                    pr_number=args.pr,
+                    deployed_sha=args.deployed_sha,
+                    production_run_id=args.production_run,
                     owner_authorize=args.owner_authorize,
                 )
             )
