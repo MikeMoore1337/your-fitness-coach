@@ -220,7 +220,9 @@ def test_pr_ci_requires_free_deterministic_security_audit_without_llm_api() -> N
     assert "pull_request_review:" not in workflow
     assert "review-contract:" not in workflow
     assert 'validate-pr-review --event "$GITHUB_EVENT_PATH"' not in workflow
-    assert "github/codeql-action/init@v3" in workflow
+    assert "github/codeql-action/init@v4" in workflow
+    assert "github/codeql-action/analyze@v4" in workflow
+    assert "python3 scripts/codeql_sarif_gate.py" in workflow
     assert "queries: security-extended" in workflow
     assert "python scripts/ci_contract.py run-group dependency-audit" in workflow
     assert "scanners: vuln,misconfig,secret" in workflow
