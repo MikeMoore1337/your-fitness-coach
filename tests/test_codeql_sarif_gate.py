@@ -122,6 +122,44 @@ def test_exact_validated_baseline_finding_is_reported_but_does_not_block(tmp_pat
     assert result[0]["validated_reason"]
 
 
+def test_validated_false_positive_baselines_are_exact(tmp_path: Path) -> None:
+    cases = (
+        ("py/bad-tag-filter", "backend/tests/test_app.py", 3492),
+        ("py/bad-tag-filter", "backend/tests/test_app.py", 3500),
+        ("js/user-controlled-bypass", "frontend/src/pages/auth/LoginPage.tsx", 170),
+    )
+    for rule_id, finding_path, line in cases:
+        exact = _write(
+            tmp_path,
+            _sarif(
+                security_severity="7.8",
+                level="warning",
+                rule_id=rule_id,
+                path=finding_path,
+                line=line,
+            ),
+        )
+        result = codeql_sarif_gate.evaluate(exact)
+        assert len(result) == 1
+        assert result[0]["blocking"] is False
+        assert result[0]["validated_reason"]
+
+        shifted = _write(
+            tmp_path,
+            _sarif(
+                security_severity="7.8",
+                level="warning",
+                rule_id=rule_id,
+                path=finding_path,
+                line=line + 1,
+            ),
+        )
+        shifted_result = codeql_sarif_gate.evaluate(shifted)
+        assert len(shifted_result) == 1
+        assert shifted_result[0]["blocking"] is True
+        assert shifted_result[0]["validated_reason"] is None
+
+
 def test_validated_baseline_does_not_hide_same_rule_on_a_new_line(tmp_path: Path) -> None:
     path = _write(
         tmp_path,
