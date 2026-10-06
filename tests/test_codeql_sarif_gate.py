@@ -4,7 +4,15 @@ from pathlib import Path
 from scripts import codeql_sarif_gate
 
 
-def _sarif(*, security_severity: str | None, level: str, suppressed: bool = False) -> dict:
+def _sarif(
+    *,
+    security_severity: str | None,
+    level: str,
+    suppressed: bool = False,
+    rule_id: str = "test/rule",
+    path: str = "src/example.py",
+    line: int = 17,
+) -> dict:
     properties = {}
     if security_severity is not None:
         properties["security-severity"] = security_severity
