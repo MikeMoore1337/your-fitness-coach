@@ -9,13 +9,13 @@ def _sarif(*, security_severity: str | None, level: str, suppressed: bool = Fals
     if security_severity is not None:
         properties["security-severity"] = security_severity
     result = {
-        "ruleId": "test/rule",
+        "ruleId": rule_id,
         "level": level,
         "locations": [
             {
                 "physicalLocation": {
-                    "artifactLocation": {"uri": "src/example.py"},
-                    "region": {"startLine": 17},
+                    "artifactLocation": {"uri": path},
+                    "region": {"startLine": line},
                 }
             }
         ],
@@ -31,7 +31,7 @@ def _sarif(*, security_severity: str | None, level: str, suppressed: bool = Fals
                         "name": "CodeQL",
                         "rules": [
                             {
-                                "id": "test/rule",
+                                "id": rule_id,
                                 "properties": properties,
                             }
                         ],
@@ -60,6 +60,7 @@ def test_high_security_finding_blocks(tmp_path: Path) -> None:
             "path": "src/example.py",
             "line": 17,
             "blocking": True,
+            "validated_reason": None,
         }
     ]
 
@@ -92,3 +93,41 @@ def test_suppressed_high_security_finding_is_not_reported(tmp_path: Path) -> Non
     )
 
     assert codeql_sarif_gate.evaluate(path) == []
+
+
+def test_exact_validated_baseline_finding_is_reported_but_does_not_block(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        _sarif(
+            security_severity="7.8",
+            level="warning",
+            rule_id="py/overly-permissive-file",
+            path="scripts/allure_report_origin.py",
+            line=550,
+        ),
+    )
+
+    result = codeql_sarif_gate.evaluate(path)
+
+    assert len(result) == 1
+    assert result[0]["blocking"] is False
+    assert result[0]["validated_reason"]
+
+
+def test_validated_baseline_does_not_hide_same_rule_on_a_new_line(tmp_path: Path) -> None:
+    path = _write(
+        tmp_path,
+        _sarif(
+            security_severity="7.8",
+            level="warning",
+            rule_id="py/overly-permissive-file",
+            path="scripts/allure_report_origin.py",
+            line=551,
+        ),
+    )
+
+    result = codeql_sarif_gate.evaluate(path)
+
+    assert len(result) == 1
+    assert result[0]["blocking"] is True
+    assert result[0]["validated_reason"] is None
