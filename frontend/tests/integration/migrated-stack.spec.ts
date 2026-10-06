@@ -189,10 +189,9 @@ for (const scenario of programImportViewports) {
 
     const exerciseSelect = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
     await exerciseSelect.click();
-    await expect(
-      exerciseSelect.getByRole('option', { name: strengthExercise.title }),
-    ).toBeAttached();
-    await exerciseSelect.getByRole('option', { name: strengthExercise.title }).click();
+    const strengthOption = page.getByRole('option', { name: strengthExercise.title });
+    await expect(strengthOption).toBeAttached();
+    await strengthOption.click();
 
     const resolved = page.waitForResponse(
       (response) =>
