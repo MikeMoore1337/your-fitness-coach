@@ -5006,6 +5006,103 @@ def test_run_scopes_git_safety_to_exact_worktree(
         assert command[3:5] == ["-c", "core.longpaths=true"]
 
 
+def test_github_api_retries_only_transient_read_transport_failures(
+    repository: tuple[Path, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, git_repository = repository
+    github = task_session.GitHubClient(git_repository, "owner/repository")
+    calls = 0
+    sleeps: list[float] = []
+
+    def fake_run(
+        args: Sequence[str],
+        *,
+        cwd: Path,
+        check: bool = True,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        del cwd, check, env
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise task_session.TaskSessionError(
+                "Command failed (gh api ...): Get https://api.github.com: TLS handshake timeout"
+            )
+        return subprocess.CompletedProcess(args, 0, stdout='{"ok": true}', stderr="")
+
+    monkeypatch.setattr(task_session, "_run", fake_run)
+    monkeypatch.setattr(task_session.time, "sleep", sleeps.append)
+
+    assert github.api("pulls/764") == {"ok": True}
+    assert calls == 3
+    assert sleeps == [1.0, 2.0]
+
+
+def test_github_api_does_not_retry_non_transport_failures(
+    repository: tuple[Path, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, git_repository = repository
+    github = task_session.GitHubClient(git_repository, "owner/repository")
+    calls = 0
+    sleeps: list[float] = []
+
+    def fake_run(
+        args: Sequence[str],
+        *,
+        cwd: Path,
+        check: bool = True,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        del args, cwd, check, env
+        nonlocal calls
+        calls += 1
+        raise task_session.TaskSessionError("Command failed (gh api ...): HTTP 403: Forbidden")
+
+    monkeypatch.setattr(task_session, "_run", fake_run)
+    monkeypatch.setattr(task_session.time, "sleep", sleeps.append)
+
+    with pytest.raises(task_session.TaskSessionError, match="HTTP 403"):
+        github.api("pulls/764")
+
+    assert calls == 1
+    assert sleeps == []
+
+
+def test_github_api_transient_retry_budget_is_bounded(
+    repository: tuple[Path, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, git_repository = repository
+    github = task_session.GitHubClient(git_repository, "owner/repository")
+    calls = 0
+    sleeps: list[float] = []
+
+    def fake_run(
+        args: Sequence[str],
+        *,
+        cwd: Path,
+        check: bool = True,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        del args, cwd, check, env
+        nonlocal calls
+        calls += 1
+        raise task_session.TaskSessionError(
+            "Command failed (gh api ...): Get https://api.github.com: TLS handshake timeout"
+        )
+
+    monkeypatch.setattr(task_session, "_run", fake_run)
+    monkeypatch.setattr(task_session.time, "sleep", sleeps.append)
+
+    with pytest.raises(task_session.TaskSessionError, match="TLS handshake timeout"):
+        github.api("pulls/764")
+
+    assert calls == 3
+    assert sleeps == [1.0, 2.0]
+
+
 @pytest.mark.parametrize("task_id", ["127", "90A", "124C"])
 def test_task_ids_and_branch_traceability_accept_suffix_ids(task_id: str) -> None:
     task_session.validate_task_commit_messages(task_id, [f"fix: [Task {task_id}] preserve trace"])
