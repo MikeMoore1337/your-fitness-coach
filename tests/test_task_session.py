@@ -36,6 +36,25 @@ def _load_module():
 task_session = _load_module()
 
 
+def test_guard_replay_accepts_historical_report_without_completion_mode() -> None:
+    replayed = {
+        "schema_version": 1,
+        "classification": "yfc-worker-guard-report",
+        "completion_mode": {
+            "active": True,
+            "starts_at_percent": 75,
+            "starts_at_tool_actions": 180,
+        },
+        "blocked": True,
+    }
+    historical = dict(replayed)
+    historical.pop("completion_mode")
+
+    assert task_session._guard_report_matches_replay(historical, replayed) is True
+    historical["blocked"] = False
+    assert task_session._guard_report_matches_replay(historical, replayed) is False
+
+
 def _git(path: Path, *args: str) -> str:
     completed = subprocess.run(["git", *args], cwd=path, check=True, text=True, capture_output=True)
     return completed.stdout.strip()
