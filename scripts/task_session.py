@@ -71,7 +71,9 @@ TASK_COMMIT_RE = re.compile(rf"\[Task (?P<task_id>{TASK_ID_PATTERN})\]", re.IGNO
 CONTROLLER_COMMIT_RE = re.compile(r"^\[Controller\]\s+\S")
 CONTROLLER_ALLOWED_PATHS = frozenset(
     {
+        ".github/workflows/ci.yml",
         ".github/workflows/deploy.yml",
+        ".github/workflows/security-audit.yml",
         ".agents/MANIFEST.json",
         ".agents/evals/lifecycle.json",
         "AGENTS.md",
@@ -92,8 +94,10 @@ CONTROLLER_ALLOWED_PATHS = frozenset(
         "docs/codex-code-review-retirement.md",
         "docs/issue-driven-continuous-workflow.md",
         "docs/task-branch-integration.md",
+        "security/SECURITY_REVIEW.md",
         "scripts/agent_harness.py",
         "scripts/archive_backlog_task.py",
+        "scripts/codeql_sarif_gate.py",
         "scripts/artifact_manager.py",
         "scripts/issue_workflow.py",
         "scripts/run_task_delivery.py",
@@ -101,6 +105,8 @@ CONTROLLER_ALLOWED_PATHS = frozenset(
         "scripts/worker_guard.py",
         "tests/test_agent_harness.py",
         "tests/test_archive_backlog_task.py",
+        "tests/test_ci_contract.py",
+        "tests/test_codeql_sarif_gate.py",
         "tests/test_artifact_manager.py",
         "tests/test_deployment_contract.py",
         "tests/test_issue_workflow.py",

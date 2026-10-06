@@ -36,7 +36,9 @@ def test_ci_runs_full_regression_on_task_pr_and_only_provenance_on_master_push()
     assert "SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}" in ci
     assert "codeql-security:" in ci
     assert "security-audit:" in ci
-    assert "github/codeql-action/init@v3" in ci
+    assert "github/codeql-action/init@v4" in ci
+    assert "github/codeql-action/analyze@v4" in ci
+    assert "python3 scripts/codeql_sarif_gate.py" in ci
     assert "scanners: vuln,misconfig,secret" in ci
     assert "openai/codex-action" not in ci
     assert "python scripts/ci_contract.py run-group" in ci

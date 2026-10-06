@@ -54,9 +54,14 @@ Deterministic checks, Residual risk и итоговым audit status.
   `CRITICAL`/`HIGH`.
 
 Jobs `codeql-security` и `security-audit` входят в aggregate `checks`, поэтому их failure
-блокирует merge. Это static/deterministic gate: scanner finding является candidate evidence,
-а не автоматически доказанной exploitability. Для проверки реального attack path используй
-repository-native Security Review вручную/условно через `$security-engineer`.
+блокирует merge. CodeQL сохраняет SARIF локально, после чего
+`scripts/codeql_sarif_gate.py` fail-closed блокирует security findings с
+`security-severity >= 7.0` (High/Critical) и non-security findings уровня `error`.
+Medium/Low security findings сами по себе merge не блокируют и остаются candidate evidence до
+validation реального attack path. Для доказанных non-exploitable findings допускается только
+точечный baseline по exact `rule + path + line` с зафиксированной причиной; совпадение правила
+или файла без точной строки не подавляет новую находку. Этот gate выполняется внутри required CI
+и не зависит от отдельного GitHub ruleset `code_scanning`.
 
 ## Deterministic Security Audit
 
@@ -67,7 +72,7 @@ GitHub Actions workflow `Security Audit` запускается:
 
 Он не подключён к normal PR lane. Workflow выполняет:
 
-- CodeQL для Python и JavaScript/TypeScript;
+- CodeQL для Python и JavaScript/TypeScript с тем же SARIF severity gate;
 - существующий YFC dependency audit через `scripts/ci_contract.py`;
 - Trivy filesystem scan для HIGH/CRITICAL dependency/configuration findings.
 
