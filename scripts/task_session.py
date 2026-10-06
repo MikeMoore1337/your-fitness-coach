@@ -274,6 +274,18 @@ def _is_canonical_managed_ignored_path(path: str, *, root: Path) -> bool:
     return False
 
 
+def _guard_report_matches_replay(stored: Mapping[str, Any], replayed: Mapping[str, Any]) -> bool:
+    """Accept only the historical absence of newly added optional report fields."""
+
+    if dict(stored) == dict(replayed):
+        return True
+    if "completion_mode" not in stored:
+        historical = dict(replayed)
+        historical.pop("completion_mode", None)
+        return dict(stored) == historical
+    return False
+
+
 class TaskSessionError(RuntimeError):
     """A fail-closed controller refusal with an actionable message."""
 
@@ -4697,7 +4709,7 @@ class TaskController:
                     ) from error
                 for line in events_bytes.splitlines(keepends=True):
                     replay.observe_line(line)
-                if replay.report() != report:
+                if not _guard_report_matches_replay(report, replay.report()):
                     raise TaskSessionError("Direct guard report does not match its captured events")
                 raw_started = attempt_id.removesuffix("-delivery")
                 try:
@@ -5104,7 +5116,7 @@ class TaskController:
             raise TaskSessionError("Guard report has invalid budget limits") from error
         for line in events_bytes.splitlines(keepends=True):
             replay.observe_line(line)
-        if replay.report() != report:
+        if not _guard_report_matches_replay(report, replay.report()):
             raise TaskSessionError("Guard report does not match its captured events")
         start_ns = int(started_at.timestamp() * 1_000_000_000)
         if start_ns > report_stat.st_mtime_ns:
@@ -5385,7 +5397,7 @@ class TaskController:
             ) from error
         for line in events_bytes.splitlines(keepends=True):
             replay.observe_line(line)
-        if replay.report() != report:
+        if not _guard_report_matches_replay(report, replay.report()):
             raise TaskSessionError("Post-start transport guard report does not match its events")
         start_ns = int(started_at.timestamp() * 1_000_000_000)
         if start_ns > report_stat.st_mtime_ns:
