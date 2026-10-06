@@ -53,6 +53,7 @@ from fitminiapp_api.models.notification import (
 )
 from fitminiapp_api.models.nutrition import EnergyCalibration, NutritionTarget
 from fitminiapp_api.models.nutrition_label import NutritionCatalogContribution
+from fitminiapp_api.models.nutrition_plan import NutritionPlan
 from fitminiapp_api.models.nutrition_power import (
     FoodSearchAlias,
     NutritionMealTemplate,
@@ -87,7 +88,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 22
+ACCOUNT_EXPORT_SCHEMA_VERSION = 23
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -117,6 +118,8 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "recipe_ingredients": "recipes",
     "nutrition_meal_templates": "nutrition_meal_templates",
     "nutrition_meal_template_items": "nutrition_meal_templates",
+    "nutrition_plans": "nutrition_plans",
+    "nutrition_plan_items": "nutrition_plans",
     "food_search_aliases": "food_search_aliases",
     "food_diary_entries": "food_diary_entries",
     "food_diary_day_statuses": "food_diary_day_statuses",
@@ -201,6 +204,7 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "ai_coach_conversation_message_requests": (
         "opaque AI Coach message request keys used only for idempotency"
     ),
+    "nutrition_plan_operations": "idempotency fingerprints used only for planner write safety",
 }
 
 
@@ -491,6 +495,34 @@ def _serialize_meal_template(template: NutritionMealTemplate) -> dict[str, objec
                 "source_brand": item.source_brand,
             }
             for item in template.items
+        ],
+    }
+
+
+def _serialize_nutrition_plan(plan: NutritionPlan) -> dict[str, object]:
+    return {
+        "id": plan.id,
+        "plan_date": plan.plan_date,
+        "revision": plan.revision,
+        "created_at": plan.created_at,
+        "updated_at": plan.updated_at,
+        "items": [
+            {
+                "id": item.id,
+                "source_template_id": item.source_template_id,
+                "food_id": item.food_id,
+                "recipe_id": item.recipe_id,
+                "item_kind": item.item_kind,
+                "meal_type": item.meal_type,
+                "position": item.position,
+                "amount": item.amount,
+                "amount_unit": item.amount_unit,
+                "source_name": item.source_name,
+                "source_brand": item.source_brand,
+                "created_at": item.created_at,
+                "updated_at": item.updated_at,
+            }
+            for item in plan.items
         ],
     }
 
@@ -854,6 +886,13 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .options(selectinload(NutritionMealTemplate.items))
         .filter(NutritionMealTemplate.owner_user_id == user.id)
         .order_by(NutritionMealTemplate.created_at.asc(), NutritionMealTemplate.id.asc())
+        .all()
+    )
+    nutrition_plans = (
+        db.query(NutritionPlan)
+        .options(selectinload(NutritionPlan.items))
+        .filter(NutritionPlan.user_id == user.id)
+        .order_by(NutritionPlan.plan_date.asc(), NutritionPlan.id.asc())
         .all()
     )
     food_search_aliases = (
@@ -1381,6 +1420,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             for recipe in recipes
         ],
         "nutrition_meal_templates": [_serialize_meal_template(row) for row in meal_templates],
+        "nutrition_plans": [_serialize_nutrition_plan(row) for row in nutrition_plans],
         "food_search_aliases": [
             _fields(
                 row,

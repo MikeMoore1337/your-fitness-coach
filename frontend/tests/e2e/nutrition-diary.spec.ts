@@ -253,6 +253,59 @@ async function mockNutritionApi(
           },
         ];
   let dayStatus: 'incomplete' | 'complete' = 'incomplete';
+  const plannerTargets = {
+    energy_kcal: '2000.00',
+    protein_g: '140.000',
+    fat_g: '70.000',
+    carbs_g: '220.000',
+  };
+  const plannerPlanned = {
+    energy_kcal: '360.00',
+    protein_g: '12.000',
+    fat_g: '6.000',
+    carbs_g: '62.000',
+    fiber_g: '8.000',
+  };
+  const plannerRemaining = {
+    energy_kcal: '1640.00',
+    protein_g: '128.000',
+    fat_g: '64.000',
+    carbs_g: '158.000',
+  };
+  const plannerItem = {
+    id: 101,
+    meal_type: 'breakfast',
+    position: 0,
+    item_kind: 'food',
+    food_id: oatmealFood.id,
+    recipe_id: null,
+    source_template_id: null,
+    name: oatmealFood.name,
+    brand: oatmealFood.brand,
+    amount: '100.000',
+    amount_unit: 'g',
+    weight_g: '100.000',
+    nutrition: plannerPlanned,
+    available: true,
+    message: null,
+  };
+  const plannerDay = (planDate: string) => ({
+    plan_date: planDate,
+    timezone: 'Europe/Moscow',
+    revision: 1,
+    slots: ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type) => ({
+      meal_type,
+      items: meal_type === 'breakfast' && planDate === '2026-08-19' ? [plannerItem] : [],
+      planned:
+        meal_type === 'breakfast' && planDate === '2026-08-19' ? plannerPlanned : zeroNutrition,
+    })),
+    planned: planDate === '2026-08-19' ? plannerPlanned : zeroNutrition,
+    targets: plannerTargets,
+    remaining: planDate === '2026-08-19' ? plannerRemaining : plannerTargets,
+    nutrition_complete: false,
+    updated_at: null,
+    replayed: false,
+  });
 
   await page.addInitScript(() => {
     sessionStorage.setItem('fit_access_token', 'e2e-token');
@@ -454,6 +507,32 @@ async function mockNutritionApi(
         },
       });
     }
+    if (path === '/api/v1/nutrition/plans/day' && request.method() === 'GET') {
+      return route.fulfill({ json: plannerDay(url.searchParams.get('plan_date') || '2026-08-19') });
+    }
+    if (path === '/api/v1/nutrition/plans/week' && request.method() === 'GET') {
+      const days = [
+        '2026-08-17',
+        '2026-08-18',
+        '2026-08-19',
+        '2026-08-20',
+        '2026-08-21',
+        '2026-08-22',
+        '2026-08-23',
+      ].map(plannerDay);
+      return route.fulfill({
+        json: {
+          week_start: '2026-08-17',
+          week_end: '2026-08-23',
+          timezone: 'Europe/Moscow',
+          days,
+          planned: plannerPlanned,
+          targets: plannerTargets,
+          remaining: plannerRemaining,
+          nutrition_complete: false,
+        },
+      });
+    }
     if (path === '/api/v1/nutrition/diary/suggestions' && request.method() === 'GET') {
       const suggestions: NutritionSuggestionsResponse = {
         mode: 'deterministic',
@@ -533,6 +612,12 @@ async function mockNutritionApi(
     }
     if (path === '/api/v1/nutrition/foods/favorites') {
       return route.fulfill({ json: { items: [oatmealFood], total: 1, limit: 12, offset: 0 } });
+    }
+    if (path === '/api/v1/nutrition/recipes' && request.method() === 'GET') {
+      return route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } });
+    }
+    if (path === '/api/v1/nutrition/templates' && request.method() === 'GET') {
+      return route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } });
     }
     if (path === '/api/v1/nutrition/foods/search') {
       const includeExternal = url.searchParams.get('include_external') === 'true';
@@ -692,6 +777,26 @@ async function mockNutritionApi(
     getLastSuggestionCommit: () => lastSuggestionCommit,
   };
 }
+
+test('Task 746 meal planner stays separate from diary on mobile day and week views', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+
+  const planner = page.getByTestId('meal-planner');
+  await expect(planner).toBeVisible();
+  await planner.locator('summary').click();
+  await expect(planner.getByText('План против цели', { exact: true })).toBeVisible();
+  await expect(planner.getByRole('strong').filter({ hasText: 'Овсяная каша' })).toBeVisible();
+  await expect(page.getByText('Греческий йогурт', { exact: true })).toBeVisible();
+
+  await planner.getByRole('tab', { name: 'Неделя', exact: true }).click();
+  await expect(planner.getByText('План недели', { exact: true })).toBeVisible();
+  await expect(planner.getByRole('button', { name: 'Открыть день', exact: true })).toHaveCount(7);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
 
 test('macro-aware suggestions show partial evidence and require an editable confirmation', async ({
   page,

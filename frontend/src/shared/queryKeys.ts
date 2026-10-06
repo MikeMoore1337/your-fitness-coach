@@ -56,6 +56,11 @@ export const queryKeys = {
     mealTemplates: ['nutrition', 'meal-templates'] as const,
     suggestions: (diaryDate: string) => ['nutrition', 'suggestions', diaryDate] as const,
     foodAliases: ['nutrition', 'food-aliases'] as const,
+    plans: {
+      all: ['nutrition', 'plans'] as const,
+      day: (planDate: string) => ['nutrition', 'plans', 'day', planDate] as const,
+      week: (weekStart: string) => ['nutrition', 'plans', 'week', weekStart] as const,
+    },
   },
   notifications: {
     all: ['notifications'] as const,

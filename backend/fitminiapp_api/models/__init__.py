@@ -72,6 +72,11 @@ from fitminiapp_api.models.nutrition_label import (
     NutritionCatalogContribution,
     NutritionLabelDraft,
 )
+from fitminiapp_api.models.nutrition_plan import (
+    NutritionPlan,
+    NutritionPlanItem,
+    NutritionPlanOperation,
+)
 from fitminiapp_api.models.nutrition_power import (
     FoodSearchAlias,
     NutritionMealTemplate,
@@ -190,6 +195,9 @@ __all__ = [
     "NutritionLabelDraft",
     "NutritionMealTemplate",
     "NutritionMealTemplateItem",
+    "NutritionPlan",
+    "NutritionPlanItem",
+    "NutritionPlanOperation",
     "NutritionTarget",
     "OAuthTransaction",
     "Payment",
