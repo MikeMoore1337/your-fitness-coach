@@ -7444,6 +7444,267 @@ def test_task_session_exposes_ready_production_reconciliation_command() -> None:
     assert args.owner_authorize is True
 
 
+def test_reconcile_historical_production_success_accepts_task_746_shape_and_finishes(
+    repository: tuple[Path, Any],
+) -> None:
+    (
+        _root,
+        git_repository,
+        controller,
+        worktree,
+        branch,
+        base_sha,
+        anchor_head_sha,
+        deployed_sha,
+        _github,
+        records,
+    ) = _prepare_historical_production_reconciliation(repository)
+    final_head_sha = git_repository.ref(branch)
+
+    history = controller.reconcile_historical_production_success(
+        "746",
+        pr_number=764,
+        deployed_sha=deployed_sha,
+        production_run_id=37419987998,
+        owner_authorize=True,
+    )
+
+    assert history["state"] == "production-success"
+    assert history["deployed_sha"] == deployed_sha
+    assert history["head_sha"] == final_head_sha
+    assert history["base_sha"] == base_sha
+    audit = history["historical_production_reconciliation"]
+    assert audit["preserved_anchor"]["head_sha"] == anchor_head_sha
+    assert audit["final_task_pr"]["head_sha"] == final_head_sha
+    assert audit["final_task_pr"]["bounded_delivery_commits"]
+    assert audit["original_production"]["run_id"] == 37419987998
+    assert [
+        item["classification"]
+        for item in audit["verified_master_evidence"]["intervening_commits"]
+    ] == ["controller", "product"]
+    assert audit["verified_master_evidence"]["current_master_sha"] == records[-1]["commit_sha"]
+    assert audit["feature_preservation"]["migration_paths"] == [
+        "backend/alembic/versions/0120_synthetic.py"
+    ]
+
+    lease = controller.store.read_json(controller.store.task_lease_path("746"))
+    assert isinstance(lease, dict)
+    assert lease["lifecycle_state"] == task_session.DEPLOYED_STATE
+    assert lease["ready_head_sha"] == anchor_head_sha
+    assert lease["delivery_head_sha"] == anchor_head_sha
+    assert lease["historical_production_reconciliation"] == audit
+
+    result = controller.finish("746")
+
+    assert result["cleanup_performed"] is True
+    assert result["deleted_local_branch"] == branch
+    assert not worktree.exists()
+    assert not git_repository.ref_exists(branch)
+    finished = controller.store.read_json(controller.store.history / "task-746.json")
+    assert finished["state"] == "finished"
+    assert finished["historical_production_reconciliation"] == audit
+
+
+def test_reconcile_historical_production_success_requires_owner_authorization(
+    repository: tuple[Path, Any],
+) -> None:
+    (
+        _root,
+        _git_repository,
+        controller,
+        _worktree,
+        _branch,
+        _base_sha,
+        _anchor_head_sha,
+        deployed_sha,
+        _github,
+        _records,
+    ) = _prepare_historical_production_reconciliation(repository)
+
+    with pytest.raises(task_session.TaskSessionError, match="explicit owner authorization"):
+        controller.reconcile_historical_production_success(
+            "746",
+            pr_number=764,
+            deployed_sha=deployed_sha,
+            production_run_id=37419987998,
+            owner_authorize=False,
+        )
+
+    assert not (controller.store.history / "task-746.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("anchor_ancestry", "not an ancestor of the final task PR head"),
+        ("foreign_task_history", "does not belong exclusively to the same task"),
+        ("pr_task_mismatch", "Task 746"),
+        ("failed_check", "Exact-head required check"),
+        ("missing_deployment", "lacks an exact successful deployment"),
+        ("missing_subsequent_provenance", "no unique merged pull request"),
+        ("controller_allowlist", "disallowed"),
+        ("feature_revert", "appears fully reverted"),
+        ("dirty_worktree", "dirty or interrupted task worktree"),
+        ("unique_worktree", "unique local task commits"),
+        ("active_delivery", "active delivery owner"),
+        ("active_deployment", "production deployment is active"),
+        ("missing_latest_release", "product commits after the latest production deployment"),
+        ("non_ancestor_merge", "merge is not an ancestor of current master"),
+    ],
+)
+def test_reconcile_historical_production_success_fails_closed(
+    repository: tuple[Path, Any],
+    mutation: str,
+    message: str,
+) -> None:
+    (
+        root,
+        git_repository,
+        controller,
+        worktree,
+        _branch,
+        base_sha,
+        _anchor_head_sha,
+        deployed_sha,
+        github,
+        records,
+    ) = _prepare_historical_production_reconciliation(
+        repository,
+        revert_feature=mutation == "feature_revert",
+        controller_disallowed_path=mutation == "controller_allowlist",
+        omit_latest_release=mutation == "missing_latest_release",
+    )
+
+    if mutation == "anchor_ancestry":
+        lease_path = controller.store.task_lease_path("746")
+        lease = controller.store.read_json(lease_path)
+        assert isinstance(lease, dict)
+        invalid_anchor = records[-1]["commit_sha"]
+        lease["ready_head_sha"] = invalid_anchor
+        lease["delivery_head_sha"] = invalid_anchor
+        lease["delivery_anchor"]["head_sha"] = invalid_anchor
+        lease["task_provenance"]["head_sha"] = invalid_anchor
+        task_session.StateStore.replace_json(lease_path, lease)
+    elif mutation == "foreign_task_history":
+        github.commits[764][-1]["commit"]["message"] = "[Task 999] Foreign delivery mutation"
+    elif mutation == "pr_task_mismatch":
+        github.pulls[764]["title"] = "[Task 999] Wrong task"
+    elif mutation == "failed_check":
+        final_head = github.pulls[764]["head"]["sha"]
+        github.checks[final_head] = [
+            {
+                "name": "checks",
+                "head_sha": final_head,
+                "status": "completed",
+                "conclusion": "FAILURE",
+            }
+        ]
+    elif mutation == "missing_deployment":
+        github.successful_deployments.discard((deployed_sha, "production"))
+    elif mutation == "missing_subsequent_provenance":
+        github.associated_pulls_by_commit.pop(records[0]["commit_sha"], None)
+    elif mutation == "dirty_worktree":
+        (worktree / "untracked-recovery.txt").write_text("preserve\n", encoding="utf-8")
+    elif mutation == "unique_worktree":
+        unique_path = worktree / "unique.txt"
+        unique_path.write_text("unique\n", encoding="utf-8")
+        _git(worktree, "add", "unique.txt")
+        _git(worktree, "commit", "-m", "[Task 746] Unmerged local recovery commit")
+    elif mutation == "active_delivery":
+        delivery = controller.store.delivery_state()
+        delivery["owner"] = {"task_id": "999"}
+        task_session.StateStore.replace_json(controller.store.delivery_path, delivery)
+    elif mutation == "active_deployment":
+        github.active_runs = [{"name": "Release production", "status": "in_progress"}]
+    elif mutation == "non_ancestor_merge":
+        _git(root, "switch", "-c", "task/999-side-history", base_sha)
+        side_path = root / "side-history.txt"
+        side_path.write_text("side\n", encoding="utf-8")
+        _git(root, "add", "side-history.txt")
+        _git(root, "commit", "-m", "[Task 999] Side history")
+        side_sha = _git(root, "rev-parse", "HEAD")
+        _git(root, "switch", "master")
+        github.pulls[764]["merge_commit_sha"] = side_sha
+        deployed_sha = side_sha
+        github.runs[37419987998]["head_sha"] = side_sha
+        github.successful_deployments.add((side_sha, "production"))
+
+    with pytest.raises(task_session.TaskSessionError, match=message):
+        controller.reconcile_historical_production_success(
+            "746",
+            pr_number=764,
+            deployed_sha=deployed_sha,
+            production_run_id=37419987998,
+            owner_authorize=True,
+        )
+
+    assert not (controller.store.history / "task-746.json").exists()
+
+
+def test_reconcile_historical_production_success_rejects_master_race(
+    repository: tuple[Path, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (
+        _root,
+        git_repository,
+        controller,
+        _worktree,
+        _branch,
+        _base_sha,
+        _anchor_head_sha,
+        deployed_sha,
+        _github,
+        _records,
+    ) = _prepare_historical_production_reconciliation(repository)
+    original_ref = git_repository.ref
+    origin_master_reads = 0
+
+    def racing_ref(name: str) -> str:
+        nonlocal origin_master_reads
+        value = original_ref(name)
+        if name == "origin/master":
+            origin_master_reads += 1
+            if origin_master_reads >= 3:
+                return "f" * 40
+        return value
+
+    monkeypatch.setattr(git_repository, "ref", racing_ref)
+
+    with pytest.raises(task_session.TaskSessionError, match="origin/master changed during"):
+        controller.reconcile_historical_production_success(
+            "746",
+            pr_number=764,
+            deployed_sha=deployed_sha,
+            production_run_id=37419987998,
+            owner_authorize=True,
+        )
+
+    assert not (controller.store.history / "task-746.json").exists()
+
+
+def test_historical_production_reconciliation_parser_contract() -> None:
+    args = task_session._parser().parse_args(
+        [
+            "reconcile-historical-production-success",
+            "746",
+            "--pr",
+            "764",
+            "--deployed-sha",
+            "a" * 40,
+            "--production-run",
+            "37419987998",
+            "--owner-authorize",
+        ]
+    )
+
+    assert args.task_id == "746"
+    assert args.pr == 764
+    assert args.deployed_sha == "a" * 40
+    assert args.production_run == 37419987998
+    assert args.owner_authorize is True
+
+
 def test_reconcile_ready_production_success_accepts_exact_squash_and_finishes(
     repository: tuple[Path, Any],
 ) -> None:
