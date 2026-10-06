@@ -302,7 +302,10 @@ owner-authorized recovery path:
 Он принимает только `human-required` lease с сохранённым ready anchor без delivery rewrite,
 доказывает ancestry anchor → final PR head и каждый commit в этом диапазоне, same-repository
 merged PR, exact-head `checks`, exact successful production run/deployment, полный independently
-validated subsequent master chain и сохранность Task feature/migration paths. Любой неизвестный
+validated subsequent master chain и сохранность Task feature/migration paths. Task PR после latest
+production допускается без runtime deploy только если его changed paths полностью совпадают с
+controller/governance allowlist, exact release успешен, application-deploy job имеет `skipped`, а
+successful production deployment для этого SHA отсутствует. Любой runtime path, неизвестный
 commit, missing provenance/check/deployment, active owner/deployment, dirty или unique worktree,
 master race либо позднее изменение production path блокирует запись. Recovery сохраняет старый
 anchor и фактические PR/merge/deployed SHAs, переводит lease в `deployed`, а terminal closeout
