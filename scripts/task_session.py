@@ -151,6 +151,10 @@ GUARD_RECOVERY_HANDOFF_BLOCKER = (
     "Owner-authorized bounded guard recovery is launching the preserved task WIP."
 )
 MAX_GUARD_EVIDENCE_BYTES = 16 * 1024 * 1024
+GUARD_GENERATED_OUTPUT_RE = re.compile(
+    r"(?m)^\s*[^\r\n]*?(?:→|->)\s*(?P<path>[^\s\[]+)"
+    r"(?:\s+\[[^\r\n]*\])?\s*$"
+)
 TASK_INTEGRATION_BRANCHES = {"feature/app-experience-v3": "393"}
 DEPENDABOT_LOGIN = "dependabot[bot]"
 TRUSTED_DEPENDENCY_BOT_BRANCH_PREFIXES = {
@@ -284,6 +288,83 @@ def _guard_report_matches_replay(stored: Mapping[str, Any], replayed: Mapping[st
         historical.pop("completion_mode", None)
         return dict(stored) == historical
     return False
+
+
+def _guard_generated_output_relative_path(raw_path: str, *, worktree: Path) -> str | None:
+    """Resolve one explicit generator output without trusting an arbitrary path."""
+    normalized = raw_path.strip().strip("`'\"").replace("\\", "/")
+    if not normalized or normalized.startswith("/") or re.fullmatch(r"[a-zA-Z]:.*", normalized):
+        return None
+    output = PurePosixPath(normalized)
+    if any(part in {"", ".", ".."} for part in output.parts):
+        return None
+    try:
+        roots = [worktree]
+        roots.extend(
+            child
+            for child in sorted(worktree.iterdir(), key=lambda path: path.name.casefold())
+            if child.is_dir() and not child.is_symlink()
+        )
+    except OSError:
+        return None
+    matches: set[str] = set()
+    worktree_root = worktree.resolve()
+    for root in roots:
+        candidate = root.joinpath(*output.parts)
+        try:
+            resolved = candidate.resolve()
+            relative = resolved.relative_to(worktree_root).as_posix()
+        except OSError, ValueError:
+            continue
+        if resolved.is_file():
+            matches.add(relative)
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
+def _guard_event_changed_paths(events_bytes: bytes, *, worktree: Path) -> set[str]:
+    """Collect file-change paths plus unambiguous successful generator outputs."""
+    changed_paths: set[str] = set()
+    for line in events_bytes.splitlines():
+        try:
+            payload = json.loads(line.decode("utf-8"))
+        except UnicodeError, json.JSONDecodeError:
+            continue
+        if not isinstance(payload, Mapping) or payload.get("type") != "item.completed":
+            continue
+        item = payload.get("item")
+        if not isinstance(item, Mapping):
+            continue
+        if item.get("type") == "file_change":
+            changes = item.get("changes")
+            if not isinstance(changes, list):
+                continue
+            for change in changes:
+                raw_path = change.get("path") if isinstance(change, Mapping) else None
+                if not isinstance(raw_path, str) or not raw_path:
+                    continue
+                candidate_path = Path(raw_path)
+                if not candidate_path.is_absolute():
+                    candidate_path = worktree / candidate_path
+                try:
+                    relative = candidate_path.resolve().relative_to(worktree.resolve())
+                except OSError, ValueError:
+                    continue
+                changed_paths.add(relative.as_posix())
+            continue
+        if (
+            item.get("type") != "command_execution"
+            or item.get("status") != "completed"
+            or item.get("exit_code") != 0
+        ):
+            continue
+        output = item.get("aggregated_output")
+        if not isinstance(output, str):
+            continue
+        for match in GUARD_GENERATED_OUTPUT_RE.finditer(output):
+            relative = _guard_generated_output_relative_path(match.group("path"), worktree=worktree)
+            if relative is not None:
+                changed_paths.add(relative)
+    return changed_paths
 
 
 class TaskSessionError(RuntimeError):
@@ -4721,32 +4802,10 @@ class TaskController:
                 start_ns = int(started_at.timestamp() * 1_000_000_000)
                 if start_ns > report_stat.st_mtime_ns:
                     raise TaskSessionError("Direct guard report predates the delivery attempt")
-                event_changed_paths: set[str] = set()
-                for line in events_bytes.splitlines():
-                    try:
-                        payload = json.loads(line.decode("utf-8"))
-                    except UnicodeError:
-                        continue
-                    except json.JSONDecodeError:
-                        continue
-                    item = payload.get("item") if isinstance(payload, Mapping) else None
-                    if not isinstance(item, Mapping) or item.get("type") != "file_change":
-                        continue
-                    changes = item.get("changes")
-                    if not isinstance(changes, list):
-                        continue
-                    for change in changes:
-                        raw_path = change.get("path") if isinstance(change, Mapping) else None
-                        if not isinstance(raw_path, str) or not raw_path:
-                            continue
-                        candidate_path = Path(raw_path)
-                        if not candidate_path.is_absolute():
-                            candidate_path = worktree / candidate_path
-                        try:
-                            relative = candidate_path.resolve().relative_to(worktree.resolve())
-                        except ValueError:
-                            continue
-                        event_changed_paths.add(relative.as_posix())
+                event_changed_paths = _guard_event_changed_paths(
+                    events_bytes,
+                    worktree=worktree,
+                )
                 candidates.append(
                     {
                         "attempt_id": attempt_id,

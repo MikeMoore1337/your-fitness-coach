@@ -55,6 +55,65 @@ def test_guard_replay_accepts_historical_report_without_completion_mode() -> Non
     assert task_session._guard_report_matches_replay(historical, replayed) is False
 
 
+def test_guard_event_paths_accept_successful_unambiguous_generator_output(tmp_path: Path) -> None:
+    generated = tmp_path / "frontend" / "src" / "shared" / "api" / "schema.d.ts"
+    generated.parent.mkdir(parents=True)
+    generated.write_text("export type Generated = true;\n", encoding="utf-8")
+    events = (
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "status": "completed",
+                    "exit_code": 0,
+                    "aggregated_output": ("openapi.json → src/shared/api/schema.d.ts [427.4ms]"),
+                },
+            }
+        ).encode()
+        + b"\n"
+    )
+
+    assert task_session._guard_event_changed_paths(events, worktree=tmp_path) == {
+        "frontend/src/shared/api/schema.d.ts"
+    }
+
+
+def test_guard_event_paths_reject_failed_or_ambiguous_generator_output(tmp_path: Path) -> None:
+    for relative in ("frontend/src/shared/api/schema.d.ts", "src/shared/api/schema.d.ts"):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("generated\n", encoding="utf-8")
+    events = (
+        json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "status": "completed",
+                    "exit_code": 1,
+                    "aggregated_output": "openapi.json → src/shared/api/schema.d.ts [1ms]",
+                },
+            }
+        ).encode()
+        + b"\n"
+        + json.dumps(
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "status": "completed",
+                    "exit_code": 0,
+                    "aggregated_output": "openapi.json → src/shared/api/schema.d.ts [1ms]",
+                },
+            }
+        ).encode()
+        + b"\n"
+    )
+
+    assert task_session._guard_event_changed_paths(events, worktree=tmp_path) == set()
+
+
 def _git(path: Path, *args: str) -> str:
     completed = subprocess.run(["git", *args], cwd=path, check=True, text=True, capture_output=True)
     return completed.stdout.strip()
