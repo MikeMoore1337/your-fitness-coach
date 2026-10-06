@@ -48,7 +48,8 @@
       "pytest_nodeids": [
         "tests/test_task_session.py::test_record_production_success_requires_exact_merged_master_deployment",
         "tests/test_task_session.py::test_finish_accepts_controller_only_master_drift_after_deployment",
-        "tests/test_task_session.py::test_finish_rejects_product_master_drift_after_deployment"
+        "tests/test_task_session.py::test_finish_rejects_product_master_drift_after_deployment",
+        "tests/test_task_session.py::test_reconcile_subsequent_production_accepts_verified_no_deploy_task_tail"
       ]
     },
     {
