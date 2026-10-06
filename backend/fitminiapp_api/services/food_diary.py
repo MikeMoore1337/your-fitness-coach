@@ -21,6 +21,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryEntry,
     FoodDiaryRepeatPreview,
 )
+from fitminiapp_api.models.nutrition_plan import NutritionPlanItem
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.food_diary import (
@@ -708,6 +709,9 @@ def delete_food_diary_entry(db: Session, user: User, entry_id: int) -> None:
     if entry is None:
         raise FoodDiaryNotFoundError("diary entry not found")
     status = _stored_day_status(db, user, entry.diary_date)
+    db.query(NutritionPlanItem).filter(NutritionPlanItem.diary_entry_id == entry.id).update(
+        {NutritionPlanItem.diary_entry_id: None}, synchronize_session=False
+    )
     db.delete(entry)
     db.flush()
     if status is not None and status.status == "complete":

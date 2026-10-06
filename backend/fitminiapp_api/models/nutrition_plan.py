@@ -117,9 +117,8 @@ class NutritionPlanItem(Base):
     source_name: Mapped[str] = mapped_column(String(256), nullable=False)
     source_brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
     status: Mapped[str | None] = mapped_column(String(16), nullable=True, default="planned")
-    diary_entry_id: Mapped[int | None] = mapped_column(
-        ForeignKey("food_diary_entries.id", ondelete="SET NULL"), nullable=True
-    )
+    # Server-owned consumption lineage stays a nullable scalar during the online expand.
+    diary_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     action_idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     action_request_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
