@@ -1,6 +1,6 @@
 {
   "package": "your-fitness-coach-agents",
-  "version": "10",
+  "version": "11",
   "root": ".agents",
   "skill_count": 43,
   "skills": [
@@ -83,6 +83,18 @@
     "QA v8 keeps qa-engineer as strategy/router and adds focused testing, E2E review, triage, flakiness and coverage skills",
     "QA work profiles are modes, not additional lifecycle roles",
     "Security v9 adds repository-native diff/full review, YFC threat model and a separate deterministic Security Audit workflow",
-    "Security v10 adds free mandatory PR security jobs (CodeQL, dependency audit, Trivy) while semantic Security Review remains manual/conditional"
-  ]
+    "Security v10 adds free mandatory PR security jobs (CodeQL, dependency audit, Trivy) while semantic Security Review remains manual/conditional",
+    "Agent Harness v11 adapts eval/checkpoint/controlled-learning ideas without Claude-specific hooks, session transcript persistence or automatic instruction promotion"
+  ],
+  "agent_harness": {
+    "script": "scripts/agent_harness.py",
+    "eval_root": ".agents/evals",
+    "features": [
+      "deterministic-pytest-backed-evals",
+      "derived-read-only-task-checkpoints",
+      "owner-reviewable-learning-candidates"
+    ],
+    "source_of_truth": false,
+    "generated_artifacts": ".artifacts/tasks/<TASK_ID>/{temporary,evidence,deliverables}"
+  }
 }

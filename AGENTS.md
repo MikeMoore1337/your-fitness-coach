@@ -87,6 +87,16 @@ truth and never part of the application runtime.
   automatic graph rebuilds for every task. Graphify findings must not expand the current task scope.
 - Installation and usage details live in `docs/graphify-development.md`.
 
+# Agent harness
+
+`scripts/agent_harness.py` is a bounded deterministic aid, not another lifecycle or source of truth.
+
+- Versioned definitions under `.agents/evals/` may only map agent/controller behavior to existing deterministic pytest node IDs. For controller, lifecycle, instruction-routing or eval-definition changes, run `python scripts/agent_harness.py eval validate` and the relevant evals; do not duplicate the whole CI suite without a concrete reason.
+- `checkpoint <TASK_ID>` writes only a compact derived projection of read-only `task_session.py recover` state under that task's `.artifacts/.../temporary/`. Git, GitHub and controller state always win on disagreement.
+- `learn propose` may record a reusable pattern only as a task deliverable candidate. It must include evidence, reuse rationale, destination and conflict analysis. There is no automatic promotion into `AGENTS.md`, roles, skills or docs.
+- Never persist session transcripts, credentials, tokens or secret-like values through the harness.
+- WorldFlowAI/everything-claude-code is reference material only; do not install, vendor or copy its Claude-specific hook/settings layer into YFC.
+
 # Implementation minimalism
 
 Understand the task and trace the real affected flow before choosing a solution. Before adding new

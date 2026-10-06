@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "suite": "lifecycle",
+  "description": "Deterministic regression and capability evals for the YFC Codex task controller. These evals reuse existing pytest tests and do not create a second lifecycle.",
+  "evals": [
+    {
+      "id": "merged-no-deploy-recovery",
+      "kind": "regression",
+      "description": "CI-only tasks can be reconciled after merge without duplicate deployment and unsafe anchors still fail closed.",
+      "pytest_nodeids": [
+        "tests/test_task_session.py::test_reconcile_merged_no_deploy_corrects_stale_lease_and_unblocks_controller",
+        "tests/test_task_session.py::test_reconcile_merged_no_deploy_records_observed_automatic_deployment",
+        "tests/test_task_session.py::test_reconcile_merged_no_deploy_rejects_dirty_or_changed_anchor"
+      ]
+    },
+    {
+      "id": "delivery-serialization",
+      "kind": "regression",
+      "description": "The delivery lane remains serial, deterministic and blocked only where active production ownership requires it.",
+      "pytest_nodeids": [
+        "tests/test_task_session.py::test_delivery_lane_is_serial_and_handoff_is_deterministic",
+        "tests/test_task_session.py::test_active_production_deploy_blocks_only_delivery_acquisition",
+        "tests/test_task_session.py::test_release_delivery_does_not_handoff_during_active_production"
+      ]
+    },
+    {
+      "id": "owner-gate-start",
+      "kind": "capability",
+      "description": "Owner-selected tasks start through the existing gate contract without inventing extra approval stages.",
+      "pytest_nodeids": [
+        "tests/test_task_session.py::test_owner_selected_launch_requires_only_explicit_launch_unless_concrete_gate_declared",
+        "tests/test_task_session.py::test_yellow_owner_gates_allow_implementation_start"
+      ]
+    },
+    {
+      "id": "read-only-recovery",
+      "kind": "regression",
+      "description": "Recovery inspection remains read only and mutation requires the dedicated owner-authorized path.",
+      "pytest_nodeids": [
+        "tests/test_task_session.py::test_recover_is_read_only_and_preserves_dirty_unique_task_state",
+        "tests/test_task_session.py::test_resolve_recovery_requires_owner_authorization_and_clean_unique_anchor"
+      ]
+    },
+    {
+      "id": "production-closeout-safety",
+      "kind": "regression",
+      "description": "Production success and finish require exact verified deployment provenance and reject product drift.",
+      "pytest_nodeids": [
+        "tests/test_task_session.py::test_record_production_success_requires_exact_merged_master_deployment",
+        "tests/test_task_session.py::test_finish_accepts_controller_only_master_drift_after_deployment",
+        "tests/test_task_session.py::test_finish_rejects_product_master_drift_after_deployment"
+      ]
+    },
+    {
+      "id": "controller-interruption-recovery",
+      "kind": "capability",
+      "description": "Interrupted worker/controller paths retain bounded retry behavior and recover without legacy launch state.",
+      "pytest_nodeids": [
+        "tests/test_task_session.py::test_guard_interrupted_resume_recovery_budget_is_exhausted_after_claim",
+        "tests/test_task_session.py::test_direct_guard_interrupted_resume_recovers_without_legacy_launch_audit"
+      ]
+    }
+  ]
+}
