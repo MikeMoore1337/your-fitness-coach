@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
