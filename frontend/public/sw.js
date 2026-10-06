@@ -314,6 +314,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.origin !== self.location.origin) return;
   if (event.data?.type === 'YFC_PWA_SKIP_WAITING') {
     event.waitUntil(self.skipWaiting());
     return;

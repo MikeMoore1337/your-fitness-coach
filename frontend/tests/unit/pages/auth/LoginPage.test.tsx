@@ -5,7 +5,7 @@ import { NavigationProvider } from '../../../../src/shared/navigation/router';
 
 const { authState } = vi.hoisted(() => ({
   authState: {
-    user: null as { id: number } | null,
+    user: null as { id: number; is_coach?: boolean; is_root?: boolean } | null,
     config: {
       app_env: 'prod',
       enable_dev_auth: false,
@@ -120,11 +120,31 @@ describe('LoginPage', () => {
     expect(document.body).not.toHaveTextContent('secret-state');
   });
 
-  it('redirects an already authenticated account to the intended destination', async () => {
-    authState.user = { id: 9 };
+  it('redirects an authenticated coach to an explicitly requested coach destination', async () => {
+    authState.user = { id: 9, is_coach: true };
     renderLogin();
 
     await waitFor(() => expect(window.location.pathname).toBe('/coach'));
+  });
+
+  it.each([
+    ['/coach', { id: 9 }],
+    ['/admin', { id: 9 }],
+    ['/admin', { id: 9, is_coach: true }],
+  ])('rejects unauthorized privileged next destination %s', async (next, user) => {
+    authState.user = user;
+    window.history.replaceState(null, '', `/login?next=${encodeURIComponent(next)}`);
+    renderLogin();
+
+    await waitFor(() => expect(window.location.pathname).toBe('/app'));
+  });
+
+  it('allows an authenticated root account to use an explicit admin destination', async () => {
+    authState.user = { id: 9, is_root: true };
+    window.history.replaceState(null, '', '/login?next=%2Fadmin');
+    renderLogin();
+
+    await waitFor(() => expect(window.location.pathname).toBe('/admin'));
   });
 
   it('explains clean onboarding and provides an explicit return to the demo scenario', () => {
