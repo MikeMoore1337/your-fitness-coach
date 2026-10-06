@@ -270,6 +270,25 @@ delivery ownership и обычные `complete-production`/`reconcile-production
 изменяются. После этого применяется только штатный `finish`, который повторно проверяет сохранённый
 anchor и drift evidence.
 
+Если exact merged revision product-task уже успешно deployed, но обычный closeout был пропущен и
+за это время protected `master` ушёл вперёд независимыми PR других tasks, используется отдельная
+owner-authorized команда `reconcile-historical-production-success <ID> --pr <number>
+--deployed-sha <sha> --production-run <id> --owner-authorize`. Она принимает только
+`human-required` write lease без active delivery owner/production deployment и не переписывает
+исходный ready/delivery anchor. Команда доказывает, что preserved anchor является ancestor финального
+task PR head, каждый commit между ними принадлежит той же Task, task branch/worktree чист и не имеет
+unique local commits, финальный same-repository PR merged в protected `master` с green exact-head
+`checks`, а его merge SHA точно совпадает с историческим successful production run/deployment.
+
+Каждый последующий first-parent merge после исторического deploy повторно проверяется по тому же
+fail-closed контракту, что и `reconcile-subsequent-production`: controller PR обязан менять только
+allowlist paths и иметь successful release с skipped application deploy; product PR обязан иметь
+успешный собственный либо более поздний superseding production evidence. Дополнительно task patch
+должен по-прежнему отличаться от pre-task base на текущем master, а изменённые task migration-файлы
+не могут быть полностью отменены. Успех записывает `historical_production_reconciliation`,
+переводит lease в `deployed` и оставляет cleanup только штатному `finish`. Старый SHA повторно
+не деплоится, task provenance/ready/delivery anchor не переписываются.
+
 Для уже завершённой task, чей production SHA позже стал ancestor master, существует отдельная
 terminal-only команда `reconcile-subsequent-production <ID> --owner-authorize`. Она требует
 `deployed` lease с совместимой `production-success` history, неизменённую clean task branch/worktree без unique commits, пустой delivery
