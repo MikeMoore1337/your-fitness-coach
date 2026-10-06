@@ -58,8 +58,10 @@ Jobs `codeql-security` и `security-audit` входят в aggregate `checks`, �
 `scripts/codeql_sarif_gate.py` fail-closed блокирует security findings с
 `security-severity >= 7.0` (High/Critical) и non-security findings уровня `error`.
 Medium/Low security findings сами по себе merge не блокируют и остаются candidate evidence до
-validation реального attack path. Этот gate выполняется внутри required CI и не зависит от
-отдельного GitHub ruleset `code_scanning`.
+validation реального attack path. Для доказанных non-exploitable findings допускается только
+точечный baseline по exact `rule + path + line` с зафиксированной причиной; совпадение правила
+или файла без точной строки не подавляет новую находку. Этот gate выполняется внутри required CI
+и не зависит от отдельного GitHub ruleset `code_scanning`.
 
 ## Deterministic Security Audit
 
