@@ -4808,6 +4808,33 @@ def test_controller_release_skips_worker_guard_only_diff() -> None:
     assert result["deploy"] is False
 
 
+def test_controller_release_skips_agent_harness_governance_diff() -> None:
+    merge_sha = "c" * 40
+    paths = [
+        ".agents/MANIFEST.json",
+        ".agents/evals/lifecycle.json",
+        "AGENTS.md",
+        "docs/agent-harness.md",
+        "scripts/agent_harness.py",
+        "tests/test_agent_harness.py",
+    ]
+    pull_request = _merged_release_pr(
+        999,
+        merge_sha,
+        branch="task/999-agent-harness",
+        title="[Task 999] Agent Harness",
+        paths=paths,
+    )
+    result = task_session.classify_controller_release(
+        _release_github([pull_request], {999: paths}),
+        deploy_sha=merge_sha,
+        repository="owner/repository",
+    )
+
+    assert result["controller_only"] is True
+    assert result["deploy"] is False
+
+
 @pytest.mark.parametrize(
     ("branch", "title", "paths"),
     [
