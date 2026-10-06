@@ -389,7 +389,7 @@ class FoodDiaryBatchOperation(Base):
     __tablename__ = "food_diary_batch_operations"
     __table_args__ = (
         CheckConstraint(
-            "operation_kind IN ('meal_template', 'natural_input', 'suggestion')",
+            "operation_kind IN ('meal_template', 'natural_input', 'suggestion', 'planned_item')",
             name="ck_food_diary_batch_operations_kind",
         ),
         CheckConstraint(

@@ -288,14 +288,22 @@ async function mockNutritionApi(
     nutrition: plannerPlanned,
     available: true,
     message: null,
+    status: 'planned' as const,
+    diary_entry_id: null,
   };
+  let plannerRevision = 1;
+  let plannerStatus: 'planned' | 'consumed' | 'skipped' = 'planned';
+  let plannerDiaryEntryId: number | null = null;
   const plannerDay = (planDate: string) => ({
     plan_date: planDate,
     timezone: 'Europe/Moscow',
-    revision: 1,
+    revision: planDate === '2026-08-19' ? plannerRevision : 0,
     slots: ['breakfast', 'lunch', 'dinner', 'snacks'].map((meal_type) => ({
       meal_type,
-      items: meal_type === 'breakfast' && planDate === '2026-08-19' ? [plannerItem] : [],
+      items:
+        meal_type === 'breakfast' && planDate === '2026-08-19'
+          ? [{ ...plannerItem, status: plannerStatus, diary_entry_id: plannerDiaryEntryId }]
+          : [],
       planned:
         meal_type === 'breakfast' && planDate === '2026-08-19' ? plannerPlanned : zeroNutrition,
     })),
@@ -530,6 +538,69 @@ async function mockNutritionApi(
           targets: plannerTargets,
           remaining: plannerRemaining,
           nutrition_complete: false,
+        },
+      });
+    }
+    if (path === '/api/v1/nutrition/plans/suggestions' && request.method() === 'GET') {
+      return route.fulfill({
+        json: {
+          mode: 'deterministic',
+          diary_date: url.searchParams.get('plan_date') || '2026-08-19',
+          targets: plannerTargets,
+          remaining: plannerRemaining,
+          remaining_confidence: 'exact',
+          limitations: ['Это варианты из уже сохранённых продуктов, рецептов и шаблонов.'],
+          max_candidates: 6,
+          candidates: [
+            {
+              candidate_id: 'food:7',
+              candidate_kind: 'food',
+              identity_id: 7,
+              name: oatmealFood.name,
+              items: [
+                {
+                  position: 0,
+                  item_kind: 'food',
+                  food_id: oatmealFood.id,
+                  recipe_id: null,
+                  name: oatmealFood.name,
+                  brand: oatmealFood.brand,
+                  amount: '100.000',
+                  amount_unit: 'g',
+                  nutrition: plannerPlanned,
+                  nutrition_confidence: 'exact',
+                },
+              ],
+              nutrition: plannerPlanned,
+              nutrition_confidence: 'exact',
+              sources: ['recent'],
+              reasons: ['recent'],
+            },
+          ],
+        },
+      });
+    }
+    if (path === '/api/v1/nutrition/plans/fill' && request.method() === 'POST') {
+      plannerRevision += 1;
+      return route.fulfill({ json: plannerDay('2026-08-19') });
+    }
+    if (path === '/api/v1/nutrition/plans/items/101/action' && request.method() === 'POST') {
+      const body = request.postDataJSON() as { action: 'consume' | 'skip' };
+      plannerRevision += 1;
+      plannerStatus = body.action === 'skip' ? 'skipped' : 'consumed';
+      plannerDiaryEntryId = body.action === 'skip' ? null : 222;
+      return route.fulfill({
+        json: {
+          action: body.action,
+          item: {
+            ...plannerItem,
+            status: plannerStatus,
+            diary_entry_id: plannerDiaryEntryId,
+          },
+          day: plannerDay('2026-08-19'),
+          diary_entry_id: plannerDiaryEntryId,
+          replayed: false,
+          diagnostic: body.action === 'skip' ? 'planned_item_skipped' : 'planned_item_consumed',
         },
       });
     }
@@ -789,12 +860,75 @@ test('Task 746 meal planner stays separate from diary on mobile day and week vie
   await expect(planner).toBeVisible();
   await planner.locator('summary').click();
   await expect(planner.getByText('План против цели', { exact: true })).toBeVisible();
-  await expect(planner.getByRole('strong').filter({ hasText: 'Овсяная каша' })).toBeVisible();
+  await expect(
+    planner.locator('.meal-planner__slots').getByText('Овсяная каша', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText('Греческий йогурт', { exact: true })).toBeVisible();
 
   await planner.getByRole('tab', { name: 'Неделя', exact: true }).click();
   await expect(planner.getByText('План недели', { exact: true })).toBeVisible();
   await expect(planner.getByRole('button', { name: 'Открыть день', exact: true })).toHaveCount(7);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('Task 747 mocked TMA keeps plan fill explicit and bridges one planned item to diary', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    window.Telegram = {
+      WebApp: {
+        initData: 'signed-task-747-init-data',
+        initDataUnsafe: {},
+        version: '8.0',
+        platform: 'android',
+        colorScheme: 'light',
+        themeParams: {},
+        viewportHeight: 844,
+        viewportStableHeight: 844,
+        safeAreaInset: { top: 24, right: 0, bottom: 18, left: 0 },
+        contentSafeAreaInset: { top: 8, right: 0, bottom: 10, left: 0 },
+        ready() {},
+        expand() {},
+        onEvent() {},
+        offEvent() {},
+        setHeaderColor() {},
+        setBackgroundColor() {},
+        setBottomBarColor() {},
+      },
+    };
+  });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19#tgWebAppPlatform=android');
+
+  const planner = page.getByTestId('meal-planner');
+  await planner.locator('summary').click();
+  const planSuggestions = planner.getByRole('region', { name: 'Варианты для плана' });
+  await expect(planSuggestions.getByRole('button', { name: 'Проверить вариант' })).toBeVisible({
+    timeout: 15_000,
+  });
+  const fillRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes('/api/v1/nutrition/plans/fill') && request.method() === 'POST',
+  );
+  await planSuggestions.getByRole('button', { name: 'Проверить вариант' }).click();
+  await planSuggestions.getByRole('button', { name: 'Добавить в план' }).click();
+  expect((await fillRequest).postDataJSON()).toMatchObject({
+    candidate_id: 'food:7',
+    expected_revision: 1,
+  });
+
+  const actionRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes('/api/v1/nutrition/plans/items/101/action') &&
+      request.method() === 'POST',
+  );
+  await planner.getByRole('button', { name: 'Съел Овсяная каша' }).click();
+  expect((await actionRequest).postDataJSON()).toEqual({
+    action: 'consume',
+    expected_revision: 2,
+  });
+  await expect(planner.getByText('Съедено', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 

@@ -71,6 +71,9 @@ from fitminiapp_api.schemas.nutrition_label import (
 from fitminiapp_api.schemas.nutrition_plan import (
     NutritionPlanCopyRequest,
     NutritionPlanDayResponse,
+    NutritionPlanFillRequest,
+    NutritionPlanItemActionRequest,
+    NutritionPlanItemActionResponse,
     NutritionPlanItemCreate,
     NutritionPlanItemUpdate,
     NutritionPlanWeekResponse,
@@ -183,8 +186,11 @@ from fitminiapp_api.services.nutrition_plan import (
     add_plan_item,
     copy_plan_day,
     delete_plan_item,
+    fill_plan_from_suggestion,
     get_plan_day,
+    get_plan_fill_suggestions,
     get_plan_week,
+    perform_plan_item_action,
     update_plan_item,
 )
 from fitminiapp_api.services.nutrition_power import (
@@ -262,6 +268,11 @@ def _raise_nutrition_plan_http_error(exc: NutritionPlanError) -> None:
     if isinstance(exc, NutritionPlanNotFoundError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if isinstance(exc, NutritionPlanConflictError):
+        if exc.code is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": exc.code, "message": str(exc), **exc.details},
+            ) from exc
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -988,6 +999,37 @@ def nutrition_plan_week(
     return get_plan_week(db, current_user, week_start)
 
 
+@router.get("/plans/suggestions", response_model=NutritionSuggestionsResponse)
+def get_plan_suggestions(
+    plan_date: date | None = Query(default=None),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return get_plan_fill_suggestions(db, current_user, plan_date)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
+@router.post(
+    "/plans/fill",
+    response_model=NutritionPlanDayResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def fill_nutrition_plan(
+    payload: NutritionPlanFillRequest,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return fill_plan_from_suggestion(db, current_user, payload, idempotency_key)
+    except NutritionPlanError as exc:
+        _raise_nutrition_plan_http_error(exc)
+    except FoodDiaryError as exc:
+        _raise_diary_http_error(exc)
+
+
 @router.post(
     "/plans/items",
     response_model=NutritionPlanDayResponse,
@@ -1025,6 +1067,23 @@ def patch_nutrition_plan_item(
 ):
     try:
         return update_plan_item(db, current_user, item_id, payload)
+    except NutritionPlanError as exc:
+        _raise_nutrition_plan_http_error(exc)
+
+
+@router.post(
+    "/plans/items/{item_id}/action",
+    response_model=NutritionPlanItemActionResponse,
+)
+def action_nutrition_plan_item(
+    item_id: int,
+    payload: NutritionPlanItemActionRequest,
+    idempotency_key: IdempotencyKey,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return perform_plan_item_action(db, current_user, item_id, payload, idempotency_key)
     except NutritionPlanError as exc:
         _raise_nutrition_plan_http_error(exc)
 

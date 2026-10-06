@@ -475,7 +475,7 @@ def _batch_response(
     )
     return FoodDiaryBatchResponse(
         operation_kind=cast(
-            Literal["meal_template", "natural_input", "suggestion"],
+            Literal["meal_template", "natural_input", "suggestion", "planned_item"],
             operation.operation_kind,
         ),
         diary_date=operation.diary_date,
@@ -486,7 +486,7 @@ def _batch_response(
 
 
 def _batch_request_fingerprint(
-    operation_kind: Literal["meal_template", "natural_input", "suggestion"],
+    operation_kind: Literal["meal_template", "natural_input", "suggestion", "planned_item"],
     diary_date: date,
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
@@ -536,8 +536,9 @@ def create_food_diary_batch(
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
     idempotency_key: str,
-    operation_kind: Literal["meal_template", "natural_input", "suggestion"],
+    operation_kind: Literal["meal_template", "natural_input", "suggestion", "planned_item"],
     template_id: int | None = None,
+    commit: bool = True,
 ) -> FoodDiaryBatchResponse:
     key = _normalize_idempotency_key(idempotency_key)
     fingerprint = _batch_request_fingerprint(
@@ -602,7 +603,10 @@ def create_food_diary_batch(
                 day_scope=True,
             )
             record_progress_weekly_action_completion(db, user, "nutrition")
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except FoodDiaryError:
         db.rollback()
         raise

@@ -22,12 +22,18 @@ from fitminiapp_api.schemas.food_diary import FoodDiaryNutrition, FoodDiaryTarge
 from fitminiapp_api.schemas.nutrition_plan import (
     NutritionPlanCopyRequest,
     NutritionPlanDayResponse,
+    NutritionPlanFillItem,
+    NutritionPlanFillRequest,
+    NutritionPlanItemActionRequest,
+    NutritionPlanItemActionResponse,
     NutritionPlanItemCreate,
     NutritionPlanItemResponse,
     NutritionPlanItemUpdate,
     NutritionPlanSlotResponse,
     NutritionPlanWeekResponse,
 )
+from fitminiapp_api.schemas.nutrition_power import FoodDiaryBatchItem, NutritionSuggestionsResponse
+from fitminiapp_api.services.food_diary import FoodDiaryError, create_food_diary_batch
 from fitminiapp_api.services.foods import (
     FoodError,
     FoodNutrition,
@@ -44,7 +50,16 @@ ZERO = Decimal("0")
 
 
 class NutritionPlanError(ValueError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        details: dict[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.details = details or {}
 
 
 class NutritionPlanNotFoundError(NutritionPlanError):
@@ -186,6 +201,8 @@ def _serialize_item(
         weight_g=weight_g,
         nutrition=nutrition,
         available=available,
+        status=cast(Literal["planned", "consumed", "skipped"], item.status),
+        diary_entry_id=item.diary_entry_id,
         message=message,
     )
 
@@ -250,6 +267,24 @@ def get_plan_day(db: Session, user: User, plan_date: date | None) -> NutritionPl
     return _build_day(db, user, plan_date or today_for_user(user))
 
 
+def get_plan_fill_suggestions(
+    db: Session,
+    user: User,
+    plan_date: date | None,
+) -> NutritionSuggestionsResponse:
+    from fitminiapp_api.services.nutrition_suggestions import get_nutrition_suggestions
+
+    day = get_plan_day(db, user, plan_date)
+    return get_nutrition_suggestions(
+        db,
+        user,
+        day.plan_date,
+        targets_override=day.targets,
+        remaining_override=day.remaining,
+        force_context=True,
+    )
+
+
 def _monday(value: date) -> date:
     return value - timedelta(days=value.weekday())
 
@@ -311,7 +346,11 @@ def _plan_for_write(db: Session, user: User, plan_date: date) -> NutritionPlan:
 
 def _check_revision(plan: NutritionPlan, expected_revision: int) -> None:
     if plan.revision != expected_revision:
-        raise NutritionPlanConflictError("plan revision is stale; reload the plan and retry")
+        raise NutritionPlanConflictError(
+            "plan revision is stale; reload the plan and retry",
+            code="stale_plan",
+            details={"expected_revision": expected_revision, "current_revision": plan.revision},
+        )
 
 
 def _operation(
@@ -320,7 +359,7 @@ def _operation(
     *,
     key: str,
     fingerprint: str,
-    kind: Literal["add", "copy"],
+    kind: Literal["add", "copy", "fill"],
     target_date: date,
 ) -> tuple[NutritionPlanOperation, bool]:
     existing = (
@@ -333,7 +372,10 @@ def _operation(
     )
     if existing is not None:
         if existing.request_fingerprint != fingerprint:
-            raise NutritionPlanConflictError("idempotency key was reused for another plan request")
+            raise NutritionPlanConflictError(
+                "idempotency key was reused for another plan request",
+                code="plan_idempotency_conflict",
+            )
         return existing, True
     operation = NutritionPlanOperation(
         user_id=user.id,
@@ -484,6 +526,248 @@ def _template_sources(
     return items
 
 
+def _fill_item_matches_candidate(
+    item: NutritionPlanFillItem,
+    candidate_item: object,
+) -> bool:
+    return item.food_id == getattr(candidate_item, "food_id", None) and item.recipe_id == getattr(
+        candidate_item, "recipe_id", None
+    )
+
+
+def fill_plan_from_suggestion(
+    db: Session,
+    user: User,
+    payload: NutritionPlanFillRequest,
+    idempotency_key: str,
+) -> NutritionPlanDayResponse:
+    try:
+        fingerprint = _fingerprint(payload.model_dump(mode="json"))
+        _lock_user(db, user)
+        operation, replayed = _operation(
+            db,
+            user,
+            key=idempotency_key,
+            fingerprint=fingerprint,
+            kind="fill",
+            target_date=payload.plan_date,
+        )
+        if replayed:
+            return _build_day(db, user, operation.target_date, replayed=True)
+
+        plan = _plan_for_write(db, user, payload.plan_date)
+        _check_revision(plan, payload.expected_revision)
+        suggestions = get_plan_fill_suggestions(db, user, payload.plan_date)
+        candidate = next(
+            (item for item in suggestions.candidates if item.candidate_id == payload.candidate_id),
+            None,
+        )
+        if candidate is None:
+            raise NutritionPlanConflictError(
+                "selected plan variant is stale; reload suggestions",
+                code="suggestion_stale",
+                details={"candidate_id": payload.candidate_id},
+            )
+        candidate_items = {item.position: item for item in candidate.items}
+        if len(plan.items) + len(payload.items) > MAX_ITEMS_PER_DAY:
+            raise NutritionPlanError("daily plan item limit reached")
+        for fill_item in payload.items:
+            candidate_item = candidate_items.get(fill_item.position)
+            if candidate_item is None or not _fill_item_matches_candidate(
+                fill_item, candidate_item
+            ):
+                raise NutritionPlanConflictError(
+                    "selected plan variant no longer matches the available source",
+                    code="suggestion_stale",
+                    details={"candidate_id": payload.candidate_id, "position": fill_item.position},
+                )
+            source = NutritionPlanItemCreate(
+                food_id=fill_item.food_id,
+                recipe_id=fill_item.recipe_id,
+                amount=fill_item.amount,
+                amount_unit=fill_item.amount_unit,
+            )
+            db.add(
+                _item_from_source(
+                    db,
+                    user,
+                    plan,
+                    payload.meal_type,
+                    source,
+                    position=_next_position(plan, payload.meal_type),
+                    source_template_id=(
+                        candidate.identity_id if candidate.candidate_kind == "template" else None
+                    ),
+                )
+            )
+        plan.revision += 1
+        db.commit()
+        return _build_day(db, user, payload.plan_date)
+    except Exception:
+        db.rollback()
+        raise
+
+
+def _validate_item_source(db: Session, user: User, item: NutritionPlanItem) -> None:
+    try:
+        if item.item_kind == "food" and item.food_id is not None:
+            food = get_visible_food(db, user, item.food_id)
+            _nutrition_from_calculation(calculate_food_amount(food, item.amount, item.amount_unit))
+            return
+        if item.recipe_id is not None and item.amount_unit == "g":
+            _recipe_calculation(db, user, item.recipe_id, item.amount)
+            return
+    except (FoodError, RecipeError, NutritionPlanError) as exc:
+        raise NutritionPlanError("planned source cannot be recalculated") from exc
+    raise NutritionPlanError("planned source cannot be recalculated")
+
+
+def _action_response(
+    db: Session,
+    user: User,
+    item: NutritionPlanItem,
+    *,
+    action: Literal["consume", "edit_and_consume", "skip"],
+    replayed: bool,
+    diagnostic: str,
+) -> NutritionPlanItemActionResponse:
+    day = _build_day(db, user, item.plan.plan_date, replayed=replayed)
+    response_item = next(
+        plan_item for slot in day.slots for plan_item in slot.items if plan_item.id == item.id
+    )
+    return NutritionPlanItemActionResponse(
+        action=action,
+        item=response_item,
+        day=day,
+        diary_entry_id=item.diary_entry_id,
+        replayed=replayed,
+        diagnostic=diagnostic,
+    )
+
+
+def perform_plan_item_action(
+    db: Session,
+    user: User,
+    item_id: int,
+    payload: NutritionPlanItemActionRequest,
+    idempotency_key: str,
+) -> NutritionPlanItemActionResponse:
+    try:
+        _lock_user(db, user)
+        item = _owned_item_query(db, user, item_id)
+        if item is None:
+            raise NutritionPlanNotFoundError("planned item not found")
+        plan = _plan_for_write(db, user, item.plan.plan_date)
+        fingerprint = _fingerprint(
+            {
+                "item_id": item_id,
+                "action": payload.action,
+                "amount": payload.amount,
+                "amount_unit": payload.amount_unit,
+                "meal_type": payload.meal_type,
+                "expected_revision": payload.expected_revision,
+            }
+        )
+        if item.action_idempotency_key is not None:
+            if item.action_idempotency_key != idempotency_key:
+                raise NutritionPlanConflictError(
+                    "planned item has already been resolved",
+                    code="planned_item_already_resolved",
+                    details={
+                        "item_id": item.id,
+                        "status": item.status,
+                        "diary_entry_id": item.diary_entry_id,
+                    },
+                )
+            if item.action_request_fingerprint != fingerprint:
+                raise NutritionPlanConflictError(
+                    "idempotency key was reused for another planned item action",
+                    code="planned_item_idempotency_conflict",
+                    details={"item_id": item.id},
+                )
+            return _action_response(
+                db,
+                user,
+                item,
+                action=payload.action,
+                replayed=True,
+                diagnostic="planned_item_action_replayed",
+            )
+        if item.status != "planned":
+            raise NutritionPlanConflictError(
+                "planned item has already been resolved",
+                code="planned_item_already_resolved",
+                details={
+                    "item_id": item.id,
+                    "status": item.status,
+                    "diary_entry_id": item.diary_entry_id,
+                },
+            )
+        _check_revision(plan, payload.expected_revision)
+        if payload.action == "skip":
+            item.action_idempotency_key = idempotency_key
+            item.action_request_fingerprint = fingerprint
+            item.status = "skipped"
+            plan.revision += 1
+            db.commit()
+            return _action_response(
+                db,
+                user,
+                item,
+                action=payload.action,
+                replayed=False,
+                diagnostic="planned_item_skipped",
+            )
+
+        if payload.action == "edit_and_consume":
+            if payload.meal_type is not None and payload.meal_type != item.meal_type:
+                item.meal_type = payload.meal_type
+                item.position = _next_position(plan, payload.meal_type)
+            item.amount = cast(Decimal, payload.amount)
+            item.amount_unit = cast(str, payload.amount_unit)
+            if item.item_kind == "recipe" and item.amount_unit != "g":
+                raise NutritionPlanError("recipe plan items must use grams")
+        _validate_item_source(db, user, item)
+        item.action_idempotency_key = idempotency_key
+        item.action_request_fingerprint = fingerprint
+        diary_item = FoodDiaryBatchItem(
+            food_id=item.food_id,
+            recipe_id=item.recipe_id,
+            amount=item.amount,
+            amount_unit=cast(Literal["g", "ml", "serving"], item.amount_unit),
+        )
+        try:
+            batch = create_food_diary_batch(
+                db,
+                user,
+                diary_date=plan.plan_date,
+                meal_type=cast(MealType, item.meal_type),
+                items=[diary_item],
+                idempotency_key=f"planned-item-{item.id}",
+                operation_kind="planned_item",
+                commit=False,
+            )
+        except FoodDiaryError as exc:
+            raise NutritionPlanError(str(exc), code="planned_item_diary_write_failed") from exc
+        if len(batch.entries) != 1:
+            raise NutritionPlanError("planned item diary write returned no entry")
+        item.diary_entry_id = batch.entries[0].id
+        item.status = "consumed"
+        plan.revision += 1
+        db.commit()
+        return _action_response(
+            db,
+            user,
+            item,
+            action=payload.action,
+            replayed=False,
+            diagnostic="planned_item_consumed",
+        )
+    except Exception:
+        db.rollback()
+        raise
+
+
 def add_plan_item(
     db: Session,
     user: User,
@@ -575,6 +859,12 @@ def update_plan_item(
         item = _owned_item_query(db, user, item_id)
         if item is None:
             raise NutritionPlanNotFoundError("planned item not found")
+        if item.status != "planned":
+            raise NutritionPlanConflictError(
+                "resolved planned items cannot be edited",
+                code="planned_item_already_resolved",
+                details={"item_id": item.id, "status": item.status},
+            )
         plan_date = item.plan.plan_date
         _lock_user(db, user)
         plan = _plan_for_write(db, user, plan_date)
@@ -620,6 +910,12 @@ def delete_plan_item(
         item = _owned_item_query(db, user, item_id)
         if item is None:
             raise NutritionPlanNotFoundError("planned item not found")
+        if item.status != "planned":
+            raise NutritionPlanConflictError(
+                "resolved planned items cannot be deleted",
+                code="planned_item_already_resolved",
+                details={"item_id": item.id, "status": item.status},
+            )
         plan_date = item.plan.plan_date
         _lock_user(db, user)
         plan = _plan_for_write(db, user, plan_date)

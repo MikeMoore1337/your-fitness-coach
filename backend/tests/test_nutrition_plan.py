@@ -7,13 +7,23 @@ from pathlib import Path
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import Column, Integer, MetaData, Table, create_engine, inspect
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    inspect,
+)
 
 from fitminiapp_api import main as main_module
 from fitminiapp_api.core import timezone as timezone_module
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.food import Food
-from fitminiapp_api.models.food_diary import FoodDiaryEntry
+from fitminiapp_api.models.food_diary import FoodDiaryBatchOperation, FoodDiaryEntry
+from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.user import User
 
 
@@ -60,6 +70,38 @@ def _today() -> date:
 
 def _items(day: dict) -> list[dict]:
     return [item for slot in day["slots"] for item in slot["items"]]
+
+
+def _add_target(telegram_user_id: int) -> None:
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == telegram_user_id).one()
+        db.add(
+            NutritionTarget(
+                user_id=user.id,
+                sex="male",
+                weight_kg=80,
+                height_cm=180,
+                age=30,
+                daily_activity_level="moderate",
+                daily_routine="mixed",
+                steps_range="from_7000_to_10000",
+                strength_trainings_per_week=3,
+                strength_training_duration_minutes=60,
+                strength_training_type="regular",
+                strength_rest="one_to_two",
+                cardio_trainings_per_week=1,
+                cardio_training_duration_minutes=30,
+                cardio_intensity="moderate",
+                cardio_trainings=[],
+                goal="maintenance",
+                bmr=1800,
+                tdee=2400,
+                calories=2000,
+                protein_g=150,
+                fat_g=70,
+                carbs_g=190,
+            )
+        )
 
 
 def test_plan_day_week_crud_replay_stale_write_and_diary_isolation(client) -> None:
@@ -260,29 +302,232 @@ def test_plan_day_week_crud_replay_stale_write_and_diary_isolation(client) -> No
     assert other_headers["Authorization"]
 
 
+def test_plan_fill_is_explicit_and_consumption_is_atomic_idempotent_and_owner_scoped(
+    client,
+) -> None:
+    headers = _auth(client, 74_603)
+    other_headers = _auth(client, 74_604)
+    food_id = _store_food("Bridge овсянка")
+    _add_target(74_603)
+    selected_date = _today()
+    diary_entry = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "diary_date": selected_date.isoformat(),
+            "meal_type": "breakfast",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert diary_entry.status_code == 201
+
+    preview = client.get(
+        "/api/v1/nutrition/plans/suggestions",
+        headers=headers,
+        params={"plan_date": selected_date.isoformat()},
+    )
+    assert preview.status_code == 200, preview.text
+    candidate = next(
+        item for item in preview.json()["candidates"] if item["candidate_id"] == f"food:{food_id}"
+    )
+    fill_payload = {
+        "plan_date": selected_date.isoformat(),
+        "meal_type": "lunch",
+        "candidate_id": candidate["candidate_id"],
+        "items": [
+            {
+                "position": 0,
+                "food_id": food_id,
+                "amount": "120",
+                "amount_unit": "g",
+            }
+        ],
+        "expected_revision": 0,
+    }
+    first_fill = client.post(
+        "/api/v1/nutrition/plans/fill",
+        headers={**headers, "Idempotency-Key": "plan-fill-747-1"},
+        json=fill_payload,
+    )
+    assert first_fill.status_code == 201, first_fill.text
+    assert first_fill.json()["revision"] == 1
+    assert _items(first_fill.json())[0]["status"] == "planned"
+    assert _items(first_fill.json())[0]["diary_entry_id"] is None
+    assert first_fill.json()["replayed"] is False
+    before_action_diary = client.get(
+        "/api/v1/nutrition/diary",
+        headers=headers,
+        params={"diary_date": selected_date.isoformat()},
+    ).json()
+    assert sum(len(meal["entries"]) for meal in before_action_diary["meals"]) == 1
+
+    fill_replay = client.post(
+        "/api/v1/nutrition/plans/fill",
+        headers={**headers, "Idempotency-Key": "plan-fill-747-1"},
+        json=fill_payload,
+    )
+    assert fill_replay.status_code == 201
+    assert fill_replay.json()["replayed"] is True
+    assert len(_items(fill_replay.json())) == 1
+
+    second_fill_payload = {**fill_payload, "expected_revision": 1}
+    second_fill = client.post(
+        "/api/v1/nutrition/plans/fill",
+        headers={**headers, "Idempotency-Key": "plan-fill-747-2"},
+        json=second_fill_payload,
+    )
+    assert second_fill.status_code == 201, second_fill.text
+    assert second_fill.json()["revision"] == 2
+    first_item, second_item = _items(second_fill.json())
+
+    action_payload = {
+        "action": "edit_and_consume",
+        "amount": "75",
+        "amount_unit": "g",
+        "meal_type": "dinner",
+        "expected_revision": 2,
+    }
+    action = client.post(
+        f"/api/v1/nutrition/plans/items/{first_item['id']}/action",
+        headers={**headers, "Idempotency-Key": "plan-action-747-1"},
+        json=action_payload,
+    )
+    assert action.status_code == 200, action.text
+    assert action.json()["item"]["status"] == "consumed"
+    assert action.json()["item"]["diary_entry_id"] is not None
+    assert action.json()["diagnostic"] == "planned_item_consumed"
+    diary_entry_id = action.json()["diary_entry_id"]
+
+    action_replay = client.post(
+        f"/api/v1/nutrition/plans/items/{first_item['id']}/action",
+        headers={**headers, "Idempotency-Key": "plan-action-747-1"},
+        json=action_payload,
+    )
+    assert action_replay.status_code == 200
+    assert action_replay.json()["replayed"] is True
+    assert action_replay.json()["diary_entry_id"] == diary_entry_id
+
+    already_resolved = client.post(
+        f"/api/v1/nutrition/plans/items/{first_item['id']}/action",
+        headers={**headers, "Idempotency-Key": "plan-action-747-new"},
+        json={"action": "consume", "expected_revision": 4},
+    )
+    assert already_resolved.status_code == 409
+    assert already_resolved.json()["detail"]["code"] == "planned_item_already_resolved"
+
+    stale = client.post(
+        f"/api/v1/nutrition/plans/items/{second_item['id']}/action",
+        headers={**headers, "Idempotency-Key": "plan-action-747-stale"},
+        json={"action": "skip", "expected_revision": 2},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["code"] == "stale_plan"
+
+    skip = client.post(
+        f"/api/v1/nutrition/plans/items/{second_item['id']}/action",
+        headers={**headers, "Idempotency-Key": "plan-action-747-2"},
+        json={"action": "skip", "expected_revision": 3},
+    )
+    assert skip.status_code == 200, skip.text
+    assert skip.json()["item"]["status"] == "skipped"
+    assert skip.json()["diary_entry_id"] is None
+
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 74_603).one()
+        assert db.query(FoodDiaryEntry).filter(FoodDiaryEntry.user_id == user.id).count() == 2
+        operation = (
+            db.query(FoodDiaryBatchOperation)
+            .filter(
+                FoodDiaryBatchOperation.user_id == user.id,
+                FoodDiaryBatchOperation.operation_kind == "planned_item",
+            )
+            .one()
+        )
+        assert operation.idempotency_key == f"planned-item-{first_item['id']}"
+
+    deleted_diary_entry = client.delete(
+        f"/api/v1/nutrition/diary/entries/{diary_entry_id}",
+        headers=headers,
+    )
+    assert deleted_diary_entry.status_code == 204
+    plan_after_diary_delete = client.get(
+        "/api/v1/nutrition/plans/day",
+        headers=headers,
+        params={"plan_date": selected_date.isoformat()},
+    )
+    assert plan_after_diary_delete.status_code == 200
+    consumed_after_diary_delete = next(
+        item for item in _items(plan_after_diary_delete.json()) if item["id"] == first_item["id"]
+    )
+    assert consumed_after_diary_delete["status"] == "consumed"
+    assert consumed_after_diary_delete["diary_entry_id"] is None
+
+    foreign = client.post(
+        f"/api/v1/nutrition/plans/items/{first_item['id']}/action",
+        headers={**other_headers, "Idempotency-Key": "plan-action-747-foreign"},
+        json={"action": "consume", "expected_revision": 0},
+    )
+    assert foreign.status_code == 404
+
+
 def test_nutrition_plan_migration_is_additive_and_reversible(tmp_path: Path) -> None:
     migrations_dir = Path(main_module.__file__).resolve().parents[1] / "alembic" / "versions"
-    migration_path = migrations_dir / "0120_nutrition_plans.py"
-    spec = importlib.util.spec_from_file_location("nutrition_plan_migration", migration_path)
-    assert spec is not None and spec.loader is not None
-    migration = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(migration)
+    migration_paths = [
+        migrations_dir / "0120_nutrition_plans.py",
+        migrations_dir / "0121_nutrition_plan_consumption_bridge.py",
+    ]
+    migrations = []
+    for index, migration_path in enumerate(migration_paths):
+        spec = importlib.util.spec_from_file_location(
+            f"nutrition_plan_migration_{index}", migration_path
+        )
+        assert spec is not None and spec.loader is not None
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        migrations.append(migration)
 
     engine = create_engine(f"sqlite:///{(tmp_path / 'nutrition-plan.db').as_posix()}")
     metadata = MetaData()
-    for table_name in ("users", "foods", "recipes", "nutrition_meal_templates"):
+    for table_name in (
+        "users",
+        "foods",
+        "recipes",
+        "nutrition_meal_templates",
+        "food_diary_entries",
+    ):
         Table(table_name, metadata, Column("id", Integer, primary_key=True))
+    Table(
+        "food_diary_batch_operations",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("operation_kind", String(24), nullable=False),
+        CheckConstraint(
+            "operation_kind IN ('meal_template', 'natural_input', 'suggestion')",
+            name="ck_food_diary_batch_operations_kind",
+        ),
+    )
     metadata.create_all(engine)
     with engine.begin() as connection:
-        migration.op = Operations(MigrationContext.configure(connection))
-        migration.upgrade()
+        for migration in migrations:
+            migration.op = Operations(MigrationContext.configure(connection))
+            migration.upgrade()
         schema = inspect(connection)
         assert {
             "nutrition_plans",
             "nutrition_plan_items",
             "nutrition_plan_operations",
         } <= set(schema.get_table_names())
-        migration.downgrade()
+        assert {
+            "status",
+            "diary_entry_id",
+            "action_idempotency_key",
+            "action_request_fingerprint",
+        } <= {column["name"] for column in schema.get_columns("nutrition_plan_items")}
+        for migration in reversed(migrations):
+            migration.op = Operations(MigrationContext.configure(connection))
+            migration.downgrade()
         schema = inspect(connection)
         assert not {
             "nutrition_plans",

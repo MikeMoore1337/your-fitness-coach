@@ -519,6 +519,8 @@ def _serialize_nutrition_plan(plan: NutritionPlan) -> dict[str, object]:
                 "amount_unit": item.amount_unit,
                 "source_name": item.source_name,
                 "source_brand": item.source_brand,
+                "status": item.status,
+                "diary_entry_id": item.diary_entry_id,
                 "created_at": item.created_at,
                 "updated_at": item.updated_at,
             }

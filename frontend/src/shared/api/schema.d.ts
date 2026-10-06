@@ -3641,6 +3641,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/plans/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Plan Suggestions */
+        get: operations["get_plan_suggestions_api_v1_nutrition_plans_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/fill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fill Nutrition Plan */
+        post: operations["fill_nutrition_plan_api_v1_nutrition_plans_fill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nutrition/plans/items": {
         parameters: {
             query?: never;
@@ -3674,6 +3708,23 @@ export interface paths {
         head?: never;
         /** Patch Nutrition Plan Item */
         patch: operations["patch_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/nutrition/plans/items/{item_id}/action": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Action Nutrition Plan Item */
+        post: operations["action_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__action_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/nutrition/plans/copy": {
@@ -9475,7 +9526,7 @@ export interface components {
              * Operation Kind
              * @enum {string}
              */
-            operation_kind: "meal_template" | "natural_input" | "suggestion";
+            operation_kind: "meal_template" | "natural_input" | "suggestion" | "planned_item";
             /**
              * Diary Date
              * Format: date
@@ -11096,6 +11147,74 @@ export interface components {
              */
             replayed: boolean;
         };
+        /** NutritionPlanFillItem */
+        NutritionPlanFillItem: {
+            /** Position */
+            position: number;
+            /** Food Id */
+            food_id?: number | null;
+            /** Recipe Id */
+            recipe_id?: number | null;
+            /** Amount */
+            amount: number | string;
+            /**
+             * Amount Unit
+             * @default g
+             * @enum {string}
+             */
+            amount_unit: "g" | "ml" | "serving";
+        };
+        /** NutritionPlanFillRequest */
+        NutritionPlanFillRequest: {
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Candidate Id */
+            candidate_id: string;
+            /** Items */
+            items: components["schemas"]["NutritionPlanFillItem"][];
+            /** Expected Revision */
+            expected_revision: number;
+        };
+        /** NutritionPlanItemActionRequest */
+        NutritionPlanItemActionRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "consume" | "edit_and_consume" | "skip";
+            /** Amount */
+            amount?: number | string | null;
+            /** Amount Unit */
+            amount_unit?: ("g" | "ml" | "serving") | null;
+            /** Meal Type */
+            meal_type?: ("breakfast" | "lunch" | "dinner" | "snacks") | null;
+            /** Expected Revision */
+            expected_revision: number;
+        };
+        /** NutritionPlanItemActionResponse */
+        NutritionPlanItemActionResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "consume" | "edit_and_consume" | "skip";
+            item: components["schemas"]["NutritionPlanItemResponse"];
+            day: components["schemas"]["NutritionPlanDayResponse"];
+            /** Diary Entry Id */
+            diary_entry_id: number | null;
+            /** Replayed */
+            replayed: boolean;
+            /** Diagnostic */
+            diagnostic: string;
+        };
         /** NutritionPlanItemCreate */
         NutritionPlanItemCreate: {
             /** Food Id */
@@ -11151,6 +11270,13 @@ export interface components {
             nutrition: components["schemas"]["FoodDiaryNutrition"] | null;
             /** Available */
             available: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "planned" | "consumed" | "skipped";
+            /** Diary Entry Id */
+            diary_entry_id: number | null;
             /** Message */
             message?: string | null;
         };
@@ -24004,6 +24130,72 @@ export interface operations {
             };
         };
     };
+    get_plan_suggestions_api_v1_nutrition_plans_suggestions_get: {
+        parameters: {
+            query?: {
+                plan_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionSuggestionsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fill_nutrition_plan_api_v1_nutrition_plans_fill_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanFillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_nutrition_plan_item_api_v1_nutrition_plans_items_post: {
         parameters: {
             query: {
@@ -24098,6 +24290,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    action_nutrition_plan_item_api_v1_nutrition_plans_items__item_id__action_post: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NutritionPlanItemActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NutritionPlanItemActionResponse"];
                 };
             };
             /** @description Validation Error */

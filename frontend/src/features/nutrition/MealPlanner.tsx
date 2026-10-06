@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, api } from '../../shared/api/client';
 import {
@@ -7,12 +7,13 @@ import {
   dateInputValue,
   formatCalendarDate,
 } from '../../shared/dateTime';
-import { queryKeys } from '../../shared/queryKeys';
+import { invalidateNutritionSummaries, queryKeys } from '../../shared/queryKeys';
 import type {
   Food,
   FoodList,
   NutritionMealTemplateList,
   NutritionPlanDay,
+  NutritionPlanItemActionResponse,
   NutritionPlanItem,
   NutritionPlanWeek,
   RecipeList,
@@ -30,6 +31,7 @@ import {
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import type { MealType } from './FoodPickerDialog';
+import { NutritionSuggestions } from './NutritionSuggestions';
 
 type PlanView = 'day' | 'week';
 type SourceKind = 'food' | 'recipe' | 'template';
@@ -176,6 +178,7 @@ function PlanItemRow({
   onChanged: (day: NutritionPlanDay) => Promise<void>;
 }) {
   const { toast } = useFeedback();
+  const actionKey = useRef<string | null>(null);
   const [amount, setAmount] = useState(item.amount);
   const [amountUnit, setAmountUnit] = useState<PlanAmountUnit>(item.amount_unit);
   const [mealType, setMealType] = useState<MealType>(item.meal_type);
@@ -222,12 +225,52 @@ function PlanItemRow({
       );
     },
   });
+  const action = useMutation({
+    mutationFn: (actionName: 'consume' | 'edit_and_consume' | 'skip') => {
+      actionKey.current ??= requestKey('nutrition-plan-action');
+      return api<NutritionPlanItemActionResponse>(
+        `/api/v1/nutrition/plans/items/${item.id}/action`,
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': actionKey.current },
+          body: {
+            action: actionName,
+            ...(actionName === 'edit_and_consume'
+              ? { amount, amount_unit: amountUnit, meal_type: mealType }
+              : {}),
+            expected_revision: revision,
+          },
+        },
+      );
+    },
+    onSuccess: async (response) => {
+      actionKey.current = null;
+      await onChanged(response.day);
+      toast(response.item.status === 'skipped' ? 'Элемент пропущен' : 'Записано в дневник');
+    },
+    onError: (error) => {
+      toast(
+        error instanceof ApiError && error.status === 409
+          ? 'План уже изменился. Обновите его.'
+          : 'Не удалось обработать элемент плана',
+      );
+    },
+  });
+  const pending = update.isPending || remove.isPending || action.isPending;
+  const resolved = item.status !== 'planned';
 
   return (
     <li className="meal-planner__item">
       <div className="meal-planner__item-copy">
         <strong>{item.name}</strong>
         <span>{itemNutritionLabel(item)}</span>
+        <span className="meal-planner__item-status">
+          {item.status === 'consumed'
+            ? 'Съедено'
+            : item.status === 'skipped'
+              ? 'Пропущено'
+              : 'Запланировано'}
+        </span>
         {!item.available && (
           <span className="meal-planner__item-warning">
             {item.message ?? 'Источник недоступен'}
@@ -237,7 +280,7 @@ function PlanItemRow({
       <div className="meal-planner__item-controls">
         <Select
           aria-label={`Приём пищи для ${item.name}`}
-          disabled={readOnly || update.isPending}
+          disabled={readOnly || resolved || pending}
           value={mealType}
           onChange={(event) => setMealType(event.target.value as MealType)}
         >
@@ -249,7 +292,7 @@ function PlanItemRow({
         </Select>
         <Input
           aria-label={`Количество для ${item.name}`}
-          disabled={readOnly || update.isPending}
+          disabled={readOnly || resolved || pending}
           min="0.001"
           step="0.001"
           type="number"
@@ -261,7 +304,7 @@ function PlanItemRow({
         ) : (
           <Select
             aria-label={`Единица для ${item.name}`}
-            disabled={readOnly || update.isPending}
+            disabled={readOnly || resolved || pending}
             value={amountUnit}
             onChange={(event) => setAmountUnit(event.target.value as PlanAmountUnit)}
           >
@@ -270,11 +313,11 @@ function PlanItemRow({
             <option value="serving">порц.</option>
           </Select>
         )}
-        {!readOnly && (
+        {!readOnly && !resolved && (
           <>
             <Button
               aria-label={`Сохранить ${item.name}`}
-              disabled={update.isPending || remove.isPending}
+              disabled={pending}
               onClick={() => update.mutate()}
               type="button"
               variant="secondary"
@@ -283,12 +326,39 @@ function PlanItemRow({
             </Button>
             <Button
               aria-label={`Удалить ${item.name}`}
-              disabled={update.isPending || remove.isPending}
+              disabled={pending}
               onClick={() => remove.mutate()}
               type="button"
               variant="danger"
             >
               Удалить
+            </Button>
+            <Button
+              aria-label={`Съел ${item.name}`}
+              disabled={pending}
+              onClick={() => action.mutate('consume')}
+              type="button"
+              variant="secondary"
+            >
+              Съел
+            </Button>
+            <Button
+              aria-label={`Изменить и записать ${item.name}`}
+              disabled={pending}
+              onClick={() => action.mutate('edit_and_consume')}
+              type="button"
+              variant="secondary"
+            >
+              Изменить и записать
+            </Button>
+            <Button
+              aria-label={`Пропустить ${item.name}`}
+              disabled={pending}
+              onClick={() => action.mutate('skip')}
+              type="button"
+              variant="ghost"
+            >
+              Пропустить
             </Button>
           </>
         )}
@@ -532,6 +602,14 @@ function DayPlan({
           onChanged={onChanged}
         />
       )}
+      <NutritionSuggestions
+        diaryDate={day.plan_date}
+        initialMealType="breakfast"
+        mode="plan"
+        onPlanFilled={onChanged}
+        planRevision={day.revision}
+        readOnly={readOnly}
+      />
       <div className="meal-planner__slots">
         {day.slots.map((slot) => (
           <section className="meal-planner__slot" key={slot.meal_type}>
@@ -625,7 +703,13 @@ export function MealPlanner({
     favorites.isLoading || recent.isLoading || recipes.isLoading || templates.isLoading;
   const onChanged = async (nextDay: NutritionPlanDay) => {
     queryClient.setQueryData(queryKeys.nutrition.plans.day(nextDay.plan_date), nextDay);
-    await queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.plans.all });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.plans.all }),
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.nutrition.planSuggestions(nextDay.plan_date),
+      }),
+      invalidateNutritionSummaries(queryClient),
+    ]);
   };
   const weekNavigation = {
     onPrevious: () => setSelectedDate(addCalendarDays(selectedDate, -7)),

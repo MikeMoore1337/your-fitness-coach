@@ -55,6 +55,7 @@ export const queryKeys = {
     recipes: ['nutrition', 'recipes'] as const,
     mealTemplates: ['nutrition', 'meal-templates'] as const,
     suggestions: (diaryDate: string) => ['nutrition', 'suggestions', diaryDate] as const,
+    planSuggestions: (planDate: string) => ['nutrition', 'plan-suggestions', planDate] as const,
     foodAliases: ['nutrition', 'food-aliases'] as const,
     plans: {
       all: ['nutrition', 'plans'] as const,
