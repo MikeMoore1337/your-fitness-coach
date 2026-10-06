@@ -1110,10 +1110,28 @@ class GitHubClient:
         return match.group("slug")
 
     def api(self, endpoint: str) -> Any:
-        result = _run(
-            ["gh", "api", f"repos/{self.repo_slug}/{endpoint}"],
-            cwd=self.repository.current_worktree,
+        command = ["gh", "api", f"repos/{self.repo_slug}/{endpoint}"]
+        transient_markers = (
+            "tls handshake timeout",
+            "i/o timeout",
+            "client.timeout exceeded",
+            "connection reset by peer",
+            "connection refused",
+            "could not resolve host",
+            "unexpected eof",
         )
+        result: subprocess.CompletedProcess[str] | None = None
+        for attempt in range(3):
+            try:
+                result = _run(command, cwd=self.repository.current_worktree)
+                break
+            except TaskSessionError as error:
+                retryable = any(marker in str(error).casefold() for marker in transient_markers)
+                if not retryable or attempt == 2:
+                    raise
+                time.sleep(float(2**attempt))
+        if result is None:
+            raise AssertionError("GitHub API retry loop exited without a result")
         try:
             return json.loads(result.stdout)
         except json.JSONDecodeError as error:
