@@ -144,6 +144,14 @@ async function responseError(response: Response): Promise<ApiError> {
     if (body && typeof body === 'object' && 'detail' in body) {
       const detail = (body as { detail: unknown }).detail;
       if (typeof detail === 'string') message = detail;
+      if (
+        detail &&
+        typeof detail === 'object' &&
+        'message' in detail &&
+        typeof (detail as { message?: unknown }).message === 'string'
+      ) {
+        message = (detail as { message: string }).message;
+      }
       if (Array.isArray(detail)) {
         message = detail
           .map((item) =>

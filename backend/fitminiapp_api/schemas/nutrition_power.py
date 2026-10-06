@@ -134,7 +134,7 @@ class FoodDiaryBatchItem(BaseModel):
 
 
 class FoodDiaryBatchResponse(BaseModel):
-    operation_kind: Literal["meal_template", "natural_input", "suggestion"]
+    operation_kind: Literal["meal_template", "natural_input", "suggestion", "planned_item"]
     diary_date: date
     meal_type: MealType
     entries: list[FoodDiaryEntryResponse]

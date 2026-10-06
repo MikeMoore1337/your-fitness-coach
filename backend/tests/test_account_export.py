@@ -21,6 +21,7 @@ from fitminiapp_api.models.notification import (
     NotificationDelivery,
     WebPushSubscription,
 )
+from fitminiapp_api.models.nutrition_plan import NutritionPlan, NutritionPlanItem
 from fitminiapp_api.models.nutrition_power import (
     FoodSearchAlias,
     NutritionMealTemplate,
@@ -202,26 +203,50 @@ def test_account_export_includes_current_nutrition_domains_and_omits_secrets() -
                 meal_type="lunch",
             )
         )
+        diary_entry = FoodDiaryEntry(
+            user_id=owner.id,
+            food_id=own_food.id,
+            copy_operation_id=copy_operation.id,
+            diary_date=date(2026, 8, 19),
+            meal_type="lunch",
+            amount=Decimal("1"),
+            amount_unit="serving",
+            weight_g=Decimal("50"),
+            food_name="Снимок дневника",
+            food_brand="Снимок бренда",
+            energy_kcal_per_100g=Decimal("205"),
+            protein_g_per_100g=Decimal("11"),
+            fat_g_per_100g=Decimal("7"),
+            carbs_g_per_100g=Decimal("21"),
+            fiber_g_per_100g=Decimal("3"),
+            serving_amount=Decimal("1"),
+            serving_unit="serving",
+            serving_weight_g=Decimal("50"),
+        )
+        db.add(diary_entry)
+        db.flush()
+        nutrition_plan = NutritionPlan(
+            user_id=owner.id,
+            plan_date=date(2026, 8, 19),
+            revision=1,
+        )
+        db.add(nutrition_plan)
+        db.flush()
         db.add(
-            FoodDiaryEntry(
-                user_id=owner.id,
+            NutritionPlanItem(
+                plan_id=nutrition_plan.id,
+                source_template_id=None,
                 food_id=own_food.id,
-                copy_operation_id=copy_operation.id,
-                diary_date=date(2026, 8, 19),
+                recipe_id=None,
+                item_kind="food",
                 meal_type="lunch",
-                amount=Decimal("1"),
-                amount_unit="serving",
-                weight_g=Decimal("50"),
-                food_name="Снимок дневника",
-                food_brand="Снимок бренда",
-                energy_kcal_per_100g=Decimal("205"),
-                protein_g_per_100g=Decimal("11"),
-                fat_g_per_100g=Decimal("7"),
-                carbs_g_per_100g=Decimal("21"),
-                fiber_g_per_100g=Decimal("3"),
-                serving_amount=Decimal("1"),
-                serving_unit="serving",
-                serving_weight_g=Decimal("50"),
+                position=0,
+                amount=Decimal("50"),
+                amount_unit="g",
+                source_name="Мой экспортируемый продукт",
+                source_brand="Личный бренд",
+                status="consumed",
+                diary_entry_id=diary_entry.id,
             )
         )
         db.add(
@@ -300,6 +325,11 @@ def test_account_export_includes_current_nutrition_domains_and_omits_secrets() -
     assert "request_fingerprint" not in payload["food_diary_batch_operations"][0]
     assert payload["food_diary_entries"][0]["food_name"] == "Снимок дневника"
     assert payload["food_diary_entries"][0]["energy_kcal_per_100g"] == Decimal("205")
+    assert payload["nutrition_plans"][0]["items"][0]["status"] == "consumed"
+    assert (
+        payload["nutrition_plans"][0]["items"][0]["diary_entry_id"]
+        == payload["food_diary_entries"][0]["id"]
+    )
     assert payload["food_diary_day_statuses"][0]["status"] == "complete"
     assert payload["food_diary_copy_operations"][0]["copy_scope"] == "product"
     assert set(ACCOUNT_EXPORT_DATA_INVENTORY.values()) <= set(payload)

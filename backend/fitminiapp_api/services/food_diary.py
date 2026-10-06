@@ -21,6 +21,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryEntry,
     FoodDiaryRepeatPreview,
 )
+from fitminiapp_api.models.nutrition_plan import NutritionPlanItem
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.user import User
 from fitminiapp_api.schemas.food_diary import (
@@ -475,7 +476,7 @@ def _batch_response(
     )
     return FoodDiaryBatchResponse(
         operation_kind=cast(
-            Literal["meal_template", "natural_input", "suggestion"],
+            Literal["meal_template", "natural_input", "suggestion", "planned_item"],
             operation.operation_kind,
         ),
         diary_date=operation.diary_date,
@@ -486,7 +487,7 @@ def _batch_response(
 
 
 def _batch_request_fingerprint(
-    operation_kind: Literal["meal_template", "natural_input", "suggestion"],
+    operation_kind: Literal["meal_template", "natural_input", "suggestion", "planned_item"],
     diary_date: date,
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
@@ -536,8 +537,9 @@ def create_food_diary_batch(
     meal_type: MealType,
     items: list[FoodDiaryBatchItem],
     idempotency_key: str,
-    operation_kind: Literal["meal_template", "natural_input", "suggestion"],
+    operation_kind: Literal["meal_template", "natural_input", "suggestion", "planned_item"],
     template_id: int | None = None,
+    commit: bool = True,
 ) -> FoodDiaryBatchResponse:
     key = _normalize_idempotency_key(idempotency_key)
     fingerprint = _batch_request_fingerprint(
@@ -602,7 +604,10 @@ def create_food_diary_batch(
                 day_scope=True,
             )
             record_progress_weekly_action_completion(db, user, "nutrition")
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except FoodDiaryError:
         db.rollback()
         raise
@@ -704,6 +709,9 @@ def delete_food_diary_entry(db: Session, user: User, entry_id: int) -> None:
     if entry is None:
         raise FoodDiaryNotFoundError("diary entry not found")
     status = _stored_day_status(db, user, entry.diary_date)
+    db.query(NutritionPlanItem).filter(NutritionPlanItem.diary_entry_id == entry.id).update(
+        {NutritionPlanItem.diary_entry_id: None}, synchronize_session=False
+    )
     db.delete(entry)
     db.flush()
     if status is not None and status.status == "complete":

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import { queryKeys, invalidateNutritionSummaries } from '../../shared/queryKeys';
@@ -7,6 +7,8 @@ import type {
   FoodDiaryNutrition,
   NutritionSuggestion,
   NutritionSuggestionCommitRequest,
+  NutritionPlanDay,
+  NutritionPlanFillRequest,
   NutritionSuggestions as NutritionSuggestionsResponse,
 } from '../../shared/api/types';
 import {
@@ -56,6 +58,7 @@ type ReviewItem = {
   amount: string;
   amountUnit: NutritionSuggestion['items'][number]['amount_unit'];
 };
+type SuggestionMode = 'diary' | 'plan';
 
 function formatNumber(value: string | number | null | undefined, fractionDigits = 1): string {
   if (value === null || value === undefined) return '—';
@@ -97,6 +100,26 @@ function reviewItemPayload(item: ReviewItem): NutritionSuggestionCommitRequest['
   }
   if (item.item.recipe_id != null) {
     return { recipe_id: item.item.recipe_id, amount: item.amount, amount_unit: 'g' };
+  }
+  throw new Error('У варианта отсутствует подтверждённая identity.');
+}
+
+function planReviewItemPayload(item: ReviewItem): NutritionPlanFillRequest['items'][number] {
+  if (item.item.food_id != null) {
+    return {
+      position: item.item.position,
+      food_id: item.item.food_id,
+      amount: item.amount,
+      amount_unit: item.amountUnit,
+    };
+  }
+  if (item.item.recipe_id != null) {
+    return {
+      position: item.item.position,
+      recipe_id: item.item.recipe_id,
+      amount: item.amount,
+      amount_unit: 'g',
+    };
   }
   throw new Error('У варианта отсутствует подтверждённая identity.');
 }
@@ -145,6 +168,7 @@ function CandidateCard({
 function SuggestionReview({
   candidate,
   initialMealType,
+  mode,
   disabled,
   onCancel,
   onSubmit,
@@ -152,6 +176,7 @@ function SuggestionReview({
 }: {
   candidate: NutritionSuggestion;
   initialMealType: MealType;
+  mode: SuggestionMode;
   disabled: boolean;
   onCancel: () => void;
   onSubmit: (mealType: MealType, items: ReviewItem[]) => void;
@@ -177,14 +202,18 @@ function SuggestionReview({
     >
       <div className="nutrition-suggestion-review__head">
         <div>
-          <span className="eyebrow">Проверка перед записью</span>
+          <span className="eyebrow">
+            {mode === 'plan' ? 'Проверка перед планированием' : 'Проверка перед записью'}
+          </span>
           <h3>{candidate.name}</h3>
         </div>
         <Badge>Можно изменить</Badge>
       </div>
       <p className="muted">
-        Измените количество или уберите ингредиент. В дневник ничего не попадёт до явного
-        подтверждения.
+        Измените количество или уберите ингредиент.{' '}
+        {mode === 'plan'
+          ? 'В план ничего не попадёт до явного подтверждения.'
+          : 'В дневник ничего не попадёт до явного подтверждения.'}
       </p>
       <Field label="Приём пищи" labelFor="nutrition-suggestion-meal-type">
         <Select
@@ -275,7 +304,7 @@ function SuggestionReview({
       )}
       <div className="nutrition-suggestion-review__actions">
         <Button type="submit" disabled={disabled || pending || items.length === 0}>
-          {pending ? 'Добавляем…' : 'Добавить выбранное'}
+          {pending ? 'Добавляем…' : mode === 'plan' ? 'Добавить в план' : 'Добавить выбранное'}
         </Button>
         <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>
           Вернуться к вариантам
@@ -290,54 +319,95 @@ export function NutritionSuggestions({
   initialMealType,
   readOnly = false,
   demoSafeMode = false,
+  mode = 'diary',
+  planRevision,
+  onPlanFilled,
 }: {
   diaryDate: string;
   initialMealType: MealType;
   readOnly?: boolean;
   demoSafeMode?: boolean;
+  mode?: SuggestionMode;
+  planRevision?: number;
+  onPlanFilled?: (day: NutritionPlanDay) => Promise<void>;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
+  const idempotencyKey = useRef<string | null>(null);
+  const titleId = `nutrition-suggestions-title-${mode}`;
   const [selectedCandidate, setSelectedCandidate] = useState<NutritionSuggestion | null>(null);
   const suggestions = useQuery({
-    queryKey: queryKeys.nutrition.suggestions(diaryDate),
+    queryKey:
+      mode === 'plan'
+        ? queryKeys.nutrition.planSuggestions(diaryDate)
+        : queryKeys.nutrition.suggestions(diaryDate),
     queryFn: () =>
       api<NutritionSuggestionsResponse>(
-        `/api/v1/nutrition/diary/suggestions?diary_date=${diaryDate}`,
+        mode === 'plan'
+          ? `/api/v1/nutrition/plans/suggestions?plan_date=${diaryDate}`
+          : `/api/v1/nutrition/diary/suggestions?diary_date=${diaryDate}`,
       ),
     enabled: !demoSafeMode,
   });
-  const commit = useMutation({
-    mutationFn: ({ mealType, items }: { mealType: MealType; items: ReviewItem[] }) =>
-      api<FoodDiaryBatchResponse>('/api/v1/nutrition/diary/suggestions/commit', {
+  const commit = useMutation<
+    FoodDiaryBatchResponse | NutritionPlanDay,
+    Error,
+    { mealType: MealType; items: ReviewItem[] }
+  >({
+    mutationFn: ({ mealType, items }: { mealType: MealType; items: ReviewItem[] }) => {
+      idempotencyKey.current ??= requestKey();
+      if (mode === 'plan') {
+        if (planRevision == null || selectedCandidate == null) {
+          throw new Error('План изменился. Выберите вариант ещё раз.');
+        }
+        return api<NutritionPlanDay>('/api/v1/nutrition/plans/fill', {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey.current },
+          body: {
+            plan_date: diaryDate,
+            meal_type: mealType,
+            candidate_id: selectedCandidate.candidate_id,
+            items: items.map(planReviewItemPayload),
+            expected_revision: planRevision,
+          } satisfies NutritionPlanFillRequest,
+        });
+      }
+      return api<FoodDiaryBatchResponse>('/api/v1/nutrition/diary/suggestions/commit', {
         method: 'POST',
-        headers: { 'Idempotency-Key': requestKey() },
+        headers: { 'Idempotency-Key': idempotencyKey.current },
         body: {
           diary_date: diaryDate,
           meal_type: mealType,
           items: items.map(reviewItemPayload),
         } satisfies NutritionSuggestionCommitRequest,
-      }),
-    onSuccess: async () => {
-      await Promise.all([
-        invalidateNutritionSummaries(queryClient),
-        queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.suggestions(diaryDate) }),
-      ]);
+      });
+    },
+    onSuccess: async (result) => {
+      if (mode === 'plan') {
+        await onPlanFilled?.(result as NutritionPlanDay);
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.nutrition.planSuggestions(diaryDate),
+        });
+        toast('Вариант добавлен в план');
+      } else {
+        await Promise.all([
+          invalidateNutritionSummaries(queryClient),
+          queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.suggestions(diaryDate) }),
+        ]);
+        toast('Вариант добавлен в дневник');
+      }
+      idempotencyKey.current = null;
       setSelectedCandidate(null);
-      toast('Вариант добавлен в дневник');
     },
   });
 
   if (demoSafeMode) {
     return (
-      <section
-        className="nutrition-section-card nutrition-suggestions"
-        aria-labelledby="nutrition-suggestions-title"
-      >
+      <section className="nutrition-section-card nutrition-suggestions" aria-labelledby={titleId}>
         <header className="nutrition-section-card__header">
           <div>
             <span className="eyebrow">Подбор из дневника</span>
-            <h2 id="nutrition-suggestions-title">Варианты из вашей еды</h2>
+            <h2 id={titleId}>Варианты из вашей еды</h2>
           </div>
         </header>
         <p className="muted demo-capability-notice" role="status">
@@ -348,15 +418,18 @@ export function NutritionSuggestions({
   }
 
   return (
-    <section
-      className="nutrition-section-card nutrition-suggestions"
-      aria-labelledby="nutrition-suggestions-title"
-    >
+    <section className="nutrition-section-card nutrition-suggestions" aria-labelledby={titleId}>
       <header className="nutrition-section-card__header">
         <div>
-          <span className="eyebrow">Подбор из дневника</span>
-          <h2 id="nutrition-suggestions-title">Варианты из вашей еды</h2>
-          <p className="muted">Что можно добавить дальше — проверьте состав и количество сами.</p>
+          <span className="eyebrow">
+            {mode === 'plan' ? 'Подбор для плана' : 'Подбор из дневника'}
+          </span>
+          <h2 id={titleId}>{mode === 'plan' ? 'Варианты для плана' : 'Варианты из вашей еды'}</h2>
+          <p className="muted">
+            {mode === 'plan'
+              ? 'Выберите сохранённый вариант и проверьте его перед добавлением в план.'
+              : 'Что можно добавить дальше — проверьте состав и количество сами.'}
+          </p>
         </div>
         {suggestions.data?.remaining && (
           <Badge tone={suggestions.data.remaining_confidence === 'partial' ? 'warning' : 'neutral'}>
@@ -386,7 +459,10 @@ export function NutritionSuggestions({
                 <CandidateCard
                   candidate={candidate}
                   key={candidate.candidate_id}
-                  onSelect={setSelectedCandidate}
+                  onSelect={(nextCandidate) => {
+                    idempotencyKey.current = null;
+                    setSelectedCandidate(nextCandidate);
+                  }}
                 />
               ))}
             </ul>
@@ -402,9 +478,13 @@ export function NutritionSuggestions({
         <SuggestionReview
           candidate={selectedCandidate}
           initialMealType={initialMealType}
+          mode={mode}
           disabled={readOnly}
           pending={commit.isPending}
-          onCancel={() => setSelectedCandidate(null)}
+          onCancel={() => {
+            idempotencyKey.current = null;
+            setSelectedCandidate(null);
+          }}
           onSubmit={(mealType, items) => commit.mutate({ mealType, items })}
         />
       )}

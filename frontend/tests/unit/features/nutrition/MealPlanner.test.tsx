@@ -50,6 +50,8 @@ function makeDay(date = '2026-08-19'): NutritionPlanDay {
             weight_g: '100.000',
             nutrition,
             available: true,
+            status: 'planned',
+            diary_entry_id: null,
           },
         ],
       },
@@ -130,6 +132,56 @@ describe('MealPlanner', () => {
   beforeEach(() => {
     apiMock.mockReset();
     apiMock.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path.includes('/plans/suggestions'))
+        return Promise.resolve({
+          mode: 'deterministic',
+          diary_date: '2026-08-19',
+          targets,
+          remaining: {
+            energy_kcal: '1880.00',
+            protein_g: '128.000',
+            fat_g: '66.000',
+            carbs_g: '212.000',
+          },
+          remaining_confidence: 'exact',
+          limitations: [],
+          max_candidates: 6,
+          candidates: [
+            {
+              candidate_id: 'food:11',
+              candidate_kind: 'food',
+              identity_id: 11,
+              name: 'Овсянка',
+              items: [
+                {
+                  position: 0,
+                  item_kind: 'food',
+                  food_id: 11,
+                  recipe_id: null,
+                  name: 'Овсянка',
+                  brand: null,
+                  amount: '100.000',
+                  amount_unit: 'g',
+                  nutrition,
+                  nutrition_confidence: 'exact',
+                },
+              ],
+              nutrition,
+              nutrition_confidence: 'exact',
+              sources: ['recent'],
+              reasons: ['recent'],
+            },
+          ],
+        });
+      if (options?.method === 'POST' && path.includes('/action'))
+        return Promise.resolve({
+          action: 'consume',
+          item: { ...makeDay().slots[0]!.items[0]!, status: 'consumed', diary_entry_id: 44 },
+          day: makeDay(),
+          diary_entry_id: 44,
+          replayed: false,
+          diagnostic: 'planned_item_consumed',
+        });
       if (options?.method === 'POST') return Promise.resolve(makeDay());
       if (path.includes('/plans/day')) return Promise.resolve(makeDay());
       if (path.includes('/plans/week')) return Promise.resolve(makeWeek());
@@ -186,5 +238,44 @@ describe('MealPlanner', () => {
     expect(await screen.findByRole('heading', { name: 'Неделя плана' })).toBeVisible();
     expect(await screen.findByRole('region', { name: 'Планы по дням' })).toBeVisible();
     expect(screen.getAllByRole('button', { name: 'Открыть день' })).toHaveLength(7);
+  });
+
+  it('fills a plan only after explicit review and exposes planned-item consumption', async () => {
+    renderPlanner();
+    fireEvent.click(screen.getByText('План питания'));
+    const planSuggestions = await screen.findByRole('region', { name: 'Варианты для плана' });
+    const verifyButton = await within(planSuggestions).findByRole('button', {
+      name: 'Проверить вариант',
+    });
+    fireEvent.click(verifyButton);
+    expect(within(planSuggestions).getByRole('button', { name: 'Добавить в план' })).toBeVisible();
+    fireEvent.click(within(planSuggestions).getByRole('button', { name: 'Добавить в план' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/nutrition/plans/fill',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.objectContaining({
+            candidate_id: 'food:11',
+            expected_revision: 1,
+            items: [{ position: 0, food_id: 11, amount: '100.000', amount_unit: 'g' }],
+          }),
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        }),
+      ),
+    );
+
+    await screen.findByRole('button', { name: 'Съел Овсянка' });
+    fireEvent.click(screen.getByRole('button', { name: 'Съел Овсянка' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/nutrition/plans/items/7/action',
+        expect.objectContaining({
+          method: 'POST',
+          body: { action: 'consume', expected_revision: 1 },
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        }),
+      ),
+    );
   });
 });

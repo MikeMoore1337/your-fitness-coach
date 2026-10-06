@@ -17,6 +17,7 @@ from fitminiapp_api.schemas.food_diary import (
     DiaryAmountUnit,
     FoodDiaryDayResponse,
     FoodDiaryNutrition,
+    FoodDiaryTargets,
 )
 from fitminiapp_api.schemas.nutrition_power import (
     FoodDiaryBatchResponse,
@@ -422,8 +423,21 @@ def get_nutrition_suggestions(
     db: Session,
     user: User,
     diary_date: date | None,
+    *,
+    targets_override: FoodDiaryTargets | None = None,
+    remaining_override: FoodDiaryTargets | None = None,
+    force_context: bool = False,
 ) -> NutritionSuggestionsResponse:
     day = get_food_diary_day(db, user, diary_date)
+    if force_context or targets_override is not None or remaining_override is not None:
+        day = day.model_copy(
+            update={
+                "targets": targets_override if targets_override is not None else day.targets,
+                "remaining": remaining_override
+                if remaining_override is not None
+                else day.remaining,
+            }
+        )
     confidence = _remaining_confidence(day) if day.remaining is not None else None
     if day.targets is None or day.remaining is None:
         return NutritionSuggestionsResponse(

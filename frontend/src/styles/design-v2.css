@@ -10731,6 +10731,10 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   color: var(--text-muted);
   font-size: 12px;
 }
+.meal-planner__item-status {
+  color: var(--v2-lime) !important;
+  font-weight: 700;
+}
 .meal-planner__item-warning {
   color: var(--color-status-warning) !important;
 }
@@ -10791,6 +10795,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   }
   .meal-planner__item-controls .ui-button {
     min-height: 42px;
+    flex: 1 1 auto;
   }
   .meal-planner__week-day {
     display: grid;

@@ -77,6 +77,11 @@ class NutritionPlanItem(Base):
             "length(trim(source_name)) > 0",
             name="ck_nutrition_plan_items_source_name_not_blank",
         ),
+        CheckConstraint(
+            "(status IS NULL OR status IN ('planned', 'consumed', 'skipped')) AND "
+            "(diary_entry_id IS NULL OR status = 'consumed')",
+            name="ck_nutrition_plan_items_lifecycle",
+        ),
         UniqueConstraint(
             "plan_id",
             "meal_type",
@@ -111,6 +116,11 @@ class NutritionPlanItem(Base):
     amount_unit: Mapped[str] = mapped_column(String(16), nullable=False)
     source_name: Mapped[str] = mapped_column(String(256), nullable=False)
     source_brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    status: Mapped[str | None] = mapped_column(String(16), nullable=True, default="planned")
+    # Server-owned consumption lineage stays a nullable scalar during the online expand.
+    diary_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    action_idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    action_request_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
@@ -130,7 +140,7 @@ class NutritionPlanOperation(Base):
     __tablename__ = "nutrition_plan_operations"
     __table_args__ = (
         CheckConstraint(
-            "operation_kind IN ('add', 'copy')",
+            "operation_kind IN ('add', 'copy', 'fill')",
             name="ck_nutrition_plan_operations_kind",
         ),
         UniqueConstraint(
