@@ -1195,6 +1195,30 @@ def test_task_session_exposes_transport_interrupted_resume_command() -> None:
     assert args.owner_authorize is True
 
 
+def test_task_session_exposes_historical_deployed_task_reconciliation_command() -> None:
+    args = task_session._parser().parse_args(
+        [
+            "reconcile-deployed-task-after-master-drift",
+            "746",
+            "--pr",
+            "764",
+            "--merge-sha",
+            "a" * 40,
+            "--deployed-sha",
+            "a" * 40,
+            "--production-run",
+            "37419987998",
+            "--owner-authorize",
+        ]
+    )
+
+    assert args.command == "reconcile-deployed-task-after-master-drift"
+    assert args.task_id == "746"
+    assert args.pr == 764
+    assert args.production_run == 37419987998
+    assert args.owner_authorize is True
+
+
 def test_guard_interrupted_resume_checkpoints_and_preserves_wip(
     repository: tuple[Path, Any],
 ) -> None:
@@ -2801,6 +2825,397 @@ def _prepare_subsequent_production_reconciliation(
     _git(root, "fetch", "origin", "master")
     github.master_sha = previous_sha
     return root, git_repository, controller, worktree, branch, original_sha, records
+
+
+def _prepare_historical_deployed_task_reconciliation(
+    repository: tuple[Path, Any],
+    *,
+    foreign_head_history: bool = False,
+    revert_feature: bool = False,
+) -> dict[str, Any]:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "746"
+    )
+    base_sha, ready_head_sha = sha_pair.split(":")
+    controller.mark_ready("746", head_sha=ready_head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    remediation_paths = [
+        "frontend/tests/integration/task746-remediation.spec.ts",
+        "backend/tests/test_task746_remediation.py",
+        "tests/test_task746_contract.py",
+    ]
+    for index, path_text in enumerate(remediation_paths):
+        path = worktree / path_text
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"remediation {index}\n", encoding="utf-8")
+        _git(worktree, "add", path_text)
+        commit_task_id = "999" if foreign_head_history and index == 0 else "746"
+        _git(
+            worktree,
+            "commit",
+            "-m",
+            f"test: [Task {commit_task_id}] bounded CI remediation {index}",
+        )
+    final_head_sha = _git(worktree, "rev-parse", "HEAD")
+    lease_path = controller.store.task_lease_path("746")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["lifecycle_state"] = task_session.HUMAN_REQUIRED_STATE
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    _git(
+        root,
+        "merge",
+        "--no-ff",
+        branch,
+        "-m",
+        "Merge pull request #764 from owner/task/746-synthetic-task",
+    )
+    task_merge_sha = _git(root, "rev-parse", "HEAD")
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    task_commits = _git(root, "rev-list", "--reverse", f"{base_sha}..{final_head_sha}").splitlines()
+    task_messages = [
+        _git(root, "show", "-s", "--format=%s", commit_sha) for commit_sha in task_commits
+    ]
+    task_pr = _task_pr(764, "746", base_sha, final_head_sha, merge_sha=task_merge_sha)
+    task_pr.update(
+        {
+            "title": "[Task 746] V10-A1 meal planner foundation",
+            "state": "closed",
+            "commits": len(task_commits),
+            "changed_files": 1 + len(remediation_paths),
+        }
+    )
+    task_pr["head"]["ref"] = branch
+    github.pulls[764] = task_pr
+    github.commits[764] = [
+        {"sha": commit_sha, "commit": {"message": message}}
+        for commit_sha, message in zip(task_commits, task_messages, strict=True)
+    ]
+    github.files[764] = [{"filename": "change.txt"}] + [
+        {"filename": path_text} for path_text in remediation_paths
+    ]
+    github.checks[final_head_sha] = [_success_check(final_head_sha)]
+    github.associated_pulls_by_commit[task_merge_sha] = [task_pr]
+    task_run_id = 9000
+    github.runs[task_run_id] = {
+        "id": task_run_id,
+        "name": "Release production",
+        "head_sha": task_merge_sha,
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://example.invalid/actions/runs/9000",
+    }
+    github.workflow_runs_by_sha[task_merge_sha] = [github.runs[task_run_id]]
+    github.successful_deployments.add((task_merge_sha, "production"))
+
+    previous_sha = task_merge_sha
+    later_records: list[dict[str, Any]] = []
+    later_specs = [
+        (
+            761,
+            "760",
+            "task/760-later",
+            "[Task 760] Later product change",
+            "backend/later760.py",
+            True,
+        ),
+        (
+            759,
+            "",
+            "codex/controller-later",
+            "[Controller] Later governance change",
+            "scripts/task_session.py",
+            False,
+        ),
+        (
+            743,
+            "742",
+            "task/742-later",
+            "[Task 742] Later security change",
+            "backend/later742.py",
+            True,
+        ),
+        (
+            765,
+            "",
+            "codex/controller-later-final",
+            "[Controller] Later security gate",
+            "tests/test_task_session.py",
+            False,
+        ),
+    ]
+    for index, (number, later_task_id, later_branch, title, default_path, _deploy) in enumerate(
+        later_specs, start=1
+    ):
+        _git(root, "switch", "-c", later_branch)
+        path_text = "change.txt" if revert_feature and number == 743 else default_path
+        path = root / path_text
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"later change {index}\n", encoding="utf-8")
+        _git(root, "add", path_text)
+        subject = title
+        _git(root, "commit", "-m", subject)
+        head_sha = _git(root, "rev-parse", "HEAD")
+        _git(root, "switch", "master")
+        _git(
+            root,
+            "merge",
+            "--no-ff",
+            later_branch,
+            "-m",
+            f"Merge pull request #{number} from owner/{later_branch}",
+        )
+        merge_sha = _git(root, "rev-parse", "HEAD")
+        pr = {
+            "number": number,
+            "title": title,
+            "state": "closed",
+            "merged_at": f"2026-10-06T0{index}:00:00Z",
+            "merge_commit_sha": merge_sha,
+            "commits": 1,
+            "changed_files": 1,
+            "base": {
+                "ref": "master",
+                "sha": previous_sha,
+                "repo": {"full_name": "owner/repository"},
+            },
+            "head": {
+                "ref": later_branch,
+                "sha": head_sha,
+                "repo": {"full_name": "owner/repository"},
+            },
+        }
+        github.pulls[number] = pr
+        github.commits[number] = [{"sha": head_sha, "commit": {"message": subject}}]
+        github.files[number] = [{"filename": path_text}]
+        github.checks[head_sha] = [_success_check(head_sha)]
+        github.associated_pulls_by_commit[merge_sha] = [pr]
+        release_run_id = 9100 + index
+        release = {
+            "id": release_run_id,
+            "name": "Release production",
+            "head_sha": merge_sha,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": f"https://example.invalid/actions/runs/{release_run_id}",
+        }
+        github.workflow_runs_by_sha[merge_sha] = [release]
+        if later_task_id:
+            github.successful_deployments.add((merge_sha, "production"))
+            github.current_production_deployment = {
+                "deployment_id": 8000 + index,
+                "sha": merge_sha,
+                "environment": "production",
+                "state": "success",
+                "updated_at": f"2026-10-06T0{index}:30:00Z",
+                "log_url": f"https://example.invalid/deployments/{8000 + index}",
+            }
+        else:
+            github.workflow_jobs_by_run[release_run_id] = [
+                {"name": "Authorize exact merged master revision", "conclusion": "success"},
+                {"name": "Deploy immutable tested bundle", "conclusion": "skipped"},
+            ]
+        later_records.append(
+            {
+                "number": number,
+                "task_id": later_task_id,
+                "merge_sha": merge_sha,
+                "head_sha": head_sha,
+                "release_run_id": release_run_id,
+            }
+        )
+        previous_sha = merge_sha
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+    github.master_sha = previous_sha
+    return {
+        "root": root,
+        "repository": git_repository,
+        "controller": controller,
+        "worktree": worktree,
+        "branch": branch,
+        "lease": lease,
+        "ready_base_sha": base_sha,
+        "ready_head_sha": ready_head_sha,
+        "final_head_sha": final_head_sha,
+        "merge_sha": task_merge_sha,
+        "master_sha": previous_sha,
+        "github": github,
+        "later": later_records,
+    }
+
+
+def test_reconcile_historical_deployed_task_after_master_drift_and_finish(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(repository)
+    controller = fixture["controller"]
+    reconciliation = controller.reconcile_deployed_task_after_master_drift(
+        "746",
+        pr_number=764,
+        merge_sha=fixture["merge_sha"],
+        deployed_sha=fixture["merge_sha"],
+        production_run_id=9000,
+        owner_authorize=True,
+    )
+
+    assert reconciliation["original_ready_anchor"]["head_sha"] == fixture["ready_head_sha"]
+    assert reconciliation["reconciled_task_head_sha"] == fixture["final_head_sha"]
+    assert reconciliation["production"]["deployed_sha"] == fixture["merge_sha"]
+    assert [
+        item["pr_number"]
+        for item in reconciliation["verified_master_evidence"]["intervening_commits"]
+    ] == [item["number"] for item in fixture["later"]]
+    lease = controller.store.read_json(controller.store.task_lease_path("746"))
+    assert lease["ready_head_sha"] == fixture["ready_head_sha"]
+    assert lease["task_provenance"]["head_sha"] == fixture["ready_head_sha"]
+    assert lease["reconciled_task_head_sha"] == fixture["final_head_sha"]
+
+    result = controller.finish("746")
+
+    assert result["cleanup_performed"] is True
+    assert not fixture["worktree"].exists()
+    assert (
+        fixture["branch"]
+        not in controller.repository.git("branch", "--list", fixture["branch"]).splitlines()
+    )
+    history = controller.store.read_json(controller.store.history / "task-746.json")
+    assert history["state"] == "finished"
+    assert history["merge_sha"] == fixture["merge_sha"]
+    assert history["head_sha"] == fixture["final_head_sha"]
+    assert (
+        history["historical_deployed_task_reconciliation"]["original_ready_anchor"]["head_sha"]
+        == (fixture["ready_head_sha"])
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("anchor_not_ancestor", "ready anchor to precede"),
+        ("foreign_head_history", "Task 746"),
+        ("pr_task_mismatch", "PR title must start"),
+        ("missing_exact_head_checks", "required check 'checks' is not successful"),
+        ("failed_task_deployment", "No successful production deployment"),
+        ("task_merge_not_ancestor", "merge is not an ancestor"),
+        ("subsequent_pr_provenance", "does not map to its PR task ID"),
+        ("subsequent_runtime_release", "Current production SHA has no successful exact-SHA"),
+        ("controller_allowlist", "governance allowlist"),
+        ("feature_reverted", "touched Task PR feature paths"),
+        ("dirty_worktree", "dirty or interrupted task worktree"),
+        ("unique_worktree_commit", "clean task branch at the final PR head"),
+        ("active_delivery_owner", "active delivery owner"),
+        ("active_deployment", "active production deployment"),
+        ("missing_owner_authorization", "explicit owner authorization"),
+    ],
+)
+def test_reconcile_historical_deployed_task_fails_closed(
+    repository: tuple[Path, Any], mutation: str, message: str, monkeypatch: Any
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(
+        repository,
+        foreign_head_history=mutation == "foreign_head_history",
+        revert_feature=mutation == "feature_reverted",
+    )
+    controller = fixture["controller"]
+    git_repository = fixture["repository"]
+    github = fixture["github"]
+    if mutation == "anchor_not_ancestor":
+        original = git_repository.is_ancestor
+        monkeypatch.setattr(
+            git_repository,
+            "is_ancestor",
+            lambda ancestor, descendant: (
+                False
+                if ancestor == fixture["ready_head_sha"] and descendant == fixture["final_head_sha"]
+                else original(ancestor, descendant)
+            ),
+        )
+    elif mutation == "pr_task_mismatch":
+        github.pulls[764]["title"] = "[Task 999] wrong provenance"
+    elif mutation == "missing_exact_head_checks":
+        github.checks[fixture["final_head_sha"]] = []
+    elif mutation == "failed_task_deployment":
+        github.successful_deployments.discard((fixture["merge_sha"], "production"))
+    elif mutation == "task_merge_not_ancestor":
+        original = git_repository.is_ancestor
+        monkeypatch.setattr(
+            git_repository,
+            "is_ancestor",
+            lambda ancestor, descendant: (
+                False
+                if ancestor == fixture["merge_sha"] and descendant == fixture["master_sha"]
+                else original(ancestor, descendant)
+            ),
+        )
+    elif mutation == "subsequent_pr_provenance":
+        github.pulls[fixture["later"][2]["number"]]["head"]["ref"] = "task/999-wrong-task"
+    elif mutation == "subsequent_runtime_release":
+        last_product = fixture["later"][2]
+        github.workflow_runs_by_sha.pop(last_product["merge_sha"])
+        github.successful_deployments.discard((last_product["merge_sha"], "production"))
+    elif mutation == "controller_allowlist":
+        github.files[fixture["later"][1]["number"]] = [{"filename": "backend/private.py"}]
+    elif mutation == "dirty_worktree":
+        (fixture["worktree"] / "dirty.txt").write_text("keep\n", encoding="utf-8")
+    elif mutation == "unique_worktree_commit":
+        monkeypatch.setattr(git_repository, "unique_commits", lambda _branch: ["unique"])
+    elif mutation == "active_delivery_owner":
+        delivery = controller.store.delivery_state()
+        delivery["owner"] = {"task_id": "999"}
+        task_session.StateStore.replace_json(controller.store.delivery_path, delivery)
+    elif mutation == "active_deployment":
+        github.active_runs = [{"name": "Release production", "status": "in_progress"}]
+
+    owner_authorize = mutation != "missing_owner_authorization"
+    with pytest.raises(task_session.TaskSessionError, match=message):
+        controller.reconcile_deployed_task_after_master_drift(
+            "746",
+            pr_number=764,
+            merge_sha=fixture["merge_sha"],
+            deployed_sha=fixture["merge_sha"],
+            production_run_id=9000,
+            owner_authorize=owner_authorize,
+        )
+    lease = controller.store.read_json(controller.store.task_lease_path("746"))
+    assert lease["lifecycle_state"] == task_session.HUMAN_REQUIRED_STATE
+    assert controller.store.read_json(controller.store.history / "task-746.json") is None
+
+
+def test_reconcile_historical_deployed_task_rejects_master_race_without_state_write(
+    repository: tuple[Path, Any], monkeypatch: Any
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(repository)
+    controller = fixture["controller"]
+    github = fixture["github"]
+    lease_path = controller.store.task_lease_path("746")
+    before_lease = controller.store.read_json(lease_path)
+    fetch_count = 0
+    original_fetch = controller.repository.fetch_origin_master
+
+    def race_fetch(*, cwd: Path | None = None, prune: bool = True) -> None:
+        nonlocal fetch_count
+        fetch_count += 1
+        original_fetch(cwd=cwd, prune=prune)
+        if fetch_count == 2:
+            github.master_sha = "b" * 40
+
+    monkeypatch.setattr(controller.repository, "fetch_origin_master", race_fetch)
+    with pytest.raises(task_session.TaskSessionError, match="live protected master"):
+        controller.reconcile_deployed_task_after_master_drift(
+            "746",
+            pr_number=764,
+            merge_sha=fixture["merge_sha"],
+            deployed_sha=fixture["merge_sha"],
+            production_run_id=9000,
+            owner_authorize=True,
+        )
+    assert controller.store.read_json(lease_path) == before_lease
+    assert controller.store.read_json(controller.store.history / "task-746.json") is None
 
 
 def test_reconcile_subsequent_production_accepts_controller_only_master_advance(
