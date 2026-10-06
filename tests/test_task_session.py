@@ -4789,6 +4789,36 @@ def test_controller_release_skips_allowlisted_diff_for_controller_and_task_branc
     assert result["deploy"] is False
 
 
+def test_controller_release_skips_task_735_security_only_diff() -> None:
+    merge_sha = "c" * 40
+    paths = [
+        ".github/workflows/ci.yml",
+        ".github/workflows/security-audit.yml",
+        "scripts/codeql_sarif_gate.py",
+        "scripts/task_session.py",
+        "security/SECURITY_REVIEW.md",
+        "tests/test_ci_contract.py",
+        "tests/test_codeql_sarif_gate.py",
+        "tests/test_release_safeguards.py",
+        "tests/test_task_session.py",
+    ]
+    pull_request = _merged_release_pr(
+        735,
+        merge_sha,
+        branch="task/735-code-scanning-hardening-final",
+        title="[Task 735] Harden Code Scanning and CodeQL gate",
+        paths=paths,
+    )
+    result = task_session.classify_controller_release(
+        _release_github([pull_request], {735: paths}),
+        deploy_sha=merge_sha,
+        repository="owner/repository",
+    )
+
+    assert result["controller_only"] is True
+    assert result["deploy"] is False
+
+
 def test_controller_release_skips_worker_guard_only_diff() -> None:
     merge_sha = "c" * 40
     pull_request = _merged_release_pr(
@@ -4812,6 +4842,11 @@ def test_controller_release_skips_worker_guard_only_diff() -> None:
     ("branch", "title", "paths"),
     [
         ("task/999-product-change", "[Task 999] Product", ["backend/app.py"]),
+        (
+            "task/735-code-scanning-hardening-final",
+            "[Task 735] Mixed security/runtime",
+            [".github/workflows/ci.yml", "backend/app.py"],
+        ),
         ("task/999-product-change", "[Controller] Fake", ["backend/app.py"]),
         ("codex/controller-foo", "[Controller] Fake", ["backend/app.py"]),
         (
