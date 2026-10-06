@@ -126,7 +126,7 @@ for (const scenario of programImportViewports) {
       '',
       '1',
       'Силовая 1',
-      'Упражнение для ручного сопоставления',
+      `Упражнение для ручного сопоставления ${scenario.name}`,
       '3',
       '8-12',
       '90',
@@ -187,11 +187,12 @@ for (const scenario of programImportViewports) {
     await page.getByLabel('Цель', { exact: true }).selectOption('maintenance');
     await page.getByLabel('Уровень', { exact: true }).selectOption('beginner');
 
-    const exerciseSelect = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
-    await exerciseSelect.click();
-    const strengthOption = page.getByRole('option', { name: strengthExercise.title });
-    await expect(strengthOption).toBeAttached();
-    await strengthOption.click();
+    const exercisePicker = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
+    await exercisePicker.fill(strengthExercise.title);
+    const exerciseOption = page.getByRole('option', { name: strengthExercise.title });
+    await expect(exerciseOption).toBeVisible();
+    await exerciseOption.click();
+    await expect(exercisePicker).toHaveValue(strengthExercise.title);
 
     const resolved = page.waitForResponse(
       (response) =>
