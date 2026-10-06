@@ -7479,8 +7479,7 @@ def test_reconcile_historical_production_success_accepts_task_746_shape_and_fini
     assert audit["final_task_pr"]["bounded_delivery_commits"]
     assert audit["original_production"]["run_id"] == 37419987998
     assert [
-        item["classification"]
-        for item in audit["verified_master_evidence"]["intervening_commits"]
+        item["classification"] for item in audit["verified_master_evidence"]["intervening_commits"]
     ] == ["controller", "product"]
     assert audit["verified_master_evidence"]["current_master_sha"] == records[-1]["commit_sha"]
     assert audit["feature_preservation"]["migration_paths"] == [
@@ -7559,7 +7558,7 @@ def test_reconcile_historical_production_success_fails_closed(
 ) -> None:
     (
         root,
-        git_repository,
+        _git_repository,
         controller,
         worktree,
         _branch,
