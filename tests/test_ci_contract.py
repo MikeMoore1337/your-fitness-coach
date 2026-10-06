@@ -496,6 +496,14 @@ def test_scope_router_is_conservative_and_profile_specific(
     assert not forbidden_groups & groups
 
 
+def test_migrated_stack_browser_spec_routes_to_migration_profile() -> None:
+    decision = ci_contract.classify_scope(["frontend/tests/integration/migrated-stack.spec.ts"])
+
+    assert decision["profile"] == "migration"
+    assert "migrated-stack" in decision["required_groups"]
+    assert decision["outputs"]["run_migrated_stack"] is True
+
+
 def test_scope_router_preserves_dot_prefixed_workflow_paths() -> None:
     decision = ci_contract.classify_scope(["./.github/workflows/ci.yml"])
 

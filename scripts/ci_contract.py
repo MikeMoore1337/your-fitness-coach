@@ -604,6 +604,7 @@ _MIGRATION_PREFIXES = (
     "backend/fitminiapp_api/db/",
     "backend/fitminiapp_api/models/",
 )
+_MIGRATED_STACK_TEST_PATHS = frozenset({"frontend/tests/integration/migrated-stack.spec.ts"})
 _ALL_ROUTABLE_GROUPS = tuple(sorted(COMMAND_GROUPS))
 
 
@@ -654,8 +655,10 @@ def _is_api_path(path: str) -> bool:
 
 def _is_migration_path(path: str) -> bool:
     lowered = path.casefold()
-    return path.startswith(_MIGRATION_PREFIXES) or any(
-        token in lowered.split("/") for token in ("migration", "migrations")
+    return (
+        path in _MIGRATED_STACK_TEST_PATHS
+        or path.startswith(_MIGRATION_PREFIXES)
+        or any(token in lowered.split("/") for token in ("migration", "migrations"))
     )
 
 
