@@ -340,6 +340,305 @@ def _prepare_merged_no_deploy_reconciliation(
     )
 
 
+def _prepare_historical_production_reconciliation(
+    repository: tuple[Path, Any],
+    *,
+    revert_feature: bool = False,
+    controller_disallowed_path: bool = False,
+    omit_latest_release: bool = False,
+) -> tuple[Path, Any, Any, Path, str, str, str, str, FakeGitHub, list[dict[str, Any]]]:
+    root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
+        repository, "746"
+    )
+    base_sha, anchor_head_sha = sha_pair.split(":")
+    controller.mark_ready(
+        "746",
+        head_sha=anchor_head_sha,
+        quality_verdict="PASS",
+        qa_verdict="PASS",
+    )
+
+    migration_path = worktree / "backend" / "alembic" / "versions" / "0120_synthetic.py"
+    migration_path.parent.mkdir(parents=True, exist_ok=True)
+    migration_path.write_text("revision = '0120_synthetic'\n", encoding="utf-8")
+    _git(worktree, "add", str(migration_path.relative_to(worktree)))
+    _git(worktree, "commit", "-m", "[Task 746] Add synthetic migration")
+    (worktree / "change.txt").write_text("change\nfinal\n", encoding="utf-8")
+    _git(worktree, "add", "change.txt")
+    _git(worktree, "commit", "-m", "[Task 746] Complete bounded delivery repair")
+    final_head_sha = _git(worktree, "rev-parse", "HEAD")
+
+    task_commit_shas = _git(
+        worktree, "rev-list", "--reverse", f"{base_sha}..{final_head_sha}"
+    ).splitlines()
+    task_commits = [
+        {
+            "sha": sha,
+            "commit": {"message": _git(worktree, "show", "-s", "--format=%B", sha).strip()},
+        }
+        for sha in task_commit_shas
+    ]
+
+    _git(
+        root,
+        "merge",
+        "--no-ff",
+        branch,
+        "-m",
+        "Merge pull request #764 from owner/task/746-synthetic-task",
+    )
+    deployed_sha = _git(root, "rev-parse", "HEAD")
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    task_pr = _task_pr(764, "746", base_sha, final_head_sha, merge_sha=deployed_sha)
+    task_pr.update(
+        {
+            "state": "closed",
+            "title": "[Task 746] V10-A1 synthetic meal planner",
+            "commits": len(task_commits),
+            "changed_files": 2,
+        }
+    )
+    task_pr["head"]["ref"] = branch
+    github.pulls[764] = task_pr
+    github.commits[764] = task_commits
+    github.files[764] = [
+        {"filename": "change.txt"},
+        {"filename": "backend/alembic/versions/0120_synthetic.py"},
+    ]
+    github.checks[final_head_sha] = [_success_check(final_head_sha)]
+    github.associated_pulls_by_commit[deployed_sha] = [task_pr]
+
+    production_run_id = 37419987998
+    production_run = {
+        "id": production_run_id,
+        "name": "Release production",
+        "head_sha": deployed_sha,
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": f"https://example.invalid/actions/runs/{production_run_id}",
+    }
+    github.runs[production_run_id] = production_run
+    github.workflow_runs_by_sha[deployed_sha] = [production_run]
+    github.successful_deployments.add((deployed_sha, "production"))
+    github.current_production_deployment = {
+        "deployment_id": 8100,
+        "sha": deployed_sha,
+        "environment": "production",
+        "state": "success",
+        "updated_at": "2026-10-06T05:45:00Z",
+        "log_url": "https://example.invalid/deployments/8100",
+    }
+
+    records: list[dict[str, Any]] = []
+    previous_sha = deployed_sha
+
+    controller_branch = "codex/controller-synthetic-after-746"
+    _git(root, "switch", "-c", controller_branch)
+    controller_path = (
+        "backend/forbidden-controller.py"
+        if controller_disallowed_path
+        else "scripts/task_session.py"
+    )
+    controller_file = root / controller_path
+    controller_file.parent.mkdir(parents=True, exist_ok=True)
+    controller_file.write_text(
+        controller_file.read_text(encoding="utf-8") + "\n# synthetic controller drift\n"
+        if controller_file.exists()
+        else "# synthetic controller drift\n",
+        encoding="utf-8",
+    )
+    _git(root, "add", controller_path)
+    _git(root, "commit", "-m", "[Controller] Synthetic post-746 maintenance")
+    controller_head = _git(root, "rev-parse", "HEAD")
+    _git(root, "switch", "master")
+    _git(
+        root,
+        "merge",
+        "--no-ff",
+        controller_branch,
+        "-m",
+        "Merge pull request #761 from owner/codex/controller-synthetic-after-746",
+    )
+    controller_merge = _git(root, "rev-parse", "HEAD")
+    controller_pr = {
+        "number": 761,
+        "title": "[Controller] Synthetic post-746 maintenance",
+        "state": "closed",
+        "merged_at": "2026-10-06T05:49:08Z",
+        "merge_commit_sha": controller_merge,
+        "commits": 1,
+        "changed_files": 1,
+        "base": {
+            "ref": "master",
+            "sha": previous_sha,
+            "repo": {"full_name": "owner/repository"},
+        },
+        "head": {
+            "ref": controller_branch,
+            "sha": controller_head,
+            "repo": {"full_name": "owner/repository"},
+        },
+    }
+    github.pulls[761] = controller_pr
+    github.associated_pulls_by_commit[controller_merge] = [controller_pr]
+    github.commits[761] = [
+        {
+            "sha": controller_head,
+            "commit": {"message": "[Controller] Synthetic post-746 maintenance"},
+        }
+    ]
+    github.files[761] = [{"filename": controller_path}]
+    github.checks[controller_head] = [_success_check(controller_head)]
+    controller_run_id = 37420010001
+    github.workflow_runs_by_sha[controller_merge] = [
+        {
+            "id": controller_run_id,
+            "name": "Release production",
+            "head_sha": controller_merge,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": f"https://example.invalid/runs/{controller_run_id}",
+        }
+    ]
+    github.workflow_jobs_by_run[controller_run_id] = [
+        {"name": "Authorize exact merged master revision", "conclusion": "success"},
+        {"name": "Deploy immutable tested bundle", "conclusion": "skipped"},
+    ]
+    records.append(
+        {
+            "classification": "controller",
+            "commit_sha": controller_merge,
+            "head_sha": controller_head,
+            "pr_number": 761,
+        }
+    )
+    previous_sha = controller_merge
+
+    product_branch = "task/760-synthetic-after-746"
+    _git(root, "switch", "-c", product_branch)
+    product_paths: list[str]
+    if revert_feature:
+        _git(root, "rm", "change.txt", "backend/alembic/versions/0120_synthetic.py")
+        product_paths = ["change.txt", "backend/alembic/versions/0120_synthetic.py"]
+    else:
+        runtime_path = root / "backend" / "synthetic_after_746.py"
+        runtime_path.write_text("VALUE = 1\n", encoding="utf-8")
+        _git(root, "add", str(runtime_path.relative_to(root)))
+        product_paths = ["backend/synthetic_after_746.py"]
+    _git(root, "commit", "-m", "[Task 760] Synthetic independent runtime change")
+    product_head = _git(root, "rev-parse", "HEAD")
+    _git(root, "switch", "master")
+    _git(
+        root,
+        "merge",
+        "--no-ff",
+        product_branch,
+        "-m",
+        "Merge pull request #767 from owner/task/760-synthetic-after-746",
+    )
+    product_merge = _git(root, "rev-parse", "HEAD")
+    product_pr = {
+        "number": 767,
+        "title": "[Task 760] Synthetic independent runtime change",
+        "state": "closed",
+        "merged_at": "2026-10-06T06:00:00Z",
+        "merge_commit_sha": product_merge,
+        "commits": 1,
+        "changed_files": len(product_paths),
+        "base": {
+            "ref": "master",
+            "sha": previous_sha,
+            "repo": {"full_name": "owner/repository"},
+        },
+        "head": {
+            "ref": product_branch,
+            "sha": product_head,
+            "repo": {"full_name": "owner/repository"},
+        },
+    }
+    github.pulls[767] = product_pr
+    github.associated_pulls_by_commit[product_merge] = [product_pr]
+    github.commits[767] = [
+        {
+            "sha": product_head,
+            "commit": {"message": "[Task 760] Synthetic independent runtime change"},
+        }
+    ]
+    github.files[767] = [{"filename": item} for item in product_paths]
+    github.checks[product_head] = [_success_check(product_head)]
+    product_run_id = 37420010002
+    if not omit_latest_release:
+        github.workflow_runs_by_sha[product_merge] = [
+            {
+                "id": product_run_id,
+                "name": "Release production",
+                "head_sha": product_merge,
+                "status": "completed",
+                "conclusion": "success",
+                "html_url": f"https://example.invalid/runs/{product_run_id}",
+            }
+        ]
+        github.successful_deployments.add((product_merge, "production"))
+        github.current_production_deployment = {
+            "deployment_id": 8102,
+            "sha": product_merge,
+            "environment": "production",
+            "state": "success",
+            "updated_at": "2026-10-06T06:05:00Z",
+            "log_url": "https://example.invalid/deployments/8102",
+        }
+    records.append(
+        {
+            "classification": "product",
+            "commit_sha": product_merge,
+            "head_sha": product_head,
+            "pr_number": 767,
+            "release_run_id": product_run_id,
+        }
+    )
+
+    _git(root, "push", "origin", "master")
+    _git(root, "fetch", "origin", "master")
+    github.master_sha = product_merge
+
+    lease_path = controller.store.task_lease_path("746")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease.update(
+        {
+            "lifecycle_state": task_session.HUMAN_REQUIRED_STATE,
+            "delivery_base_origin_master_sha": base_sha,
+            "delivery_head_sha": anchor_head_sha,
+            "delivery_anchor": {
+                "task_id": "746",
+                "branch": branch,
+                "base_sha": base_sha,
+                "head_sha": anchor_head_sha,
+            },
+            "recovery_reason": "missed production closeout after independent master drift",
+        }
+    )
+    lease.pop("delivery_owner", None)
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    return (
+        root,
+        git_repository,
+        controller,
+        worktree,
+        branch,
+        base_sha,
+        anchor_head_sha,
+        deployed_sha,
+        github,
+        records,
+    )
+
+
 def _prepare_ready_production_reconciliation(
     repository: tuple[Path, Any], task_id: str = "506"
 ) -> tuple[Path, Any, Any, Path, str, str, str, FakeGitHub]:
