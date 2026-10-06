@@ -11130,6 +11130,88 @@ class TaskController:
             raise TaskSessionError(invalid)
         return master_sha
 
+    def _historical_production_reconciliation_master_snapshot(
+        self, expected: str, lease: Mapping[str, Any], history: Mapping[str, Any]
+    ) -> str | None:
+        key = "historical_production_reconciliation"
+        if key not in history:
+            if key in lease:
+                raise TaskSessionError(
+                    "finish refuses unmatched historical production reconciliation"
+                )
+            return None
+
+        audit = history.get(key)
+        invalid = "finish refuses malformed historical production reconciliation history"
+        if not isinstance(audit, Mapping):
+            raise TaskSessionError(invalid)
+        final_pr = audit.get("final_task_pr")
+        production = audit.get("original_production")
+        master_sha = str(audit.get("reconciled_against_master_sha", ""))
+        deployed_sha = str(history.get("deployed_sha", ""))
+        if (
+            audit.get("version") != 1
+            or audit.get("owner_authorized") is not True
+            or audit.get("authorization") != "explicit --owner-authorize"
+            or not isinstance(audit.get("authorized_at"), str)
+            or not isinstance(audit.get("reconciled_at"), str)
+            or audit.get("original_state") != HUMAN_REQUIRED_STATE
+            or lease.get(key) != audit
+            or history.get("closeout_required") is not True
+            or history.get("merge_sha") != deployed_sha
+            or lease.get("merge_sha") != deployed_sha
+            or lease.get("deployed_sha") != deployed_sha
+            or not isinstance(final_pr, Mapping)
+            or not isinstance(production, Mapping)
+            or re.fullmatch(r"[0-9a-f]{40}", master_sha) is None
+            or re.fullmatch(r"[0-9a-f]{40}", deployed_sha) is None
+            or final_pr.get("merge_sha") != deployed_sha
+            or history.get("pr_number") != final_pr.get("pr_number")
+            or history.get("head_sha") != final_pr.get("head_sha")
+            or history.get("base_sha") != final_pr.get("base_sha")
+            or production.get("deployed_sha") != deployed_sha
+            or production.get("run_conclusion") != "success"
+            or production.get("deployment_success_verified") is not True
+        ):
+            raise TaskSessionError(invalid)
+
+        origin_master_sha = self.repository.ref("origin/master")
+        if origin_master_sha != master_sha:
+            raise TaskSessionError(
+                "finish requires master to remain at the historical reconciliation snapshot"
+            )
+        self._verify_live_master(master_sha)
+
+        pr_number = final_pr.get("pr_number")
+        production_run_id = production.get("run_id")
+        if (
+            type(pr_number) is not int
+            or pr_number <= 0
+            or type(production_run_id) is not int
+            or production_run_id <= 0
+        ):
+            raise TaskSessionError(invalid)
+        current_evidence = self._verified_historical_production_evidence(
+            expected,
+            lease,
+            pr_number=pr_number,
+            deployed_sha=deployed_sha,
+            production_run_id=production_run_id,
+            master_sha=master_sha,
+        )
+        for field in (
+            "preserved_anchor",
+            "final_task_pr",
+            "original_production",
+            "feature_preservation",
+            "verified_master_evidence",
+        ):
+            if audit.get(field) != current_evidence.get(field):
+                raise TaskSessionError(
+                    "finish refuses stale historical production reconciliation evidence"
+                )
+        return master_sha
+
     def _ready_production_reconciliation_master_snapshot(
         self, expected: str, lease: Mapping[str, Any], history: Mapping[str, Any]
     ) -> str | None:
@@ -11236,6 +11318,11 @@ class TaskController:
     def _reconciliation_master_snapshot(
         self, expected: str, lease: Mapping[str, Any], history: Mapping[str, Any]
     ) -> str | None:
+        historical_sha = self._historical_production_reconciliation_master_snapshot(
+            expected, lease, history
+        )
+        if historical_sha is not None:
+            return historical_sha
         ready_sha = self._ready_production_reconciliation_master_snapshot(expected, lease, history)
         if ready_sha is not None:
             return ready_sha
@@ -11321,9 +11408,17 @@ class TaskController:
             )
         branch = str(lease.get("branch", ""))
         worktree_path = Path(str(lease.get("worktree", ""))).resolve()
-        expected_head = str(lease.get("ready_head_sha", ""))
         deployed_sha = str(history.get("deployed_sha", ""))
         root = self._canonical_root()
+        reconciliation_master_sha = self._reconciliation_master_snapshot(
+            expected, lease, history
+        )
+        expected_head = str(lease.get("ready_head_sha", ""))
+        historical = history.get("historical_production_reconciliation")
+        if isinstance(historical, Mapping):
+            final_pr = historical.get("final_task_pr")
+            if isinstance(final_pr, Mapping):
+                expected_head = str(final_pr.get("head_sha", ""))
         expected_parent = (root / ".artifacts" / "worktrees").resolve()
         if worktree_path.parent != expected_parent:
             raise TaskSessionError(
@@ -11333,7 +11428,6 @@ class TaskController:
             raise TaskSessionError("finish cleanup branch does not match task lease")
         if not expected_head or not deployed_sha:
             raise TaskSessionError("finish requires exact ready and deployed SHAs")
-        reconciliation_master_sha = self._reconciliation_master_snapshot(expected, lease, history)
         if self.repository.current_worktree != root:
             raise TaskSessionError("finish cleanup must run from the canonical repository worktree")
         origin_master_sha = self.repository.ref("origin/master")
