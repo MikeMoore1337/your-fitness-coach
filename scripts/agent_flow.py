@@ -15,7 +15,7 @@ PONYTAIL_TESTED_VERSION = "4.10.0"
 PONYTAIL_MODES = frozenset({"off", "lite", "full", "ultra"})
 
 ORDINARY_TOOL_ACTION_BUDGET = 160
-EXPANDED_TOOL_ACTION_BUDGET = 240
+EXPANDED_TOOL_ACTION_BUDGET = 320
 READ_ONLY_SUBAGENT_BUDGET = 2
 READ_ONLY_COLLAB_TOOL_BUDGET = 10
 LOOP_IDENTICAL_FAILURE_LIMIT = 4
@@ -263,6 +263,13 @@ def build_agent_flow(
         "max_completed_tool_actions": (
             EXPANDED_TOOL_ACTION_BUDGET if expanded_tool_budget else ORDINARY_TOOL_ACTION_BUDGET
         ),
+        "completion_mode": {
+            "starts_at_percent": 75,
+            "policy": (
+                "stop broad discovery, prioritize acceptance checks, targeted fixes, final "
+                "verification and lifecycle handoff; never skip required checks"
+            ),
+        },
         "max_collab_tool_calls": collab_budget,
         "max_spawned_subagents": subagent_budget,
         "max_concurrent_subagents": subagent_budget,
@@ -398,7 +405,9 @@ def render_agent_flow_prompt(plan: Mapping[str, Any]) -> str:
         "safe. Ponytail is optional host tooling: use the planned mode if the plugin is already "
         "available, never install it automatically, and never start ponytail-review/audit loops. "
         "If it is unavailable, apply the YFC minimalism ladder from AGENTS.md directly. "
-        "Always verify source/tests/migrations/docs before writes.\n"
+        "Always verify source/tests/migrations/docs before writes. At 75% of the tool-action "
+        "budget enter completion mode: stop broad discovery, prioritize acceptance checks, "
+        "targeted fixes, final verification and lifecycle handoff; never skip required checks.\n"
     )
 
 

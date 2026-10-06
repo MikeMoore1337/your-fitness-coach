@@ -18,6 +18,7 @@ from scripts.issue_workflow import (
     render_control_state_comment,
     render_queue_budget_report,
     render_task_contract,
+    task_contract_fingerprint,
     task_contract_payload,
     task_risk_lane,
     validate_control_transition,
@@ -187,6 +188,24 @@ def test_task_issue_contract_round_trip_preserves_dependencies_and_acceptance() 
     )
     assert parse_task_contract(render_task_contract(contract)) == contract
     assert parse_task_contract("ordinary issue body") is None
+
+
+def test_task_contract_fingerprint_is_state_insensitive_and_source_sensitive() -> None:
+    contract = task_contract_payload(
+        task_id="748",
+        scope="grocery planning",
+        acceptance=("planned items remain separate",),
+        dependencies=("747",),
+        owner_gate="owner_launch",
+        risk_lane="GREEN",
+        source_spec="product-v10:A3:grocery-list",
+        issue_state="queued",
+    )
+    in_progress = {**contract, "issue_state": "in_progress"}
+    changed_source = {**contract, "source_spec": "product-v10:A3:other"}
+
+    assert task_contract_fingerprint(contract) == task_contract_fingerprint(in_progress)
+    assert task_contract_fingerprint(contract) != task_contract_fingerprint(changed_source)
 
 
 def test_legacy_completed_task_contract_normalizes_to_terminal_without_runtime_state() -> None:

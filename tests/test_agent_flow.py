@@ -47,7 +47,8 @@ Assess wearable platform feasibility and document evidence. Do not implement pro
     assert plan["execution"]["production_writer"] is None
     assert plan["ponytail"]["mode"] == "off"
     assert plan["agent_budget"]["max_spawned_subagents"] == 0
-    assert plan["agent_budget"]["max_completed_tool_actions"] == 240
+    assert plan["agent_budget"]["max_completed_tool_actions"] == 320
+    assert plan["agent_budget"]["completion_mode"]["starts_at_percent"] == 75
     assert plan["execution"]["spawn_extra_codex_processes"] is False
 
 
@@ -75,7 +76,8 @@ React frontend, and a PostgreSQL/Alembic migration.
     assert plan["agent_budget"]["max_spawned_subagents"] == 2
     assert plan["agent_budget"]["max_concurrent_subagents"] == 2
     assert plan["agent_budget"]["max_collab_tool_calls"] == 10
-    assert plan["agent_budget"]["max_completed_tool_actions"] == 240
+    assert plan["agent_budget"]["max_completed_tool_actions"] == 320
+    assert plan["agent_budget"]["completion_mode"]["starts_at_percent"] == 75
 
 
 def test_explicit_roles_override_inferred_orchestrator_and_qa() -> None:

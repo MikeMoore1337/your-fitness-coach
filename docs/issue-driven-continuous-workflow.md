@@ -14,6 +14,14 @@ merge/deployment evidence; controller не дублирует эти факты 
 lease state читаются через compatibility map без переписывания history. Retry/resume хранится
 в bounded `attempts` audit и ограничен одной owner-authorized попыткой.
 
+Task identity не смешивает logical и filesystem provenance: `source_spec` является logical
+identity, а `canonical_task_path` — отдельным локальным путём materialized task document.
+Issue-backed `yfc-task-contract:v1` contract materializes idempotently в ровно один
+детерминированный документ и получает fingerprint нормализованного contract; Issue не
+переписывается. Duplicate document, changed fingerprint, dependency/gate/risk mismatch или
+ambiguous ownership останавливают controller fail-closed. Старые path-valued `source_spec` и
+lease/document без fingerprint поддерживаются compatibility path без массовой миграции.
+
 ## Обычная разовая задача
 
 ```text
@@ -50,7 +58,7 @@ security/legal/human/destructive gates. Security Review — отдельный m
   --continue-queue --control-issue 218 --max-tasks 4
 ```
 
-Launcher использует только существующие task specs и их GitHub Issue contracts, соблюдает порядок
+Launcher использует materialized task documents и их GitHub Issue contracts, соблюдает порядок
 canonical backlog и проверяет подтверждённые terminal dependencies. За один batch допускается не
 более четырёх задач. На одну задачу допускается не более трёх review-fix и трёх CI-fix cycles;
 scope expansion равен нулю. После достижения лимита, ошибки CI/deploy, dependency blocker или
@@ -130,6 +138,17 @@ owner и exact dependencies. Операция может только аудир
 зависимостей, если Issue и task spec совпадают и все зависимости уже terminal. Новый `in_progress`
 публикуется guarded launcher только после durable worker-start marker; второй такой retry и любая
 неоднозначность остаются `HUMAN_REQUIRED`.
+
+Validation до запуска worker не расходует continuation budget. Расход фиксируется только после
+durable worker-start marker; поэтому failed recovery preparation не превращается в ложный второй
+retry. При достижении 75% finite tool budget controller переводит worker в completion mode:
+останавливает широкое исследование и оставляет только acceptance checks, targeted fixes и
+handoff. Повторный чистый budget stop после разрешённой bounded continuation останавливает queue
+с `HUMAN_REQUIRED`, без третьей попытки.
+
+Ошибка записи optional cleanup metadata уже завершённой task сохраняется как deferred housekeeping
+и не блокирует unrelated active task. Обязательная запись нового lease/delivery/controller state
+по-прежнему fail-closed.
 
 Для queue-mode authoritative-счётчики review-fix и CI-fix хранятся в durable controller ledger.
 Перед каждым фактическим fix cycle worker обязан выполнить `record-queue-cycle`; `final.md`

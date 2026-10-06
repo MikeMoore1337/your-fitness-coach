@@ -238,6 +238,22 @@ Normal task delivery uses deterministic routing from `scripts/agent_flow.py` bef
 worker starts. The resulting bounded plan is stored under task-scoped
 `.artifacts/tasks/<TASK_ID>/evidence/agent-flow/` and embedded into the worker prompt.
 
+Issue-backed task identity is split deliberately: `source_spec` is the logical task identity,
+while `canonical_task_path` is the local materialized document path. A valid
+`yfc-task-contract:v1` Issue contract may be materialized into exactly one deterministic local
+task document; the controller records a normalized contract fingerprint and must never require
+the logical source to equal that filesystem path. Duplicate, mismatched or ambiguous documents
+fail closed, with legacy path-valued sources accepted only through the compatibility path.
+
+The same identity validation applies at start, resume, guard, transport, queue and delivery
+boundaries. Pre-launch validation failures do not consume worker continuation budget; only a
+durable worker-start marker does. Worker tool budgets remain finite: at the 75% warning boundary
+the worker enters completion mode, and a pure repeated budget stop cannot become an unbounded retry
+loop.
+
+Optional metadata cleanup for already-finished tasks must not block creation or activation of an
+unrelated task. Required writes for new active state remain fail-closed.
+
 - Explicit `Основная роль` / `Дополнительные роли lifecycle` in the task remain authoritative.
 - Without an explicit role contract, ordinary work defaults to `implementer`; routing may
   conservatively infer `researcher`, `orchestrator` or `qa-verifier` only on their documented

@@ -323,6 +323,7 @@ class WorkerEventGuard:
         return self.observe_event(raw)
 
     def report(self) -> dict[str, Any]:
+        completion_threshold = (self.limits.max_completed_tool_actions * 3 + 3) // 4
         return {
             "schema_version": SCHEMA_VERSION,
             "classification": "yfc-worker-guard-report",
@@ -336,6 +337,11 @@ class WorkerEventGuard:
                 "malformed_lines": self.malformed_lines,
             },
             "warning_codes": sorted(self._warning_codes),
+            "completion_mode": {
+                "active": "TOOL_ACTION_BUDGET_75_PERCENT" in self._warning_codes,
+                "starts_at_percent": 75,
+                "starts_at_tool_actions": completion_threshold,
+            },
             "blocked": self.block_reason_code is not None,
             "block_reason_code": self.block_reason_code,
             "block_signature_hash": self.block_signature_hash,

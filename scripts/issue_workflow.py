@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -12,6 +13,16 @@ CONTROL_STATE_VERSION = 1
 CONTROL_STATE_MARKER = "<!-- yfc-control-state:v1 -->"
 TASK_CONTRACT_VERSION = 1
 TASK_CONTRACT_MARKER = "<!-- yfc-task-contract:v1 -->"
+TASK_CONTRACT_FINGERPRINT_FIELDS = (
+    "version",
+    "task_id",
+    "scope",
+    "acceptance",
+    "dependencies",
+    "owner_gate",
+    "risk_lane",
+    "source_spec",
+)
 QUEUE_BUDGET_REPORT_VERSION = 1
 QUEUE_BUDGET_REPORT_MARKER = "<!-- yfc-queue-budget:v1 -->"
 CONTINUE_QUEUE_TOKEN = "CONTINUE_QUEUE"
@@ -571,6 +582,45 @@ def task_contract_payload(
         "source_spec": source_spec.strip(),
         "issue_state": normalized_issue_state,
     }
+
+
+def normalize_task_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the stable, owner-authored portion of a task contract.
+
+    ``issue_state`` is intentionally excluded from the fingerprint below: it is a
+    controller state transition, not a change to the task specification.
+    """
+
+    if not isinstance(contract, Mapping):
+        raise IssueWorkflowError("Task contract must be an object")
+    normalized = task_contract_payload(
+        task_id=contract.get("task_id", ""),
+        scope=contract.get("scope", ""),
+        acceptance=contract.get("acceptance", []),
+        dependencies=contract.get("dependencies", []),
+        owner_gate=contract.get("owner_gate", ""),
+        risk_lane=contract.get("risk_lane", ""),
+        source_spec=contract.get("source_spec", ""),
+        issue_state=(
+            contract.get("issue_state")
+            if isinstance(contract.get("issue_state"), str)
+            and contract.get("issue_state", "").strip().lower() in CONTROL_STATES
+            else "queued"
+        ),
+    )
+    return {field: normalized[field] for field in TASK_CONTRACT_FINGERPRINT_FIELDS}
+
+
+def task_contract_fingerprint(contract: Mapping[str, Any]) -> str:
+    """Return the deterministic identity hash for a normalized task specification."""
+
+    canonical = json.dumps(
+        normalize_task_contract(contract),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def render_task_contract(contract: Mapping[str, Any]) -> str:
