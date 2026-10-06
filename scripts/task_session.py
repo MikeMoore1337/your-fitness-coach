@@ -9916,6 +9916,44 @@ class TaskController:
             "deployment_success_verified": True,
         }
 
+    def _successful_no_deploy_release_evidence(self, sha: str) -> dict[str, Any] | None:
+        github = self._github()
+        runs = github.workflow_runs("deploy.yml", sha)
+        successful = [
+            item
+            for item in runs
+            if item.get("name") == "Release production"
+            and item.get("head_sha") == sha
+            and item.get("status") == "completed"
+            and str(item.get("conclusion", "")).lower() == "success"
+            and type(item.get("id")) is int
+            and item.get("id", 0) > 0
+        ]
+        if github.has_successful_deployment(sha, "production"):
+            return None
+        for run in sorted(successful, key=lambda item: item["id"]):
+            jobs = github.workflow_jobs(run["id"])
+            authorize = [
+                job for job in jobs if job.get("name") == "Authorize exact merged master revision"
+            ]
+            deploy = [job for job in jobs if job.get("name") == "Deploy immutable tested bundle"]
+            if (
+                len(authorize) == 1
+                and authorize[0].get("conclusion") == "success"
+                and len(deploy) == 1
+                and deploy[0].get("conclusion") == "skipped"
+            ):
+                return {
+                    "run_id": run["id"],
+                    "run_url": run.get("html_url"),
+                    "head_sha": sha,
+                    "run_conclusion": "success",
+                    "authorization_job": "success",
+                    "application_deploy_job": "skipped",
+                    "application_deployment_verified": False,
+                }
+        return None
+
     def _verified_ready_production_master(
         self, deployed_sha: str, master_sha: str, production_run_id: int
     ) -> dict[str, Any]:
@@ -10134,48 +10172,10 @@ class TaskController:
                         f"Controller commit {commit_sha} changes disallowed paths: "
                         + ", ".join(disallowed)
                     )
-                release_runs = [
-                    item
-                    for item in github.workflow_runs("deploy.yml", commit_sha)
-                    if item.get("name") == "Release production"
-                    and item.get("head_sha") == commit_sha
-                    and item.get("status") == "completed"
-                    and str(item.get("conclusion", "")).lower() == "success"
-                    and type(item.get("id")) is int
-                ]
-                controller_release: dict[str, Any] | None = None
-                for run in sorted(release_runs, key=lambda item: item["id"]):
-                    jobs = github.workflow_jobs(run["id"])
-                    authorize = [
-                        job
-                        for job in jobs
-                        if job.get("name") == "Authorize exact merged master revision"
-                    ]
-                    deploy = [
-                        job for job in jobs if job.get("name") == "Deploy immutable tested bundle"
-                    ]
-                    if (
-                        len(authorize) == 1
-                        and authorize[0].get("conclusion") == "success"
-                        and len(deploy) == 1
-                        and deploy[0].get("conclusion") == "skipped"
-                    ):
-                        controller_release = {
-                            "run_id": run["id"],
-                            "run_url": run.get("html_url"),
-                            "run_conclusion": "success",
-                            "authorization_job": "success",
-                            "application_deploy_job": "skipped",
-                            "application_deployment_verified": False,
-                        }
-                        break
+                controller_release = self._successful_no_deploy_release_evidence(commit_sha)
                 if controller_release is None:
                     raise TaskSessionError(
                         f"Controller PR #{pr_number} lacks proof that application deployment was skipped"
-                    )
-                if github.has_successful_deployment(commit_sha, "production"):
-                    raise TaskSessionError(
-                        f"Controller commit {commit_sha} unexpectedly has a production deployment"
                     )
                 record = {
                     "commit_sha": commit_sha,
@@ -10218,11 +10218,22 @@ class TaskController:
                     )
                 validate_task_commit_messages(task_id, messages, dependency_ids=None)
                 validate_task_pull_request_files(files, expected_count=changed_files)
+                non_runtime_release: dict[str, Any] | None = None
+                try:
+                    validate_controller_pull_request_files(files, expected_count=changed_files)
+                    disallowed = sorted(set(changed_paths) - CONTROLLER_ALLOWED_PATHS)
+                except TaskSessionError:
+                    disallowed = ["<incomplete-or-disallowed-file-inventory>"]
+                if not disallowed:
+                    non_runtime_release = self._successful_no_deploy_release_evidence(commit_sha)
+                classification = (
+                    "non_runtime_task" if non_runtime_release is not None else "product"
+                )
                 record = {
                     "commit_sha": commit_sha,
                     "parent_sha": previous_sha,
                     "subject": subject,
-                    "classification": "product",
+                    "classification": classification,
                     "task_id": task_id,
                     "pr_number": pr_number,
                     "pr_title": title,
@@ -10231,7 +10242,11 @@ class TaskController:
                     "merged_at": merged_time.astimezone(UTC).isoformat(),
                     "required_check": check,
                     "changed_paths": changed_paths,
-                    "release": None,
+                    "release": (
+                        {"result": "no_deploy", **non_runtime_release}
+                        if non_runtime_release is not None
+                        else None
+                    ),
                 }
             chain.append(record)
             previous_sha = commit_sha
@@ -10264,7 +10279,7 @@ class TaskController:
         production_index = (
             master_commits.index(production_sha) if production_sha in master_commits else -1
         )
-        if any(item["classification"] != "controller" for item in chain[production_index + 1 :]):
+        if any(item["classification"] == "product" for item in chain[production_index + 1 :]):
             raise TaskSessionError(
                 "Current master contains product commits after the latest production deployment"
             )

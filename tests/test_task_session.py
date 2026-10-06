@@ -2941,10 +2941,10 @@ def _prepare_historical_deployed_task_reconciliation(
         ),
         (
             765,
-            "",
-            "codex/controller-later-final",
-            "[Controller] Later security gate",
-            "tests/test_task_session.py",
+            "735",
+            "task/735-codeql-gate-final-v2",
+            "[Task 735] Later security gate",
+            "scripts/codeql_sarif_gate.py",
             False,
         ),
     ]
@@ -3004,7 +3004,7 @@ def _prepare_historical_deployed_task_reconciliation(
             "html_url": f"https://example.invalid/actions/runs/{release_run_id}",
         }
         github.workflow_runs_by_sha[merge_sha] = [release]
-        if later_task_id:
+        if _deploy:
             github.successful_deployments.add((merge_sha, "production"))
             github.current_production_deployment = {
                 "deployment_id": 8000 + index,
@@ -3066,10 +3066,11 @@ def test_reconcile_historical_deployed_task_after_master_drift_and_finish(
     assert reconciliation["original_ready_anchor"]["head_sha"] == fixture["ready_head_sha"]
     assert reconciliation["reconciled_task_head_sha"] == fixture["final_head_sha"]
     assert reconciliation["production"]["deployed_sha"] == fixture["merge_sha"]
-    assert [
-        item["pr_number"]
-        for item in reconciliation["verified_master_evidence"]["intervening_commits"]
-    ] == [item["number"] for item in fixture["later"]]
+    chain = reconciliation["verified_master_evidence"]["intervening_commits"]
+    assert [item["pr_number"] for item in chain] == [item["number"] for item in fixture["later"]]
+    assert chain[-1]["classification"] == "non_runtime_task"
+    assert chain[-1]["task_id"] == "735"
+    assert chain[-1]["release"]["application_deploy_job"] == "skipped"
     lease = controller.store.read_json(controller.store.task_lease_path("746"))
     assert lease["ready_head_sha"] == fixture["ready_head_sha"]
     assert lease["task_provenance"]["head_sha"] == fixture["ready_head_sha"]
