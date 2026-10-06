@@ -188,10 +188,11 @@ for (const scenario of programImportViewports) {
     await page.getByLabel('Уровень', { exact: true }).selectOption('beginner');
 
     const exerciseSelect = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
+    await exerciseSelect.click();
     await expect(
       exerciseSelect.getByRole('option', { name: strengthExercise.title }),
     ).toBeAttached();
-    await exerciseSelect.selectOption(String(strengthExercise.id));
+    await exerciseSelect.getByRole('option', { name: strengthExercise.title }).click();
 
     const resolved = page.waitForResponse(
       (response) =>
