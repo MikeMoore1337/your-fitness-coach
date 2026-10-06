@@ -1274,3 +1274,4 @@ def test_runtime_contract_has_no_external_secrets_or_publish_surface() -> None:
     assert "subprocess" not in source
     assert "selenium" not in source
     assert "playwright" not in source
+    assert "context.minimum_version = ssl.tlsversion.tlsv1_2" in source

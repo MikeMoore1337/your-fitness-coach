@@ -1048,6 +1048,7 @@ def _http_get(
             transport.settimeout(timeout_seconds)
             if parsed.scheme == "https":
                 context = ssl.create_default_context()
+                context.minimum_version = ssl.TLSVersion.TLSv1_2
                 transport = context.wrap_socket(transport, server_hostname=hostname)
                 transport.settimeout(timeout_seconds)
             request = (

@@ -56,6 +56,16 @@ function AuthErrorNotice({ code }: { code: string | null }) {
   );
 }
 
+function authorizedPostAuthDestination(
+  nextPath: string,
+  { canCoach, canAdmin }: { canCoach: boolean; canAdmin: boolean },
+): string {
+  const pathname = nextPath.split(/[?#]/, 1)[0];
+  if (pathname === '/admin') return canAdmin ? nextPath : '/app';
+  if (pathname === '/coach') return canCoach ? nextPath : '/app';
+  return nextPath;
+}
+
 function DevLoginControls({
   hasExplicitNext,
   nextPath,
@@ -108,7 +118,11 @@ function DevLoginControls({
             className="secondary"
             disabled={busyRole !== null}
             onClick={() => {
-              const destination = hasExplicitNext ? nextPath : defaultPath;
+              const requestedDestination = hasExplicitNext ? nextPath : defaultPath;
+              const destination = authorizedPostAuthDestination(requestedDestination, {
+                canCoach: input.is_coach,
+                canAdmin: input.is_admin,
+              });
               onDestinationChange(destination);
               setBusyRole(label);
               setError(null);
@@ -139,7 +153,18 @@ export default function LoginPage() {
   const [devLoginDestination, setDevLoginDestination] = useState<string | null>(null);
   const authenticatedDestination =
     devLoginDestination ??
-    (hasExplicitNext ? nextPath : user?.is_root ? '/admin' : user?.is_coach ? '/coach' : nextPath);
+    (user
+      ? hasExplicitNext
+        ? authorizedPostAuthDestination(nextPath, {
+            canCoach: Boolean(user.is_coach),
+            canAdmin: Boolean(user.is_root),
+          })
+        : user.is_root
+          ? '/admin'
+          : user.is_coach
+            ? '/coach'
+            : '/app'
+      : '/app');
   const demoReturnPath = demoReturnPathFromLogin(window.location.search);
   const authErrorCode = params.get('auth_error');
   const providers = configuredOAuthProviders(config?.enable_web_auth ? config.oauth_providers : []);

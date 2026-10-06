@@ -4,6 +4,7 @@ import json
 import re
 import time
 from datetime import UTC, date, datetime, timedelta
+from html.parser import HTMLParser
 from http.cookies import SimpleCookie
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -3475,6 +3476,33 @@ def test_removed_user_delete_route_preserves_coach_program_and_workouts(client):
         assert db.query(UserWorkout).filter(UserWorkout.user_program_id == program.id).count() == 1
 
 
+class _InlineScriptContentParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._inside_script = False
+        self.inline_sources: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        del attrs
+        if tag.casefold() == "script":
+            self._inside_script = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.casefold() == "script":
+            self._inside_script = False
+
+    def handle_data(self, data: str) -> None:
+        if self._inside_script and data.strip():
+            self.inline_sources.append(data)
+
+
+def _inline_script_sources(document: str) -> list[str]:
+    parser = _InlineScriptContentParser()
+    parser.feed(document)
+    parser.close()
+    return parser.inline_sources
+
+
 def test_csp_blocks_unhashed_inline_scripts(client):
     response = client.get("/app")
     policy = response.headers["content-security-policy"]
@@ -3489,16 +3517,14 @@ def test_csp_blocks_unhashed_inline_scripts(client):
     assert "'sha256-" not in script_policy
 
     html = response.text
-    inline_sources = re.findall(r"<script(?:\s+[^>]*)?>([\s\S]*?)</script>", html)
-    assert all(not source.strip() for source in inline_sources)
+    assert _inline_script_sources(html) == []
 
     source_template = (Path(__file__).resolve().parents[2] / "frontend" / "index.html").read_text(
         encoding="utf-8"
     )
     assert '<link rel="manifest" href="/manifest.webmanifest" />' in source_template
     assert '<script src="/assets/theme-bootstrap-20260826.js"></script>' in source_template
-    source_inline_scripts = re.findall(r"<script(?:\s+[^>]*)?>([\s\S]*?)</script>", source_template)
-    assert all(not source.strip() for source in source_inline_scripts)
+    assert _inline_script_sources(source_template) == []
     assert (
         Path(__file__).resolve().parents[2]
         / "frontend"

@@ -62,6 +62,9 @@ test('serves the install manifest, canonical icons and service worker contract',
   expect(serviceWorkerSource).toContain("assetPath.startsWith('providers/')");
   expect(serviceWorkerSource).toContain("assetPath.startsWith('marketing/')");
   expect(serviceWorkerSource).toContain("assetPath.startsWith('product/')");
+  expect(serviceWorkerSource).toContain(
+    "if (event.origin !== self.location.origin) return;",
+  );
   expect(serviceWorkerSource).toContain("self.addEventListener('push'");
   expect(serviceWorkerSource).toContain("self.addEventListener('notificationclick'");
   expect(serviceWorkerSource).toContain(
