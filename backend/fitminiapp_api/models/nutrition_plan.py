@@ -78,12 +78,9 @@ class NutritionPlanItem(Base):
             name="ck_nutrition_plan_items_source_name_not_blank",
         ),
         CheckConstraint(
-            "status IN ('planned', 'consumed', 'skipped')",
-            name="ck_nutrition_plan_items_status",
-        ),
-        CheckConstraint(
-            "diary_entry_id IS NULL OR status = 'consumed'",
-            name="ck_nutrition_plan_items_diary_link",
+            "(status IS NULL OR status IN ('planned', 'consumed', 'skipped')) AND "
+            "(diary_entry_id IS NULL OR status = 'consumed')",
+            name="ck_nutrition_plan_items_lifecycle",
         ),
         UniqueConstraint(
             "plan_id",
@@ -119,9 +116,7 @@ class NutritionPlanItem(Base):
     amount_unit: Mapped[str] = mapped_column(String(16), nullable=False)
     source_name: Mapped[str] = mapped_column(String(256), nullable=False)
     source_brand: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="planned", server_default="planned"
-    )
+    status: Mapped[str | None] = mapped_column(String(16), nullable=True, default="planned")
     diary_entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("food_diary_entries.id", ondelete="SET NULL"), nullable=True
     )

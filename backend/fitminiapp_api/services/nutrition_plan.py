@@ -201,7 +201,7 @@ def _serialize_item(
         weight_g=weight_g,
         nutrition=nutrition,
         available=available,
-        status=cast(Literal["planned", "consumed", "skipped"], item.status),
+        status=cast(Literal["planned", "consumed", "skipped"], item.status or "planned"),
         diary_entry_id=item.diary_entry_id,
         message=message,
     )
@@ -693,7 +693,7 @@ def perform_plan_item_action(
                 replayed=True,
                 diagnostic="planned_item_action_replayed",
             )
-        if item.status != "planned":
+        if (item.status or "planned") != "planned":
             raise NutritionPlanConflictError(
                 "planned item has already been resolved",
                 code="planned_item_already_resolved",
@@ -859,7 +859,7 @@ def update_plan_item(
         item = _owned_item_query(db, user, item_id)
         if item is None:
             raise NutritionPlanNotFoundError("planned item not found")
-        if item.status != "planned":
+        if (item.status or "planned") != "planned":
             raise NutritionPlanConflictError(
                 "resolved planned items cannot be edited",
                 code="planned_item_already_resolved",

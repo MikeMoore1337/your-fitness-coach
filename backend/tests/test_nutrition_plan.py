@@ -477,6 +477,9 @@ def test_nutrition_plan_migration_is_additive_and_reversible(tmp_path: Path) -> 
     migration_paths = [
         migrations_dir / "0120_nutrition_plans.py",
         migrations_dir / "0121_nutrition_plan_consumption_bridge.py",
+        migrations_dir / "0122_plan_fill_kind.py",
+        migrations_dir / "0123_diary_planned_item_kind.py",
+        migrations_dir / "0124_plan_item_lifecycle.py",
     ]
     migrations = []
     for index, migration_path in enumerate(migration_paths):
