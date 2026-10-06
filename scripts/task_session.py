@@ -105,6 +105,7 @@ CONTROLLER_ALLOWED_PATHS = frozenset(
         "scripts/archive_backlog_task.py",
         "scripts/codeql_sarif_gate.py",
         "scripts/artifact_manager.py",
+        "scripts/agent_flow.py",
         "scripts/issue_workflow.py",
         "scripts/run_task_delivery.py",
         "scripts/task_session.py",
@@ -114,12 +115,14 @@ CONTROLLER_ALLOWED_PATHS = frozenset(
         "tests/test_ci_contract.py",
         "tests/test_codeql_sarif_gate.py",
         "tests/test_artifact_manager.py",
+        "tests/test_agent_flow.py",
         "tests/test_deployment_contract.py",
         "tests/test_issue_workflow.py",
         "tests/test_quality_gate_policy.py",
         "tests/test_release_safeguards.py",
         "tests/test_run_task_delivery.py",
         "tests/test_task_session.py",
+        "tests/test_worker_guard.py",
     }
 )
 TASK_DEPENDENCY_RE = re.compile(r"(?im)^Depends-on:\s*(?P<value>.+)$")
