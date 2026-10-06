@@ -10,6 +10,7 @@ import type {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Badge, Button, Card, Field, Input, Select } from '../../shared/ui/common';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import { SearchableExercisePicker, type ExercisePickerExercise } from './SearchableExercisePicker';
 import './program-import.css';
 
 const PAGE_SIZE = 50;
@@ -58,6 +59,35 @@ const prescriptionGroupLabels: Record<string, string> = {
   cluster: 'Кластер',
   drop_chain: 'Подход со снижением веса',
   circuit: 'Круговая тренировка',
+};
+
+const importFormatLabels: Record<ProgramImport['source_format'], string> = {
+  csv: 'CSV',
+  xlsx: 'Excel',
+  txt: 'Текст',
+  docx: 'Word',
+};
+
+const importLayoutLabels: Record<string, string> = {
+  'canonical-table-v1': 'каноническая таблица',
+  'weekly-matrix-v1': 'таблица недель',
+  'generic-table-v1': 'обычная таблица',
+  'text-list-v1': 'текстовый список',
+  'docx-document-v1': 'документ Word',
+};
+
+const aiProposalFieldLabels: Record<string, string> = {
+  program_title: 'название программы',
+  goal: 'цель',
+  level: 'уровень',
+  day_number: 'номер дня',
+  day_title: 'название дня',
+  prescribed_sets: 'рабочие подходы',
+  prescribed_reps: 'повторы',
+  prescribed_duration_minutes: 'длительность',
+  rest_seconds: 'отдых между подходами',
+  notes: 'заметка',
+  exercise_mapping: 'сопоставление упражнения',
 };
 
 function prescriptionPreview(row: ProgramImport['rows'][number]): string[] {
@@ -193,7 +223,7 @@ function coachingRulePreview(rule: ImportCoachingRule, preview: ProgramImport): 
       deload: 'разгрузка при неудаче',
       manual_review: 'ручная проверка при неудаче',
     };
-    parts.push(failureActionLabels[rule.amrap_failure_action] ?? rule.amrap_failure_action);
+    parts.push(failureActionLabels[rule.amrap_failure_action] ?? 'действие после неудачи');
   }
   if (rule.deload_volume_percent != null) {
     parts.push(`объём разгрузки ${rule.deload_volume_percent}%`);
@@ -226,7 +256,11 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 function rowExerciseLabel(row: ProgramImport['rows'][number]): string {
-  return row.resolved_exercise_title || row.exercise_name || row.exercise_slug || 'Не сопоставлено';
+  return row.resolved_exercise_title || row.exercise_name || 'Упражнение не сопоставлено';
+}
+
+function importLayoutLabel(layoutVersion: string | null | undefined): string {
+  return layoutVersion ? (importLayoutLabels[layoutVersion] ?? 'табличный формат') : 'определяется';
 }
 
 export function ProgramImportPanel({ onImported }: { onImported?: () => void } = {}) {
@@ -411,15 +445,14 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
     setError(null);
     try {
       const result = await apiFile(`/api/v1/programs/imports/template.${format}`);
-      downloadBlob(result.blob, result.filename ?? `yfc-program-template-v1.${format}`);
+      downloadBlob(result.blob, result.filename ?? `шаблон-программы.${format}`);
     } catch (reason) {
       setError(formatError(reason));
     }
   };
 
   const exerciseOptions = (row: ProgramImport['rows'][number]) => {
-    type ExerciseOption = Pick<Exercise, 'id' | 'title' | 'slug' | 'metric_type'>;
-    const byId = new Map<number, ExerciseOption>();
+    const byId = new Map<number, ExercisePickerExercise>();
     for (const candidate of row.candidates ?? []) {
       byId.set(candidate.exercise_id, {
         id: candidate.exercise_id,
@@ -478,7 +511,9 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
         <section className="program-import-preview" aria-labelledby="program-import-preview-title">
           <div className="program-import-preview__head">
             <div>
-              <span className="eyebrow">Предпросмотр · {preview.source_format.toUpperCase()}</span>
+              <span className="eyebrow">
+                Предпросмотр · {importFormatLabels[preview.source_format]}
+              </span>
               <h3 id="program-import-preview-title">Проверьте план перед сохранением</h3>
             </div>
             <Badge tone={preview.summary.blocking_issue_count ? 'danger' : 'success'}>
@@ -721,7 +756,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
           )}
 
           <p className="muted program-import-layout-summary">
-            Формат: {preview.layout_version ?? 'определяется'} · Дней:{' '}
+            Формат: {importLayoutLabel(preview.layout_version)} · Дней:{' '}
             {new Set(preview.rows.map((row) => row.day_number).filter((day) => day != null)).size}
             {preview.duration_weeks ? ` · Недель: ${preview.duration_weeks}` : ''}
           </p>
@@ -735,7 +770,7 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
               <p>
                 {preview.ai.status === 'proposed'
                   ? `Предложений: ${preview.ai.proposal_count}. Они привязаны к источнику и не подтверждают импорт автоматически.`
-                  : 'Документ не отправлялся внешнему provider. Используйте детерминированные значения и ручное разрешение.'}
+                  : 'Документ не передавался внешнему сервису. Используйте детерминированные значения и ручное разрешение.'}
               </p>
               {preview.ai.conflict_count > 0 && (
                 <small>Отклонено конфликтующих предложений: {preview.ai.conflict_count}</small>
@@ -778,30 +813,23 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                       {row.match_status === 'matched' ? (
                         <strong>{rowExerciseLabel(row)}</strong>
                       ) : (
-                        <Select
-                          aria-label={`Упражнение для строки ${row.row_number}`}
-                          value={String(selectedExercises[row.row_number] ?? '')}
-                          onChange={(event) =>
+                        <SearchableExercisePicker
+                          ariaLabel={`Упражнение для строки ${row.row_number}`}
+                          exercises={exerciseOptions(row)}
+                          portalResults
+                          value={selectedExercises[row.row_number] ?? ''}
+                          onChange={(exerciseId) =>
                             setSelectedExercises((current) => ({
                               ...current,
-                              [row.row_number]: event.target.value
-                                ? Number(event.target.value)
-                                : '',
+                              [row.row_number]: exerciseId,
                             }))
                           }
-                        >
-                          <option value="">Выберите упражнение</option>
-                          {exerciseOptions(row).map((exercise) => (
-                            <option value={exercise.id} key={exercise.id}>
-                              {exercise.title}
-                            </option>
-                          ))}
-                        </Select>
+                        />
                       )}
                       {row.ai_rerank_reason && (
                         <small className="program-import-ai-evidence">
-                          AI предложил порядок candidates: {row.ai_rerank_reason} Только ручной
-                          выбор подтверждает упражнение.
+                          AI предложил порядок вариантов: {row.ai_rerank_reason} Только ручной выбор
+                          подтверждает упражнение.
                         </small>
                       )}
                       {row.exercise_name && row.match_status === 'matched' && (
@@ -812,8 +840,9 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                           className="program-import-ai-evidence"
                           key={`${proposal.evidence_id}-${index}`}
                         >
-                          AI-подсказка: {proposal.field} = {proposal.value} ·{' '}
-                          {proposal.applied ? 'применена' : 'только подсказка'}
+                          AI-подсказка:{' '}
+                          {aiProposalFieldLabels[proposal.field] ?? 'параметр программы'} ={' '}
+                          {proposal.value} · {proposal.applied ? 'применена' : 'только подсказка'}
                           <br />
                           Источник: {proposal.source_location} — {proposal.source_text}
                         </small>

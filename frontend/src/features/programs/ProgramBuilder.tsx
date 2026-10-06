@@ -1,10 +1,10 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
-import { difficultyLabels, orderExercisesForLevel } from './exerciseOrdering';
+import { orderExercisesForLevel } from './exerciseOrdering';
 import { buildStrengthPreset, resolveStrengthRule, type StrengthSplit } from './strengthPresets';
 import { usePersistentState } from '../../shared/storage';
 import { programDraftStorageKey } from '../../shared/userScopedStorage';
@@ -13,9 +13,8 @@ import { AppLink } from '../../shared/navigation/router';
 import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
 import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
-import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
-import { normalizeExerciseSearchText, rankExercisesForSearch } from '../exercises/exerciseSearch';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
+import { SearchableExercisePicker } from './SearchableExercisePicker';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { Icon } from '../../shared/ui/Icon';
 import {
@@ -70,150 +69,6 @@ function weekdayFromDate(value: string): number {
 function scheduleForDays(dayCount: number, startDate: string): number[] {
   const firstWeekday = weekdayFromDate(startDate);
   return Array.from({ length: dayCount }, (_, index) => (firstWeekday + index) % 7);
-}
-
-function ExercisePicker({
-  exercises,
-  level,
-  value,
-  onChange,
-  onOpenGuide,
-}: {
-  exercises: Exercise[];
-  level: ProgramTemplateCreate['level'];
-  value: number;
-  onChange: (id: number) => void;
-  onOpenGuide: (exercise: Exercise) => void;
-}) {
-  const selected = exercises.find((exercise) => exercise.id === value);
-  const resultsId = useId();
-  const [query, setQuery] = useState(selected?.title ?? '');
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const results = useMemo(() => {
-    const ranked = rankExercisesForSearch(exercises, query);
-    return normalizeExerciseSearchText(query) ? ranked : orderExercisesForLevel(ranked, level);
-  }, [exercises, level, query]);
-
-  const currentActiveIndex = Math.min(activeIndex, Math.max(0, results.length - 1));
-  const chooseExercise = (exercise: Exercise) => {
-    onChange(exercise.id);
-    setQuery(exercise.title);
-    setOpen(false);
-  };
-
-  return (
-    <div
-      className="exercise-picker"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
-      }}
-    >
-      <input
-        type="search"
-        role="combobox"
-        aria-label="Поиск упражнения"
-        aria-expanded={open}
-        aria-controls={resultsId}
-        aria-activedescendant={
-          open && results[currentActiveIndex]
-            ? `${resultsId}-${results[currentActiveIndex].id}`
-            : undefined
-        }
-        autoComplete="off"
-        enterKeyHint="search"
-        value={query}
-        placeholder="Начните вводить название"
-        onFocus={() => setOpen(true)}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setActiveIndex(0);
-          setOpen(true);
-          if (value) onChange(0);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            setOpen(true);
-            setActiveIndex((index) => Math.min(results.length - 1, index + 1));
-          } else if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            setOpen(true);
-            setActiveIndex((index) => Math.max(0, index - 1));
-          } else if (event.key === 'Enter' && open && results[currentActiveIndex]) {
-            event.preventDefault();
-            chooseExercise(results[currentActiveIndex]);
-          } else if (event.key === 'Escape') {
-            setOpen(false);
-          }
-        }}
-      />
-      {open && (
-        <div className="exercise-picker__results">
-          {results.length ? (
-            <>
-              <div className="exercise-picker__options" id={resultsId} role="listbox">
-                {results.map((exercise) => (
-                  <button
-                    type="button"
-                    role="option"
-                    id={`${resultsId}-${exercise.id}`}
-                    tabIndex={-1}
-                    aria-selected={exercise.id === value}
-                    className="exercise-picker__option"
-                    key={exercise.id}
-                    onClick={() => chooseExercise(exercise)}
-                  >
-                    <ExerciseMediaAsset
-                      animationUrl={exercise.media_animation_url}
-                      alt={`${exercise.title}: изображение упражнения`}
-                      className="exercise-picker__option-thumb"
-                      thumbnailUrl={exercise.media_thumbnail_url}
-                      variant="thumbnail"
-                    />
-                    <span className="exercise-picker__option-copy">
-                      <strong>{exercise.title}</strong>
-                      <span className="exercise-picker__meta">
-                        <small>
-                          {exercise.primary_muscle || 'Все мышцы'} ·{' '}
-                          {exercise.equipment || 'Без оборудования'}
-                        </small>
-                        <span className="badge">{difficultyLabels[exercise.difficulty_level]}</span>
-                        {exercise.is_custom && <span className="badge">Своё</span>}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="exercise-picker__guides" aria-label="Техника упражнений" role="group">
-                {results.map((exercise) => (
-                  <button
-                    type="button"
-                    className="text-button exercise-picker__guide"
-                    aria-label={`${exercise.has_guide ? 'Техника' : 'Подробнее'}: ${exercise.title}`}
-                    key={exercise.id}
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      onOpenGuide(exercise);
-                    }}
-                    onClick={(event) => {
-                      if (event.detail === 0) onOpenGuide(exercise);
-                    }}
-                  >
-                    {exercise.has_guide ? 'Техника' : 'Подробнее'}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <span className="exercise-picker__empty" id={resultsId} role="status">
-              Ничего не найдено
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export function ProgramBuilder({
@@ -299,6 +154,10 @@ export function ProgramBuilder({
     queryKey: ['exercises'],
     queryFn: () => api<Exercise[]>('/api/v1/programs/exercises'),
   });
+  const orderedExercises = useMemo(
+    () => orderExercisesForLevel(exercises.data ?? [], level),
+    [exercises.data, level],
+  );
 
   const effectiveScheduleWeekdays =
     scheduleWeekdays.length === days.length
@@ -689,17 +548,18 @@ export function ProgramBuilder({
                         </button>
                       </span>
                     </span>
-                    <ExercisePicker
+                    <SearchableExercisePicker
                       key={`${exerciseIndex}-${item.exercise_id}`}
-                      exercises={exercises.data ?? []}
-                      level={level}
+                      exercises={orderedExercises}
                       value={item.exercise_id}
+                      clearValue={0}
                       onOpenGuide={(exercise) =>
                         setGuide({ id: exercise.id, title: exercise.title })
                       }
                       onChange={(exerciseId) => {
+                        const nextExerciseId = typeof exerciseId === 'number' ? exerciseId : 0;
                         const selected = exercises.data?.find(
-                          (exercise) => exercise.id === exerciseId,
+                          (exercise) => exercise.id === nextExerciseId,
                         );
                         updateDay(dayIndex, {
                           ...day,
@@ -708,7 +568,7 @@ export function ProgramBuilder({
                             if (selected?.metric_type === 'cardio') {
                               return {
                                 ...row,
-                                exercise_id: exerciseId,
+                                exercise_id: nextExerciseId,
                                 prescribed_sets: null,
                                 prescribed_reps: null,
                                 prescribed_duration_minutes: row.prescribed_duration_minutes ?? 30,
@@ -718,7 +578,7 @@ export function ProgramBuilder({
                             }
                             return {
                               ...row,
-                              exercise_id: exerciseId,
+                              exercise_id: nextExerciseId,
                               prescribed_sets: row.prescribed_sets ?? 3,
                               prescribed_reps: row.prescribed_reps || '8-12',
                               prescribed_duration_minutes: null,

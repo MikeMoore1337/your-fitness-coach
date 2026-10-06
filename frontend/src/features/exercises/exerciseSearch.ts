@@ -1,6 +1,17 @@
-import type { Exercise } from '../../shared/api/types';
-
 const punctuation = /[^\p{L}\p{N}]+/gu;
+
+export type ExerciseSearchItem = {
+  id: number;
+  title: string;
+  slug?: string | null;
+  canonical_slug?: string | null;
+  primary_muscle?: string | null;
+  equipment?: string | null;
+  aliases?: string[] | null;
+  machine_variant_tags?: string[] | null;
+  execution_variant_tags?: string[] | null;
+  alternatives?: Array<{ title: string }> | null;
+};
 
 export function normalizeExerciseSearchText(value: string): string {
   return value
@@ -12,19 +23,19 @@ export function normalizeExerciseSearchText(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
-type SearchGroup = {
-  exercise: Exercise;
+type SearchGroup<T extends ExerciseSearchItem> = {
+  exercise: T;
   titles: string[];
   aliases: string[];
   haystack: string;
 };
 
-function canonicalKey(exercise: Exercise): string {
+function canonicalKey(exercise: ExerciseSearchItem): string {
   return exercise.canonical_slug ?? exercise.slug ?? `exercise-${exercise.id}`;
 }
 
-function buildSearchGroups(exercises: Exercise[]): SearchGroup[] {
-  const grouped = new Map<string, Exercise[]>();
+function buildSearchGroups<T extends ExerciseSearchItem>(exercises: T[]): SearchGroup<T>[] {
+  const grouped = new Map<string, T[]>();
   for (const exercise of exercises) {
     const key = canonicalKey(exercise);
     grouped.set(key, [...(grouped.get(key) ?? []), exercise]);
@@ -54,7 +65,10 @@ function buildSearchGroups(exercises: Exercise[]): SearchGroup[] {
   });
 }
 
-function searchRank(group: SearchGroup, query: string): number | null {
+function searchRank<T extends ExerciseSearchItem>(
+  group: SearchGroup<T>,
+  query: string,
+): number | null {
   if (!query) return 0;
   if (group.titles.includes(query)) return 0;
   if (group.aliases.includes(query)) return 1;
@@ -65,11 +79,14 @@ function searchRank(group: SearchGroup, query: string): number | null {
   return tokens.every((token) => group.haystack.includes(token)) ? 4 : null;
 }
 
-export function rankExercisesForSearch(exercises: Exercise[], rawQuery: string): Exercise[] {
+export function rankExercisesForSearch<T extends ExerciseSearchItem>(
+  exercises: T[],
+  rawQuery: string,
+): T[] {
   const query = normalizeExerciseSearchText(rawQuery);
   return buildSearchGroups(exercises)
     .map((group) => ({ group, rank: searchRank(group, query) }))
-    .filter((item): item is { group: SearchGroup; rank: number } => item.rank !== null)
+    .filter((item): item is { group: SearchGroup<T>; rank: number } => item.rank !== null)
     .sort(
       (left, right) =>
         left.rank - right.rank ||
@@ -78,6 +95,9 @@ export function rankExercisesForSearch(exercises: Exercise[], rawQuery: string):
     .map((item) => item.group.exercise);
 }
 
-export function matchesExerciseSearch(exercise: Exercise, rawQuery: string): boolean {
+export function matchesExerciseSearch<T extends ExerciseSearchItem>(
+  exercise: T,
+  rawQuery: string,
+): boolean {
   return rankExercisesForSearch([exercise], rawQuery).length > 0;
 }

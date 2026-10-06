@@ -197,7 +197,8 @@
   text-transform: uppercase;
 }
 
-.program-import-table select {
+.program-import-table .exercise-picker,
+.program-import-table .exercise-picker > input {
   min-width: 210px;
 }
 
