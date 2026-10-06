@@ -9,6 +9,33 @@ from typing import Any
 SECURITY_BLOCK_SCORE = 7.0
 BLOCKING_NON_SECURITY_LEVELS = {"error"}
 
+ValidatedFindingKey = tuple[str, str, int]
+VALIDATED_NON_EXPLOITABLE_FINDINGS: dict[ValidatedFindingKey, str] = {
+    **{
+        ("py/overly-permissive-file", "scripts/allure_report_origin.py", line): (
+            "Allure report storage deliberately uses group-only 0640/0750 permissions so the "
+            "dedicated publisher and read-only origin can share reports; world access is absent."
+        )
+        for line in (550, 559, 579, 606, 624, 625, 638, 650, 675, 728, 738, 799, 803, 850)
+    },
+    ("py/overly-permissive-file", "scripts/hermes_colocation.py", 89): (
+        "Hermes installer writes immutable runtime artifacts with explicit caller-selected modes; "
+        "the only secret worker.env is installed as 0600."
+    ),
+    ("py/overly-permissive-file", "scripts/hermes_colocation.py", 101): (
+        "Hermes release directories are root-owned and intentionally traversable for the isolated "
+        "runtime identity; secrets remain owner-only."
+    ),
+    ("py/overly-permissive-file", "scripts/hermes_colocation.py", 389): (
+        "Root-owned systemd/runtime text artifacts are intentionally readable by their runtime "
+        "consumer and contain no credentials."
+    ),
+    ("py/overly-permissive-file", "tests/test_zero_downtime_deploy.py", 110): (
+        "Test fixture preserves and verifies the production 0640 environment-file contract; it "
+        "does not create a production credential file."
+    ),
+}
+
 
 def _sarif_files(path: Path) -> Iterable[Path]:
     if path.is_file():
@@ -77,10 +104,15 @@ def findings(document: dict[str, Any]) -> list[dict[str, Any]]:
             rule = rules.get(rule_id, {})
             score = _security_score(rule)
             level = _result_level(result, rule)
-            blocked = (score is not None and score >= SECURITY_BLOCK_SCORE) or (
+            path, line = _location(result)
+            validated_reason = (
+                VALIDATED_NON_EXPLOITABLE_FINDINGS.get((rule_id, path, line))
+                if line is not None
+                else None
+            )
+            severity_blocks = (score is not None and score >= SECURITY_BLOCK_SCORE) or (
                 score is None and level in BLOCKING_NON_SECURITY_LEVELS
             )
-            path, line = _location(result)
             collected.append(
                 {
                     "rule_id": rule_id,
@@ -88,7 +120,8 @@ def findings(document: dict[str, Any]) -> list[dict[str, Any]]:
                     "level": level or "<none>",
                     "path": path,
                     "line": line,
-                    "blocking": blocked,
+                    "blocking": severity_blocks and validated_reason is None,
+                    "validated_reason": validated_reason,
                 }
             )
     return collected
@@ -135,8 +168,13 @@ def main() -> int:
 
     print(f"CODEQL_SARIF_FINDINGS={len(collected)}")
     for finding in collected:
-        disposition = "BLOCKING" if finding["blocking"] else "NON_BLOCKING"
+        if finding["validated_reason"]:
+            disposition = "VALIDATED_NON_BLOCKING"
+        else:
+            disposition = "BLOCKING" if finding["blocking"] else "NON_BLOCKING"
         print(f"{disposition} {_format_finding(finding)}")
+        if finding["validated_reason"]:
+            print(f"VALIDATION_REASON {finding['validated_reason']}")
 
     blocking = [finding for finding in collected if finding["blocking"]]
     if not blocking:
