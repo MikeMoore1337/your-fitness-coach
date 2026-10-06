@@ -2769,7 +2769,7 @@ def _prepare_subsequent_production_reconciliation(
         github.files[number] = [{"filename": filename}]
         github.checks[head_sha_for_pr] = [_success_check(head_sha_for_pr)]
         release_run_id = 9100 + index
-        if classification in {"controller", "controller_merge"}:
+        if classification in {"controller", "controller_merge", "task_no_deploy"}:
             github.workflow_runs_by_sha[commit_sha] = [
                 {
                     "id": release_run_id,
@@ -3234,6 +3234,61 @@ def test_reconcile_subsequent_production_accepts_controller_only_master_advance(
     assert (
         reconciliation["intervening_commits"][0]["release"]["application_deploy_job"] == "skipped"
     )
+
+
+def test_reconcile_subsequent_production_accepts_verified_no_deploy_task_tail(
+    repository: tuple[Path, Any],
+) -> None:
+    _, _, controller, _, _, _, _ = _prepare_subsequent_production_reconciliation(
+        repository,
+        [
+            ("product", "475", "backend/news_one.py", True),
+            ("task_no_deploy", "735", "scripts/codeql_sarif_gate.py", False),
+            ("controller", "", "scripts/task_session.py", False),
+        ],
+    )
+
+    reconciliation = controller.reconcile_subsequent_production("415", owner_authorize=True)
+    chain = reconciliation["intervening_commits"]
+
+    assert [item["classification"] for item in chain] == [
+        "product",
+        "task-no-deploy",
+        "controller",
+    ]
+    assert chain[1]["task_id"] == "735"
+    assert chain[1]["release"]["result"] == "verified-no-deploy"
+    assert chain[1]["release"]["application_deploy_job"] == "skipped"
+    assert reconciliation["current_production"]["deployed_sha"] == chain[0]["commit_sha"]
+
+
+@pytest.mark.parametrize("mutation", ["runtime_path", "missing_skip_evidence"])
+def test_reconcile_subsequent_production_rejects_unproven_no_deploy_task_tail(
+    repository: tuple[Path, Any],
+    mutation: str,
+) -> None:
+    path = "backend/runtime_after_deploy.py" if mutation == "runtime_path" else "scripts/codeql_sarif_gate.py"
+    _, _, controller, _, _, _, records = _prepare_subsequent_production_reconciliation(
+        repository,
+        [
+            ("product", "475", "backend/news_one.py", True),
+            ("task_no_deploy", "735", path, False),
+        ],
+    )
+    github = controller.github
+    assert isinstance(github, FakeGitHub)
+    if mutation == "missing_skip_evidence":
+        run_id = records[1]["release_run_id"]
+        github.workflow_jobs_by_run[run_id] = [
+            {"name": "Authorize exact merged master revision", "conclusion": "success"},
+            {"name": "Deploy immutable tested bundle", "conclusion": "success"},
+        ]
+
+    with pytest.raises(
+        task_session.TaskSessionError,
+        match="product commits after the latest production deployment",
+    ):
+        controller.reconcile_subsequent_production("415", owner_authorize=True)
 
 
 def test_reconcile_subsequent_production_preserves_original_and_records_product_deployment(
