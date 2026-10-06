@@ -9724,14 +9724,9 @@ class TaskController:
             raise TaskSessionError(
                 "Historical production reconciliation requires one unambiguous task branch/worktree"
             )
-        if (
-            not worktree_path.is_dir()
-            or matches[0].branch != branch
-            or matches[0].head != final_head_sha
-            or self.repository.ref(branch) != final_head_sha
-        ):
+        if not worktree_path.is_dir() or matches[0].branch != branch:
             raise TaskSessionError(
-                "Historical production task branch/worktree does not match the final task PR head"
+                "Historical production task branch/worktree does not match the recovery lease"
             )
         if self.repository.status(worktree_path) or self.repository.operation_issues(worktree_path):
             raise TaskSessionError(
@@ -9740,6 +9735,10 @@ class TaskController:
         if self.repository.unique_commits(branch):
             raise TaskSessionError(
                 "Historical production reconciliation refuses unique local task commits"
+            )
+        if matches[0].head != final_head_sha or self.repository.ref(branch) != final_head_sha:
+            raise TaskSessionError(
+                "Historical production task branch/worktree does not match the final task PR head"
             )
 
         try:
