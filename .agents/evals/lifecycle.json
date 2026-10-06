@@ -59,6 +59,16 @@
         "tests/test_task_session.py::test_guard_interrupted_resume_recovery_budget_is_exhausted_after_claim",
         "tests/test_task_session.py::test_direct_guard_interrupted_resume_recovers_without_legacy_launch_audit"
       ]
+    },
+    {
+      "id": "historical-production-recovery",
+      "kind": "regression",
+      "description": "Historically deployed product tasks can be reconciled after independently verified master drift without old-SHA redeploy or provenance rewrite.",
+      "pytest_nodeids": [
+        "tests/test_task_session.py::test_reconcile_historical_production_success_accepts_task_746_shape_and_finishes",
+        "tests/test_task_session.py::test_reconcile_historical_production_success_requires_owner_authorization",
+        "tests/test_task_session.py::test_reconcile_historical_production_success_rejects_master_race"
+      ]
     }
   ]
 }
