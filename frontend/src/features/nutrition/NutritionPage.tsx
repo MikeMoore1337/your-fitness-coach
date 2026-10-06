@@ -5,6 +5,7 @@ import { NutritionDiary } from './NutritionDiary';
 import { NutritionForm } from './NutritionForm';
 import type { MealType } from './FoodPickerDialog';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
+import { MealPlanner } from './MealPlanner';
 
 export function NutritionPage({
   initial,
@@ -59,6 +60,9 @@ export function NutritionPage({
         readOnlyEntries={readOnlyEntries}
         timeZone={timeZone}
       />
+      {!demoSafeMode && (
+        <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+      )}
       <details
         id="nutrition-target-settings"
         className="nutrition-target-settings"
