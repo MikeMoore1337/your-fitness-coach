@@ -64,6 +64,14 @@ Lifecycle разделён на две coordination boundary:
   worktree после проверки; уже наблюдавшийся автоматический deployment только фиксируется в
   evidence и не запускается повторно. Active/dirty/ambiguous task remains blocked.
   Production-required task не может пройти этот путь.
+- Owner-authorized `reconcile-historical-production-success` — отдельный recovery-переход для
+  product-task, чей exact merge уже успешно deployed, но terminal closeout был пропущен до
+  независимого protected-master drift. Он принимает только `human-required` lease, сохраняет
+  исходный ready/delivery anchor неизменным, повторно доказывает bounded same-task commits до
+  финального PR head, exact-head CI, exact historical deployment, каждый subsequent first-parent
+  PR/release/deployment, отсутствие revert task implementation/migration и clean branch/worktree
+  без unique commits. Он не выполняет redeploy и после записи `production-success` оставляет
+  terminal cleanup только `finish`.
 - `delivery lane`: один минимальный shared owner/queue в Git common directory. Только её owner
   может выполнить `refresh/rebase` относительно latest `origin/master`, current-base/provenance
   check, PR/CI, merge, product-task production deploy, smoke и terminal closeout. Owner сохраняется до завершения
