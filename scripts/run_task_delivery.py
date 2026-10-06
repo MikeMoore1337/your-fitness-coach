@@ -70,7 +70,9 @@ try:
         TaskSessionError,
         canonical_lifecycle_state,
         find_task_document,
+        materialize_task_document,
         task_id_from_branch,
+        validate_task_identity,
     )
     from scripts.worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 except ModuleNotFoundError:
@@ -109,7 +111,9 @@ except ModuleNotFoundError:
         TaskSessionError,
         canonical_lifecycle_state,
         find_task_document,
+        materialize_task_document,
         task_id_from_branch,
+        validate_task_identity,
     )
     from worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
 
@@ -1885,6 +1889,7 @@ def _task_issue_contracts(
         normalized_contract = {
             **contract,
             "issue_number": issue_number,
+            "issue_title": str(issue.get("title", "")).strip(),
             "issue_state": str(issue.get("state", "")).lower(),
             "latest_control_state": latest,
         }
@@ -1980,6 +1985,31 @@ def _queue_candidates() -> list[dict[str, Any]]:
         if _is_implementation_blocking_lease(item)
     }
     order = _read_task_order(root)
+    contracts = _task_issue_contracts(terminal_task_ids=completed)
+    initialize = getattr(controller.store, "initialize", None)
+    state_lock = getattr(controller.store, "lock", None)
+    if callable(initialize) and callable(state_lock):
+        initialize()
+        with state_lock():
+            for contract in contracts.values():
+                if (
+                    isinstance(contract, Mapping)
+                    and str(contract.get("issue_state", "")).lower() == "open"
+                    and not contract.get("legacy_source_spec_missing")
+                ):
+                    try:
+                        materialize_task_document(
+                            root,
+                            contract,
+                            issue_title=str(contract.get("issue_title", "")),
+                            issue_number=contract.get("issue_number")
+                            if isinstance(contract.get("issue_number"), int)
+                            else None,
+                        )
+                    except TaskSessionError as error:
+                        raise DeliveryError(
+                            f"Task contract materialization failed: {error}"
+                        ) from error
     task_roots = (
         tasks_root,
         root / "codex-backlog" / "telegram-core-release-backlog" / "tasks",
@@ -2005,7 +2035,6 @@ def _queue_candidates() -> list[dict[str, Any]]:
             item.task_id,
         )
     )
-    contracts = _task_issue_contracts(terminal_task_ids=completed)
     result: list[dict[str, Any]] = []
     for document in documents:
         task_id = document.task_id
@@ -2059,6 +2088,13 @@ def _queue_candidates() -> list[dict[str, Any]]:
                 )
                 break
             continue
+        if hasattr(document, "contract"):
+            try:
+                validate_task_identity(root, task_id, document, contract)
+            except TaskSessionError as error:
+                raise DeliveryError(
+                    f"Task {task_id} identity validation failed: {error}"
+                ) from error
         if latest_state and latest_state != "queued":
             result.append(
                 {

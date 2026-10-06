@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -67,6 +68,202 @@ def _write_task(
         encoding="utf-8",
     )
     return path
+
+
+def _issue_contract(task_id: str, source_spec: str) -> dict[str, Any]:
+    return {
+        "version": 1,
+        "task_id": task_id,
+        "scope": "bounded controller identity fixture",
+        "acceptance": ["identity remains deterministic"],
+        "dependencies": [],
+        "owner_gate": "explicit_launch",
+        "risk_lane": "GREEN",
+        "source_spec": source_spec,
+        "issue_state": "queued",
+    }
+
+
+def test_issue_contract_materialization_is_idempotent_and_preserves_logical_identity(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _ = repository
+    tasks_root = root / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True, exist_ok=True)
+    (tasks_root / "README.md").write_text("# Tasks\n", encoding="utf-8")
+    contract = _issue_contract("749", "product-v10:A4:weekly-planning-review")
+
+    first = task_session.materialize_task_document(
+        root, contract, issue_title="[Task 749] Weekly planning review", issue_number=749
+    )
+    second = task_session.materialize_task_document(
+        root, {**contract, "issue_state": "in_progress"}, issue_title="changed title"
+    )
+
+    assert first.path == second.path
+    assert first.source_spec == contract["source_spec"]
+    assert first.spec_fingerprint == task_session.task_contract_fingerprint(contract)
+    assert len(list(tasks_root.glob("749-*.md"))) == 1
+    assert "`749`" in (tasks_root / "README.md").read_text(encoding="utf-8")
+
+    with pytest.raises(task_session.TaskSessionError, match="spec_fingerprint"):
+        task_session.materialize_task_document(
+            root, {**contract, "scope": "changed contract"}, issue_title="changed"
+        )
+
+
+def test_identity_validator_accepts_legacy_path_source_and_rejects_duplicates(
+    repository: tuple[Path, Any],
+) -> None:
+    root, _ = repository
+    legacy = _write_task(root, "750", "legacy-task")
+    contract = _issue_contract("750", "codex-backlog/tasks/750-legacy-task.md")
+    document = task_session.find_task_document(root, "750")
+    identity = task_session.validate_task_identity(root, "750", document, contract)
+
+    assert identity["canonical_task_path"] == "codex-backlog/tasks/750-legacy-task.md"
+    duplicate = legacy.with_name("750-duplicate.md")
+    duplicate.write_text(legacy.read_text(encoding="utf-8"), encoding="utf-8")
+    with pytest.raises(task_session.TaskSessionError, match=r"Multiple|Expected one"):
+        task_session.find_task_document(root, "750")
+
+
+def test_github_api_retries_only_bounded_transient_reads(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, git_repository = repository
+    github = task_session.GitHubClient(git_repository, "owner/repository")
+    calls = 0
+    sleeps: list[float] = []
+
+    def fake_run(
+        args: Sequence[str],
+        *,
+        cwd: Path,
+        check: bool = True,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        del args, cwd, check, env
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise task_session.TaskSessionError("TLS handshake timeout")
+        return subprocess.CompletedProcess([], 0, stdout='{"ok": true}', stderr="")
+
+    monkeypatch.setattr(task_session, "_run", fake_run)
+    monkeypatch.setattr(task_session.time, "sleep", sleeps.append)
+
+    assert github.api("pulls/776") == {"ok": True}
+    assert calls == 3
+    assert sleeps == [1.0, 2.0]
+
+
+def test_github_api_does_not_retry_permission_failures(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, git_repository = repository
+    github = task_session.GitHubClient(git_repository, "owner/repository")
+    calls = 0
+    sleeps: list[float] = []
+
+    def fake_run(
+        args: Sequence[str],
+        *,
+        cwd: Path,
+        check: bool = True,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        del args, cwd, check, env
+        nonlocal calls
+        calls += 1
+        raise task_session.TaskSessionError("HTTP 403: Forbidden")
+
+    monkeypatch.setattr(task_session, "_run", fake_run)
+    monkeypatch.setattr(task_session.time, "sleep", sleeps.append)
+
+    with pytest.raises(task_session.TaskSessionError, match="HTTP 403"):
+        github.api("issues/776")
+    assert calls == 1
+    assert sleeps == []
+
+
+def test_github_api_transient_retry_budget_is_bounded(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, git_repository = repository
+    github = task_session.GitHubClient(git_repository, "owner/repository")
+    calls = 0
+    sleeps: list[float] = []
+
+    def fake_run(
+        args: Sequence[str],
+        *,
+        cwd: Path,
+        check: bool = True,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        del args, cwd, check, env
+        nonlocal calls
+        calls += 1
+        raise task_session.TaskSessionError("connection reset by peer")
+
+    monkeypatch.setattr(task_session, "_run", fake_run)
+    monkeypatch.setattr(task_session.time, "sleep", sleeps.append)
+
+    with pytest.raises(task_session.TaskSessionError, match="connection reset"):
+        github.api("issues/776")
+    assert calls == 3
+    assert sleeps == [1.0, 2.0]
+
+
+def test_preimplementation_identity_accepts_materialized_logical_source(
+    repository: tuple[Path, Any],
+) -> None:
+    root, git_repository = repository
+    tasks_root = root / "codex-backlog" / "tasks"
+    tasks_root.mkdir(parents=True, exist_ok=True)
+    (tasks_root / "README.md").write_text("# Tasks\n", encoding="utf-8")
+    contract = _issue_contract("752", "product-v10:B3:coach-review-workspace")
+    document = task_session.materialize_task_document(
+        root, contract, issue_title="[Task 752] Coach review workspace", issue_number=752
+    )
+    github = FakeGitHub(git_repository.ref("origin/master"))
+    github.issues[752] = {
+        "number": 752,
+        "state": "open",
+        "user": {"login": "owner"},
+        "body": task_session.render_task_contract({**contract, "issue_state": "in_progress"}),
+    }
+    controller = task_session.TaskController(git_repository, github=github)
+    started = controller.start("752", owner_launch=True, session_label="identity", offline=True)
+    lease = started["lease"]
+    github.issue_comment_map[752] = [
+        {
+            "id": 1,
+            "created_at": "2026-10-06T00:00:00Z",
+            "user": {"login": "owner"},
+            "body": render_control_state_comment(
+                control_state_payload(
+                    task_id="752",
+                    state="human_required",
+                    issue_number=752,
+                    branch=str(lease["branch"]),
+                    blocker="worker stopped before implementation during bootstrap",
+                )
+            ),
+        }
+    ]
+    state = controller._preimplementation_issue_state(
+        "752",
+        752,
+        str(lease["branch"]),
+        document,
+        lease,
+    )
+
+    assert state["state"] == "human_required"
+    assert lease["source_spec"] == contract["source_spec"]
+    assert lease["spec_fingerprint"] == task_session.task_contract_fingerprint(contract)
 
 
 @pytest.fixture
@@ -8235,6 +8432,45 @@ def test_finish_records_windows_residue_without_blocking_terminal_closeout(
     finished = controller.store.read_json(controller.store.history / "task-207F.json")
     assert finished["cleanup"]["cleanup_pending"] is False
     assert finished["cleanup"]["physical_cleanup"]["status"] == "completed"
+
+
+def test_optional_finished_cleanup_metadata_failure_does_not_block_new_task(
+    repository: tuple[Path, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, git_repository = repository
+    _write_task(root, "751", "next-task")
+    controller = task_session.TaskController(
+        git_repository, github=FakeGitHub(git_repository.ref("origin/master"))
+    )
+    controller.store.initialize()
+    history_path = controller.store.history / "task-750.json"
+    task_session.StateStore.replace_json(
+        history_path,
+        {
+            "task_id": "750",
+            "state": "finished",
+            "cleanup": {
+                "cleanup_pending": True,
+                "worktree": str(root / ".artifacts" / "worktrees" / "750-residue"),
+            },
+        },
+    )
+    original_replace = task_session.StateStore.replace_json
+
+    def fail_finished_history(path: Path, payload: object) -> None:
+        if path == history_path:
+            raise PermissionError("simulated locked finished history")
+        original_replace(path, payload)
+
+    monkeypatch.setattr(task_session.StateStore, "replace_json", fail_finished_history)
+
+    result = controller.start(
+        "751", owner_launch=True, session_label="cleanup-isolation", offline=True
+    )
+
+    retry = next(item for item in result["cleanup_retries"] if item["task_id"] == "750")
+    assert retry["metadata_write"] == "deferred"
+    assert result["lease"]["task_id"] == "751"
 
 
 def test_finish_cleans_only_delivered_task_and_preserves_next_delivery_task(

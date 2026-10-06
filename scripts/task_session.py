@@ -40,7 +40,10 @@ try:
         latest_control_state,
         normalize_github_login,
         normalize_owner_gate,
+        normalize_task_contract,
         parse_task_contract,
+        render_task_contract,
+        task_contract_fingerprint,
         task_risk_lane,
     )
     from scripts.worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
@@ -55,7 +58,10 @@ except ModuleNotFoundError:
         latest_control_state,
         normalize_github_login,
         normalize_owner_gate,
+        normalize_task_contract,
         parse_task_contract,
+        render_task_contract,
+        task_contract_fingerprint,
         task_risk_lane,
     )
     from worker_guard import GuardLimits, WorkerEventGuard, WorkerGuardConfigError
@@ -585,6 +591,9 @@ class TaskDocument:
     concurrency_class: str
     owner_gate: str
     integration_policy: str
+    source_spec: str | None = None
+    spec_fingerprint: str | None = None
+    contract: dict[str, Any] | None = None
 
 
 class GitRepository:
@@ -806,7 +815,7 @@ def _metadata_block(text: str) -> dict[str, str]:
     return result
 
 
-def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
+def _task_document_candidates(canonical_root: Path, task_id: str) -> list[Path]:
     expected = normalize_task_id(task_id)
     roots = (
         canonical_root / "codex-backlog" / "tasks",
@@ -821,6 +830,49 @@ def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
                 for path in root.glob(f"{expected}-*.md")
                 if "done" not in path.relative_to(root).parts
             )
+    return [path.resolve() for path in matches]
+
+
+def _task_contract_from_document(
+    text: str, *, task_id: str, path: Path, metadata: Mapping[str, str]
+) -> tuple[dict[str, Any] | None, str | None, str | None]:
+    if TASK_CONTRACT_MARKER not in text:
+        if metadata.get("source_spec") or metadata.get("spec_fingerprint"):
+            raise TaskSessionError(
+                f"Task document metadata declares contract identity without {TASK_CONTRACT_MARKER}: {path}"
+            )
+        return None, None, None
+    try:
+        contract = parse_task_contract(text)
+    except IssueWorkflowError as error:
+        raise TaskSessionError(f"Task document contract is malformed: {path}: {error}") from error
+    if not isinstance(contract, dict) or contract.get("task_id") != task_id:
+        raise TaskSessionError(f"Task document contract task ID does not match {task_id}: {path}")
+    source_spec = (
+        None
+        if contract.get("legacy_source_spec_missing") is True
+        else str(contract.get("source_spec", "")).strip() or None
+    )
+    fingerprint = task_contract_fingerprint(contract) if source_spec is not None else None
+    metadata_source = metadata.get("source_spec")
+    if metadata_source and metadata_source != source_spec:
+        raise TaskSessionError(
+            f"Task document source_spec metadata disagrees with its contract: {path}"
+        )
+    metadata_fingerprint = metadata.get("spec_fingerprint")
+    if metadata_fingerprint:
+        if not re.fullmatch(r"[0-9a-f]{64}", metadata_fingerprint):
+            raise TaskSessionError(f"Task document spec_fingerprint is malformed: {path}")
+        if fingerprint is None or metadata_fingerprint != fingerprint:
+            raise TaskSessionError(
+                f"Task document spec_fingerprint disagrees with its contract: {path}"
+            )
+    return contract, source_spec, fingerprint
+
+
+def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
+    expected = normalize_task_id(task_id)
+    matches = _task_document_candidates(canonical_root, expected)
     if len(matches) != 1:
         raise TaskSessionError(
             f"Expected one canonical pending task for {expected}, found {len(matches)}"
@@ -831,6 +883,9 @@ def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
         raise TaskSessionError(f"Invalid task filename: {path.name}")
     text = path.read_text(encoding="utf-8")
     metadata = _metadata_block(text)
+    contract, source_spec, spec_fingerprint = _task_contract_from_document(
+        text, task_id=expected, path=path, metadata=metadata
+    )
     status = _extract_bold_field(text, "Статус")
     task_type = _extract_bold_field(text, "Тип").lower()
     executable_default = expected not in UMBRELLA_TASK_IDS and "umbrella" not in task_type
@@ -853,7 +908,259 @@ def find_task_document(canonical_root: Path, task_id: str) -> TaskDocument:
         ),
         owner_gate=metadata.get("owner_gate", "explicit-launch"),
         integration_policy=metadata.get("integration", "task-pr-to-master"),
+        source_spec=source_spec,
+        spec_fingerprint=spec_fingerprint,
+        contract=contract,
     )
+
+
+def _canonical_task_relative_path(canonical_root: Path, path: Path) -> str:
+    resolved = path.resolve()
+    for root in (
+        canonical_root / "codex-backlog" / "tasks",
+        canonical_root / "codex-backlog" / "bugs" / "pending",
+        canonical_root / "codex-backlog" / "telegram-core-release-backlog" / "tasks",
+    ):
+        try:
+            relative = resolved.relative_to(root.resolve())
+            return (root.resolve().relative_to(canonical_root.resolve()) / relative).as_posix()
+        except ValueError:
+            continue
+    raise TaskSessionError(f"Task document is outside the canonical backlog: {resolved}")
+
+
+def validate_task_identity(
+    canonical_root: Path,
+    task_id: str,
+    document: TaskDocument,
+    contract: Mapping[str, Any],
+    *,
+    lease: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Validate the logical task identity independently from its local file path."""
+
+    expected = normalize_task_id(task_id)
+    if document.task_id != expected:
+        raise TaskSessionError("Task document identity does not match the requested task")
+    legacy_contract = contract.get("legacy_contract") is True
+    contract_for_validation = dict(contract)
+    if legacy_contract and not contract_for_validation.get("acceptance"):
+        contract_for_validation["acceptance"] = ["legacy controller contract"]
+    try:
+        normalized = normalize_task_contract(contract_for_validation)
+    except IssueWorkflowError as error:
+        raise TaskSessionError(f"Task Issue contract is invalid: {error}") from error
+    if normalized["task_id"] != expected:
+        raise TaskSessionError("Task Issue contract task ID does not match the requested task")
+
+    canonical_path = document.path.resolve()
+    canonical_task_path = _canonical_task_relative_path(canonical_root, canonical_path)
+    logical_source = str(normalized["source_spec"]).strip()
+    document_source = getattr(document, "source_spec", None)
+    if document_source is not None:
+        if document_source != logical_source:
+            raise TaskSessionError("Task document logical source_spec does not match the Issue")
+    elif logical_source != canonical_task_path:
+        # Compatibility for old path-valued Issue contracts and old task documents that
+        # predate the logical source identity marker.
+        raise TaskSessionError("Legacy task document requires a path-valued Issue source_spec")
+
+    fingerprint = None if legacy_contract else task_contract_fingerprint(contract)
+    document_fingerprint = getattr(document, "spec_fingerprint", None)
+    if document_fingerprint is not None and (
+        fingerprint is None or document_fingerprint != fingerprint
+    ):
+        raise TaskSessionError("Task document spec_fingerprint does not match the Issue contract")
+
+    raw_document_dependencies = getattr(document, "dependencies", None)
+    document_dependencies = (
+        tuple(dict.fromkeys(normalize_task_id(item) for item in raw_document_dependencies))
+        if raw_document_dependencies is not None
+        else tuple(normalized["dependencies"])
+    )
+    issue_dependencies = _resolved_dependency_ids(normalized["dependencies"], document_dependencies)
+    if issue_dependencies != document_dependencies:
+        raise TaskSessionError("Task dependency contract changed since the lease was created")
+
+    def gate_identity(value: str) -> str:
+        label, separator, requirement = normalize_owner_gate(value).partition(":")
+        if label in {"explicit_launch", "owner_launch"}:
+            label = "launch"
+        return f"{label}:{requirement}" if separator else label
+
+    issue_gate = gate_identity(str(normalized["owner_gate"]))
+    raw_document_gate = getattr(document, "owner_gate", None)
+    document_gate = (
+        gate_identity(raw_document_gate) if raw_document_gate is not None else issue_gate
+    )
+    if normalized["risk_lane"] == "RED" or task_risk_lane(issue_gate) == "RED":
+        raise TaskSessionError("Task Issue owner gate requires a separate human or external gate")
+    if not legacy_contract and document_gate != issue_gate:
+        raise TaskSessionError("Issue and task document owner gates do not match")
+
+    if lease is not None:
+        if lease.get("task_id") != expected:
+            raise TaskSessionError("Task lease task ID does not match the task identity")
+        lease_path = Path(str(lease.get("canonical_task_path", ""))).resolve()
+        if lease_path != canonical_path:
+            raise TaskSessionError("Task lease canonical path does not match the task document")
+        lease_source = lease.get("source_spec")
+        if lease_source is not None and lease_source != logical_source:
+            raise TaskSessionError("Task lease source_spec does not match the Issue contract")
+        lease_fingerprint = lease.get("spec_fingerprint")
+        if lease_fingerprint is not None:
+            if not isinstance(lease_fingerprint, str) or not re.fullmatch(
+                r"[0-9a-f]{64}", lease_fingerprint
+            ):
+                raise TaskSessionError("Task lease spec_fingerprint is malformed")
+            if lease_fingerprint != fingerprint:
+                raise TaskSessionError("Task lease spec_fingerprint does not match the Issue")
+        lease_dependencies = lease.get("dependency_ids")
+        if (
+            not isinstance(lease_dependencies, list)
+            or tuple(lease_dependencies) != issue_dependencies
+        ):
+            raise TaskSessionError("Task dependency contract changed since the lease was created")
+
+    return {
+        "task_id": expected,
+        "source_spec": logical_source,
+        "canonical_task_path": canonical_task_path,
+        "spec_fingerprint": fingerprint,
+        "dependencies": issue_dependencies,
+        "contract": dict(contract),
+    }
+
+
+def _materialized_task_slug(task_id: str, title: str, source_spec: str) -> str:
+    values = (title, source_spec, f"task-{task_id}")
+    for value in values:
+        candidate = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+        if candidate:
+            return candidate[:96].rstrip("-")
+    return f"task-{task_id.lower()}"
+
+
+def _ensure_task_readme_entry(
+    canonical_root: Path, *, task_id: str, path: Path, title: str, issue_number: int | None
+) -> None:
+    readme = canonical_root / "codex-backlog" / "tasks" / "README.md"
+    if not readme.is_file():
+        return
+    text = readme.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    task_pattern = re.compile(rf"^\s*-\s*\[[ xX]\]\s*`?{re.escape(task_id)}`?\b")
+    matching = [line for line in lines if task_pattern.match(line)]
+    link = f"]({path.name})"
+    if len(matching) > 1 or (matching and link not in matching[0]):
+        raise TaskSessionError(f"Task {task_id} has an ambiguous backlog README entry")
+    if matching:
+        return
+    label = re.sub(r"^\[Task [^]]+\]\s*", "", title.strip(), flags=re.IGNORECASE).strip()
+    label = label or f"Task {task_id}"
+    issue_suffix = f" — Issue #{issue_number}" if issue_number is not None else ""
+    entry = f"- [ ] `{task_id}` [{label}]({path.name}){issue_suffix}."
+    newline = "\n" if text and not text.endswith("\n") else ""
+    temporary = readme.with_name(f".{readme.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_text(text + newline + entry + "\n", encoding="utf-8")
+        temporary.replace(readme)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def materialize_task_document(
+    canonical_root: Path,
+    contract: Mapping[str, Any],
+    *,
+    issue_title: str = "",
+    issue_number: int | None = None,
+) -> TaskDocument:
+    """Materialize one deterministic local task document for an Issue contract."""
+
+    try:
+        normalized = normalize_task_contract(contract)
+    except IssueWorkflowError as error:
+        raise TaskSessionError(f"Cannot materialize invalid task contract: {error}") from error
+    task_id = normalized["task_id"]
+    candidates = _task_document_candidates(canonical_root, task_id)
+    if len(candidates) > 1:
+        raise TaskSessionError(f"Multiple local task documents claim Task {task_id}")
+    if candidates:
+        document = find_task_document(canonical_root, task_id)
+        validate_task_identity(canonical_root, task_id, document, contract)
+        _ensure_task_readme_entry(
+            canonical_root,
+            task_id=task_id,
+            path=document.path,
+            title=issue_title,
+            issue_number=issue_number,
+        )
+        return document
+
+    archived = [
+        path
+        for root in (
+            canonical_root / "codex-backlog" / "tasks" / "done",
+            canonical_root / "codex-backlog" / "bugs" / "done",
+            canonical_root / "codex-backlog" / "telegram-core-release-backlog" / "tasks" / "done",
+        )
+        if root.is_dir()
+        for path in root.glob(f"{task_id}-*.md")
+    ]
+    if archived:
+        raise TaskSessionError(f"Task {task_id} already has an archived task document")
+    title = issue_title.strip() or f"Task {task_id}"
+    slug = _materialized_task_slug(task_id, title, normalized["source_spec"])
+    target = canonical_root / "codex-backlog" / "tasks" / f"{task_id}-{slug}.md"
+    if target.exists():
+        raise TaskSessionError(f"Task {task_id} materialization target already exists")
+    dependencies = ", ".join(normalized["dependencies"])
+    acceptance = "\n".join(f"- {item}" for item in normalized["acceptance"])
+    queued_contract = dict(contract)
+    queued_contract["issue_state"] = "queued"
+    content = (
+        f"# [Task {task_id}] {title}\n\n"
+        + (f"- Issue: #{issue_number}\n" if issue_number is not None else "")
+        + "- **Основная роль:** implementer\n"
+        + "- **Статус:** QUEUED\n"
+        + "- **Тип:** implementation\n\n"
+        + "<!-- task-session\n"
+        + f"dependencies: {dependencies}\n"
+        + "executable: true\n"
+        + "concurrency: independent-write\n"
+        + f"owner_gate: {normalized['owner_gate']}\n"
+        + "integration: task-pr-to-master\n"
+        + f"source_spec: {normalized['source_spec']}\n"
+        + f"spec_fingerprint: {task_contract_fingerprint(contract)}\n"
+        + "-->\n\n"
+        + "## Scope\n\n"
+        + f"{normalized['scope']}\n\n"
+        + "## Acceptance\n\n"
+        + f"{acceptance}\n\n"
+        + render_task_contract(queued_contract)
+        + "\n"
+    )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f".{target.name}.{uuid4().hex}.tmp")
+    try:
+        with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(target)
+    finally:
+        temporary.unlink(missing_ok=True)
+    document = find_task_document(canonical_root, task_id)
+    validate_task_identity(canonical_root, task_id, document, contract)
+    _ensure_task_readme_entry(
+        canonical_root,
+        task_id=task_id,
+        path=document.path,
+        title=title,
+        issue_number=issue_number,
+    )
+    return document
 
 
 def _resolved_dependency_ids(
@@ -1110,10 +1417,28 @@ class GitHubClient:
         return match.group("slug")
 
     def api(self, endpoint: str) -> Any:
-        result = _run(
-            ["gh", "api", f"repos/{self.repo_slug}/{endpoint}"],
-            cwd=self.repository.current_worktree,
+        command = ["gh", "api", f"repos/{self.repo_slug}/{endpoint}"]
+        transient_markers = (
+            "tls handshake timeout",
+            "i/o timeout",
+            "client.timeout exceeded",
+            "connection reset by peer",
+            "connection refused",
+            "could not resolve host",
+            "unexpected eof",
         )
+        result: subprocess.CompletedProcess[str] | None = None
+        for attempt in range(3):
+            try:
+                result = _run(command, cwd=self.repository.current_worktree)
+                break
+            except TaskSessionError as error:
+                retryable = any(marker in str(error).casefold() for marker in transient_markers)
+                if not retryable or attempt == 2:
+                    raise
+                time.sleep(float(2**attempt))
+        if result is None:
+            raise AssertionError("GitHub API retry loop exited without a result")
         try:
             return json.loads(result.stdout)
         except json.JSONDecodeError as error:
@@ -1838,14 +2163,25 @@ class TaskController:
             cleanup["cleanup_pending"] = physical_cleanup.get("status") != "completed"
             cleanup["last_retry_at"] = utc_now()
             history["cleanup"] = cleanup
-            StateStore.replace_json(history_path, history)
-            results.append(
-                {
-                    "task_id": history.get("task_id"),
-                    "status": physical_cleanup.get("status"),
-                    "path": raw_path,
-                }
-            )
+            metadata_write = "completed"
+            metadata_error: str | None = None
+            try:
+                StateStore.replace_json(history_path, history)
+            except (OSError, TaskSessionError) as error:
+                # Finished-task cleanup metadata is optional.  A locked historical file must
+                # not block a new task; the next maintenance pass will retry it.
+                metadata_write = "deferred"
+                metadata_error = f"{type(error).__name__}: {error}"
+            result = {
+                "task_id": history.get("task_id"),
+                "status": physical_cleanup.get("status"),
+                "path": raw_path,
+            }
+            if metadata_write != "completed":
+                result["metadata_write"] = metadata_write
+            if metadata_error is not None:
+                result["metadata_error"] = metadata_error
+            results.append(result)
         return results
 
     def _cleanup_merged_unleased_worktrees(self) -> list[dict[str, Any]]:
@@ -3386,6 +3722,11 @@ class TaskController:
             raise TaskSessionError(f"Task {expected} is umbrella/non-executable")
         if "blocked" in document.status.lower() or "заблок" in document.status.lower():
             raise TaskSessionError(f"Task {expected} status is blocked: {document.status}")
+        local_identity = (
+            validate_task_identity(self._canonical_root(), expected, document, document.contract)
+            if document.contract is not None
+            else None
+        )
         owner_gate = normalize_owner_gate(document.owner_gate)
         gate_label, _, requirement = owner_gate.partition(":")
         if task_risk_lane(owner_gate) == "RED":
@@ -3443,6 +3784,16 @@ class TaskController:
                 or lease.get("integration_policy") != "task-pr-to-master"
                 or tuple(str(item) for item in lease.get("dependency_ids", ()))
                 != tuple(resolved_dependencies)
+                or (
+                    local_identity is not None
+                    and lease.get("source_spec") is not None
+                    and lease.get("source_spec") != local_identity["source_spec"]
+                )
+                or (
+                    local_identity is not None
+                    and lease.get("spec_fingerprint") is not None
+                    and lease.get("spec_fingerprint") != local_identity["spec_fingerprint"]
+                )
                 or bool(lease.get("queue_mode")) != bool(queue_mode)
                 or lease.get("session_label") != session_label
             )
@@ -3556,6 +3907,9 @@ class TaskController:
                 "canonical_master_refresh": canonical_refresh,
                 "attempts": [],
             }
+            if local_identity is not None:
+                lease["source_spec"] = local_identity["source_spec"]
+                lease["spec_fingerprint"] = local_identity["spec_fingerprint"]
             if queue_mode:
                 lease["queue_mode"] = True
                 lease["queue_budget"] = {
@@ -3651,30 +4005,10 @@ class TaskController:
             )
         if contract is None or contract.get("task_id") != task_id:
             raise TaskSessionError("Task Issue has no matching machine-readable contract")
-        expected_source = document.path.resolve().relative_to(self._canonical_root()).as_posix()
-        if contract.get("source_spec") != expected_source:
-            raise TaskSessionError("Task Issue source does not match the registered task document")
-        try:
-            issue_dependencies = _resolved_dependency_ids(
-                contract.get("dependencies"), document.dependencies
-            )
-        except TaskSessionError as error:
-            raise TaskSessionError(f"Task Issue dependency contract is invalid: {error}") from error
-        document_dependencies = tuple(
-            dict.fromkeys(normalize_task_id(item) for item in document.dependencies)
+        identity = validate_task_identity(
+            self._canonical_root(), task_id, document, contract, lease=lease
         )
-        lease_dependencies = lease.get("dependency_ids")
-        if (
-            issue_dependencies != document_dependencies
-            or not isinstance(lease_dependencies, list)
-            or tuple(lease_dependencies) != document_dependencies
-        ):
-            raise TaskSessionError("Task dependency contract changed since the lease was created")
-        owner_gate = str(contract.get("owner_gate", ""))
-        if contract.get("risk_lane") == "RED" or task_risk_lane(owner_gate) == "RED":
-            raise TaskSessionError(
-                "Task Issue owner gate requires a separate human or external gate"
-            )
+        issue_dependencies = tuple(identity["dependencies"])
         missing_dependencies = sorted(set(issue_dependencies) - self._completed_dependency_ids())
         if missing_dependencies:
             raise TaskSessionError(
@@ -3839,6 +4173,7 @@ class TaskController:
             "risk_lane": normalized_risk_lane,
             "source_spec": expected_source,
             "issue_state": issue_state.strip().lower(),
+            "legacy_contract": True,
         }
 
     def _preimplementation_worker_state_paths(self, task_id: str) -> list[Path]:
@@ -5730,15 +6065,11 @@ class TaskController:
                 raise TaskSessionError(f"Task Issue contract is malformed: {error}") from error
             if not isinstance(contract, Mapping) or contract.get("task_id") != expected:
                 raise TaskSessionError("Task Issue has no matching machine-readable contract")
-            expected_source = document.path.resolve().relative_to(self._canonical_root()).as_posix()
-            if contract.get("source_spec") != expected_source:
-                raise TaskSessionError(
-                    "Task Issue source does not match the registered task document"
-                )
-            issue_dependencies = _resolved_dependency_ids(
-                contract.get("dependencies"), document.dependencies
+            identity = validate_task_identity(self._canonical_root(), expected, document, contract)
+            issue_dependencies = tuple(identity["dependencies"])
+            document_dependencies = tuple(
+                dict.fromkeys(normalize_task_id(item) for item in document.dependencies)
             )
-            document_dependencies = tuple(dict.fromkeys(document.dependencies))
             if issue_dependencies != document_dependencies:
                 raise TaskSessionError("Issue and task document dependencies do not match")
             lease_dependencies = lease.get("dependency_ids")
@@ -5751,11 +6082,6 @@ class TaskController:
             missing = sorted(set(issue_dependencies) - self._completed_dependency_ids())
             if missing:
                 raise TaskSessionError("Task has incomplete dependencies: " + ", ".join(missing))
-            owner_gate = normalize_owner_gate(str(contract.get("owner_gate", "")))
-            if contract.get("risk_lane") == "RED" or task_risk_lane(owner_gate) == "RED":
-                raise TaskSessionError(
-                    "Task Issue owner gate requires a separate human or external gate"
-                )
             if str(contract.get("issue_state", "queued")).lower() not in {"queued", "in_progress"}:
                 raise TaskSessionError("Task Issue contract is not runnable")
             try:
@@ -7470,6 +7796,11 @@ class TaskController:
             raise TaskSessionError(f"Task {expected} is umbrella/non-executable")
         if "blocked" in document.status.lower() or "заблок" in document.status.lower():
             raise TaskSessionError(f"Task {expected} status is blocked: {document.status}")
+        local_identity = (
+            validate_task_identity(self._canonical_root(), expected, document, document.contract)
+            if document.contract is not None
+            else None
+        )
         owner_gate = normalize_owner_gate(document.owner_gate)
         gate_label, _, requirement = owner_gate.partition(":")
         if task_risk_lane(owner_gate) == "RED":
@@ -7505,6 +7836,9 @@ class TaskController:
             "canonical_master_refresh": canonical_refresh,
             "attempts": [],
         }
+        if local_identity is not None:
+            lease["source_spec"] = local_identity["source_spec"]
+            lease["spec_fingerprint"] = local_identity["spec_fingerprint"]
         with self.store.lock():
             existing = self.store.all_leases()
             if any(item.get("task_id") == expected for item in existing):

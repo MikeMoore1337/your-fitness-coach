@@ -80,6 +80,21 @@ def test_normal_worker_activity_passes() -> None:
     assert report["counters"]["progress_events"] == 1
 
 
+def test_tool_budget_report_enters_bounded_completion_mode_at_seventy_five_percent() -> None:
+    guard = WorkerEventGuard(_limits(max_completed_tool_actions=4))
+
+    for command in ("one", "two", "three"):
+        assert guard.observe_event(_command(command)).blocked is False
+
+    report = guard.report()
+    assert report["completion_mode"] == {
+        "active": True,
+        "starts_at_percent": 75,
+        "starts_at_tool_actions": 3,
+    }
+    assert "TOOL_ACTION_BUDGET_75_PERCENT" in report["warning_codes"]
+
+
 def test_file_change_progress_resets_repeated_failure_history() -> None:
     guard = WorkerEventGuard(_limits())
 
