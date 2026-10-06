@@ -285,6 +285,30 @@ authorization в lease и history. `finish` повторно проверяет 
 master и latest production deployment и отказывает при изменении любого из них. Обычный `finish`
 без этой записи продолжает отклонять product drift.
 
+Если normal `complete-production` не успел записать deployment history, а затем protected
+`master` уже продвинулся независимыми validated task/controller PR, используется отдельный
+owner-authorized recovery path:
+
+```powershell
+./.venv/Scripts/python.exe scripts/task_session.py `
+    reconcile-deployed-task-after-master-drift <ID> `
+    --pr <final-task-pr> `
+    --merge-sha <exact-task-merge-sha> `
+    --deployed-sha <exact-task-merge-sha> `
+    --production-run <successful-release-run-id> `
+    --owner-authorize
+```
+
+Он принимает только `human-required` lease с сохранённым ready anchor без delivery rewrite,
+доказывает ancestry anchor → final PR head и каждый commit в этом диапазоне, same-repository
+merged PR, exact-head `checks`, exact successful production run/deployment, полный independently
+validated subsequent master chain и сохранность Task feature/migration paths. Любой неизвестный
+commit, missing provenance/check/deployment, active owner/deployment, dirty или unique worktree,
+master race либо позднее изменение production path блокирует запись. Recovery сохраняет старый
+anchor и фактические PR/merge/deployed SHAs, переводит lease в `deployed`, а terminal closeout
+выполняется только штатным `finish`. Команда не redeploy-ит старый SHA и не разрешает ручное
+изменение lease/history JSON.
+
 Если canonical checkout ещё не содержит merged controller fix из-за заблокированного refresh,
 запустите этот код из чистого worktree merged controller PR и передайте `--repo` путь к canonical
 checkout с общим Git common dir. Пример для уже проверенной цепочки Task 415:
