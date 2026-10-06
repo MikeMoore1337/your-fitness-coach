@@ -3267,7 +3267,11 @@ def test_reconcile_subsequent_production_rejects_unproven_no_deploy_task_tail(
     repository: tuple[Path, Any],
     mutation: str,
 ) -> None:
-    path = "backend/runtime_after_deploy.py" if mutation == "runtime_path" else "scripts/codeql_sarif_gate.py"
+    path = (
+        "backend/runtime_after_deploy.py"
+        if mutation == "runtime_path"
+        else "scripts/codeql_sarif_gate.py"
+    )
     _, _, controller, _, _, _, records = _prepare_subsequent_production_reconciliation(
         repository,
         [

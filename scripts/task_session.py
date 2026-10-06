@@ -10024,13 +10024,9 @@ class TaskController:
         for run in sorted(release_runs, key=lambda item: item["id"]):
             jobs = github.workflow_jobs(run["id"])
             authorize = [
-                job
-                for job in jobs
-                if job.get("name") == "Authorize exact merged master revision"
+                job for job in jobs if job.get("name") == "Authorize exact merged master revision"
             ]
-            deploy = [
-                job for job in jobs if job.get("name") == "Deploy immutable tested bundle"
-            ]
+            deploy = [job for job in jobs if job.get("name") == "Deploy immutable tested bundle"]
             if (
                 len(authorize) == 1
                 and authorize[0].get("conclusion") == "success"
