@@ -9645,7 +9645,9 @@ class TaskController:
 
         pull_request = self._verified_reconciliation_pr(pr_number, expected, master_sha)
         if pull_request["branch"] != branch:
-            raise TaskSessionError("Historical production PR branch does not match the recovery lease")
+            raise TaskSessionError(
+                "Historical production PR branch does not match the recovery lease"
+            )
         if pull_request["merge_sha"] != deployed_sha:
             raise TaskSessionError("Historical production PR merge SHA does not match deployed SHA")
         final_head_sha = str(pull_request["head_sha"])
@@ -9855,9 +9857,7 @@ class TaskController:
                 "Historical production reconciliation requires a positive production run ID"
             )
         if re.fullmatch(r"[0-9a-f]{40}", deployed_sha) is None:
-            raise TaskSessionError(
-                "Historical production reconciliation deployed SHA is invalid"
-            )
+            raise TaskSessionError("Historical production reconciliation deployed SHA is invalid")
 
         lease_path = self.store.task_lease_path(expected)
         history_path = self.store.history / f"task-{expected}.json"
@@ -11409,9 +11409,7 @@ class TaskController:
         worktree_path = Path(str(lease.get("worktree", ""))).resolve()
         deployed_sha = str(history.get("deployed_sha", ""))
         root = self._canonical_root()
-        reconciliation_master_sha = self._reconciliation_master_snapshot(
-            expected, lease, history
-        )
+        reconciliation_master_sha = self._reconciliation_master_snapshot(expected, lease, history)
         expected_head = str(lease.get("ready_head_sha", ""))
         historical = history.get("historical_production_reconciliation")
         if isinstance(historical, Mapping):
