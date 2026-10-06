@@ -120,13 +120,14 @@ for (const scenario of programImportViewports) {
     await expect(page.getByRole('heading', { level: 1, name: /^Сегодня ·/ })).toBeVisible();
 
     const programTitle = `Импорт браузера ${scenario.name}`;
+    const unresolvedExerciseTitle = `Упражнение для ручного сопоставления ${scenario.name}`;
     const row = [
       '',
       '',
       '',
       '1',
       'Силовая 1',
-      'Упражнение для ручного сопоставления',
+      unresolvedExerciseTitle,
       '3',
       '8-12',
       '90',
@@ -187,11 +188,13 @@ for (const scenario of programImportViewports) {
     await page.getByLabel('Цель', { exact: true }).selectOption('maintenance');
     await page.getByLabel('Уровень', { exact: true }).selectOption('beginner');
 
-    const exerciseSelect = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
-    await expect(
-      exerciseSelect.getByRole('option', { name: strengthExercise.title }),
-    ).toBeAttached();
-    await exerciseSelect.selectOption(String(strengthExercise.id));
+    const exercisePicker = page.getByRole('combobox', { name: 'Упражнение для строки 3' });
+    await exercisePicker.click();
+    await exercisePicker.fill(strengthExercise.title);
+    const exerciseOption = page.getByRole('option', { name: strengthExercise.title, exact: true });
+    await expect(exerciseOption).toBeVisible();
+    await exerciseOption.click();
+    await expect(exercisePicker).toHaveValue(strengthExercise.title);
 
     const resolved = page.waitForResponse(
       (response) =>
