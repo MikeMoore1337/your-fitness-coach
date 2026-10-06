@@ -11,6 +11,18 @@ BLOCKING_NON_SECURITY_LEVELS = {"error"}
 
 ValidatedFindingKey = tuple[str, str, int]
 VALIDATED_NON_EXPLOITABLE_FINDINGS: dict[ValidatedFindingKey, str] = {
+    ("py/bad-tag-filter", "backend/tests/test_app.py", 3492): (
+        "Test-only assertion inspects locally rendered HTML for inline script bodies; it does not "
+        "sanitize, transform, or authorize untrusted production content."
+    ),
+    ("py/bad-tag-filter", "backend/tests/test_app.py", 3500): (
+        "Test-only assertion inspects the repository-owned frontend index template; it is not a "
+        "production HTML sanitizer or security filter."
+    ),
+    ("js/user-controlled-bypass", "frontend/src/pages/auth/LoginPage.tsx", 170): (
+        "The URL-controlled branch only clears an ephemeral product-analytics login-attempt marker "
+        "from memory/sessionStorage; it cannot change authentication, authorization, or session state."
+    ),
     **{
         ("py/overly-permissive-file", "scripts/allure_report_origin.py", line): (
             "Allure report storage deliberately uses group-only 0640/0750 permissions so the "
