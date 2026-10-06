@@ -122,6 +122,40 @@ def test_exact_validated_baseline_finding_is_reported_but_does_not_block(tmp_pat
     assert result[0]["validated_reason"]
 
 
+def test_analytics_only_login_error_baseline_is_exact(tmp_path: Path) -> None:
+    exact = _write(
+        tmp_path,
+        _sarif(
+            security_severity="7.8",
+            level="error",
+            rule_id="js/user-controlled-bypass",
+            path="frontend/src/pages/auth/LoginPage.tsx",
+            line=195,
+        ),
+    )
+    exact_result = codeql_sarif_gate.evaluate(exact)
+
+    assert len(exact_result) == 1
+    assert exact_result[0]["blocking"] is False
+    assert exact_result[0]["validated_reason"]
+
+    shifted = _write(
+        tmp_path,
+        _sarif(
+            security_severity="7.8",
+            level="error",
+            rule_id="js/user-controlled-bypass",
+            path="frontend/src/pages/auth/LoginPage.tsx",
+            line=196,
+        ),
+    )
+    shifted_result = codeql_sarif_gate.evaluate(shifted)
+
+    assert len(shifted_result) == 1
+    assert shifted_result[0]["blocking"] is True
+    assert shifted_result[0]["validated_reason"] is None
+
+
 def test_validated_baseline_does_not_hide_same_rule_on_a_new_line(tmp_path: Path) -> None:
     path = _write(
         tmp_path,
