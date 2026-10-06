@@ -11,6 +11,11 @@ BLOCKING_NON_SECURITY_LEVELS = {"error"}
 
 ValidatedFindingKey = tuple[str, str, int]
 VALIDATED_NON_EXPLOITABLE_FINDINGS: dict[ValidatedFindingKey, str] = {
+    ("js/user-controlled-bypass", "frontend/src/pages/auth/LoginPage.tsx", 195): (
+        "The URL-controlled branch only clears the product-analytics login-attempt marker from "
+        "memory/sessionStorage. Authentication state, tokens, cookies, roles and authorization "
+        "checks are not changed by this function."
+    ),
     **{
         ("py/overly-permissive-file", "scripts/allure_report_origin.py", line): (
             "Allure report storage deliberately uses group-only 0640/0750 permissions so the "
