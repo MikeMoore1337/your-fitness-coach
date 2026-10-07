@@ -1284,6 +1284,24 @@ async function mockApi(
           exercises: [],
         },
       });
+    if (path.endsWith('/coach/inbox'))
+      return route.fulfill({
+        json: {
+          date: '2030-01-01',
+          timezone: 'Europe/Moscow',
+          items: [],
+          total: 0,
+          counts: {
+            attention: 0,
+            pending_reviews: 0,
+            tasks: 0,
+            sessions: 0,
+            packages: 0,
+            payments: 0,
+          },
+          generated_at: '2030-01-01T10:00:00Z',
+        },
+      });
     if (path.endsWith('/coach/client-summaries'))
       return route.fulfill({
         json: {
