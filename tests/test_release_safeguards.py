@@ -161,21 +161,21 @@ def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() 
 def test_deploy_reads_active_revision_before_migration_and_rollout() -> None:
     deploy = _sources()["deploy"]
 
-    assert "latest_summary" in deploy
-    assert "com.docker.compose.service=\\$service" in deploy
-    assert "org.opencontainers.image.revision" in deploy
+    assert "scripts/production_provenance.py" in deploy
+    assert "python3 - snapshot --app-root" in deploy
+    assert "Production provenance mismatch before transfer" in deploy
     assert "ACTIVE_REVISION: ${{ steps.migration.outputs.active_revision }}" in deploy
     assert "active_marker" in deploy
     assert "last-successful-revision" in deploy
-    assert 'if [ -f \\"\\$active_marker\\" ]; then' in deploy
-    assert 'install -d -m 700 \\"\\$(dirname \\"\\$active_marker\\")\\"' in deploy
+    assert 'test -f \\"\\$active_marker\\"' in deploy
+    assert 'install -d -m 700 \\"\\$(dirname \\"\\$active_marker\\")\\"' not in deploy
 
 
 def test_manual_rollback_uses_native_actions_and_existing_production_safety() -> None:
     deploy = _sources()["deploy"]
 
     assert "operation:" in deploy
-    assert "options: [deploy, rollback]" in deploy
+    assert "options: [deploy, reconcile, rollback]" in deploy
     assert "rollback:" in deploy
     assert "owner-authorized rollback" in deploy
     assert "python3 scripts/zero_downtime_deploy.py rollback" in deploy

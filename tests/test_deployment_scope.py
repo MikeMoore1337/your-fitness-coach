@@ -34,6 +34,35 @@ def test_docs_governance_tests_and_ci_only_do_not_deploy() -> None:
     assert decision["deploy_paths"] == []
 
 
+def test_host_delivery_tooling_does_not_redeploy_unchanged_application() -> None:
+    decision = classify_paths(
+        [
+            ".github/workflows/deploy.yml",
+            "scripts/deploy_production.sh",
+            "scripts/deployment_contract.py",
+            "scripts/production_host_cleanup.py",
+            "scripts/production_provenance.py",
+            "scripts/zero_downtime_deploy.py",
+        ]
+    )
+
+    assert decision["deploy_required"] is False
+    assert decision["deploy_paths"] == []
+
+
+def test_runtime_scripts_copied_into_images_require_deploy() -> None:
+    decision = classify_paths(
+        ["backend/Dockerfile", "scripts/check_deployment.py", "scripts/fetch_rapidocr_models.py"]
+    )
+
+    assert decision["deploy_required"] is True
+    assert decision["deploy_paths"] == [
+        "backend/Dockerfile",
+        "scripts/check_deployment.py",
+        "scripts/fetch_rapidocr_models.py",
+    ]
+
+
 def test_unknown_non_governance_path_is_conservative() -> None:
     decision = classify_paths(["config/production-feature.toml"])
 

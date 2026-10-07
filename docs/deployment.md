@@ -31,11 +31,12 @@ Application deploy требуется для фактических измене
 - Alembic migrations;
 - Docker/Compose/Caddy/deploy configuration;
 - runtime dependency lock/configuration;
-- production deployment helpers.
+- runtime scripts copied into an application image.
 
-Только документация, backlog, governance, tests-only и local developer tooling не требуют
-application deploy. Изменение самого CI/deploy workflow проверяется CI, но не вызывает ненужную
-application mutation. Известный non-governance path классифицируется консервативно.
+Только документация, backlog, governance, tests-only, CI/deploy workflow и host-side delivery
+helpers не требуют application deploy: они проверяются CI и попадут в следующий deployable
+release, но не перезапускают неизменившийся application runtime. Известный non-governance path
+классифицируется консервативно.
 
 ## Safety
 
@@ -49,6 +50,13 @@ Deploy workflow:
 - сохраняет operational evidence под `.artifacts/operations/deployments/` на production host.
 
 Deployment evidence — operational release record, не development lifecycle state.
+
+If a read-only preflight finds a uniform running revision that differs from the recorded marker,
+normal deployment fails closed before transfer or service mutation. The owner-authorized
+`workflow_dispatch` operation `reconcile` accepts the exact tested revision and successful CI run,
+rechecks runtime images, health, migration heads, release files and public/SEO smoke, then may
+update only the existing marker and `current` symlink. It never restarts services, pulls images,
+runs migrations, changes `.env` or writes application data.
 
 ## Rollback
 

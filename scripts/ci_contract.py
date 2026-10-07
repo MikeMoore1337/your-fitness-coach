@@ -339,6 +339,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "tests/test_scheduled_regression.py",
                 "tests/test_deployment_contract.py",
                 "tests/test_deployment_scope.py",
+                "tests/test_production_provenance.py",
                 "tests/test_online_migrations.py",
                 "tests/test_zero_downtime_deploy.py",
                 "-q",

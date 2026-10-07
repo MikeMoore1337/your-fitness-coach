@@ -81,9 +81,10 @@ migrations -> rollout -> production smoke/evidence`.
 
 The deploy workflow uses `concurrency.group: production` with `cancel-in-progress: false`. Do not
 add a repository-local mutex or replacement owner. Application deploy is required for actual
-runtime, migration, image, production configuration and deployment-script changes. Documentation,
-backlog, governance, tests-only and local developer-tool changes do not deploy the application.
-Unknown non-governance paths are handled conservatively by the stateless helper.
+runtime, migration, image, production configuration and scripts copied into an application image.
+Documentation, backlog, governance, tests-only, CI/deploy workflows and host-side delivery helpers
+do not deploy unchanged application runtime. Unknown non-governance paths are handled
+conservatively by the stateless helper.
 
 Deployment evidence under the production `.artifacts/operations/deployments/` area is operational
 release evidence, not development lifecycle state. Keep immutable bundle/revision checks, safe
