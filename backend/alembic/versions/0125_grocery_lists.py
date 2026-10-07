@@ -11,33 +11,15 @@ down_revision: str | None = "0124_plan_item_lifecycle"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-online_rollout_phase = "constraint_swap"
-online_rollout_constraint_table = "nutrition_plan_items"
-online_rollout_constraint_name = "ck_nutrition_plan_items_single_source"
-online_rollout_lock_timeout_seconds = 3
-online_rollout_statement_timeout_seconds = 30
+online_rollout_phase = "expand"
 online_rollout_notes = (
-    "Allows recipe plan rows to retain a stale source after recipe deletion and adds "
-    "owner-scoped weekly grocery snapshots and manual items without changing diary rows."
+    "Adds owner-scoped weekly grocery snapshots, source references, and manual items "
+    "without changing existing diary rows; the related constraint swap is a following "
+    "online migration."
 )
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        op.execute("SET LOCAL lock_timeout = '3s'")
-        op.execute("SET LOCAL statement_timeout = '30s'")
-        op.execute(
-            "ALTER TABLE nutrition_plan_items DROP CONSTRAINT IF EXISTS "
-            "ck_nutrition_plan_items_single_source, ADD CONSTRAINT "
-            "ck_nutrition_plan_items_single_source CHECK ("
-            "(item_kind = 'food' AND food_id IS NOT NULL AND recipe_id IS NULL) OR "
-            "(item_kind = 'recipe' AND food_id IS NULL AND amount_unit = 'g')) NOT VALID"
-        )
-        op.execute(
-            "ALTER TABLE nutrition_plan_items VALIDATE CONSTRAINT "
-            "ck_nutrition_plan_items_single_source"
-        )
     op.create_table(
         "grocery_lists",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -172,19 +154,3 @@ def downgrade() -> None:
     op.drop_table("grocery_list_items")
     op.drop_index("ix_grocery_lists_user_week", table_name="grocery_lists")
     op.drop_table("grocery_lists")
-    bind = op.get_bind()
-    if bind.dialect.name == "postgresql":
-        op.execute("SET LOCAL lock_timeout = '3s'")
-        op.execute("SET LOCAL statement_timeout = '30s'")
-        op.execute(
-            "ALTER TABLE nutrition_plan_items DROP CONSTRAINT IF EXISTS "
-            "ck_nutrition_plan_items_single_source, ADD CONSTRAINT "
-            "ck_nutrition_plan_items_single_source CHECK ("
-            "(item_kind = 'food' AND food_id IS NOT NULL AND recipe_id IS NULL) OR "
-            "(item_kind = 'recipe' AND recipe_id IS NOT NULL AND food_id IS NULL AND "
-            "amount_unit = 'g')) NOT VALID"
-        )
-        op.execute(
-            "ALTER TABLE nutrition_plan_items VALIDATE CONSTRAINT "
-            "ck_nutrition_plan_items_single_source"
-        )
