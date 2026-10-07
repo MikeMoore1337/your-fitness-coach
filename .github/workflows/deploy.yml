@@ -6,6 +6,22 @@ on:
     workflows: [CI]
     branches: [master]
     types: [completed]
+  # Owner-authorized recovery for a tested merge whose automatic release was
+  # blocked before deployment by a subsequently fixed controller.
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Exact merged master SHA to deploy
+        required: true
+        type: string
+      ci_run_id:
+        description: Successful post-merge CI run ID for the exact revision
+        required: true
+        type: string
+      reason:
+        description: Bounded owner-authorized recovery reason
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -18,8 +34,11 @@ jobs:
   authorize:
     name: Authorize exact merged master revision
     if: >-
+      (github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' &&
+      inputs.revision != '' && inputs.ci_run_id != '' && inputs.reason != '')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -29,14 +48,35 @@ jobs:
       deploy: ${{ steps.provenance.outputs.deploy }}
       reason: ${{ steps.provenance.outputs.reason }}
     env:
-      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.revision || github.event.workflow_run.head_sha }}
+      CI_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.ci_run_id || github.event.workflow_run.id }}
+      RECOVERY_REASON: ${{ github.event_name == 'workflow_dispatch' && inputs.reason || '' }}
     steps:
-      - name: Check out exact merge revision for release classification
+      - name: Check out current controller source for release classification
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ github.workflow_sha }}
           fetch-depth: 1
           persist-credentials: false
+
+      - name: Verify exact successful CI evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          ci_run="$(gh api "repos/$REPOSITORY/actions/runs/$CI_RUN_ID")"
+          printf '%s\n' "$ci_run"
+          jq -e \
+            --arg sha "$DEPLOY_SHA" \
+            --argjson run_id "$CI_RUN_ID" \
+            '(.id == $run_id) and
+             (.name == "CI") and
+             (.head_sha == $sha) and
+             (.event == "push") and
+             (.status == "completed") and
+             (.conclusion == "success")' \
+            <<<"$ci_run" >/dev/null
 
       - name: Verify merged pull request provenance and deployment scope
         id: provenance
@@ -66,6 +106,9 @@ jobs:
               ;;
             true)
               echo "deploy=true" >> "$GITHUB_OUTPUT"
+              if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+                reason="owner-authorized exact-SHA recovery: $RECOVERY_REASON; $reason"
+              fi
               echo "reason=$reason" >> "$GITHUB_OUTPUT"
               echo "Authorized production revision $DEPLOY_SHA: $reason"
               ;;
@@ -86,7 +129,7 @@ jobs:
       packages: read
     environment: production
     env:
-      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.revision || github.event.workflow_run.head_sha }}
       PROD_HOST: 77.91.90.171
       PROD_PORT: "1337"
       PROD_USER: yfc-deploy
