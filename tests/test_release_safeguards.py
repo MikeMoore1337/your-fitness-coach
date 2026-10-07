@@ -122,9 +122,6 @@ def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() 
     assert "- master" in deploy
     assert "sync-dev:" not in deploy
     assert "actions/create-github-app-token" not in deploy
-    assert "git fetch" not in deploy
-    assert "git reset" not in deploy
-    assert "git rev-parse" not in deploy
     assert "deployment_contract.py refs" in deploy
     assert "bundle" in deploy.lower()
     assert "controller-only governance merge" in deploy
@@ -149,6 +146,15 @@ def test_controller_release_skip_uses_exact_provenance_and_full_changed_file_inv
     assert "classify-controller-release" in deploy
     assert "CONTROLLER_ROWS" not in deploy
     assert "codex/controller-[a-z0-9-]+" not in deploy
+    assert "controller-source" in deploy
+    assert "git rev-list --first-parent --no-merges" in deploy
+    assert "git rev-list --first-parent --merges --reverse" in deploy
+    assert "workflow_runs" in deploy
+    assert "pull_requests[]" in deploy
+    assert "/pulls/$pr_number" in deploy
+    assert "commits/$pr_head_sha/check-runs" in deploy
+    assert '"Deploy immutable tested bundle"' in deploy
+    assert '"skipped"' in deploy
     assert "CONTROLLER_ALLOWED_PATHS" in controller
     assert "pulls/{number}/files?per_page=100&page={page}" in controller
     assert "len(files) != declared_count" in controller

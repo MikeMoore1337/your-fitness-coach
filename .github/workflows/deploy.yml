@@ -165,6 +165,15 @@ jobs:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
 
+      - name: Check out current controller source for recovery validation
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller-source
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Resolve immutable application image references
         id: images
         env:
@@ -272,8 +281,58 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
+          git fetch --no-tags origin master
           CURRENT_MASTER="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/master" --jq '.object.sha')"
-          test "$CURRENT_MASTER" = "$DEPLOY_SHA"
+          test "$(git rev-parse refs/remotes/origin/master)" = "$CURRENT_MASTER"
+          if [ "$CURRENT_MASTER" = "$DEPLOY_SHA" ]; then
+            exit 0
+          fi
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            echo "Refusing transfer: protected master advanced after the tested revision" >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$DEPLOY_SHA" "$CURRENT_MASTER"; then
+            echo "Refusing recovery transfer: tested revision is not an ancestor of current master" >&2
+            exit 1
+          fi
+          if git rev-list --first-parent --no-merges "$DEPLOY_SHA..$CURRENT_MASTER" | grep -q .; then
+            echo "Refusing recovery transfer: current master contains a non-merge commit after the tested revision" >&2
+            exit 1
+          fi
+          drift_commits="$(git rev-list --first-parent --merges --reverse "$DEPLOY_SHA..$CURRENT_MASTER")"
+          test -n "$drift_commits"
+          while IFS= read -r drift_sha; do
+            classification="$(
+              cd controller-source
+              python scripts/task_session.py \
+                --github-repository "$GITHUB_REPOSITORY" \
+                classify-controller-release \
+                --sha "$drift_sha"
+            )"
+            printf '%s\n' "$classification"
+            jq -e '.controller_only == true and .deploy == false' <<<"$classification" >/dev/null
+
+            pr_numbers="$(jq -r '.pull_requests[] | .number' <<<"$classification")"
+            test -n "$pr_numbers"
+            while IFS= read -r pr_number; do
+              pr_head_sha="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq '.head.sha')"
+              test -n "$pr_head_sha"
+              checks="$(gh api "repos/$GITHUB_REPOSITORY/commits/$pr_head_sha/check-runs?per_page=100")"
+              jq -e --arg sha "$pr_head_sha" \
+                '[.check_runs[] | select(.name == "checks" and .head_sha == $sha and .status == "completed" and .conclusion == "success")] | length > 0' \
+                <<<"$checks" >/dev/null
+            done <<<"$pr_numbers"
+
+            release_runs="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?head_sha=$drift_sha&per_page=100")"
+            release_run_id="$(jq -r --arg sha "$drift_sha" \
+              '[.workflow_runs[] | select(.head_sha == $sha and .event == "workflow_run" and .status == "completed" and .conclusion == "success") | .id] | first // empty' \
+              <<<"$release_runs")"
+            test -n "$release_run_id"
+            release_jobs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$release_run_id/jobs?per_page=100")"
+            jq -e \
+              '[.jobs[] | select(.name == "Deploy immutable tested bundle" and .conclusion == "skipped")] | length == 1' \
+              <<<"$release_jobs" >/dev/null
+          done <<<"$drift_commits"
 
       - name: Transfer immutable bundle to production
         run: |
