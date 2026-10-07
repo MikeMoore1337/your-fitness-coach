@@ -200,7 +200,7 @@ def test_rollout_preview_apply_is_idempotent_and_auditable(client):
             db.query(AuditEvent)
             .filter(
                 AuditEvent.action == "coach.program_rollout.failed",
-                AuditEvent.resource_id.in_(program_ids),
+                AuditEvent.resource_id.in_([str(program_id) for program_id in program_ids]),
             )
             .all()
         )
