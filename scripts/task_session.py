@@ -314,7 +314,7 @@ def _guard_generated_output_relative_path(raw_path: str, *, worktree: Path) -> s
         try:
             resolved = candidate.resolve()
             relative = resolved.relative_to(worktree_root).as_posix()
-        except OSError, ValueError:
+        except (OSError, ValueError):  # fmt: skip
             continue
         if resolved.is_file():
             matches.add(relative)
@@ -327,7 +327,7 @@ def _guard_event_changed_paths(events_bytes: bytes, *, worktree: Path) -> set[st
     for line in events_bytes.splitlines():
         try:
             payload = json.loads(line.decode("utf-8"))
-        except UnicodeError, json.JSONDecodeError:
+        except (UnicodeError, json.JSONDecodeError):  # fmt: skip
             continue
         if not isinstance(payload, Mapping) or payload.get("type") != "item.completed":
             continue
@@ -347,7 +347,7 @@ def _guard_event_changed_paths(events_bytes: bytes, *, worktree: Path) -> set[st
                     candidate_path = worktree / candidate_path
                 try:
                     relative = candidate_path.resolve().relative_to(worktree.resolve())
-                except OSError, ValueError:
+                except (OSError, ValueError):  # fmt: skip
                     continue
                 changed_paths.add(relative.as_posix())
             continue

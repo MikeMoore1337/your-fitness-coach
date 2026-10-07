@@ -36,6 +36,12 @@ def _load_module():
 task_session = _load_module()
 
 
+def test_task_session_source_compiles_on_supported_python() -> None:
+    source = Path(__file__).parents[1] / "scripts" / "task_session.py"
+
+    compile(source.read_text(encoding="utf-8"), str(source), "exec")
+
+
 def test_guard_replay_accepts_historical_report_without_completion_mode() -> None:
     replayed = {
         "schema_version": 1,
