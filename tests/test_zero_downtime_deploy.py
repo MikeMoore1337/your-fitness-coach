@@ -800,7 +800,7 @@ def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
     monkeypatch.setattr(
         deploy,
         "_stop_legacy_services",
-        lambda value: calls["stops"].append(value.target_revision),
+        lambda value, **kwargs: calls["stops"].append(value.target_revision),
     )
     monkeypatch.setattr(
         deploy,
@@ -862,6 +862,64 @@ def test_single_slot_rollout_replaces_legacy_services_and_records_success(
     assert "BACKEND_IMAGE=registry/backend@sha256:" + "b" * 64 in environment
     assert "BOT_IMAGE=registry/bot@sha256:" + "b" * 64 in environment
     assert not config.state_root.joinpath("state.json").exists()
+
+
+def test_repair_rollout_does_not_require_partial_consumers_or_old_image_rollback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    monkeypatch.setenv("DEPLOY_REPAIR_MODE", "true")
+    monkeypatch.setenv("DEPLOY_REPAIR_BASELINE_SHA", OLD_SHA)
+    monkeypatch.setattr(
+        deploy,
+        "_legacy_image_digest",
+        lambda *_args: pytest.fail("repair must not use partial runtime as rollback baseline"),
+    )
+    monkeypatch.setattr(
+        deploy,
+        "_legacy_running_image",
+        lambda service: (
+            "registry/edge:baseline"
+            if service == "edge"
+            else pytest.fail("repair must not inspect partial application images")
+        ),
+    )
+
+    evidence = deploy.single_slot_deploy(config)
+
+    assert evidence.verdict == "active"
+    assert calls["stops"] == [NEW_SHA]
+    assert (
+        config.state_root.joinpath("last-successful-revision").read_text(encoding="utf-8").strip()
+        == NEW_SHA
+    )
+
+
+def test_failed_repair_after_stop_keeps_baseline_marker_and_records_intervention(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    _patch_single_slot_runtime(tmp_path, monkeypatch)
+    monkeypatch.setenv("DEPLOY_REPAIR_MODE", "true")
+    monkeypatch.setenv("DEPLOY_REPAIR_BASELINE_SHA", OLD_SHA)
+    monkeypatch.setattr(
+        deploy,
+        "_start_legacy_backend",
+        lambda *_args: (_ for _ in ()).throw(deploy.DeploymentError("backend failed")),
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="backend failed"):
+        deploy.single_slot_deploy(config)
+
+    assert (
+        config.state_root.joinpath("last-successful-revision").read_text(encoding="utf-8").strip()
+        == OLD_SHA
+    )
+    summary = next(config.state_root.glob("single-slot-*/summary.json"))
+    assert json.loads(summary.read_text(encoding="utf-8"))["verdict"] == (
+        "manual intervention required"
+    )
 
 
 def test_single_slot_docker_reclaim_never_removes_container_data_or_volumes(

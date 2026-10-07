@@ -175,12 +175,33 @@ def test_manual_rollback_uses_native_actions_and_existing_production_safety() ->
     deploy = _sources()["deploy"]
 
     assert "operation:" in deploy
-    assert "options: [deploy, reconcile, rollback]" in deploy
+    assert "options: [deploy, repair, reconcile, rollback]" in deploy
     assert "rollback:" in deploy
     assert "owner-authorized rollback" in deploy
     assert "python3 scripts/zero_downtime_deploy.py rollback" in deploy
     assert "scripts/task_session.py" not in deploy
     assert "delivery owner" not in deploy
+
+
+def test_manual_repair_is_native_ancestor_checked_and_reuses_single_slot_rollout() -> None:
+    deploy = _sources()["deploy"]
+
+    assert "if: needs.authorize.outputs.operation == 'repair'" in deploy
+    assert 'git merge-base --is-ancestor "$DEPLOY_SHA" "$current_master"' in deploy
+    assert "name: Repair known production release" in deploy
+    assert "BASELINE_REVISION: 050bbd3f80aac0b8e84389fa3c4c28875df89066" in deploy
+    assert "Read-only production repair preflight" in deploy
+    assert "Verify target images and OCI provenance before transfer" in deploy
+    assert "check_online_migrations.py" in deploy
+    assert "DEPLOY_REPAIR_MODE=true" in deploy
+    assert "DEPLOY_REPAIR_BASELINE_SHA" in deploy
+    assert "single-slot" in deploy
+    assert "Verify repaired production provenance" in deploy
+    assert "services.bot.runtime_markers.telegram_polling_started" in deploy
+    assert "last-successful-revision" in deploy
+    assert "operation=reconcile" not in deploy
+    assert "repair database" not in deploy.lower()
+    assert "deployment.lock" not in deploy
 
 
 def test_deploy_bounds_transient_production_ssh_failures() -> None:

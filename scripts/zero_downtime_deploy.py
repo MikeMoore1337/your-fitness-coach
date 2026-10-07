@@ -1340,14 +1340,18 @@ def _legacy_image_digest(service: str, expected_revision: str) -> str:
     )
 
 
-def _stop_legacy_services(config: DeployConfig) -> None:
+def _stop_legacy_services(config: DeployConfig, *, require_running: bool = True) -> None:
     for service, timeout in (
         ("worker", config.worker_drain_seconds),
         ("bot", config.bot_drain_seconds),
         ("backend", config.backend_drain_seconds),
     ):
         if not _service_is_running(service):
-            raise DeploymentError(f"legacy service {service} stopped before maintenance handoff")
+            if require_running:
+                raise DeploymentError(
+                    f"legacy service {service} stopped before maintenance handoff"
+                )
+            continue
         worker_lease = (
             _consumer_lease(service, ("worker_started",)) if service == "worker" else None
         )
@@ -1465,6 +1469,11 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
     active_revision = active_revision_path.read_text(encoding="utf-8").strip()
     if not re.fullmatch(r"[0-9a-f]{40}", active_revision):
         raise DeploymentError("last-successful-revision is not a full Git SHA")
+    repair_mode = os.environ.get("DEPLOY_REPAIR_MODE", "").strip().lower() == "true"
+    if repair_mode and os.environ.get("DEPLOY_REPAIR_BASELINE_SHA", "") != active_revision:
+        raise DeploymentError(
+            "repair rollout baseline does not match last-successful-revision evidence"
+        )
 
     deployment_id = (
         f"single-slot-{int(time.time())}-{config.target_revision[:12]}-{uuid.uuid4().hex[:8]}"
@@ -1495,13 +1504,14 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
 
     try:
         with _stage(evidence, "single_slot_legacy_provenance"):
-            old_backend = _legacy_image_digest("backend", active_revision)
-            old_bot = _legacy_image_digest("bot", active_revision)
-            old_worker = _legacy_image_digest("worker", active_revision)
-            if old_worker != old_backend:
-                raise DeploymentError(
-                    "legacy backend and worker do not use the same verified image digest"
-                )
+            if not repair_mode:
+                old_backend = _legacy_image_digest("backend", active_revision)
+                old_bot = _legacy_image_digest("bot", active_revision)
+                old_worker = _legacy_image_digest("worker", active_revision)
+                if old_worker != old_backend:
+                    raise DeploymentError(
+                        "legacy backend and worker do not use the same verified image digest"
+                    )
             _legacy_running_image("edge")
 
         with _stage(evidence, "single_slot_docker_reclaim"):
@@ -1511,7 +1521,8 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
             evidence.capacity = _single_slot_capacity()
             _compose("config", "--quiet")
             _switch_gateway("legacy", "legacy")
-            _public_smoke(config)
+            if not repair_mode:
+                _public_smoke(config)
 
         with _stage(evidence, "pull_and_verify"):
             preliminary_env = _legacy_environment(
@@ -1574,7 +1585,10 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
 
         with _stage(evidence, "maintenance_stop"):
             services_stopped = True
-            _stop_legacy_services(config)
+            if repair_mode:
+                _stop_legacy_services(config, require_running=False)
+            else:
+                _stop_legacy_services(config)
 
         with _stage(evidence, "migration"):
             if target_env is None:
@@ -1683,6 +1697,8 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
                 evidence.verdict = "manual intervention required"
             finally:
                 rollback_stage.ended_at = time.time()
+        elif services_stopped:
+            evidence.verdict = "manual intervention required"
         else:
             evidence.verdict = "not stopped"
         raise

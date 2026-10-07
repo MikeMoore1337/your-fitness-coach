@@ -478,7 +478,9 @@ def test_logging_scope_matches_normal_rollout_ownership() -> None:
     assert "_start_legacy_consumers(" in single_slot
     assert '_slot_service("backend", candidate_slot)' in blue_green
     assert "_start_slot_consumers(" in blue_green
-    assert '"--rm", "--no-deps", "setup"' in single_slot
+    assert '"--rm"' in single_slot
+    assert '"--no-deps"' in single_slot
+    assert '"setup"' in single_slot
     assert all("logging" not in services[name] for name in PROTECTED_SERVICES)
 
 

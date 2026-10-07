@@ -58,6 +58,18 @@ rechecks runtime images, health, migration heads, release files and public/SEO s
 update only the existing marker and `current` symlink. It never restarts services, pulls images,
 runs migrations, changes `.env` or writes application data.
 
+## Interrupted deployment repair
+
+An interrupted or mixed runtime is not eligible for `reconcile`. The owner-authorized manual
+`workflow_dispatch` operation `repair` accepts an explicit tested ancestor SHA and CI run only
+after it verifies the durable recorded baseline, immutable target images and migration safety. Its
+read-only preflight also checks the current symlink, release marker and Alembic state before any
+transfer. The repair then uses the existing `deploy_production.sh` single-slot rollout with the
+current delivery tooling, and records marker/current/evidence only after backend, worker, bot,
+runtime provenance and public/SEO smoke are green. Repair is an exceptional GitHub Actions path;
+it creates no controller, lease, queue or persistent repair state and is never selected by normal
+release automation.
+
 ## Rollback
 
 Rollback — owner-authorized `workflow_dispatch` operation `rollback` с указанием известной

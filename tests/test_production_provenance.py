@@ -104,7 +104,7 @@ def test_deploy_preflight_is_before_bundle_transfer_and_reconcile_is_metadata_on
         < workflow.index("Transfer immutable bundle to production")
     )
     assert "Production provenance mismatch before transfer" in workflow
-    assert "options: [deploy, reconcile, rollback]" in workflow
+    assert "options: [deploy, repair, reconcile, rollback]" in workflow
     reconcile = workflow.split("\n  reconcile:\n", maxsplit=1)[1].split(
         "\n  rollback:", maxsplit=1
     )[0]
