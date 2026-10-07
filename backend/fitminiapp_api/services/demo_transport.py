@@ -1973,6 +1973,16 @@ def handle_demo_transport(
                 "total": 1,
                 "generated_at": _iso(_now(session)),
             }
+        if path == "/api/v1/coach/workflow-automation/preview":
+            return {
+                "ruleset_version": "coach-workflow-v1",
+                "mode": "preview",
+                "events_evaluated": 0,
+                "proposals": [],
+                "tasks_created": 0,
+                "tasks_reused": 0,
+                "generated_at": _iso(_now(session)),
+            }
         if path == "/api/v1/coach/operations/today":
             return _crm_operations_today(session)
         if path == "/api/v1/coach/agenda":
@@ -2345,6 +2355,16 @@ def handle_demo_transport(
             state["payments"].append(payment)
             session.revision += 1
             return payment
+        if path == "/api/v1/coach/workflow-automation/evaluate":
+            return {
+                "ruleset_version": "coach-workflow-v1",
+                "mode": "evaluated",
+                "events_evaluated": 0,
+                "proposals": [],
+                "tasks_created": 0,
+                "tasks_reused": 0,
+                "generated_at": _iso(_now(session)),
+            }
         if path == "/api/v1/coach/tasks":
             payload = _request_body(body)
             task_client_id = payload.get("client_id")
