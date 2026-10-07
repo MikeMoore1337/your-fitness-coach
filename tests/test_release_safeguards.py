@@ -175,7 +175,7 @@ def test_manual_rollback_uses_native_actions_and_existing_production_safety() ->
     deploy = _sources()["deploy"]
 
     assert "operation:" in deploy
-    assert "options: [deploy, repair, reconcile, rollback]" in deploy
+    assert "options: [deploy, repair, verify, reconcile, rollback]" in deploy
     assert "rollback:" in deploy
     assert "owner-authorized rollback" in deploy
     assert "python3 scripts/zero_downtime_deploy.py rollback" in deploy
@@ -202,6 +202,26 @@ def test_manual_repair_is_native_ancestor_checked_and_reuses_single_slot_rollout
     assert "operation=reconcile" not in deploy
     assert "repair database" not in deploy.lower()
     assert "deployment.lock" not in deploy
+
+
+def test_manual_verify_is_read_only_and_runs_provenance_and_smoke() -> None:
+    deploy = _sources()["deploy"]
+    verify = deploy.split("  verify:\n", 1)[1].split("  reconcile:\n", 1)[0]
+
+    assert "if: needs.authorize.outputs.operation == 'verify'" in verify
+    assert "ref: ${{ needs.authorize.outputs.current_master }}" in verify
+    assert "python3 - verify --app-root" in verify
+    assert "python scripts/check_deployment.py" in verify
+    assert "python scripts/check_seo_surface.py" in verify
+    assert "VERIFY_MUTATION=false" in verify
+    for forbidden in (
+        "deploy_production.sh",
+        "zero_downtime_deploy.py",
+        "docker compose",
+        "python3 - reconcile",
+        "alembic upgrade",
+    ):
+        assert forbidden not in verify
 
 
 def test_manual_repair_always_executes_fresh_current_tooling() -> None:

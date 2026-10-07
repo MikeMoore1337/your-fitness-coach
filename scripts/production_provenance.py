@@ -58,6 +58,37 @@ def alembic_revisions_are_consistent(current: Collection[str], heads: Collection
     return bool(current) and bool(heads) and set(heads).issubset(current)
 
 
+def _validate_image_reference(
+    image_ref: str,
+    *,
+    revision: object,
+    repo_digests: Sequence[object],
+) -> None:
+    """Accept only an exact revision tag or a matching immutable repository digest."""
+
+    if not is_full_sha(revision):
+        raise ProvenanceError("OCI revision is not a full lowercase Git SHA")
+    if not image_ref or any(character.isspace() for character in image_ref):
+        raise ProvenanceError(f"image reference {image_ref!r} is malformed")
+
+    if "@" in image_ref:
+        if image_ref.count("@") != 1:
+            raise ProvenanceError(f"immutable image reference {image_ref!r} is malformed")
+        repository, digest = image_ref.split("@", maxsplit=1)
+        repository_name = repository.rsplit("/", maxsplit=1)[-1]
+        if not repository or ":" in repository_name or not DIGEST_RE.fullmatch(digest):
+            raise ProvenanceError(f"immutable image reference {image_ref!r} is malformed")
+        if image_ref not in {value for value in repo_digests if isinstance(value, str)}:
+            raise ProvenanceError(
+                f"immutable image reference {image_ref!r} is absent from RepoDigests"
+            )
+        return
+
+    _repository, separator, tag = image_ref.rpartition(":")
+    if not separator or not _repository or tag != revision:
+        raise ProvenanceError(f"image reference {image_ref!r} is not an exact OCI revision tag")
+
+
 def classify_marker_runtime(recorded_revision: object, runtime_revisions: Sequence[object]) -> str:
     """Classify the durable marker against the currently running services."""
 
@@ -187,8 +218,7 @@ def _service_snapshot(service: str) -> dict[str, object]:
         raise ProvenanceError(f"{service} image has no immutable RepoDigest")
     if not result["immutable_image"]:
         raise ProvenanceError(f"{service} container does not match its immutable image ID")
-    if image_ref.rsplit(":", maxsplit=1)[-1] != revision:
-        raise ProvenanceError(f"{service} image tag does not match OCI revision {revision}")
+    _validate_image_reference(image_ref, revision=revision, repo_digests=repo_digests)
     if service == "bot":
         logs = _run(["docker", "logs", "--tail", "200", container_id])
         runtime_markers = {marker: marker in logs for marker in BOT_RUNTIME_MARKERS}
