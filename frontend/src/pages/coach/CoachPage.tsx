@@ -14,6 +14,7 @@ import {
 } from '../../features/coach/CoachOperationsPanel';
 import { CoachToolsHub, type CoachTool } from '../../features/coach/CoachToolsHub';
 import { CoachCheckInReviews } from '../../features/coach/CoachCheckInReviews';
+import { CoachReviewWorkspace } from '../../features/coach/CoachReviewWorkspace';
 import { CoachCheckInTemplates } from '../../features/coach/CoachCheckInTemplates';
 import { CoachRosterAnalytics } from '../../features/coach/CoachRosterAnalytics';
 import { CoachClientTimeline } from '../../features/coach/CoachClientTimeline';
@@ -736,6 +737,7 @@ function CoachClientDetail({
   focusedAttention,
   focusedProgramId,
   focusedWorkoutId,
+  focusedReviewWorkspace,
   onBack,
   onOpenCatalog,
   onFocusWorkout,
@@ -748,6 +750,7 @@ function CoachClientDetail({
   focusedAttention: 'weekly_check_in' | null;
   focusedProgramId: number | null;
   focusedWorkoutId: number | null;
+  focusedReviewWorkspace: boolean;
   onBack: () => void;
   onOpenCatalog: () => void;
   onFocusWorkout: (workoutId: number) => void;
@@ -761,6 +764,7 @@ function CoachClientDetail({
   const [programRequest, setProgramRequest] = useState<number | null>(null);
   const [progressRequest, setProgressRequest] = useState<number | null>(null);
   const [reportRequest, setReportRequest] = useState<number | null>(null);
+  const [reviewWorkspaceRequest, setReviewWorkspaceRequest] = useState<number | null>(null);
   if (client.id == null) return null;
   const activeProgram = programs.find((program) => program.is_active);
   return (
@@ -780,6 +784,15 @@ function CoachClientDetail({
           </p>
         </div>
         <nav className="coach-client-quick-actions" aria-label="Данные клиента">
+          <a
+            href="#coach-client-review-workspace"
+            onClick={() => {
+              onQuickAction('review_check_in');
+              setReviewWorkspaceRequest(Date.now());
+            }}
+          >
+            Проверка
+          </a>
           <a
             href="#coach-client-timeline"
             onClick={() => {
@@ -855,6 +868,19 @@ function CoachClientDetail({
           <small>{activityLabel(summary?.training.last_completed_workout_on)}</small>
         </div>
       </section>
+
+      <ClientDataSection
+        id="coach-client-review-workspace"
+        key={`review-workspace-${client.id}-${focusedReviewWorkspace ? 'focused' : (reviewWorkspaceRequest ?? 'closed')}`}
+        title="Рабочее место проверки"
+        description="Итоги, факты, изменения и ручные действия тренера"
+        open={focusedReviewWorkspace || reviewWorkspaceRequest != null}
+      >
+        <CoachReviewWorkspace
+          clientId={client.id}
+          enabled={focusedReviewWorkspace || reviewWorkspaceRequest != null}
+        />
+      </ClientDataSection>
 
       <CoachClientOperationsCard
         clientId={client.id}
@@ -1079,6 +1105,7 @@ export default function CoachPage({
   })();
   const initialAttentionFocus =
     searchParams.get('focus') === 'weekly_check_in' ? ('weekly_check_in' as const) : null;
+  const initialReviewWorkspaceFocus = searchParams.get('focus') === 'review_workspace';
   const [selectedId, setSelectedId] = useState<number | null>(initialClientId);
   const [localClientDetailOpen, setLocalClientDetailOpen] = useState(Boolean(initialClientId));
   const clientDetailOpen =
@@ -1537,6 +1564,7 @@ export default function CoachPage({
                   focusedAttention={focusedAttention}
                   focusedProgramId={focusedProgramId}
                   focusedWorkoutId={focusedWorkoutId}
+                  focusedReviewWorkspace={initialReviewWorkspaceFocus}
                   onBack={() => {
                     if (runtime.kind === 'demo') setLocalClientDetailOpen(false);
                     else navigate(coachPathForTab('clients'), true);

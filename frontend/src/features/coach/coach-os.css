@@ -729,6 +729,133 @@
   border-inline-start: 3px solid var(--v2-lime);
 }
 
+.coach-review-workspace--client .card {
+  display: grid;
+  gap: var(--v2-space-4);
+}
+
+.coach-review-workspace__check-ins,
+.coach-review-workspace__change-list,
+.coach-review-workspace__history-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2) var(--v2-space-4);
+}
+
+.coach-review-workspace__check-ins span,
+.coach-review-workspace__change-list > div,
+.coach-review-workspace__history-row {
+  padding: var(--v2-space-2) var(--v2-space-3);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.coach-review-workspace__groups,
+.coach-review-workspace__task-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-3);
+}
+
+.coach-review-workspace__group,
+.coach-review-workspace__task-card {
+  display: grid;
+  gap: var(--v2-space-2);
+  min-width: 0;
+  padding: var(--v2-space-3);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-panel-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.coach-review-workspace__group h3,
+.coach-review-workspace__task-card h4,
+.coach-review-workspace__action-history h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.coach-review-workspace__group dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-2);
+  margin: 0;
+}
+
+.coach-review-workspace__group dl > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.coach-review-workspace__group dt,
+.coach-review-workspace__program .eyebrow,
+.coach-review-workspace__history-row span {
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+}
+
+.coach-review-workspace__group dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.coach-review-workspace__change-list > div {
+  display: grid;
+  gap: 2px;
+}
+
+.coach-review-workspace__change-list span {
+  color: var(--v2-text-secondary);
+  font-size: 0.8rem;
+}
+
+.coach-review-workspace__program p,
+.coach-review-workspace__private-notes blockquote,
+.coach-review-workspace__private-notes blockquote p {
+  margin: 0;
+}
+
+.coach-review-workspace__private-notes {
+  display: grid;
+  gap: var(--v2-space-2);
+  padding: var(--v2-space-3);
+  border-inline-start: 3px solid var(--v2-lime);
+  background: var(--v2-surface-secondary);
+}
+
+.coach-review-workspace__private-notes blockquote {
+  display: grid;
+  gap: 3px;
+}
+
+.coach-review-workspace__private-notes footer {
+  color: var(--v2-text-secondary);
+  font-size: 0.78rem;
+}
+
+.coach-review-workspace__action-form,
+.coach-review-workspace__action-history {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.coach-review-workspace__history-row {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.coach-review-workspace__history-row > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.coach-review-workspace__history-row span {
+  overflow-wrap: anywhere;
+}
+
 .coach-review-card__follow-up {
   grid-template-columns: minmax(0, 1.5fr) minmax(180px, 1fr);
   align-items: end;
@@ -1596,8 +1723,15 @@
   }
 
   .coach-review-card__follow-up,
-  .coach-roster-analytics__metrics {
+  .coach-roster-analytics__metrics,
+  .coach-review-workspace__groups,
+  .coach-review-workspace__task-actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .coach-review-workspace__groups,
+  .coach-review-workspace__task-actions {
+    grid-template-columns: 1fr;
   }
 
   .coach-roster-row {

@@ -103,6 +103,7 @@ export type CoachTask = ApiSchemas['CoachTaskResponse'];
 export type CoachTaskCreate = ApiSchemas['CoachTaskCreate'];
 export type CoachCheckInReviewItem = ApiSchemas['CoachCheckInReviewItem'];
 export type CoachCheckInReviewListResponse = ApiSchemas['CoachCheckInReviewListResponse'];
+export type CoachReviewWorkspace = ApiSchemas['CoachReviewWorkspaceResponse'];
 export type CheckInTemplate = ApiSchemas['CheckInTemplateResponse'];
 export type CheckInTemplateList = ApiSchemas['CheckInTemplateListResponse'];
 export type CheckInTemplateCreate = ApiSchemas['CheckInTemplateCreate'];

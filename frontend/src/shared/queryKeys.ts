@@ -36,6 +36,8 @@ export const queryKeys = {
     clientWorkouts: (clientId: number) => ['coach', 'client', clientId, 'workouts'] as const,
     clientCheckIns: (clientId: number) =>
       ['coach', 'client', clientId, 'weekly-check-ins'] as const,
+    clientReviewWorkspace: (clientId: number) =>
+      ['coach', 'client', clientId, 'review-workspace'] as const,
     clientReportHandoffs: (clientId: number) =>
       ['coach', 'client', clientId, 'report-handoffs'] as const,
     clientOperations: (clientId: number) => ['coach', 'client', clientId, 'operations'] as const,

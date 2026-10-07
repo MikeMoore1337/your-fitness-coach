@@ -5,7 +5,7 @@ from datetime import timedelta
 from fitminiapp_api.core.timezone import now_msk_naive, today_msk
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.check_in import WeeklyCheckIn
-from fitminiapp_api.models.coach_crm import CoachTask
+from fitminiapp_api.models.coach_crm import CoachBusinessSession, CoachTask
 from fitminiapp_api.models.coach_reviews import CoachCheckInReview
 from fitminiapp_api.models.user import CoachClient, User
 
@@ -141,3 +141,132 @@ def test_check_in_review_does_not_expose_unmanaged_check_in(client) -> None:
     )
     assert response.status_code == 404
     assert client.get("/api/v1/coach/check-ins/review", headers=coach_headers).json()["total"] == 0
+
+
+def test_review_workspace_composes_bounded_facts_and_trainer_private_notes(client) -> None:
+    coach_headers = _login(client, 985_201, is_coach=True)
+    other_coach_headers = _login(client, 985_202, is_coach=True)
+    _login(client, 985_210, is_coach=False)
+
+    with get_session_context() as db:
+        coach = _user(db, 985_201)
+        managed = _user(db, 985_210)
+        db.add(CoachClient(coach_user_id=coach.id, client_user_id=managed.id))
+        current_week = today_msk() - timedelta(days=7)
+        previous_week = current_week - timedelta(days=7)
+        db.add_all(
+            [
+                WeeklyCheckIn(
+                    user_id=managed.id,
+                    week_start=previous_week,
+                    week_end=previous_week + timedelta(days=6),
+                    submitted_on=previous_week + timedelta(days=6),
+                    timezone="Europe/Moscow",
+                    status="completed",
+                    summary_version="test-v1",
+                    summary={
+                        "training": {
+                            "planned_workouts": 3,
+                            "completed_workouts": 2,
+                            "adherence": {"percent": 66.7},
+                        },
+                        "nutrition": {
+                            "logged_days": 4,
+                            "complete_days": 3,
+                            "average_calories": 2_000,
+                            "target_calories": 2_100,
+                            "average_protein_g": 120,
+                            "target_protein_g": 130,
+                        },
+                        "progression": {
+                            "training_volume_kg": 1_000,
+                            "new_personal_records": 1,
+                        },
+                        "weight_trend": {
+                            "latest_value": 80,
+                            "change": 0,
+                            "latest_measured_on": previous_week.isoformat(),
+                        },
+                        "anthropometry_trends": [],
+                    },
+                    created_at=now_msk_naive() - timedelta(days=8),
+                ),
+                WeeklyCheckIn(
+                    user_id=managed.id,
+                    week_start=current_week,
+                    week_end=current_week + timedelta(days=6),
+                    submitted_on=current_week + timedelta(days=6),
+                    timezone="Europe/Moscow",
+                    status="completed",
+                    summary_version="test-v1",
+                    summary={
+                        "training": {
+                            "planned_workouts": 4,
+                            "completed_workouts": 3,
+                            "adherence": {"percent": 75},
+                        },
+                        "nutrition": {
+                            "logged_days": 6,
+                            "complete_days": 5,
+                            "average_calories": 2_100,
+                            "target_calories": 2_100,
+                            "average_protein_g": 135,
+                            "target_protein_g": 130,
+                        },
+                        "progression": {
+                            "training_volume_kg": 1_250,
+                            "new_personal_records": 2,
+                        },
+                        "weight_trend": {
+                            "latest_value": 79.2,
+                            "change": -0.8,
+                            "latest_measured_on": current_week.isoformat(),
+                        },
+                        "anthropometry_trends": [
+                            {"metric": "waist_cm", "latest_value": 84},
+                        ],
+                    },
+                    created_at=now_msk_naive() - timedelta(days=1),
+                ),
+                CoachBusinessSession(
+                    coach_user_id=coach.id,
+                    client_user_id=managed.id,
+                    starts_at_utc=now_msk_naive() - timedelta(days=1),
+                    timezone="Europe/Moscow",
+                    duration_minutes=60,
+                    format="online",
+                    status="completed",
+                    private_note="Только для тренера: обсудить технику приседа.",
+                ),
+            ]
+        )
+        db.commit()
+        managed_id = managed.id
+
+    response = client.get(
+        f"/api/v1/coach/clients/{managed_id}/review-workspace",
+        headers=coach_headers,
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["state"] == "available"
+    assert payload["previous_check_in"]["id"] != payload["current_check_in"]["id"]
+    assert payload["training_actuals"]["completed_workouts"] == 3
+    assert payload["progression_facts"]["training_volume_kg"] == 1_250
+    assert payload["nutrition"]["logged_days"] == 6
+    assert payload["measurements"]["weight_kg"] == 79.2
+    assert {item["key"] for item in payload["meaningful_changes"]} >= {
+        "training.completed_workouts",
+        "progression.training_volume_kg",
+        "nutrition.logged_days",
+        "measurements.weight_kg",
+    }
+    assert payload["private_notes"][0]["text"] == "Только для тренера: обсудить технику приседа."
+
+    assert (
+        client.get(
+            f"/api/v1/coach/clients/{managed_id}/review-workspace",
+            headers=other_coach_headers,
+        ).status_code
+        == 404
+    )
