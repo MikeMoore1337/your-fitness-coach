@@ -1608,6 +1608,20 @@ class GitHubClient:
                 return jobs
             page += 1
 
+    def workflow_job_logs(self, job_id: int) -> str:
+        if type(job_id) is not int or job_id <= 0:
+            raise TaskSessionError("GitHub returned an invalid workflow job ID")
+        result = _run(
+            [
+                "gh",
+                "api",
+                "--allow-escape-sequences",
+                f"repos/{self.repo_slug}/actions/jobs/{job_id}/logs",
+            ],
+            cwd=self.repository.current_worktree,
+        )
+        return result.stdout
+
     def pull_requests_for_commit(self, sha: str) -> list[dict[str, Any]]:
         pull_requests: list[dict[str, Any]] = []
         page = 1
@@ -10454,7 +10468,11 @@ class TaskController:
         return None
 
     def _verified_subsequent_production_chain(
-        self, original_sha: str, master_sha: str
+        self,
+        original_sha: str,
+        master_sha: str,
+        *,
+        original_production_evidence: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         github = self._github()
         if not self.repository.is_ancestor(original_sha, master_sha):
@@ -10755,7 +10773,16 @@ class TaskController:
                 release_cache[sha] = self._successful_release_evidence(sha)
             return release_cache[sha]
 
-        original_production = release_for(original_sha)
+        if original_production_evidence is None:
+            original_production = release_for(original_sha)
+        else:
+            if (
+                original_production_evidence.get("deployed_sha") != original_sha
+                or original_production_evidence.get("deployment_success_verified") is not True
+            ):
+                raise TaskSessionError("Supplied original production evidence is invalid")
+            original_production = dict(original_production_evidence)
+            release_cache[original_sha] = original_production
         current_production_run = release_for(production_sha)
         if original_production is None:
             raise TaskSessionError("Original deployed SHA has no successful production evidence")
@@ -10817,7 +10844,11 @@ class TaskController:
         }
 
     def _verified_exact_production_run(
-        self, deployed_sha: str, production_run_id: int
+        self,
+        deployed_sha: str,
+        production_run_id: int,
+        *,
+        current_master_sha: str | None = None,
     ) -> dict[str, Any]:
         if type(production_run_id) is not int or production_run_id <= 0:
             raise TaskSessionError(
@@ -10836,10 +10867,69 @@ class TaskController:
             not isinstance(run, Mapping)
             or run.get("id") != production_run_id
             or run.get("name") != "Release production"
-            or run.get("head_sha") != deployed_sha
             or run.get("status") != "completed"
             or str(run.get("conclusion", "")).lower() != "success"
         ):
+            raise TaskSessionError("Production run is not successful for the exact deployed SHA")
+
+        if run.get("head_sha") != deployed_sha and run.get("event") == "workflow_dispatch":
+            run_head_sha = str(run.get("head_sha", ""))
+            if (
+                current_master_sha is None
+                or re.fullmatch(r"[0-9a-f]{40}", run_head_sha) is None
+                or re.fullmatch(r"[0-9a-f]{40}", current_master_sha) is None
+                or run.get("head_branch") != TARGET_BASE_BRANCH
+                or not self.repository.is_ancestor(deployed_sha, run_head_sha)
+                or not self.repository.is_ancestor(run_head_sha, current_master_sha)
+            ):
+                raise TaskSessionError(
+                    "Manual recovery production run is not anchored to protected master"
+                )
+
+            github_jobs = github.workflow_jobs(production_run_id)
+            authorize_jobs = [
+                job
+                for job in github_jobs
+                if job.get("name") == "Authorize exact merged master revision"
+            ]
+            deploy_jobs = [
+                job for job in github_jobs if job.get("name") == "Deploy immutable tested bundle"
+            ]
+            if (
+                len(authorize_jobs) != 1
+                or len(deploy_jobs) != 1
+                or authorize_jobs[0].get("conclusion") != "success"
+                or deploy_jobs[0].get("conclusion") != "success"
+                or type(deploy_jobs[0].get("id")) is not int
+            ):
+                raise TaskSessionError(
+                    "Manual recovery production run lacks successful authorize/deploy jobs"
+                )
+
+            logs = github.workflow_job_logs(deploy_jobs[0]["id"])
+            deploy_sha_markers = set(re.findall(r"DEPLOY_SHA(?:=|:\s*)([0-9a-f]{40})", logs))
+            completion_markers = set(
+                re.findall(r"Production deployment completed:\s*([0-9a-f]{40})", logs)
+            )
+            if deploy_sha_markers != {deployed_sha} or completion_markers != {deployed_sha}:
+                raise TaskSessionError(
+                    "Manual recovery production run lacks an unambiguous exact deployment marker"
+                )
+            return {
+                "run_id": production_run_id,
+                "run_url": run.get("html_url"),
+                "head_sha": deployed_sha,
+                "run_head_sha": run_head_sha,
+                "run_head_branch": TARGET_BASE_BRANCH,
+                "run_event": "workflow_dispatch",
+                "run_conclusion": "success",
+                "environment": "production",
+                "deployed_sha": deployed_sha,
+                "deployment_success_verified": True,
+                "verification_mode": "owner-authorized-workflow-dispatch-log",
+            }
+
+        if run.get("head_sha") != deployed_sha:
             raise TaskSessionError("Production run is not successful for the exact deployed SHA")
         if not github.has_successful_deployment(deployed_sha, "production"):
             raise TaskSessionError(
@@ -11390,8 +11480,12 @@ class TaskController:
         feature_preservation = self._verified_task_feature_preservation(
             pr_number, merge_sha, master_sha
         )
-        production = self._verified_exact_production_run(merge_sha, production_run_id)
-        master_evidence = self._verified_subsequent_production_chain(merge_sha, master_sha)
+        production = self._verified_exact_production_run(
+            merge_sha, production_run_id, current_master_sha=master_sha
+        )
+        master_evidence = self._verified_subsequent_production_chain(
+            merge_sha, master_sha, original_production_evidence=production
+        )
         now = utc_now()
         reconciliation = {
             "version": 1,
@@ -11470,11 +11564,23 @@ class TaskController:
                 raise TaskSessionError(
                     "Task feature preservation evidence changed during historical reconciliation"
                 )
-            if self._verified_exact_production_run(merge_sha, production_run_id) != production:
+            if (
+                self._verified_exact_production_run(
+                    merge_sha, production_run_id, current_master_sha=master_sha
+                )
+                != production
+            ):
                 raise TaskSessionError(
                     "Production deployment evidence changed during historical reconciliation"
                 )
-            if self._verified_subsequent_production_chain(merge_sha, master_sha) != master_evidence:
+            if (
+                self._verified_subsequent_production_chain(
+                    merge_sha,
+                    master_sha,
+                    original_production_evidence=production,
+                )
+                != master_evidence
+            ):
                 raise TaskSessionError(
                     "Subsequent master evidence changed during historical reconciliation"
                 )
@@ -11887,13 +11993,18 @@ class TaskController:
         ):
             raise TaskSessionError("finish refuses stale task feature-preservation evidence")
         production_run_id = production.get("run_id")
-        if self._verified_exact_production_run(deployed_sha, production_run_id) != dict(production):
+        current_production = self._verified_exact_production_run(
+            deployed_sha, production_run_id, current_master_sha=master_sha
+        )
+        if current_production != dict(production):
             raise TaskSessionError("finish refuses stale historical production evidence")
         master_evidence = audit.get("verified_master_evidence")
         if not isinstance(master_evidence, Mapping):
             raise TaskSessionError(invalid)
         current_master_evidence = self._verified_subsequent_production_chain(
-            deployed_sha, master_sha
+            deployed_sha,
+            master_sha,
+            original_production_evidence=current_production,
         )
         if current_master_evidence != master_evidence:
             raise TaskSessionError("finish refuses stale historical master evidence")
