@@ -395,6 +395,50 @@ def _next_position(plan: NutritionPlan, meal_type: MealType) -> int:
     )
 
 
+def copy_pending_plan_items(
+    db: Session,
+    user: User,
+    *,
+    source_date: date,
+    target_date: date,
+    expected_source_revision: int,
+    expected_target_revision: int,
+) -> int:
+    source = _plan_query(db, user, source_date)
+    if source is None or source.revision != expected_source_revision:
+        raise NutritionPlanConflictError(
+            "source plan changed; reload the weekly review and retry",
+            code="stale_planning_review",
+        )
+    target = _plan_for_write(db, user, target_date)
+    _check_revision(target, expected_target_revision)
+    pending_items = [item for item in source.items if (item.status or "planned") == "planned"]
+    if not pending_items:
+        raise NutritionPlanConflictError(
+            "there are no pending planned items to move",
+            code="stale_planning_review",
+        )
+    if len(target.items) + len(pending_items) > MAX_ITEMS_PER_DAY:
+        raise NutritionPlanError("daily plan item limit reached")
+    for source_item in pending_items:
+        item = NutritionPlanItem(
+            plan=target,
+            source_template_id=source_item.source_template_id,
+            food_id=source_item.food_id,
+            recipe_id=source_item.recipe_id,
+            item_kind=source_item.item_kind,
+            meal_type=source_item.meal_type,
+            position=_next_position(target, cast(MealType, source_item.meal_type)),
+            amount=source_item.amount,
+            amount_unit=source_item.amount_unit,
+            source_name=source_item.source_name,
+            source_brand=source_item.source_brand,
+        )
+        db.add(item)
+    target.revision += 1
+    return len(pending_items)
+
+
 def _food_source(
     db: Session,
     user: User,

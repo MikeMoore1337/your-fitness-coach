@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_user
@@ -12,6 +12,8 @@ from fitminiapp_api.schemas.check_in import (
     WeeklyCheckInHistoryResponse,
     WeeklyCheckInResponse,
     WeeklyCheckInSubmitRequest,
+    WeeklyPlanningReviewConfirmRequest,
+    WeeklyPlanningReviewConfirmResponse,
 )
 from fitminiapp_api.schemas.daily_wellbeing import (
     DailyWellbeingCheckInResponse,
@@ -28,6 +30,7 @@ from fitminiapp_api.services.daily_wellbeing import (
 )
 from fitminiapp_api.services.weekly_check_ins import (
     WeeklyCheckInConflictError,
+    confirm_weekly_planning_review,
     get_current_weekly_check_in,
     list_weekly_check_ins,
     serialize_weekly_check_in,
@@ -88,6 +91,27 @@ def current_weekly_check_in(
     db: Session = Depends(get_db),
 ):
     return get_current_weekly_check_in(db, current_user)
+
+
+@router.post(
+    "/weekly/planning-review/confirm",
+    response_model=WeeklyPlanningReviewConfirmResponse,
+)
+def confirm_weekly_planning_review_action(
+    payload: WeeklyPlanningReviewConfirmRequest,
+    _idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        min_length=8,
+        max_length=128,
+    ),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return confirm_weekly_planning_review(db, current_user, payload)
+    except WeeklyCheckInConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/weekly", response_model=WeeklyCheckInHistoryResponse)

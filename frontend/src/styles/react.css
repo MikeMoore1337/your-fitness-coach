@@ -2829,6 +2829,83 @@ details:not([open]) > :not(summary) {
   font-size: 1.25rem;
   font-weight: 800;
 }
+.weekly-review__planning {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-subtle);
+}
+.weekly-review__planning-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.weekly-review__planning-heading h3 {
+  margin: 3px 0 0;
+}
+.weekly-review__planning-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--border);
+}
+.weekly-review__planning-stats > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+.weekly-review__planning-stats > div + div {
+  border-left: 1px solid var(--border);
+}
+.weekly-review__planning-stats dt,
+.weekly-review__planning-day span,
+.weekly-review__planning-day small {
+  color: var(--muted);
+}
+.weekly-review__planning-stats dd {
+  order: -1;
+  margin: 0;
+  font-weight: 800;
+}
+.weekly-review__planning-days {
+  display: grid;
+  gap: 8px;
+}
+.weekly-review__planning-day {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) repeat(2, minmax(100px, 1fr)) minmax(100px, 1.2fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.weekly-review__planning-day span,
+.weekly-review__planning-day small {
+  font-size: 0.84rem;
+}
+.weekly-review__planning-proposal {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.weekly-review__planning-proposal p,
+.weekly-review__planning-proposal ul {
+  margin: 0;
+}
+.weekly-review__planning-proposal ul {
+  padding-left: 20px;
+}
+.weekly-review__planning-proposal button {
+  min-height: 48px;
+  border-radius: var(--radius-action);
+}
 .weekly-review__target,
 .weekly-review__complete,
 .weekly-review__calibration-heading {
@@ -3041,6 +3118,23 @@ details:not([open]) > :not(summary) {
   }
   .weekly-review__calibration-heading > span {
     text-align: left;
+  }
+  .weekly-review__planning-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .weekly-review__planning-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .weekly-review__planning-stats > div + div {
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+  .weekly-review__planning-day {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .weekly-review__planning-day strong {
+    grid-column: 1 / -1;
   }
   .weekly-review__diff {
     grid-template-columns: minmax(0, 1fr);
