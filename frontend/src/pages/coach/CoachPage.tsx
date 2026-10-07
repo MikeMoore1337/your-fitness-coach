@@ -449,6 +449,28 @@ function coachToolFromSearch(value: string | null): CoachTool | null {
   return value && coachToolValues.includes(value as CoachTool) ? (value as CoachTool) : null;
 }
 
+function recordCoachUsefulAction(
+  startedAt: { current: number | null },
+  tracked: { current: boolean },
+): void {
+  if (tracked.current) return;
+  tracked.current = true;
+  const elapsed = performance.now() - (startedAt.current ?? performance.now());
+  const latency_bucket =
+    elapsed < 10_000
+      ? ('under_10s' as const)
+      : elapsed < 30_000
+        ? ('10_30s' as const)
+        : elapsed < 60_000
+          ? ('30_60s' as const)
+          : ('over_60s' as const);
+  trackProductEvent({
+    name: 'coach_time_to_first_useful_action',
+    surface: productEventSurface(),
+    latency_bucket,
+  });
+}
+
 function adherenceText(summary?: TrainerClientProgressSummary): string {
   const workouts = summary?.adherence.workouts;
   if (!workouts || workouts.status !== 'available' || workouts.percent == null) {
@@ -1102,22 +1124,7 @@ export default function CoachPage({
   const [inviteCreating, setInviteCreating] = useState(false);
 
   const trackCoachUsefulAction = () => {
-    if (usefulActionTracked.current) return;
-    usefulActionTracked.current = true;
-    const elapsed = performance.now() - (usefulActionStartedAt.current ?? performance.now());
-    const latency_bucket =
-      elapsed < 10_000
-        ? ('under_10s' as const)
-        : elapsed < 30_000
-          ? ('10_30s' as const)
-          : elapsed < 60_000
-            ? ('30_60s' as const)
-            : ('over_60s' as const);
-    trackProductEvent({
-      name: 'coach_time_to_first_useful_action',
-      surface: productEventSurface(),
-      latency_bucket,
-    });
+    recordCoachUsefulAction(usefulActionStartedAt, usefulActionTracked);
   };
 
   const trackCoachQuickAction = (kind: CoachQuickActionKind) => {
@@ -1372,13 +1379,6 @@ export default function CoachPage({
       >
         {tab === 'today' && (
           <>
-            <CoachOperationsPanel
-              clients={activeClients}
-              onDemoStep={markDemoStep}
-              onNavigate={openCoachTool}
-              onOpenClient={openClient}
-              timezone={user.profile?.timezone}
-            />
             <CoachToday
               clients={clients.data ?? []}
               programs={programs.data ?? []}

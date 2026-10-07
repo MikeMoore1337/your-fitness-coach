@@ -113,6 +113,16 @@ function productionPathInDemo(to: string, scenario: DemoScenario): string {
         const value = parsed.searchParams.get(key);
         if (value && /^\d+$/.test(value)) target.searchParams.set(key, value);
       }
+      if (parsed.searchParams.get('tab') === 'tools') target.searchParams.set('tab', 'tools');
+      const tool = parsed.searchParams.get('tool');
+      if (
+        tool &&
+        ['reviews', 'analytics', 'schedule', 'tasks', 'finance', 'invitations', 'catalog'].includes(
+          tool,
+        )
+      ) {
+        target.searchParams.set('tool', tool);
+      }
       const focus = parsed.searchParams.get('focus');
       if (focus === 'weekly_check_in') target.searchParams.set('focus', focus);
       const demoStep = parsed.searchParams.get('demo_step');
@@ -386,6 +396,24 @@ export default function DemoCabinet() {
       for (const key of ['client_id', 'workout_id'] as const) {
         const value = current.searchParams.get(key);
         if (value && /^\d+$/.test(value)) normalizedUrl.searchParams.set(key, value);
+      }
+      if (current.searchParams.get('tab') === 'tools') {
+        normalizedUrl.searchParams.set('tab', 'tools');
+        const tool = current.searchParams.get('tool');
+        if (
+          tool &&
+          [
+            'reviews',
+            'analytics',
+            'schedule',
+            'tasks',
+            'finance',
+            'invitations',
+            'catalog',
+          ].includes(tool)
+        ) {
+          normalizedUrl.searchParams.set('tool', tool);
+        }
       }
       if (current.searchParams.get('focus') === 'weekly_check_in') {
         normalizedUrl.searchParams.set('focus', 'weekly_check_in');

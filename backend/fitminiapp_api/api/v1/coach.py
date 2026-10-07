@@ -38,6 +38,7 @@ from fitminiapp_api.schemas.coach_crm import (
     CoachTaskResponse,
     CoachTaskStateUpdate,
 )
+from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
 from fitminiapp_api.schemas.coach_reviews import (
     CoachCheckInReviewItem,
     CoachCheckInReviewListResponse,
@@ -110,6 +111,7 @@ from fitminiapp_api.services.coach_crm import (
     update_session,
     update_task_state,
 )
+from fitminiapp_api.services.coach_inbox import build_coach_inbox
 from fitminiapp_api.services.coach_reviews import (
     CoachReviewError,
     list_coach_check_in_reviews,
@@ -291,6 +293,15 @@ def coach_attention(
     return CoachAttentionResponse.model_validate(
         build_coach_attention(db, current_user, limit=limit)
     )
+
+
+@router.get("/inbox", response_model=CoachInboxResponse)
+def coach_inbox(
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachInboxResponse:
+    return CoachInboxResponse.model_validate(build_coach_inbox(db, current_user, limit=limit))
 
 
 @router.get("/capacity", response_model=CoachCapacityResponse)

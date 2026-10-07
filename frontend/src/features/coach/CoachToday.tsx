@@ -4,7 +4,7 @@ import type { Client, CoachAssignedProgram, CoachCapacityResponse } from '../../
 import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/queryKeys';
 import type { CoachClientFilter } from './coachWorkspace';
-import { CoachAttentionCenter } from './CoachAttentionCenter';
+import { CoachInbox } from './CoachInbox';
 import { Badge, Button, ErrorState, LoadingState } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 
@@ -55,7 +55,7 @@ export function CoachToday({
         </div>
       </header>
 
-      <CoachAttentionCenter enabled onAction={onAttentionAction} />
+      <CoachInbox onAction={onAttentionAction} />
 
       <section
         className="coach-today__section coach-today__capacity"

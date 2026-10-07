@@ -1709,6 +1709,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Inbox */
+        get: operations["coach_inbox_api_v1_coach_inbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/capacity": {
         parameters: {
             query?: never;
@@ -7590,6 +7607,82 @@ export interface components {
             payments: components["schemas"]["CoachPaymentResponse"][];
             /** Tasks */
             tasks: components["schemas"]["CoachTaskResponse"][];
+        };
+        /** CoachInboxCounts */
+        CoachInboxCounts: {
+            /** Attention */
+            attention: number;
+            /** Pending Reviews */
+            pending_reviews: number;
+            /** Tasks */
+            tasks: number;
+            /** Sessions */
+            sessions: number;
+            /** Packages */
+            packages: number;
+            /** Payments */
+            payments: number;
+        };
+        /** CoachInboxItem */
+        CoachInboxItem: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "attention" | "check_in" | "task" | "session" | "package" | "payment";
+            client: components["schemas"]["CoachAttentionClient"];
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+            /** Source Kind */
+            source_kind?: string | null;
+            /** Source Id */
+            source_id?: number | null;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "review_workout" | "review_check_in" | "assign_program" | "review_program" | "open_task" | "open_schedule" | "open_finance";
+            /** Destination */
+            destination: string;
+            /**
+             * Priority
+             * @default normal
+             * @enum {string}
+             */
+            priority: "urgent" | "soon" | "normal";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due At */
+            due_at?: string | null;
+            /** Evidence */
+            evidence?: components["schemas"]["CoachAttentionEvidence"][];
+        };
+        /** CoachInboxResponse */
+        CoachInboxResponse: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Timezone */
+            timezone: string;
+            /** Items */
+            items?: components["schemas"]["CoachInboxItem"][];
+            /** Total */
+            total: number;
+            counts: components["schemas"]["CoachInboxCounts"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
         };
         /** CoachInviteLinkResponse */
         CoachInviteLinkResponse: {
@@ -20121,6 +20214,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoachAttentionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_inbox_api_v1_coach_inbox_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachInboxResponse"];
                 };
             };
             /** @description Validation Error */

@@ -1573,6 +1573,24 @@ export async function installPlatformApi(
           generated_at: '2026-08-20T10:00:00Z',
         },
       });
+    if (path.endsWith('/coach/inbox'))
+      return route.fulfill({
+        json: {
+          date: today,
+          timezone: 'Europe/Moscow',
+          items: [],
+          total: 0,
+          counts: {
+            attention: 0,
+            pending_reviews: 0,
+            tasks: 0,
+            sessions: 0,
+            packages: 0,
+            payments: 0,
+          },
+          generated_at: `${today}T10:00:00Z`,
+        },
+      });
     if (path.endsWith('/coach/client-summaries')) {
       return route.fulfill({ json: { items: [], total: 0, limit: 100, offset: 0 } });
     }
