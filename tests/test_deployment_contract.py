@@ -47,3 +47,14 @@ def test_deploy_bundle_includes_migration_sources() -> None:
 
     assert "git archive" in deploy
     assert "backend/alembic/versions" in deploy
+
+
+def test_release_recovery_dispatch_requires_exact_ci_evidence() -> None:
+    root = Path(__file__).resolve().parents[1]
+    deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+
+    assert "workflow_dispatch:" in deploy
+    assert "github.workflow_sha" in deploy
+    assert "actions/runs/$CI_RUN_ID" in deploy
+    assert ".head_sha == $sha" in deploy
+    assert '.conclusion == "success"' in deploy
